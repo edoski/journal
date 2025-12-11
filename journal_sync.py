@@ -20,9 +20,6 @@ BREAK_GAP_CAP_SECONDS = 60  # 1 minute; breaks auto-start, so keep this tight
 BREAK_LINK_MAX_GAP_SECONDS = int(os.environ.get("LOG_SYNC_BREAK_GAP_CAP", "300"))
 # Default daily lunch window used to forgive that off-time in overrun calculations.
 LUNCH_WINDOW_DEFAULT = ("13:30", "14:30")  # HH:MM - HH:MM
-RUN_GUARD_PATH = "/tmp/journal_sync.last_run"
-RUN_GUARD_WINDOW_SECONDS = 5  # Coalesce bursts of file events
-
 def _read_break_defaults():
     """
     Read Flow's configured break lengths.
@@ -192,24 +189,6 @@ def _compute_dynamic_lunch_window(flow_sessions, base_window, reference_date=Non
 
     shifted_end_dt = shifted_start_dt + window_duration
     return (shifted_start_dt.time(), shifted_end_dt.time())
-
-def _skip_if_ran_recently():
-    """
-    Avoid spamming runs when multiple file events fire in quick succession.
-    Returns True if this invocation should exit early.
-    """
-    try:
-        mtime = os.path.getmtime(RUN_GUARD_PATH)
-        if time.time() - mtime < RUN_GUARD_WINDOW_SECONDS:
-            return True
-    except FileNotFoundError:
-        pass
-    try:
-        with open(RUN_GUARD_PATH, "w") as f:
-            f.write(str(time.time()))
-    except Exception:
-        pass
-    return False
 
 def overlap_minutes_with_window(start_dt, end_dt, window):
     """
@@ -1174,8 +1153,6 @@ def update_markdown(sessions):
     return True
 
 if __name__ == "__main__":
-    if _skip_if_ran_recently():
-        sys.exit(0)
     sessions = get_todays_sessions()
     changed = update_markdown(sessions)
     if changed is False:
