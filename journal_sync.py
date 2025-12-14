@@ -752,9 +752,10 @@ def update_markdown(sessions):
             actual_minutes = session.get('actual_elapsed', 0) or 0
             interrupt_minutes = (session.get('interruptions_duration', 0) or 0) / 60.0
 
-            total_rounded = round_half_up(actual_minutes)
+            # Hybrid rounding: keep pauses tidy to whole minutes for display, but
+            # subtract the raw pause minutes and round the final focus once.
             interrupt_rounded = round_half_up(interrupt_minutes)
-            focus_rounded = max(0, total_rounded - interrupt_rounded)
+            focus_rounded = max(0, round_half_up(actual_minutes - interrupt_minutes))
 
             session['focus_minutes'] = focus_rounded
             session['focus_minutes_rounded'] = focus_rounded
