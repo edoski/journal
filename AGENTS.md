@@ -1,11 +1,11 @@
 # Repository Guidelines
 
-This repository hosts a single automation script that syncs daily focus data from the Flow macOS app into an Obsidian vault, enriching the day’s note with sessions, breaks, workouts, stretching, and sleep summaries.
+This repository hosts a single automation script that syncs daily focus data from the Flow macOS app into an Obsidian vault, enriching the day’s note with sessions, breaks, workouts, stretching, and sleep summaries. It also carries forward yesterday’s incomplete Goals into today’s note once per day.
 
 ## Project Structure & Data Flow
-- `journal_sync.py`: main entry point; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, and writes/updates today’s markdown file in `JOURNAL_DIR`.
+- `journal_sync.py`: main entry point; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today’s markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent + single run per day).
 - `__pycache__/`: generated Python bytecode; safe to ignore.
-- Configuration: tune `DB_PATH`, `JOURNAL_DIR`, `RUN_GUARD_PATH`, and env vars `LOG_SYNC_BREAK_GAP_CAP` (seconds) and `LOG_SYNC_LUNCH_WINDOW` (`HH:MM-HH:MM` or `off`).
+- Configuration: tune `DB_PATH`, `JOURNAL_DIR`, `RUN_GUARD_PATH`, `CARRY_FORWARD_GUARD_PATH`, and env vars `LOG_SYNC_BREAK_GAP_CAP` (seconds) and `LOG_SYNC_LUNCH_WINDOW` (`HH:MM-HH:MM` or `off`).
 
 ## Build, Test, and Run
 - Requires Python 3.10+ on macOS with Flow and Obsidian installed; uses only stdlib.
@@ -13,6 +13,7 @@ This repository hosts a single automation script that syncs daily focus data fro
 - Override timings: `LOG_SYNC_BREAK_GAP_CAP=120 LOG_SYNC_LUNCH_WINDOW="13:00-14:30" python3 journal_sync.py`.
 - Quick syntax check: `python3 -m compileall journal_sync.py`.
 - The run guard at `/tmp/journal_sync.last_run` prevents rapid re-entry; delete it if you intentionally need back-to-back runs.
+- The carry-forward guard at `~/.cache/journal_sync/carry_forward_goals.last_run` prevents re-importing yesterday’s Goals more than once per day; delete it only if you need to re-run the carry-forward the same day.
 
 ## Coding Style & Naming Conventions
 - 4-space indentation, snake_case functions, UPPER_SNAKE constants at top.

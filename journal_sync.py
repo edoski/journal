@@ -18,6 +18,12 @@ BREAK_GAP_CAP_SECONDS = 60  # 1 minute; breaks auto-start, so keep this tight
 # to consider them linked. Defaults to 5 minutes but can be overridden via
 # LOG_SYNC_BREAK_GAP_CAP if you want to tighten/loosen this behavior.
 BREAK_LINK_MAX_GAP_SECONDS = int(os.environ.get("LOG_SYNC_BREAK_GAP_CAP", "300"))
+# Carry-forward guard to avoid re-importing yesterday's goals multiple times a day
+CARRY_FORWARD_GUARD_PATH = os.path.expanduser(
+    "~/.cache/journal_sync/carry_forward_goals.last_run"
+)
+# Regular study day cutoff: sessions past this time incur no overrun.
+REGULAR_DAY_END = datetime.time(18, 0)
 # Default daily lunch window used to forgive that off-time in overrun calculations.
 LUNCH_WINDOW_DEFAULT = ("13:30", "14:30")  # HH:MM - HH:MM
 def _read_break_defaults():
@@ -41,6 +47,143 @@ def _read_break_defaults():
     return result
 
 BREAK_DEFAULTS = _read_break_defaults()
+
+
+def _canonical_goal(text: str) -> str:
+    """Normalize a goal line for idempotent matching."""
+    cleaned = re.sub(r"^\s*[-*]\s*\[[ xX]?\]\s*", "", text)
+    cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
+    cleaned = cleaned.strip(" `")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = cleaned.rstrip(".,;:-—– ")
+    return cleaned.lower()
+
+
+def _parse_goal_tasks_from_lines(lines):
+    pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[ xX]?)\]\s*(?P<body>.+)$")
+    tasks = []
+    for line in lines:
+        match = pattern.match(line)
+        if not match:
+            continue
+        state = (match.group("state") or "").lower()
+        body = match.group("body").strip()
+        tasks.append({
+            "line": line,
+            "body": body,
+            "done": state == "x",
+            "canonical": _canonical_goal(line),
+        })
+    return tasks
+
+
+def _find_section_bounds(lines, title):
+    header_re = re.compile(rf"^\s*##\s+{re.escape(title)}\s*$", re.IGNORECASE)
+    start_idx = -1
+    for idx, line in enumerate(lines):
+        if header_re.match(line):
+            start_idx = idx
+            break
+    if start_idx == -1:
+        return -1, -1
+    end_idx = len(lines)
+    for idx in range(start_idx + 1, len(lines)):
+        if re.match(r"^\s*##\s+[^#]", lines[idx]):
+            end_idx = idx
+            break
+    return start_idx, end_idx
+
+
+def _goals_body_bounds(lines, goals_idx):
+    if goals_idx == -1:
+        return -1, -1
+    end_idx = len(lines)
+    for idx in range(goals_idx + 1, len(lines)):
+        if re.match(r"^\s*##\s+[^#]", lines[idx]):
+            end_idx = idx
+            break
+    body_start = goals_idx + 1
+    if body_start < end_idx and lines[body_start].strip() == "---":
+        body_start += 1
+    if body_start < end_idx and lines[body_start].strip() == "":
+        body_start += 1
+    return body_start, end_idx
+
+
+def _load_goals_for_date(date_obj, include_checked=False):
+    path = os.path.join(JOURNAL_DIR, f"{date_obj:%Y-%m-%d}.md")
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return []
+    start, end = _find_section_bounds(lines, "Goals")
+    if start == -1:
+        return []
+    body_start, body_end = _goals_body_bounds(lines, start)
+    tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
+    if include_checked:
+        return tasks
+    return [t for t in tasks if not t.get("done")]
+
+
+def _carry_forward_already_ran(date_obj):
+    try:
+        with open(CARRY_FORWARD_GUARD_PATH, "r") as f:
+            last = f.read().strip()
+        return last == date_obj.isoformat()
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return False
+
+
+def _mark_carry_forward(date_obj):
+    try:
+        os.makedirs(os.path.dirname(CARRY_FORWARD_GUARD_PATH), exist_ok=True)
+        with open(CARRY_FORWARD_GUARD_PATH, "w") as f:
+            f.write(date_obj.isoformat())
+    except Exception:
+        pass
+
+
+def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
+    if goals_idx == -1 or _carry_forward_already_ran(today_date):
+        return 0
+
+    yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
+    if not os.path.exists(yesterday_path):
+        return 0
+
+    yesterday_tasks = _load_goals_for_date(yesterday_date, include_checked=False)
+    if not yesterday_tasks:
+        _mark_carry_forward(today_date)
+        return 0
+
+    body_start, body_end = _goals_body_bounds(lines, goals_idx)
+    if body_start == -1:
+        return 0
+
+    today_tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
+    today_canon = {t["canonical"] for t in today_tasks if t.get("canonical")}
+
+    new_body = list(lines[body_start:body_end])
+    carried = 0
+    for task in yesterday_tasks:
+        canon = task.get("canonical")
+        if canon in today_canon:
+            continue
+        new_body.append(f"- [ ] {task['body']}")
+        today_canon.add(canon)
+        carried += 1
+
+    if carried:
+        lines[body_start:body_end] = new_body
+
+    _mark_carry_forward(today_date)
+    return carried
 
 def get_expected_break_minutes(break_session=None):
     """
@@ -207,6 +350,17 @@ def overlap_minutes_with_window(start_dt, end_dt, window):
     if earliest_end <= latest_start:
         return 0
     return (earliest_end - latest_start).total_seconds() / 60
+
+def clamp_next_flow_within_day(session_end_dt, next_flow_start_dt, cutoff_time):
+    """
+    Limit overrun calculations to the regular study day. If the clamped next
+    start is at or before the session end, treat as no overrun.
+    """
+    cutoff_dt = datetime.datetime.combine(session_end_dt.date(), cutoff_time)
+    effective_next = min(next_flow_start_dt, cutoff_dt)
+    if effective_next <= session_end_dt:
+        return None
+    return effective_next
 
 def get_db_connection():
     if not os.path.exists(DB_PATH):
@@ -378,6 +532,17 @@ def get_todays_sessions():
     
     end_of_day_dt = datetime.datetime(now.year, now.month, now.day, 23, 59, 59)
     lunch_window = _compute_dynamic_lunch_window(flow_sessions, LUNCH_WINDOW, reference_date=now.date())
+    lunch_duration_minutes = 0
+    if lunch_window:
+        try:
+            lunch_start_t, lunch_end_t = lunch_window
+            lunch_start_dt = datetime.datetime.combine(now.date(), lunch_start_t)
+            lunch_end_dt = datetime.datetime.combine(now.date(), lunch_end_t)
+            if lunch_end_dt <= lunch_start_dt:
+                lunch_end_dt += datetime.timedelta(days=1)
+            lunch_duration_minutes = int(round((lunch_end_dt - lunch_start_dt).total_seconds() / 60.0))
+        except Exception:
+            lunch_duration_minutes = 0
 
     for idx, session in enumerate(flow_sessions):
         # Fetch Interruptions for this session (merge duplicates by keeping the max duration)
@@ -412,27 +577,43 @@ def get_todays_sessions():
                 best_break = b
             break
 
-        def anchor_lunch_window(end_dt, base_window, anchor_after="13:15", anchor_before="14:30"):
+        def anchor_lunch_window(end_dt, base_window, lead_minutes=15):
             """
-            Anchor lunch start at the session end if it falls within the anchor window.
+            If end_dt falls within a reasonable lunch window window, anchor the lunch
+            start at end_dt and keep the same duration as base_window.
+
             Returns (start_time, end_time) tuple or None.
             """
-            anchor_start_t = datetime.time(13, 15)
-            anchor_end_t = datetime.time(14, 30)
-            end_t = end_dt.time()
-
-            def in_range(t):
-                # handles times within same day; if base window crosses midnight this is still fine for our hours
-                return (t >= anchor_start_t) and (t <= anchor_end_t)
-
-            if not in_range(end_t):
+            if not base_window or not end_dt:
                 return None
 
-            anchor_start_dt = end_dt
-            anchor_end_dt = end_dt + datetime.timedelta(minutes=60)
-            return (anchor_start_dt.time(), anchor_end_dt.time())
+            base_start_t, base_end_t = base_window
+            base_start_dt = datetime.datetime.combine(end_dt.date(), base_start_t)
+            base_end_dt = datetime.datetime.combine(end_dt.date(), base_end_t)
+            if base_end_dt <= base_start_dt:
+                base_end_dt += datetime.timedelta(days=1)
+            window_duration = base_end_dt - base_start_dt
 
-        if best_break:
+            anchor_start_dt = base_start_dt - datetime.timedelta(minutes=lead_minutes)
+            anchor_end_dt = base_end_dt
+            if not (anchor_start_dt <= end_dt <= anchor_end_dt):
+                return None
+
+            anchored_start_dt = end_dt
+            anchored_end_dt = end_dt + window_duration
+            return (anchored_start_dt.time(), anchored_end_dt.time())
+
+        anchored = anchor_lunch_window(session['end'], lunch_window)
+        if anchored:
+            # Lunch takes precedence for display/expectation even if Flow logged a shortBreak.
+            session['anchored_lunch_window'] = anchored
+            session['break_expected'] = lunch_duration_minutes or 60
+            session['break_duration'] = session['break_expected']
+            session['break_missing'] = False
+            session['break_reason'] = "lunch"
+            if best_break:
+                session['linked_break_start'] = best_break['start']
+        elif best_break:
             session['break_expected'] = get_expected_break_minutes(best_break)
             session['break_duration'] = session['break_expected']
             session['linked_break_start'] = best_break['start']
@@ -440,19 +621,11 @@ def get_todays_sessions():
             session['break_reason'] = None
             session['anchored_lunch_window'] = None
         else:
-            anchored = anchor_lunch_window(session['end'], lunch_window)
-            if anchored:
-                session['anchored_lunch_window'] = anchored
-                session['break_expected'] = 60
-                session['break_duration'] = session['break_expected']
-                session['break_missing'] = False
-                session['break_reason'] = "lunch"
-            else:
-                session['anchored_lunch_window'] = None
-                session['break_expected'] = get_expected_break_minutes(None)
-                session['break_duration'] = session['break_expected']
-                session['break_missing'] = True
-                session['break_reason'] = None
+            session['anchored_lunch_window'] = None
+            session['break_expected'] = get_expected_break_minutes(None)
+            session['break_duration'] = session['break_expected']
+            session['break_missing'] = True
+            session['break_reason'] = None
 
         # Overrun calculation: gap until next flow (or end of day), less lunch, less expected break
         if idx == len(flow_sessions) - 1:
@@ -460,12 +633,13 @@ def get_todays_sessions():
             session['break_overrun'] = 0
         else:
             next_flow_start = flow_sessions[idx + 1]['start']
-            if next_flow_start <= session['end']:
+            effective_next_start = clamp_next_flow_within_day(session['end'], next_flow_start, REGULAR_DAY_END)
+            if not effective_next_start or effective_next_start <= session['end']:
                 session['break_overrun'] = 0
             else:
-                gap_minutes = (next_flow_start - session['end']).total_seconds() / 60
+                gap_minutes = (effective_next_start - session['end']).total_seconds() / 60
                 effective_lunch_window = session.get('anchored_lunch_window') or lunch_window
-                lunch_overlap = overlap_minutes_with_window(session['end'], next_flow_start, effective_lunch_window)
+                lunch_overlap = overlap_minutes_with_window(session['end'], effective_next_start, effective_lunch_window)
                 expected_break = session.get('break_expected', get_expected_break_minutes(best_break))
                 # If lunch covers the gap, only count overrun beyond lunch plus any remaining expected break.
                 expected_excl_lunch = max(0.0, expected_break - lunch_overlap)
@@ -499,7 +673,8 @@ def _parse_frontmatter(lines):
     return order, data
 
 def update_markdown(sessions):
-    today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    today = datetime.datetime.now().date()
+    today_str = today.strftime("%Y-%m-%d")
     file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
         
     # TEMPLATE PATH
@@ -631,33 +806,78 @@ def update_markdown(sessions):
             if dashes_count == 2:
                 yaml_end_idx = i
                 break
-    
-    # Ensure Metrics section exists
-    metrics_idx = -1
-    for i, line in enumerate(lines):
-        if line.strip() == "## Metrics":
-            metrics_idx = i
-            break
-    if metrics_idx == -1:
-        insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
-        lines = lines[:insert_pos] + ["## Metrics", "---"] + lines[insert_pos:]
-        metrics_idx = insert_pos
-    
-    # Ensure separator exists right after Metrics
-    if metrics_idx + 1 >= len(lines) or lines[metrics_idx + 1].strip() != "---":
-        lines = lines[:metrics_idx + 1] + ["---"] + lines[metrics_idx + 1:]
-    
-    metrics_sep_idx = metrics_idx + 1
 
-    # Identify where Reflections starts to preserve everything after it
-    reflections_idx = -1
-    for i in range(metrics_sep_idx + 1, len(lines)):
-        if lines[i].strip().lower() == "## reflections":
-            reflections_idx = i
-            break
+    # Normalize spacing: do not allow blank lines immediately after YAML.
+    if yaml_end_idx != -1:
+        while yaml_end_idx + 1 < len(lines) and lines[yaml_end_idx + 1].strip() == "":
+            del lines[yaml_end_idx + 1]
+
+    def find_top_header_idx(title, start=0):
+        pattern = re.compile(rf"^\s*##\s+{re.escape(title)}\s*$", re.IGNORECASE)
+        for idx in range(start, len(lines)):
+            if pattern.match(lines[idx]):
+                return idx
+        return -1
+
+    def find_top_section_end(start_idx):
+        if start_idx == -1:
+            return -1
+        for idx in range(start_idx + 1, len(lines)):
+            if re.match(r"^\s*##\s+[^#]", lines[idx]):
+                return idx
+        return len(lines)
+
+    def ensure_divider_after_header(header_idx):
+        if header_idx == -1:
+            return -1
+
+        for idx in range(header_idx + 1, len(lines)):
+            stripped = lines[idx].strip()
+            if stripped == "":
+                continue
+            if stripped == "---":
+                return idx
+            lines.insert(header_idx + 1, "---")
+            return header_idx + 1
+
+        lines.append("---")
+        return len(lines) - 1
+
+    # Ensure Goals section exists (immediately below YAML, before Metrics).
+    goals_idx = find_top_header_idx("Goals")
+    metrics_idx = find_top_header_idx("Metrics")
+    if goals_idx == -1:
+        insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
+        lines[insert_pos:insert_pos] = ["## Goals", "---", ""]
+
+    goals_idx = find_top_header_idx("Goals")
+    ensure_divider_after_header(goals_idx)
+
+    # Ensure Metrics section exists (after Goals).
+    metrics_idx = find_top_header_idx("Metrics")
+    if metrics_idx == -1:
+        if goals_idx != -1:
+            insert_pos = find_top_section_end(goals_idx)
+        else:
+            insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
+        lines[insert_pos:insert_pos] = ["## Metrics", "---"]
+
+    metrics_idx = find_top_header_idx("Metrics")
+    metrics_sep_idx = ensure_divider_after_header(metrics_idx)
+
+    # Carry forward yesterday's incomplete Goals exactly once per day.
+    yesterday = today - datetime.timedelta(days=1)
+    _carry_forward_goals(lines, goals_idx, today, yesterday)
+
+    # Identify where Reflections starts to preserve everything after it.
+    reflections_idx = find_top_header_idx("Reflections", start=(metrics_sep_idx + 1 if metrics_sep_idx != -1 else 0))
 
     rest_lines = lines[reflections_idx:] if reflections_idx != -1 else []
-    metrics_body = lines[metrics_sep_idx + 1 : reflections_idx] if reflections_idx != -1 else lines[metrics_sep_idx + 1 :]
+    metrics_body = (
+        lines[metrics_sep_idx + 1 : reflections_idx]
+        if reflections_idx != -1
+        else lines[metrics_sep_idx + 1 :]
+    )
     # Calculate Total Study Time
     total_focus_minutes = sum(s.get('focus_minutes_rounded', 0) for s in sessions)
     hours = total_focus_minutes // 60
