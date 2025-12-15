@@ -149,9 +149,42 @@ def _mark_carry_forward(date_obj):
         pass
 
 
+def _normalize_goals_section(lines, goals_idx):
+    """
+    Keep only checkbox task lines inside the Goals section and strip stray
+    blank lines so metrics tables cannot leak into the Goals block.
+    """
+    if goals_idx == -1:
+        return
+
+    body_start, body_end = _goals_body_bounds(lines, goals_idx)
+    if body_start == -1:
+        return
+
+    tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
+    task_lines = [t["line"].strip() for t in tasks]
+
+    # Rebuild the Goals block: header, divider, tasks, optional spacer.
+    new_block = [lines[goals_idx].rstrip(), "---"]
+    new_block.extend(task_lines)
+
+    # Avoid trailing blank lines in the Goals body.
+    while new_block and new_block[-1].strip() == "":
+        new_block.pop()
+
+    # If the next line is a section header and not already separated, add one spacer.
+    remainder = lines[body_end:]
+    if remainder and remainder[0].strip() != "":
+        new_block.append("")
+
+    lines[goals_idx:body_end] = new_block
+
+
 def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
-    if goals_idx == -1 or _carry_forward_already_ran(today_date):
+    if goals_idx == -1:
         return 0
+
+    already_ran = _carry_forward_already_ran(today_date)
 
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     if not os.path.exists(yesterday_path):
@@ -179,10 +212,16 @@ def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
         today_canon.add(canon)
         carried += 1
 
+    # Ensure a single blank line separates Goals from the next section.
+    if new_body and new_body[-1].strip() != "":
+        new_body.append("")
+
     if carried:
         lines[body_start:body_end] = new_body
 
-    _mark_carry_forward(today_date)
+    # Always refresh the guard stamp to reflect the latest attempted sync.
+    if not already_ran or carried:
+        _mark_carry_forward(today_date)
     return carried
 
 def get_expected_break_minutes(break_session=None):
@@ -849,7 +888,7 @@ def update_markdown(sessions):
     metrics_idx = find_top_header_idx("Metrics")
     if goals_idx == -1:
         insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
-        lines[insert_pos:insert_pos] = ["## Goals", "---", ""]
+        lines[insert_pos:insert_pos] = ["## Goals", "---"]
 
     goals_idx = find_top_header_idx("Goals")
     ensure_divider_after_header(goals_idx)
@@ -863,6 +902,12 @@ def update_markdown(sessions):
             insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
         lines[insert_pos:insert_pos] = ["## Metrics", "---"]
 
+    # Clean up Goals before we touch Metrics so stray tables cannot remain there.
+    goals_idx = find_top_header_idx("Goals")
+    _normalize_goals_section(lines, goals_idx)
+
+    metrics_idx = find_top_header_idx("Metrics")
+    goals_idx = find_top_header_idx("Goals")
     metrics_idx = find_top_header_idx("Metrics")
     metrics_sep_idx = ensure_divider_after_header(metrics_idx)
 
