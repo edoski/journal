@@ -18,6 +18,9 @@ BREAK_GAP_CAP_SECONDS = 60  # 1 minute; breaks auto-start, so keep this tight
 # to consider them linked. Defaults to 5 minutes but can be overridden via
 # LOG_SYNC_BREAK_GAP_CAP if you want to tighten/loosen this behavior.
 BREAK_LINK_MAX_GAP_SECONDS = int(os.environ.get("LOG_SYNC_BREAK_GAP_CAP", "300"))
+# Cache for training entries so workout/stretch files can arrive in separate
+# runs without losing earlier entries for the same day.
+TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal_sync/training_entries.json")
 # Carry-forward guard to avoid re-importing yesterday's goals multiple times a day
 CARRY_FORWARD_GUARD_PATH = os.path.expanduser(
     "~/.cache/journal_sync/carry_forward_goals.last_run"
@@ -1141,6 +1144,24 @@ def update_markdown(sessions):
         final_lines.append("")
 
     # Build/merge Training table
+    def load_training_cache(date_str):
+        try:
+            with open(TRAINING_CACHE_PATH, "r") as f:
+                obj = json.load(f)
+            if obj.get("date") == date_str and isinstance(obj.get("entries"), list):
+                return obj.get("entries") or []
+        except Exception:
+            pass
+        return []
+
+    def save_training_cache(date_str, entries):
+        try:
+            os.makedirs(os.path.dirname(TRAINING_CACHE_PATH), exist_ok=True)
+            with open(TRAINING_CACHE_PATH, "w") as f:
+                json.dump({"date": date_str, "entries": entries}, f)
+        except Exception:
+            pass
+
     def activity_entries_from_data(data, default_activity_label):
         """
         Normalize workout/stretch JSON payloads into training table entries.
@@ -1246,21 +1267,28 @@ def update_markdown(sessions):
     stretch_entries = activity_entries_from_data(stretch_data, "Stretching")
     new_training_entries = workout_entries + stretch_entries
 
+    # Persist today's training entries so workout/stretch files can arrive in
+    # separate runs without losing earlier ones. Cache is per-day and ignores
+    # whatever might be in the template.
+    training_cache_entries = load_training_cache(today_str)
+
+    merged_training_entries = []
     if new_training_entries:
-        merged_training_entries = merge_training_entries(existing_training_entries, new_training_entries)
+        merged_training_entries = merge_training_entries(training_cache_entries, new_training_entries)
+        save_training_cache(today_str, merged_training_entries)
+    elif training_cache_entries:
+        merged_training_entries = training_cache_entries
+    elif existing_training_block:
+        # As a last resort (e.g., cache deleted), fall back to the note's block.
+        merged_training_entries = existing_training_entries
+
+    if merged_training_entries:
         if not final_lines or final_lines[-1].strip() != "":
             final_lines.append("")
         final_lines.append("### TRAINING")
         final_lines.append("")
         final_lines.extend(render_training_entries(merged_training_entries))
         final_lines.append("")
-    elif existing_training_block:
-        # Preserve prior training block if no new data
-        if not final_lines or final_lines[-1].strip() != "":
-            final_lines.append("")
-        final_lines.extend(existing_training_block)
-        if final_lines and final_lines[-1].strip() != "":
-            final_lines.append("")
     else:
         # Insert explicit placeholder when no training data
         if not final_lines or final_lines[-1].strip() != "":
