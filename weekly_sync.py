@@ -129,8 +129,8 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     lines.append(training_row("STRETCH", "stretch"))
     lines.append("")
 
-    lines.append("| ACTIVITY     | TOTAL   |")
-    lines.append("| ------------ | ------- |")
+    lines.append("| ACTIVITY | TOTAL |")
+    lines.append("| -------- | ----- |")
     lines.append(f"| **WORKOUT** | `{workout_days}/{days_in_period}` |")
     lines.append(f"| **STRETCH**  | `{stretch_days}/{days_in_period}` |")
     lines.append("")
@@ -153,8 +153,8 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
     avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
 
-    lines.append("| METRIC         | AVERAGE |")
-    lines.append("| -------------- | ------- |")
+    lines.append("| ACTIVITY | AVERAGE |")
+    lines.append("| -------- | ------- |")
     lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
     lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
     if avg_awakenings is not None:

@@ -465,8 +465,8 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     lines = ["### **SUMMARY**", ""]
     
     # Table header
-    lines.append(f"| METRIC      | {current_label}  | {previous_label} | CHANGE |")
-    lines.append("| ----------- | ----------- | ----------------------- | ------ |")
+    lines.append(f"| METRIC | {current_label} | {previous_label} | CHANGE |")
+    lines.append("| ------ | ----------- | ----------------------- | ------ |")
     
     # STUDY row (daily average)
     curr_study_avg = format_study_avg(
@@ -481,7 +481,7 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
         current_metrics.get("study_total_minutes", 0) / max(1, current_metrics.get("total_days", 7)),
         previous_metrics.get("study_total_minutes", 0) / max(1, previous_metrics.get("total_days", 7))
     )
-    lines.append(f"| **STUDY**   | `{curr_study_avg}` | `{prev_study_avg}` | `{format_percent_change(study_pct)}` |")
+    lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{format_percent_change(study_pct)}` |")
     
     # WORKOUT row
     curr_workout = format_training_ratio(
@@ -520,7 +520,7 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
         current_metrics.get("mood_avg"),
         previous_metrics.get("mood_avg")
     )
-    lines.append(f"| **MOOD**    | `{curr_mood}` | `{prev_mood}` | `{format_percent_change(mood_pct)}` |")
+    lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{format_percent_change(mood_pct)}` |")
     
     # SLEEP row
     curr_sleep = format_minutes(current_metrics.get("sleep_avg_minutes"))
@@ -529,7 +529,7 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
         current_metrics.get("sleep_avg_minutes"),
         previous_metrics.get("sleep_avg_minutes")
     )
-    lines.append(f"| **SLEEP**   | `{curr_sleep}` | `{prev_sleep}` | `{format_percent_change(sleep_pct)}` |")
+    lines.append(f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{format_percent_change(sleep_pct)}` |")
     
     lines.append("")
     return lines
@@ -567,16 +567,13 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
         else:
             bar_heights.append(min(height, max(1, round_half_up(val * scale))))
     
-    # Determine Y-axis label width
-    y_label_width = len(str(y_max))
-    
     lines = []
     
     # Check if any value is at max (needs overflow line for label)
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
     if has_max_value:
         # Add overflow line for labels at max height
-        overflow_row = "\t"
+        overflow_row = " "
         for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
             if bar_h == height:
                 label_str = str(label).strip('`') if label else ""
@@ -587,13 +584,11 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
     
     # Y-axis and bars with value labels on top
     for level in range(height, -1, -1):
-        actual_value = round_half_up(level * y_max / height)
-        
         if level == 0:
             # Bottom line with axis
-            row = f"{actual_value:>{y_label_width}} └" + "─" * (col_spacing * len(labels))
+            row = "└" + "─" * (col_spacing * len(labels))
         else:
-            row = f"{actual_value:>{y_label_width}} │"
+            row = "│"
             for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
                 label_str = str(label).strip('`') if label else ""
                 
@@ -614,8 +609,8 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
                     row += " " * col_spacing
         lines.append(row.rstrip())
     
-    # X-axis labels row with single tab
-    label_row = "\t"
+    # X-axis labels row with single space (left-aligned)
+    label_row = " "
     for label in labels:
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
@@ -655,16 +650,13 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
         else:
             bar_heights.append(min(height, max(1, round_half_up(val * scale))))
     
-    # Determine Y-axis label width
-    y_label_width = len(str(y_max))
-    
     lines = []
     
     # Check if any value is at max (needs overflow line for label)
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
     if has_max_value:
-        # Add overflow line for labels at max height
-        overflow_row = "\t"
+        # Add overflow line for labels at max height (centered values, not labels)
+        overflow_row = "   "
         for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
             if bar_h == height:
                 label_str = str(label).strip('`') if label else ""
@@ -676,13 +668,11 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     
     # Y-axis and bars with value labels on top
     for level in range(height, -1, -1):
-        actual_value = round_half_up(level * y_max / height)
-        
         if level == 0:
             # Bottom line with axis
-            row = f"{actual_value:>{y_label_width}} └" + "─" * (col_spacing * len(labels))
+            row = "└" + "─" * (col_spacing * len(labels))
         else:
-            row = f"{actual_value:>{y_label_width}} │"
+            row = "│"
             for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
                 label_str = str(label).strip('`') if label else ""
                 left_pad = (col_spacing - len(label_str)) // 2
@@ -705,12 +695,11 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
                     row += " " * col_spacing
         lines.append(row.rstrip())
     
-    # X-axis labels row with tab indent
-    label_row = "\t"
+    # X-axis labels row with 3 spaces indent (left-aligned, not centered)
+    label_row = "   "
     for label in labels:
         label_str = str(label)
-        left_pad = (col_spacing - len(label_str)) // 2
-        label_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+        label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
     
     return lines

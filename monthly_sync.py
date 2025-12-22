@@ -126,8 +126,8 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # TRAINING section
     lines.append("### **TRAINING**")
-    lines.append("| WEEK            | MON | TUE  | WED | THU  | FRI  | SAT  | SUN  |")
-    lines.append("| --------------- | --- | ---- | --- | ---- | ---- | ---- | ---- |")
+    lines.append("| WEEK | MON | TUE | WED | THU | FRI | SAT | SUN |")
+    lines.append("| ---- | --- | --- | --- | --- | --- | --- | --- |")
     for start, end in week_ranges:
         label = f"**`{format_week_label(start, end)}`**"
         cells = []
@@ -152,8 +152,8 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         lines.append(f"| {label} | " + " | ".join(cells[:7]) + " |")
     lines.append("`W = WORKOUT`, `S = STRETCH`, `WS = BOTH`")
     lines.append("")
-    lines.append("| ACTIVITY     | TOTAL   |")
-    lines.append("| ------------ | ------- |")
+    lines.append("| ACTIVITY | TOTAL |")
+    lines.append("| -------- | ----- |")
     lines.append(f"| **WORKOUT** | `{workout_days}/{days_in_period}` |")
     lines.append(f"| **STRETCH**  | `{stretch_days}/{days_in_period}` |")
     lines.append("")
@@ -186,8 +186,8 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
     avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
 
-    lines.append("| METRIC         | AVERAGE |")
-    lines.append("| -------------- | ------- |")
+    lines.append("| ACTIVITY | AVERAGE |")
+    lines.append("| -------- | ------- |")
     lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
     lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
     if avg_awakenings is not None:
