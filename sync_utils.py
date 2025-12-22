@@ -63,17 +63,20 @@ def parse_duration_to_minutes(val):
     return total
 
 
-def format_minutes(total_minutes):
+def format_minutes(total_minutes, always_show_both=False):
+    """
+    Format minutes as XhYm string.
+    Always uses two-digit minutes when hours > 0 (e.g., 7h00m, 7h05m).
+    If always_show_both=True, always shows both h and m (e.g., 0h00m for 0 minutes).
+    """
     if total_minutes is None:
         return ""
     total_minutes = max(0, float(total_minutes))
-    total_minutes = int(round(total_minutes))
+    total_minutes = round_half_up(total_minutes)
     hours = total_minutes // 60
     minutes = total_minutes % 60
-    if hours > 0:
-        if minutes > 0:
-            return f"{hours}h{minutes:02d}m"
-        return f"{hours}h"
+    if hours > 0 or always_show_both:
+        return f"{hours}h{minutes:02d}m"
     return f"{minutes}m"
 
 
@@ -357,7 +360,7 @@ def render_vertical_chart(labels, bar_values, value_labels, height=10, col_width
 
 
 def wrap_code_block(lines):
-    return ["```text"] + lines + ["```"]
+    return ["```"] + lines + ["```"]
 
 
 def ensure_note(path, template_path):
@@ -395,4 +398,320 @@ def replace_metrics_block(lines, new_block_lines):
     new_lines.append("")
     new_lines.extend(lines[end_idx:])
     return new_lines
+
+
+def compute_percent_change(current, previous):
+    """
+    Compute percentage change from previous to current.
+    Returns None if previous is 0 or None.
+    """
+    if previous is None or previous == 0:
+        return None
+    if current is None:
+        return None
+    return ((current - previous) / previous) * 100
+
+
+def format_percent_change(pct):
+    """
+    Format percentage change as +X% or -X%.
+    """
+    if pct is None:
+        return "-"
+    sign = "+" if pct >= 0 else ""
+    return f"{sign}{round_half_up(pct)}%"
+
+
+def format_study_avg(total_minutes, days):
+    """
+    Format study as daily average (e.g., "1h16m/day").
+    """
+    if days <= 0 or total_minutes is None:
+        return "-"
+    avg = total_minutes / days
+    return f"{format_minutes(round_half_up(avg))}/day"
+
+
+def format_training_ratio(count, total_days):
+    """
+    Format workout/stretch as count/total.
+    """
+    return f"{count}/{total_days}"
+
+
+def format_mood_with_scale(val):
+    """Format mood value with /10.0 suffix, always showing one decimal (e.g., 5.0/10.0)."""
+    if val is None:
+        return ""
+    return f"{val:.1f}/10.0"
+
+
+def render_summary_table(current_metrics, previous_metrics, current_label, previous_label):
+    """
+    Generate markdown summary table with averages, previous values, and % change.
+    
+    current_metrics and previous_metrics are dicts with keys:
+    - study_avg_minutes: daily average study in minutes
+    - study_total_minutes: total study in minutes
+    - sleep_avg_minutes: average sleep in minutes
+    - mood_avg: average mood
+    - workout_count: number of workout days
+    - stretch_count: number of stretch days
+    - total_days: number of days in period
+    
+    previous_label should be a wiki link like "[[2025-W50\\|LAST WEEK]]"
+    Order: STUDY → WORKOUT → STRETCH → MOOD → SLEEP
+    """
+    lines = ["### **SUMMARY**", ""]
+    
+    # Table header
+    lines.append(f"| METRIC      | {current_label}  | {previous_label} | CHANGE |")
+    lines.append("| ----------- | ----------- | ----------------------- | ------ |")
+    
+    # STUDY row (daily average)
+    curr_study_avg = format_study_avg(
+        current_metrics.get("study_total_minutes"),
+        current_metrics.get("total_days", 7)
+    )
+    prev_study_avg = format_study_avg(
+        previous_metrics.get("study_total_minutes"),
+        previous_metrics.get("total_days", 7)
+    )
+    study_pct = compute_percent_change(
+        current_metrics.get("study_total_minutes", 0) / max(1, current_metrics.get("total_days", 7)),
+        previous_metrics.get("study_total_minutes", 0) / max(1, previous_metrics.get("total_days", 7))
+    )
+    lines.append(f"| **STUDY**   | `{curr_study_avg}` | `{prev_study_avg}` | `{format_percent_change(study_pct)}` |")
+    
+    # WORKOUT row
+    curr_workout = format_training_ratio(
+        current_metrics.get("workout_count", 0),
+        current_metrics.get("total_days", 7)
+    )
+    prev_workout = format_training_ratio(
+        previous_metrics.get("workout_count", 0),
+        previous_metrics.get("total_days", 7)
+    )
+    workout_pct = compute_percent_change(
+        current_metrics.get("workout_count", 0),
+        previous_metrics.get("workout_count", 0)
+    )
+    lines.append(f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{format_percent_change(workout_pct)}` |")
+    
+    # STRETCH row
+    curr_stretch = format_training_ratio(
+        current_metrics.get("stretch_count", 0),
+        current_metrics.get("total_days", 7)
+    )
+    prev_stretch = format_training_ratio(
+        previous_metrics.get("stretch_count", 0),
+        previous_metrics.get("total_days", 7)
+    )
+    stretch_pct = compute_percent_change(
+        current_metrics.get("stretch_count", 0),
+        previous_metrics.get("stretch_count", 0)
+    )
+    lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{format_percent_change(stretch_pct)}` |")
+    
+    # MOOD row (with /10 suffix)
+    curr_mood = format_mood_with_scale(current_metrics.get("mood_avg"))
+    prev_mood = format_mood_with_scale(previous_metrics.get("mood_avg"))
+    mood_pct = compute_percent_change(
+        current_metrics.get("mood_avg"),
+        previous_metrics.get("mood_avg")
+    )
+    lines.append(f"| **MOOD**    | `{curr_mood}` | `{prev_mood}` | `{format_percent_change(mood_pct)}` |")
+    
+    # SLEEP row
+    curr_sleep = format_minutes(current_metrics.get("sleep_avg_minutes"))
+    prev_sleep = format_minutes(previous_metrics.get("sleep_avg_minutes"))
+    sleep_pct = compute_percent_change(
+        current_metrics.get("sleep_avg_minutes"),
+        previous_metrics.get("sleep_avg_minutes")
+    )
+    lines.append(f"| **SLEEP**   | `{curr_sleep}` | `{prev_sleep}` | `{format_percent_change(sleep_pct)}` |")
+    
+    lines.append("")
+    return lines
+
+
+def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2):
+    """
+    Render a monthly bar chart with values on top of bars.
+    
+    labels: list of x-axis labels (e.g., ["DEC 01-07", "DEC 08-14", ...])
+    values: list of numeric values for bar heights
+    value_labels: list of formatted value strings to show on top of bars
+    height: number of visual rows for bars (default 10)
+    y_max: maximum value on Y-axis (default same as height)
+    bar_width: number of █ characters per bar (default 5)
+    col_spacing: spacing between columns (default 12)
+    left_pad: number of spaces before bars/labels in each column (default 2)
+    
+    Format:
+    - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
+    - For values at y_max, label goes on overflow line above chart, blocks fill all levels
+    - For zero values, label appears at level 1 with no blocks
+    """
+    bar_char = "█"
+    
+    if y_max is None:
+        y_max = height
+    
+    # Scale values to visual height
+    scale = height / y_max if y_max > 0 else 1
+    bar_heights = []
+    for val in values:
+        if val is None or val == 0:
+            bar_heights.append(0)
+        else:
+            bar_heights.append(min(height, max(1, round_half_up(val * scale))))
+    
+    # Determine Y-axis label width
+    y_label_width = len(str(y_max))
+    
+    lines = []
+    
+    # Check if any value is at max (needs overflow line for label)
+    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
+    if has_max_value:
+        # Add overflow line for labels at max height
+        overflow_row = "\t"
+        for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
+            if bar_h == height:
+                label_str = str(label).strip('`') if label else ""
+                overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+            else:
+                overflow_row += " " * col_spacing
+        lines.append(overflow_row.rstrip())
+    
+    # Y-axis and bars with value labels on top
+    for level in range(height, -1, -1):
+        actual_value = round_half_up(level * y_max / height)
+        
+        if level == 0:
+            # Bottom line with axis
+            row = f"{actual_value:>{y_label_width}} └" + "─" * (col_spacing * len(labels))
+        else:
+            row = f"{actual_value:>{y_label_width}} │"
+            for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
+                label_str = str(label).strip('`') if label else ""
+                
+                if bar_h == 0 and level == 1:
+                    # Zero value - show label at level 1, no blocks
+                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                elif bar_h == height and level <= height:
+                    # Max value - blocks fill all levels (label on overflow line)
+                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+                    # One level above top of bar (non-max) - show label
+                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                elif bar_h > 0 and level <= bar_h:
+                    # Bar level - show block
+                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+                else:
+                    # Empty space
+                    row += " " * col_spacing
+        lines.append(row.rstrip())
+    
+    # X-axis labels row with single tab
+    label_row = "\t"
+    for label in labels:
+        label_str = str(label)
+        label_row += label_str + " " * (col_spacing - len(label_str))
+    lines.append(label_row.rstrip())
+    
+    return lines
+
+
+def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=3, col_spacing=8):
+    """
+    Render a weekly bar chart with values on top of bars.
+    
+    labels: list of x-axis labels (e.g., ["MON", "TUE", ...])
+    values: list of numeric values for bar heights
+    value_labels: list of formatted value strings to show on top of bars
+    height: number of visual rows for bars (default 10)
+    y_max: maximum value on Y-axis (default same as height)
+    bar_width: number of █ characters per bar (default 3)
+    col_spacing: spacing between columns (default 8)
+    
+    Format:
+    - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
+    - For values at y_max, label goes on overflow line above chart, blocks fill all levels
+    - For zero values, label appears at level 1 with no blocks
+    """
+    bar_char = "█"
+    
+    if y_max is None:
+        y_max = height
+    
+    # Scale values to visual height
+    scale = height / y_max if y_max > 0 else 1
+    bar_heights = []
+    for val in values:
+        if val is None or val == 0:
+            bar_heights.append(0)
+        else:
+            bar_heights.append(min(height, max(1, round_half_up(val * scale))))
+    
+    # Determine Y-axis label width
+    y_label_width = len(str(y_max))
+    
+    lines = []
+    
+    # Check if any value is at max (needs overflow line for label)
+    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
+    if has_max_value:
+        # Add overflow line for labels at max height
+        overflow_row = "\t"
+        for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
+            if bar_h == height:
+                label_str = str(label).strip('`') if label else ""
+                left_pad = (col_spacing - len(label_str)) // 2
+                overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+            else:
+                overflow_row += " " * col_spacing
+        lines.append(overflow_row.rstrip())
+    
+    # Y-axis and bars with value labels on top
+    for level in range(height, -1, -1):
+        actual_value = round_half_up(level * y_max / height)
+        
+        if level == 0:
+            # Bottom line with axis
+            row = f"{actual_value:>{y_label_width}} └" + "─" * (col_spacing * len(labels))
+        else:
+            row = f"{actual_value:>{y_label_width}} │"
+            for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
+                label_str = str(label).strip('`') if label else ""
+                left_pad = (col_spacing - len(label_str)) // 2
+                bar_left_pad = (col_spacing - bar_width) // 2
+                
+                if bar_h == 0 and level == 1:
+                    # Zero value - show label at level 1, no blocks
+                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                elif bar_h == height and level <= height:
+                    # Max value - blocks fill all levels (label on overflow line)
+                    row += " " * bar_left_pad + bar_char * bar_width + " " * (col_spacing - bar_left_pad - bar_width)
+                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+                    # One level above top of bar (non-max) - show label
+                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                elif bar_h > 0 and level <= bar_h:
+                    # Bar level - show block
+                    row += " " * bar_left_pad + bar_char * bar_width + " " * (col_spacing - bar_left_pad - bar_width)
+                else:
+                    # Empty space
+                    row += " " * col_spacing
+        lines.append(row.rstrip())
+    
+    # X-axis labels row with tab indent
+    label_row = "\t"
+    for label in labels:
+        label_str = str(label)
+        left_pad = (col_spacing - len(label_str)) // 2
+        label_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+    lines.append(label_row.rstrip())
+    
+    return lines
 

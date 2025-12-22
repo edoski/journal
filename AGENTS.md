@@ -10,6 +10,7 @@ journal/
   daily_sync.py      # Daily sync (Flow sessions, training, sleep, goals)
   weekly_sync.py     # Weekly metrics aggregation
   monthly_sync.py    # Monthly metrics aggregation
+  sync_all.sh        # Wrapper script that runs all syncs (called by LaunchAgent)
   AGENTS.md          # This file
   __pycache__/       # Generated Python bytecode; safe to ignore
 ```
@@ -23,6 +24,8 @@ journal/
 - **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with charts and summary tables.
 
 - **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns.
+
+- **`sync_all.sh`**: Wrapper script that runs daily, weekly, and monthly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
 ### Configuration Constants
 
@@ -54,7 +57,8 @@ journal/
 ## Build, Test, and Run
 
 - Requires Python 3.10+ on macOS with Flow and Obsidian installed; uses only stdlib.
-- Run daily sync: `python3 daily_sync.py` (read-only to SQLite; writes the current day's note).
+- Run all syncs: `./sync_all.sh` (recommended; runs daily, weekly, and monthly in sequence)
+- Run daily sync: `python3 daily_sync.py` (read-only to SQLite; writes the current day's note)
 - Run weekly sync: `python3 weekly_sync.py [--date YYYY-MM-DD] [--file PATH]`
 - Run monthly sync: `python3 monthly_sync.py [--month YYYY-MM] [--file PATH]`
 - Quick syntax check: `python3 -m compileall daily_sync.py weekly_sync.py monthly_sync.py sync_utils.py`
@@ -64,9 +68,11 @@ journal/
 
 ## LaunchAgent
 
-The daily sync is triggered automatically via LaunchAgent at `~/Library/LaunchAgents/com.edo.journalsync.plist`:
-- Watches Flow's CoreData database and iCloud status files
+All syncs (daily, weekly, monthly) are triggered automatically via LaunchAgent at `~/Library/LaunchAgents/com.edo.journalsync.plist`:
+- Runs `sync_all.sh` which executes daily, weekly, and monthly syncs in sequence
+- Watches Flow's CoreData database and iCloud status files for changes
 - Runs every 15 minutes as a fail-safe
+- Throttles to prevent rapid-fire execution (10-second minimum between runs)
 - Logs to `/tmp/journalsync.out` and `/tmp/journalsync.err`
 
 To reload after changes:
