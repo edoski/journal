@@ -99,6 +99,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     ]
     chart_lines = render_weekly_chart(DAYS, study_hours, study_values, height=10, y_max=10, bar_width=3, col_spacing=8)
     lines.extend(wrap_code_block(chart_lines))
+    lines.append(f"**`SUM: {format_minutes(study_total_from_activities)}`**")
     lines.append("")
 
     # Activity table (activity_totals already computed above)
@@ -170,7 +171,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     mood_value_labels = [
         f"{m:.1f}" if m is not None else "0.0" for m in mood_vals
     ]
-    mood_chart = render_weekly_chart(DAYS, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=3, col_spacing=8)
+    mood_chart = render_weekly_chart(DAYS, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=5, col_spacing=8, center_labels_on_bars=True)
     lines.extend(wrap_code_block(mood_chart))
 
     return lines

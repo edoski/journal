@@ -460,7 +460,7 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     - total_days: number of days in period
     
     previous_label should be a wiki link like "[[2025-W50\\|LAST WEEK]]"
-    Order: STUDY → WORKOUT → STRETCH → MOOD → SLEEP
+    Order: STUDY → SLEEP → WORKOUT → STRETCH → MOOD
     """
     lines = ["### **SUMMARY**", ""]
     
@@ -469,73 +469,120 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     lines.append("| ------ | ----------- | ----------------------- | ------ |")
     
     # STUDY row (daily average)
-    curr_study_avg = format_study_avg(
-        current_metrics.get("study_total_minutes"),
-        current_metrics.get("total_days", 7)
-    )
-    prev_study_avg = format_study_avg(
-        previous_metrics.get("study_total_minutes"),
-        previous_metrics.get("total_days", 7)
-    )
-    study_pct = compute_percent_change(
-        current_metrics.get("study_total_minutes", 0) / max(1, current_metrics.get("total_days", 7)),
-        previous_metrics.get("study_total_minutes", 0) / max(1, previous_metrics.get("total_days", 7))
-    )
-    lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{format_percent_change(study_pct)}` |")
+    curr_study_total = current_metrics.get("study_total_minutes")
+    prev_study_total = previous_metrics.get("study_total_minutes")
+    
+    if curr_study_total is not None and curr_study_total > 0:
+        curr_study_avg = format_study_avg(curr_study_total, current_metrics.get("total_days", 7))
+    else:
+        curr_study_avg = "-"
+    
+    if prev_study_total is not None and prev_study_total > 0:
+        prev_study_avg = format_study_avg(prev_study_total, previous_metrics.get("total_days", 7))
+    else:
+        prev_study_avg = "-"
+    
+    if curr_study_total and prev_study_total:
+        study_pct = compute_percent_change(
+            curr_study_total / max(1, current_metrics.get("total_days", 7)),
+            prev_study_total / max(1, previous_metrics.get("total_days", 7))
+        )
+        study_pct_str = format_percent_change(study_pct)
+    else:
+        study_pct_str = "-"
+    
+    lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` |")
+    
+    # SLEEP row (with /night suffix)
+    curr_sleep_avg = current_metrics.get("sleep_avg_minutes")
+    prev_sleep_avg = previous_metrics.get("sleep_avg_minutes")
+    
+    if curr_sleep_avg is not None and curr_sleep_avg > 0:
+        curr_sleep = format_minutes(curr_sleep_avg) + "/night"
+    else:
+        curr_sleep = "-"
+    
+    if prev_sleep_avg is not None and prev_sleep_avg > 0:
+        prev_sleep = format_minutes(prev_sleep_avg) + "/night"
+    else:
+        prev_sleep = "-"
+    
+    if curr_sleep_avg and prev_sleep_avg:
+        sleep_pct = compute_percent_change(curr_sleep_avg, prev_sleep_avg)
+        sleep_pct_str = format_percent_change(sleep_pct)
+    else:
+        sleep_pct_str = "-"
+    
+    lines.append(f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` |")
     
     # WORKOUT row
-    curr_workout = format_training_ratio(
-        current_metrics.get("workout_count", 0),
-        current_metrics.get("total_days", 7)
-    )
-    prev_workout = format_training_ratio(
-        previous_metrics.get("workout_count", 0),
-        previous_metrics.get("total_days", 7)
-    )
-    workout_pct = compute_percent_change(
-        current_metrics.get("workout_count", 0),
-        previous_metrics.get("workout_count", 0)
-    )
-    lines.append(f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{format_percent_change(workout_pct)}` |")
+    curr_workout_count = current_metrics.get("workout_count", 0)
+    prev_workout_count = previous_metrics.get("workout_count", 0)
+    curr_total_days = current_metrics.get("total_days", 7)
+    prev_total_days = previous_metrics.get("total_days", 7)
+    
+    # Only show "-" if previous period has no data (0 total days worth of data)
+    if prev_total_days == 0 or previous_metrics.get("study_total_minutes") is None:
+        prev_workout = "-"
+    else:
+        prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
+    
+    curr_workout = format_training_ratio(curr_workout_count, curr_total_days)
+    
+    if prev_workout != "-":
+        workout_pct = compute_percent_change(curr_workout_count, prev_workout_count)
+        workout_pct_str = format_percent_change(workout_pct)
+    else:
+        workout_pct_str = "-"
+    
+    lines.append(f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` |")
     
     # STRETCH row
-    curr_stretch = format_training_ratio(
-        current_metrics.get("stretch_count", 0),
-        current_metrics.get("total_days", 7)
-    )
-    prev_stretch = format_training_ratio(
-        previous_metrics.get("stretch_count", 0),
-        previous_metrics.get("total_days", 7)
-    )
-    stretch_pct = compute_percent_change(
-        current_metrics.get("stretch_count", 0),
-        previous_metrics.get("stretch_count", 0)
-    )
-    lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{format_percent_change(stretch_pct)}` |")
+    curr_stretch_count = current_metrics.get("stretch_count", 0)
+    prev_stretch_count = previous_metrics.get("stretch_count", 0)
     
-    # MOOD row (with /10 suffix)
-    curr_mood = format_mood_with_scale(current_metrics.get("mood_avg"))
-    prev_mood = format_mood_with_scale(previous_metrics.get("mood_avg"))
-    mood_pct = compute_percent_change(
-        current_metrics.get("mood_avg"),
-        previous_metrics.get("mood_avg")
-    )
-    lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{format_percent_change(mood_pct)}` |")
+    if prev_total_days == 0 or previous_metrics.get("study_total_minutes") is None:
+        prev_stretch = "-"
+    else:
+        prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
     
-    # SLEEP row
-    curr_sleep = format_minutes(current_metrics.get("sleep_avg_minutes"))
-    prev_sleep = format_minutes(previous_metrics.get("sleep_avg_minutes"))
-    sleep_pct = compute_percent_change(
-        current_metrics.get("sleep_avg_minutes"),
-        previous_metrics.get("sleep_avg_minutes")
-    )
-    lines.append(f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{format_percent_change(sleep_pct)}` |")
+    curr_stretch = format_training_ratio(curr_stretch_count, curr_total_days)
+    
+    if prev_stretch != "-":
+        stretch_pct = compute_percent_change(curr_stretch_count, prev_stretch_count)
+        stretch_pct_str = format_percent_change(stretch_pct)
+    else:
+        stretch_pct_str = "-"
+    
+    lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` |")
+    
+    # MOOD row (with /10.0 suffix)
+    curr_mood_avg = current_metrics.get("mood_avg")
+    prev_mood_avg = previous_metrics.get("mood_avg")
+    
+    if curr_mood_avg is not None:
+        curr_mood = format_mood_with_scale(curr_mood_avg)
+    else:
+        curr_mood = "-"
+    
+    if prev_mood_avg is not None:
+        prev_mood = format_mood_with_scale(prev_mood_avg)
+    else:
+        prev_mood = "-"
+    
+    if curr_mood_avg and prev_mood_avg:
+        mood_pct = compute_percent_change(curr_mood_avg, prev_mood_avg)
+        mood_pct_str = format_percent_change(mood_pct)
+    else:
+        mood_pct_str = "-"
+    
+    lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` |")
     
     lines.append("")
     return lines
 
 
-def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2):
+def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=False):
     """
     Render a monthly bar chart with values on top of bars.
     
@@ -546,7 +593,8 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
     y_max: maximum value on Y-axis (default same as height)
     bar_width: number of █ characters per bar (default 5)
     col_spacing: spacing between columns (default 12)
-    left_pad: number of spaces before bars/labels in each column (default 2)
+    left_pad: number of spaces before bars in each column (default 2)
+    center_labels_on_bars: if True, center labels on bars by adding 1 space (default False)
     
     Format:
     - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
@@ -577,7 +625,8 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
         for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
             if bar_h == height:
                 label_str = str(label).strip('`') if label else ""
-                overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                label_left_pad = left_pad + 1 if center_labels_on_bars else left_pad
+                overflow_row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
             else:
                 overflow_row += " " * col_spacing
         lines.append(overflow_row.rstrip())
@@ -585,22 +634,23 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
     # Y-axis and bars with value labels on top
     for level in range(height, -1, -1):
         if level == 0:
-            # Bottom line with axis
-            row = "└" + "─" * (col_spacing * len(labels))
+            # Bottom line with axis (trimmed by 3 characters)
+            row = "└" + "─" * (col_spacing * len(labels) - 3)
         else:
             row = "│"
             for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
                 label_str = str(label).strip('`') if label else ""
+                label_left_pad = left_pad + 1 if center_labels_on_bars else left_pad
                 
                 if bar_h == 0 and level == 1:
                     # Zero value - show label at level 1, no blocks
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
                 elif bar_h == height and level <= height:
                     # Max value - blocks fill all levels (label on overflow line)
                     row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
                 elif bar_h > 0 and bar_h < height and level == bar_h + 1:
                     # One level above top of bar (non-max) - show label
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
+                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
                 elif bar_h > 0 and level <= bar_h:
                     # Bar level - show block
                     row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
@@ -619,7 +669,7 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
     return lines
 
 
-def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=3, col_spacing=8):
+def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=3, col_spacing=8, center_labels_on_bars=False):
     """
     Render a weekly bar chart with values on top of bars.
     
@@ -630,6 +680,7 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     y_max: maximum value on Y-axis (default same as height)
     bar_width: number of █ characters per bar (default 3)
     col_spacing: spacing between columns (default 8)
+    center_labels_on_bars: if True, center labels on bars instead of column (default False)
     
     Format:
     - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
@@ -655,12 +706,16 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     # Check if any value is at max (needs overflow line for label)
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
     if has_max_value:
-        # Add overflow line for labels at max height (centered values, not labels)
+        # Add overflow line for labels at max height
         overflow_row = "   "
         for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
             if bar_h == height:
                 label_str = str(label).strip('`') if label else ""
-                left_pad = (col_spacing - len(label_str)) // 2
+                if center_labels_on_bars:
+                    bar_left_pad = (col_spacing - bar_width) // 2
+                    left_pad = bar_left_pad + (bar_width - len(label_str)) // 2
+                else:
+                    left_pad = (col_spacing - len(label_str)) // 2
                 overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
             else:
                 overflow_row += " " * col_spacing
@@ -669,14 +724,19 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     # Y-axis and bars with value labels on top
     for level in range(height, -1, -1):
         if level == 0:
-            # Bottom line with axis
-            row = "└" + "─" * (col_spacing * len(labels))
+            # Bottom line with axis (trimmed by 2 characters for weekly)
+            row = "└" + "─" * (col_spacing * len(labels) - 2)
         else:
             row = "│"
             for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
                 label_str = str(label).strip('`') if label else ""
-                left_pad = (col_spacing - len(label_str)) // 2
                 bar_left_pad = (col_spacing - bar_width) // 2
+                if center_labels_on_bars:
+                    # Center label on bar (for 5-char blocks)
+                    left_pad = bar_left_pad + (bar_width - len(label_str)) // 2
+                else:
+                    # Center label in column
+                    left_pad = (col_spacing - len(label_str)) // 2
                 
                 if bar_h == 0 and level == 1:
                     # Zero value - show label at level 1, no blocks

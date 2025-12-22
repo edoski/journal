@@ -108,8 +108,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=8, y_max=40, bar_width=6, col_spacing=12)
     lines.extend(wrap_code_block(chart_lines))
-    lines.append("")
-    lines.append(f"#### **`SUM: {format_minutes(study_total_from_activities)}`**")
+    lines.append(f"**`SUM: {format_minutes(study_total_from_activities)}`**")
     lines.append("")
 
     # Activity table (activity_totals already computed above)
@@ -197,7 +196,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         lines.append("| **AWAKENINGS** | |")
     lines.append("")
 
-    # MOOD section (3-char bars, weekly averages, always show decimal)
+    # MOOD section (5-char bars, weekly averages, always show decimal)
     lines.append("### **MOOD**")
     mood_chart_vals = []
     mood_value_labels = []
@@ -214,7 +213,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             mood_chart_vals.append(0)
             mood_value_labels.append("0.0")
 
-    mood_chart = render_monthly_chart(week_labels, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=3, col_spacing=12, left_pad=3)
+    mood_chart = render_monthly_chart(week_labels, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=True)
     lines.extend(wrap_code_block(mood_chart))
 
     return lines
