@@ -14,6 +14,7 @@ from sync_utils import (
     format_minutes,
     render_summary_table,
     render_weekly_chart,
+    render_weekly_training_grid,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -115,24 +116,10 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
 
     # TRAINING section
     lines.append("### **TRAINING**")
-    lines.append("| TYPE | MON | TUE | WED | THU | FRI | SAT | SUN |")
-    lines.append("| ---- | --- | --- | --- | --- | --- | --- | --- |")
-
-    def training_row(label, key):
-        cells = []
-        for d in dates:
-            val = daily_data.get(d, {}).get(key)
-            cells.append("`X`" if val else "")
-        return f"| **{label}** | " + " | ".join(cells) + " |"
-
-    lines.append(training_row("WORKOUT", "workout"))
-    lines.append(training_row("STRETCH", "stretch"))
-    lines.append("")
-
-    lines.append("| ACTIVITY | TOTAL |")
-    lines.append("| -------- | ----- |")
-    lines.append(f"| **WORKOUT** | `{workout_days}/{days_in_period}` |")
-    lines.append(f"| **STRETCH**  | `{stretch_days}/{days_in_period}` |")
+    training_grid = render_weekly_training_grid(
+        dates, daily_data, workout_days, stretch_days
+    )
+    lines.extend(wrap_code_block(training_grid))
     lines.append("")
 
     # SLEEP section (values on top of bars, 5-char bars like monthly)

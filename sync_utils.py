@@ -843,3 +843,52 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
     
     return lines
 
+
+def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count):
+    """
+    Render a compact frequency grid showing workout/stretch activity for a single week.
+    
+    dates: list of 7 date objects (Monday-Sunday)
+    daily_data: dict mapping date -> parsed daily note data
+    workout_count: total number of workout days
+    stretch_count: total number of stretch days
+    
+    Returns list of lines for the frequency grid visualization.
+    
+    Format:
+    │ WORKOUT:  ███ ░░░ ███ ███ ░░░ ███ ███   (5/7)
+    │ STRETCH:  ░░░ ███ ███ ░░░ ███ ░░░ ███   (4/7)
+    │           ─── ─── ─── ─── ─── ─── ───
+    │           MON TUE WED THU FRI SAT SUN
+    """
+    lines = []
+    
+    # Build workout and stretch symbols
+    workout_symbols = []
+    stretch_symbols = []
+    
+    for day in dates:
+        entry = daily_data.get(day, {})
+        has_workout = entry.get("workout", False)
+        has_stretch = entry.get("stretch", False)
+        
+        workout_symbols.append("███" if has_workout else "░░░")
+        stretch_symbols.append("███" if has_stretch else "░░░")
+    
+    # Build the two main rows (each day takes 4 chars: 3-char block + 1 space)
+    workout_row = "│ WORKOUT:  " + " ".join(workout_symbols) + f"   ({workout_count}/7)"
+    stretch_row = "│ STRETCH:  " + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
+    
+    lines.append(workout_row)
+    lines.append(stretch_row)
+    
+    # Build separator row (3 dashes per day)
+    separator_row = "│           " + " ".join(["───"] * 7)
+    lines.append(separator_row)
+    
+    # Build label row with day names
+    label_row = "│           " + " ".join(DAYS)
+    lines.append(label_row)
+    
+    return lines
+
