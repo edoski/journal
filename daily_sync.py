@@ -404,7 +404,7 @@ def _build_sleep_section(sleep_data, existing_block):
     sleep_table = _build_sleep_table(sleep_data)
 
     if sleep_table:
-        lines_out.extend(["", "### SLEEP", ""])
+        lines_out.extend(["", "### **SLEEP**", ""])
         lines_out.extend(sleep_table)
         lines_out.append("")
     elif existing_block:
@@ -655,7 +655,7 @@ def _build_training_section(workout_data, stretch_data, existing_block, today_st
     elif existing_block:
         merged = existing_entries
 
-    lines_out = ["", "### TRAINING", ""]
+    lines_out = ["", "### **TRAINING**", ""]
     if merged:
         lines_out.extend(_render_training_entries(merged))
     else:
@@ -1308,12 +1308,12 @@ def update_markdown(sessions):
     sleep_done, sleep_data = _load_status_file("sleep_status.json")
 
     # Extract existing blocks for fallback (using shared extract_block)
-    existing_training_block = extract_block(metrics_body, "### training")
-    existing_sleep_block = extract_block(metrics_body, "### sleep")
+    existing_training_block = extract_block(metrics_body, "### **training**")
+    existing_sleep_block = extract_block(metrics_body, "### **sleep**")
 
     # Rebuild Metrics section from scratch (idempotent)
     final_lines = lines[:metrics_sep_idx + 1]
-    final_lines.append("### STUDY")
+    final_lines.append("### **STUDY**")
     if new_table_lines:
         final_lines.append("")
         final_lines.extend(new_table_lines)

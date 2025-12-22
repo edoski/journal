@@ -148,7 +148,7 @@ def extract_block(lines, header):
 
 
 def parse_study_table(lines):
-    block = extract_block(lines, "### STUDY")
+    block = extract_block(lines, "### **STUDY**")
     if not block:
         return []
     header_idx = -1
@@ -193,7 +193,7 @@ def parse_study_table(lines):
 
 
 def parse_sleep_table(lines):
-    block = extract_block(lines, "### SLEEP")
+    block = extract_block(lines, "### **SLEEP**")
     if not block:
         return []
     header_idx = -1
