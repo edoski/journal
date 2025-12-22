@@ -107,7 +107,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         # Always use 0h00m format for zero values
         study_value_labels.append(format_minutes(total_min) if total_min > 0 else "0h00m")
 
-    chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=8, y_max=40, bar_width=6, col_spacing=12)
+    chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=10, y_max=40, bar_width=6, col_spacing=12)
     lines.extend(wrap_code_block(chart_lines))
     lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
     lines.append("")
