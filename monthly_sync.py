@@ -16,6 +16,7 @@ from sync_utils import (
     format_minutes,
     render_summary_table,
     render_monthly_chart,
+    render_training_frequency_grid,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -108,7 +109,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=8, y_max=40, bar_width=6, col_spacing=12)
     lines.extend(wrap_code_block(chart_lines))
-    lines.append(f"**`SUM: {format_minutes(study_total_from_activities)}`**")
+    lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
     lines.append("")
 
     # Activity table (activity_totals already computed above)
@@ -125,36 +126,10 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # TRAINING section
     lines.append("### **TRAINING**")
-    lines.append("| WEEK | MON | TUE | WED | THU | FRI | SAT | SUN |")
-    lines.append("| ---- | --- | --- | --- | --- | --- | --- | --- |")
-    for start, end in week_ranges:
-        label = f"**`{format_week_label(start, end)}`**"
-        cells = []
-        for d in daterange(start, end):
-            entry = daily_data.get(d)
-            if not entry:
-                cells.append("")
-                continue
-            w = entry.get("workout")
-            s = entry.get("stretch")
-            if w and s:
-                cells.append("`WS`")
-            elif w:
-                cells.append("`W`")
-            elif s:
-                cells.append("`S`")
-            else:
-                cells.append("")
-        # pad to 7 columns in case week ranges are partial
-        while len(cells) < 7:
-            cells.append("")
-        lines.append(f"| {label} | " + " | ".join(cells[:7]) + " |")
-    lines.append("`W = WORKOUT`, `S = STRETCH`, `WS = BOTH`")
-    lines.append("")
-    lines.append("| ACTIVITY | TOTAL |")
-    lines.append("| -------- | ----- |")
-    lines.append(f"| **WORKOUT** | `{workout_days}/{days_in_period}` |")
-    lines.append(f"| **STRETCH**  | `{stretch_days}/{days_in_period}` |")
+    training_grid = render_training_frequency_grid(
+        week_ranges, daily_data, workout_days, stretch_days, days_in_period
+    )
+    lines.extend(wrap_code_block(training_grid))
     lines.append("")
 
     # SLEEP section (5-char bars, weekly averages)

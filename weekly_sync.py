@@ -90,16 +90,15 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         "THIS WEEK", prev_week_label
     ))
 
-    # STUDY section with total in header (using activity totals for accuracy)
-    total_label = format_minutes(study_total_from_activities) if study_total_from_activities > 0 else "0h00m"
-    lines.append(f"### **STUDY** (`{total_label}`)")
+    # STUDY section (using activity totals for accuracy)
+    lines.append("### **STUDY**")
     study_hours = [m / 60 if m is not None and m > 0 else 0 for m in study_minutes]
     study_values = [
         format_minutes(m) if m is not None and m > 0 else "0h00m" for m in study_minutes
     ]
     chart_lines = render_weekly_chart(DAYS, study_hours, study_values, height=10, y_max=10, bar_width=3, col_spacing=8)
     lines.extend(wrap_code_block(chart_lines))
-    lines.append(f"**`SUM: {format_minutes(study_total_from_activities)}`**")
+    lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
     lines.append("")
 
     # Activity table (activity_totals already computed above)

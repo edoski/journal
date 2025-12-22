@@ -435,7 +435,10 @@ def format_study_avg(total_minutes, days):
 def format_training_ratio(count, total_days):
     """
     Format workout/stretch as count/total.
+    Zero-pad count only for monthly notes (total_days > 7).
     """
+    if total_days > 7:
+        return f"{count:02d}/{total_days}"
     return f"{count}/{total_days}"
 
 
@@ -469,24 +472,21 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     lines.append("| ------ | ----------- | ----------------------- | ------ |")
     
     # STUDY row (daily average)
-    curr_study_total = current_metrics.get("study_total_minutes")
-    prev_study_total = previous_metrics.get("study_total_minutes")
+    curr_study_total = current_metrics.get("study_total_minutes") or 0
+    prev_study_total = previous_metrics.get("study_total_minutes") or 0
+    curr_total_days = current_metrics.get("total_days", 7)
+    prev_total_days = previous_metrics.get("total_days", 7)
     
-    if curr_study_total is not None and curr_study_total > 0:
-        curr_study_avg = format_study_avg(curr_study_total, current_metrics.get("total_days", 7))
-    else:
-        curr_study_avg = "-"
+    # Always show study average, even if zero
+    curr_study_avg_mins = curr_study_total / max(1, curr_total_days)
+    curr_study_avg = format_minutes(curr_study_avg_mins, always_show_both=True) + "/day"
     
-    if prev_study_total is not None and prev_study_total > 0:
-        prev_study_avg = format_study_avg(prev_study_total, previous_metrics.get("total_days", 7))
-    else:
-        prev_study_avg = "-"
+    prev_study_avg_mins = prev_study_total / max(1, prev_total_days)
+    prev_study_avg = format_minutes(prev_study_avg_mins, always_show_both=True) + "/day"
     
-    if curr_study_total and prev_study_total:
-        study_pct = compute_percent_change(
-            curr_study_total / max(1, current_metrics.get("total_days", 7)),
-            prev_study_total / max(1, previous_metrics.get("total_days", 7))
-        )
+    # Compute percentage change (show dash only if both are zero)
+    if curr_study_avg_mins > 0 or prev_study_avg_mins > 0:
+        study_pct = compute_percent_change(curr_study_avg_mins, prev_study_avg_mins)
         study_pct_str = format_percent_change(study_pct)
     else:
         study_pct_str = "-"
@@ -494,20 +494,15 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` |")
     
     # SLEEP row (with /night suffix)
-    curr_sleep_avg = current_metrics.get("sleep_avg_minutes")
-    prev_sleep_avg = previous_metrics.get("sleep_avg_minutes")
+    curr_sleep_avg = current_metrics.get("sleep_avg_minutes") or 0
+    prev_sleep_avg = previous_metrics.get("sleep_avg_minutes") or 0
     
-    if curr_sleep_avg is not None and curr_sleep_avg > 0:
-        curr_sleep = format_minutes(curr_sleep_avg) + "/night"
-    else:
-        curr_sleep = "-"
+    # Always show sleep average, even if zero
+    curr_sleep = format_minutes(curr_sleep_avg, always_show_both=True) + "/night"
+    prev_sleep = format_minutes(prev_sleep_avg, always_show_both=True) + "/night"
     
-    if prev_sleep_avg is not None and prev_sleep_avg > 0:
-        prev_sleep = format_minutes(prev_sleep_avg) + "/night"
-    else:
-        prev_sleep = "-"
-    
-    if curr_sleep_avg and prev_sleep_avg:
+    # Compute percentage change (show dash only if both are zero)
+    if curr_sleep_avg > 0 or prev_sleep_avg > 0:
         sleep_pct = compute_percent_change(curr_sleep_avg, prev_sleep_avg)
         sleep_pct_str = format_percent_change(sleep_pct)
     else:
@@ -518,18 +513,13 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     # WORKOUT row
     curr_workout_count = current_metrics.get("workout_count", 0)
     prev_workout_count = previous_metrics.get("workout_count", 0)
-    curr_total_days = current_metrics.get("total_days", 7)
-    prev_total_days = previous_metrics.get("total_days", 7)
     
-    # Only show "-" if previous period has no data (0 total days worth of data)
-    if prev_total_days == 0 or previous_metrics.get("study_total_minutes") is None:
-        prev_workout = "-"
-    else:
-        prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
-    
+    # Always show workout ratio, even if zero
     curr_workout = format_training_ratio(curr_workout_count, curr_total_days)
+    prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
     
-    if prev_workout != "-":
+    # Compute percentage change (show dash only if both are zero)
+    if curr_workout_count > 0 or prev_workout_count > 0:
         workout_pct = compute_percent_change(curr_workout_count, prev_workout_count)
         workout_pct_str = format_percent_change(workout_pct)
     else:
@@ -541,14 +531,12 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     curr_stretch_count = current_metrics.get("stretch_count", 0)
     prev_stretch_count = previous_metrics.get("stretch_count", 0)
     
-    if prev_total_days == 0 or previous_metrics.get("study_total_minutes") is None:
-        prev_stretch = "-"
-    else:
-        prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
-    
+    # Always show stretch ratio, even if zero
     curr_stretch = format_training_ratio(curr_stretch_count, curr_total_days)
+    prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
     
-    if prev_stretch != "-":
+    # Compute percentage change (show dash only if both are zero)
+    if curr_stretch_count > 0 or prev_stretch_count > 0:
         stretch_pct = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_pct_str = format_percent_change(stretch_pct)
     else:
@@ -557,20 +545,15 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` |")
     
     # MOOD row (with /10.0 suffix)
-    curr_mood_avg = current_metrics.get("mood_avg")
-    prev_mood_avg = previous_metrics.get("mood_avg")
+    curr_mood_avg = current_metrics.get("mood_avg") or 0
+    prev_mood_avg = previous_metrics.get("mood_avg") or 0
     
-    if curr_mood_avg is not None:
-        curr_mood = format_mood_with_scale(curr_mood_avg)
-    else:
-        curr_mood = "-"
+    # Always show mood value, even if zero
+    curr_mood = format_mood_with_scale(curr_mood_avg)
+    prev_mood = format_mood_with_scale(prev_mood_avg)
     
-    if prev_mood_avg is not None:
-        prev_mood = format_mood_with_scale(prev_mood_avg)
-    else:
-        prev_mood = "-"
-    
-    if curr_mood_avg and prev_mood_avg:
+    # Compute percentage change (show dash only if both are zero)
+    if curr_mood_avg > 0 or prev_mood_avg > 0:
         mood_pct = compute_percent_change(curr_mood_avg, prev_mood_avg)
         mood_pct_str = format_percent_change(mood_pct)
     else:
@@ -761,6 +744,102 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
+    
+    return lines
+
+
+def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period):
+    """
+    Render a compact frequency grid showing workout/stretch activity for the entire month.
+    
+    week_ranges: list of (start_date, end_date) tuples for each week in the month
+    daily_data: dict mapping date -> parsed daily note data
+    workout_count: total number of workout days
+    stretch_count: total number of stretch days
+    days_in_period: total days in the month
+    
+    Returns list of lines for the frequency grid visualization.
+    
+    Format:
+    WORKOUT:  ■ ■ · ■ ■ · ■   ■ ■ ■ · ■ · ■   ...   (14/31)
+    STRETCH:  ■ · ■ · · ■ ■   ■ ■ ■ ■ ■ ■ ·   ...   (15/31)
+              ─────────────   ─────────────   ...
+              DEC 01-07       DEC 08-14       ...
+    """
+    lines = []
+    
+    # Build workout and stretch rows
+    workout_symbols = []
+    stretch_symbols = []
+    week_labels = []
+    week_day_counts = []
+    
+    for start, end in week_ranges:
+        week_days = list(daterange(start, end))
+        week_day_counts.append(len(week_days))
+        week_labels.append(format_week_label(start, end))
+        
+        for day in week_days:
+            entry = daily_data.get(day, {})
+            has_workout = entry.get("workout", False)
+            has_stretch = entry.get("stretch", False)
+            
+            workout_symbols.append("■" if has_workout else "·")
+            stretch_symbols.append("■" if has_stretch else "·")
+    
+    # Build the two main rows with spacing between weeks
+    workout_row = "│ WORKOUT:  "
+    stretch_row = "│ STRETCH:  "
+    
+    symbol_idx = 0
+    for i, day_count in enumerate(week_day_counts):
+        # Add symbols for this week
+        week_workout = " ".join(workout_symbols[symbol_idx:symbol_idx + day_count])
+        week_stretch = " ".join(stretch_symbols[symbol_idx:symbol_idx + day_count])
+        
+        workout_row += week_workout
+        stretch_row += week_stretch
+        
+        symbol_idx += day_count
+        
+        # Add spacing between weeks (3 spaces)
+        if i < len(week_day_counts) - 1:
+            workout_row += "   "
+            stretch_row += "   "
+    
+    # Add counts at the end (zero-padded for alignment)
+    workout_row += f"   ({workout_count:02d}/{days_in_period})"
+    stretch_row += f"   ({stretch_count:02d}/{days_in_period})"
+    
+    lines.append(workout_row)
+    lines.append(stretch_row)
+    
+    # Build separator row (dashes under each week)
+    separator_row = "│           "  # "│ " + 10 spaces to align with "│ WORKOUT:  "
+    for i, day_count in enumerate(week_day_counts):
+        # Each day takes 2 chars (symbol + space), minus last space
+        dash_count = day_count * 2 - 1
+        separator_row += "─" * dash_count
+        
+        # Add spacing between weeks (3 spaces)
+        if i < len(week_day_counts) - 1:
+            separator_row += "   "
+    
+    lines.append(separator_row)
+    
+    # Build label row
+    label_row = "│           "  # "│ " + 10 spaces to align
+    for i, (label, day_count) in enumerate(zip(week_labels, week_day_counts)):
+        label_row += label
+        
+        # Add spacing to next label (if not last)
+        if i < len(week_day_counts) - 1:
+            # Calculate spacing: week width minus label length, plus inter-week spacing
+            week_width = day_count * 2 - 1  # Each day is 2 chars (symbol + space), minus last space
+            spacing = week_width - len(label) + 3  # +3 for inter-week gap
+            label_row += " " * spacing
+    
+    lines.append(label_row)
     
     return lines
 
