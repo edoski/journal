@@ -1212,7 +1212,7 @@ def update_markdown(sessions):
     new_table_lines, total_focus_minutes = _build_study_section(sessions, existing_notes)
     hours = total_focus_minutes // 60
     minutes = total_focus_minutes % 60
-    study_str = f"{hours}h{minutes}m"
+    study_str = format_minutes(total_focus_minutes, always_show_both=True)
 
     # Find YAML end
     yaml_end_idx = -1
@@ -1358,4 +1358,3 @@ if __name__ == "__main__":
     if changed is False:
         # Suppress noisy success logs on no-op runs.
         pass
-
