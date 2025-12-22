@@ -15,9 +15,8 @@ JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
 CORE_DATA_EPOCH_OFFSET = 978307200  # Seconds between 1970-01-01 and 2001-01-01
 BREAK_GAP_CAP_SECONDS = 60  # 1 minute; breaks auto-start, so keep this tight
 # Maximum allowed gap (seconds) between a flow end and the next break start
-# to consider them linked. Defaults to 5 minutes but can be overridden via
-# LOG_SYNC_BREAK_GAP_CAP if you want to tighten/loosen this behavior.
-BREAK_LINK_MAX_GAP_SECONDS = int(os.environ.get("LOG_SYNC_BREAK_GAP_CAP", "300"))
+# to consider them linked (5 minutes).
+BREAK_LINK_MAX_GAP_SECONDS = 300
 # Cache for training entries so workout/stretch files can arrive in separate
 # runs without losing earlier entries for the same day.
 TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal_sync/training_entries.json")
@@ -27,8 +26,16 @@ CARRY_FORWARD_GUARD_PATH = os.path.expanduser(
 )
 # Regular study day cutoff: sessions past this time incur no overrun.
 REGULAR_DAY_END = datetime.time(18, 0)
-# Default daily lunch window used to forgive that off-time in overrun calculations.
-LUNCH_WINDOW_DEFAULT = ("13:30", "14:30")  # HH:MM - HH:MM
+# Base daily lunch window (dynamically shifted by _compute_dynamic_lunch_window
+# when a flow session straddles the nominal start).
+LUNCH_WINDOW_BASE = (datetime.time(13, 30), datetime.time(14, 30))
+# iCloud paths for Shortcuts status files
+ICLOUD_SHORTCUTS_DIR = "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents"
+ICLOUD_JOURNALSYNC_DIR = os.path.join(ICLOUD_SHORTCUTS_DIR, "JournalSync")
+# Daily note template path
+TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.md"
+
+
 def _read_break_defaults():
     """
     Read Flow's configured break lengths.
@@ -54,7 +61,7 @@ BREAK_DEFAULTS = _read_break_defaults()
 
 def _canonical_goal(text: str) -> str:
     """Normalize a goal line for idempotent matching."""
-    cleaned = re.sub(r"^\s*[-*]\s*\[[ xX]?\]\s*", "", text)
+    cleaned = re.sub(r"^\s*[-*]\s*\[[^\]]?\]\s*", "", text)
     cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
     cleaned = cleaned.strip(" `")
     cleaned = re.sub(r"\s+", " ", cleaned)
@@ -63,18 +70,19 @@ def _canonical_goal(text: str) -> str:
 
 
 def _parse_goal_tasks_from_lines(lines):
-    pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[ xX]?)\]\s*(?P<body>.+)$")
+    pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[^\]]?)\]\s*(?P<body>.+)$")
     tasks = []
     for line in lines:
         match = pattern.match(line)
         if not match:
             continue
-        state = (match.group("state") or "").lower()
+        state = (match.group("state") or "").strip()
         body = match.group("body").strip()
+        done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
         tasks.append({
             "line": line,
             "body": body,
-            "done": state == "x",
+            "done": done_state,
             "canonical": _canonical_goal(line),
         })
     return tasks
@@ -121,7 +129,7 @@ def _load_goals_for_date(date_obj, include_checked=False):
         with open(path, "r") as f:
             lines = f.read().splitlines()
     except Exception:
-        return []
+        return None
     start, end = _find_section_bounds(lines, "Goals")
     if start == -1:
         return []
@@ -188,14 +196,19 @@ def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
         return 0
 
     already_ran = _carry_forward_already_ran(today_date)
+    if already_ran:
+        return 0
 
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     if not os.path.exists(yesterday_path):
         return 0
 
     yesterday_tasks = _load_goals_for_date(yesterday_date, include_checked=False)
+    if yesterday_tasks is None:
+        return 0
     if not yesterday_tasks:
-        _mark_carry_forward(today_date)
+        if not already_ran:
+            _mark_carry_forward(today_date)
         return 0
 
     body_start, body_end = _goals_body_bounds(lines, goals_idx)
@@ -205,27 +218,574 @@ def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
     today_tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
     today_canon = {t["canonical"] for t in today_tasks if t.get("canonical")}
 
-    new_body = list(lines[body_start:body_end])
-    carried = 0
+    missing_tasks = []
     for task in yesterday_tasks:
         canon = task.get("canonical")
         if canon in today_canon:
             continue
+        missing_tasks.append(task)
+
+    if not missing_tasks:
+        if not already_ran:
+            _mark_carry_forward(today_date)
+        return 0
+
+    new_body = list(lines[body_start:body_end])
+    carried = 0
+    for task in missing_tasks:
         new_body.append(f"- [ ] {task['body']}")
-        today_canon.add(canon)
         carried += 1
 
     # Ensure a single blank line separates Goals from the next section.
     if new_body and new_body[-1].strip() != "":
         new_body.append("")
 
-    if carried:
-        lines[body_start:body_end] = new_body
+    lines[body_start:body_end] = new_body
 
-    # Always refresh the guard stamp to reflect the latest attempted sync.
-    if not already_ran or carried:
-        _mark_carry_forward(today_date)
+    # Mark today's carry-forward attempt so this runs once per day.
+    _mark_carry_forward(today_date)
+
+    # Log what was carried for diagnostics
+    try:
+        with open("/tmp/journal_sync.log", "a") as f:
+            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            f.write(f"[{ts}] Carried {carried} goal(s) from {yesterday_date} → {today_date}:\n")
+            for task in missing_tasks:
+                f.write(f"  • {task['body']}\n")
+    except Exception:
+        pass
+
     return carried
+
+
+def _extract_existing_notes(lines):
+    """Extract notes from existing study table keyed by start time (HH:MM)."""
+    existing_notes = {}
+    table_header_re = re.compile(
+        r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*NOTES\s*\|",
+        re.IGNORECASE
+    )
+    header_idx = -1
+    for i, line in enumerate(lines):
+        if table_header_re.match(line.strip()):
+            header_idx = i
+            break
+    if header_idx == -1:
+        return existing_notes
+
+    row_start = header_idx + 2  # skip header and separator
+    for i in range(row_start, len(lines)):
+        if not lines[i].lstrip().startswith("|"):
+            break
+        parts = [p.strip() for p in lines[i].split("|")]
+        if len(parts) < 7:
+            continue
+        time_cell = parts[1].replace("`", "")
+        time_match = re.search(r"([0-2][0-9]:[0-5][0-9])", time_cell)
+        if not time_match:
+            continue
+        start_key = time_match.group(1)
+        note_content = parts[6]
+        if note_content and note_content != "❌":
+            existing_notes[start_key] = note_content
+    return existing_notes
+
+
+def _build_study_section(sessions, existing_notes):
+    """
+    Build the study table lines and compute focus_minutes on each session.
+    Returns (table_lines, total_focus_minutes).
+    """
+    if not sessions:
+        return [], 0
+
+    header = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |"
+    separator = "| ---- | -------- | -------- | --------- | ----- | ----- |"
+    table_lines = [header, separator]
+
+    for session in sessions:
+        start_s = session['start'].strftime("%H:%M")
+        end_s = session['end'].strftime("%H:%M")
+        time_str = f"`{start_s} - {end_s}`"
+
+        title = session['title']
+        if title and title.lower() != "flow":
+            activity_str = title
+        else:
+            activity_str = "Flow"
+
+        actual_minutes = session.get('actual_elapsed', 0) or 0
+        interrupt_minutes = (session.get('interruptions_duration', 0) or 0) / 60.0
+
+        interrupt_rounded = round_half_up(interrupt_minutes)
+        focus_rounded = max(0, round_half_up(actual_minutes - interrupt_minutes))
+
+        session['focus_minutes'] = focus_rounded
+        session['focus_minutes_rounded'] = focus_rounded
+
+        duration_str = f"`{format_minutes(focus_rounded)}`"
+        interrupt_str = f"`+{interrupt_rounded:02d}m`" if interrupt_rounded > 0 else "`+00m`"
+
+        break_str = ""
+        break_expected_val = session.get('break_expected', session.get('break_duration', 0)) or 0
+        break_min = ceil_minutes(break_expected_val)
+        overrun = int(session.get('break_overrun', 0))
+        break_reason = session.get('break_reason')
+        if break_min > 0:
+            break_display = f"{break_min}m" if break_reason == "lunch" else format_minutes(break_min)
+            parts = []
+            if break_reason and break_reason != "lunch":
+                parts.append(break_reason)
+            if session.get('break_missing', False):
+                parts.append("missing")
+            if overrun > 0:
+                parts.append(f"+{format_minutes(overrun)}")
+
+            if parts:
+                break_str = f"`{break_display} ({', '.join(parts)})`"
+            else:
+                break_str = f"`{break_display}`"
+
+        notes_str = existing_notes.get(start_s, "")
+        row = f"| {time_str} | {activity_str} | {duration_str} | {interrupt_str} | {break_str} | {notes_str} |"
+        table_lines.append(row)
+
+    total_focus = sum(s.get('focus_minutes_rounded', 0) for s in sessions)
+    return table_lines, total_focus
+
+
+def _build_sleep_table(data):
+    """Build sleep table lines from status data."""
+    if not data:
+        return []
+    try:
+        def parse_time(raw):
+            if not raw:
+                return ""
+            for fmt in ("%d %b %Y at %H:%M", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"):
+                try:
+                    dt = datetime.datetime.strptime(raw, fmt)
+                    return dt.strftime("%H:%M")
+                except Exception:
+                    continue
+            return raw
+
+        start_raw = data.get("start") or data.get("SleepBegin") or data.get("SleepStart")
+        end_raw = data.get("end") or data.get("SleepEnd")
+        sleep_min = data.get("sleep_min") or data.get("SleepMinutes")
+        awake_min = data.get("awake_min") or data.get("AwakeMinutes")
+        awake_count = data.get("awake_count") or data.get("AwakeCount")
+
+        start_fmt = parse_time(start_raw)
+        end_fmt = parse_time(end_raw)
+        time_cell = f"`{start_fmt} - {end_fmt}`" if start_fmt and end_fmt else (f"`{start_fmt}`" if start_fmt else "")
+        duration_cell = f"`{format_minutes_seconds(float(sleep_min))}`" if sleep_min is not None else ""
+        awake_cell = f"`{int(round(float(awake_min)))}m`" if awake_min is not None else ""
+        wakes_cell = f"`{int(awake_count)} times`" if awake_count is not None else ""
+
+        header = "| TIME | DURATION | AWAKE | AWAKENINGS |"
+        separator = "| ---- | -------- | ----- | ---------- |"
+        row = f"| {time_cell} | {duration_cell} | {awake_cell} | {wakes_cell} |"
+        return [header, separator, row]
+    except Exception:
+        return []
+
+
+def _build_sleep_section(sleep_data, existing_block):
+    """Build sleep section lines."""
+    lines_out = []
+    sleep_table = _build_sleep_table(sleep_data)
+
+    if sleep_table:
+        lines_out.extend(["", "### SLEEP", ""])
+        lines_out.extend(sleep_table)
+        lines_out.append("")
+    elif existing_block:
+        lines_out.append("")
+        lines_out.extend(existing_block)
+        if lines_out and lines_out[-1].strip() != "":
+            lines_out.append("")
+
+    return lines_out
+
+
+def _update_frontmatter(final_lines, study_str, workout_done, stretch_done, sleep_data):
+    """
+    Update YAML frontmatter in final_lines with study time and status flags.
+    Returns the updated lines list.
+    """
+    first_dash_idx = -1
+    second_dash_idx = -1
+    for i, line in enumerate(final_lines):
+        if line.strip() == "---":
+            if first_dash_idx == -1:
+                first_dash_idx = i
+            elif second_dash_idx == -1:
+                second_dash_idx = i
+                break
+
+    if first_dash_idx == -1 or second_dash_idx == -1 or second_dash_idx <= first_dash_idx:
+        return final_lines
+
+    fm_lines = final_lines[first_dash_idx + 1 : second_dash_idx]
+    fm_order, fm_data = _parse_frontmatter(fm_lines)
+
+    def set_value(key, value):
+        if key not in fm_order:
+            fm_order.append(key)
+        fm_data[key] = value
+
+    set_value("study", study_str)
+
+    if workout_done:
+        set_value("workout", "true")
+    else:
+        current = fm_data.get("workout", "")
+        set_value("workout", current if current else "false")
+
+    if stretch_done:
+        set_value("stretch", "true")
+    else:
+        current = fm_data.get("stretch", "")
+        set_value("stretch", current if current else "false")
+
+    if sleep_data and (sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")):
+        try:
+            total_min = float(sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes"))
+            hours = int(total_min) // 60
+            mins = int(total_min) % 60
+            sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
+            set_value("sleep", sleep_str)
+        except Exception:
+            pass
+
+    new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
+    return (
+        final_lines[: first_dash_idx + 1]
+        + new_fm_lines
+        + final_lines[second_dash_idx:]
+    )
+
+
+def _extract_block(body_lines, header_lower):
+    """
+    Return the block that starts at header_lower and stops before the next
+    section header (### or ##).
+    """
+    start_idx = -1
+    for idx, line in enumerate(body_lines):
+        if line.strip().lower() == header_lower:
+            start_idx = idx
+            break
+    if start_idx == -1:
+        return []
+
+    end_idx = len(body_lines)
+    for idx in range(start_idx + 1, len(body_lines)):
+        stripped = body_lines[idx].strip()
+        if stripped.startswith("### ") or stripped.startswith("## "):
+            end_idx = idx
+            break
+
+    while end_idx > start_idx and body_lines[end_idx - 1].strip() == "":
+        end_idx -= 1
+
+    return body_lines[start_idx:end_idx]
+
+
+def _parse_training_table(block_lines):
+    """Convert an existing TRAINING table into structured entries."""
+    entries = []
+    header_re = re.compile(r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|", re.IGNORECASE)
+    header_idx = -1
+    for idx, line in enumerate(block_lines):
+        if header_re.search(line):
+            header_idx = idx
+            break
+    if header_idx == -1:
+        return entries
+
+    row_start = header_idx + 2
+    for line in block_lines[row_start:]:
+        if not line.lstrip().startswith("|"):
+            break
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+        raw_time = parts[1].strip("` ").replace("`", "")
+        activity = parts[2]
+        duration = parts[3].strip("` ").replace("`", "")
+        calories = parts[4].strip("` ").replace("`", "")
+
+        start_val = None
+        end_val = None
+        time_match = re.match(r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$", raw_time)
+        if time_match:
+            start_val = time_match.group(1)
+            end_val = time_match.group(2)
+
+        entries.append({
+            "start": start_val,
+            "end": end_val,
+            "time_raw": raw_time,
+            "activity": activity,
+            "duration": duration,
+            "calories": calories,
+        })
+    return entries
+
+
+def _load_training_cache(date_str):
+    try:
+        with open(TRAINING_CACHE_PATH, "r") as f:
+            obj = json.load(f)
+        if obj.get("date") == date_str and isinstance(obj.get("entries"), list):
+            return obj.get("entries") or []
+    except Exception:
+        pass
+    return []
+
+
+def _save_training_cache(date_str, entries):
+    try:
+        os.makedirs(os.path.dirname(TRAINING_CACHE_PATH), exist_ok=True)
+        with open(TRAINING_CACHE_PATH, "w") as f:
+            json.dump({"date": date_str, "entries": entries}, f)
+    except Exception:
+        pass
+
+
+def _activity_entries_from_data(data, default_activity_label):
+    """Normalize workout/stretch JSON payloads into training table entries."""
+    entries_out = []
+    if not data:
+        return entries_out
+    try:
+        source_entries = data if isinstance(data, list) else [data]
+        for entry in source_entries:
+            start_raw = (entry.get("start") or "").strip()
+            end_raw = (entry.get("end") or "").strip()
+            dur_val = entry.get("duration")
+            kcal_val = entry.get("kcal")
+            activity_val = entry.get("type") or default_activity_label
+
+            duration_fmt = ""
+            if dur_val is not None:
+                duration_fmt = format_minutes_seconds(float(dur_val))
+
+            calories_fmt = ""
+            if kcal_val is not None:
+                calories_fmt = f"{int(round(float(kcal_val)))} kcal"
+
+            if start_raw and end_raw:
+                time_raw = f"{start_raw} - {end_raw}"
+            else:
+                time_raw = start_raw or ""
+
+            entries_out.append({
+                "start": start_raw or None,
+                "end": end_raw or None,
+                "time_raw": time_raw,
+                "activity": activity_val,
+                "duration": duration_fmt,
+                "calories": calories_fmt,
+            })
+    except Exception:
+        entries_out = []
+    return entries_out
+
+
+def _merge_training_entries(existing, new):
+    """Deduplicate training rows, letting new entries override prior ones."""
+    merged = OrderedDict()
+
+    def key(entry):
+        return (
+            entry.get("start") or "",
+            entry.get("end") or "",
+            (entry.get("activity") or "").strip().lower(),
+            entry.get("duration") or "",
+            entry.get("calories") or "",
+        )
+
+    for e in existing:
+        merged[key(e)] = e
+    for e in new:
+        merged[key(e)] = e
+    return list(merged.values())
+
+
+def _render_training_entries(entries):
+    """Render training entries as markdown table lines."""
+    if not entries:
+        return []
+
+    def to_minutes(val):
+        try:
+            h, m = map(int, val.split(":"))
+            return h * 60 + m
+        except Exception:
+            return None
+
+    def sort_key(e):
+        mins = to_minutes(e.get("start") or "")
+        return (mins if mins is not None else 24 * 60 + 1, e.get("activity") or "")
+
+    ordered = sorted(entries, key=sort_key)
+    header = "| TIME | ACTIVITY | DURATION | CALORIES |"
+    separator = "| ---- | -------- | -------- | -------- |"
+    lines_out = [header, separator]
+    for entry in ordered:
+        if entry.get("start") and entry.get("end"):
+            time_cell = f"`{entry['start']} - {entry['end']}`"
+        elif entry.get("start"):
+            time_cell = f"`{entry['start']}`"
+        elif entry.get("time_raw"):
+            time_cell = f"`{entry['time_raw']}`"
+        else:
+            time_cell = ""
+
+        duration_cell = f"`{entry['duration']}`" if entry.get("duration") else ""
+        calories_cell = f"`{entry['calories']}`" if entry.get("calories") else ""
+
+        row = f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {calories_cell} |"
+        lines_out.append(row)
+    return lines_out
+
+
+def _build_training_section(workout_data, stretch_data, existing_block, today_str):
+    """
+    Build training section lines from workout/stretch data.
+    Returns (lines, merged_entries).
+    """
+    existing_entries = _parse_training_table(existing_block)
+    workout_entries = _activity_entries_from_data(workout_data, "Workout")
+    stretch_entries = _activity_entries_from_data(stretch_data, "Stretching")
+    new_entries = workout_entries + stretch_entries
+
+    cache_entries = _load_training_cache(today_str)
+
+    merged = []
+    if new_entries:
+        merged = _merge_training_entries(cache_entries, new_entries)
+        _save_training_cache(today_str, merged)
+    elif cache_entries:
+        merged = cache_entries
+    elif existing_block:
+        merged = existing_entries
+
+    lines_out = ["", "### TRAINING", ""]
+    if merged:
+        lines_out.extend(_render_training_entries(merged))
+        lines_out.append("")
+    else:
+        lines_out.append("_No training sessions completed today._")
+        lines_out.append("")
+
+    return lines_out, merged
+
+
+def _load_status_file(filename):
+    """
+    Read and JSON-parse a status file dropped in iCloud by Shortcuts.
+
+    Resilience features:
+    - Wait for the file size to stabilize (to avoid half-synced reads).
+    - Retry for up to ~60 seconds before giving up.
+    - Only delete the file after a successful parse.
+    - If parsing never succeeds, keep a `.invalid` copy for inspection
+      and return (False, None) without touching frontmatter.
+    """
+    path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
+
+    def try_parse(target_path, delete_after):
+        last_size = None
+        stable_count = 0
+        max_attempts = 60
+        stable_needed = 2
+        last_err = None
+
+        for _ in range(max_attempts):
+            try:
+                size = os.path.getsize(target_path)
+            except FileNotFoundError:
+                last_err = FileNotFoundError("file disappeared while waiting")
+                time.sleep(1.0)
+                continue
+
+            if size == 0:
+                last_err = ValueError("empty file (likely still syncing)")
+                stable_count = 0
+                time.sleep(1.0)
+                continue
+
+            if last_size is not None and size == last_size:
+                stable_count += 1
+            else:
+                stable_count = 0
+                last_size = size
+
+            if stable_count < stable_needed:
+                time.sleep(1.0)
+                continue
+
+            try:
+                with open(target_path, "r") as f:
+                    raw = f.read()
+                data = json.loads(raw)
+                if delete_after:
+                    try:
+                        os.remove(target_path)
+                    except Exception:
+                        pass
+                return True, data, None
+            except Exception as e:
+                last_err = e
+                time.sleep(1.0)
+
+        return False, None, last_err
+
+    def cleanup_invalids(primary_path):
+        invalids = glob.glob(primary_path + ".invalid") + glob.glob(primary_path + ".*.invalid")
+        for inv in invalids:
+            try:
+                os.remove(inv)
+            except Exception:
+                pass
+
+    # First try the primary path
+    last_err = None
+    if os.path.exists(path):
+        success, data, last_err = try_parse(path, delete_after=True)
+        if success:
+            cleanup_invalids(path)
+            return True, data
+        # Promote the failed file to an .invalid copy for inspection/retry.
+        backup_path = path + ".invalid"
+        try:
+            if os.path.exists(backup_path):
+                ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                backup_path = f"{path}.{ts}.invalid"
+            os.replace(path, backup_path)
+        except Exception:
+            pass
+    else:
+        # Missing is expected most of the time; treat as no new data.
+        return False, None
+
+    # Fallback: reprocess any existing .invalid copies (most recent first)
+    candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
+    candidates = sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
+    for cand in candidates:
+        success, data, _ = try_parse(cand, delete_after=False)
+        if success:
+            cleanup_invalids(path)
+            return True, data
+
+    if last_err:
+        print(f"Failed to parse {os.path.basename(path)}: {last_err}")
+    return False, None
+
 
 def get_expected_break_minutes(break_session=None):
     """
@@ -313,33 +873,6 @@ def round_half_up(val: float) -> int:
         return 0
     return int(math.floor(val + 0.5000001))
 
-def _parse_time_str(time_str: str):
-    hours, minutes = map(int, time_str.split(":"))
-    return datetime.time(hours, minutes)
-
-def _read_lunch_window():
-    """
-    Allow overriding the lunch window with LOG_SYNC_LUNCH_WINDOW env var ("HH:MM-HH:MM").
-    Set to "none"/"off"/"false" to disable forgiving a lunch window.
-    """
-    env_val = os.environ.get("LOG_SYNC_LUNCH_WINDOW", "").strip()
-    if env_val:
-        lowered = env_val.lower()
-        if lowered in ("none", "off", "false", "0"):
-            return None
-        match = re.match(r"^([0-2]\\d:[0-5]\\d)\\s*-\\s*([0-2]\\d:[0-5]\\d)$", env_val)
-        if match:
-            try:
-                return (_parse_time_str(match.group(1)), _parse_time_str(match.group(2)))
-            except ValueError:
-                pass
-    try:
-        start_str, end_str = LUNCH_WINDOW_DEFAULT
-        return (_parse_time_str(start_str), _parse_time_str(end_str))
-    except Exception:
-        return None
-
-LUNCH_WINDOW = _read_lunch_window()
 
 def _compute_dynamic_lunch_window(flow_sessions, base_window, reference_date=None):
     """
@@ -573,7 +1106,7 @@ def get_todays_sessions():
     break_sessions.sort(key=lambda x: x['start'])
     
     end_of_day_dt = datetime.datetime(now.year, now.month, now.day, 23, 59, 59)
-    lunch_window = _compute_dynamic_lunch_window(flow_sessions, LUNCH_WINDOW, reference_date=now.date())
+    lunch_window = _compute_dynamic_lunch_window(flow_sessions, LUNCH_WINDOW_BASE, reference_date=now.date())
     lunch_duration_minutes = 0
     if lunch_window:
         try:
@@ -718,10 +1251,7 @@ def update_markdown(sessions):
     today = datetime.datetime.now().date()
     today_str = today.strftime("%Y-%m-%d")
     file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
-        
-    # TEMPLATE PATH
-    TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.md"
-        
+
     if not os.path.exists(file_path):
         if os.path.exists(TEMPLATE_PATH):
             try:
@@ -740,106 +1270,13 @@ def update_markdown(sessions):
     
     lines = content.splitlines()
     
-    # Preserve existing notes keyed by session start time (HH:MM)
-    existing_notes = {}
-    table_header_re = re.compile(r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*NOTES\s*\|", re.IGNORECASE)
-    header_idx = -1
-    for i, line in enumerate(lines):
-        if table_header_re.match(line.strip()):
-            header_idx = i
-            break
-    if header_idx != -1:
-        row_start = header_idx + 2  # skip header and separator
-        for i in range(row_start, len(lines)):
-            if not lines[i].lstrip().startswith("|"):
-                break
-            parts = [p.strip() for p in lines[i].split("|")]
-            if len(parts) < 7:
-                continue
-            time_cell = parts[1].replace("`", "")
-            time_match = re.search(r"([0-2][0-9]:[0-5][0-9])", time_cell)
-            if not time_match:
-                continue
-            start_key = time_match.group(1)
-            note_content = parts[6]
-            if note_content and note_content != "❌":
-                existing_notes[start_key] = note_content
-    
-    # Construct New Table
-    new_table_lines = []
-    if sessions:
-        header = "| {:<13} | {:<20} | {:<10} | {:<12} | {:<10} | {:<30} |".format(
-            "TIME", "ACTIVITY", "DURATION", "INTERRUPT", "BREAK", "NOTES"
-        )
-        separator = "| {:<13} | {:<20} | {:<10} | {:<12} | {:<10} | {:<30} |".format(
-            "-------------", "--------------------", "----------", "------------", "----------", "------------------------------"
-        )
-        
-        new_table_lines = [header, separator]
-    
-        # Generate rows from sessions
-        for i, session in enumerate(sessions):
-            start_s = session['start'].strftime("%H:%M")
-            end_s = session['end'].strftime("%H:%M")
-            time_str = f"`{start_s} - {end_s}`"
+    # Build study table (also computes focus_minutes on sessions)
+    existing_notes = _extract_existing_notes(lines)
+    new_table_lines, total_focus_minutes = _build_study_section(sessions, existing_notes)
+    hours = total_focus_minutes // 60
+    minutes = total_focus_minutes % 60
+    study_str = f"{hours}h{minutes}m"
 
-            title = session['title']
-            if title and title.lower() != "flow":
-                activity_str = title
-            elif title:
-                activity_str = "Flow"
-            else:
-                activity_str = "Flow" # Default if title is None
-
-            actual_minutes = session.get('actual_elapsed', 0) or 0
-            interrupt_minutes = (session.get('interruptions_duration', 0) or 0) / 60.0
-
-            # Hybrid rounding: keep pauses tidy to whole minutes for display, but
-            # subtract the raw pause minutes and round the final focus once.
-            interrupt_rounded = round_half_up(interrupt_minutes)
-            focus_rounded = max(0, round_half_up(actual_minutes - interrupt_minutes))
-
-            session['focus_minutes'] = focus_rounded
-            session['focus_minutes_rounded'] = focus_rounded
-
-            duration_str = f"`{format_minutes(focus_rounded)}`"
-
-            int_dur_min = interrupt_rounded
-
-            if int_dur_min > 0:
-                interrupt_str = f"`+{int_dur_min:02d}m`"
-            else:
-                interrupt_str = "`+00m`"
-
-            break_str = ""
-            break_expected_val = session.get('break_expected', session.get('break_duration', 0)) or 0
-            break_min = ceil_minutes(break_expected_val)
-            overrun = int(session.get('break_overrun', 0))
-            break_reason = session.get('break_reason')
-            if break_min > 0:
-                break_display = f"{break_min}m" if break_reason == "lunch" else format_minutes(break_min)
-                parts = []
-                # Suppress explicit "lunch" label; keep other reasons if ever added
-                if break_reason and break_reason != "lunch":
-                    parts.append(break_reason)
-                if session.get('break_missing', False):
-                    parts.append("missing")
-                if overrun > 0:
-                    parts.append(f"+{format_minutes(overrun)}")
-
-                if parts:
-                    break_str = f"`{break_display} ({', '.join(parts)})`"
-                else:
-                    break_str = f"`{break_display}`"
-
-            # Restore Note
-            notes_str = existing_notes.get(start_s, "")
-            
-            row = "| {:<13} | {:<20} | {:<10} | {:<12} | {:<10} | {:<30} |".format(
-                time_str, activity_str, duration_str, interrupt_str, break_str, notes_str
-            )
-            new_table_lines.append(row)
-        
     # Find YAML end
     yaml_end_idx = -1
     dashes_count = 0
@@ -927,508 +1364,42 @@ def update_markdown(sessions):
         if reflections_idx != -1
         else lines[metrics_sep_idx + 1 :]
     )
-    # Calculate Total Study Time
-    total_focus_minutes = sum(s.get('focus_minutes_rounded', 0) for s in sessions)
-    hours = total_focus_minutes // 60
-    minutes = total_focus_minutes % 60
-    study_str = f"{hours}h{minutes}m"
 
-    # ICLOUD PATHS
-    ICLOUD_SHORTCUTS_DIR = "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents"
-    ICLOUD_JOURNALSYNC_DIR = os.path.join(ICLOUD_SHORTCUTS_DIR, "JournalSync")
+    # Load activity status files
+    workout_done, workout_data = _load_status_file("workout_status.json")
+    stretch_done, stretch_data = _load_status_file("stretching_status.json")
+    sleep_done, sleep_data = _load_status_file("sleep_status.json")
 
-    # Load activity status files (Workout and Stretching); presence alone signals completion.
-    def load_status(filename):
-        """
-        Read and JSON-parse a status file dropped in iCloud by Shortcuts.
-
-        Observed issue: the LaunchAgent triggers as soon as iCloud creates the
-        placeholder file, which can be empty or partially synced. We used to
-        delete the file regardless of parse success, losing the data. To make
-        this resilient we now:
-        - Wait for the file size to stabilize (to avoid half-synced reads).
-        - Retry for up to ~60 seconds before giving up.
-        - Only delete the file after a successful parse.
-        - If parsing never succeeds, we keep a `.invalid` copy for inspection
-          and return (False, None) without touching frontmatter.
-        """
-        path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
-
-        def try_parse(target_path, delete_after):
-            """
-            Wait for the file to finish syncing by checking for stable size,
-            then attempt to parse JSON. Returns (success: bool, data, last_err).
-            """
-            last_size = None
-            stable_count = 0
-            max_attempts = 60           # up to ~60s total
-            stable_needed = 2           # need two consecutive stable reads
-            last_err = None
-
-            for attempt in range(max_attempts):
-                try:
-                    size = os.path.getsize(target_path)
-                except FileNotFoundError:
-                    # File disappeared; treat as not ready
-                    last_err = FileNotFoundError("file disappeared while waiting")
-                    time.sleep(1.0)
-                    continue
-
-                if size == 0:
-                    last_err = ValueError("empty file (likely still syncing)")
-                    stable_count = 0
-                    time.sleep(1.0)
-                    continue
-
-                if last_size is not None and size == last_size:
-                    stable_count += 1
-                else:
-                    stable_count = 0
-                    last_size = size
-
-                if stable_count < stable_needed:
-                    time.sleep(1.0)
-                    continue
-
-                try:
-                    with open(target_path, "r") as f:
-                        raw = f.read()
-                    data = json.loads(raw)
-                    if delete_after:
-                        try:
-                            os.remove(target_path)
-                        except Exception:
-                            pass
-                    return True, data, None
-                except Exception as e:
-                    last_err = e
-                    time.sleep(1.0)
-
-            return False, None, last_err
-
-        def cleanup_invalids(primary_path):
-            """Remove all .invalid variants for the given primary path."""
-            invalids = glob.glob(primary_path + ".invalid") + glob.glob(primary_path + ".*.invalid")
-            for inv in invalids:
-                try:
-                    os.remove(inv)
-                except Exception:
-                    pass
-
-        def parse_with_fallback(primary_path):
-            # First try the primary path
-            if os.path.exists(primary_path):
-                success, data, last_err = try_parse(primary_path, delete_after=True)
-                if success:
-                    cleanup_invalids(primary_path)
-                    return True, data
-                # Promote the failed file to an .invalid copy for inspection/retry.
-                backup_path = primary_path + ".invalid"
-                try:
-                    if os.path.exists(backup_path):
-                        ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                        backup_path = f"{primary_path}.{ts}.invalid"
-                    os.replace(primary_path, backup_path)
-                except Exception:
-                    pass
-            else:
-                # Missing is expected most of the time; treat as no new data without logging.
-                return False, None
-
-            # Fallback: reprocess any existing .invalid copies (most recent first)
-            candidates = glob.glob(primary_path + ".invalid") + glob.glob(primary_path + ".*.invalid")
-            candidates = sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
-            for cand in candidates:
-                success, data, _ = try_parse(cand, delete_after=False)
-                if success:
-                    # Successful parse from an .invalid copy; clean up all invalids.
-                    cleanup_invalids(primary_path)
-                    return True, data
-
-            print(f"Failed to parse {os.path.basename(primary_path)}: {last_err}")
-            return False, None
-
-        return parse_with_fallback(path)
-
-    workout_done, workout_data = load_status("workout_status.json")
-    stretch_done, stretch_data = load_status("stretching_status.json")
-    sleep_done, sleep_data = load_status("sleep_status.json")
-
-    # Extract existing blocks (for fallback when no new status files)
-    def extract_block(body_lines, header_lower):
-        """
-        Return the block that starts at header_lower and stops before the next
-        section header (### or ##). This prevents runaway duplication when the
-        same block has already been injected multiple times.
-        """
-        start_idx = -1
-        for idx, line in enumerate(body_lines):
-            if line.strip().lower() == header_lower:
-                start_idx = idx
-                break
-        if start_idx == -1:
-            return []
-
-        end_idx = len(body_lines)
-        for idx in range(start_idx + 1, len(body_lines)):
-            stripped = body_lines[idx].strip()
-            if stripped.startswith("### ") or stripped.startswith("## "):
-                end_idx = idx
-                break
-
-        # Trim trailing blank lines within the block
-        while end_idx > start_idx and body_lines[end_idx - 1].strip() == "":
-            end_idx -= 1
-
-        return body_lines[start_idx:end_idx]
-
-    existing_training_block = extract_block(metrics_body, "### training")
-    existing_sleep_block = extract_block(metrics_body, "### sleep")
-
-    def parse_training_table(block_lines):
-        """
-        Convert an existing TRAINING table into structured entries so we can
-        merge new workouts/stretching events without dropping prior ones.
-        """
-        entries = []
-        header_re = re.compile(r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|", re.IGNORECASE)
-        header_idx = -1
-        for idx, line in enumerate(block_lines):
-            if header_re.search(line):
-                header_idx = idx
-                break
-        if header_idx == -1:
-            return entries
-
-        row_start = header_idx + 2  # skip header and separator
-        for line in block_lines[row_start:]:
-            if not line.lstrip().startswith("|"):
-                break
-            parts = [p.strip() for p in line.split("|")]
-            if len(parts) < 5:
-                continue
-            raw_time = parts[1].strip("` ").replace("`", "")
-            activity = parts[2]
-            duration = parts[3].strip("` ").replace("`", "")
-            calories = parts[4].strip("` ").replace("`", "")
-
-            start_val = None
-            end_val = None
-            time_match = re.match(r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$", raw_time)
-            if time_match:
-                start_val = time_match.group(1)
-                end_val = time_match.group(2)
-
-            entries.append({
-                "start": start_val,
-                "end": end_val,
-                "time_raw": raw_time,
-                "activity": activity,
-                "duration": duration,
-                "calories": calories,
-            })
-        return entries
-
-    existing_training_entries = parse_training_table(existing_training_block)
+    # Extract existing blocks for fallback
+    existing_training_block = _extract_block(metrics_body, "### training")
+    existing_sleep_block = _extract_block(metrics_body, "### sleep")
 
     # Rebuild Metrics section from scratch (idempotent)
     final_lines = lines[:metrics_sep_idx + 1]
     final_lines.append("### STUDY")
     if new_table_lines:
-        final_lines.append("")  # blank before study table
+        final_lines.append("")
         final_lines.extend(new_table_lines)
-        final_lines.append("")  # blank after study table
+        final_lines.append("")
     else:
-        final_lines.append("")  # blank before the no-study message
+        final_lines.append("")
         final_lines.append("_No study sessions completed today._")
         final_lines.append("")
 
-    # Build/merge Training table
-    def load_training_cache(date_str):
-        try:
-            with open(TRAINING_CACHE_PATH, "r") as f:
-                obj = json.load(f)
-            if obj.get("date") == date_str and isinstance(obj.get("entries"), list):
-                return obj.get("entries") or []
-        except Exception:
-            pass
-        return []
+    # Build training section
+    training_lines, _ = _build_training_section(
+        workout_data, stretch_data, existing_training_block, today_str
+    )
+    final_lines.extend(training_lines)
 
-    def save_training_cache(date_str, entries):
-        try:
-            os.makedirs(os.path.dirname(TRAINING_CACHE_PATH), exist_ok=True)
-            with open(TRAINING_CACHE_PATH, "w") as f:
-                json.dump({"date": date_str, "entries": entries}, f)
-        except Exception:
-            pass
-
-    def activity_entries_from_data(data, default_activity_label):
-        """
-        Normalize workout/stretch JSON payloads into training table entries.
-        """
-        entries_out = []
-        if not data:
-            return entries_out
-        try:
-            source_entries = data if isinstance(data, list) else [data]
-            for entry in source_entries:
-                start_raw = (entry.get("start") or "").strip()
-                end_raw = (entry.get("end") or "").strip()
-                dur_val = entry.get("duration")
-                kcal_val = entry.get("kcal")
-                activity_val = entry.get("type") or default_activity_label
-
-                duration_fmt = ""
-                if dur_val is not None:
-                    duration_fmt = format_minutes_seconds(float(dur_val))
-
-                calories_fmt = ""
-                if kcal_val is not None:
-                    calories_fmt = f"{int(round(float(kcal_val)))} kcal"
-
-                if start_raw and end_raw:
-                    time_raw = f"{start_raw} - {end_raw}"
-                else:
-                    time_raw = start_raw or ""
-
-                entries_out.append({
-                    "start": start_raw or None,
-                    "end": end_raw or None,
-                    "time_raw": time_raw,
-                    "activity": activity_val,
-                    "duration": duration_fmt,
-                    "calories": calories_fmt,
-                })
-        except Exception:
-            entries_out = []
-        return entries_out
-
-    def merge_training_entries(existing, new):
-        """
-        Deduplicate training rows while letting new entries override prior ones
-        when they share the same identifying key.
-        """
-        merged = OrderedDict()
-
-        def key(entry):
-            return (
-                entry.get("start") or "",
-                entry.get("end") or "",
-                (entry.get("activity") or "").strip().lower(),
-                entry.get("duration") or "",
-                entry.get("calories") or "",
-            )
-
-        for e in existing:
-            merged[key(e)] = e
-        for e in new:
-            merged[key(e)] = e
-        return list(merged.values())
-
-    def render_training_entries(entries):
-        if not entries:
-            return []
-
-        def to_minutes(val):
-            try:
-                h, m = map(int, val.split(":"))
-                return h * 60 + m
-            except Exception:
-                return None
-
-        def sort_key(e):
-            mins = to_minutes(e.get("start") or "")
-            return (mins if mins is not None else 24 * 60 + 1, e.get("activity") or "")
-
-        ordered = sorted(entries, key=sort_key)
-        header = "| {:<13} | {:<15} | {:<12} | {:<12} |".format("TIME", "ACTIVITY", "DURATION", "CALORIES")
-        separator = "| {:<13} | {:<15} | {:<12} | {:<12} |".format("-------------", "---------------", "------------", "------------")
-        lines_out = [header, separator]
-        for entry in ordered:
-            if entry.get("start") and entry.get("end"):
-                time_cell = f"`{entry['start']} - {entry['end']}`"
-            elif entry.get("start"):
-                time_cell = f"`{entry['start']}`"
-            elif entry.get("time_raw"):
-                time_cell = f"`{entry['time_raw']}`"
-            else:
-                time_cell = ""
-
-            duration_cell = f"`{entry['duration']}`" if entry.get("duration") else ""
-            calories_cell = f"`{entry['calories']}`" if entry.get("calories") else ""
-
-            row = "| {:<13} | {:<15} | {:<12} | {:<12} |".format(
-                time_cell, entry.get("activity", ""), duration_cell, calories_cell
-            )
-            lines_out.append(row)
-        return lines_out
-
-    workout_entries = activity_entries_from_data(workout_data, "Workout")
-    stretch_entries = activity_entries_from_data(stretch_data, "Stretching")
-    new_training_entries = workout_entries + stretch_entries
-
-    # Persist today's training entries so workout/stretch files can arrive in
-    # separate runs without losing earlier ones. Cache is per-day and ignores
-    # whatever might be in the template.
-    training_cache_entries = load_training_cache(today_str)
-
-    merged_training_entries = []
-    if new_training_entries:
-        merged_training_entries = merge_training_entries(training_cache_entries, new_training_entries)
-        save_training_cache(today_str, merged_training_entries)
-    elif training_cache_entries:
-        merged_training_entries = training_cache_entries
-    elif existing_training_block:
-        # As a last resort (e.g., cache deleted), fall back to the note's block.
-        merged_training_entries = existing_training_entries
-
-    if merged_training_entries:
-        if not final_lines or final_lines[-1].strip() != "":
-            final_lines.append("")
-        final_lines.append("### TRAINING")
-        final_lines.append("")
-        final_lines.extend(render_training_entries(merged_training_entries))
-        final_lines.append("")
-    else:
-        # Insert explicit placeholder when no training data
-        if not final_lines or final_lines[-1].strip() != "":
-            final_lines.append("")
-        final_lines.append("### TRAINING")
-        final_lines.append("")
-        final_lines.append("_No training sessions completed today._")
-        final_lines.append("")
-
-    # Build Sleep table if data is available
-    def build_sleep_table(data):
-        lines_out = []
-        if not data:
-            return lines_out
-        try:
-            header = "| {:<13} | {:<12} | {:<10} | {:<14} |".format("TIME", "DURATION", "AWAKE", "AWAKENINGS")
-            separator = "| {:<13} | {:<12} | {:<10} | {:<14} |".format("-------------", "------------", "----------", "--------------")
-            lines_out = [header, separator]
-
-            def parse_time(raw):
-                if not raw:
-                    return ""
-                for fmt in ("%d %b %Y at %H:%M", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"):
-                    try:
-                        dt = datetime.datetime.strptime(raw, fmt)
-                        return dt.strftime("%H:%M")
-                    except Exception:
-                        continue
-                # If parsing fails, return raw truncated
-                return raw
-
-            start_raw = data.get("start") or data.get("SleepBegin") or data.get("SleepStart")
-            end_raw = data.get("end") or data.get("SleepEnd")
-            sleep_min = data.get("sleep_min") or data.get("SleepMinutes")
-            awake_min = data.get("awake_min") or data.get("AwakeMinutes")
-            awake_count = data.get("awake_count") or data.get("AwakeCount")
-
-            time_cell = ""
-            start_fmt = parse_time(start_raw)
-            end_fmt = parse_time(end_raw)
-            if start_fmt and end_fmt:
-                time_cell = f"`{start_fmt} - {end_fmt}`"
-            elif start_fmt:
-                time_cell = f"`{start_fmt}`"
-
-            duration_cell = ""
-            if sleep_min is not None:
-                duration_cell = f"`{format_minutes_seconds(float(sleep_min))}`"
-
-            awake_cell = ""
-            if awake_min is not None:
-                awake_cell = f"`{int(round(float(awake_min)))}m`"
-
-            wakes_cell = ""
-            if awake_count is not None:
-                wakes_cell = f"`{int(awake_count)} times`"
-
-            row = "| {:<13} | {:<12} | {:<10} | {:<14} |".format(time_cell, duration_cell, awake_cell, wakes_cell)
-            lines_out.append(row)
-        except Exception:
-            lines_out = []
-        return lines_out
-
-    sleep_table_lines = build_sleep_table(sleep_data)
-
-    if sleep_table_lines:
-        if not final_lines or final_lines[-1].strip() != "":
-            final_lines.append("")
-        final_lines.append("### SLEEP")
-        final_lines.append("")
-        final_lines.extend(sleep_table_lines)
-        final_lines.append("")
-    elif existing_sleep_block:
-        if not final_lines or final_lines[-1].strip() != "":
-            final_lines.append("")
-        final_lines.extend(existing_sleep_block)
-        if final_lines and final_lines[-1].strip() != "":
-            final_lines.append("")
+    # Build sleep section
+    sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
+    final_lines.extend(sleep_lines)
 
     final_lines.extend(rest_lines)
 
-    # Sleep is now entered manually; no automated sleep import
-    sleep_str = ""
-
-    # Update YAML Frontmatter only
-    first_dash_idx = -1
-    second_dash_idx = -1
-    for i, line in enumerate(final_lines):
-        if line.strip() == "---":
-            if first_dash_idx == -1:
-                first_dash_idx = i
-            elif second_dash_idx == -1:
-                second_dash_idx = i
-                break
-
-    if first_dash_idx != -1 and second_dash_idx != -1 and second_dash_idx > first_dash_idx:
-        fm_lines = final_lines[first_dash_idx + 1 : second_dash_idx]
-        fm_order, fm_data = _parse_frontmatter(fm_lines)
-
-        def set_value(key, value):
-            if key not in fm_order:
-                fm_order.append(key)
-            fm_data[key] = value
-
-        # Mandatory overwrite
-        set_value("study", study_str)
-
-        # Workout: flip to true only when status file says so; otherwise preserve or default to false
-        if workout_done:
-            set_value("workout", "true")
-        else:
-            current_workout = fm_data.get("workout", "")
-            set_value("workout", current_workout if current_workout else "false")
-
-        # Stretch: flip to true only when status file says so; otherwise preserve or default to false
-        if stretch_done:
-            set_value("stretch", "true")
-        else:
-            current_stretch = fm_data.get("stretch", "")
-            set_value("stretch", current_stretch if current_stretch else "false")
-
-        # Sleep: update if provided; else preserve manual entry
-        if sleep_data and (sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")):
-            try:
-                total_min = float(sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes"))
-                hours = int(total_min) // 60
-                mins = int(total_min) % 60
-                sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
-                set_value("sleep", sleep_str)
-            except Exception:
-                pass
-
-        # Stretch/mood/sleep and other keys: preserve as-is
-
-        new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
-        final_lines = (
-            final_lines[: first_dash_idx + 1]
-            + new_fm_lines
-            + final_lines[second_dash_idx:]
-        )
+    # Update YAML frontmatter
+    final_lines = _update_frontmatter(final_lines, study_str, workout_done, stretch_done, sleep_data)
 
     new_content = "\n".join(final_lines)
     
