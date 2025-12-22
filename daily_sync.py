@@ -6,12 +6,19 @@ import sys
 import json
 import time
 import glob
-import math
 from collections import OrderedDict
+
+from sync_utils import (
+    JOURNAL_DIR,
+    format_minutes,
+    format_minutes_seconds,
+    ceil_minutes,
+    round_half_up,
+    extract_block,
+)
 
 # Configuration
 DB_PATH = "/Users/edo/Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite"
-JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
 CORE_DATA_EPOCH_OFFSET = 978307200  # Seconds between 1970-01-01 and 2001-01-01
 BREAK_GAP_CAP_SECONDS = 60  # 1 minute; breaks auto-start, so keep this tight
 # Maximum allowed gap (seconds) between a flow end and the next break start
@@ -467,32 +474,6 @@ def _update_frontmatter(final_lines, study_str, workout_done, stretch_done, slee
     )
 
 
-def _extract_block(body_lines, header_lower):
-    """
-    Return the block that starts at header_lower and stops before the next
-    section header (### or ##).
-    """
-    start_idx = -1
-    for idx, line in enumerate(body_lines):
-        if line.strip().lower() == header_lower:
-            start_idx = idx
-            break
-    if start_idx == -1:
-        return []
-
-    end_idx = len(body_lines)
-    for idx in range(start_idx + 1, len(body_lines)):
-        stripped = body_lines[idx].strip()
-        if stripped.startswith("### ") or stripped.startswith("## "):
-            end_idx = idx
-            break
-
-    while end_idx > start_idx and body_lines[end_idx - 1].strip() == "":
-        end_idx -= 1
-
-    return body_lines[start_idx:end_idx]
-
-
 def _parse_training_table(block_lines):
     """Convert an existing TRAINING table into structured entries."""
     entries = []
@@ -677,10 +658,8 @@ def _build_training_section(workout_data, stretch_data, existing_block, today_st
     lines_out = ["", "### TRAINING", ""]
     if merged:
         lines_out.extend(_render_training_entries(merged))
-        lines_out.append("")
     else:
         lines_out.append("_No training sessions completed today._")
-        lines_out.append("")
 
     return lines_out, merged
 
@@ -829,49 +808,6 @@ def get_expected_break_minutes(break_session=None):
         if val:
             return val
     return 30
-
-def format_minutes(total_minutes: int) -> str:
-    hours = total_minutes // 60
-    minutes = total_minutes % 60
-    if hours > 0:
-        return f"{hours}h{minutes:02d}m" if minutes else f"{hours}h"
-    return f"{minutes}m"
-
-def format_minutes_seconds(total_minutes_float: float) -> str:
-    """
-    Convert minute value (can be float) to XmYYs string.
-    """
-    if total_minutes_float is None:
-        return ""
-    mins = int(total_minutes_float)
-    secs = round((total_minutes_float - mins) * 60)
-    if secs == 60:
-        mins += 1
-        secs = 0
-    if mins >= 60:
-        hours = mins // 60
-        rem_mins = mins % 60
-        return f"{hours}h{rem_mins:02d}m" if secs == 0 else f"{hours}h{rem_mins:02d}m{secs:02d}s"
-    if secs == 0:
-        return f"{mins}m"
-    return f"{mins}m{secs:02d}s"
-
-def ceil_minutes(val: float) -> int:
-    """
-    Round minutes upward with a tiny tolerance to avoid float undercounts
-    (e.g., 89.0000001 -> 90).
-    """
-    if val is None:
-        return 0
-    return int(math.ceil(val - 1e-6))
-
-def round_half_up(val: float) -> int:
-    """
-    Round to nearest minute, half-up, with tiny tolerance to prevent float drift.
-    """
-    if val is None:
-        return 0
-    return int(math.floor(val + 0.5000001))
 
 
 def _compute_dynamic_lunch_window(flow_sessions, base_window, reference_date=None):
@@ -1230,6 +1166,7 @@ def _parse_frontmatter(lines):
     """
     Parse simple YAML-style key: value lines into an ordered dict.
     Ignores blank lines and comment lines starting with '#'.
+    Returns (order, data) tuple for preserving key order when writing back.
     """
     data = OrderedDict()
     order = []
@@ -1370,9 +1307,9 @@ def update_markdown(sessions):
     stretch_done, stretch_data = _load_status_file("stretching_status.json")
     sleep_done, sleep_data = _load_status_file("sleep_status.json")
 
-    # Extract existing blocks for fallback
-    existing_training_block = _extract_block(metrics_body, "### training")
-    existing_sleep_block = _extract_block(metrics_body, "### sleep")
+    # Extract existing blocks for fallback (using shared extract_block)
+    existing_training_block = extract_block(metrics_body, "### training")
+    existing_sleep_block = extract_block(metrics_body, "### sleep")
 
     # Rebuild Metrics section from scratch (idempotent)
     final_lines = lines[:metrics_sep_idx + 1]
@@ -1380,11 +1317,9 @@ def update_markdown(sessions):
     if new_table_lines:
         final_lines.append("")
         final_lines.extend(new_table_lines)
-        final_lines.append("")
     else:
         final_lines.append("")
         final_lines.append("_No study sessions completed today._")
-        final_lines.append("")
 
     # Build training section
     training_lines, _ = _build_training_section(
@@ -1423,3 +1358,4 @@ if __name__ == "__main__":
     if changed is False:
         # Suppress noisy success logs on no-op runs.
         pass
+
