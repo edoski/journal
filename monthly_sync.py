@@ -27,8 +27,13 @@ def compute_month_metrics(dates, daily_data):
     """
     Compute aggregated metrics for a list of dates (month).
     Returns a dict with study_total_minutes, sleep_avg_minutes, mood_avg,
-    workout_count, stretch_count, total_days.
+    workout_count, stretch_count, total_days, days_up_to_today.
     """
+    # Only count days up to today (or last day with any data)
+    today = datetime.date.today()
+    dates_up_to_today = [d for d in dates if d <= today]
+    days_up_to_today = len(dates_up_to_today)
+    
     study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
     sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
     mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
@@ -49,6 +54,7 @@ def compute_month_metrics(dates, daily_data):
         "workout_count": workout_count,
         "stretch_count": stretch_count,
         "total_days": len(dates),
+        "days_up_to_today": days_up_to_today,
     }
 
 
@@ -122,6 +128,38 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
     else:
         lines.append("|  |  |  |")
+    lines.append("")
+
+    # INTERRUPTIONS table
+    interrupt_totals = [daily_data.get(d, {}).get("interrupt_minutes", 0) for d in dates]
+    overrun_totals = [daily_data.get(d, {}).get("overrun_minutes", 0) for d in dates]
+    total_interrupts = sum(interrupt_totals)
+    total_overruns = sum(overrun_totals)
+    
+    # Calculate averages per day (only count days up to today)
+    days_up_to_today = current_metrics.get("days_up_to_today", len(dates))
+    avg_interrupts = total_interrupts / max(1, days_up_to_today)
+    avg_overruns = total_overruns / max(1, days_up_to_today)
+    
+    # Calculate study daily average for percentage comparison
+    study_daily_avg = study_total_from_activities / max(1, days_up_to_today)
+    
+    # Calculate percentage of study time lost to interrupts
+    interrupt_pct_str = "-"
+    if study_total_from_activities > 0 and total_interrupts > 0:
+        interrupt_pct = (total_interrupts / study_total_from_activities) * 100
+        interrupt_pct_str = f"{int(round(interrupt_pct))}%"
+    
+    # Calculate percentage comparison for overruns vs daily study average
+    overrun_pct_str = "-"
+    if study_daily_avg > 0 and avg_overruns > 0:
+        overrun_pct = (avg_overruns / study_daily_avg) * 100
+        overrun_pct_str = f"{int(round(overrun_pct))}%"
+    
+    lines.append("| METRIC | AVERAGE | % OF STUDY |")
+    lines.append("| ------ | ------- | ---------- |")
+    lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts)}/day` | `{interrupt_pct_str}` |")
+    lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns)}/day` | `{overrun_pct_str}` |")
     lines.append("")
 
     # TRAINING section

@@ -169,8 +169,26 @@ def parse_study_table(lines):
             continue
         activity = parts[2].strip("`")
         duration_min = parse_duration_to_minutes(parts[3])
+        
+        # Parse interrupt minutes from INTERRUPT column (format: `+XXm`)
+        interrupt_min = 0
+        if len(parts) > 4:
+            interrupt_str = parts[4].strip("`").strip()
+            interrupt_match = re.search(r"\+(\d+)m", interrupt_str)
+            if interrupt_match:
+                interrupt_min = int(interrupt_match.group(1))
+        
+        # Parse overrun minutes from BREAK column (format: `5m (+15m)` where (+15m) is the overrun)
+        overrun_min = 0
+        if len(parts) > 5:
+            break_str = parts[5].strip("`").strip()
+            overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
+            if overrun_match:
+                overrun_str = overrun_match.group(1)
+                overrun_min = parse_duration_to_minutes(overrun_str) or 0
+        
         if activity and duration_min:
-            rows.append((activity, duration_min))
+            rows.append((activity, duration_min, interrupt_min, overrun_min))
     return rows
 
 
@@ -215,10 +233,8 @@ def parse_daily_note(path):
     study_rows = parse_study_table(lines)
     sleep_rows = parse_sleep_table(lines)
 
-    study_from_fm = parse_duration_to_minutes(fm.get("study"))
+    # Sleep still uses frontmatter if available (user may adjust for naps, etc.)
     sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
-
-    study_total = study_from_fm if study_from_fm is not None else sum((m for _, m in study_rows), 0)
     sleep_total = sleep_from_fm if sleep_from_fm is not None else sum((r[0] or 0 for r in sleep_rows), 0)
 
     mood_val = None
@@ -239,8 +255,21 @@ def parse_daily_note(path):
             awakenings_total = sum(awak_counts)
 
     activity_totals = {}
-    for activity, minutes in study_rows:
+    interrupt_total = 0
+    overrun_total = 0
+    for row in study_rows:
+        activity, minutes = row[0], row[1]
         activity_totals[activity] = activity_totals.get(activity, 0) + minutes
+        
+        # Aggregate interrupts and overruns
+        if len(row) > 2:
+            interrupt_total += row[2]
+        if len(row) > 3:
+            overrun_total += row[3]
+
+    # Study total always derived from table (activity_totals) for consistency
+    # This ensures chart bars, SUM, SUMMARY avg, and percentages all match
+    study_total = sum(activity_totals.values())
 
     return {
         "study_minutes": study_total,
@@ -251,6 +280,8 @@ def parse_daily_note(path):
         "awake_minutes": awake_total,
         "awakenings": awakenings_total,
         "activity_totals": activity_totals,
+        "interrupt_minutes": interrupt_total,
+        "overrun_minutes": overrun_total,
     }
 
 
@@ -402,14 +433,17 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     # STUDY row (daily average)
     curr_study_total = current_metrics.get("study_total_minutes") or 0
     prev_study_total = previous_metrics.get("study_total_minutes") or 0
+    # Use days_up_to_today for accurate daily average (not counting future days)
+    curr_days_for_avg = current_metrics.get("days_up_to_today") or current_metrics.get("total_days", 7)
+    prev_days_for_avg = previous_metrics.get("days_up_to_today") or previous_metrics.get("total_days", 7)
     curr_total_days = current_metrics.get("total_days", 7)
     prev_total_days = previous_metrics.get("total_days", 7)
     
     # Always show study average, even if zero
-    curr_study_avg_mins = curr_study_total / max(1, curr_total_days)
+    curr_study_avg_mins = curr_study_total / max(1, curr_days_for_avg)
     curr_study_avg = format_minutes(curr_study_avg_mins, always_show_both=True) + "/day"
     
-    prev_study_avg_mins = prev_study_total / max(1, prev_total_days)
+    prev_study_avg_mins = prev_study_total / max(1, prev_days_for_avg)
     prev_study_avg = format_minutes(prev_study_avg_mins, always_show_both=True) + "/day"
     
     # Compute percentage change (show dash only if both are zero)
