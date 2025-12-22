@@ -21,9 +21,9 @@ journal/
 
 - **`daily_sync.py`**: Main entry point for daily syncing; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today's markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent + single run per day).
 
-- **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with charts and summary tables.
+- **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with bar charts for study/sleep/mood and a compact frequency grid for training data showing completed/skipped days using visual blocks.
 
-- **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns.
+- **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns, including bar charts for study/sleep/mood and a compact frequency grid showing entire month's training patterns at a glance.
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, and monthly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
@@ -35,10 +35,10 @@ journal/
 ## Architecture
 
 ### Shared Utilities (`sync_utils.py`)
-- **Formatting**: `format_minutes`, `format_minutes_seconds`, `format_hours_value`, `format_mood_value`, `ceil_minutes`, `round_half_up`
+- **Formatting**: `format_minutes`, `format_minutes_seconds`, `ceil_minutes`, `round_half_up`, `format_training_ratio`, `format_mood_with_scale`, `format_percent_change`, `compute_percent_change`
 - **Parsing**: `parse_frontmatter`, `parse_duration_to_minutes`, `parse_bool`, `extract_block`, `parse_study_table`, `parse_sleep_table`, `parse_daily_note`
 - **Date utilities**: `daterange`, `iso_week_range`, `month_range`, `month_week_ranges`, `format_week_label`
-- **Rendering**: `render_summary_block`, `render_vertical_chart`, `wrap_code_block`
+- **Chart rendering**: `render_summary_table`, `render_monthly_chart`, `render_weekly_chart`, `render_training_frequency_grid`, `render_weekly_training_grid`, `wrap_code_block`
 - **File handling**: `ensure_note`, `replace_metrics_block`
 
 ### Daily Sync (`daily_sync.py`)
@@ -53,6 +53,13 @@ journal/
 ### Weekly/Monthly Sync
 - `build_weekly_metrics` / `build_monthly_metrics`: Generate aggregated metrics blocks
 - Both import shared utilities from `sync_utils.py`
+
+### Training Visualizations
+Weekly and monthly notes use compact frequency grids to display training data:
+- **Monthly grid**: Uses `■` (completed) and `·` (skipped) with week grouping, dynamically adjusts for 28-31 day months, shows inline counts like `(06/31)` with zero-padding
+- **Weekly grid**: Uses `███` (completed) and `░░░` (skipped) for better visibility, shows inline counts like `(2/7)` without zero-padding
+- Both formats include vertical bars (`│`) for visual consistency, separator lines, and day labels
+- No legends or summary tables—visual patterns and inline counts make totals immediately apparent
 
 ## Build, Test, and Run
 
@@ -96,6 +103,8 @@ launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 - After changes, run the script twice and confirm the daily note remains stable (no duplicate rows) and preserves existing notes by start time.
 - Validate edge cases: open sessions (no `completed_at`), missing JSON payloads, and dynamic lunch window shifting.
 - Test weekly/monthly scripts with `--date` or `--month` flags to verify historical aggregation.
+- For training visualizations: test with weeks/months containing zero training days, full training days, and mixed patterns to verify proper rendering.
+- Verify formatting consistency: study SUM should always show `0h00m` (not `0m`), training counts should be zero-padded in monthly notes only (`06/31` vs `2/7`).
 
 ## Commit & Pull Request Guidelines
 
