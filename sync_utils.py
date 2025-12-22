@@ -119,22 +119,6 @@ def round_half_up(val: float) -> int:
     return int(math.floor(val + 0.5000001))
 
 
-def format_hours_value(hours, suffix="h"):
-    if hours is None:
-        return ""
-    if abs(hours - round(hours)) < 0.05:
-        return f"{int(round(hours))}{suffix}"
-    return f"{hours:.1f}{suffix}"
-
-
-def format_mood_value(val):
-    if val is None:
-        return ""
-    if abs(val - round(val)) < 0.05:
-        return str(int(round(val)))
-    return f"{val:.1f}"
-
-
 def parse_bool(val):
     if isinstance(val, bool):
         return val
@@ -313,52 +297,6 @@ def format_week_label(start_date, end_date):
     return f"{month} {start_date.day:02d}-{end_date.day:02d}"
 
 
-def render_summary_block(label_values, max_values, bar_width=20):
-    lines = ["### SUMMARY", ""]
-    label_width = max((len(label) for label, _, _ in label_values), default=0)
-    for label, value_str, numeric_val in label_values:
-        max_val = max_values.get(label, 1) or 1
-        bar_len = 0
-        if numeric_val is not None:
-            bar_len = int(round(min(bar_width, max(0, numeric_val / max_val * bar_width))))
-        bar = "#" * bar_len
-        lines.append(f"{label.ljust(label_width)} {value_str} | {bar}")
-    lines.append("")
-    return lines
-
-
-def render_vertical_chart(labels, bar_values, value_labels, height=10, col_width=8):
-    axis_width = len(f"{height:>2} |")
-    left_pad = (col_width - 1) // 2
-    bar_col = " " * left_pad + "#" + " " * (col_width - 1 - left_pad)
-    blank_col = " " * col_width
-
-    bars = []
-    for val in bar_values:
-        if val is None:
-            bars.append(0)
-            continue
-        bars.append(int(round(min(height, max(0, val)))))
-
-    lines = []
-    for level in range(height, 0, -1):
-        row = f"{level:>2} |"
-        for bar in bars:
-            row += bar_col if bar >= level else blank_col
-        lines.append(row)
-
-    label_row = " " * axis_width
-    for label in labels:
-        label_row += label.ljust(col_width)[:col_width]
-    lines.append(label_row.rstrip())
-
-    value_row = " " * axis_width
-    for val in value_labels:
-        value_row += str(val).ljust(col_width)[:col_width]
-    lines.append(value_row.rstrip())
-    return lines
-
-
 def wrap_code_block(lines):
     return ["```"] + lines + ["```"]
 
@@ -420,16 +358,6 @@ def format_percent_change(pct):
         return "-"
     sign = "+" if pct >= 0 else ""
     return f"{sign}{round_half_up(pct)}%"
-
-
-def format_study_avg(total_minutes, days):
-    """
-    Format study as daily average (e.g., "1h16m/day").
-    """
-    if days <= 0 or total_minutes is None:
-        return "-"
-    avg = total_minutes / days
-    return f"{format_minutes(round_half_up(avg))}/day"
 
 
 def format_training_ratio(count, total_days):
