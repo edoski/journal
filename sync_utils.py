@@ -127,11 +127,24 @@ def parse_bool(val):
     return str(val).strip().lower() == "true"
 
 
+def _normalize_header(line: str) -> str:
+    """
+    Normalize markdown headers for matching, ignoring emphasis markers.
+    This allows matching "### STUDY" with "### **STUDY**", etc.
+    """
+    if line is None:
+        return ""
+    normalized = line.strip().lower()
+    normalized = re.sub(r"[*_`]", "", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
+
+
 def extract_block(lines, header):
-    header_lower = header.strip().lower()
+    header_norm = _normalize_header(header)
     start = -1
     for idx, line in enumerate(lines):
-        if line.strip().lower() == header_lower:
+        if _normalize_header(line) == header_norm:
             start = idx
             break
     if start == -1:
@@ -853,4 +866,3 @@ def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count)
     lines.append(label_row)
     
     return lines
-
