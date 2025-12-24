@@ -182,6 +182,145 @@ def _normalize_header(line: str) -> str:
     return normalized
 
 
+# --- Goal helpers ---------------------------------------------------------
+
+def canonical_goal(text: str) -> str:
+    """Normalize a goal line for idempotent matching.
+
+    - Strips leading checkbox/bullet markers.
+    - Strips wiki links ([[foo]] -> foo) to avoid false mismatches.
+    - Collapses whitespace and trims trailing punctuation.
+    """
+    cleaned = re.sub(r"^\s*[-*]\s*\[[^\]]?\]\s*", "", text)
+    cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
+    cleaned = cleaned.strip(" `")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    cleaned = cleaned.rstrip(".,;:-—– ")
+    return cleaned.lower()
+
+
+def parse_goal_tasks(lines):
+    """Extract checkbox task lines into a list of dicts.
+
+    Each dict contains: line (original), body (after checkbox), done (bool),
+    canonical (normalized for comparisons).
+    """
+    pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[^\]]?)\]\s*(?P<body>.+)$")
+    tasks = []
+    for line in lines:
+        match = pattern.match(line)
+        if not match:
+            continue
+        state = (match.group("state") or "").strip()
+        body = match.group("body").strip()
+        done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
+        tasks.append({
+            "line": line,
+            "body": body,
+            "done": done_state,
+            "canonical": canonical_goal(line),
+        })
+    return tasks
+
+
+def render_goal_lines(tasks):
+    """Render task dicts back to markdown checkbox lines."""
+    rendered = []
+    for task in tasks:
+        mark = "x" if task.get("done") else " "
+        rendered.append(f"- [{mark}] {task.get('body', '').strip()}")
+    return rendered
+
+
+def find_subheader_idx(lines, title, start=0, end=None, level=3):
+    """Find index of a subheader between start and end (defaults to full list)."""
+    end = end if end is not None else len(lines)
+    needle = _normalize_header(f"{'#'*level} {title}")
+    for idx in range(start, end):
+        if _normalize_header(lines[idx]) == needle:
+            return idx
+    return -1
+
+
+def goals_section_bounds(lines):
+    """Return (start, end) indices for the ## Goals section."""
+    goals_idx = find_header_idx(lines, "Goals", level=2)
+    if goals_idx == -1:
+        return -1, -1
+    _, end = section_bounds(lines, goals_idx, level=2)
+    return goals_idx, end
+
+
+def extract_subsection_tasks(lines, parent_start, parent_end, sub_title):
+    """Extract checkbox tasks from a ### subsection within a parent block."""
+    sub_idx = find_subheader_idx(lines, sub_title, start=parent_start, end=parent_end, level=3)
+    if sub_idx == -1:
+        return []
+    sub_start, sub_end = subsection_bounds(lines, sub_idx, parent_end)
+    body_start = sub_idx + 1
+    while body_start < sub_end and lines[body_start].strip() == "":
+        body_start += 1
+    tasks = parse_goal_tasks(lines[body_start:sub_end])
+    return tasks
+
+
+def build_goals_block(subsections):
+    """Render a complete Goals block given ordered subsections.
+
+    subsections: list of (title, tasks_lines) where tasks_lines are already
+    rendered checkbox lines (not parsed tasks).
+    """
+    lines = ["## Goals", "---"]
+    for idx, (title, task_lines) in enumerate(subsections):
+        lines.append(f"### **{title}**")
+        if task_lines:
+            lines.extend(task_lines)
+        if idx != len(subsections) - 1:
+            lines.append("")
+    # Ensure a blank line after the Goals block so following sections are separated.
+    if lines and lines[-1].strip() != "":
+        lines.append("")
+    return lines
+
+
+def find_header_idx(lines, title, level=2, start=0):
+    """Find the index of a markdown header like ## Title or ### Title.
+
+    Returns -1 when not found. Matching is case-insensitive and ignores extra
+    emphasis markers (handled via _normalize_header).
+    """
+    needle = _normalize_header(f"{'#'*level} {title}")
+    for idx in range(start, len(lines)):
+        if _normalize_header(lines[idx]) == needle:
+            return idx
+    return -1
+
+
+def section_bounds(lines, header_idx, level=2):
+    """Return (start, end) indices for a header block delimited by same-level headers."""
+    if header_idx == -1:
+        return -1, -1
+    end_idx = len(lines)
+    header_prefix = "#" * level + " "
+    for idx in range(header_idx + 1, len(lines)):
+        if lines[idx].strip().startswith(header_prefix) and _normalize_header(lines[idx]) != _normalize_header(lines[header_idx]):
+            end_idx = idx
+            break
+    return header_idx, end_idx
+
+
+def subsection_bounds(lines, subheader_idx, parent_end_idx):
+    """Return (start, end) indices for a ### subsection up to next ### or parent end."""
+    if subheader_idx == -1:
+        return -1, -1
+    end_idx = parent_end_idx
+    for idx in range(subheader_idx + 1, parent_end_idx):
+        if lines[idx].strip().startswith("### ") and _normalize_header(lines[idx]) != _normalize_header(lines[subheader_idx]):
+            end_idx = idx
+            break
+    return subheader_idx, end_idx
+
+
 def extract_block(lines, header):
     header_norm = _normalize_header(header)
     start = -1

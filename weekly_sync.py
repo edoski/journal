@@ -6,7 +6,9 @@ import os
 from sync_utils import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
+    MONTHLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
+    DEFAULT_MONTHLY_DIR,
     locked_note,
     DAYS,
     parse_daily_note,
@@ -19,7 +21,81 @@ from sync_utils import (
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
+    goals_section_bounds,
+    extract_subsection_tasks,
+    parse_goal_tasks,
+    render_goal_lines,
+    build_goals_block,
 )
+
+
+WEEKLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_weekly.last_run")
+
+
+def _week_guard_ran(week_start):
+    try:
+        with open(WEEKLY_CARRY_GUARD_PATH, "r") as f:
+            return f.read().strip() == week_start.isoformat()
+    except Exception:
+        return False
+
+
+def _mark_week_guard(week_start):
+    try:
+        os.makedirs(os.path.dirname(WEEKLY_CARRY_GUARD_PATH), exist_ok=True)
+        with open(WEEKLY_CARRY_GUARD_PATH, "w") as f:
+            f.write(week_start.isoformat())
+    except Exception:
+        pass
+
+
+def _load_monthly_goals(month_start, monthly_dir=None):
+    monthly_dir = monthly_dir or DEFAULT_MONTHLY_DIR
+    path = os.path.join(monthly_dir, f"{month_start.year}-{month_start.month:02d}.md")
+    ensure_note(path, MONTHLY_TEMPLATE_PATH)
+    try:
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return [], path, []
+
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start == -1:
+        tasks = []
+    else:
+        body = lines[g_start + 1:g_end]
+        if body and body[0].strip() == "---":
+            body = body[1:]
+        tasks = parse_goal_tasks(body)
+    return tasks, path, lines
+
+
+def _write_monthly_goals(path, tasks, existing_lines):
+    g_start, g_end = goals_section_bounds(existing_lines)
+    new_block = ["## Goals", "---"] + render_goal_lines(tasks)
+    if g_start == -1:
+        lines = new_block + ([""] if existing_lines and existing_lines[0].strip() else []) + existing_lines
+    else:
+        lines = existing_lines[:]
+        lines[g_start:g_end] = new_block
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines).rstrip() + "\n")
+    os.replace(tmp, path)
+
+
+def _parse_weekly_note_goals(lines):
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start == -1:
+        return [], []
+    monthly_mirror = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+    weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
+    if not weekly_tasks and not monthly_mirror:
+        body = lines[g_start + 1:g_end]
+        if body and body[0].strip() == "---":
+            body = body[1:]
+        weekly_tasks = parse_goal_tasks(body)
+    return monthly_mirror, weekly_tasks
 
 
 def compute_period_metrics(dates, daily_data):
@@ -256,6 +332,10 @@ def main():
     weekly_dir = args.weekly_dir or DEFAULT_WEEKLY_DIR
     note_path = args.file or os.path.join(weekly_dir, filename)
 
+    # Determine month note for the target week (use week_start's month).
+    month_start = datetime.date(week_start.year, week_start.month, 1)
+    monthly_tasks, monthly_path, monthly_lines = _load_monthly_goals(month_start)
+
     with locked_note(note_path):
         ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
 
@@ -291,6 +371,60 @@ def main():
                 lines = f.read().splitlines()
         except FileNotFoundError:
             lines = []
+
+        # Parse existing goals in the weekly note
+        monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
+
+        # Carry forward open weekly goals from prior week once per week
+        if not _week_guard_ran(week_start):
+            prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
+            prev_week_tasks = []
+            if os.path.exists(prev_week_path):
+                try:
+                    with open(prev_week_path, "r") as pf:
+                        prev_lines = pf.read().splitlines()
+                    _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
+                except Exception:
+                    prev_week_tasks = []
+            open_prev = [t for t in prev_week_tasks if not t.get("done")]
+            existing_canon = {t["canonical"] for t in weekly_tasks}
+            for t in open_prev:
+                if t["canonical"] in existing_canon:
+                    continue
+                weekly_tasks.append({**t, "done": False})
+                existing_canon.add(t["canonical"])
+            _mark_week_guard(week_start)
+
+        # Propagate MONTHLY status changes from weekly mirror to monthly source
+        mirror_lookup = {t["canonical"]: t for t in monthly_mirror}
+        monthly_changed = False
+        for task in monthly_tasks:
+            mirror = mirror_lookup.get(task["canonical"])
+            if mirror and mirror.get("done") and not task.get("done"):
+                task["done"] = True
+                monthly_changed = True
+
+        if monthly_changed:
+            with locked_note(monthly_path):
+                # refresh monthly_lines in case file changed
+                try:
+                    with open(monthly_path, "r") as mf:
+                        monthly_lines = mf.read().splitlines()
+                except Exception:
+                    monthly_lines = []
+                _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
+
+        # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
+        goals_block = build_goals_block([
+            ("MONTHLY", render_goal_lines(monthly_tasks)),
+            ("WEEKLY", render_goal_lines(weekly_tasks)),
+        ])
+
+        g_start, g_end = goals_section_bounds(lines)
+        if g_start == -1:
+            lines = goals_block + ([""] if lines and lines[0].strip() else []) + lines
+        else:
+            lines[g_start:g_end] = goals_block
 
         updated_lines = replace_metrics_block(lines, metrics_block)
         tmp_path = note_path + ".tmp"

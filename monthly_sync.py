@@ -24,7 +24,31 @@ from sync_utils import (
     ensure_note,
     replace_metrics_block,
     round_half_up,
+    parse_goal_tasks,
+    render_goal_lines,
+    goals_section_bounds,
+    extract_subsection_tasks,
+    build_goals_block,
 )
+
+MONTHLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_monthly.last_run")
+
+
+def _month_guard_ran(month_start):
+    try:
+        with open(MONTHLY_CARRY_GUARD_PATH, "r") as f:
+            return f.read().strip() == month_start.isoformat()
+    except Exception:
+        return False
+
+
+def _mark_month_guard(month_start):
+    try:
+        os.makedirs(os.path.dirname(MONTHLY_CARRY_GUARD_PATH), exist_ok=True)
+        with open(MONTHLY_CARRY_GUARD_PATH, "w") as f:
+            f.write(month_start.isoformat())
+    except Exception:
+        pass
 
 
 def compute_month_metrics(dates, daily_data):
@@ -437,6 +461,54 @@ def main():
     with locked_note(note_path):
         ensure_note(note_path, MONTHLY_TEMPLATE_PATH)
 
+        try:
+            with open(note_path, "r") as f:
+                lines = f.read().splitlines()
+        except FileNotFoundError:
+            lines = []
+
+        # Parse monthly goals and carry forward open goals from previous month once.
+        g_start, g_end = goals_section_bounds(lines)
+        monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+
+        if not _month_guard_ran(month_start):
+            # Determine previous month path
+            if month_start.month == 1:
+                prev_year = month_start.year - 1
+                prev_month = 12
+            else:
+                prev_year = month_start.year
+                prev_month = month_start.month - 1
+            prev_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
+            try:
+                with open(prev_path, "r") as pf:
+                    prev_lines = pf.read().splitlines()
+                p_start, p_end = goals_section_bounds(prev_lines)
+                p_body = prev_lines[p_start + 1:p_end] if p_start != -1 else []
+                if p_body and p_body[0].strip() == "---":
+                    p_body = p_body[1:]
+                prev_tasks = parse_goal_tasks(p_body)
+            except Exception:
+                prev_tasks = []
+
+            open_prev = [t for t in prev_tasks if not t.get("done")]
+            existing_canon = {t["canonical"] for t in monthly_tasks}
+            for t in open_prev:
+                if t["canonical"] in existing_canon:
+                    continue
+                monthly_tasks.append({**t, "done": False})
+                existing_canon.add(t["canonical"])
+            _mark_month_guard(month_start)
+
+        # Rewrite Goals block with MONTHLY subsection and spacer
+        new_goals_block = build_goals_block([
+            ("MONTHLY", render_goal_lines(monthly_tasks)),
+        ])
+        if g_start == -1:
+            lines = new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
+        else:
+            lines[g_start:g_end] = new_goals_block
+
         # Load current month's daily data
         daily_data = {}
         for day in daterange(month_start, month_end):
@@ -474,12 +546,6 @@ def main():
             month_start, month_end, week_ranges, daily_data,
             prev_daily_data, current_month_label, prev_month_label
         )
-
-        try:
-            with open(note_path, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            lines = []
 
         updated_lines = replace_metrics_block(lines, metrics_block)
         tmp_path = note_path + ".tmp"

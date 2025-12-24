@@ -10,12 +10,22 @@ from collections import OrderedDict
 
 from sync_utils import (
     JOURNAL_DIR,
+    DEFAULT_WEEKLY_DIR,
+    WEEKLY_TEMPLATE_PATH,
     format_minutes,
     format_minutes_seconds,
     ceil_minutes,
     round_half_up,
     extract_block,
     locked_note,
+    ensure_note,
+    canonical_goal,
+    parse_goal_tasks,
+    render_goal_lines,
+    goals_section_bounds,
+    extract_subsection_tasks,
+    build_goals_block,
+    find_header_idx,
 )
 
 # Configuration
@@ -67,52 +77,6 @@ def _read_break_defaults():
 BREAK_DEFAULTS = _read_break_defaults()
 
 
-def _canonical_goal(text: str) -> str:
-    """Normalize a goal line for idempotent matching."""
-    cleaned = re.sub(r"^\s*[-*]\s*\[[^\]]?\]\s*", "", text)
-    cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
-    cleaned = cleaned.strip(" `")
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    cleaned = cleaned.rstrip(".,;:-—– ")
-    return cleaned.lower()
-
-
-def _parse_goal_tasks_from_lines(lines):
-    pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[^\]]?)\]\s*(?P<body>.+)$")
-    tasks = []
-    for line in lines:
-        match = pattern.match(line)
-        if not match:
-            continue
-        state = (match.group("state") or "").strip()
-        body = match.group("body").strip()
-        done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
-        tasks.append({
-            "line": line,
-            "body": body,
-            "done": done_state,
-            "canonical": _canonical_goal(line),
-        })
-    return tasks
-
-
-def _find_section_bounds(lines, title):
-    header_re = re.compile(rf"^\s*##\s+{re.escape(title)}\s*$", re.IGNORECASE)
-    start_idx = -1
-    for idx, line in enumerate(lines):
-        if header_re.match(line):
-            start_idx = idx
-            break
-    if start_idx == -1:
-        return -1, -1
-    end_idx = len(lines)
-    for idx in range(start_idx + 1, len(lines)):
-        if re.match(r"^\s*##\s+[^#]", lines[idx]):
-            end_idx = idx
-            break
-    return start_idx, end_idx
-
-
 def _goals_body_bounds(lines, goals_idx):
     if goals_idx == -1:
         return -1, -1
@@ -138,14 +102,18 @@ def _load_goals_for_date(date_obj, include_checked=False):
             lines = f.read().splitlines()
     except Exception:
         return None
-    start, end = _find_section_bounds(lines, "Goals")
-    if start == -1:
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start == -1:
         return []
-    body_start, body_end = _goals_body_bounds(lines, start)
-    tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
+    daily_tasks = extract_subsection_tasks(lines, g_start, g_end, "DAILY")
+    if not daily_tasks:
+        body = lines[g_start + 1:g_end]
+        if body and body[0].strip() == "---":
+            body = body[1:]
+        daily_tasks = parse_goal_tasks(body)
     if include_checked:
-        return tasks
-    return [t for t in tasks if not t.get("done")]
+        return daily_tasks
+    return [t for t in daily_tasks if not t.get("done")]
 
 
 def _carry_forward_already_ran(date_obj):
@@ -166,37 +134,6 @@ def _mark_carry_forward(date_obj):
             f.write(date_obj.isoformat())
     except Exception:
         pass
-
-
-def _normalize_goals_section(lines, goals_idx):
-    """
-    Keep only checkbox task lines inside the Goals section and strip stray
-    blank lines so metrics tables cannot leak into the Goals block.
-    """
-    if goals_idx == -1:
-        return
-
-    body_start, body_end = _goals_body_bounds(lines, goals_idx)
-    if body_start == -1:
-        return
-
-    tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
-    task_lines = [t["line"].strip() for t in tasks]
-
-    # Rebuild the Goals block: header, divider, tasks, optional spacer.
-    new_block = [lines[goals_idx].rstrip(), "---"]
-    new_block.extend(task_lines)
-
-    # Avoid trailing blank lines in the Goals body.
-    while new_block and new_block[-1].strip() == "":
-        new_block.pop()
-
-    # If the next line is a section header and not already separated, add one spacer.
-    remainder = lines[body_end:]
-    if remainder and remainder[0].strip() != "":
-        new_block.append("")
-
-    lines[goals_idx:body_end] = new_block
 
 
 def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
@@ -223,7 +160,7 @@ def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
     if body_start == -1:
         return 0
 
-    today_tasks = _parse_goal_tasks_from_lines(lines[body_start:body_end])
+    today_tasks = parse_goal_tasks(lines[body_start:body_end])
     today_canon = {t["canonical"] for t in today_tasks if t.get("canonical")}
 
     missing_tasks = []
@@ -264,6 +201,130 @@ def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
         pass
 
     return carried
+
+
+def _weekly_note_path(date_obj, weekly_dir=None):
+    weekly_dir = weekly_dir or DEFAULT_WEEKLY_DIR
+    year, week_num, _ = date_obj.isocalendar()
+    filename = f"{year}-W{week_num:02d}.md"
+    return os.path.join(weekly_dir, filename)
+
+
+def _load_weekly_goals(date_obj, weekly_dir=None):
+    """Load weekly goals (source of truth) from the weekly note."""
+    path = _weekly_note_path(date_obj, weekly_dir)
+    if not os.path.exists(path):
+        return [], path
+    try:
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return [], path
+
+    g_start, g_end = goals_section_bounds(lines)
+    tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
+    return tasks, path
+
+
+def _write_weekly_goals(date_obj, weekly_tasks, weekly_dir=None):
+    """Update the WEEKLY subsection in the weekly note without touching other sections."""
+    path = _weekly_note_path(date_obj, weekly_dir)
+    with locked_note(path):
+        ensure_note(path, WEEKLY_TEMPLATE_PATH)
+        try:
+            with open(path, "r") as f:
+                lines = f.read().splitlines()
+        except Exception:
+            lines = []
+
+        g_start, g_end = goals_section_bounds(lines)
+        if g_start == -1:
+            # No Goals section: prepend it.
+            new_block = build_goals_block([
+                ("MONTHLY", []),
+                ("WEEKLY", render_goal_lines(weekly_tasks)),
+            ])
+            lines = new_block + ([""] if lines and lines[0].strip() else []) + lines
+        else:
+            monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+            new_block = build_goals_block([
+                ("MONTHLY", render_goal_lines(monthly_tasks)),
+                ("WEEKLY", render_goal_lines(weekly_tasks)),
+            ])
+            lines[g_start:g_end] = new_block
+            # Ensure a blank line separation if next line is not blank or header
+            insert_pos = g_start + len(new_block)
+            if insert_pos < len(lines) and lines[insert_pos].strip() and not lines[insert_pos].startswith("## "):
+                lines.insert(insert_pos, "")
+
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w") as f:
+            f.write("\n".join(lines).rstrip() + "\n")
+        os.replace(tmp_path, path)
+    return path
+
+
+def _parse_daily_goal_subsections(lines):
+    """Return (weekly_tasks, daily_tasks) parsed from the current daily note."""
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start == -1:
+        return [], []
+    weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
+    daily_tasks = extract_subsection_tasks(lines, g_start, g_end, "DAILY")
+
+    # Backward compatibility: if no subsections, treat all tasks as DAILY.
+    if not weekly_tasks and not daily_tasks:
+        body = lines[g_start + 1:g_end]
+        if body and body[0].strip() == "---":
+            body = body[1:]
+        parsed = parse_goal_tasks(body)
+        daily_tasks = parsed
+    return weekly_tasks, daily_tasks
+
+
+def _carry_forward_daily_tasks(today_date, yesterday_date, existing_daily_tasks):
+    """Carry forward unchecked DAILY goals from yesterday into today's daily tasks list."""
+    already_ran = _carry_forward_already_ran(today_date)
+    if already_ran:
+        return existing_daily_tasks, 0
+
+    yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
+    if not os.path.exists(yesterday_path):
+        return existing_daily_tasks, 0
+
+    try:
+        with open(yesterday_path, "r") as f:
+            y_lines = f.read().splitlines()
+    except Exception:
+        return existing_daily_tasks, 0
+
+    y_start, y_end = goals_section_bounds(y_lines)
+    y_daily = extract_subsection_tasks(y_lines, y_start, y_end, "DAILY")
+    if not y_daily:
+        # Fallback: entire block
+        body = y_lines[y_start + 1:y_end] if y_start != -1 else []
+        if body and body and body[0].strip() == "---":
+            body = body[1:]
+        y_daily = parse_goal_tasks(body)
+
+    open_y = [t for t in y_daily if not t.get("done")]
+    if not open_y:
+        _mark_carry_forward(today_date)
+        return existing_daily_tasks, 0
+
+    existing_canon = {t["canonical"] for t in existing_daily_tasks}
+    added = 0
+    for task in open_y:
+        if task["canonical"] in existing_canon:
+            continue
+        new_task = task.copy()
+        new_task["done"] = False
+        existing_daily_tasks.append(new_task)
+        existing_canon.add(task["canonical"])
+        added += 1
+
+    _mark_carry_forward(today_date)
+    return existing_daily_tasks, added
 
 
 def _extract_existing_notes(lines):
@@ -1266,35 +1327,60 @@ def update_markdown(sessions):
 
     # Ensure Goals section exists (immediately below YAML, before Metrics).
     goals_idx = find_top_header_idx("Goals")
-    metrics_idx = find_top_header_idx("Metrics")
     if goals_idx == -1:
         insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
         lines[insert_pos:insert_pos] = ["## Goals", "---"]
-
     goals_idx = find_top_header_idx("Goals")
-    ensure_divider_after_header(goals_idx)
 
     # Ensure Metrics section exists (after Goals).
     metrics_idx = find_top_header_idx("Metrics")
     if metrics_idx == -1:
-        if goals_idx != -1:
-            insert_pos = find_top_section_end(goals_idx)
-        else:
-            insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
+        insert_pos = find_top_section_end(goals_idx) if goals_idx != -1 else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0)
         lines[insert_pos:insert_pos] = ["## Metrics", "---"]
-
-    # Clean up Goals before we touch Metrics so stray tables cannot remain there.
-    goals_idx = find_top_header_idx("Goals")
-    _normalize_goals_section(lines, goals_idx)
-
     metrics_idx = find_top_header_idx("Metrics")
-    goals_idx = find_top_header_idx("Goals")
+
+    # Parse existing goal subsections from today's note.
+    existing_weekly_tasks, existing_daily_tasks = _parse_daily_goal_subsections(lines)
+
+    # Carry forward yesterday's incomplete DAILY goals exactly once per day.
+    yesterday = today - datetime.timedelta(days=1)
+    existing_daily_tasks, _ = _carry_forward_daily_tasks(today, yesterday, existing_daily_tasks)
+
+    # Load weekly source goals and propagate status changes from daily mirror.
+    weekly_tasks, weekly_path = _load_weekly_goals(today)
+    updated_weekly_tasks = []
+    daily_weekly_lookup = {t["canonical"]: t for t in existing_weekly_tasks}
+    for task in weekly_tasks:
+        canon = task["canonical"]
+        mirror = daily_weekly_lookup.get(canon)
+        done = task.get("done", False)
+        if mirror:
+            if mirror.get("done") and not done:
+                done = True  # done wins
+        updated = task.copy()
+        updated["done"] = done
+        updated_weekly_tasks.append(updated)
+
+    # Write back weekly note if statuses changed.
+    if updated_weekly_tasks != weekly_tasks:
+        _write_weekly_goals(today, updated_weekly_tasks)
+
+    # Rebuild Goals block with WEEKLY mirror then DAILY goals.
+    goals_block = build_goals_block([
+        ("WEEKLY", render_goal_lines(updated_weekly_tasks)),
+        ("DAILY", render_goal_lines(existing_daily_tasks)),
+    ])
+
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start == -1:
+        insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
+        lines[insert_pos:insert_pos] = goals_block
+    else:
+        lines[g_start:g_end] = goals_block
+
+    # Recompute Metrics separator after Goals rewrite.
     metrics_idx = find_top_header_idx("Metrics")
     metrics_sep_idx = ensure_divider_after_header(metrics_idx)
-
-    # Carry forward yesterday's incomplete Goals exactly once per day.
-    yesterday = today - datetime.timedelta(days=1)
-    _carry_forward_goals(lines, goals_idx, today, yesterday)
 
     # Identify where Reflections starts to preserve everything after it.
     reflections_idx = find_top_header_idx("Reflections", start=(metrics_sep_idx + 1 if metrics_sep_idx != -1 else 0))
