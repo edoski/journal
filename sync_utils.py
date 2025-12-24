@@ -553,13 +553,21 @@ def replace_metrics_block(lines, new_block_lines):
             break
 
     new_lines = lines[:metrics_idx + 1]
-    if metrics_idx + 1 < len(lines) and lines[metrics_idx + 1].strip() == "---":
-        new_lines.append("---")
-    else:
-        new_lines.append("---")
+    new_lines.append("---")
+
+    # Insert new metrics content as-is (builders should control internal spacing)
     new_lines.extend(new_block_lines)
-    new_lines.append("")
-    new_lines.extend(lines[end_idx:])
+
+    remainder = lines[end_idx:]
+    # Strip leading blank lines from remainder to avoid double spacing
+    while remainder and remainder[0].strip() == "":
+        remainder = remainder[1:]
+
+    # Ensure a single blank line between Metrics and following content when remainder exists
+    if remainder and (not new_lines or new_lines[-1].strip() != ""):
+        new_lines.append("")
+
+    new_lines.extend(remainder)
     return new_lines
 
 

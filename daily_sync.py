@@ -26,6 +26,7 @@ from sync_utils import (
     extract_subsection_tasks,
     build_goals_block,
     find_header_idx,
+    replace_metrics_block,
 )
 
 # Configuration
@@ -468,14 +469,11 @@ def _build_sleep_section(sleep_data, existing_block):
     if sleep_table:
         lines_out.extend(["", "### **SLEEP**", ""])
         lines_out.extend(sleep_table)
-        lines_out.append("")
     elif existing_block:
         lines_out.append("")
         lines_out.extend(existing_block)
-        if lines_out and lines_out[-1].strip() != "":
-            lines_out.append("")
     else:
-        lines_out.extend(["", "### **SLEEP**", "", "_Sleep data not available._", ""])
+        lines_out.extend(["", "### **SLEEP**", "", "_Sleep data not available._"])
 
     return lines_out
 
@@ -1382,10 +1380,8 @@ def update_markdown(sessions):
     metrics_idx = find_top_header_idx("Metrics")
     metrics_sep_idx = ensure_divider_after_header(metrics_idx)
 
-    # Identify where Reflections starts to preserve everything after it.
+    # Identify current Metrics body (used for fallback blocks) without touching later sections.
     reflections_idx = find_top_header_idx("Reflections", start=(metrics_sep_idx + 1 if metrics_sep_idx != -1 else 0))
-
-    rest_lines = lines[reflections_idx:] if reflections_idx != -1 else []
     metrics_body = (
         lines[metrics_sep_idx + 1 : reflections_idx]
         if reflections_idx != -1
@@ -1401,32 +1397,30 @@ def update_markdown(sessions):
     existing_training_block = extract_block(metrics_body, "### **training**")
     existing_sleep_block = extract_block(metrics_body, "### **sleep**")
 
-    # Rebuild Metrics section from scratch (idempotent)
-    final_lines = lines[:metrics_sep_idx + 1]
-    final_lines.append("### **STUDY**")
+    # Build Metrics body lines
+    metrics_lines = ["### **STUDY**"]
     if new_table_lines:
-        final_lines.append("")
-        final_lines.extend(new_table_lines)
+        metrics_lines.append("")
+        metrics_lines.extend(new_table_lines)
     else:
-        final_lines.append("")
-        final_lines.append("_No study sessions completed today._")
+        metrics_lines.append("")
+        metrics_lines.append("_No study sessions completed today._")
 
-    # Build training section
     training_lines, _ = _build_training_section(
         workout_data, stretch_data, existing_training_block, today_str
     )
-    final_lines.extend(training_lines)
+    metrics_lines.extend(training_lines)
 
-    # Build sleep section
     sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
-    final_lines.extend(sleep_lines)
+    metrics_lines.extend(sleep_lines)
 
-    final_lines.extend(rest_lines)
+    # Splice Metrics via shared helper (keeps content after Metrics intact)
+    updated_lines = replace_metrics_block(lines, metrics_lines)
 
     # Update YAML frontmatter
-    final_lines = _update_frontmatter(final_lines, study_str, workout_done, stretch_done, sleep_data)
+    updated_lines = _update_frontmatter(updated_lines, study_str, workout_done, stretch_done, sleep_data)
 
-    new_content = "\n".join(final_lines)
+    new_content = "\n".join(updated_lines)
     
     try:
         with open(file_path, 'r') as f:
