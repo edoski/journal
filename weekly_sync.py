@@ -64,6 +64,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     """
     days_in_period = 7
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
+    today = datetime.date.today()
 
     # Compute metrics for current and previous week
     current_metrics = compute_period_metrics(dates, daily_data)
@@ -100,9 +101,12 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     # STUDY section (using activity totals for accuracy)
     lines.append("### **STUDY**")
     study_hours = [m / 60 if m is not None and m > 0 else 0 for m in study_minutes]
-    study_values = [
-        format_minutes(m) if m is not None and m > 0 else "0h00m" for m in study_minutes
-    ]
+    study_values = []
+    for d, m in zip(dates, study_minutes):
+        if d > today:
+            study_values.append("")
+        else:
+            study_values.append(format_minutes(m) if m is not None and m > 0 else "0h00m")
     chart_lines = render_weekly_chart(DAYS, study_hours, study_values, height=10, y_max=10, bar_width=5, col_spacing=8)
     lines.extend(wrap_code_block(chart_lines))
     lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
@@ -163,9 +167,12 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     # SLEEP section (values on top of bars, 5-char bars like monthly)
     lines.append("### **SLEEP**")
     sleep_hours = [m / 60 if m is not None else 0 for m in sleep_minutes]
-    sleep_values = [
-        format_minutes(m) if m is not None and m > 0 else "0h00m" for m in sleep_minutes
-    ]
+    sleep_values = []
+    for d, m in zip(dates, sleep_minutes):
+        if d > today:
+            sleep_values.append("")
+        else:
+            sleep_values.append(format_minutes(m) if m is not None and m > 0 else "0h00m")
     sleep_chart = render_weekly_chart(DAYS, sleep_hours, sleep_values, height=10, y_max=10, bar_width=5, col_spacing=8)
     lines.extend(wrap_code_block(sleep_chart))
     lines.append("")
@@ -192,9 +199,12 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     # MOOD section (values on top of bars, always show decimal)
     lines.append("### **MOOD**")
     mood_chart_vals = [m if m is not None else 0 for m in mood_vals]
-    mood_value_labels = [
-        f"{m:.1f}" if m is not None else "0.0" for m in mood_vals
-    ]
+    mood_value_labels = []
+    for d, m in zip(dates, mood_vals):
+        if d > today:
+            mood_value_labels.append("")
+        else:
+            mood_value_labels.append(f"{m:.1f}" if m is not None else "0.0")
     mood_chart = render_weekly_chart(DAYS, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=5, col_spacing=8, center_labels_on_bars=True)
     lines.extend(wrap_code_block(mood_chart))
 

@@ -571,7 +571,7 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
         if val is None or val == 0:
             bar_heights.append(0)
         else:
-            bar_heights.append(min(height, max(1, round_half_up(val * scale))))
+            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
     
     lines = []
     
@@ -657,7 +657,7 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
         if val is None or val == 0:
             bar_heights.append(0)
         else:
-            bar_heights.append(min(height, max(1, round_half_up(val * scale))))
+            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
     
     lines = []
     

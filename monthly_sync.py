@@ -20,6 +20,7 @@ from sync_utils import (
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
+    round_half_up,
 )
 
 
@@ -67,6 +68,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     """
     days_in_period = (end_date - start_date).days + 1
     dates = list(daterange(start_date, end_date))
+    today = datetime.date.today()
 
     # Compute metrics for current and previous month
     current_metrics = compute_month_metrics(dates, daily_data)
@@ -111,7 +113,10 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         total_min = sum(mins) if mins else 0
         study_chart_vals.append(total_min / 60)  # Convert to hours for chart
         # Always use 0h00m format for zero values
-        study_value_labels.append(format_minutes(total_min) if total_min > 0 else "0h00m")
+        if start > today:
+            study_value_labels.append("")
+        else:
+            study_value_labels.append(format_minutes(total_min) if total_min > 0 else "0h00m")
 
     chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=10, y_max=40, bar_width=6, col_spacing=12)
     lines.extend(wrap_code_block(chart_lines))
@@ -170,6 +175,21 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     lines.extend(wrap_code_block(training_grid))
     lines.append("")
 
+    days_elapsed = current_metrics.get("days_up_to_today", len(dates))
+    lines.append("| ACTIVITY | % DONE | % MISSED |")
+    lines.append("| -------- | ------ | -------- |")
+    if days_elapsed > 0:
+        workout_done_pct = min(100, max(0, round_half_up((workout_days / days_elapsed) * 100)))
+        workout_missed_pct = max(0, 100 - workout_done_pct)
+        stretch_done_pct = min(100, max(0, round_half_up((stretch_days / days_elapsed) * 100)))
+        stretch_missed_pct = max(0, 100 - stretch_done_pct)
+        lines.append(f"| **WORKOUT** | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
+        lines.append(f"| **STRETCH** | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
+    else:
+        lines.append("| **WORKOUT** | `-` | `-` |")
+        lines.append("| **STRETCH** | `-` | `-` |")
+    lines.append("")
+
     # SLEEP section (5-char bars, weekly averages)
     lines.append("### **SLEEP**")
     sleep_chart_vals = []
@@ -181,10 +201,16 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         if mins:
             avg_min = sum(mins) / len(mins)  # AVERAGE for sleep
             sleep_chart_vals.append(avg_min / 60)
-            sleep_value_labels.append(format_minutes(avg_min))
+            if start > today:
+                sleep_value_labels.append("")
+            else:
+                sleep_value_labels.append(format_minutes(avg_min))
         else:
             sleep_chart_vals.append(0)
-            sleep_value_labels.append("0h00m")
+            if start > today:
+                sleep_value_labels.append("")
+            else:
+                sleep_value_labels.append("0h00m")
 
     sleep_chart = render_monthly_chart(week_labels, sleep_chart_vals, sleep_value_labels, height=10, y_max=10, bar_width=5, col_spacing=12)
     lines.extend(wrap_code_block(sleep_chart))
@@ -221,10 +247,16 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             avg_val = sum(vals) / len(vals)  # AVERAGE for mood
             mood_chart_vals.append(avg_val)
             # Always show one decimal for mood (e.g., 5.0, 6.0, 10.0)
-            mood_value_labels.append(f"{avg_val:.1f}")
+            if start > today:
+                mood_value_labels.append("")
+            else:
+                mood_value_labels.append(f"{avg_val:.1f}")
         else:
             mood_chart_vals.append(0)
-            mood_value_labels.append("0.0")
+            if start > today:
+                mood_value_labels.append("")
+            else:
+                mood_value_labels.append("0.0")
 
     mood_chart = render_monthly_chart(week_labels, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=True)
     lines.extend(wrap_code_block(mood_chart))
