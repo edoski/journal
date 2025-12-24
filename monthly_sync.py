@@ -29,7 +29,8 @@ from sync_utils import (
     goals_section_bounds,
     extract_subsection_tasks,
     build_goals_block,
-    normalize_blank_lines,
+    trim_blank_lines,
+    join_sections,
 )
 
 MONTHLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_monthly.last_run")
@@ -117,16 +118,17 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             activity_totals[activity] = activity_totals.get(activity, 0) + mins
     study_total_from_activities = sum(activity_totals.values())
 
-    lines = []
+    sections = []
     
-    # Summary table with comparison
-    lines.extend(render_summary_table(
+    # Summary
+    summary_lines = render_summary_table(
         current_metrics, prev_metrics,
         current_month_label, prev_month_label
-    ))
+    )
+    sections.append(trim_blank_lines(summary_lines))
 
     # STUDY section (using activity totals for accuracy)
-    lines.append("### **STUDY**")
+    study_lines = ["### **STUDY**"]
 
     # Weekly TOTALS for study chart (0-40h scale, 8 visual rows, 6-char bars)
     week_labels = []
@@ -188,21 +190,21 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         col_spacing=12,
         delta_labels=study_delta_labels,
     )
-    lines.extend(wrap_code_block(chart_lines))
-    lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
-    lines.append("")
+    study_lines.extend(wrap_code_block(chart_lines))
+    study_lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
+    study_lines.append("")
 
     # Activity table (activity_totals already computed above)
     total_activity = sum(activity_totals.values())
-    lines.append("| ACTIVITY | TIME | SHARE |")
-    lines.append("| -------- | ---- | ----- |")
+    study_lines.append("| ACTIVITY | TIME | SHARE |")
+    study_lines.append("| -------- | ---- | ----- |")
     if activity_totals:
         for activity, mins in sorted(activity_totals.items(), key=lambda x: x[1], reverse=True):
             share = f"{int(round((mins / total_activity) * 100))}%" if total_activity else "0%"
-            lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
+            study_lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
     else:
-        lines.append("|  |  |  |")
-    lines.append("")
+        study_lines.append("|  |  |  |")
+    study_lines.append("")
 
     # INTERRUPTIONS table
     interrupt_totals = [daily_data.get(d, {}).get("interrupt_minutes", 0) for d in dates]
@@ -230,14 +232,15 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         overrun_pct = (avg_overruns / study_daily_avg) * 100
         overrun_pct_str = f"{int(round(overrun_pct))}%"
     
-    lines.append("| METRIC | AVERAGE | % OF STUDY |")
-    lines.append("| ------ | ------- | ---------- |")
-    lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts)}/day` | `{interrupt_pct_str}` |")
-    lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns)}/day` | `{overrun_pct_str}` |")
-    lines.append("")
+    study_lines.append("| METRIC | AVERAGE | % OF STUDY |")
+    study_lines.append("| ------ | ------- | ---------- |")
+    study_lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts)}/day` | `{interrupt_pct_str}` |")
+    study_lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns)}/day` | `{overrun_pct_str}` |")
+    study_lines.append("")
+    sections.append(trim_blank_lines(study_lines))
 
     # TRAINING section
-    lines.append("### **TRAINING**")
+    training_lines = ["### **TRAINING**"]
     workout_delta_labels = []
     stretch_delta_labels = []
     for idx, week_days in enumerate(week_day_lists):
@@ -277,26 +280,27 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         workout_delta_labels=workout_delta_labels,
         stretch_delta_labels=stretch_delta_labels,
     )
-    lines.extend(wrap_code_block(training_grid))
-    lines.append("")
+    training_lines.extend(wrap_code_block(training_grid))
+    training_lines.append("")
 
     days_elapsed = current_metrics.get("days_up_to_today", len(dates))
-    lines.append("| ACTIVITY | % DONE | % MISSED |")
-    lines.append("| -------- | ------ | -------- |")
+    training_lines.append("| ACTIVITY | % DONE | % MISSED |")
+    training_lines.append("| -------- | ------ | -------- |")
     if days_elapsed > 0:
         workout_done_pct = min(100, max(0, round_half_up((workout_days / days_elapsed) * 100)))
         workout_missed_pct = max(0, 100 - workout_done_pct)
         stretch_done_pct = min(100, max(0, round_half_up((stretch_days / days_elapsed) * 100)))
         stretch_missed_pct = max(0, 100 - stretch_done_pct)
-        lines.append(f"| **WORKOUT** | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
-        lines.append(f"| **STRETCH** | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
+        training_lines.append(f"| **WORKOUT** | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
+        training_lines.append(f"| **STRETCH** | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
     else:
-        lines.append("| **WORKOUT** | `-` | `-` |")
-        lines.append("| **STRETCH** | `-` | `-` |")
-    lines.append("")
+        training_lines.append("| **WORKOUT** | `-` | `-` |")
+        training_lines.append("| **STRETCH** | `-` | `-` |")
+    training_lines.append("")
+    sections.append(trim_blank_lines(training_lines))
 
     # SLEEP section (5-char bars, weekly averages)
-    lines.append("### **SLEEP**")
+    sleep_lines = ["### **SLEEP**"]
     sleep_week_raw = []
     sleep_chart_vals = []
     sleep_value_labels = []
@@ -352,8 +356,8 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         col_spacing=12,
         delta_labels=sleep_delta_labels,
     )
-    lines.extend(wrap_code_block(sleep_chart))
-    lines.append("")
+    sleep_lines.extend(wrap_code_block(sleep_chart))
+    sleep_lines.append("")
 
     awake_vals = [daily_data.get(d, {}).get("awake_minutes") for d in dates if daily_data.get(d)]
     awakenings_vals = [daily_data.get(d, {}).get("awakenings") for d in dates if daily_data.get(d)]
@@ -363,19 +367,20 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
     avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
 
-    lines.append("| ACTIVITY | AVERAGE |")
-    lines.append("| -------- | ------- |")
-    lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
-    lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
+    sleep_lines.append("| ACTIVITY | AVERAGE |")
+    sleep_lines.append("| -------- | ------- |")
+    sleep_lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
+    sleep_lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
     if avg_awakenings is not None:
         awaken_val = f"{avg_awakenings:.1f}" if abs(avg_awakenings - round(avg_awakenings)) >= 0.05 else str(int(round(avg_awakenings)))
-        lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
+        sleep_lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
     else:
-        lines.append("| **AWAKENINGS** | |")
-    lines.append("")
+        sleep_lines.append("| **AWAKENINGS** | |")
+    sleep_lines.append("")
+    sections.append(trim_blank_lines(sleep_lines))
 
     # MOOD section (5-char bars, weekly averages, always show decimal)
-    lines.append("### **MOOD**")
+    mood_lines = ["### **MOOD**"]
     mood_week_raw = []
     mood_chart_vals = []
     mood_value_labels = []
@@ -434,9 +439,10 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         center_labels_on_bars=True,
         delta_labels=mood_delta_labels,
     )
-    lines.extend(wrap_code_block(mood_chart))
+    mood_lines.extend(wrap_code_block(mood_chart))
+    sections.append(trim_blank_lines(mood_lines))
 
-    return lines
+    return join_sections(sections)
 
 
 def main():
@@ -547,7 +553,6 @@ def main():
             month_start, month_end, week_ranges, daily_data,
             prev_daily_data, current_month_label, prev_month_label
         )
-        metrics_block = normalize_blank_lines(metrics_block)
 
         updated_lines = replace_metrics_block(lines, metrics_block)
         tmp_path = note_path + ".tmp"
