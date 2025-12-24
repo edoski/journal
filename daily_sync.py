@@ -412,6 +412,8 @@ def _build_sleep_section(sleep_data, existing_block):
         lines_out.extend(existing_block)
         if lines_out and lines_out[-1].strip() != "":
             lines_out.append("")
+    else:
+        lines_out.extend(["", "### **SLEEP**", "", "_Sleep data not available._", ""])
 
     return lines_out
 
