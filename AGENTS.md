@@ -19,7 +19,7 @@ journal/
 
 - **`sync_utils.py`**: Shared utilities including constants (`JOURNAL_DIR`, template paths), formatting helpers (`format_minutes`, `format_minutes_seconds`, `ceil_minutes`, `round_half_up`), frontmatter/block parsing, date range utilities, and chart rendering functions.
 
-- **`daily_sync.py`**: Main entry point for daily syncing; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today's markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent + single run per day).
+- **`daily_sync.py`**: Main entry point for daily syncing; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today's markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent via goal IDs; safe to run multiple times per day).
 
 - **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with bar charts for study/sleep/mood and a compact frequency grid for training data showing completed/skipped days using visual blocks.
 
@@ -30,7 +30,7 @@ journal/
 ### Configuration Constants
 
 - **In `sync_utils.py`**: `JOURNAL_DIR`, `VAULT_DIR`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `DEFAULT_WEEKLY_DIR`, `DEFAULT_MONTHLY_DIR`
-- **In `daily_sync.py`**: `DB_PATH`, `TEMPLATE_PATH`, `ICLOUD_JOURNALSYNC_DIR`, `TRAINING_CACHE_PATH`, `CARRY_FORWARD_GUARD_PATH`, `LUNCH_WINDOW_BASE`, `REGULAR_DAY_END`
+- **In `daily_sync.py`**: `DB_PATH`, `TEMPLATE_PATH`, `ICLOUD_JOURNALSYNC_DIR`, `TRAINING_CACHE_PATH`, `LUNCH_WINDOW_BASE`, `REGULAR_DAY_END`
 
 ## Architecture
 
@@ -42,7 +42,7 @@ journal/
 - **File handling**: `ensure_note`, `replace_metrics_block`
 
 ### Daily Sync (`daily_sync.py`)
-- **Goal management**: `_canonical_goal`, `_parse_goal_tasks_from_lines`, `_load_goals_for_date`, `_carry_forward_goals`, `_normalize_goals_section`
+- **Goal management**: `_parse_daily_goal_subsections`, `_carry_forward_daily_tasks`; goal IDs (`^gid-…`) are mandatory and deterministic per period
 - **Section builders**: `_build_study_section`, `_build_training_section`, `_build_sleep_section`
 - **Training data**: `_load_training_cache`, `_save_training_cache`, `_activity_entries_from_data`, `_merge_training_entries`, `_render_training_entries`, `_parse_training_table`
 - **Status file handling**: `_load_status_file` (resilient iCloud sync with retry logic)
@@ -69,9 +69,8 @@ Weekly and monthly notes use compact frequency grids to display training data:
 - Run weekly sync: `python3 weekly_sync.py [--date YYYY-MM-DD] [--file PATH]`
 - Run monthly sync: `python3 monthly_sync.py [--month YYYY-MM] [--file PATH]`
 - Quick syntax check: `python3 -m compileall daily_sync.py weekly_sync.py monthly_sync.py sync_utils.py`
-- The carry-forward guard at `~/.cache/journal_sync/carry_forward_goals.last_run` prevents re-importing yesterday's Goals more than once per day; delete it only if you need to re-run the carry-forward the same day.
+- Goal carry-forward is ID-based (no guard files). Each goal line ends with a hidden block ID `^gid-xxxxxxxxxx` used for mirroring across daily/weekly/monthly notes.
 - The training cache at `~/.cache/journal_sync/training_entries.json` stores workout/stretch entries for the current day to handle status files arriving across separate runs.
-- Diagnostic log at `/tmp/journal_sync.log` records goal carry-forward events with timestamps.
 
 ## LaunchAgent
 

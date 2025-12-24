@@ -31,26 +31,8 @@ from sync_utils import (
     build_goals_block,
     trim_blank_lines,
     join_sections,
+    ensure_goal_ids,
 )
-
-MONTHLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_monthly.last_run")
-
-
-def _month_guard_ran(month_start):
-    try:
-        with open(MONTHLY_CARRY_GUARD_PATH, "r") as f:
-            return f.read().strip() == month_start.isoformat()
-    except Exception:
-        return False
-
-
-def _mark_month_guard(month_start):
-    try:
-        os.makedirs(os.path.dirname(MONTHLY_CARRY_GUARD_PATH), exist_ok=True)
-        with open(MONTHLY_CARRY_GUARD_PATH, "w") as f:
-            f.write(month_start.isoformat())
-    except Exception:
-        pass
 
 
 def compute_month_metrics(dates, daily_data):
@@ -86,6 +68,9 @@ def compute_month_metrics(dates, daily_data):
         "total_days": len(dates),
         "days_up_to_today": days_up_to_today,
     }
+
+def _ensure_task_ids(tasks, period_key):
+    ensure_goal_ids(tasks, "monthly", period_key)
 
 
 def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_daily_data, current_month_label, prev_month_label):
@@ -474,38 +459,38 @@ def main():
         except FileNotFoundError:
             lines = []
 
-        # Parse monthly goals and carry forward open goals from previous month once.
+        # Parse monthly goals and carry forward open goals from previous month (ID-based).
         g_start, g_end = goals_section_bounds(lines)
         monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+        _ensure_task_ids(monthly_tasks, month_start.isoformat())
 
-        if not _month_guard_ran(month_start):
-            # Determine previous month path
-            if month_start.month == 1:
-                prev_year = month_start.year - 1
-                prev_month = 12
-            else:
-                prev_year = month_start.year
-                prev_month = month_start.month - 1
-            prev_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
-            try:
-                with open(prev_path, "r") as pf:
-                    prev_lines = pf.read().splitlines()
-                p_start, p_end = goals_section_bounds(prev_lines)
-                p_body = prev_lines[p_start + 1:p_end] if p_start != -1 else []
-                if p_body and p_body[0].strip() == "---":
-                    p_body = p_body[1:]
-                prev_tasks = parse_goal_tasks(p_body)
-            except Exception:
-                prev_tasks = []
+        # Determine previous month path
+        if month_start.month == 1:
+            prev_year = month_start.year - 1
+            prev_month = 12
+        else:
+            prev_year = month_start.year
+            prev_month = month_start.month - 1
+        prev_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
+        try:
+            with open(prev_path, "r") as pf:
+                prev_lines = pf.read().splitlines()
+            p_start, p_end = goals_section_bounds(prev_lines)
+            p_body = prev_lines[p_start + 1:p_end] if p_start != -1 else []
+            if p_body and p_body[0].strip() == "---":
+                p_body = p_body[1:]
+            prev_tasks = parse_goal_tasks(p_body)
+            _ensure_task_ids(prev_tasks, prev_month_start.isoformat())
+        except Exception:
+            prev_tasks = []
 
-            open_prev = [t for t in prev_tasks if not t.get("done")]
-            existing_canon = {t["canonical"] for t in monthly_tasks}
-            for t in open_prev:
-                if t["canonical"] in existing_canon:
-                    continue
-                monthly_tasks.append({**t, "done": False})
-                existing_canon.add(t["canonical"])
-            _mark_month_guard(month_start)
+        open_prev = [t for t in prev_tasks if not t.get("done")]
+        existing_ids = {t["id"] for t in monthly_tasks if t.get("id")}
+        for t in open_prev:
+            if t.get("id") in existing_ids:
+                continue
+            monthly_tasks.append({**t, "done": False})
+            existing_ids.add(t.get("id"))
 
         # Rewrite Goals block with MONTHLY subsection and spacer
         new_goals_block = build_goals_block([

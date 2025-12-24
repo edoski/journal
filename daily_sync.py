@@ -12,6 +12,7 @@ from sync_utils import (
     JOURNAL_DIR,
     DEFAULT_WEEKLY_DIR,
     WEEKLY_TEMPLATE_PATH,
+    ensure_goal_ids,
     format_minutes,
     format_minutes_seconds,
     ceil_minutes,
@@ -27,6 +28,7 @@ from sync_utils import (
     build_goals_block,
     find_header_idx,
     replace_metrics_block,
+    iso_week_range,
 )
 
 # Configuration
@@ -39,10 +41,6 @@ BREAK_LINK_MAX_GAP_SECONDS = 300
 # Cache for training entries so workout/stretch files can arrive in separate
 # runs without losing earlier entries for the same day.
 TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal_sync/training_entries.json")
-# Carry-forward guard to avoid re-importing yesterday's goals multiple times a day
-CARRY_FORWARD_GUARD_PATH = os.path.expanduser(
-    "~/.cache/journal_sync/carry_forward_goals.last_run"
-)
 # Regular study day cutoff: sessions past this time incur no overrun.
 REGULAR_DAY_END = datetime.time(18, 0)
 # Base daily lunch window (dynamically shifted by _compute_dynamic_lunch_window
@@ -78,132 +76,6 @@ def _read_break_defaults():
 BREAK_DEFAULTS = _read_break_defaults()
 
 
-def _goals_body_bounds(lines, goals_idx):
-    if goals_idx == -1:
-        return -1, -1
-    end_idx = len(lines)
-    for idx in range(goals_idx + 1, len(lines)):
-        if re.match(r"^\s*##\s+[^#]", lines[idx]):
-            end_idx = idx
-            break
-    body_start = goals_idx + 1
-    if body_start < end_idx and lines[body_start].strip() == "---":
-        body_start += 1
-    if body_start < end_idx and lines[body_start].strip() == "":
-        body_start += 1
-    return body_start, end_idx
-
-
-def _load_goals_for_date(date_obj, include_checked=False):
-    path = os.path.join(JOURNAL_DIR, f"{date_obj:%Y-%m-%d}.md")
-    if not os.path.exists(path):
-        return []
-    try:
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-    except Exception:
-        return None
-    g_start, g_end = goals_section_bounds(lines)
-    if g_start == -1:
-        return []
-    daily_tasks = extract_subsection_tasks(lines, g_start, g_end, "DAILY")
-    if not daily_tasks:
-        body = lines[g_start + 1:g_end]
-        if body and body[0].strip() == "---":
-            body = body[1:]
-        daily_tasks = parse_goal_tasks(body)
-    if include_checked:
-        return daily_tasks
-    return [t for t in daily_tasks if not t.get("done")]
-
-
-def _carry_forward_already_ran(date_obj):
-    try:
-        with open(CARRY_FORWARD_GUARD_PATH, "r") as f:
-            last = f.read().strip()
-        return last == date_obj.isoformat()
-    except FileNotFoundError:
-        return False
-    except Exception:
-        return False
-
-
-def _mark_carry_forward(date_obj):
-    try:
-        os.makedirs(os.path.dirname(CARRY_FORWARD_GUARD_PATH), exist_ok=True)
-        with open(CARRY_FORWARD_GUARD_PATH, "w") as f:
-            f.write(date_obj.isoformat())
-    except Exception:
-        pass
-
-
-def _carry_forward_goals(lines, goals_idx, today_date, yesterday_date):
-    if goals_idx == -1:
-        return 0
-
-    already_ran = _carry_forward_already_ran(today_date)
-    if already_ran:
-        return 0
-
-    yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
-    if not os.path.exists(yesterday_path):
-        return 0
-
-    yesterday_tasks = _load_goals_for_date(yesterday_date, include_checked=False)
-    if yesterday_tasks is None:
-        return 0
-    if not yesterday_tasks:
-        if not already_ran:
-            _mark_carry_forward(today_date)
-        return 0
-
-    body_start, body_end = _goals_body_bounds(lines, goals_idx)
-    if body_start == -1:
-        return 0
-
-    today_tasks = parse_goal_tasks(lines[body_start:body_end])
-    today_canon = {t["canonical"] for t in today_tasks if t.get("canonical")}
-
-    missing_tasks = []
-    for task in yesterday_tasks:
-        canon = task.get("canonical")
-        if canon in today_canon:
-            continue
-        missing_tasks.append(task)
-
-    if not missing_tasks:
-        if not already_ran:
-            _mark_carry_forward(today_date)
-        return 0
-
-    new_body = list(lines[body_start:body_end])
-    carried = 0
-    for task in missing_tasks:
-        new_body.append(f"- [ ] {task['body']}")
-        carried += 1
-
-    # Ensure a single blank line separates Goals from the next section.
-    if new_body and new_body[-1].strip() != "":
-        new_body.append("")
-
-    lines[body_start:body_end] = new_body
-
-    # Mark today's carry-forward attempt so this runs once per day.
-    _mark_carry_forward(today_date)
-
-    # Log what was carried for diagnostics
-    try:
-        with open("/tmp/journal_sync.log", "a") as f:
-            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"[{ts}] Carried {carried} goal(s) from {yesterday_date} → {today_date}:\n")
-            for task in missing_tasks:
-                f.write(f"  • {task['body']}\n")
-    except Exception:
-        pass
-
-    return carried
-
-
 def _weekly_note_path(date_obj, weekly_dir=None):
     weekly_dir = weekly_dir or DEFAULT_WEEKLY_DIR
     year, week_num, _ = date_obj.isocalendar()
@@ -224,6 +96,7 @@ def _load_weekly_goals(date_obj, weekly_dir=None):
 
     g_start, g_end = goals_section_bounds(lines)
     tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
+    ensure_goal_ids(tasks, "weekly", date_obj.isoformat())
     return tasks, path
 
 
@@ -272,23 +145,15 @@ def _parse_daily_goal_subsections(lines):
         return [], []
     weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
     daily_tasks = extract_subsection_tasks(lines, g_start, g_end, "DAILY")
-
-    # Backward compatibility: if no subsections, treat all tasks as DAILY.
-    if not weekly_tasks and not daily_tasks:
-        body = lines[g_start + 1:g_end]
-        if body and body[0].strip() == "---":
-            body = body[1:]
-        parsed = parse_goal_tasks(body)
-        daily_tasks = parsed
+    today = datetime.date.today()
+    week_start, _ = iso_week_range(today)
+    ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
+    ensure_goal_ids(daily_tasks, "daily", today.isoformat())
     return weekly_tasks, daily_tasks
 
 
 def _carry_forward_daily_tasks(today_date, yesterday_date, existing_daily_tasks):
     """Carry forward unchecked DAILY goals from yesterday into today's daily tasks list."""
-    already_ran = _carry_forward_already_ran(today_date)
-    if already_ran:
-        return existing_daily_tasks, 0
-
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     if not os.path.exists(yesterday_path):
         return existing_daily_tasks, 0
@@ -301,30 +166,26 @@ def _carry_forward_daily_tasks(today_date, yesterday_date, existing_daily_tasks)
 
     y_start, y_end = goals_section_bounds(y_lines)
     y_daily = extract_subsection_tasks(y_lines, y_start, y_end, "DAILY")
-    if not y_daily:
-        # Fallback: entire block
-        body = y_lines[y_start + 1:y_end] if y_start != -1 else []
-        if body and body and body[0].strip() == "---":
-            body = body[1:]
-        y_daily = parse_goal_tasks(body)
+
+    ensure_goal_ids(y_daily, "daily", yesterday_date.isoformat())
+    ensure_goal_ids(existing_daily_tasks, "daily", today_date.isoformat())
 
     open_y = [t for t in y_daily if not t.get("done")]
     if not open_y:
-        _mark_carry_forward(today_date)
         return existing_daily_tasks, 0
 
-    existing_canon = {t["canonical"] for t in existing_daily_tasks}
+    existing_ids = {t["id"] for t in existing_daily_tasks if t.get("id")}
     added = 0
     for task in open_y:
-        if task["canonical"] in existing_canon:
+        tid = task.get("id")
+        if tid in existing_ids:
             continue
         new_task = task.copy()
         new_task["done"] = False
         existing_daily_tasks.append(new_task)
-        existing_canon.add(task["canonical"])
+        existing_ids.add(tid)
         added += 1
 
-    _mark_carry_forward(today_date)
     return existing_daily_tasks, added
 
 
@@ -1341,7 +1202,7 @@ def update_markdown(sessions):
     # Parse existing goal subsections from today's note.
     existing_weekly_tasks, existing_daily_tasks = _parse_daily_goal_subsections(lines)
 
-    # Carry forward yesterday's incomplete DAILY goals exactly once per day.
+    # Carry forward yesterday's incomplete DAILY goals (ID-based, idempotent across runs).
     yesterday = today - datetime.timedelta(days=1)
     existing_daily_tasks, _ = _carry_forward_daily_tasks(today, yesterday, existing_daily_tasks)
 

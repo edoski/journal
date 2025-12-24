@@ -5,6 +5,7 @@ import math
 import os
 import re
 import time
+import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
 
@@ -190,8 +191,10 @@ def canonical_goal(text: str) -> str:
     - Strips leading checkbox/bullet markers.
     - Strips wiki links ([[foo]] -> foo) to avoid false mismatches.
     - Collapses whitespace and trims trailing punctuation.
+    - Strips trailing goal block IDs like ^gid-abcdef1234.
     """
     cleaned = re.sub(r"^\s*[-*]\s*\[[^\]]?\]\s*", "", text)
+    cleaned = re.sub(r"(\s+\^gid-[0-9a-fA-F]{1,32})+\s*$", "", cleaned)
     cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
     cleaned = cleaned.strip(" `")
     cleaned = re.sub(r"\s+", " ", cleaned)
@@ -203,7 +206,7 @@ def parse_goal_tasks(lines):
     """Extract checkbox task lines into a list of dicts.
 
     Each dict contains: line (original), body (after checkbox), done (bool),
-    canonical (normalized for comparisons).
+    canonical (normalized for comparisons), id (goal id).
     """
     pattern = re.compile(r"^\s*[-*]\s*\[(?P<state>[^\]]?)\]\s*(?P<body>.+)$")
     tasks = []
@@ -214,11 +217,15 @@ def parse_goal_tasks(lines):
         state = (match.group("state") or "").strip()
         body = match.group("body").strip()
         done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
+        goal_id = extract_goal_id(line)
+        # Strip trailing gid marker from body if present
+        body = re.sub(r"(\s+\^gid-[0-9a-fA-F]{6,32})+\s*$", "", body).rstrip()
         tasks.append({
             "line": line,
             "body": body,
             "done": done_state,
             "canonical": canonical_goal(line),
+            "id": goal_id,
         })
     return tasks
 
@@ -228,7 +235,9 @@ def render_goal_lines(tasks):
     rendered = []
     for task in tasks:
         mark = "x" if task.get("done") else " "
-        rendered.append(f"- [{mark}] {task.get('body', '').strip()}")
+        body = task.get("body", "").strip()
+        gid = task.get("id") or generate_goal_id()
+        rendered.append(f"- [{mark}] {body} ^{gid}")
     return rendered
 
 
@@ -281,6 +290,46 @@ def build_goals_block(subsections):
     if lines and lines[-1].strip() != "":
         lines.append("")
     return lines
+
+
+def generate_goal_id() -> str:
+    """Return a short goal id (gid-xxxxxxxxxx)."""
+    return f"gid-{uuid.uuid4().hex[:10]}"
+
+
+def generate_goal_id_for(horizon_key: str, period_key: str, canonical: str, index: int = 0) -> str:
+    """
+    Deterministic goal id for a horizon + period + canonical text + occurrence index.
+    Prevents collision when the same canonical text appears multiple times.
+    """
+    base = f"{horizon_key}|{period_key}|{canonical}|{index}"
+    digest = hashlib.sha1(base.encode()).hexdigest()[:10]
+    return f"gid-{digest}"
+
+
+def extract_goal_id(line: str):
+    """Extract a gid-... block ID from a line, if present."""
+    if not line:
+        return None
+    m = re.search(r"\^gid-([0-9a-fA-F]{6,32})\s*$", line)
+    if m:
+        return f"gid-{m.group(1).lower()}"
+    return None
+
+
+def ensure_goal_ids(tasks, horizon_key: str, period_key: str):
+    """
+    Ensure every task dict has an 'id'.
+    Uses deterministic IDs for missing ones to avoid duplicates across runs.
+    """
+    counts = {}
+    for t in tasks:
+        canon = t.get("canonical") or ""
+        if not t.get("id"):
+            idx = counts.get(canon, 0)
+            t["id"] = generate_goal_id_for(horizon_key, period_key, canon, idx)
+        counts[canon] = counts.get(canon, 0) + 1
+    return tasks
 
 
 def trim_blank_lines(lines):

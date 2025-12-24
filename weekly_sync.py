@@ -28,27 +28,9 @@ from sync_utils import (
     build_goals_block,
     trim_blank_lines,
     join_sections,
-)
+    ensure_goal_ids,
+    )
 
-
-WEEKLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_weekly.last_run")
-
-
-def _week_guard_ran(week_start):
-    try:
-        with open(WEEKLY_CARRY_GUARD_PATH, "r") as f:
-            return f.read().strip() == week_start.isoformat()
-    except Exception:
-        return False
-
-
-def _mark_week_guard(week_start):
-    try:
-        os.makedirs(os.path.dirname(WEEKLY_CARRY_GUARD_PATH), exist_ok=True)
-        with open(WEEKLY_CARRY_GUARD_PATH, "w") as f:
-            f.write(week_start.isoformat())
-    except Exception:
-        pass
 
 
 def _load_monthly_goals(month_start, monthly_dir=None):
@@ -69,6 +51,7 @@ def _load_monthly_goals(month_start, monthly_dir=None):
         if body and body[0].strip() == "---":
             body = body[1:]
         tasks = parse_goal_tasks(body)
+    ensure_goal_ids(tasks, "monthly", month_start.isoformat())
     return tasks, path, lines
 
 
@@ -92,11 +75,6 @@ def _parse_weekly_note_goals(lines):
         return [], []
     monthly_mirror = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
     weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
-    if not weekly_tasks and not monthly_mirror:
-        body = lines[g_start + 1:g_end]
-        if body and body[0].strip() == "---":
-            body = body[1:]
-        weekly_tasks = parse_goal_tasks(body)
     return monthly_mirror, weekly_tasks
 
 
@@ -381,32 +359,33 @@ def main():
 
         # Parse existing goals in the weekly note
         monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
+        ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
+        ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
 
-        # Carry forward open weekly goals from prior week once per week
-        if not _week_guard_ran(week_start):
-            prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
-            prev_week_tasks = []
-            if os.path.exists(prev_week_path):
-                try:
-                    with open(prev_week_path, "r") as pf:
-                        prev_lines = pf.read().splitlines()
-                    _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
-                except Exception:
-                    prev_week_tasks = []
-            open_prev = [t for t in prev_week_tasks if not t.get("done")]
-            existing_canon = {t["canonical"] for t in weekly_tasks}
-            for t in open_prev:
-                if t["canonical"] in existing_canon:
-                    continue
-                weekly_tasks.append({**t, "done": False})
-                existing_canon.add(t["canonical"])
-            _mark_week_guard(week_start)
+        # Carry forward open weekly goals from prior week (ID-based, idempotent)
+        prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
+        prev_week_tasks = []
+        if os.path.exists(prev_week_path):
+            try:
+                with open(prev_week_path, "r") as pf:
+                    prev_lines = pf.read().splitlines()
+                _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
+                ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
+            except Exception:
+                prev_week_tasks = []
+        open_prev = [t for t in prev_week_tasks if not t.get("done")]
+        existing_ids = {t["id"] for t in weekly_tasks if t.get("id")}
+        for t in open_prev:
+            if t.get("id") in existing_ids:
+                continue
+            weekly_tasks.append({**t, "done": False})
+            existing_ids.add(t.get("id"))
 
         # Propagate MONTHLY status changes from weekly mirror to monthly source
-        mirror_lookup = {t["canonical"]: t for t in monthly_mirror}
+        mirror_lookup = {t["id"]: t for t in monthly_mirror if t.get("id")}
         monthly_changed = False
         for task in monthly_tasks:
-            mirror = mirror_lookup.get(task["canonical"])
+            mirror = mirror_lookup.get(task.get("id"))
             if mirror and mirror.get("done") and not task.get("done"):
                 task["done"] = True
                 monthly_changed = True
