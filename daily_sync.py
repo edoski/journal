@@ -29,6 +29,8 @@ from sync_utils import (
     find_header_idx,
     replace_metrics_block,
     iso_week_range,
+    ensure_section_with_divider,
+    section_bounds,
 )
 
 # Configuration
@@ -1108,38 +1110,55 @@ def _parse_frontmatter(lines):
         data[key] = value
     return order, data
 
-def update_markdown(sessions):
-    today = datetime.datetime.now().date()
-    today_str = today.strftime("%Y-%m-%d")
-    file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
+def _ensure_daily_sections(lines, yaml_end_idx):
+    """Guarantee Goals, Metrics, Reflections exist with required dividers."""
+    # Goals immediately after YAML (or start of file)
+    goals_header_idx, _ = ensure_section_with_divider(
+        lines,
+        "Goals",
+        level=2,
+        insert_pos=(yaml_end_idx + 1) if yaml_end_idx != -1 else 0,
+    )
 
+    # Metrics after Goals
+    _, goals_end = section_bounds(lines, goals_header_idx, level=2) if goals_header_idx != -1 else (-1, -1)
+    metrics_header_idx, _ = ensure_section_with_divider(
+        lines,
+        "Metrics",
+        level=2,
+        insert_pos=goals_end if goals_end != -1 else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0),
+    )
+
+    # Reflections after Metrics
+    _, metrics_end = section_bounds(lines, metrics_header_idx, level=2) if metrics_header_idx != -1 else (-1, -1)
+    ensure_section_with_divider(
+        lines,
+        "Reflections",
+        level=2,
+        insert_pos=metrics_end if metrics_end != -1 else len(lines),
+    )
+
+
+def _read_daily_note(file_path):
     with locked_note(file_path):
         if not os.path.exists(file_path):
             if os.path.exists(TEMPLATE_PATH):
                 try:
-                    with open(TEMPLATE_PATH, 'r') as tf:
+                    with open(TEMPLATE_PATH, "r") as tf:
                         template_content = tf.read()
-                    with open(file_path, 'w') as f:
+                    with open(file_path, "w") as f:
                         f.write(template_content)
                 except Exception as e:
                     print(f"Error creating file from template: {e}")
-                    return
+                    return []
             else:
-                return
-        
-        with open(file_path, 'r') as f:
-            content = f.read()
-        
-        lines = content.splitlines()
-    
-    # Build study table (also computes focus_minutes on sessions)
-    existing_notes = _extract_existing_notes(lines)
-    new_table_lines, total_focus_minutes = _build_study_section(sessions, existing_notes)
-    hours = total_focus_minutes // 60
-    minutes = total_focus_minutes % 60
-    study_str = format_minutes(total_focus_minutes, always_show_both=True)
+                return []
 
-    # Find YAML end
+        with open(file_path, "r") as f:
+            return f.read().splitlines()
+
+
+def _find_yaml_end(lines):
     yaml_end_idx = -1
     dashes_count = 0
     for i, line in enumerate(lines):
@@ -1148,56 +1167,29 @@ def update_markdown(sessions):
             if dashes_count == 2:
                 yaml_end_idx = i
                 break
+    return yaml_end_idx
 
-    # Normalize spacing: do not allow blank lines immediately after YAML.
-    if yaml_end_idx != -1:
-        while yaml_end_idx + 1 < len(lines) and lines[yaml_end_idx + 1].strip() == "":
-            del lines[yaml_end_idx + 1]
 
-    def find_top_header_idx(title, start=0):
-        pattern = re.compile(rf"^\s*##\s+{re.escape(title)}\s*$", re.IGNORECASE)
-        for idx in range(start, len(lines)):
-            if pattern.match(lines[idx]):
-                return idx
-        return -1
+def update_markdown(sessions):
+    today = datetime.datetime.now().date()
+    today_str = today.strftime("%Y-%m-%d")
+    file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
 
-    def find_top_section_end(start_idx):
-        if start_idx == -1:
-            return -1
-        for idx in range(start_idx + 1, len(lines)):
-            if re.match(r"^\s*##\s+[^#]", lines[idx]):
-                return idx
-        return len(lines)
+    lines = _read_daily_note(file_path)
+    if not lines:
+        return
+    
+    # Build study table (also computes focus_minutes on sessions)
+    existing_notes = _extract_existing_notes(lines)
+    new_table_lines, total_focus_minutes = _build_study_section(sessions, existing_notes)
+    study_str = format_minutes(total_focus_minutes, always_show_both=True)
 
-    def ensure_divider_after_header(header_idx):
-        if header_idx == -1:
-            return -1
+    yaml_end_idx = _find_yaml_end(lines)
 
-        for idx in range(header_idx + 1, len(lines)):
-            stripped = lines[idx].strip()
-            if stripped == "":
-                continue
-            if stripped == "---":
-                return idx
-            lines.insert(header_idx + 1, "---")
-            return header_idx + 1
+    # Preserve divider after top-level sections and enforce presence
+    _ensure_daily_sections(lines, yaml_end_idx)
 
-        lines.append("---")
-        return len(lines) - 1
-
-    # Ensure Goals section exists (immediately below YAML, before Metrics).
-    goals_idx = find_top_header_idx("Goals")
-    if goals_idx == -1:
-        insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
-        lines[insert_pos:insert_pos] = ["## Goals", "---"]
-    goals_idx = find_top_header_idx("Goals")
-
-    # Ensure Metrics section exists (after Goals).
-    metrics_idx = find_top_header_idx("Metrics")
-    if metrics_idx == -1:
-        insert_pos = find_top_section_end(goals_idx) if goals_idx != -1 else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0)
-        lines[insert_pos:insert_pos] = ["## Metrics", "---"]
-    metrics_idx = find_top_header_idx("Metrics")
+    metrics_idx = find_header_idx(lines, "Metrics")
 
     # Parse existing goal subsections from today's note.
     existing_weekly_tasks, existing_daily_tasks = _parse_daily_goal_subsections(lines)
@@ -1239,15 +1231,20 @@ def update_markdown(sessions):
         lines[g_start:g_end] = goals_block
 
     # Recompute Metrics separator after Goals rewrite.
-    metrics_idx = find_top_header_idx("Metrics")
-    metrics_sep_idx = ensure_divider_after_header(metrics_idx)
+    metrics_idx = find_header_idx(lines, "Metrics")
+    metrics_divider_idx = metrics_idx + 1 if metrics_idx != -1 else -1
 
     # Identify current Metrics body (used for fallback blocks) without touching later sections.
-    reflections_idx = find_top_header_idx("Reflections", start=(metrics_sep_idx + 1 if metrics_sep_idx != -1 else 0))
+    metrics_body_start = metrics_divider_idx + 1 if metrics_divider_idx != -1 else 0
+    reflections_idx = find_header_idx(
+        lines,
+        "Reflections",
+        start=metrics_body_start,
+    )
     metrics_body = (
-        lines[metrics_sep_idx + 1 : reflections_idx]
+        lines[metrics_body_start:reflections_idx]
         if reflections_idx != -1
-        else lines[metrics_sep_idx + 1 :]
+        else lines[metrics_body_start:]
     )
 
     # Load activity status files
@@ -1291,20 +1288,22 @@ def update_markdown(sessions):
     updated_lines = _update_frontmatter(updated_lines, study_str, workout_done, stretch_done, sleep_data)
 
     new_content = "\n".join(updated_lines)
-    
-    try:
-        with open(file_path, 'r') as f:
-            current_content = f.read()
-    except FileNotFoundError:
-        current_content = ""
-        
-    if new_content.strip() == current_content.strip():
-        return False
 
-    tmp_path = file_path + ".tmp"
-    with open(tmp_path, 'w') as f:
-        f.write(new_content)
-    os.replace(tmp_path, file_path)
+    with locked_note(file_path):
+        try:
+            with open(file_path, "r") as f:
+                current_content = f.read()
+        except FileNotFoundError:
+            current_content = ""
+
+        if new_content.strip() == current_content.strip():
+            return False
+
+        tmp_path = file_path + ".tmp"
+        with open(tmp_path, "w") as f:
+            f.write(new_content)
+        os.replace(tmp_path, file_path)
+
     print(f"Successfully updated {file_path} (Study Time: {study_str})")
     return True
 

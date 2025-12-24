@@ -39,7 +39,7 @@ journal/
 - **Parsing**: `parse_frontmatter`, `parse_duration_to_minutes`, `parse_bool`, `extract_block`, `parse_study_table`, `parse_sleep_table`, `parse_daily_note`
 - **Date utilities**: `daterange`, `iso_week_range`, `month_range`, `month_week_ranges`, `format_week_label`
 - **Chart rendering**: `render_summary_table`, `render_monthly_chart`, `render_weekly_chart`, `render_training_frequency_grid`, `render_weekly_training_grid`, `wrap_code_block`
-- **File handling**: `ensure_note`, `replace_metrics_block`
+- **File handling**: `ensure_note`, `replace_metrics_block`, `ensure_section_with_divider`, `section_bounds`
 
 ### Daily Sync (`daily_sync.py`)
 - **Goal management**: `_parse_daily_goal_subsections`, `_carry_forward_daily_tasks`; goal IDs (`^gid-…`) are mandatory and deterministic per period
@@ -49,10 +49,15 @@ journal/
 - **Frontmatter**: `_parse_frontmatter`, `_update_frontmatter`
 - **Flow database**: `get_todays_sessions`, `dedupe_sessions`, `get_expected_break_minutes`
 - **Main orchestrator**: `update_markdown`
+  - Ensures top-level sections (`## Goals`, `## Metrics`, `## Reflections`) exist and each is followed by `---` via `ensure_section_with_divider`
+  - Rebuilds Goals block with weekly mirror + daily goals using `build_goals_block` and `goals_section_bounds`
+  - Builds Metrics subsections and splices them with `replace_metrics_block`, leaving later content untouched
+  - Updates frontmatter (study/workout/stretch/sleep) and writes atomically with temp-file swap under `locked_note`
 
 ### Weekly/Monthly Sync
 - `build_weekly_metrics` / `build_monthly_metrics`: Generate aggregated metrics blocks
 - Both import shared utilities from `sync_utils.py`
+- Goals and Metrics are built as discrete blocks and spliced into existing notes (surgical updates), with atomic temp-file writes under `locked_note`
 
 ### Training Visualizations
 Weekly and monthly notes use compact frequency grids to display training data:

@@ -410,6 +410,37 @@ def extract_block(lines, header):
     return lines[start:end]
 
 
+def ensure_section_with_divider(lines, title, level=2, insert_pos=None, create_if_missing=True):
+    """Ensure a header exists and is immediately followed by a divider line.
+
+    Returns (header_idx, divider_idx). If the header is absent and
+    create_if_missing is False, returns (-1, -1).
+    """
+    header = f"{'#'*level} {title}"
+    header_idx = find_header_idx(lines, title, level=level)
+
+    if header_idx == -1:
+        if not create_if_missing:
+            return -1, -1
+        insert_at = insert_pos if insert_pos is not None else len(lines)
+        lines[insert_at:insert_at] = [header, "---"]
+        return insert_at, insert_at + 1
+
+    cursor = header_idx + 1
+    while cursor < len(lines) and lines[cursor].strip() == "":
+        cursor += 1
+
+    if cursor < len(lines) and lines[cursor].strip() == "---":
+        if cursor != header_idx + 1:
+            del lines[header_idx + 1 : cursor]
+        divider_idx = header_idx + 1
+    else:
+        lines.insert(header_idx + 1, "---")
+        divider_idx = header_idx + 1
+
+    return header_idx, divider_idx
+
+
 def parse_study_table(lines):
     block = extract_block(lines, "### **STUDY**")
     if not block:
