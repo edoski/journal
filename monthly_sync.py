@@ -14,6 +14,8 @@ from sync_utils import (
     month_week_ranges,
     format_week_label,
     format_minutes,
+    compute_percent_change,
+    format_percent_change,
     render_summary_table,
     render_monthly_chart,
     render_training_frequency_grid,
@@ -102,12 +104,17 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # Weekly TOTALS for study chart (0-40h scale, 8 visual rows, 6-char bars)
     week_labels = []
+    week_day_lists = []
+    study_week_raw = []
     study_chart_vals = []
     study_value_labels = []
     for start, end in week_ranges:
         label = format_week_label(start, end)
         week_labels.append(label)
         week_days = list(daterange(start, end))
+        week_day_lists.append(week_days)
+        raw_minutes = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
+        study_week_raw.append(raw_minutes)
         mins = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
         mins = [m for m in mins if m is not None]
         total_min = sum(mins) if mins else 0
@@ -118,7 +125,43 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         else:
             study_value_labels.append(format_minutes(total_min) if total_min > 0 else "0h00m")
 
-    chart_lines = render_monthly_chart(week_labels, study_chart_vals, study_value_labels, height=10, y_max=40, bar_width=6, col_spacing=12)
+    is_current_month = start_date.year == today.year and start_date.month == today.month
+    study_delta_labels = []
+    for idx, week_days in enumerate(week_day_lists):
+        week_start = week_days[0]
+        # Future weeks: blank
+        if week_start > today and is_current_month:
+            study_delta_labels.append("")
+            continue
+        # First week has no prior comparison
+        if idx == 0:
+            study_delta_labels.append("—")
+            continue
+        # Determine slice length (partial for active week)
+        if is_current_month and week_start <= today <= week_days[-1]:
+            days_elapsed = sum(1 for d in week_days if d <= today)
+        else:
+            days_elapsed = len(week_days)
+        prev_week_days = week_day_lists[idx - 1]
+        slice_len = min(days_elapsed, len(week_days))
+        prev_slice_len = min(days_elapsed, len(prev_week_days))
+        curr_vals = study_week_raw[idx][:slice_len]
+        prev_vals = study_week_raw[idx - 1][:prev_slice_len]
+        curr_sum = sum(v for v in curr_vals if v is not None)
+        prev_sum = sum(v for v in prev_vals if v is not None)
+        delta = compute_percent_change(curr_sum, prev_sum)
+        study_delta_labels.append(format_percent_change(delta))
+
+    chart_lines = render_monthly_chart(
+        week_labels,
+        study_chart_vals,
+        study_value_labels,
+        height=10,
+        y_max=40,
+        bar_width=6,
+        col_spacing=12,
+        delta_labels=study_delta_labels,
+    )
     lines.extend(wrap_code_block(chart_lines))
     lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
     lines.append("")
@@ -169,8 +212,44 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # TRAINING section
     lines.append("### **TRAINING**")
+    workout_delta_labels = []
+    stretch_delta_labels = []
+    for idx, week_days in enumerate(week_day_lists):
+        week_start = week_days[0]
+        if is_current_month and week_start > today:
+            workout_delta_labels.append("")
+            stretch_delta_labels.append("")
+            continue
+        if idx == 0:
+            workout_delta_labels.append("—")
+            stretch_delta_labels.append("—")
+            continue
+        if is_current_month and week_start <= today <= week_days[-1]:
+            days_elapsed = sum(1 for d in week_days if d <= today)
+        else:
+            days_elapsed = len(week_days)
+        prev_week_days = week_day_lists[idx - 1]
+        slice_len = min(days_elapsed, len(week_days))
+        prev_slice_len = min(days_elapsed, len(prev_week_days))
+
+        curr_workout_count = sum(1 for d in week_days[:slice_len] if daily_data.get(d, {}).get("workout"))
+        prev_workout_count = sum(1 for d in prev_week_days[:prev_slice_len] if daily_data.get(d, {}).get("workout"))
+        workout_delta = compute_percent_change(curr_workout_count, prev_workout_count)
+        workout_delta_labels.append(format_percent_change(workout_delta))
+
+        curr_stretch_count = sum(1 for d in week_days[:slice_len] if daily_data.get(d, {}).get("stretch"))
+        prev_stretch_count = sum(1 for d in prev_week_days[:prev_slice_len] if daily_data.get(d, {}).get("stretch"))
+        stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
+        stretch_delta_labels.append(format_percent_change(stretch_delta))
+
     training_grid = render_training_frequency_grid(
-        week_ranges, daily_data, workout_days, stretch_days, days_in_period
+        week_ranges,
+        daily_data,
+        workout_days,
+        stretch_days,
+        days_in_period,
+        workout_delta_labels=workout_delta_labels,
+        stretch_delta_labels=stretch_delta_labels,
     )
     lines.extend(wrap_code_block(training_grid))
     lines.append("")
@@ -192,12 +271,14 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # SLEEP section (5-char bars, weekly averages)
     lines.append("### **SLEEP**")
+    sleep_week_raw = []
     sleep_chart_vals = []
     sleep_value_labels = []
-    for start, end in week_ranges:
-        week_days = list(daterange(start, end))
-        mins = [daily_data.get(d, {}).get("sleep_minutes") for d in week_days]
-        mins = [m for m in mins if m is not None]
+    for week_days in week_day_lists:
+        mins_raw = [daily_data.get(d, {}).get("sleep_minutes") for d in week_days]
+        sleep_week_raw.append(mins_raw)
+        mins = [m for m in mins_raw if m is not None]
+        start = week_days[0]
         if mins:
             avg_min = sum(mins) / len(mins)  # AVERAGE for sleep
             sleep_chart_vals.append(avg_min / 60)
@@ -212,7 +293,39 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             else:
                 sleep_value_labels.append("0h00m")
 
-    sleep_chart = render_monthly_chart(week_labels, sleep_chart_vals, sleep_value_labels, height=10, y_max=10, bar_width=5, col_spacing=12)
+    sleep_delta_labels = []
+    for idx, week_days in enumerate(week_day_lists):
+        week_start = week_days[0]
+        if week_start > today and is_current_month:
+            sleep_delta_labels.append("")
+            continue
+        if idx == 0:
+            sleep_delta_labels.append("—")
+            continue
+        if is_current_month and week_start <= today <= week_days[-1]:
+            days_elapsed = sum(1 for d in week_days if d <= today)
+        else:
+            days_elapsed = len(week_days)
+        prev_week_days = week_day_lists[idx - 1]
+        slice_len = min(days_elapsed, len(week_days))
+        prev_slice_len = min(days_elapsed, len(prev_week_days))
+        curr_vals = [v for v in sleep_week_raw[idx][:slice_len] if v is not None]
+        prev_vals = [v for v in sleep_week_raw[idx - 1][:prev_slice_len] if v is not None]
+        curr_avg = (sum(curr_vals) / len(curr_vals)) if curr_vals else 0
+        prev_avg = (sum(prev_vals) / len(prev_vals)) if prev_vals else 0
+        delta = compute_percent_change(curr_avg, prev_avg)
+        sleep_delta_labels.append(format_percent_change(delta))
+
+    sleep_chart = render_monthly_chart(
+        week_labels,
+        sleep_chart_vals,
+        sleep_value_labels,
+        height=10,
+        y_max=10,
+        bar_width=5,
+        col_spacing=12,
+        delta_labels=sleep_delta_labels,
+    )
     lines.extend(wrap_code_block(sleep_chart))
     lines.append("")
 
@@ -237,12 +350,14 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # MOOD section (5-char bars, weekly averages, always show decimal)
     lines.append("### **MOOD**")
+    mood_week_raw = []
     mood_chart_vals = []
     mood_value_labels = []
-    for start, end in week_ranges:
-        week_days = list(daterange(start, end))
-        vals = [daily_data.get(d, {}).get("mood") for d in week_days]
-        vals = [v for v in vals if v is not None]
+    for week_days in week_day_lists:
+        vals_raw = [daily_data.get(d, {}).get("mood") for d in week_days]
+        mood_week_raw.append(vals_raw)
+        vals = [v for v in vals_raw if v is not None]
+        start = week_days[0]
         if vals:
             avg_val = sum(vals) / len(vals)  # AVERAGE for mood
             mood_chart_vals.append(avg_val)
@@ -258,7 +373,41 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             else:
                 mood_value_labels.append("0.0")
 
-    mood_chart = render_monthly_chart(week_labels, mood_chart_vals, mood_value_labels, height=10, y_max=10, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=True)
+    mood_delta_labels = []
+    for idx, week_days in enumerate(week_day_lists):
+        week_start = week_days[0]
+        if week_start > today and is_current_month:
+            mood_delta_labels.append("")
+            continue
+        if idx == 0:
+            mood_delta_labels.append("—")
+            continue
+        if is_current_month and week_start <= today <= week_days[-1]:
+            days_elapsed = sum(1 for d in week_days if d <= today)
+        else:
+            days_elapsed = len(week_days)
+        prev_week_days = week_day_lists[idx - 1]
+        slice_len = min(days_elapsed, len(week_days))
+        prev_slice_len = min(days_elapsed, len(prev_week_days))
+        curr_vals = [v for v in mood_week_raw[idx][:slice_len] if v is not None]
+        prev_vals = [v for v in mood_week_raw[idx - 1][:prev_slice_len] if v is not None]
+        curr_avg = (sum(curr_vals) / len(curr_vals)) if curr_vals else 0
+        prev_avg = (sum(prev_vals) / len(prev_vals)) if prev_vals else 0
+        delta = compute_percent_change(curr_avg, prev_avg)
+        mood_delta_labels.append(format_percent_change(delta))
+
+    mood_chart = render_monthly_chart(
+        week_labels,
+        mood_chart_vals,
+        mood_value_labels,
+        height=10,
+        y_max=10,
+        bar_width=5,
+        col_spacing=12,
+        left_pad=2,
+        center_labels_on_bars=True,
+        delta_labels=mood_delta_labels,
+    )
     lines.extend(wrap_code_block(mood_chart))
 
     return lines

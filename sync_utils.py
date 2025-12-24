@@ -385,21 +385,24 @@ def replace_metrics_block(lines, new_block_lines):
 def compute_percent_change(current, previous):
     """
     Compute percentage change from previous to current.
-    Returns None if previous is 0 or None.
+
+    - Returns None when previous is None or zero and current > 0 (avoids +∞%).
+    - Returns 0 when both current and previous are zero (explicit 0%).
     """
-    if previous is None or previous == 0:
+    if current is None or previous is None:
         return None
-    if current is None:
-        return None
+    if previous == 0:
+        return 0 if current == 0 else None
     return ((current - previous) / previous) * 100
 
 
 def format_percent_change(pct):
     """
     Format percentage change as +X% or -X%.
+    Uses an em dash when pct is None (e.g., baseline=0 with a nonzero current).
     """
     if pct is None:
-        return "-"
+        return "—"
     sign = "+" if pct >= 0 else ""
     return f"{sign}{round_half_up(pct)}%"
 
@@ -540,7 +543,7 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     return lines
 
 
-def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=False):
+def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=False, delta_labels=None):
     """
     Render a monthly bar chart with values on top of bars.
     
@@ -618,11 +621,24 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
         lines.append(row.rstrip())
     
     # X-axis labels row with single space (left-aligned)
-    label_row = " "
+    label_prefix = " "
+    label_row = label_prefix
     for label in labels:
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
+
+    if delta_labels:
+        delta_row = label_prefix
+        for idx, delta in enumerate(delta_labels):
+            delta_str = str(delta) if delta is not None else ""
+            label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
+            left_pad = max((label_len - len(delta_str)) // 2, 0)
+            remaining = col_spacing - left_pad - len(delta_str)
+            if remaining < 0:
+                remaining = 0
+            delta_row += " " * left_pad + delta_str + " " * remaining
+        lines.append(delta_row.rstrip())
     
     return lines
 
@@ -719,11 +735,11 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
-    
+
     return lines
 
 
-def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period):
+def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period, workout_delta_labels=None, stretch_delta_labels=None):
     """
     Render a compact frequency grid showing workout/stretch activity for the entire month.
     
@@ -765,15 +781,31 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
     # Build the two main rows with spacing between weeks
     workout_row = "│ WORKOUT:  "
     stretch_row = "│ STRETCH:  "
+    workout_delta_row = "│           " if workout_delta_labels else None
+    stretch_delta_row = "│           " if stretch_delta_labels else None
     
+    max_days = max(week_day_counts) if week_day_counts else 0
+    week_width = max_days * 2 - 1 if max_days > 0 else 0
+
     symbol_idx = 0
     for i, day_count in enumerate(week_day_counts):
         # Add symbols for this week
         week_workout = " ".join(workout_symbols[symbol_idx:symbol_idx + day_count])
         week_stretch = " ".join(stretch_symbols[symbol_idx:symbol_idx + day_count])
         
-        workout_row += week_workout
-        stretch_row += week_stretch
+        workout_row += week_workout.ljust(week_width)
+        stretch_row += week_stretch.ljust(week_width)
+
+        if workout_delta_row is not None:
+            label = workout_delta_labels[i] if i < len(workout_delta_labels) else ""
+            label_str = label or ""
+            left_pad = max((week_width - len(label_str)) // 2, 0)
+            workout_delta_row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
+        if stretch_delta_row is not None:
+            label = stretch_delta_labels[i] if i < len(stretch_delta_labels) else ""
+            label_str = label or ""
+            left_pad = max((week_width - len(label_str)) // 2, 0)
+            stretch_delta_row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
         
         symbol_idx += day_count
         
@@ -781,22 +813,28 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
         if i < len(week_day_counts) - 1:
             workout_row += "   "
             stretch_row += "   "
+            if workout_delta_row is not None:
+                workout_delta_row += "   "
+            if stretch_delta_row is not None:
+                stretch_delta_row += "   "
     
     # Add counts at the end (zero-padded for alignment)
     workout_row += f"   ({workout_count:02d}/{days_in_period})"
     stretch_row += f"   ({stretch_count:02d}/{days_in_period})"
     
     lines.append(workout_row)
+    if workout_delta_row is not None:
+        lines.append(workout_delta_row.rstrip())
+    # Spacer between workout and stretch rows
+    lines.append("│")
     lines.append(stretch_row)
+    if stretch_delta_row is not None:
+        lines.append(stretch_delta_row.rstrip())
     
     # Build separator row (dashes under each week)
     separator_row = "│           "  # "│ " + 10 spaces to align with "│ WORKOUT:  "
-    for i, day_count in enumerate(week_day_counts):
-        # Each day takes 2 chars (symbol + space), minus last space
-        dash_count = day_count * 2 - 1
-        separator_row += "─" * dash_count
-        
-        # Add spacing between weeks (3 spaces)
+    for i in range(len(week_day_counts)):
+        separator_row += "─" * week_width
         if i < len(week_day_counts) - 1:
             separator_row += "   "
     
@@ -804,15 +842,11 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
     
     # Build label row
     label_row = "│           "  # "│ " + 10 spaces to align
-    for i, (label, day_count) in enumerate(zip(week_labels, week_day_counts)):
-        label_row += label
-        
-        # Add spacing to next label (if not last)
-        if i < len(week_day_counts) - 1:
-            # Calculate spacing: week width minus label length, plus inter-week spacing
-            week_width = day_count * 2 - 1  # Each day is 2 chars (symbol + space), minus last space
-            spacing = week_width - len(label) + 3  # +3 for inter-week gap
-            label_row += " " * spacing
+    for i, label in enumerate(week_labels):
+        left_pad = max((week_width - len(label)) // 2, 0)
+        label_row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+        if i < len(week_labels) - 1:
+            label_row += "   "
     
     lines.append(label_row)
     
