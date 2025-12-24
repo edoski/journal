@@ -29,6 +29,7 @@ from sync_utils import (
     goals_section_bounds,
     extract_subsection_tasks,
     build_goals_block,
+    normalize_blank_lines,
 )
 
 MONTHLY_CARRY_GUARD_PATH = os.path.expanduser("~/.cache/journal_sync/carry_forward_monthly.last_run")
@@ -546,6 +547,7 @@ def main():
             month_start, month_end, week_ranges, daily_data,
             prev_daily_data, current_month_label, prev_month_label
         )
+        metrics_block = normalize_blank_lines(metrics_block)
 
         updated_lines = replace_metrics_block(lines, metrics_block)
         tmp_path = note_path + ".tmp"

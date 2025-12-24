@@ -467,13 +467,13 @@ def _build_sleep_section(sleep_data, existing_block):
     sleep_table = _build_sleep_table(sleep_data)
 
     if sleep_table:
-        lines_out.extend(["", "### **SLEEP**", ""])
+        lines_out.append("### **SLEEP**")
+        lines_out.append("")  # spacer between header and table
         lines_out.extend(sleep_table)
     elif existing_block:
-        lines_out.append("")
         lines_out.extend(existing_block)
     else:
-        lines_out.extend(["", "### **SLEEP**", "", "_Sleep data not available._"])
+        lines_out.extend(["### **SLEEP**", "", "_Sleep data not available._"])
 
     return lines_out
 
@@ -717,7 +717,8 @@ def _build_training_section(workout_data, stretch_data, existing_block, today_st
     elif existing_block:
         merged = existing_entries
 
-    lines_out = ["", "### **TRAINING**", ""]
+    lines_out = ["### **TRAINING**"]
+    lines_out.append("")  # spacer between header and body
     if merged:
         lines_out.extend(_render_training_entries(merged))
     else:
@@ -1398,21 +1399,29 @@ def update_markdown(sessions):
     existing_sleep_block = extract_block(metrics_body, "### **sleep**")
 
     # Build Metrics body lines
-    metrics_lines = ["### **STUDY**"]
+    study_lines = ["### **STUDY**"]
     if new_table_lines:
-        metrics_lines.append("")
-        metrics_lines.extend(new_table_lines)
+        study_lines.append("")
+        study_lines.extend(new_table_lines)
     else:
-        metrics_lines.append("")
-        metrics_lines.append("_No study sessions completed today._")
+        study_lines.append("")
+        study_lines.append("_No study sessions completed today._")
 
     training_lines, _ = _build_training_section(
         workout_data, stretch_data, existing_training_block, today_str
     )
-    metrics_lines.extend(training_lines)
 
     sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
-    metrics_lines.extend(sleep_lines)
+
+    # Join metrics subsections with single blank between, none before first, none trailing
+    sections = [study_lines, training_lines, sleep_lines]
+    metrics_lines = []
+    for sec in sections:
+        if not sec:
+            continue
+        if metrics_lines:
+            metrics_lines.append("")
+        metrics_lines.extend(sec)
 
     # Splice Metrics via shared helper (keeps content after Metrics intact)
     updated_lines = replace_metrics_block(lines, metrics_lines)

@@ -283,6 +283,27 @@ def build_goals_block(subsections):
     return lines
 
 
+def normalize_blank_lines(lines):
+    """
+    Collapse multiple consecutive blank lines into a single blank.
+    Strip leading and trailing blank lines.
+    """
+    normalized = []
+    for line in lines:
+        if line.strip() == "":
+            if not normalized or normalized[-1].strip() == "":
+                continue
+            normalized.append("")
+        else:
+            normalized.append(line)
+    # Trim trailing blank
+    if normalized and normalized[-1].strip() == "":
+        normalized.pop()
+    # Trim leading blank
+    if normalized and normalized[0].strip() == "":
+        normalized = normalized[1:]
+    return normalized
+
 def find_header_idx(lines, title, level=2, start=0):
     """Find the index of a markdown header like ## Title or ### Title.
 

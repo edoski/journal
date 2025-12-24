@@ -26,6 +26,7 @@ from sync_utils import (
     parse_goal_tasks,
     render_goal_lines,
     build_goals_block,
+    normalize_blank_lines,
 )
 
 
@@ -365,6 +366,7 @@ def main():
                 prev_daily_data[day] = parsed
 
         metrics_block = build_weekly_metrics(week_start, week_end, daily_data, prev_daily_data, prev_week_label)
+        metrics_block = normalize_blank_lines(metrics_block)
 
         try:
             with open(note_path, "r") as f:
