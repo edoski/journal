@@ -15,6 +15,7 @@ from sync_utils import (
     ceil_minutes,
     round_half_up,
     extract_block,
+    locked_note,
 )
 
 # Configuration
@@ -1191,23 +1192,24 @@ def update_markdown(sessions):
     today_str = today.strftime("%Y-%m-%d")
     file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
 
-    if not os.path.exists(file_path):
-        if os.path.exists(TEMPLATE_PATH):
-            try:
-                with open(TEMPLATE_PATH, 'r') as tf:
-                    template_content = tf.read()
-                with open(file_path, 'w') as f:
-                    f.write(template_content)
-            except Exception as e:
-                print(f"Error creating file from template: {e}")
+    with locked_note(file_path):
+        if not os.path.exists(file_path):
+            if os.path.exists(TEMPLATE_PATH):
+                try:
+                    with open(TEMPLATE_PATH, 'r') as tf:
+                        template_content = tf.read()
+                    with open(file_path, 'w') as f:
+                        f.write(template_content)
+                except Exception as e:
+                    print(f"Error creating file from template: {e}")
+                    return
+            else:
                 return
-        else:
-            return
-    
-    with open(file_path, 'r') as f:
-        content = f.read()
-    
-    lines = content.splitlines()
+        
+        with open(file_path, 'r') as f:
+            content = f.read()
+        
+        lines = content.splitlines()
     
     # Build study table (also computes focus_minutes on sessions)
     existing_notes = _extract_existing_notes(lines)
@@ -1349,8 +1351,10 @@ def update_markdown(sessions):
     if new_content.strip() == current_content.strip():
         return False
 
-    with open(file_path, 'w') as f:
+    tmp_path = file_path + ".tmp"
+    with open(tmp_path, 'w') as f:
         f.write(new_content)
+    os.replace(tmp_path, file_path)
     print(f"Successfully updated {file_path} (Study Time: {study_str})")
     return True
 

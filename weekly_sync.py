@@ -7,6 +7,7 @@ from sync_utils import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
+    locked_note,
     DAYS,
     parse_daily_note,
     daterange,
@@ -255,44 +256,47 @@ def main():
     weekly_dir = args.weekly_dir or DEFAULT_WEEKLY_DIR
     note_path = args.file or os.path.join(weekly_dir, filename)
 
-    ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
+    with locked_note(note_path):
+        ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
 
-    # Load current week's daily data
-    daily_data = {}
-    for day in daterange(week_start, week_end):
-        path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-        if not os.path.exists(path):
-            continue
-        parsed = parse_daily_note(path)
-        if parsed:
-            daily_data[day] = parsed
+        # Load current week's daily data
+        daily_data = {}
+        for day in daterange(week_start, week_end):
+            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
+            if not os.path.exists(path):
+                continue
+            parsed = parse_daily_note(path)
+            if parsed:
+                daily_data[day] = parsed
 
-    # Load previous week's daily data for comparison
-    prev_week_start = week_start - datetime.timedelta(days=7)
-    prev_week_end = week_end - datetime.timedelta(days=7)
-    prev_year, prev_week_num, _ = prev_week_start.isocalendar()
-    prev_week_label = f"**[[{prev_year}-W{prev_week_num:02d}\\|LAST WEEK]]**"
+        # Load previous week's daily data for comparison
+        prev_week_start = week_start - datetime.timedelta(days=7)
+        prev_week_end = week_end - datetime.timedelta(days=7)
+        prev_year, prev_week_num, _ = prev_week_start.isocalendar()
+        prev_week_label = f"**[[{prev_year}-W{prev_week_num:02d}\\|LAST WEEK]]**"
 
-    prev_daily_data = {}
-    for day in daterange(prev_week_start, prev_week_end):
-        path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-        if not os.path.exists(path):
-            continue
-        parsed = parse_daily_note(path)
-        if parsed:
-            prev_daily_data[day] = parsed
+        prev_daily_data = {}
+        for day in daterange(prev_week_start, prev_week_end):
+            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
+            if not os.path.exists(path):
+                continue
+            parsed = parse_daily_note(path)
+            if parsed:
+                prev_daily_data[day] = parsed
 
-    metrics_block = build_weekly_metrics(week_start, week_end, daily_data, prev_daily_data, prev_week_label)
+        metrics_block = build_weekly_metrics(week_start, week_end, daily_data, prev_daily_data, prev_week_label)
 
-    try:
-        with open(note_path, "r") as f:
-            lines = f.read().splitlines()
-    except FileNotFoundError:
-        lines = []
+        try:
+            with open(note_path, "r") as f:
+                lines = f.read().splitlines()
+        except FileNotFoundError:
+            lines = []
 
-    updated_lines = replace_metrics_block(lines, metrics_block)
-    with open(note_path, "w") as f:
-        f.write("\n".join(updated_lines).rstrip() + "\n")
+        updated_lines = replace_metrics_block(lines, metrics_block)
+        tmp_path = note_path + ".tmp"
+        with open(tmp_path, "w") as f:
+            f.write("\n".join(updated_lines).rstrip() + "\n")
+        os.replace(tmp_path, note_path)
 
 
 if __name__ == "__main__":

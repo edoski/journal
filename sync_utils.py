@@ -1,8 +1,12 @@
 import datetime
+import fcntl
+import hashlib
 import math
 import os
 import re
+import time
 from collections import OrderedDict
+from contextlib import contextmanager
 
 JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
 VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
@@ -13,8 +17,46 @@ MONTHLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates
 DEFAULT_WEEKLY_DIR = os.environ.get("WEEKLY_DIR", JOURNAL_DIR)
 DEFAULT_MONTHLY_DIR = os.environ.get("MONTHLY_DIR", JOURNAL_DIR)
 
+LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
+
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+
+def _lockfile_for(path: str) -> str:
+    os.makedirs(LOCK_DIR, exist_ok=True)
+    digest = hashlib.sha1(os.path.abspath(path).encode()).hexdigest()
+    return os.path.join(LOCK_DIR, f"{digest}.lock")
+
+
+@contextmanager
+def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
+    """
+    Serialize writes to a note by taking an advisory lock stored in ~/.cache.
+
+    - Uses fcntl.flock (works on macOS) with non-blocking attempts.
+    - Waits up to `timeout` seconds, polling every `poll` seconds.
+    - Raises TimeoutError if the lock cannot be acquired in time.
+    """
+    lock_path = _lockfile_for(path)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+    start = time.time()
+    acquired = False
+    try:
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except BlockingIOError:
+                if time.time() - start >= timeout:
+                    raise TimeoutError(f"lock timeout for {path}")
+                time.sleep(poll)
+        yield
+    finally:
+        if acquired:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
 
 
 def parse_frontmatter(lines):
