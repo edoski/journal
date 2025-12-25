@@ -469,7 +469,7 @@ def parse_study_table(lines):
             continue
         activity = parts[2].strip("`")
         duration_min = parse_duration_to_minutes(parts[3])
-        
+
         # Parse interrupt minutes from INTERRUPT column (format: `+XXm`)
         interrupt_min = 0
         if len(parts) > 4:
@@ -477,18 +477,22 @@ def parse_study_table(lines):
             interrupt_match = re.search(r"\+(\d+)m", interrupt_str)
             if interrupt_match:
                 interrupt_min = int(interrupt_match.group(1))
-        
+
         # Parse overrun minutes from BREAK column (format: `5m (+15m)` where (+15m) is the overrun)
         overrun_min = 0
+        planned_break_min = 0
         if len(parts) > 5:
             break_str = parts[5].strip("`").strip()
+            if break_str:
+                planned_str = break_str.split("(", 1)[0].strip()
+                planned_break_min = parse_duration_to_minutes(planned_str) or 0
             overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
             if overrun_match:
                 overrun_str = overrun_match.group(1)
                 overrun_min = parse_duration_to_minutes(overrun_str) or 0
-        
+
         if activity and duration_min:
-            rows.append((activity, duration_min, interrupt_min, overrun_min))
+            rows.append((activity, duration_min, interrupt_min, overrun_min, planned_break_min))
     return rows
 
 
@@ -557,15 +561,18 @@ def parse_daily_note(path):
     activity_totals = {}
     interrupt_total = 0
     overrun_total = 0
+    planned_break_total = 0
     for row in study_rows:
         activity, minutes = row[0], row[1]
         activity_totals[activity] = activity_totals.get(activity, 0) + minutes
-        
+
         # Aggregate interrupts and overruns
         if len(row) > 2:
             interrupt_total += row[2]
         if len(row) > 3:
             overrun_total += row[3]
+        if len(row) > 4:
+            planned_break_total += row[4]
 
     # Study total always derived from table (activity_totals) for consistency
     # This ensures chart bars, SUM, SUMMARY avg, and percentages all match
@@ -582,6 +589,7 @@ def parse_daily_note(path):
         "activity_totals": activity_totals,
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
+        "planned_break_minutes": planned_break_total,
     }
 
 

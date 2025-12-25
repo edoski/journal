@@ -178,25 +178,19 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
 
     total_interrupts = sum(interrupt_totals)
     total_overruns = sum(overrun_totals)
-    days_elapsed = current_metrics.get("days_up_to_today", len(dates))
-    avg_interrupts = total_interrupts / max(1, days_elapsed)
-    avg_overruns = total_overruns / max(1, days_elapsed)
-    study_daily_avg = (sum(activity_totals.values()) / max(1, days_elapsed))
 
-    interrupt_pct_str = "-"
-    if study_daily_avg > 0 and total_interrupts > 0:
-        interrupt_pct = (total_interrupts / max(1, sum(activity_totals.values()))) * 100
-        interrupt_pct_str = f"{int(round(interrupt_pct))}%"
-
-    overrun_pct_str = "-"
-    if study_daily_avg > 0 and avg_overruns > 0:
-        overrun_pct = (avg_overruns / study_daily_avg) * 100
-        overrun_pct_str = f"{int(round(overrun_pct))}%"
-
-    study_lines.append("| METRIC | AVERAGE | % OF STUDY |")
-    study_lines.append("| ------ | ------- | ---------- |")
-    study_lines.append(f"| **INTERRUPTS/DAY** | `{format_minutes(avg_interrupts, always_show_both=True)}` | `{interrupt_pct_str}` |")
-    study_lines.append(f"| **OVERRUNS/DAY**   | `{format_minutes(avg_overruns, always_show_both=True)}` | `{overrun_pct_str}` |")
+    # Use only study days (any study minutes > 0) as the denominator for both
+    study_day_count = sum(
+        1 for d in dates
+        if (daily_data.get(d, {}).get("study_minutes") or 0) > 0
+    )
+    avg_interrupts = total_interrupts / max(1, study_day_count)
+    avg_overruns = total_overruns / max(1, study_day_count)
+    
+    study_lines.append("| METRIC | AVERAGE |")
+    study_lines.append("| ------ | ------- |")
+    study_lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
+    study_lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |")
     study_lines.append("")
     sections.append(trim_blank_lines(study_lines))
 
