@@ -10,6 +10,7 @@ journal/
   daily_sync.py      # Daily sync (Flow sessions, training, sleep, goals)
   weekly_sync.py     # Weekly metrics aggregation
   monthly_sync.py    # Monthly metrics aggregation
+  quarterly_sync.py  # Quarterly metrics aggregation
   sync_all.sh        # Wrapper script that runs all syncs (called by LaunchAgent)
   AGENTS.md          # This file
   __pycache__/       # Generated Python bytecode; safe to ignore
@@ -25,11 +26,13 @@ journal/
 
 - **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns, including bar charts for study/sleep/mood and a compact frequency grid showing entire month's training patterns at a glance.
 
+- **`quarterly_sync.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Charts roll up by month (3 bars per chart). Goals section mirrors yearly + quarterly goals. Training uses per-month bars (workout and stretch) plus a percent table; study/sleep/mood charts mirror monthly styling.
+
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, and monthly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
 ### Configuration Constants
 
-- **In `sync_utils.py`**: `JOURNAL_DIR`, `VAULT_DIR`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `DEFAULT_WEEKLY_DIR`, `DEFAULT_MONTHLY_DIR`
+- **In `sync_utils.py`**: `JOURNAL_DIR`, `VAULT_DIR`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `DEFAULT_WEEKLY_DIR`, `DEFAULT_MONTHLY_DIR`, `DEFAULT_QUARTERLY_DIR`
 - **In `daily_sync.py`**: `DB_PATH`, `TEMPLATE_PATH`, `ICLOUD_JOURNALSYNC_DIR`, `TRAINING_CACHE_PATH`, `LUNCH_WINDOW_BASE`, `REGULAR_DAY_END`
 
 ## Architecture
@@ -37,7 +40,7 @@ journal/
 ### Shared Utilities (`sync_utils.py`)
 - **Formatting**: `format_minutes`, `format_minutes_seconds`, `ceil_minutes`, `round_half_up`, `format_training_ratio`, `format_mood_with_scale`, `format_percent_change`, `compute_percent_change`
 - **Parsing**: `parse_frontmatter`, `parse_duration_to_minutes`, `parse_bool`, `extract_block`, `parse_study_table`, `parse_sleep_table`, `parse_daily_note`
-- **Date utilities**: `daterange`, `iso_week_range`, `month_range`, `month_week_ranges`, `format_week_label`
+- **Date utilities**: `daterange`, `iso_week_range`, `month_range`, `month_week_ranges`, `quarter_range`, `quarter_months`, `quarter_of_date`, `format_week_label`
 - **Chart rendering**: `render_summary_table`, `render_monthly_chart`, `render_weekly_chart`, `render_training_frequency_grid`, `render_weekly_training_grid`, `wrap_code_block`
 - **File handling**: `ensure_note`, `replace_metrics_block`, `ensure_section_with_divider`, `section_bounds`
 
@@ -59,12 +62,16 @@ journal/
 - Both import shared utilities from `sync_utils.py`
 - Goals and Metrics are built as discrete blocks and spliced into existing notes (surgical updates), with atomic temp-file writes under `locked_note`
 
+- `build_quarterly_metrics` (in `quarterly_sync.py`): Month-level aggregation into quarterly notes. Generates summary (this vs last quarter), study/sleep/mood monthly bars (3 columns), training per-month bars + percent table, and mirrors yearly + quarterly goals.
+
 ### Training Visualizations
 Weekly and monthly notes use compact frequency grids to display training data:
 - **Monthly grid**: Uses `■` (completed) and `·` (skipped) with week grouping, dynamically adjusts for 28-31 day months, shows inline counts like `(06/31)` with zero-padding
 - **Weekly grid**: Uses `███` (completed) and `░░░` (skipped) for better visibility, shows inline counts like `(2/7)` without zero-padding
 - Both formats include vertical bars (`│`) for visual consistency, separator lines, and day labels
 - No legends or summary tables—visual patterns and inline counts make totals immediately apparent
+
+Quarterly notes use per-month bar rows for workout and stretch (in a unified code block) plus a percent table; counts are right-aligned and zero-padded.
 
 ## Build, Test, and Run
 
@@ -79,8 +86,8 @@ Weekly and monthly notes use compact frequency grids to display training data:
 
 ## LaunchAgent
 
-All syncs (daily, weekly, monthly) are triggered automatically via LaunchAgent at `~/Library/LaunchAgents/com.edo.journalsync.plist`:
-- Runs `sync_all.sh` which executes daily, weekly, and monthly syncs in sequence
+All syncs (daily, weekly, monthly, quarterly) are triggered automatically via LaunchAgent at `~/Library/LaunchAgents/com.edo.journalsync.plist`:
+- Runs `sync_all.sh` which executes daily, weekly, monthly, and quarterly syncs in sequence
 - Watches Flow's CoreData database and iCloud status files for changes
 - Runs every 15 minutes as a fail-safe
 - Throttles to prevent rapid-fire execution (10-second minimum between runs)

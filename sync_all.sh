@@ -7,3 +7,4 @@ cd /Users/edo/scripts/journal
 python3 daily_sync.py
 python3 weekly_sync.py
 python3 monthly_sync.py
+python3 quarterly_sync.py

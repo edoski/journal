@@ -14,9 +14,11 @@ VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
 
 WEEKLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/weekly.md"
 MONTHLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/monthly.md"
+QUARTERLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/quarterly.md"
 
 DEFAULT_WEEKLY_DIR = os.environ.get("WEEKLY_DIR", JOURNAL_DIR)
 DEFAULT_MONTHLY_DIR = os.environ.get("MONTHLY_DIR", JOURNAL_DIR)
+DEFAULT_QUARTERLY_DIR = os.environ.get("QUARTERLY_DIR", JOURNAL_DIR)
 
 LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
 
@@ -601,6 +603,36 @@ def month_range(year, month):
     return start, end
 
 
+def quarter_range(year, quarter):
+    """
+    Return (start_date, end_date) for a given quarter number (1-4).
+    """
+    if quarter < 1 or quarter > 4:
+        raise ValueError("quarter must be in 1..4")
+    start_month = 3 * (quarter - 1) + 1
+    start = datetime.date(year, start_month, 1)
+    end_month = start_month + 2
+    _, end = month_range(year, end_month)
+    return start, end
+
+
+def quarter_months(year, quarter):
+    """
+    Return a list of (month_start, month_end) tuples for the quarter.
+    """
+    start_month = 3 * (quarter - 1) + 1
+    months = []
+    for m in range(start_month, start_month + 3):
+        months.append(month_range(year, m))
+    return months
+
+
+def quarter_of_date(date_obj):
+    """Return (year, quarter_number) for a given date."""
+    q = (date_obj.month - 1) // 3 + 1
+    return date_obj.year, q
+
+
 def month_week_ranges(year, month):
     month_start, month_end = month_range(year, month)
     weeks = OrderedDict()
@@ -1030,115 +1062,93 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
 
 def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period, workout_delta_labels=None, stretch_delta_labels=None):
     """
-    Render a compact frequency grid showing workout/stretch activity for the entire month.
-    
-    week_ranges: list of (start_date, end_date) tuples for each week in the month
-    daily_data: dict mapping date -> parsed daily note data
-    workout_count: total number of workout days
-    stretch_count: total number of stretch days
-    days_in_period: total days in the month
-    
-    Returns list of lines for the frequency grid visualization.
-    
-    Format:
-    WORKOUT:  ■ ■ · ■ ■ · ■   ■ ■ ■ · ■ · ■   ...   (14/31)
-    STRETCH:  ■ · ■ · · ■ ■   ■ ■ ■ ■ ■ ■ ·   ...   (15/31)
-              ─────────────   ─────────────   ...
-              DEC 01-07       DEC 08-14       ...
+    Render the monthly training grid with spaced week groups and centered deltas.
+
+    Layout (spacing is intentional):
+    │ WORKOUT
+    │
+    │ ■ · · ...   …
+    │     —      +20%   …
+    │
+    │ STRETCH
+    │
+    │ · · · ...
+    │     —      +0%    …
+      ─────────────   ─────────────   …
+        DEC 01-07       DEC 08-14    …
     """
     lines = []
-    
-    # Build workout and stretch rows
+
     workout_symbols = []
     stretch_symbols = []
     week_labels = []
     week_day_counts = []
-    
+
     for start, end in week_ranges:
         week_days = list(daterange(start, end))
         week_day_counts.append(len(week_days))
         week_labels.append(format_week_label(start, end))
-        
+
         for day in week_days:
             entry = daily_data.get(day, {})
-            has_workout = entry.get("workout", False)
-            has_stretch = entry.get("stretch", False)
-            
-            workout_symbols.append("■" if has_workout else "·")
-            stretch_symbols.append("■" if has_stretch else "·")
-    
-    # Build the two main rows with spacing between weeks
-    workout_row = "│ WORKOUT:  "
-    stretch_row = "│ STRETCH:  "
-    workout_delta_row = "│           " if workout_delta_labels else None
-    stretch_delta_row = "│           " if stretch_delta_labels else None
-    
+            workout_symbols.append("■" if entry.get("workout") else "·")
+            stretch_symbols.append("■" if entry.get("stretch") else "·")
+
     max_days = max(week_day_counts) if week_day_counts else 0
     week_width = max_days * 2 - 1 if max_days > 0 else 0
 
-    symbol_idx = 0
-    for i, day_count in enumerate(week_day_counts):
-        # Add symbols for this week
-        week_workout = " ".join(workout_symbols[symbol_idx:symbol_idx + day_count])
-        week_stretch = " ".join(stretch_symbols[symbol_idx:symbol_idx + day_count])
-        
-        workout_row += week_workout.ljust(week_width)
-        stretch_row += week_stretch.ljust(week_width)
+    def _build_symbol_row(symbols):
+        row = "│ "
+        idx = 0
+        for pos, day_count in enumerate(week_day_counts):
+            week = " ".join(symbols[idx:idx + day_count])
+            row += week.ljust(week_width)
+            idx += day_count
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row
 
-        if workout_delta_row is not None:
-            label = workout_delta_labels[i] if i < len(workout_delta_labels) else ""
+    def _build_delta_row(deltas):
+        if not deltas:
+            return None
+        row = "│ "
+        for pos, day_count in enumerate(week_day_counts):
+            label = deltas[pos] if pos < len(deltas) else ""
             label_str = label or ""
             left_pad = max((week_width - len(label_str)) // 2, 0)
-            workout_delta_row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
-        if stretch_delta_row is not None:
-            label = stretch_delta_labels[i] if i < len(stretch_delta_labels) else ""
-            label_str = label or ""
-            left_pad = max((week_width - len(label_str)) // 2, 0)
-            stretch_delta_row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
-        
-        symbol_idx += day_count
-        
-        # Add spacing between weeks (3 spaces)
-        if i < len(week_day_counts) - 1:
-            workout_row += "   "
-            stretch_row += "   "
-            if workout_delta_row is not None:
-                workout_delta_row += "   "
-            if stretch_delta_row is not None:
-                stretch_delta_row += "   "
-    
-    # Add counts at the end (zero-padded for alignment)
-    workout_row += f"   ({workout_count:02d}/{days_in_period})"
-    stretch_row += f"   ({stretch_count:02d}/{days_in_period})"
-    
-    lines.append(workout_row)
-    if workout_delta_row is not None:
-        lines.append(workout_delta_row.rstrip())
-    # Spacer between workout and stretch rows
+            row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row.rstrip()
+
+    lines.append("│ WORKOUT")
     lines.append("│")
-    lines.append(stretch_row)
+    lines.append(_build_symbol_row(workout_symbols))
+    delta_row = _build_delta_row(workout_delta_labels)
+    if delta_row is not None:
+        lines.append(delta_row)
+    lines.append("│")
+    lines.append("│ STRETCH")
+    lines.append("│")
+    lines.append(_build_symbol_row(stretch_symbols))
+    stretch_delta_row = _build_delta_row(stretch_delta_labels)
     if stretch_delta_row is not None:
-        lines.append(stretch_delta_row.rstrip())
-    
-    # Build separator row (dashes under each week)
-    separator_row = "│           "  # "│ " + 10 spaces to align with "│ WORKOUT:  "
-    for i in range(len(week_day_counts)):
-        separator_row += "─" * week_width
-        if i < len(week_day_counts) - 1:
-            separator_row += "   "
-    
-    lines.append(separator_row)
-    
-    # Build label row
-    label_row = "│           "  # "│ " + 10 spaces to align
-    for i, label in enumerate(week_labels):
+        lines.append(stretch_delta_row)
+
+    # Separator and labels (no leading pipe, only two-space indent)
+    separator = "  "
+    labels_line = "  "
+    for pos, label in enumerate(week_labels):
+        separator += "─" * week_width
         left_pad = max((week_width - len(label)) // 2, 0)
-        label_row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
-        if i < len(week_labels) - 1:
-            label_row += "   "
-    
-    lines.append(label_row)
-    
+        labels_line += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+        if pos < len(week_labels) - 1:
+            separator += "   "
+            labels_line += "   "
+
+    lines.append(separator)
+    lines.append(labels_line.rstrip())
+
     return lines
 
 

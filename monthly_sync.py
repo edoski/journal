@@ -24,6 +24,7 @@ from sync_utils import (
     ensure_note,
     replace_metrics_block,
     round_half_up,
+    format_training_ratio,
     parse_goal_tasks,
     render_goal_lines,
     goals_section_bounds,
@@ -238,21 +239,17 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
             workout_delta_labels.append("—")
             stretch_delta_labels.append("—")
             continue
-        if is_current_month and week_start <= today <= week_days[-1]:
-            days_elapsed = sum(1 for d in week_days if d <= today)
-        else:
-            days_elapsed = len(week_days)
-        prev_week_days = week_day_lists[idx - 1]
-        slice_len = min(days_elapsed, len(week_days))
-        prev_slice_len = min(days_elapsed, len(prev_week_days))
 
-        curr_workout_count = sum(1 for d in week_days[:slice_len] if daily_data.get(d, {}).get("workout"))
-        prev_workout_count = sum(1 for d in prev_week_days[:prev_slice_len] if daily_data.get(d, {}).get("workout"))
+        prev_week_days = week_day_lists[idx - 1]
+
+        # Compare full periods (no partial-window truncation)
+        curr_workout_count = sum(1 for d in week_days if daily_data.get(d, {}).get("workout"))
+        prev_workout_count = sum(1 for d in prev_week_days if daily_data.get(d, {}).get("workout"))
         workout_delta = compute_percent_change(curr_workout_count, prev_workout_count)
         workout_delta_labels.append(format_percent_change(workout_delta))
 
-        curr_stretch_count = sum(1 for d in week_days[:slice_len] if daily_data.get(d, {}).get("stretch"))
-        prev_stretch_count = sum(1 for d in prev_week_days[:prev_slice_len] if daily_data.get(d, {}).get("stretch"))
+        curr_stretch_count = sum(1 for d in week_days if daily_data.get(d, {}).get("stretch"))
+        prev_stretch_count = sum(1 for d in prev_week_days if daily_data.get(d, {}).get("stretch"))
         stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_delta_labels.append(format_percent_change(stretch_delta))
 
@@ -268,19 +265,21 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
 
-    days_elapsed = current_metrics.get("days_up_to_today", len(dates))
-    training_lines.append("| ACTIVITY | % DONE | % MISSED |")
-    training_lines.append("| -------- | ------ | -------- |")
+    days_elapsed = days_in_period  # show full-month denominators for alignment with counts
+    training_lines.append("| ACTIVITY | COUNT | % DONE | % MISSED |")
+    training_lines.append("| -------- | ----- | ------ | -------- |")
     if days_elapsed > 0:
+        workout_ratio = format_training_ratio(workout_days, days_elapsed)
+        stretch_ratio = format_training_ratio(stretch_days, days_elapsed)
         workout_done_pct = min(100, max(0, round_half_up((workout_days / days_elapsed) * 100)))
         workout_missed_pct = max(0, 100 - workout_done_pct)
         stretch_done_pct = min(100, max(0, round_half_up((stretch_days / days_elapsed) * 100)))
         stretch_missed_pct = max(0, 100 - stretch_done_pct)
-        training_lines.append(f"| **WORKOUT** | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
-        training_lines.append(f"| **STRETCH** | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
+        training_lines.append(f"| **WORKOUT** | `{workout_ratio}` | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
+        training_lines.append(f"| **STRETCH** | `{stretch_ratio}` | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
     else:
-        training_lines.append("| **WORKOUT** | `-` | `-` |")
-        training_lines.append("| **STRETCH** | `-` | `-` |")
+        training_lines.append("| **WORKOUT** | `-` | `-` | `-` |")
+        training_lines.append("| **STRETCH** | `-` | `-` | `-` |")
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 
