@@ -306,6 +306,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_delta_labels.append(format_percent_change(stretch_delta))
 
+    current_month_date = today if is_current_month else None
     training_grid = render_training_frequency_grid(
         week_ranges,
         daily_data,
@@ -314,6 +315,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         days_in_period,
         workout_delta_labels=workout_delta_labels,
         stretch_delta_labels=stretch_delta_labels,
+        current_date=current_month_date,
     )
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")

@@ -219,8 +219,9 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
+    current_week_date = today if start_date <= today <= end_date else None
     training_grid = render_weekly_training_grid(
-        dates, daily_data, workout_days, stretch_days
+        dates, daily_data, workout_days, stretch_days, current_date=current_week_date
     )
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")

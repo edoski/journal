@@ -1182,7 +1182,16 @@ def render_quarter_bar_chart(labels, values, value_labels, *, height=12, y_max=7
     return lines
 
 
-def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period, workout_delta_labels=None, stretch_delta_labels=None):
+def render_training_frequency_grid(
+    week_ranges,
+    daily_data,
+    workout_count,
+    stretch_count,
+    days_in_period,
+    workout_delta_labels=None,
+    stretch_delta_labels=None,
+    current_date=None,
+):
     """
     Render the monthly training grid as two stacked blocks (WORKOUT, STRETCH)
     with per-week separators and deltas beneath the week labels.
@@ -1250,10 +1259,10 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
                 row += "   "
         return row.rstrip()
 
-    def _build_delta_row(deltas):
+    def _build_delta_row(deltas, prefix="│ "):
         if not deltas:
             return None
-        row = "│ "
+        row = prefix
         any_label = False
         for pos in range(len(week_day_counts)):
             label_str = (deltas[pos] if pos < len(deltas) else "") or ""
@@ -1265,12 +1274,38 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
                 row += "   "
         return row.rstrip() if any_label else None
 
+    # Pre-compute arrow placement (shared by workout/stretch blocks)
+    arrow_col = None
+    if current_date:
+        for w_idx, (start, end) in enumerate(week_ranges):
+            if start <= current_date <= end:
+                day_idx = (current_date - start).days
+                day_idx = min(day_idx, max(week_day_counts[w_idx] - 1, 0))
+                arrow_col = len("│ ") + w_idx * (week_width + 3) + day_idx * 2
+                break
+
     def _build_activity_block(title, symbols, deltas):
-        block = [f"┌ {title}", "│"]
-        block.append(_build_symbol_row(symbols))
-        block.append(_build_separator_row())
-        block.append(_build_label_row())
-        delta_row = _build_delta_row(deltas)
+        symbol_row = _build_symbol_row(symbols)
+        separator_row = _build_separator_row()
+        label_row = _build_label_row()
+        delta_row = _build_delta_row(deltas, prefix="└ ")
+
+        max_width = max(len(symbol_row), len(separator_row), len(label_row), len(delta_row) if delta_row else 0)
+
+        block = [f"┌ {title}"]
+        # Arrow line (or blank spacer) under the header
+        if arrow_col is not None:
+            arrow_line = [" "] * max_width
+            arrow_line[0] = "│"
+            if arrow_col < max_width:
+                arrow_line[arrow_col] = "↓"
+            block.append("".join(arrow_line).rstrip())
+        else:
+            block.append("│")
+
+        block.append(symbol_row)
+        block.append(separator_row)
+        block.append(label_row)
         if delta_row:
             block.append(delta_row)
         return block
@@ -1282,7 +1317,7 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
     return lines
 
 
-def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count):
+def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count, current_date=None):
     """
     Render a compact frequency grid showing workout/stretch activity for a single week.
     
@@ -1313,19 +1348,42 @@ def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count)
         workout_symbols.append("███" if has_workout else "░░░")
         stretch_symbols.append("███" if has_stretch else "░░░")
     
+    prefix_workout = "│ WORKOUT:  "
+    prefix_stretch = "│ STRETCH:  "
+
     # Build the two main rows (each day takes 4 chars: 3-char block + 1 space)
-    workout_row = "│ WORKOUT:  " + " ".join(workout_symbols) + f"   ({workout_count}/7)"
-    stretch_row = "│ STRETCH:  " + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
-    
+    workout_row = prefix_workout + " ".join(workout_symbols) + f"   ({workout_count}/7)"
+    stretch_row = prefix_stretch + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
+
+    # Arrow placement (only when current_date is within this week)
+    arrow_line = None
+    if current_date and dates[0] <= current_date <= dates[-1]:
+        day_idx = (current_date - dates[0]).days
+        day_idx = max(0, min(day_idx, 6))
+        arrow_col = len(prefix_workout) + day_idx * 4 + 1  # center of 3-char block
+        width = len(workout_row)
+        if arrow_col >= width:
+            width = arrow_col + 1
+        arrow_chars = [" "] * width
+        arrow_chars[0] = "┌"
+        if arrow_col < len(arrow_chars):
+            arrow_chars[arrow_col] = "↓"
+        arrow_line = "".join(arrow_chars).rstrip()
+
+    if arrow_line:
+        lines.append(arrow_line)
+    else:
+        lines.append("┌")
+
     lines.append(workout_row)
     lines.append(stretch_row)
-    
+
     # Build separator row (3 dashes per day)
     separator_row = "│           " + " ".join(["───"] * 7)
     lines.append(separator_row)
-    
-    # Build label row with day names
-    label_row = "│           " + " ".join(DAYS)
+
+    # Build label row with day names (use bottom-left corner)
+    label_row = "└           " + " ".join(DAYS)
     lines.append(label_row)
-    
+
     return lines
