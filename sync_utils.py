@@ -1062,20 +1062,23 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
 
 def render_training_frequency_grid(week_ranges, daily_data, workout_count, stretch_count, days_in_period, workout_delta_labels=None, stretch_delta_labels=None):
     """
-    Render the monthly training grid with spaced week groups and centered deltas.
+    Render the monthly training grid as two stacked blocks (WORKOUT, STRETCH)
+    with per-week separators and deltas beneath the week labels.
 
-    Layout (spacing is intentional):
-    │ WORKOUT
+    Example shape:
+    ┌ WORKOUT
     │
-    │ ■ · · ...   …
-    │     —      +20%   …
+    │ ■ · ■ ■ · ■ ■   …
+    │ ─────────────   …
+    │   DEC 01-07     …
+    │       —         …
+
+    ┌ STRETCH
     │
-    │ STRETCH
-    │
-    │ · · · ...
-    │     —      +0%    …
-      ─────────────   ─────────────   …
-        DEC 01-07       DEC 08-14    …
+    │ · · · · · · ·   …
+    │ ─────────────   …
+    │   DEC 01-07     …
+    │       —         …
     """
     lines = []
 
@@ -1106,48 +1109,53 @@ def render_training_frequency_grid(week_ranges, daily_data, workout_count, stret
             idx += day_count
             if pos < len(week_day_counts) - 1:
                 row += "   "
-        return row
+        return row.rstrip()
+
+    def _build_separator_row():
+        row = "│ "
+        for pos in range(len(week_day_counts)):
+            row += "─" * week_width
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row.rstrip()
+
+    def _build_label_row():
+        row = "│ "
+        for pos, label in enumerate(week_labels):
+            left_pad = max((week_width - len(label)) // 2, 0)
+            row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+            if pos < len(week_labels) - 1:
+                row += "   "
+        return row.rstrip()
 
     def _build_delta_row(deltas):
         if not deltas:
             return None
         row = "│ "
-        for pos, day_count in enumerate(week_day_counts):
-            label = deltas[pos] if pos < len(deltas) else ""
-            label_str = label or ""
+        any_label = False
+        for pos in range(len(week_day_counts)):
+            label_str = (deltas[pos] if pos < len(deltas) else "") or ""
+            if label_str:
+                any_label = True
             left_pad = max((week_width - len(label_str)) // 2, 0)
             row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
             if pos < len(week_day_counts) - 1:
                 row += "   "
-        return row.rstrip()
+        return row.rstrip() if any_label else None
 
-    lines.append("│ WORKOUT")
-    lines.append("│")
-    lines.append(_build_symbol_row(workout_symbols))
-    delta_row = _build_delta_row(workout_delta_labels)
-    if delta_row is not None:
-        lines.append(delta_row)
-    lines.append("│")
-    lines.append("│ STRETCH")
-    lines.append("│")
-    lines.append(_build_symbol_row(stretch_symbols))
-    stretch_delta_row = _build_delta_row(stretch_delta_labels)
-    if stretch_delta_row is not None:
-        lines.append(stretch_delta_row)
+    def _build_activity_block(title, symbols, deltas):
+        block = [f"┌ {title}", "│"]
+        block.append(_build_symbol_row(symbols))
+        block.append(_build_separator_row())
+        block.append(_build_label_row())
+        delta_row = _build_delta_row(deltas)
+        if delta_row:
+            block.append(delta_row)
+        return block
 
-    # Separator and labels (no leading pipe, only two-space indent)
-    separator = "  "
-    labels_line = "  "
-    for pos, label in enumerate(week_labels):
-        separator += "─" * week_width
-        left_pad = max((week_width - len(label)) // 2, 0)
-        labels_line += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
-        if pos < len(week_labels) - 1:
-            separator += "   "
-            labels_line += "   "
-
-    lines.append(separator)
-    lines.append(labels_line.rstrip())
+    lines.extend(_build_activity_block("WORKOUT", workout_symbols, workout_delta_labels))
+    lines.append("")  # blank line between activity blocks
+    lines.extend(_build_activity_block("STRETCH", stretch_symbols, stretch_delta_labels))
 
     return lines
 

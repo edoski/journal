@@ -354,12 +354,15 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     workout_delta_labels = _compute_deltas(workout_counts, prev_workout_baseline)
     stretch_delta_labels = _compute_deltas(stretch_counts, prev_stretch_baseline)
 
-    training_block = ["│ WORKOUT", "│"]
-    training_block.extend(render_quarterly_training_bars(month_ranges, daily_data, "workout", workout_delta_labels))
+    def _build_training_block(title, activity_key, deltas):
+        block = [f"┌ {title}", "│"]
+        block.extend(render_quarterly_training_bars(month_ranges, daily_data, activity_key, deltas))
+        return block
+
+    training_block = []
+    training_block.extend(_build_training_block("WORKOUT", "workout", workout_delta_labels))
     training_block.append("")  # blank line between workout and stretch inside same block
-    training_block.append("│ STRETCH")
-    training_block.append("│")
-    training_block.extend(render_quarterly_training_bars(month_ranges, daily_data, "stretch", stretch_delta_labels))
+    training_block.extend(_build_training_block("STRETCH", "stretch", stretch_delta_labels))
     training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")
 
