@@ -6,7 +6,9 @@ import os
 from sync_utils import (
     JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
+    QUARTERLY_TEMPLATE_PATH,
     DEFAULT_MONTHLY_DIR,
+    DEFAULT_QUARTERLY_DIR,
     locked_note,
     MONTH_ABBR,
     parse_daily_note,
@@ -33,6 +35,7 @@ from sync_utils import (
     trim_blank_lines,
     join_sections,
     ensure_goal_ids,
+    quarter_of_date,
 )
 
 
@@ -70,8 +73,58 @@ def compute_month_metrics(dates, daily_data):
         "days_up_to_today": days_up_to_today,
     }
 
+def _quarter_id(year, quarter_num):
+    return f"{year}-Q{quarter_num}"
+
+
 def _ensure_task_ids(tasks, period_key):
     ensure_goal_ids(tasks, "monthly", period_key)
+
+
+def _ensure_quarter_task_ids(tasks, quarter_key):
+    ensure_goal_ids(tasks, "quarterly", quarter_key)
+
+
+def _load_quarterly_goals(month_start, quarterly_dir=None):
+    """
+    Load quarterly note goals for the quarter containing month_start.
+    Returns (yearly_mirror, quarterly_tasks, path, lines).
+    """
+    quarterly_dir = quarterly_dir or DEFAULT_QUARTERLY_DIR
+    q_year, q_num = quarter_of_date(month_start)
+    quarter_key = _quarter_id(q_year, q_num)
+    filename = f"{quarter_key}.md"
+    path = os.path.join(quarterly_dir, filename)
+    ensure_note(path, QUARTERLY_TEMPLATE_PATH)
+    try:
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return [], [], path, []
+
+    g_start, g_end = goals_section_bounds(lines)
+    yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
+    quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
+    ensure_goal_ids(yearly_mirror, "yearly", str(q_year))
+    _ensure_quarter_task_ids(quarterly_tasks, quarter_key)
+    return yearly_mirror, quarterly_tasks, path, lines
+
+
+def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
+    g_start, g_end = goals_section_bounds(existing_lines)
+    new_block = build_goals_block([
+        ("YEARLY", render_goal_lines(yearly_tasks)),
+        ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+    ])
+    if g_start == -1:
+        lines = new_block + ([""] if existing_lines and existing_lines[0].strip() else []) + existing_lines
+    else:
+        lines = existing_lines[:]
+        lines[g_start:g_end] = new_block
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\n".join(lines).rstrip() + "\n")
+    os.replace(tmp, path)
 
 
 def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_daily_data, current_month_label, prev_month_label):
@@ -434,6 +487,7 @@ def main():
     parser.add_argument("--file", help="Path to monthly note")
     parser.add_argument("--month", help="Month (YYYY-MM)")
     parser.add_argument("--monthly-dir", help="Directory for monthly notes")
+    parser.add_argument("--quarterly-dir", help="Directory for quarterly notes")
     args = parser.parse_args()
 
     if args.month:
@@ -447,6 +501,7 @@ def main():
     filename = f"{target_date.year}-{target_date.month:02d}.md"
 
     monthly_dir = args.monthly_dir or DEFAULT_MONTHLY_DIR
+    quarterly_dir = args.quarterly_dir or DEFAULT_QUARTERLY_DIR
     note_path = args.file or os.path.join(monthly_dir, filename)
 
     with locked_note(note_path):
@@ -458,10 +513,14 @@ def main():
         except FileNotFoundError:
             lines = []
 
-        # Parse monthly goals and carry forward open goals from previous month (ID-based).
+        # Parse goals (existing mirrors + monthly source) and carry forward open monthly goals.
         g_start, g_end = goals_section_bounds(lines)
+        quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
         _ensure_task_ids(monthly_tasks, month_start.isoformat())
+        q_year, q_num = quarter_of_date(month_start)
+        quarter_key = _quarter_id(q_year, q_num)
+        _ensure_quarter_task_ids(quarterly_mirror, quarter_key)
 
         # Determine previous month path
         if month_start.month == 1:
@@ -470,15 +529,13 @@ def main():
         else:
             prev_year = month_start.year
             prev_month = month_start.month - 1
+        prev_month_start, _ = month_range(prev_year, prev_month)
         prev_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
         try:
             with open(prev_path, "r") as pf:
                 prev_lines = pf.read().splitlines()
             p_start, p_end = goals_section_bounds(prev_lines)
-            p_body = prev_lines[p_start + 1:p_end] if p_start != -1 else []
-            if p_body and p_body[0].strip() == "---":
-                p_body = p_body[1:]
-            prev_tasks = parse_goal_tasks(p_body)
+            prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
             _ensure_task_ids(prev_tasks, prev_month_start.isoformat())
         except Exception:
             prev_tasks = []
@@ -491,8 +548,27 @@ def main():
             monthly_tasks.append({**t, "done": False})
             existing_ids.add(t.get("id"))
 
-        # Rewrite Goals block with MONTHLY subsection and spacer
+        # Load quarterly goals (source of truth) and propagate any completed statuses from the monthly mirror.
+        yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = _load_quarterly_goals(
+            month_start, quarterly_dir
+        )
+        mirror_lookup = {t.get("id"): t for t in quarterly_mirror if t.get("id")}
+        quarterly_changed = False
+        for task in quarterly_tasks:
+            mirror = mirror_lookup.get(task.get("id"))
+            if mirror and mirror.get("done") and not task.get("done"):
+                task["done"] = True
+                quarterly_changed = True
+        if quarterly_changed:
+            _write_quarterly_goals(quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines)
+
+        # Rewrite Goals block with QUARTERLY mirror + MONTHLY source.
+        quarterly_lines = render_goal_lines(quarterly_tasks) if quarterly_tasks else [
+            "",
+            "_No quarterly goals have been defined yet._",
+        ]
         new_goals_block = build_goals_block([
+            ("QUARTERLY", quarterly_lines),
             ("MONTHLY", render_goal_lines(monthly_tasks)),
         ])
         if g_start == -1:

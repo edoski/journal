@@ -117,14 +117,21 @@ def _write_weekly_goals(date_obj, weekly_tasks, weekly_dir=None):
         if g_start == -1:
             # No Goals section: prepend it.
             new_block = build_goals_block([
-                ("MONTHLY", []),
+                ("MONTHLY", [
+                    "",
+                    "_No monthly goals have been defined yet._",
+                ]),
                 ("WEEKLY", render_goal_lines(weekly_tasks)),
             ])
             lines = new_block + ([""] if lines and lines[0].strip() else []) + lines
         else:
             monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+            monthly_lines = render_goal_lines(monthly_tasks) if monthly_tasks else [
+                "",
+                "_No monthly goals have been defined yet._",
+            ]
             new_block = build_goals_block([
-                ("MONTHLY", render_goal_lines(monthly_tasks)),
+                ("MONTHLY", monthly_lines),
                 ("WEEKLY", render_goal_lines(weekly_tasks)),
             ])
             lines[g_start:g_end] = new_block
@@ -1218,8 +1225,12 @@ def update_markdown(sessions):
         _write_weekly_goals(today, updated_weekly_tasks)
 
     # Rebuild Goals block with WEEKLY mirror then DAILY goals.
+    weekly_lines = render_goal_lines(updated_weekly_tasks) if updated_weekly_tasks else [
+        "",
+        "_No weekly goals have been defined yet._",
+    ]
     goals_block = build_goals_block([
-        ("WEEKLY", render_goal_lines(updated_weekly_tasks)),
+        ("WEEKLY", weekly_lines),
         ("DAILY", render_goal_lines(existing_daily_tasks)),
     ])
 

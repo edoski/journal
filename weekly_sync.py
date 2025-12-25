@@ -44,13 +44,7 @@ def _load_monthly_goals(month_start, monthly_dir=None):
         return [], path, []
 
     g_start, g_end = goals_section_bounds(lines)
-    if g_start == -1:
-        tasks = []
-    else:
-        body = lines[g_start + 1:g_end]
-        if body and body[0].strip() == "---":
-            body = body[1:]
-        tasks = parse_goal_tasks(body)
+    tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
     ensure_goal_ids(tasks, "monthly", month_start.isoformat())
     return tasks, path, lines
 
@@ -401,8 +395,12 @@ def main():
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
+        monthly_lines = render_goal_lines(monthly_tasks) if monthly_tasks else [
+            "",
+            "_No monthly goals have been defined yet._",
+        ]
         goals_block = build_goals_block([
-            ("MONTHLY", render_goal_lines(monthly_tasks)),
+            ("MONTHLY", monthly_lines),
             ("WEEKLY", render_goal_lines(weekly_tasks)),
         ])
 

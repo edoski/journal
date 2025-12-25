@@ -218,7 +218,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         "total_days": len(prev_dates),
         "days_up_to_today": len(prev_dates),
     }
-    prev_label = f"[[{quarter_id(prev_year, prev_quarter)}\\|LAST QUARTER]]"
+    prev_label = f"**[[{quarter_id(prev_year, prev_quarter)}\\|LAST QUARTER]]**"
     summary_lines = render_summary_table(
         current_metrics,
         prev_metrics,
@@ -564,6 +564,8 @@ def main():
             lines = []
 
         g_start, g_end = goals_section_bounds(lines)
+        yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
+        ensure_goal_ids(yearly_mirror, "yearly", str(year))
         quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         _ensure_quarter_task_ids(quarterly_tasks, quarter_id(year, quarter_num))
 
@@ -588,6 +590,7 @@ def main():
             existing_ids.add(t.get("id"))
 
         yearly_tasks = []
+        yearly_lines = []
         yearly_path = os.path.join(quarterly_dir, f"{year}.md")
         try:
             with open(yearly_path, "r") as yf:
@@ -596,9 +599,44 @@ def main():
             yearly_tasks = extract_subsection_tasks(yearly_lines, y_start, y_end, "YEARLY")
         except Exception:
             yearly_tasks = []
+        ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
+        # Propagate completed YEARLY goals from quarterly mirror back to the yearly source.
+        mirror_lookup = {t.get("id"): t for t in yearly_mirror if t.get("id")}
+        yearly_changed = False
+        for task in yearly_tasks:
+            mirror = mirror_lookup.get(task.get("id"))
+            if mirror and mirror.get("done") and not task.get("done"):
+                task["done"] = True
+                yearly_changed = True
+
+        if yearly_changed:
+            with locked_note(yearly_path):
+                # Reload yearly note in case it changed while we were working.
+                try:
+                    with open(yearly_path, "r") as yf:
+                        yearly_lines = yf.read().splitlines()
+                except Exception:
+                    yearly_lines = yearly_lines or []
+                y_start, y_end = goals_section_bounds(yearly_lines)
+                new_yearly_block = build_goals_block([
+                    ("YEARLY", render_goal_lines(yearly_tasks)),
+                ])
+                if y_start == -1:
+                    yearly_lines = new_yearly_block + ([""] if yearly_lines and yearly_lines[0].strip() else []) + yearly_lines
+                else:
+                    yearly_lines[y_start:y_end] = new_yearly_block
+                tmp = yearly_path + ".tmp"
+                with open(tmp, "w") as f:
+                    f.write("\n".join(yearly_lines).rstrip() + "\n")
+                os.replace(tmp, yearly_path)
+
+        yearly_lines_block = render_goal_lines(yearly_tasks) if yearly_tasks else [
+            "",
+            "_No yearly goals have been defined yet._",
+        ]
         new_goals_block = build_goals_block([
-            ("YEARLY", render_goal_lines(yearly_tasks)),
+            ("YEARLY", yearly_lines_block),
             ("QUARTERLY", render_goal_lines(quarterly_tasks)),
         ])
         if g_start == -1:

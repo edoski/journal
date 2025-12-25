@@ -102,7 +102,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         current_metrics,
         prev_metrics,
         "THIS YEAR",
-        f"[[{year - 1}\\|LAST YEAR]]",
+        f"**[[{year - 1}\\|LAST YEAR]]**",
     )
     sections.append(trim_blank_lines(summary_lines))
 
