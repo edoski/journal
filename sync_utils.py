@@ -15,10 +15,14 @@ VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
 WEEKLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/weekly.md"
 MONTHLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/monthly.md"
 QUARTERLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/quarterly.md"
+YEARLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
+YEARLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
 
 DEFAULT_WEEKLY_DIR = os.environ.get("WEEKLY_DIR", JOURNAL_DIR)
 DEFAULT_MONTHLY_DIR = os.environ.get("MONTHLY_DIR", JOURNAL_DIR)
 DEFAULT_QUARTERLY_DIR = os.environ.get("QUARTERLY_DIR", JOURNAL_DIR)
+DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
+DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
 
 LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
 
@@ -633,6 +637,21 @@ def quarter_of_date(date_obj):
     return date_obj.year, q
 
 
+def year_range(year: int):
+    """Return (start_date, end_date) for a calendar year."""
+    start = datetime.date(year, 1, 1)
+    end = datetime.date(year, 12, 31)
+    return start, end
+
+
+def year_quarters(year: int):
+    """Return list of (start, end) tuples for all four quarters of a year."""
+    ranges = []
+    for q in range(1, 5):
+        ranges.append(quarter_range(year, q))
+    return ranges
+
+
 def month_week_ranges(year, month):
     month_start, month_end = month_range(year, month)
     weeks = OrderedDict()
@@ -1056,6 +1075,109 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
+
+    return lines
+
+
+def render_training_quarter_block(activity_name, labels, counts, delta_labels=None, bar_width=30):
+    """
+    Render a compact per-quarter training block with aligned counts and deltas.
+
+    - activity_name: header label (e.g., WORKOUT or STRETCH)
+    - labels: list of quarter labels (e.g., Q1, Q2, Q3, Q4)
+    - counts: list of (done, total) tuples per label
+    - delta_labels: list of formatted deltas (e.g., +7%, -3%, —); blanks allowed
+    - bar_width: fixed bar length (default 30) for visual consistency
+    """
+    lines = [f"┌ {activity_name.upper()}", "│"]
+    max_label_len = max((len(l) for l in labels), default=0)
+    count_strs = [f"({done:02d}/{total})" for done, total in counts] if counts else []
+    max_count_len = max((len(s) for s in count_strs), default=0)
+
+    for idx, (label, (done, total)) in enumerate(zip(labels, counts)):
+        total = max(total, 0)
+        done = max(0, min(done, total))
+        bar_len = round_half_up((done / total) * bar_width) if total > 0 else 0
+        bar_len = min(bar_width, max(0, bar_len))
+        bar = "■" * bar_len + "·" * (bar_width - bar_len)
+        count_str = count_strs[idx].rjust(max_count_len) if count_strs else ""
+        delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
+        delta_str = delta.rjust(4) if delta else ""
+
+        line = f"│ {label.ljust(max_label_len)} {bar}"
+        if count_str:
+            line += f" {count_str}"
+        if delta_str:
+            line += f"   {delta_str}"
+        lines.append(line.rstrip())
+
+    return lines
+
+
+def render_quarter_bar_chart(labels, values, value_labels, *, height=12, y_max=720, bar_width=7, col_spacing=11, left_pad=2, center_labels_on_bars=False, delta_labels=None):
+    """
+    Quarter-scale bar chart (4 bars typical) with better x-axis alignment.
+    """
+    bar_char = "█"
+    scale = height / y_max if y_max > 0 else 1
+    bar_heights = []
+    for val in values:
+        if val is None or val == 0:
+            bar_heights.append(0)
+        else:
+            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
+
+    lines = []
+
+    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
+    if has_max_value:
+        overflow_row = " "
+        for bar_h, label in zip(bar_heights, value_labels):
+            if bar_h == height:
+                label_str = str(label).strip('`') if label else ""
+                label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
+                overflow_row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+            else:
+                overflow_row += " " * col_spacing
+        lines.append(overflow_row.rstrip())
+
+    for level in range(height, -1, -1):
+        if level == 0:
+            row = "└" + "─" * (col_spacing * len(labels) + left_pad + 2)
+        else:
+            row = "│"
+            for bar_h, label in zip(bar_heights, value_labels):
+                label_str = str(label).strip('`') if label else ""
+                label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
+                if bar_h == 0 and level == 1:
+                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+                elif bar_h == height and level <= height:
+                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+                elif bar_h > 0 and level <= bar_h:
+                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+                else:
+                    row += " " * col_spacing
+        lines.append(row.rstrip())
+
+    label_row = "    "
+    for label in labels:
+        label_str = str(label)
+        label_row += label_str + " " * (col_spacing - len(label_str))
+    lines.append(label_row.rstrip())
+
+    if delta_labels:
+        delta_row = "    "
+        for idx, delta in enumerate(delta_labels):
+            delta_str = str(delta) if delta is not None else ""
+            label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
+            left_pad_delta = max((label_len - len(delta_str)) // 2, 0)
+            remaining = col_spacing - left_pad_delta - len(delta_str)
+            if remaining < 0:
+                remaining = 0
+            delta_row += " " * left_pad_delta + delta_str + " " * remaining
+        lines.append(delta_row.rstrip())
 
     return lines
 

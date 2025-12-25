@@ -195,7 +195,7 @@ def render_quarterly_training_bars(month_ranges, daily_data, activity_key, delta
             f"{count_str.rjust(max_count_len)}"
         )
         if delta_formatted:
-            line += f" {delta_formatted}"
+            line += f"   {delta_formatted}"
         lines.append(line)
     return lines
 
