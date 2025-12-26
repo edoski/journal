@@ -1128,200 +1128,154 @@ def render_summary_table(current_metrics, previous_metrics, current_label, previ
     return lines
 
 
-def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=5, col_spacing=12, left_pad=2, center_labels_on_bars=False, delta_labels=None):
+def render_bar_chart(
+    labels: list[str],
+    values: list[float | None],
+    value_labels: list[str],
+    *,
+    height: int = 10,
+    y_max: float | None = None,
+    bar_width: int = 5,
+    col_spacing: int = 12,
+    left_pad: int | None = None,
+    label_prefix: str = " ",
+    axis_trim: int | None = 3,
+    center_labels_on_bars: bool = False,
+    delta_labels: list[str] | None = None,
+) -> list[str]:
     """
-    Render a monthly bar chart with values on top of bars.
-    
-    labels: list of x-axis labels (e.g., ["DEC 01-07", "DEC 08-14", ...])
-    values: list of numeric values for bar heights
-    value_labels: list of formatted value strings to show on top of bars
-    height: number of visual rows for bars (default 10)
-    y_max: maximum value on Y-axis (default same as height)
-    bar_width: number of █ characters per bar (default 5)
-    col_spacing: spacing between columns (default 12)
-    left_pad: number of spaces before bars in each column (default 2)
-    center_labels_on_bars: if True, center labels on bars by adding 1 space (default False)
-    
-    Format:
-    - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
-    - For values at y_max, label goes on overflow line above chart, blocks fill all levels
-    - For zero values, label appears at level 1 with no blocks
+    Unified bar chart renderer for all time spans (weekly, monthly, quarterly, yearly).
+
+    Args:
+        labels: X-axis labels (e.g., ["MON", "TUE", ...] or ["DEC 01-07", ...])
+        values: Numeric values for bar heights (None/0 = no bar)
+        value_labels: Formatted strings to display above bars
+        height: Number of visual rows for bars (default 10)
+        y_max: Maximum value on Y-axis for scaling (default same as height)
+        bar_width: Number of █ characters per bar (default 5)
+        col_spacing: Spacing between column starts (default 12)
+        left_pad: Spaces before bar in column (None = center bars)
+        label_prefix: Prefix string for label/delta rows (default " ")
+        axis_trim: Characters to trim from axis (None = dynamic to match widest row)
+        center_labels_on_bars: If True, center value labels on bars (default False)
+        delta_labels: Optional list of delta strings to show below x-axis labels
+
+    Returns:
+        List of strings representing the chart lines.
     """
     bar_char = "█"
-    
+
     if y_max is None:
         y_max = height
-    
+
+    # Compute left_pad if not specified (center bars in column)
+    if left_pad is None:
+        computed_left_pad = (col_spacing - bar_width) // 2
+    else:
+        computed_left_pad = left_pad
+
     # Scale values to visual height
     scale = height / y_max if y_max > 0 else 1
-    bar_heights = []
+    bar_heights: list[int] = []
     for val in values:
         if val is None or val == 0:
             bar_heights.append(0)
         else:
             bar_heights.append(min(height, max(0, round_half_up(val * scale))))
-    
-    lines = []
-    
+
+    lines: list[str] = []
+    bar_rows: list[str] = []
+    max_bar_row_len = 0
+
     # Check if any value is at max (needs overflow line for label)
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
     if has_max_value:
-        # Add overflow line for labels at max height
-        overflow_row = " "
-        for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
+        overflow_row = label_prefix
+        for bar_h, label in zip(bar_heights, value_labels):
             if bar_h == height:
                 label_str = str(label).strip('`') if label else ""
-                label_left_pad = left_pad + 1 if center_labels_on_bars else left_pad
-                overflow_row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+                if center_labels_on_bars and left_pad is None:
+                    # Center label on bar when bars are centered
+                    lbl_left_pad = computed_left_pad + (bar_width - len(label_str)) // 2
+                else:
+                    lbl_left_pad = computed_left_pad + (1 if center_labels_on_bars else 0)
+                overflow_row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
             else:
                 overflow_row += " " * col_spacing
         lines.append(overflow_row.rstrip())
-    
+
     # Y-axis and bars with value labels on top
-    for level in range(height, -1, -1):
-        if level == 0:
-            # Bottom line with axis (trimmed by 3 characters)
-            row = "└" + "─" * (col_spacing * len(labels) - 3)
-        else:
-            row = "│"
-            for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
-                label_str = str(label).strip('`') if label else ""
-                label_left_pad = left_pad + 1 if center_labels_on_bars else left_pad
-                
-                if bar_h == 0 and level == 1:
-                    # Zero value - show label at level 1, no blocks
-                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-                elif bar_h == height and level <= height:
-                    # Max value - blocks fill all levels (label on overflow line)
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
-                    # One level above top of bar (non-max) - show label
-                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-                elif bar_h > 0 and level <= bar_h:
-                    # Bar level - show block
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                else:
-                    # Empty space
-                    row += " " * col_spacing
-        lines.append(row.rstrip())
-    
-    # X-axis labels row with single space (left-aligned)
-    label_prefix = " "
+    for level in range(height, 0, -1):
+        row = "│"
+        for bar_h, label in zip(bar_heights, value_labels):
+            label_str = str(label).strip('`') if label else ""
+
+            # Compute label padding
+            if center_labels_on_bars and left_pad is None:
+                # Center label on bar
+                lbl_left_pad = computed_left_pad + (bar_width - len(label_str)) // 2
+            elif center_labels_on_bars:
+                lbl_left_pad = computed_left_pad + 1
+            elif left_pad is None:
+                # Center label in column
+                lbl_left_pad = (col_spacing - len(label_str)) // 2
+            else:
+                lbl_left_pad = computed_left_pad
+
+            if bar_h == 0 and level == 1:
+                # Zero value - show label at level 1, no blocks
+                row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
+            elif bar_h == height and level <= height:
+                # Max value - blocks fill all levels (label on overflow line)
+                row += " " * computed_left_pad + bar_char * bar_width + " " * (col_spacing - computed_left_pad - bar_width)
+            elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+                # One level above top of bar (non-max) - show label
+                row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
+            elif bar_h > 0 and level <= bar_h:
+                # Bar level - show block
+                row += " " * computed_left_pad + bar_char * bar_width + " " * (col_spacing - computed_left_pad - bar_width)
+            else:
+                # Empty space
+                row += " " * col_spacing
+        row = row.rstrip()
+        max_bar_row_len = max(max_bar_row_len, len(row))
+        bar_rows.append(row)
+
+    # Axis row
+    if axis_trim is None:
+        # Dynamic: match widest bar row (original render_quarter_bar_chart behavior)
+        # max_bar_row_len includes the │, so subtract 1 for dashes after └
+        axis_dashes = max_bar_row_len - 1 if max_bar_row_len > 0 else col_spacing * len(labels)
+    else:
+        # Fixed trim: dashes = col_spacing * labels - axis_trim
+        axis_dashes = col_spacing * len(labels) - axis_trim
+    axis_row = "└" + "─" * max(0, axis_dashes)
+
+    lines.extend(bar_rows)
+    lines.append(axis_row)
+
+    # X-axis labels row
     label_row = label_prefix
     for label in labels:
         label_str = str(label)
         label_row += label_str + " " * (col_spacing - len(label_str))
     lines.append(label_row.rstrip())
 
+    # Delta labels row (if provided)
     if delta_labels:
         delta_row = label_prefix
         for idx, delta in enumerate(delta_labels):
             delta_str = str(delta) if delta is not None else ""
             label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
-            left_pad_delta = max((label_len - len(delta_str)) // 2, 0)
-            remaining = col_spacing - left_pad_delta - len(delta_str)
+            delta_left_pad = max((label_len - len(delta_str)) // 2, 0)
+            remaining = col_spacing - delta_left_pad - len(delta_str)
             if remaining < 0:
                 remaining = 0
-            delta_row += " " * left_pad_delta + delta_str + " " * remaining
+            delta_row += " " * delta_left_pad + delta_str + " " * remaining
         lines.append(delta_row.rstrip())
-    
-    return lines
-
-
-def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar_width=3, col_spacing=8, center_labels_on_bars=False):
-    """
-    Render a weekly bar chart with values on top of bars.
-    
-    labels: list of x-axis labels (e.g., ["MON", "TUE", ...])
-    values: list of numeric values for bar heights
-    value_labels: list of formatted value strings to show on top of bars
-    height: number of visual rows for bars (default 10)
-    y_max: maximum value on Y-axis (default same as height)
-    bar_width: number of █ characters per bar (default 3)
-    col_spacing: spacing between columns (default 8)
-    center_labels_on_bars: if True, center labels on bars instead of column (default False)
-    
-    Format:
-    - Labels appear at the level of bar_height (blocks fill levels 1 to bar_height-1)
-    - For values at y_max, label goes on overflow line above chart, blocks fill all levels
-    - For zero values, label appears at level 1 with no blocks
-    """
-    bar_char = "█"
-    
-    if y_max is None:
-        y_max = height
-    
-    # Scale values to visual height
-    scale = height / y_max if y_max > 0 else 1
-    bar_heights = []
-    for val in values:
-        if val is None or val == 0:
-            bar_heights.append(0)
-        else:
-            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
-    
-    lines = []
-    
-    # Check if any value is at max (needs overflow line for label)
-    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
-    if has_max_value:
-        # Add overflow line for labels at max height
-        overflow_row = "   "
-        for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
-            if bar_h == height:
-                label_str = str(label).strip('`') if label else ""
-                if center_labels_on_bars:
-                    bar_left_pad = (col_spacing - bar_width) // 2
-                    left_pad = bar_left_pad + (bar_width - len(label_str)) // 2
-                else:
-                    left_pad = (col_spacing - len(label_str)) // 2
-                overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-            else:
-                overflow_row += " " * col_spacing
-        lines.append(overflow_row.rstrip())
-    
-    # Y-axis and bars with value labels on top
-    for level in range(height, -1, -1):
-        if level == 0:
-            # Bottom line with axis (trimmed by 3 characters for weekly)
-            row = "└" + "─" * max(0, col_spacing * len(labels) - 3)
-        else:
-            row = "│"
-            for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
-                label_str = str(label).strip('`') if label else ""
-                bar_left_pad = (col_spacing - bar_width) // 2
-                if center_labels_on_bars:
-                    # Center label on bar (for 5-char blocks)
-                    left_pad = bar_left_pad + (bar_width - len(label_str)) // 2
-                else:
-                    # Center label in column
-                    left_pad = (col_spacing - len(label_str)) // 2
-                
-                if bar_h == 0 and level == 1:
-                    # Zero value - show label at level 1, no blocks
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-                elif bar_h == height and level <= height:
-                    # Max value - blocks fill all levels (label on overflow line)
-                    row += " " * bar_left_pad + bar_char * bar_width + " " * (col_spacing - bar_left_pad - bar_width)
-                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
-                    # One level above top of bar (non-max) - show label
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-                elif bar_h > 0 and level <= bar_h:
-                    # Bar level - show block
-                    row += " " * bar_left_pad + bar_char * bar_width + " " * (col_spacing - bar_left_pad - bar_width)
-                else:
-                    # Empty space
-                    row += " " * col_spacing
-        lines.append(row.rstrip())
-    
-    # X-axis labels row with 3 spaces indent (left-aligned, not centered)
-    label_row = "   "
-    for label in labels:
-        label_str = str(label)
-        label_row += label_str + " " * (col_spacing - len(label_str))
-    lines.append(label_row.rstrip())
 
     return lines
+
 
 
 def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=30, bars_override=None, fill_char="■", empty_char="·"):
@@ -1357,86 +1311,6 @@ def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=3
 
     return lines
 
-
-def render_quarter_bar_chart(labels, values, value_labels, *, height=12, y_max=720, bar_width=7, col_spacing=11, left_pad=2, center_labels_on_bars=False, delta_labels=None):
-    """
-    Quarter-scale bar chart (4 bars typical) with better x-axis alignment.
-    """
-    bar_char = "█"
-    scale = height / y_max if y_max > 0 else 1
-    bar_heights = []
-    for val in values:
-        if val is None or val == 0:
-            bar_heights.append(0)
-        else:
-            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
-
-    lines = []
-    bar_rows = []
-    max_bar_row_len = 0
-
-    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
-    if has_max_value:
-        overflow_row = " "
-        for bar_h, label in zip(bar_heights, value_labels):
-            if bar_h == height:
-                label_str = str(label).strip('`') if label else ""
-                label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
-                overflow_row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-            else:
-                overflow_row += " " * col_spacing
-        lines.append(overflow_row.rstrip())
-
-    for level in range(height, -1, -1):
-        if level == 0:
-            continue  # axis row handled after measuring bar rows
-        row = "│"
-        for bar_h, label in zip(bar_heights, value_labels):
-            label_str = str(label).strip('`') if label else ""
-            label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
-            if bar_h == 0 and level == 1:
-                row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-            elif bar_h == height and level <= height:
-                row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-            elif bar_h > 0 and bar_h < height and level == bar_h + 1:
-                row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-            elif bar_h > 0 and level <= bar_h:
-                row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-            else:
-                row += " " * col_spacing
-        row = row.rstrip()
-        max_bar_row_len = max(max_bar_row_len, len(row))
-        bar_rows.append(row)
-
-    # Axis row length matches widest bar row (or computed default)
-    if max_bar_row_len == 0:
-        axis_len = max(1, col_spacing * len(labels) + left_pad + 2)
-    else:
-        axis_len = max_bar_row_len
-    axis_row = "└" + "─" * max(0, axis_len - 1)
-
-    lines.extend(bar_rows)
-    lines.append(axis_row)
-
-    label_row = "    "
-    for label in labels:
-        label_str = str(label)
-        label_row += label_str + " " * (col_spacing - len(label_str))
-    lines.append(label_row.rstrip())
-
-    if delta_labels:
-        delta_row = "    "
-        for idx, delta in enumerate(delta_labels):
-            delta_str = str(delta) if delta is not None else ""
-            label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
-            left_pad_delta = max((label_len - len(delta_str)) // 2, 0)
-            remaining = col_spacing - left_pad_delta - len(delta_str)
-            if remaining < 0:
-                remaining = 0
-            delta_row += " " * left_pad_delta + delta_str + " " * remaining
-        lines.append(delta_row.rstrip())
-
-    return lines
 
 
 def render_training_frequency_grid(

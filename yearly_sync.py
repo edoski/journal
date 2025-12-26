@@ -15,7 +15,7 @@ from sync_utils import (
     format_minutes,
     compute_percent_change,
     format_percent_change,
-    render_quarter_bar_chart,
+    render_bar_chart,
     render_training_quarter_block,
     render_summary_table,
     render_yearly_study_coverage,
@@ -121,7 +121,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         delta = compute_percent_change(study_totals_minutes[idx], prev_val)
         study_delta_labels.append(format_percent_change(delta))
 
-    study_chart = render_quarter_bar_chart(
+    study_chart = render_bar_chart(
         q_labels,
         study_values_hours,
         study_value_labels,
@@ -130,7 +130,8 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         bar_width=7,
         col_spacing=11,
         left_pad=2,
-        center_labels_on_bars=False,
+        label_prefix="    ",
+        axis_trim=None,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(study_chart))
@@ -336,7 +337,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         delta = compute_percent_change(sleep_avgs_minutes[idx], prev_avg)
         sleep_delta_labels.append(format_percent_change(delta))
 
-    sleep_chart = render_quarter_bar_chart(
+    sleep_chart = render_bar_chart(
         q_labels,
         sleep_chart_vals,
         sleep_value_labels,
@@ -345,7 +346,8 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         bar_width=5,
         col_spacing=11,
         left_pad=2,
-        center_labels_on_bars=False,
+        label_prefix="    ",
+        axis_trim=None,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -404,7 +406,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         delta = compute_percent_change(mood_avgs[idx], prev_avg)
         mood_delta_labels.append(format_percent_change(delta))
 
-    mood_chart = render_quarter_bar_chart(
+    mood_chart = render_bar_chart(
         q_labels,
         mood_chart_vals,
         mood_value_labels,
@@ -413,6 +415,8 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         bar_width=5,
         col_spacing=11,
         left_pad=2,
+        label_prefix="    ",
+        axis_trim=None,
         center_labels_on_bars=True,
         delta_labels=mood_delta_labels,
     )

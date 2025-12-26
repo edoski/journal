@@ -18,7 +18,7 @@ from sync_utils import (
     format_minutes,
     compute_percent_change,
     format_percent_change,
-    render_monthly_chart,
+    render_bar_chart,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -48,77 +48,6 @@ from sync_utils import (
 
 
 
-def render_quarterly_study_chart(labels, values, value_labels, delta_labels=None):
-    """
-    Quarter study chart: 3 bars, 7-char width, 8-char spacing, 4-char leading indent.
-    Cap at 240h per month (y_max=240), height=12 rows.
-    Value labels are left-aligned with bars.
-    """
-    bar_char = "█"
-    height = 12
-    y_max = 240
-    bar_width = 7
-    col_spacing = 11  # 3-letter label + 8 spaces
-    left_pad = 2
-    label_prefix = "     "  # 5 spaces before first label (align labels under bars)
-
-    scale = height / y_max if y_max > 0 else 1
-    bar_heights = []
-    for val in values:
-        if val is None or val == 0:
-            bar_heights.append(0)
-        else:
-            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
-
-    lines = []
-    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
-    if has_max_value:
-        overflow_row = label_prefix
-        for bar_h, label in zip(bar_heights, value_labels):
-            if bar_h == height:
-                label_str = str(label).strip('`') if label else ""
-                overflow_row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-            else:
-                overflow_row += " " * col_spacing
-        lines.append(overflow_row.rstrip())
-
-    for level in range(height, -1, -1):
-        if level == 0:
-            row = "└" + "─" * (col_spacing * len(labels) + len(label_prefix) - 7)
-        else:
-            row = "│"
-            for bar_h, label in zip(bar_heights, value_labels):
-                label_str = str(label).strip('`') if label else ""
-                if bar_h == 0 and level == 1:
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-                elif bar_h == height and level <= height:
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
-                    row += " " * left_pad + label_str + " " * (col_spacing - left_pad - len(label_str))
-                elif bar_h > 0 and level <= bar_h:
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                else:
-                    row += " " * col_spacing
-        lines.append(row.rstrip())
-
-    label_row = label_prefix
-    for label in labels:
-        label_str = str(label)
-        label_row += label_str + " " * (col_spacing - len(label_str))
-    lines.append(label_row.rstrip())
-
-    if delta_labels:
-        delta_row = label_prefix
-        for idx, delta in enumerate(delta_labels):
-            delta_str = str(delta) if delta is not None else ""
-            label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
-            left_pad = max((label_len - len(delta_str)) // 2, 0)
-            remaining = col_spacing - left_pad - len(delta_str)
-            if remaining < 0:
-                remaining = 0
-            delta_row += " " * left_pad + delta_str + " " * remaining
-        lines.append(delta_row.rstrip())
-    return lines
 
 
 def render_quarterly_training_bars(month_ranges, daily_data, activity_key, delta_labels):
@@ -238,10 +167,17 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         delta = compute_percent_change(curr, prev)
         study_delta_labels.append(format_percent_change(delta))
 
-    chart_lines = render_quarterly_study_chart(
+    chart_lines = render_bar_chart(
         month_labels,
         study_chart_vals,
         study_value_labels,
+        height=12,
+        y_max=240,
+        bar_width=7,
+        col_spacing=11,
+        left_pad=2,
+        label_prefix="     ",
+        axis_trim=2,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(chart_lines))
@@ -371,7 +307,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         delta = compute_percent_change(curr, prev)
         sleep_delta_labels.append(format_percent_change(delta))
 
-    sleep_chart = render_monthly_chart(
+    sleep_chart = render_bar_chart(
         sleep_labels,
         sleep_chart_vals,
         sleep_value_labels,
@@ -379,14 +315,11 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         y_max=10,
         bar_width=5,
         col_spacing=12,
+        left_pad=2,
+        label_prefix="    ",
+        axis_trim=5,
         delta_labels=sleep_delta_labels,
     )
-    # Add extra left padding (4 spaces total) on x-axis labels for alignment and trim one dash
-    if sleep_chart:
-        # label row is second from bottom when delta row present
-        sleep_chart[-2] = "   " + sleep_chart[-2]
-        sleep_chart[-1] = "   " + sleep_chart[-1]
-        sleep_chart[-3] = sleep_chart[-3][:-2] if len(sleep_chart[-3]) > 2 else sleep_chart[-3]
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
@@ -435,7 +368,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         delta = compute_percent_change(curr, prev)
         mood_delta_labels.append(format_percent_change(delta))
 
-    mood_chart = render_monthly_chart(
+    mood_chart = render_bar_chart(
         mood_labels,
         mood_chart_vals,
         mood_value_labels,
@@ -443,13 +376,12 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         y_max=10,
         bar_width=5,
         col_spacing=12,
+        left_pad=2,
+        label_prefix="    ",
+        axis_trim=5,
         center_labels_on_bars=True,
         delta_labels=mood_delta_labels,
     )
-    if mood_chart:
-        mood_chart[-2] = "   " + mood_chart[-2]
-        mood_chart[-1] = "   " + mood_chart[-1]
-        mood_chart[-3] = mood_chart[-3][:-2] if len(mood_chart[-3]) > 2 else mood_chart[-3]
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 

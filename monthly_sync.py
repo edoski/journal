@@ -20,7 +20,7 @@ from sync_utils import (
     compute_percent_change,
     format_percent_change,
     render_summary_table,
-    render_monthly_chart,
+    render_bar_chart,
     render_training_frequency_grid,
     render_monthly_study_grid,
     STUDY_TARGET_MIN,
@@ -179,7 +179,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         delta = compute_percent_change(curr_sum, prev_sum)
         study_delta_labels.append(format_percent_change(delta))
 
-    chart_lines = render_monthly_chart(
+    chart_lines = render_bar_chart(
         week_labels,
         study_chart_vals,
         study_value_labels,
@@ -187,6 +187,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         y_max=40,
         bar_width=6,
         col_spacing=12,
+        left_pad=2,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(chart_lines))
@@ -336,7 +337,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         delta = compute_percent_change(curr_avg, prev_avg)
         sleep_delta_labels.append(format_percent_change(delta))
 
-    sleep_chart = render_monthly_chart(
+    sleep_chart = render_bar_chart(
         week_labels,
         sleep_chart_vals,
         sleep_value_labels,
@@ -344,6 +345,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         y_max=10,
         bar_width=5,
         col_spacing=12,
+        left_pad=2,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -409,7 +411,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         delta = compute_percent_change(curr_avg, prev_avg)
         mood_delta_labels.append(format_percent_change(delta))
 
-    mood_chart = render_monthly_chart(
+    mood_chart = render_bar_chart(
         week_labels,
         mood_chart_vals,
         mood_value_labels,
