@@ -32,6 +32,8 @@ from sync_utils import (
     join_sections,
     ensure_goal_ids,
     compute_period_metrics,
+    compute_moving_average,
+    load_daily_data,
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
@@ -81,11 +83,12 @@ def _parse_weekly_note_goals(lines):
 
 
 
-def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev_week_label):
+def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev_week_label, prior_week_metrics=None):
     """
     Build the metrics block for a weekly note.
     
     prev_week_label: wiki link like "[[2025-W50|LAST WEEK]]"
+    prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
     """
     days_in_period = 7
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
@@ -95,6 +98,11 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     current_metrics = compute_period_metrics(dates, daily_data)
     prev_dates = [start_date - datetime.timedelta(days=7) + datetime.timedelta(days=i) for i in range(7)]
     prev_metrics = compute_period_metrics(prev_dates, prev_daily_data)
+
+    # Compute 4-week moving average
+    ma_metrics = None
+    if prior_week_metrics and len(prior_week_metrics) >= 4:
+        ma_metrics = compute_moving_average(prior_week_metrics, 4)
 
     study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
     sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
@@ -111,10 +119,13 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
 
     sections = []
     
-    # Summary
+    # Summary with MA
     summary_lines = render_summary_table(
         current_metrics, prev_metrics,
-        "THIS WEEK", prev_week_label
+        "THIS WEEK", prev_week_label,
+        ma_metrics=ma_metrics,
+        ma_label="4-WK AVG" if ma_metrics else None,
+        ma_training_unit="7",
     )
     sections.append(trim_blank_lines(summary_lines))
 
@@ -280,7 +291,20 @@ def main():
             if parsed:
                 prev_daily_data[day] = parsed
 
-        metrics_block = build_weekly_metrics(week_start, week_end, daily_data, prev_daily_data, prev_week_label)
+        # Load 4 prior weeks for moving average calculation
+        prior_week_metrics = []
+        for weeks_ago in range(4, 0, -1):  # 4 weeks ago, 3 weeks ago, 2 weeks ago, 1 week ago
+            prior_start = week_start - datetime.timedelta(days=7 * weeks_ago)
+            prior_end = prior_start + datetime.timedelta(days=7)
+            prior_data = load_daily_data(prior_start, prior_end)
+            prior_dates = [prior_start + datetime.timedelta(days=i) for i in range(7)]
+            prior_metrics = compute_period_metrics(prior_dates, prior_data)
+            prior_week_metrics.append(prior_metrics)
+
+        metrics_block = build_weekly_metrics(
+            week_start, week_end, daily_data, prev_daily_data, prev_week_label,
+            prior_week_metrics=prior_week_metrics
+        )
 
         try:
             with open(note_path, "r") as f:

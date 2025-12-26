@@ -41,6 +41,8 @@ from sync_utils import (
     quarter_of_date,
     quarter_id,
     compute_period_metrics,
+    compute_moving_average,
+    load_daily_data,
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
@@ -92,12 +94,13 @@ def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
     os.replace(tmp, path)
 
 
-def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_daily_data, current_month_label, prev_month_label):
+def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_daily_data, current_month_label, prev_month_label, prior_month_metrics=None):
     """
     Build the metrics block for a monthly note.
     
     current_month_label: e.g., "DEC"
     prev_month_label: wiki link like "[[2025-11|NOV]]"
+    prior_month_metrics: list of metrics dicts for prior 3 months (oldest first)
     """
     days_in_period = (end_date - start_date).days + 1
     dates = list(daterange(start_date, end_date))
@@ -106,6 +109,11 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     # Compute metrics for current and previous month
     current_metrics = compute_period_metrics(dates, daily_data)
     prev_metrics = compute_period_metrics(list(prev_daily_data.keys()), prev_daily_data)
+
+    # Compute 3-month moving average
+    ma_metrics = None
+    if prior_month_metrics and len(prior_month_metrics) >= 3:
+        ma_metrics = compute_moving_average(prior_month_metrics, 3)
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
     mood_avg = current_metrics["mood_avg"]
@@ -119,10 +127,13 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     sections = []
     
-    # Summary
+    # Summary with MA
     summary_lines = render_summary_table(
         current_metrics, prev_metrics,
-        current_month_label, prev_month_label
+        current_month_label, prev_month_label,
+        ma_metrics=ma_metrics,
+        ma_label="3-MO AVG" if ma_metrics else None,
+        ma_training_unit="mo",
     )
     sections.append(trim_blank_lines(summary_lines))
 
@@ -555,10 +566,26 @@ def main():
             if parsed:
                 prev_daily_data[day] = parsed
 
+        # Load 3 prior months for moving average calculation
+        prior_month_metrics = []
+        for months_ago in range(3, 0, -1):  # 3 months ago, 2 months ago, 1 month ago
+            # Calculate prior month date
+            prior_year = target_date.year
+            prior_month_num = target_date.month - months_ago
+            while prior_month_num <= 0:
+                prior_year -= 1
+                prior_month_num += 12
+            prior_start, prior_end = month_range(prior_year, prior_month_num)
+            prior_data = load_daily_data(prior_start, prior_end)
+            prior_dates = list(daterange(prior_start, prior_end))
+            prior_metrics = compute_period_metrics(prior_dates, prior_data)
+            prior_month_metrics.append(prior_metrics)
+
         week_ranges = month_week_ranges(target_date.year, target_date.month)
         metrics_block = build_monthly_metrics(
             month_start, month_end, week_ranges, daily_data,
-            prev_daily_data, current_month_label, prev_month_label
+            prev_daily_data, current_month_label, prev_month_label,
+            prior_month_metrics=prior_month_metrics
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)

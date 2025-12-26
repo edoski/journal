@@ -162,3 +162,29 @@ def format_mood_with_scale(val) -> str:
     if val is None:
         return "0.0/10.0"
     return f"{val:.1f}/10.0"
+
+
+def format_ma_training_ratio(avg_count: float | None, unit: str) -> str:
+    """
+    Format moving average training count with unit suffix.
+
+    Args:
+        avg_count: Average count across periods (e.g., 4.5 workouts/week)
+        unit: Unit suffix - "7" for weekly, "mo" for monthly, "qtr" for quarterly, "yr" for yearly
+
+    Returns:
+        Formatted string like "4.5/7", "17.3/mo", "50.5/qtr", "168/yr"
+        Returns "—" if avg_count is None.
+    """
+    if avg_count is None:
+        return "—"
+    if unit == "7":
+        # Weekly: show one decimal
+        return f"{avg_count:.1f}/7"
+    elif unit == "yr":
+        # Yearly: round to integer
+        return f"{round(avg_count)}/{unit}"
+    else:
+        # Monthly, quarterly: show one decimal
+        return f"{avg_count:.1f}/{unit}"
+

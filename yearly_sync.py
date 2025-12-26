@@ -42,7 +42,9 @@ from sync_utils import (
     render_activity_table,
     render_interrupts_table,
     aggregate_interrupt_overrun,
+    aggregate_interrupt_overrun,
     compute_period_deltas,
+    compute_moving_average,
 )
 
 YEARLY_STUDY_BAR_WIDTH = 45
@@ -63,7 +65,7 @@ def _quarter_totals(daily_data, quarter_ranges):
     return totals
 
 
-def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarter_ranges, daily_data, prev_daily_data):
+def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarter_ranges, daily_data, prev_daily_data, prior_year_metrics=None):
     today = datetime.date.today()
     sections = []
 
@@ -73,12 +75,20 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     current_metrics = compute_period_metrics(dates, daily_data)
     prev_metrics = compute_period_metrics(prev_dates, prev_daily_data)
 
+    # Compute 3-year moving average
+    ma_metrics = None
+    if prior_year_metrics and len(prior_year_metrics) >= 3:
+        ma_metrics = compute_moving_average(prior_year_metrics, 3)
+
     # SUMMARY
     summary_lines = render_summary_table(
         current_metrics,
         prev_metrics,
         "THIS YEAR",
         f"**[[{year - 1}\\|LAST YEAR]]**",
+        ma_metrics=ma_metrics,
+        ma_label="3-YR AVG" if ma_metrics else None,
+        ma_training_unit="yr",
     )
     sections.append(trim_blank_lines(summary_lines))
 
@@ -497,6 +507,16 @@ def main():
         quarter_ranges = year_quarters(year)
         prev_quarter_ranges = year_quarters(prev_year)
 
+        # Load 3 prior years for moving average calculation
+        prior_year_metrics = []
+        for years_ago in range(3, 0, -1):  # 3 years ago... 1 year ago
+            p_year = year - years_ago
+            p_start, p_end = year_range(p_year)
+            p_data = load_daily_data(p_start, p_end)
+            p_dates = list(daterange(p_start, p_end))
+            p_metrics = compute_period_metrics(p_dates, p_data)
+            prior_year_metrics.append(p_metrics)
+
         metrics_block = build_yearly_metrics(
             year,
             year_start,
@@ -505,6 +525,7 @@ def main():
             prev_quarter_ranges,
             daily_data,
             prev_daily_data,
+            prior_year_metrics=prior_year_metrics,
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)

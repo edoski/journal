@@ -159,3 +159,72 @@ def compute_period_deltas(
         delta = compute_percent_change(done, prev_val)
         deltas.append(format_percent_change(delta))
     return deltas
+
+
+def compute_moving_average(
+    period_metrics: list[dict[str, Any]],
+    n_periods: int,
+) -> dict[str, Any]:
+    """
+    Compute moving average metrics across N prior periods.
+
+    Args:
+        period_metrics: List of period metric dicts (oldest first), each containing:
+            - study_avg_minutes: daily average study in minutes
+            - sleep_avg_minutes: average sleep in minutes
+            - mood_avg: average mood
+            - workout_count: number of workout days
+            - stretch_count: number of stretch days
+            - total_days: number of days in period
+        n_periods: Number of periods required for a valid moving average
+
+    Returns:
+        Dict with MA values for each metric. Returns None values if
+        insufficient periods (< n_periods) are provided.
+    """
+    empty_result = {
+        "study_avg_minutes": None,
+        "sleep_avg_minutes": None,
+        "mood_avg": None,
+        "workout_avg": None,
+        "stretch_avg": None,
+    }
+
+    if len(period_metrics) < n_periods:
+        return empty_result
+
+    # Take only the last n_periods
+    recent = period_metrics[-n_periods:]
+
+    # Study: average of daily averages
+    study_avgs = []
+    for pm in recent:
+        total = pm.get("study_total_minutes") or 0
+        days = pm.get("days_up_to_today") or pm.get("total_days") or 1
+        study_avgs.append(total / max(1, days))
+    study_ma = sum(study_avgs) / len(study_avgs) if study_avgs else None
+
+    # Sleep: average of averages
+    sleep_vals = [pm.get("sleep_avg_minutes") for pm in recent if pm.get("sleep_avg_minutes") is not None]
+    sleep_ma = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
+
+    # Mood: average of averages
+    mood_vals = [pm.get("mood_avg") for pm in recent if pm.get("mood_avg") is not None]
+    mood_ma = sum(mood_vals) / len(mood_vals) if mood_vals else None
+
+    # Workout: average count per period
+    workout_counts = [pm.get("workout_count", 0) for pm in recent]
+    workout_ma = sum(workout_counts) / len(workout_counts) if workout_counts else None
+
+    # Stretch: average count per period
+    stretch_counts = [pm.get("stretch_count", 0) for pm in recent]
+    stretch_ma = sum(stretch_counts) / len(stretch_counts) if stretch_counts else None
+
+    return {
+        "study_avg_minutes": study_ma,
+        "sleep_avg_minutes": sleep_ma,
+        "mood_avg": mood_ma,
+        "workout_avg": workout_ma,
+        "stretch_avg": stretch_ma,
+    }
+

@@ -37,6 +37,7 @@ from sync_utils import (
     STUDY_LEGEND_LINE,
     quarter_id,
     compute_period_metrics,
+    compute_moving_average,
     load_daily_data,
     render_sleep_stats_table,
     render_activity_table,
@@ -98,14 +99,14 @@ def render_quarterly_training_bars(month_ranges, daily_data, activity_key, delta
     return lines
 
 
-def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data, prev_daily_data, prev_year, prev_quarter):
+def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data, prev_daily_data, prev_year, prev_quarter, prior_quarter_metrics=None):
     today = datetime.date.today()
     sections = []
 
     dates = list(daterange(quarter_start, quarter_end))
     prev_dates = list(prev_daily_data.keys())
 
-    # Summary (Variant B)
+    # Summary with MA
     current_metrics = compute_period_metrics(dates, daily_data)
     prev_metrics = compute_period_metrics(prev_dates, prev_daily_data) if prev_daily_data else {
         "study_total_minutes": 0,
@@ -116,12 +117,21 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         "total_days": len(prev_dates),
         "days_up_to_today": len(prev_dates),
     }
+
+    # Compute 4-quarter moving average
+    ma_metrics = None
+    if prior_quarter_metrics and len(prior_quarter_metrics) >= 4:
+        ma_metrics = compute_moving_average(prior_quarter_metrics, 4)
+
     prev_label = f"**[[{quarter_id(prev_year, prev_quarter)}\\|LAST QUARTER]]**"
     summary_lines = render_summary_table(
         current_metrics,
         prev_metrics,
         "THIS QUARTER",
         prev_label,
+        ma_metrics=ma_metrics,
+        ma_label="4-QTR AVG" if ma_metrics else None,
+        ma_training_unit="qtr",
     )
     sections.append(trim_blank_lines(summary_lines))
 
@@ -525,6 +535,34 @@ def main():
             prev_daily_data,
             prev_year,
             prev_quarter,
+        )
+
+        # Load 4 prior quarters for moving average calculation
+        prior_quarter_metrics = []
+        for q_ago in range(4, 0, -1):  # 4 quarters ago... 1 quarter ago
+            # Calculate prior quarter (year, q)
+            # Logic: total_q = current_total_q - q_ago
+            # current_total_q = year * 4 + (quarter_num - 1)
+            curr_total = year * 4 + (quarter_num - 1)
+            target_total = curr_total - q_ago
+            p_year = target_total // 4
+            p_q = (target_total % 4) + 1
+            
+            p_start, p_end = quarter_range(p_year, p_q)
+            p_data = load_daily_data(p_start, p_end)
+            p_dates = list(daterange(p_start, p_end))
+            p_metrics = compute_period_metrics(p_dates, p_data)
+            prior_quarter_metrics.append(p_metrics)
+
+        metrics_block = build_quarterly_metrics(
+            quarter_start,
+            quarter_end,
+            month_ranges,
+            daily_data,
+            prev_daily_data,
+            prev_year,
+            prev_quarter,
+            prior_quarter_metrics=prior_quarter_metrics,
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)

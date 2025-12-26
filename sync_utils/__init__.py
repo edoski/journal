@@ -64,6 +64,7 @@ from .parsing import (
     format_percent_change,
     format_training_ratio,
     format_mood_with_scale,
+    format_ma_training_ratio,
 )
 
 # Goal utilities
@@ -83,6 +84,7 @@ from .goals import (
 from .metrics import (
     load_daily_data,
     compute_period_metrics,
+    compute_moving_average,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
     compute_period_deltas,
@@ -182,6 +184,7 @@ __all__ = [
     "format_percent_change",
     "format_training_ratio",
     "format_mood_with_scale",
+    "format_ma_training_ratio",
     # Goals
     "canonical_goal",
     "parse_goal_tasks",
@@ -195,6 +198,7 @@ __all__ = [
     # Metrics
     "load_daily_data",
     "compute_period_metrics",
+    "compute_moving_average",
     "aggregate_activity_totals",
     "aggregate_interrupt_overrun",
     "compute_period_deltas",
