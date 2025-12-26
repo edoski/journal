@@ -19,6 +19,7 @@ from sync_utils import (
     render_training_quarter_block,
     render_summary_table,
     render_yearly_study_coverage,
+    STUDY_TARGET_MIN,
     STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
@@ -32,6 +33,9 @@ from sync_utils import (
     trim_blank_lines,
     ensure_goal_ids,
 )
+
+YEARLY_STUDY_BAR_WIDTH = 45
+YEARLY_TRAINING_BAR_WIDTH = 45
 
 
 def _load_daily_data(start_date, end_date):
@@ -179,7 +183,47 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
-    study_grid = render_yearly_study_coverage(quarter_ranges, daily_data, today=today)
+    # Compute per-quarter full-study day counts (only elapsed days) for deltas
+    study_counts = []
+    for start, end in quarter_ranges:
+        days = list(daterange(start, end))
+        elapsed_days = sum(1 for d in days if d <= today)
+        done = sum(
+            1
+            for d in days
+            if d <= today and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+        )
+        study_counts.append((done, elapsed_days, start))
+
+    prev_study_baseline = None
+    if prev_quarter_ranges:
+        prev_q_start, prev_q_end = prev_quarter_ranges[-1]
+        prev_days = list(daterange(prev_q_start, prev_q_end))
+        prev_study_baseline = sum(
+            1
+            for d in prev_days
+            if d <= today and (prev_daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+        )
+
+    study_delta_labels = []
+    for idx, (done, _, start) in enumerate(study_counts):
+        if start > today:
+            study_delta_labels.append("")
+            continue
+        if idx == 0:
+            prev_val = prev_study_baseline
+        else:
+            prev_val = study_counts[idx - 1][0]
+        delta = compute_percent_change(done, prev_val)
+        study_delta_labels.append(format_percent_change(delta))
+
+    study_grid = render_yearly_study_coverage(
+        quarter_ranges,
+        daily_data,
+        today=today,
+        bar_width=YEARLY_STUDY_BAR_WIDTH,
+        delta_labels=study_delta_labels,
+    )
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
@@ -253,7 +297,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
             quarter_labels,
             [(d, t) for d, t, _ in workout_counts],
             workout_delta_labels,
-            bar_width=30,
+            bar_width=YEARLY_TRAINING_BAR_WIDTH,
         )
     )
     workout_block.append("└")
@@ -264,7 +308,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
             quarter_labels,
             [(d, t) for d, t, _ in stretch_counts],
             stretch_delta_labels,
-            bar_width=30,
+            bar_width=YEARLY_TRAINING_BAR_WIDTH,
         )
     )
     stretch_block.append("└")

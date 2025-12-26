@@ -1463,7 +1463,7 @@ def render_weekly_study_grid(dates, daily_data, current_date=None):
     return lines
 
 
-def render_monthly_study_grid(week_ranges, daily_data, current_date=None):
+def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_labels=None):
     """
     Monthly study coverage grid (single block, per-day symbols, per-week grouping).
     Mirrors the training monthly grid for spacing and arrow logic.
@@ -1523,6 +1523,21 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None):
                 row += "   "
         return row.rstrip()
 
+    def _build_delta_row():
+        if not delta_labels:
+            return None
+        row = "│ "
+        any_label = False
+        for pos in range(len(week_day_counts)):
+            label_str = (delta_labels[pos] if pos < len(delta_labels) else "") or ""
+            if label_str:
+                any_label = True
+            left_pad = max((week_width - len(label_str)) // 2, 0)
+            row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row.rstrip() if any_label else None
+
     arrow_col = None
     if current_date:
         for w_idx, (start, end) in enumerate(week_ranges):
@@ -1532,11 +1547,11 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None):
                 arrow_col = len("│ ") + w_idx * (week_width + 3) + day_idx * 2
                 break
 
-    max_width = 0
     symbol_row = _build_symbol_row()
     separator_row = _build_separator_row()
     label_row = _build_label_row()
-    max_width = max(len(symbol_row), len(separator_row), len(label_row))
+    delta_row = _build_delta_row()
+    max_width = max(len(symbol_row), len(separator_row), len(label_row), len(delta_row) if delta_row else 0)
 
     header_suffix = f" ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else " (00/00)"
     lines.append(f"┌ FULL STUDY DAYS{header_suffix}")
@@ -1552,7 +1567,11 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None):
     lines.append(symbol_row)
     lines.append(separator_row)
     lines.append(label_row)
-    lines.append("└")
+    if delta_row:
+        # Match training layout: use bottom-left corner on delta row
+        lines.append(delta_row.replace("│ ", "└ ", 1))
+    else:
+        lines.append("└")
     lines.append("")
     lines.append(STUDY_LEGEND_LINE)
     return lines
@@ -1587,9 +1606,10 @@ def _compress_symbols(symbols, target_width):
     return "".join(compressed)
 
 
-def render_quarterly_study_coverage(month_ranges, daily_data, today=None):
+def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_labels=None):
     """
     Per-month study coverage rows (intensity symbols + counts).
+    Optional delta_labels mirrors training monthly deltas (per-month percent change).
     """
     today = today or datetime.date.today()
     lines = []
@@ -1628,13 +1648,17 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None):
     lines.append(header)
     lines.append("│")
 
-    for (label, bar, _, _), count_str in zip(bars, counts):
+    for idx, ((label, bar, _, _), count_str) in enumerate(zip(bars, counts)):
         pad_between = (max_bar_len - len(bar)) + 1
+        delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
+        delta_str = delta.rjust(4) if delta else ""
         line = (
             f"│ {label} {bar}"
             f"{' ' * pad_between}"
             f"{count_str.rjust(max_count_len)}"
         )
+        if delta_str:
+            line += f"   {delta_str}"
         lines.append(line.rstrip())
     lines.append("└")
     lines.append("")
@@ -1642,9 +1666,15 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None):
     return lines
 
 
-def render_yearly_study_coverage(quarter_ranges, daily_data, today=None):
+def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_width=30, delta_labels=None):
     """
     Per-quarter study coverage rows (intensity symbols + counts).
+
+    bar_width controls how many characters each quarter's bar occupies after
+    compressing the days in that quarter. Higher values reduce quantization
+    jitter while keeping the chart compact.
+    delta_labels (optional) mirrors training bars: per-quarter percent-change
+    strings aligned to the right of the counts.
     """
     today = today or datetime.date.today()
     lines = []
@@ -1670,7 +1700,7 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None):
             bar_chars.append(symbol)
             if symbol != STUDY_SYMBOL_NONE:
                 done += 1
-        bar = _compress_symbols(bar_chars, 30)
+        bar = _compress_symbols(bar_chars, bar_width)
         bars.append((label, bar, done, elapsed_days))
         count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
         counts.append(count_str)
@@ -1683,13 +1713,17 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None):
     lines.append(header)
     lines.append("│")
 
-    for (label, bar, _, _), count_str in zip(bars, counts):
+    for idx, ((label, bar, _, _), count_str) in enumerate(zip(bars, counts)):
         pad_between = (max_bar_len - len(bar)) + 1
+        delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
+        delta_str = delta.rjust(4) if delta else ""
         line = (
             f"│ {label} {bar}"
             f"{' ' * pad_between}"
             f"{count_str.rjust(max_count_len)}"
         )
+        if delta_str:
+            line += f"   {delta_str}"
         lines.append(line.rstrip())
     lines.append("└")
     lines.append("")

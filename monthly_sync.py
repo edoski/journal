@@ -23,6 +23,7 @@ from sync_utils import (
     render_monthly_chart,
     render_training_frequency_grid,
     render_monthly_study_grid,
+    STUDY_TARGET_MIN,
     STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
@@ -248,11 +249,34 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
+    # Full-study-day deltas per week (mirror training delta behavior)
+    study_week_done = []
+    for week_days in week_day_lists:
+        done = sum(
+            1
+            for d in week_days
+            if (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+        )
+        study_week_done.append(done)
+
+    study_grid_delta_labels = []
+    for idx, week_days in enumerate(week_day_lists):
+        week_start = week_days[0]
+        if is_current_month and week_start > today:
+            study_grid_delta_labels.append("")
+            continue
+        if idx == 0:
+            study_grid_delta_labels.append("—")
+            continue
+        delta = compute_percent_change(study_week_done[idx], study_week_done[idx - 1])
+        study_grid_delta_labels.append(format_percent_change(delta))
+
     current_month_date = today if is_current_month else None
     study_grid = render_monthly_study_grid(
         week_ranges,
         daily_data,
         current_date=current_month_date,
+        delta_labels=study_grid_delta_labels,
     )
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")

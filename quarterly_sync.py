@@ -33,6 +33,7 @@ from sync_utils import (
     ensure_goal_ids,
     render_summary_table,
     render_quarterly_study_coverage,
+    STUDY_TARGET_MIN,
     STUDY_LEGEND_LINE,
 )
 
@@ -206,6 +207,20 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     today = datetime.date.today()
     sections = []
 
+    def _compute_deltas(counts, baseline):
+        deltas = []
+        for idx, (done, _, start) in enumerate(counts):
+            if start > today:
+                deltas.append("")
+                continue
+            if idx == 0:
+                prev_val = baseline
+            else:
+                prev_val = counts[idx - 1][0]
+            delta = compute_percent_change(done, prev_val)
+            deltas.append(format_percent_change(delta))
+        return deltas
+
     dates = list(daterange(quarter_start, quarter_end))
     prev_dates = list(prev_daily_data.keys())
 
@@ -228,6 +243,9 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         prev_label,
     )
     sections.append(trim_blank_lines(summary_lines))
+
+    prev_month_ranges = quarter_months(prev_year, prev_quarter)
+    prev_last_month_range = prev_month_ranges[-1] if prev_month_ranges else None
 
     # STUDY
     study_lines = ["### **STUDY**"]
@@ -293,7 +311,34 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
-    study_grid = render_quarterly_study_coverage(month_ranges, daily_data, today=today)
+    study_counts = []
+    for start, end in month_ranges:
+        days = list(daterange(start, end))
+        elapsed = sum(1 for d in days if d <= today)
+        done = sum(
+            1
+            for d in days
+            if d <= today and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+        )
+        study_counts.append((done, elapsed, start))
+
+    prev_study_baseline = None
+    if prev_last_month_range:
+        prev_days = list(daterange(prev_last_month_range[0], prev_last_month_range[1]))
+        prev_study_baseline = sum(
+            1
+            for d in prev_days
+            if d <= today and (prev_daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+        )
+
+    study_delta_labels = _compute_deltas(study_counts, prev_study_baseline)
+
+    study_grid = render_quarterly_study_coverage(
+        month_ranges,
+        daily_data,
+        today=today,
+        delta_labels=study_delta_labels,
+    )
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
@@ -320,9 +365,6 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
 
     # Per-month counts + deltas (compare each month to previous; first month vs last month of previous quarter)
     month_labels = [MONTH_ABBR[m[0].month - 1] for m in month_ranges]
-    prev_month_ranges = quarter_months(prev_year, prev_quarter)
-    prev_last_month_range = prev_month_ranges[-1] if prev_month_ranges else None
-
     def _month_count(range_tuple, key, source_data):
         start, end = range_tuple
         days = list(daterange(start, end))
@@ -338,20 +380,6 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     else:
         prev_workout_baseline = None
         prev_stretch_baseline = None
-
-    def _compute_deltas(counts, baseline):
-        deltas = []
-        for idx, (done, _, start) in enumerate(counts):
-            if start > today:
-                deltas.append("")
-                continue
-            if idx == 0:
-                prev_val = baseline
-            else:
-                prev_val = counts[idx - 1][0]
-            delta = compute_percent_change(done, prev_val)
-            deltas.append(format_percent_change(delta))
-        return deltas
 
     workout_delta_labels = _compute_deltas(workout_counts, prev_workout_baseline)
     stretch_delta_labels = _compute_deltas(stretch_counts, prev_stretch_baseline)
