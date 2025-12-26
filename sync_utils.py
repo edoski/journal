@@ -1446,7 +1446,7 @@ def render_weekly_study_grid(dates, daily_data, current_date=None):
     if current_date and dates[0] <= current_date <= dates[-1]:
         day_idx = (current_date - dates[0]).days
         day_idx = max(0, min(day_idx, len(dates) - 1))
-        arrow_col = 2 + day_idx * 4  # after "│ "
+        arrow_col = 3 + day_idx * 4  # center of 3-char block
         arrow_line = [" "] * (4 + len(study_symbols) * 4)
         arrow_line[0] = "│"
         if arrow_col < len(arrow_line):
