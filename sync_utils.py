@@ -29,6 +29,14 @@ LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 
+# Study intensity thresholds (minutes)
+STUDY_TARGET_MIN = 360    # 4 pomodoros (4 * 90m) – daily target threshold
+
+# Symbols for study intensity (binary)
+STUDY_SYMBOL_DEEP = "█"   # target met
+STUDY_SYMBOL_NONE = "·"   # target not met or no study
+STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
+
 
 def _lockfile_for(path: str) -> str:
     os.makedirs(LOCK_DIR, exist_ok=True)
@@ -1046,8 +1054,8 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     # Y-axis and bars with value labels on top
     for level in range(height, -1, -1):
         if level == 0:
-            # Bottom line with axis (trimmed by 2 characters for weekly)
-            row = "└" + "─" * (col_spacing * len(labels) - 2)
+            # Bottom line with axis (trimmed by 3 characters for weekly)
+            row = "└" + "─" * max(0, col_spacing * len(labels) - 3)
         else:
             row = "│"
             for i, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
@@ -1087,25 +1095,20 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     return lines
 
 
-def render_training_quarter_block(activity_name, labels, counts, delta_labels=None, bar_width=30):
+def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=30):
     """
-    Render a compact per-quarter training block with aligned counts and deltas.
-
-    - activity_name: header label (e.g., WORKOUT or STRETCH)
-    - labels: list of quarter labels (e.g., Q1, Q2, Q3, Q4)
-    - counts: list of (done, total) tuples per label
-    - delta_labels: list of formatted deltas (e.g., +7%, -3%, —); blanks allowed
-    - bar_width: fixed bar length (default 30) for visual consistency
+    Render per-quarter training rows (no header/footer), aligned counts and deltas.
+    counts: list of (done, elapsed) tuples.
     """
-    lines = [f"┌ {activity_name.upper()}", "│"]
+    lines = []
     max_label_len = max((len(l) for l in labels), default=0)
-    count_strs = [f"({done:02d}/{total})" for done, total in counts] if counts else []
+    count_strs = [f"({done:02d}/{elapsed:02d})" if elapsed else "(00/00)" for done, elapsed in counts] if counts else []
     max_count_len = max((len(s) for s in count_strs), default=0)
 
-    for idx, (label, (done, total)) in enumerate(zip(labels, counts)):
-        total = max(total, 0)
-        done = max(0, min(done, total))
-        bar_len = round_half_up((done / total) * bar_width) if total > 0 else 0
+    for idx, (label, (done, elapsed)) in enumerate(zip(labels, counts)):
+        elapsed = max(elapsed, 0)
+        done = max(0, min(done, elapsed))
+        bar_len = round_half_up((done / elapsed) * bar_width) if elapsed > 0 else 0
         bar_len = min(bar_width, max(0, bar_len))
         bar = "■" * bar_len + "·" * (bar_width - bar_len)
         count_str = count_strs[idx].rjust(max_count_len) if count_strs else ""
@@ -1136,6 +1139,8 @@ def render_quarter_bar_chart(labels, values, value_labels, *, height=12, y_max=7
             bar_heights.append(min(height, max(0, round_half_up(val * scale))))
 
     lines = []
+    bar_rows = []
+    max_bar_row_len = 0
 
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
     if has_max_value:
@@ -1151,23 +1156,34 @@ def render_quarter_bar_chart(labels, values, value_labels, *, height=12, y_max=7
 
     for level in range(height, -1, -1):
         if level == 0:
-            row = "└" + "─" * (col_spacing * len(labels) + left_pad + 2)
-        else:
-            row = "│"
-            for bar_h, label in zip(bar_heights, value_labels):
-                label_str = str(label).strip('`') if label else ""
-                label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
-                if bar_h == 0 and level == 1:
-                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-                elif bar_h == height and level <= height:
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                elif bar_h > 0 and bar_h < height and level == bar_h + 1:
-                    row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
-                elif bar_h > 0 and level <= bar_h:
-                    row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
-                else:
-                    row += " " * col_spacing
-        lines.append(row.rstrip())
+            continue  # axis row handled after measuring bar rows
+        row = "│"
+        for bar_h, label in zip(bar_heights, value_labels):
+            label_str = str(label).strip('`') if label else ""
+            label_left_pad = left_pad + (1 if center_labels_on_bars else 0)
+            if bar_h == 0 and level == 1:
+                row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+            elif bar_h == height and level <= height:
+                row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+            elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+                row += " " * label_left_pad + label_str + " " * (col_spacing - label_left_pad - len(label_str))
+            elif bar_h > 0 and level <= bar_h:
+                row += " " * left_pad + bar_char * bar_width + " " * (col_spacing - left_pad - bar_width)
+            else:
+                row += " " * col_spacing
+        row = row.rstrip()
+        max_bar_row_len = max(max_bar_row_len, len(row))
+        bar_rows.append(row)
+
+    # Axis row length matches widest bar row (or computed default)
+    if max_bar_row_len == 0:
+        axis_len = max(1, col_spacing * len(labels) + left_pad + 2)
+    else:
+        axis_len = max_bar_row_len
+    axis_row = "└" + "─" * max(0, axis_len - 1)
+
+    lines.extend(bar_rows)
+    lines.append(axis_row)
 
     label_row = "    "
     for label in labels:
@@ -1394,4 +1410,288 @@ def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count,
     label_row = "└           " + " ".join(DAYS)
     lines.append(label_row)
 
+    return lines
+
+
+def study_intensity_symbol(minutes):
+    """Binary mapping: target met vs not met."""
+    mins = minutes or 0
+    return STUDY_SYMBOL_DEEP if mins >= STUDY_TARGET_MIN else STUDY_SYMBOL_NONE
+
+
+def render_weekly_study_grid(dates, daily_data, current_date=None):
+    """
+    Weekly study coverage grid (single row, binary target).
+    Uses training-style blocks: ███ (met), ░░░ (not met).
+    """
+    lines = []
+    today = datetime.date.today()
+
+    met_symbol = "███"
+    none_symbol = "░░░"
+
+    study_symbols = []
+    for day in dates:
+        minutes = daily_data.get(day, {}).get("study_minutes")
+        if day > today:
+            study_symbols.append(none_symbol)
+        else:
+            study_symbols.append(met_symbol if minutes and minutes >= STUDY_TARGET_MIN else none_symbol)
+
+    study_done = sum(1 for sym in study_symbols if sym == met_symbol)
+    study_total = len(dates)
+
+    lines.append("┌ FULL STUDY DAYS")
+
+    if current_date and dates[0] <= current_date <= dates[-1]:
+        day_idx = (current_date - dates[0]).days
+        day_idx = max(0, min(day_idx, len(dates) - 1))
+        arrow_col = 2 + day_idx * 4  # after "│ "
+        arrow_line = [" "] * (4 + len(study_symbols) * 4)
+        arrow_line[0] = "│"
+        if arrow_col < len(arrow_line):
+            arrow_line[arrow_col] = "↓"
+        lines.append("".join(arrow_line).rstrip())
+    else:
+        lines.append("│")
+
+    lines.append("│ " + " ".join(study_symbols) + f"   ({study_done}/{study_total})")
+    lines.append("│ " + " ".join(["───"] * 7))
+    lines.append("└ " + " ".join(DAYS))
+    lines.append("")
+    lines.append(STUDY_LEGEND_LINE.replace("█", "███").replace("·", "░░░"))
+    return lines
+
+
+def render_monthly_study_grid(week_ranges, daily_data, current_date=None):
+    """
+    Monthly study coverage grid (single block, per-day symbols, per-week grouping).
+    Mirrors the training monthly grid for spacing and arrow logic.
+    """
+    lines = []
+    today = datetime.date.today()
+
+    symbols = []
+    week_labels = []
+    week_day_counts = []
+    total_done = 0
+    total_elapsed = 0
+
+    for start, end in week_ranges:
+        week_days = list(daterange(start, end))
+        week_day_counts.append(len(week_days))
+        week_labels.append(format_week_label(start, end))
+
+        for day in week_days:
+            if day > today:
+                symbols.append(STUDY_SYMBOL_NONE)
+            else:
+                symbol = study_intensity_symbol(daily_data.get(day, {}).get("study_minutes"))
+                symbols.append(symbol)
+                total_elapsed += 1
+                if symbol == STUDY_SYMBOL_DEEP:
+                    total_done += 1
+
+    max_days = max(week_day_counts) if week_day_counts else 0
+    week_width = max_days * 2 - 1 if max_days > 0 else 0
+
+    def _build_symbol_row():
+        row = "│ "
+        idx = 0
+        for pos, day_count in enumerate(week_day_counts):
+            week = " ".join(symbols[idx:idx + day_count])
+            row += week.ljust(week_width)
+            idx += day_count
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row.rstrip()
+
+    def _build_separator_row():
+        row = "│ "
+        for pos in range(len(week_day_counts)):
+            row += "─" * week_width
+            if pos < len(week_day_counts) - 1:
+                row += "   "
+        return row.rstrip()
+
+    def _build_label_row():
+        row = "│ "
+        for pos, label in enumerate(week_labels):
+            left_pad = max((week_width - len(label)) // 2, 0)
+            row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+            if pos < len(week_labels) - 1:
+                row += "   "
+        return row.rstrip()
+
+    arrow_col = None
+    if current_date:
+        for w_idx, (start, end) in enumerate(week_ranges):
+            if start <= current_date <= end:
+                day_idx = (current_date - start).days
+                day_idx = min(day_idx, max(week_day_counts[w_idx] - 1, 0))
+                arrow_col = len("│ ") + w_idx * (week_width + 3) + day_idx * 2
+                break
+
+    max_width = 0
+    symbol_row = _build_symbol_row()
+    separator_row = _build_separator_row()
+    label_row = _build_label_row()
+    max_width = max(len(symbol_row), len(separator_row), len(label_row))
+
+    header_suffix = f" ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else " (00/00)"
+    lines.append(f"┌ FULL STUDY DAYS{header_suffix}")
+    if arrow_col is not None:
+        arrow_line = [" "] * max_width
+        arrow_line[0] = "│"
+        if arrow_col < max_width:
+            arrow_line[arrow_col] = "↓"
+        lines.append("".join(arrow_line).rstrip())
+    else:
+        lines.append("│")
+
+    lines.append(symbol_row)
+    lines.append(separator_row)
+    lines.append(label_row)
+    lines.append("└")
+    lines.append("")
+    lines.append(STUDY_LEGEND_LINE)
+    return lines
+
+
+def _compress_symbols(symbols, target_width):
+    """
+    Compress a sequence of symbols into a fixed width by bucketing days.
+    Chooses the highest-intensity symbol present in each bucket.
+    """
+    if target_width <= 0:
+        return ""
+    total = len(symbols)
+    if total == 0:
+        return STUDY_SYMBOL_NONE * target_width
+    if total <= target_width:
+        return "".join(symbols) + STUDY_SYMBOL_NONE * (target_width - total)
+
+    bucket_size = math.ceil(total / target_width)
+    compressed = []
+    for i in range(target_width):
+        start = i * bucket_size
+        end = min(start + bucket_size, total)
+        bucket = symbols[start:end]
+        if not bucket:
+            compressed.append(STUDY_SYMBOL_NONE)
+            continue
+        if STUDY_SYMBOL_DEEP in bucket:
+            compressed.append(STUDY_SYMBOL_DEEP)
+        else:
+            compressed.append(STUDY_SYMBOL_NONE)
+    return "".join(compressed)
+
+
+def render_quarterly_study_coverage(month_ranges, daily_data, today=None):
+    """
+    Per-month study coverage rows (intensity symbols + counts).
+    """
+    today = today or datetime.date.today()
+    lines = []
+    bars = []
+    counts = []
+    max_bar_len = 0
+    max_count_len = 0
+    total_done = 0
+    total_elapsed = 0
+
+    for start, end in month_ranges:
+        label = MONTH_ABBR[start.month - 1]
+        days = list(daterange(start, end))
+        bar_chars = []
+        done = 0
+        elapsed_days = 0
+        for d in days:
+            if d > today:
+                bar_chars.append(STUDY_SYMBOL_NONE)
+                continue
+            symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
+            bar_chars.append(symbol)
+            if symbol != STUDY_SYMBOL_NONE:
+                done += 1
+            elapsed_days += 1
+        bar = "".join(bar_chars)
+        bars.append((label, bar, done, elapsed_days))
+        count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
+        counts.append(count_str)
+        max_bar_len = max(max_bar_len, len(bar))
+        max_count_len = max(max_count_len, len(count_str))
+        total_done += done
+        total_elapsed += elapsed_days
+
+    header = f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else "┌ FULL STUDY DAYS (00/00)"
+    lines.append(header)
+    lines.append("│")
+
+    for (label, bar, _, _), count_str in zip(bars, counts):
+        pad_between = (max_bar_len - len(bar)) + 1
+        line = (
+            f"│ {label} {bar}"
+            f"{' ' * pad_between}"
+            f"{count_str.rjust(max_count_len)}"
+        )
+        lines.append(line.rstrip())
+    lines.append("└")
+    lines.append("")
+    lines.append(STUDY_LEGEND_LINE)
+    return lines
+
+
+def render_yearly_study_coverage(quarter_ranges, daily_data, today=None):
+    """
+    Per-quarter study coverage rows (intensity symbols + counts).
+    """
+    today = today or datetime.date.today()
+    lines = []
+    bars = []
+    counts = []
+    max_bar_len = 0
+    max_count_len = 0
+    total_done = 0
+    total_elapsed = 0
+
+    for idx, (start, end) in enumerate(quarter_ranges):
+        label = f"Q{idx + 1}"
+        days = list(daterange(start, end))
+        bar_chars = []
+        done = 0
+        elapsed_days = 0
+        for d in days:
+            if d > today:
+                bar_chars.append(STUDY_SYMBOL_NONE)
+                continue
+            elapsed_days += 1
+            symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
+            bar_chars.append(symbol)
+            if symbol != STUDY_SYMBOL_NONE:
+                done += 1
+        bar = _compress_symbols(bar_chars, 30)
+        bars.append((label, bar, done, elapsed_days))
+        count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
+        counts.append(count_str)
+        max_bar_len = max(max_bar_len, len(bar))
+        max_count_len = max(max_count_len, len(count_str))
+        total_done += done
+        total_elapsed += elapsed_days
+
+    header = f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})"
+    lines.append(header)
+    lines.append("│")
+
+    for (label, bar, _, _), count_str in zip(bars, counts):
+        pad_between = (max_bar_len - len(bar)) + 1
+        line = (
+            f"│ {label} {bar}"
+            f"{' ' * pad_between}"
+            f"{count_str.rjust(max_count_len)}"
+        )
+        lines.append(line.rstrip())
+    lines.append("└")
+    lines.append("")
+    lines.append(STUDY_LEGEND_LINE)
     return lines

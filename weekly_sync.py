@@ -18,6 +18,8 @@ from sync_utils import (
     render_summary_table,
     render_weekly_chart,
     render_weekly_training_grid,
+    render_weekly_study_grid,
+    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -182,6 +184,11 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
             study_lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
     else:
         study_lines.append("|  |  |  |")
+    study_lines.append("")
+
+    current_week_date = today if start_date <= today <= end_date else None
+    study_grid = render_weekly_study_grid(dates, daily_data, current_date=current_week_date)
+    study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     # INTERRUPTIONS table

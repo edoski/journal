@@ -18,6 +18,8 @@ from sync_utils import (
     render_quarter_bar_chart,
     render_training_quarter_block,
     render_summary_table,
+    render_yearly_study_coverage,
+    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -42,6 +44,7 @@ def _load_daily_data(start_date, end_date):
         if parsed:
             data[day] = parsed
     return data
+
 
 
 def compute_year_metrics(dates, daily_data):
@@ -176,6 +179,10 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
+    study_grid = render_yearly_study_coverage(quarter_ranges, daily_data, today=today)
+    study_lines.extend(wrap_code_block(study_grid))
+    study_lines.append("")
+
     total_interrupts = sum(interrupt_totals)
     total_overruns = sum(overrun_totals)
 
@@ -199,14 +206,20 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     quarter_labels = [f"Q{i+1}" for i in range(4)]
     workout_counts = []
     stretch_counts = []
+    workout_done_year = 0
+    stretch_done_year = 0
+    elapsed_year = 0
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
-        total_days = len(days)
-        workout_done = sum(1 for d in days if daily_data.get(d, {}).get("workout"))
-        stretch_done = sum(1 for d in days if daily_data.get(d, {}).get("stretch"))
-        workout_counts.append((workout_done, total_days, start))
-        stretch_counts.append((stretch_done, total_days, start))
+        elapsed_days = sum(1 for d in days if d <= today)
+        workout_done = sum(1 for d in days if d <= today and daily_data.get(d, {}).get("workout"))
+        stretch_done = sum(1 for d in days if d <= today and daily_data.get(d, {}).get("stretch"))
+        workout_counts.append((workout_done, elapsed_days, start))
+        stretch_counts.append((stretch_done, elapsed_days, start))
+        workout_done_year += workout_done
+        stretch_done_year += stretch_done
+        elapsed_year += elapsed_days
 
     # Baseline is last quarter of previous year
     prev_workout_baseline = None
@@ -219,7 +232,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
 
     def _compute_deltas(counts, baseline):
         deltas = []
-        for idx, (done, _, start) in enumerate(counts):
+        for idx, (done, elapsed, start) in enumerate(counts):
             if start > today:
                 deltas.append("")
                 continue
@@ -234,45 +247,29 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     workout_delta_labels = _compute_deltas(workout_counts, prev_workout_baseline)
     stretch_delta_labels = _compute_deltas(stretch_counts, prev_stretch_baseline)
 
-    training_block = render_training_quarter_block(
-        "WORKOUT",
-        quarter_labels,
-        [(d, t) for d, t, _ in workout_counts],
-        workout_delta_labels,
-        bar_width=30,
-    )
-    training_block.append("")
-    training_block.extend(
+    workout_block = [f"┌ WORKOUT ({workout_done_year:02d}/{elapsed_year:02d})", "│"]
+    workout_block.extend(
         render_training_quarter_block(
-            "STRETCH",
+            quarter_labels,
+            [(d, t) for d, t, _ in workout_counts],
+            workout_delta_labels,
+            bar_width=30,
+        )
+    )
+    workout_block.append("└")
+
+    stretch_block = [f"┌ STRETCH ({stretch_done_year:02d}/{elapsed_year:02d})", "│"]
+    stretch_block.extend(
+        render_training_quarter_block(
             quarter_labels,
             [(d, t) for d, t, _ in stretch_counts],
             stretch_delta_labels,
             bar_width=30,
         )
     )
-    training_lines.extend(wrap_code_block(training_block))
-    training_lines.append("")
+    stretch_block.append("└")
 
-    workout_days = sum(d for d, _, _ in workout_counts)
-    stretch_days = sum(d for d, _, _ in stretch_counts)
-    year_total_days = current_metrics.get("total_days", len(dates))
-    days_elapsed = year_total_days
-
-    training_lines.append("| ACTIVITY | COUNT | % DONE | % MISSED |")
-    training_lines.append("| -------- | ----- | ------ | -------- |")
-    if days_elapsed > 0:
-        workout_ratio = format_training_ratio(workout_days, days_elapsed)
-        stretch_ratio = format_training_ratio(stretch_days, days_elapsed)
-        workout_done_pct = min(100, max(0, round_half_up((workout_days / days_elapsed) * 100)))
-        workout_missed_pct = max(0, 100 - workout_done_pct)
-        stretch_done_pct = min(100, max(0, round_half_up((stretch_days / days_elapsed) * 100)))
-        stretch_missed_pct = max(0, 100 - stretch_done_pct)
-        training_lines.append(f"| **WORKOUT** | `{workout_ratio}` | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
-        training_lines.append(f"| **STRETCH** | `{stretch_ratio}` | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
-    else:
-        training_lines.append("| **WORKOUT** | `-` | `-` | `-` |")
-        training_lines.append("| **STRETCH** | `-` | `-` | `-` |")
+    training_lines.extend(wrap_code_block(workout_block + [""] + stretch_block))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 

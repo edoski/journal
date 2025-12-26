@@ -32,6 +32,8 @@ from sync_utils import (
     trim_blank_lines,
     ensure_goal_ids,
     render_summary_table,
+    render_quarterly_study_coverage,
+    STUDY_LEGEND_LINE,
 )
 
 
@@ -124,7 +126,7 @@ def render_quarterly_study_chart(labels, values, value_labels, delta_labels=None
 
     for level in range(height, -1, -1):
         if level == 0:
-            row = "└" + "─" * (col_spacing * len(labels) + len(label_prefix) - 6)
+            row = "└" + "─" * (col_spacing * len(labels) + len(label_prefix) - 7)
         else:
             row = "│"
             for bar_h, label in zip(bar_heights, value_labels):
@@ -291,6 +293,10 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
+    study_grid = render_quarterly_study_coverage(month_ranges, daily_data, today=today)
+    study_lines.extend(wrap_code_block(study_grid))
+    study_lines.append("")
+
     total_interrupts = sum(interrupt_totals)
     total_overruns = sum(overrun_totals)
 
@@ -320,7 +326,9 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     def _month_count(range_tuple, key, source_data):
         start, end = range_tuple
         days = list(daterange(start, end))
-        return sum(1 for d in days if source_data.get(d, {}).get(key)), len(days), start
+        elapsed = sum(1 for d in days if d <= today)
+        done = sum(1 for d in days if d <= today and source_data.get(d, {}).get(key))
+        return done, elapsed, start
 
     workout_counts = [_month_count(rng, "workout", daily_data) for rng in month_ranges]
     stretch_counts = [_month_count(rng, "stretch", daily_data) for rng in month_ranges]
@@ -349,8 +357,11 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     stretch_delta_labels = _compute_deltas(stretch_counts, prev_stretch_baseline)
 
     def _build_training_block(title, activity_key, deltas):
-        block = [f"┌ {title}", "│"]
+        total_done = sum(d for d, _, _ in (workout_counts if activity_key == "workout" else stretch_counts))
+        total_elapsed = sum(e for _, e, _ in (workout_counts if activity_key == "workout" else stretch_counts))
+        block = [f"┌ {title} ({total_done:02d}/{total_elapsed:02d})", "│"]
         block.extend(render_quarterly_training_bars(month_ranges, daily_data, activity_key, deltas))
+        block.append("└")
         return block
 
     training_block = []
@@ -360,24 +371,6 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")
 
-    workout_days = current_metrics.get("workout_count", 0)
-    stretch_days = current_metrics.get("stretch_count", 0)
-    quarter_days = current_metrics.get("total_days", len(dates))
-    training_lines.append("| ACTIVITY | COUNT | % DONE | % MISSED |")
-    training_lines.append("| -------- | ----- | ------ | -------- |")
-    if quarter_days > 0:
-        workout_ratio = format_training_ratio(workout_days, quarter_days)
-        stretch_ratio = format_training_ratio(stretch_days, quarter_days)
-        workout_done_pct = min(100, max(0, round_half_up((workout_days / quarter_days) * 100)))
-        workout_missed_pct = max(0, 100 - workout_done_pct)
-        stretch_done_pct = min(100, max(0, round_half_up((stretch_days / quarter_days) * 100)))
-        stretch_missed_pct = max(0, 100 - stretch_done_pct)
-        training_lines.append(f"| **WORKOUT** | `{workout_ratio}` | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
-        training_lines.append(f"| **STRETCH** | `{stretch_ratio}` | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
-    else:
-        training_lines.append("| **WORKOUT** | `-` | `-` | `-` |")
-        training_lines.append("| **STRETCH** | `-` | `-` | `-` |")
-    training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 
     # SLEEP
@@ -435,7 +428,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
         # label row is second from bottom when delta row present
         sleep_chart[-2] = "   " + sleep_chart[-2]
         sleep_chart[-1] = "   " + sleep_chart[-1]
-        sleep_chart[-3] = sleep_chart[-3][:-1] if len(sleep_chart[-3]) > 1 else sleep_chart[-3]
+        sleep_chart[-3] = sleep_chart[-3][:-2] if len(sleep_chart[-3]) > 2 else sleep_chart[-3]
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
@@ -506,7 +499,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     if mood_chart:
         mood_chart[-2] = "   " + mood_chart[-2]
         mood_chart[-1] = "   " + mood_chart[-1]
-        mood_chart[-3] = mood_chart[-3][:-1] if len(mood_chart[-3]) > 1 else mood_chart[-3]
+        mood_chart[-3] = mood_chart[-3][:-2] if len(mood_chart[-3]) > 2 else mood_chart[-3]
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 

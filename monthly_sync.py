@@ -22,6 +22,8 @@ from sync_utils import (
     render_summary_table,
     render_monthly_chart,
     render_training_frequency_grid,
+    render_monthly_study_grid,
+    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
@@ -246,6 +248,15 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         study_lines.append("|  |  |  |")
     study_lines.append("")
 
+    current_month_date = today if is_current_month else None
+    study_grid = render_monthly_study_grid(
+        week_ranges,
+        daily_data,
+        current_date=current_month_date,
+    )
+    study_lines.extend(wrap_code_block(study_grid))
+    study_lines.append("")
+
     # INTERRUPTIONS table
     interrupt_totals = [daily_data.get(d, {}).get("interrupt_minutes", 0) for d in dates]
     overrun_totals = [daily_data.get(d, {}).get("overrun_minutes", 0) for d in dates]
@@ -292,7 +303,6 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_delta_labels.append(format_percent_change(stretch_delta))
 
-    current_month_date = today if is_current_month else None
     training_grid = render_training_frequency_grid(
         week_ranges,
         daily_data,
@@ -303,24 +313,16 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         stretch_delta_labels=stretch_delta_labels,
         current_date=current_month_date,
     )
-    training_lines.extend(wrap_code_block(training_grid))
-    training_lines.append("")
+    # Inject counts into headers of the grid lines
+    elapsed_days = current_metrics.get("days_up_to_today", days_in_period)
+    if training_grid:
+        for idx, line in enumerate(training_grid):
+            if line.startswith("┌ WORKOUT"):
+                training_grid[idx] = f"┌ WORKOUT ({workout_days:02d}/{elapsed_days:02d})"
+            if line.startswith("┌ STRETCH"):
+                training_grid[idx] = f"┌ STRETCH ({stretch_days:02d}/{elapsed_days:02d})"
 
-    days_elapsed = days_in_period  # show full-month denominators for alignment with counts
-    training_lines.append("| ACTIVITY | COUNT | % DONE | % MISSED |")
-    training_lines.append("| -------- | ----- | ------ | -------- |")
-    if days_elapsed > 0:
-        workout_ratio = format_training_ratio(workout_days, days_elapsed)
-        stretch_ratio = format_training_ratio(stretch_days, days_elapsed)
-        workout_done_pct = min(100, max(0, round_half_up((workout_days / days_elapsed) * 100)))
-        workout_missed_pct = max(0, 100 - workout_done_pct)
-        stretch_done_pct = min(100, max(0, round_half_up((stretch_days / days_elapsed) * 100)))
-        stretch_missed_pct = max(0, 100 - stretch_done_pct)
-        training_lines.append(f"| **WORKOUT** | `{workout_ratio}` | `{workout_done_pct}%` | `{workout_missed_pct}%` |")
-        training_lines.append(f"| **STRETCH** | `{stretch_ratio}` | `{stretch_done_pct}%` | `{stretch_missed_pct}%` |")
-    else:
-        training_lines.append("| **WORKOUT** | `-` | `-` | `-` |")
-        training_lines.append("| **STRETCH** | `-` | `-` | `-` |")
+    training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 
