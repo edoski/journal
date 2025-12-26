@@ -39,53 +39,13 @@ from sync_utils import (
     join_sections,
     ensure_goal_ids,
     quarter_of_date,
+    quarter_id,
+    compute_period_metrics,
+    render_sleep_stats_table,
+    render_activity_table,
+    render_interrupts_table,
 )
 
-
-def compute_month_metrics(dates, daily_data):
-    """
-    Compute aggregated metrics for a list of dates (month).
-    Returns a dict with study_total_minutes, sleep_avg_minutes, mood_avg,
-    workout_count, stretch_count, total_days, days_up_to_today.
-    """
-    # Only count days up to today (or last day with any data)
-    today = datetime.date.today()
-    dates_up_to_today = [d for d in dates if d <= today]
-    days_up_to_today = len(dates_up_to_today)
-    
-    study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
-    sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
-    mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
-
-    study_total = sum((m for m in study_minutes if m is not None), 0)
-    sleep_vals = [m for m in sleep_minutes if m is not None]
-    sleep_avg = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
-    mood_vals_clean = [m for m in mood_vals if m is not None]
-    mood_avg = sum(mood_vals_clean) / len(mood_vals_clean) if mood_vals_clean else None
-
-    workout_count = sum(1 for d in dates if daily_data.get(d, {}).get("workout"))
-    stretch_count = sum(1 for d in dates if daily_data.get(d, {}).get("stretch"))
-
-    return {
-        "study_total_minutes": study_total,
-        "sleep_avg_minutes": sleep_avg,
-        "mood_avg": mood_avg,
-        "workout_count": workout_count,
-        "stretch_count": stretch_count,
-        "total_days": len(dates),
-        "days_up_to_today": days_up_to_today,
-    }
-
-def _quarter_id(year, quarter_num):
-    return f"{year}-Q{quarter_num}"
-
-
-def _ensure_task_ids(tasks, period_key):
-    ensure_goal_ids(tasks, "monthly", period_key)
-
-
-def _ensure_quarter_task_ids(tasks, quarter_key):
-    ensure_goal_ids(tasks, "quarterly", quarter_key)
 
 
 def _load_quarterly_goals(month_start, quarterly_dir=None):
@@ -95,7 +55,7 @@ def _load_quarterly_goals(month_start, quarterly_dir=None):
     """
     quarterly_dir = quarterly_dir or DEFAULT_QUARTERLY_DIR
     q_year, q_num = quarter_of_date(month_start)
-    quarter_key = _quarter_id(q_year, q_num)
+    quarter_key = quarter_id(q_year, q_num)
     filename = f"{quarter_key}.md"
     path = os.path.join(quarterly_dir, filename)
     ensure_note(path, QUARTERLY_TEMPLATE_PATH)
@@ -109,7 +69,7 @@ def _load_quarterly_goals(month_start, quarterly_dir=None):
     yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
     quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
     ensure_goal_ids(yearly_mirror, "yearly", str(q_year))
-    _ensure_quarter_task_ids(quarterly_tasks, quarter_key)
+    ensure_goal_ids(quarterly_tasks, "quarterly", quarter_key)
     return yearly_mirror, quarterly_tasks, path, lines
 
 
@@ -142,8 +102,8 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     today = datetime.date.today()
 
     # Compute metrics for current and previous month
-    current_metrics = compute_month_metrics(dates, daily_data)
-    prev_metrics = compute_month_metrics(list(prev_daily_data.keys()), prev_daily_data)
+    current_metrics = compute_period_metrics(dates, daily_data)
+    prev_metrics = compute_period_metrics(list(prev_daily_data.keys()), prev_daily_data)
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
     mood_avg = current_metrics["mood_avg"]
@@ -238,15 +198,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     study_lines.append("")
 
     # Activity table (activity_totals already computed above)
-    total_activity = sum(activity_totals.values())
-    study_lines.append("| ACTIVITY | TIME | SHARE |")
-    study_lines.append("| -------- | ---- | ----- |")
-    if activity_totals:
-        for activity, mins in sorted(activity_totals.items(), key=lambda x: x[1], reverse=True):
-            share = f"{int(round((mins / total_activity) * 100))}%" if total_activity else "0%"
-            study_lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
-    else:
-        study_lines.append("|  |  |  |")
+    study_lines.extend(render_activity_table(activity_totals))
     study_lines.append("")
 
     # Full-study-day deltas per week (mirror training delta behavior)
@@ -292,10 +244,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
     
-    study_lines.append("| METRIC | AVERAGE |")
-    study_lines.append("| ------ | ------- |")
-    study_lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
-    study_lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |")
+    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
     study_lines.append("")
     sections.append(trim_blank_lines(study_lines))
 
@@ -418,15 +367,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
     avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
 
-    sleep_lines.append("| ACTIVITY | AVERAGE |")
-    sleep_lines.append("| -------- | ------- |")
-    sleep_lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
-    sleep_lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
-    if avg_awakenings is not None:
-        awaken_val = f"{avg_awakenings:.1f}" if abs(avg_awakenings - round(avg_awakenings)) >= 0.05 else str(int(round(avg_awakenings)))
-        sleep_lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
-    else:
-        sleep_lines.append("| **AWAKENINGS** | |")
+    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -531,10 +472,10 @@ def main():
         g_start, g_end = goals_section_bounds(lines)
         quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-        _ensure_task_ids(monthly_tasks, month_start.isoformat())
+        ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
         q_year, q_num = quarter_of_date(month_start)
-        quarter_key = _quarter_id(q_year, q_num)
-        _ensure_quarter_task_ids(quarterly_mirror, quarter_key)
+        quarter_key = quarter_id(q_year, q_num)
+        ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
 
         # Determine previous month path
         if month_start.month == 1:
@@ -550,7 +491,7 @@ def main():
                 prev_lines = pf.read().splitlines()
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
-            _ensure_task_ids(prev_tasks, prev_month_start.isoformat())
+            ensure_goal_ids(prev_tasks, "monthly", prev_month_start.isoformat())
         except Exception:
             prev_tasks = []
 

@@ -16,12 +16,10 @@ WEEKLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/
 MONTHLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/monthly.md"
 QUARTERLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/quarterly.md"
 YEARLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
-YEARLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
 
 DEFAULT_WEEKLY_DIR = os.environ.get("WEEKLY_DIR", JOURNAL_DIR)
 DEFAULT_MONTHLY_DIR = os.environ.get("MONTHLY_DIR", JOURNAL_DIR)
 DEFAULT_QUARTERLY_DIR = os.environ.get("QUARTERLY_DIR", JOURNAL_DIR)
-DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
 DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
 
 LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
@@ -32,10 +30,11 @@ MONTH_ABBR = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OC
 # Study intensity thresholds (minutes)
 STUDY_TARGET_MIN = 360    # 4 pomodoros (4 * 90m) – daily target threshold
 
-# Symbols for study intensity (binary)
+# Symbols for study intensity (binary default; yearly overrides with partial)
 STUDY_SYMBOL_DEEP = "█"   # target met
 STUDY_SYMBOL_NONE = "·"   # target not met or no study
 STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
+YEARLY_STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ all days ≥ 4 POM | ░ some days | · none"
 
 
 def _lockfile_for(path: str) -> str:
@@ -689,6 +688,98 @@ def format_week_label(start_date, end_date):
     return f"{month} {start_date.day:02d}-{end_date.day:02d}"
 
 
+def quarter_id(year, quarter_num):
+    """Return quarter identifier like '2025-Q4'."""
+    return f"{year}-Q{quarter_num}"
+
+
+def load_daily_data(start_date, end_date):
+    """Load parsed daily notes for a date range."""
+    data = {}
+    for day in daterange(start_date, end_date):
+        path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
+        if not os.path.exists(path):
+            continue
+        parsed = parse_daily_note(path)
+        if parsed:
+            data[day] = parsed
+    return data
+
+
+def compute_period_metrics(dates, daily_data):
+    """
+    Compute aggregated metrics for a list of dates.
+    Returns a dict with study_total_minutes, sleep_avg_minutes, mood_avg,
+    workout_count, stretch_count, total_days, days_up_to_today.
+    """
+    today = datetime.date.today()
+    dates_up_to_today = [d for d in dates if d <= today]
+    days_up_to_today = len(dates_up_to_today)
+
+    study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
+    sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
+    mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
+
+    study_total = sum((m for m in study_minutes if m is not None), 0)
+    sleep_vals = [m for m in sleep_minutes if m is not None]
+    sleep_avg = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
+    mood_vals_clean = [m for m in mood_vals if m is not None]
+    mood_avg = sum(mood_vals_clean) / len(mood_vals_clean) if mood_vals_clean else None
+
+    workout_count = sum(1 for d in dates if daily_data.get(d, {}).get("workout"))
+    stretch_count = sum(1 for d in dates if daily_data.get(d, {}).get("stretch"))
+
+    return {
+        "study_total_minutes": study_total,
+        "sleep_avg_minutes": sleep_avg,
+        "mood_avg": mood_avg,
+        "workout_count": workout_count,
+        "stretch_count": stretch_count,
+        "total_days": len(dates),
+        "days_up_to_today": days_up_to_today,
+    }
+
+
+def render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings):
+    """Render the SLEEP statistics table rows."""
+    lines = []
+    lines.append("| ACTIVITY | AVERAGE |")
+    lines.append("| -------- | ------- |")
+    lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
+    lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
+    if avg_awakenings is not None:
+        awaken_val = f"{avg_awakenings:.1f}" if abs(avg_awakenings - round(avg_awakenings)) >= 0.05 else str(int(round(avg_awakenings)))
+        lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
+    else:
+        lines.append("| **AWAKENINGS** | |")
+    return lines
+
+
+def render_activity_table(activity_totals):
+    """Render the ACTIVITY breakdown table rows."""
+    lines = []
+    lines.append("| ACTIVITY | TIME | SHARE |")
+    lines.append("| -------- | ---- | ----- |")
+    total_activity = sum(activity_totals.values())
+    if activity_totals:
+        for activity, mins in sorted(activity_totals.items(), key=lambda x: x[1], reverse=True):
+            share = f"{int(round((mins / total_activity) * 100))}%" if total_activity else "0%"
+            lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
+    else:
+        lines.append("|  |  |  |")
+    return lines
+
+
+def render_interrupts_table(avg_interrupts, avg_overruns):
+    """Render the INTERRUPTS/OVERRUNS metrics table."""
+    lines = []
+    lines.append("| METRIC | AVERAGE |")
+    lines.append("| ------ | ------- |")
+    lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
+    lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |")
+    return lines
+
+
 def wrap_code_block(lines):
     return ["```"] + lines + ["```"]
 
@@ -1095,7 +1186,7 @@ def render_weekly_chart(labels, values, value_labels, height=10, y_max=None, bar
     return lines
 
 
-def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=30):
+def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=30, bars_override=None, fill_char="■", empty_char="·"):
     """
     Render per-quarter training rows (no header/footer), aligned counts and deltas.
     counts: list of (done, elapsed) tuples.
@@ -1106,11 +1197,15 @@ def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=3
     max_count_len = max((len(s) for s in count_strs), default=0)
 
     for idx, (label, (done, elapsed)) in enumerate(zip(labels, counts)):
-        elapsed = max(elapsed, 0)
-        done = max(0, min(done, elapsed))
-        bar_len = round_half_up((done / elapsed) * bar_width) if elapsed > 0 else 0
-        bar_len = min(bar_width, max(0, bar_len))
-        bar = "■" * bar_len + "·" * (bar_width - bar_len)
+        if bars_override:
+            bar = bars_override[idx]
+            bar_len = len(bar)
+        else:
+            elapsed = max(elapsed, 0)
+            done = max(0, min(done, elapsed))
+            bar_len = round_half_up((done / elapsed) * bar_width) if elapsed > 0 else 0
+            bar_len = min(bar_width, max(0, bar_len))
+            bar = fill_char * bar_len + empty_char * (bar_width - bar_len)
         count_str = count_strs[idx].rjust(max_count_len) if count_strs else ""
         delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
         delta_str = delta.rjust(4) if delta else ""
@@ -1590,11 +1685,17 @@ def _compress_symbols(symbols, target_width):
     if total <= target_width:
         return "".join(symbols) + STUDY_SYMBOL_NONE * (target_width - total)
 
-    bucket_size = math.ceil(total / target_width)
+    # Use proportional mapping: each character covers (total / target_width) symbols
+    # This ensures all characters represent actual days, no empty filler at end
     compressed = []
     for i in range(target_width):
-        start = i * bucket_size
-        end = min(start + bucket_size, total)
+        # Calculate which symbols fall into this bucket using float boundaries
+        start_f = i * total / target_width
+        end_f = (i + 1) * total / target_width
+        start = int(start_f)
+        end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
+        end = min(end, total)
+        
         bucket = symbols[start:end]
         if not bucket:
             compressed.append(STUDY_SYMBOL_NONE)
@@ -1604,6 +1705,65 @@ def _compress_symbols(symbols, target_width):
         else:
             compressed.append(STUDY_SYMBOL_NONE)
     return "".join(compressed)
+
+
+def _compress_days_time_order(days, met_fn, target_width, *, allow_partial=False, fill_char="█", partial_char="░", empty_char="·", today=None):
+    """
+    Compress a time-ordered list of days into a fixed-width string.
+    - days: list of date objects in chronological order
+    - met_fn(day): returns True if the day meets the criterion
+    - allow_partial: if True, use partial_char when some but not all observed days
+      in the bucket meet the criterion
+    - future days (day > today) are treated as not met and do not trigger partial
+    """
+    today = today or datetime.date.today()
+    total = len(days)
+    if target_width <= 0 or total == 0:
+        return empty_char * max(target_width, 0)
+    
+    # Use proportional mapping: each character covers (total / target_width) days
+    # This ensures all characters represent actual days, no empty filler at end
+    symbols = []
+    for i in range(target_width):
+        # Calculate which days fall into this bucket using float boundaries
+        start_f = i * total / target_width
+        end_f = (i + 1) * total / target_width
+        start = int(start_f)
+        end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
+        end = min(end, total)
+        
+        bucket = days[start:end]
+        if not bucket:
+            symbols.append(empty_char)
+            continue
+        observed = [d for d in bucket if d <= today]
+        if not observed:
+            symbols.append(empty_char)
+            continue
+        hits = sum(1 for d in observed if met_fn(d))
+        if hits == 0:
+            symbols.append(empty_char)
+        elif hits == len(observed):
+            symbols.append(fill_char)
+        else:
+            symbols.append(partial_char if allow_partial else fill_char)
+    return "".join(symbols)
+
+
+def compress_activity_time_order(days, has_activity_fn, target_width, *, fill_char="■", empty_char="·", today=None):
+    """
+    Time-ordered compression for binary activity (workout/stretch).
+    """
+    return _compress_days_time_order(
+        days,
+        has_activity_fn,
+        target_width,
+        allow_partial=False,
+        fill_char=fill_char,
+        partial_char=fill_char,  # unused when allow_partial=False
+        empty_char=empty_char,
+        today=today,
+    )
 
 
 def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_labels=None):
@@ -1666,7 +1826,7 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_
     return lines
 
 
-def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_width=30, delta_labels=None):
+def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_width=30, delta_labels=None, bars_override=None, legend_line=STUDY_LEGEND_LINE):
     """
     Per-quarter study coverage rows (intensity symbols + counts).
 
@@ -1688,19 +1848,28 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_wid
     for idx, (start, end) in enumerate(quarter_ranges):
         label = f"Q{idx + 1}"
         days = list(daterange(start, end))
-        bar_chars = []
-        done = 0
-        elapsed_days = 0
-        for d in days:
-            if d > today:
-                bar_chars.append(STUDY_SYMBOL_NONE)
-                continue
-            elapsed_days += 1
-            symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
-            bar_chars.append(symbol)
-            if symbol != STUDY_SYMBOL_NONE:
-                done += 1
-        bar = _compress_symbols(bar_chars, bar_width)
+        if bars_override:
+            bar = bars_override[idx]
+            elapsed_days = sum(1 for d in days if d <= today)
+            done = sum(
+                1
+                for d in days
+                if d <= today and study_intensity_symbol(daily_data.get(d, {}).get("study_minutes")) == STUDY_SYMBOL_DEEP
+            )
+        else:
+            bar_chars = []
+            done = 0
+            elapsed_days = 0
+            for d in days:
+                if d > today:
+                    bar_chars.append(STUDY_SYMBOL_NONE)
+                    continue
+                elapsed_days += 1
+                symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
+                bar_chars.append(symbol)
+                if symbol != STUDY_SYMBOL_NONE:
+                    done += 1
+            bar = _compress_symbols(bar_chars, bar_width)
         bars.append((label, bar, done, elapsed_days))
         count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
         counts.append(count_str)

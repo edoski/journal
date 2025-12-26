@@ -31,7 +31,11 @@ from sync_utils import (
     trim_blank_lines,
     join_sections,
     ensure_goal_ids,
-    )
+    compute_period_metrics,
+    render_sleep_stats_table,
+    render_activity_table,
+    render_interrupts_table,
+)
 
 
 
@@ -73,40 +77,6 @@ def _parse_weekly_note_goals(lines):
     weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
     return monthly_mirror, weekly_tasks
 
-
-def compute_period_metrics(dates, daily_data):
-    """
-    Compute aggregated metrics for a list of dates.
-    Returns a dict with study_total_minutes, sleep_avg_minutes, mood_avg,
-    workout_count, stretch_count, total_days, days_up_to_today.
-    """
-    # Only count days up to today (or last day with any data)
-    today = datetime.date.today()
-    dates_up_to_today = [d for d in dates if d <= today]
-    days_up_to_today = len(dates_up_to_today)
-    
-    study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
-    sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
-    mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
-
-    study_total = sum((m for m in study_minutes if m is not None), 0)
-    sleep_vals = [m for m in sleep_minutes if m is not None]
-    sleep_avg = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
-    mood_vals_clean = [m for m in mood_vals if m is not None]
-    mood_avg = sum(mood_vals_clean) / len(mood_vals_clean) if mood_vals_clean else None
-
-    workout_count = sum(1 for d in dates if daily_data.get(d, {}).get("workout"))
-    stretch_count = sum(1 for d in dates if daily_data.get(d, {}).get("stretch"))
-
-    return {
-        "study_total_minutes": study_total,
-        "sleep_avg_minutes": sleep_avg,
-        "mood_avg": mood_avg,
-        "workout_count": workout_count,
-        "stretch_count": stretch_count,
-        "total_days": len(dates),
-        "days_up_to_today": days_up_to_today,
-    }
 
 
 def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev_week_label):
@@ -175,15 +145,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     study_lines.append("")
 
     # Activity table (activity_totals already computed above)
-    total_activity = sum(activity_totals.values())
-    study_lines.append("| ACTIVITY | TIME | SHARE |")
-    study_lines.append("| -------- | ---- | ----- |")
-    if activity_totals:
-        for activity, mins in sorted(activity_totals.items(), key=lambda x: x[1], reverse=True):
-            share = f"{int(round((mins / total_activity) * 100))}%" if total_activity else "0%"
-            study_lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
-    else:
-        study_lines.append("|  |  |  |")
+    study_lines.extend(render_activity_table(activity_totals))
     study_lines.append("")
 
     current_week_date = today if start_date <= today <= end_date else None
@@ -202,10 +164,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
     
-    study_lines.append("| METRIC | AVERAGE |")
-    study_lines.append("| ------ | ------- |")
-    study_lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
-    study_lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |")
+    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
     study_lines.append("")
     sections.append(trim_blank_lines(study_lines))
 
@@ -248,15 +207,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
     avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
 
-    sleep_lines.append("| ACTIVITY | AVERAGE |")
-    sleep_lines.append("| -------- | ------- |")
-    sleep_lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
-    sleep_lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
-    if avg_awakenings is not None:
-        awaken_val = f"{avg_awakenings:.1f}" if abs(avg_awakenings - round(avg_awakenings)) >= 0.05 else str(int(round(avg_awakenings)))
-        sleep_lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
-    else:
-        sleep_lines.append("| **AWAKENINGS** | |")
+    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
