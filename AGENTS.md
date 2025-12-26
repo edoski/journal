@@ -31,13 +31,13 @@ journal/
 
 - **`daily_sync.py`**: Main entry point for daily syncing; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today's markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent via goal IDs; safe to run multiple times per day).
 
-- **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with bar charts for study/sleep/mood and a compact frequency grid for training data showing completed/skipped days using visual blocks.
+- **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with bar charts for study/sleep/mood and a compact frequency grid for training data. Includes a **Summary Table** with 4-week moving averages for trend tracking.
 
-- **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns, including bar charts for study/sleep/mood and a compact frequency grid showing entire month's training patterns at a glance.
+- **`monthly_sync.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns, including bar charts for study/sleep/mood and a compact frequency grid. Includes a **Summary Table** with 3-month moving averages.
 
-- **`quarterly_sync.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Charts roll up by month (3 bars per chart). Goals section mirrors yearly + quarterly goals. Training uses per-month bars (workout and stretch) plus a percent table; study/sleep/mood charts mirror monthly styling.
+- **`quarterly_sync.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Charts roll up by month. Goals section mirrors yearly + quarterly goals. Includes a **Summary Table** with 4-quarter moving averages.
 
-- **`yearly_sync.py`**: Aggregates daily notes into yearly metrics with quarter-level breakdowns. Charts show 4 bars (one per quarter) with year-over-year deltas. Training and study coverage use compressed bars for the entire year.
+- **`yearly_sync.py`**: Aggregates daily notes into yearly metrics with quarter-level breakdowns. Charts show 4 bars (one per quarter). Includes a **Summary Table** with 3-year moving averages (once sufficient data exists).
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
@@ -86,6 +86,7 @@ notes.py (→ constants, parsing, goals)
   - `parse_frontmatter`, `parse_duration_to_minutes`, `format_minutes`, `format_minutes_seconds`
   - `ceil_minutes`, `round_half_up`, `parse_bool`
   - `compute_percent_change`, `format_percent_change`, `format_training_ratio`, `format_mood_with_scale`
+  - `format_ma_training_ratio`
 
 - **`goals.py`**: Goal management
   - `canonical_goal`, `parse_goal_tasks`, `render_goal_lines`
@@ -95,7 +96,7 @@ notes.py (→ constants, parsing, goals)
 - **`metrics.py`**: Period aggregation
   - `load_daily_data`, `compute_period_metrics`
   - `aggregate_activity_totals`, `aggregate_interrupt_overrun`
-  - `compute_period_deltas`
+  - `compute_period_deltas`, `compute_moving_average`
 
 - **`charts.py`**: All rendering functions
   - **Unified chart**: `render_bar_chart` (consolidated from 4 previous functions)
