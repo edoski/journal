@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import fcntl
 import hashlib
@@ -8,6 +10,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
+from typing import Any, Callable
 
 JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
 VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
@@ -35,6 +38,15 @@ STUDY_SYMBOL_DEEP = "█"   # target met
 STUDY_SYMBOL_NONE = "·"   # target not met or no study
 STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
 YEARLY_STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ all days ≥ 4 POM | ░ some days | · none"
+
+# Chart dimension constants
+CHART_HEIGHT_DEFAULT = 10
+CHART_HEIGHT_QUARTERLY = 12
+CHART_HEIGHT_YEARLY = 12
+CHART_Y_MAX_WEEKLY_STUDY = 10       # 10 hours
+CHART_Y_MAX_MONTHLY_STUDY = 40      # 40 hours per week
+CHART_Y_MAX_QUARTERLY_STUDY = 240   # 240 hours per month
+CHART_Y_MAX_YEARLY_STUDY = 720      # 720 hours per quarter
 
 
 def _lockfile_for(path: str) -> str:
@@ -705,12 +717,20 @@ def load_daily_data(start_date, end_date):
             data[day] = parsed
     return data
 
-
-def compute_period_metrics(dates, daily_data):
+def compute_period_metrics(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, dict[str, Any]],
+) -> dict[str, Any]:
     """
     Compute aggregated metrics for a list of dates.
-    Returns a dict with study_total_minutes, sleep_avg_minutes, mood_avg,
-    workout_count, stretch_count, total_days, days_up_to_today.
+
+    Args:
+        dates: List of date objects to aggregate.
+        daily_data: Dict mapping dates to parsed daily note data.
+
+    Returns:
+        Dict with keys: study_total_minutes, sleep_avg_minutes, mood_avg,
+        workout_count, stretch_count, total_days, days_up_to_today.
     """
     today = datetime.date.today()
     dates_up_to_today = [d for d in dates if d <= today]
@@ -740,9 +760,110 @@ def compute_period_metrics(dates, daily_data):
     }
 
 
-def render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings):
-    """Render the SLEEP statistics table rows."""
-    lines = []
+def aggregate_activity_totals(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, dict[str, Any]],
+) -> dict[str, float]:
+    """
+    Aggregate study activity totals across a date range.
+
+    Args:
+        dates: List of date objects to aggregate.
+        daily_data: Dict mapping dates to parsed daily note data.
+
+    Returns:
+        Dict mapping activity names to total minutes.
+    """
+    activity_totals: dict[str, float] = {}
+    for d in dates:
+        daily = daily_data.get(d)
+        if not daily:
+            continue
+        for activity, mins in daily.get("activity_totals", {}).items():
+            activity_totals[activity] = activity_totals.get(activity, 0) + mins
+    return activity_totals
+
+
+def aggregate_interrupt_overrun(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, dict[str, Any]],
+) -> tuple[float, float, int]:
+    """
+    Aggregate interrupt and overrun minutes across a date range.
+
+    Args:
+        dates: List of date objects to aggregate.
+        daily_data: Dict mapping dates to parsed daily note data.
+
+    Returns:
+        Tuple of (total_interrupts, total_overruns, study_day_count).
+        study_day_count is the number of days with any study (for averaging).
+    """
+    total_interrupts = 0.0
+    total_overruns = 0.0
+    study_day_count = 0
+    for d in dates:
+        daily = daily_data.get(d, {})
+        total_interrupts += daily.get("interrupt_minutes", 0) or 0
+        total_overruns += daily.get("overrun_minutes", 0) or 0
+        study_minutes = daily.get("study_minutes") or 0
+        if study_minutes > 0:
+            study_day_count += 1
+    return total_interrupts, total_overruns, study_day_count
+
+
+def compute_period_deltas(
+    counts: list[tuple[int, int, datetime.date]],
+    baseline: int | None,
+    today: datetime.date | None = None,
+) -> list[str]:
+    """
+    Compute percent change deltas for a sequence of period counts.
+
+    This consolidates the repeated delta calculation pattern used in
+    quarterly_sync.py and yearly_sync.py.
+
+    Args:
+        counts: List of (done, elapsed, start_date) tuples for each period.
+        baseline: The count from the previous comparable period (e.g., last
+                  quarter of previous year for Q1 comparison).
+        today: Reference date for skipping future periods. Defaults to today.
+
+    Returns:
+        List of formatted delta strings (e.g., "+25%", "-10%", "—").
+    """
+    today = today or datetime.date.today()
+    deltas: list[str] = []
+    for idx, (done, _, start) in enumerate(counts):
+        if start > today:
+            deltas.append("")
+            continue
+        if idx == 0:
+            prev_val = baseline
+        else:
+            prev_val = counts[idx - 1][0]
+        delta = compute_percent_change(done, prev_val)
+        deltas.append(format_percent_change(delta))
+    return deltas
+
+
+def render_sleep_stats_table(
+    sleep_avg: float | None,
+    avg_awake: float | None,
+    avg_awakenings: float | None,
+) -> list[str]:
+    """
+    Render the SLEEP statistics table with average metrics.
+
+    Args:
+        sleep_avg: Average sleep duration in minutes.
+        avg_awake: Average awake time during sleep in minutes.
+        avg_awakenings: Average number of awakenings per night.
+
+    Returns:
+        List of markdown table lines.
+    """
+    lines: list[str] = []
     lines.append("| ACTIVITY | AVERAGE |")
     lines.append("| -------- | ------- |")
     lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
@@ -755,9 +876,17 @@ def render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings):
     return lines
 
 
-def render_activity_table(activity_totals):
-    """Render the ACTIVITY breakdown table rows."""
-    lines = []
+def render_activity_table(activity_totals: dict[str, float]) -> list[str]:
+    """
+    Render the ACTIVITY breakdown table with time and share percentages.
+
+    Args:
+        activity_totals: Dict mapping activity names to total minutes.
+
+    Returns:
+        List of markdown table lines sorted by time (descending).
+    """
+    lines: list[str] = []
     lines.append("| ACTIVITY | TIME | SHARE |")
     lines.append("| -------- | ---- | ----- |")
     total_activity = sum(activity_totals.values())
@@ -770,9 +899,18 @@ def render_activity_table(activity_totals):
     return lines
 
 
-def render_interrupts_table(avg_interrupts, avg_overruns):
-    """Render the INTERRUPTS/OVERRUNS metrics table."""
-    lines = []
+def render_interrupts_table(avg_interrupts: float, avg_overruns: float) -> list[str]:
+    """
+    Render the INTERRUPTS/OVERRUNS metrics table.
+
+    Args:
+        avg_interrupts: Average interrupt minutes per study day.
+        avg_overruns: Average overrun minutes per study day.
+
+    Returns:
+        List of markdown table lines.
+    """
+    lines: list[str] = []
     lines.append("| METRIC | AVERAGE |")
     lines.append("| ------ | ------- |")
     lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
@@ -1080,11 +1218,11 @@ def render_monthly_chart(labels, values, value_labels, height=10, y_max=None, ba
         for idx, delta in enumerate(delta_labels):
             delta_str = str(delta) if delta is not None else ""
             label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
-            left_pad = max((label_len - len(delta_str)) // 2, 0)
-            remaining = col_spacing - left_pad - len(delta_str)
+            left_pad_delta = max((label_len - len(delta_str)) // 2, 0)
+            remaining = col_spacing - left_pad_delta - len(delta_str)
             if remaining < 0:
                 remaining = 0
-            delta_row += " " * left_pad + delta_str + " " * remaining
+            delta_row += " " * left_pad_delta + delta_str + " " * remaining
         lines.append(delta_row.rstrip())
     
     return lines

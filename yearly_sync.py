@@ -41,6 +41,8 @@ from sync_utils import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
+    aggregate_interrupt_overrun,
+    compute_period_deltas,
 )
 
 YEARLY_STUDY_BAR_WIDTH = 45
@@ -90,8 +92,6 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     study_values_hours = []
     study_value_labels = []
     study_delta_labels = []
-    interrupt_totals = []
-    overrun_totals = []
 
     for start, end in quarter_ranges:
         total_min = 0
@@ -102,8 +102,6 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
             for activity, mins in daily.get("activity_totals", {}).items():
                 activity_totals[activity] = activity_totals.get(activity, 0) + mins
                 total_min += mins
-            interrupt_totals.append(daily.get("interrupt_minutes", 0))
-            overrun_totals.append(daily.get("overrun_minutes", 0))
 
         study_totals_minutes.append(total_min)
         study_values_hours.append(total_min / 60 if total_min else 0)
@@ -200,14 +198,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
-    total_interrupts = sum(interrupt_totals)
-    total_overruns = sum(overrun_totals)
-
-    # Use only study days (any study minutes > 0) as the denominator for both
-    study_day_count = sum(
-        1 for d in dates
-        if (daily_data.get(d, {}).get("study_minutes") or 0) > 0
-    )
+    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(dates, daily_data)
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
     
@@ -244,22 +235,8 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         prev_workout_baseline = sum(1 for d in prev_days if prev_daily_data.get(d, {}).get("workout"))
         prev_stretch_baseline = sum(1 for d in prev_days if prev_daily_data.get(d, {}).get("stretch"))
 
-    def _compute_deltas(counts, baseline):
-        deltas = []
-        for idx, (done, elapsed, start) in enumerate(counts):
-            if start > today:
-                deltas.append("")
-                continue
-            if idx == 0:
-                prev_val = baseline
-            else:
-                prev_val = counts[idx - 1][0]
-            delta = compute_percent_change(done, prev_val)
-            deltas.append(format_percent_change(delta))
-        return deltas
-
-    workout_delta_labels = _compute_deltas(workout_counts, prev_workout_baseline)
-    stretch_delta_labels = _compute_deltas(stretch_counts, prev_stretch_baseline)
+    workout_delta_labels = compute_period_deltas(workout_counts, prev_workout_baseline, today)
+    stretch_delta_labels = compute_period_deltas(stretch_counts, prev_stretch_baseline, today)
 
     workout_bars = []
     stretch_bars = []

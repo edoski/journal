@@ -44,6 +44,8 @@ from sync_utils import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
+    aggregate_activity_totals,
+    aggregate_interrupt_overrun,
 )
 
 
@@ -112,13 +114,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
 
     # Collect study minutes list and total from activity tables (more accurate than frontmatter)
     study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
-    activity_totals = {}
-    for d in dates:
-        daily = daily_data.get(d)
-        if not daily:
-            continue
-        for activity, mins in daily.get("activity_totals", {}).items():
-            activity_totals[activity] = activity_totals.get(activity, 0) + mins
+    activity_totals = aggregate_activity_totals(dates, daily_data)
     study_total_from_activities = sum(activity_totals.values())
 
     sections = []
@@ -234,13 +230,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     study_lines.append("")
 
     # INTERRUPTIONS table
-    interrupt_totals = [daily_data.get(d, {}).get("interrupt_minutes", 0) for d in dates]
-    overrun_totals = [daily_data.get(d, {}).get("overrun_minutes", 0) for d in dates]
-    total_interrupts = sum(interrupt_totals)
-    total_overruns = sum(overrun_totals)
-
-    # Use only study days (any study minutes > 0) as the denominator for both
-    study_day_count = sum(1 for m in study_minutes if m and m > 0)
+    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(dates, daily_data)
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
     
