@@ -151,8 +151,8 @@ breaks.py (→ constants)
      ↓
 flow_db.py (→ constants, breaks)
      ↓
-study.py (→ sync_utils)    training.py (→ sync_utils, constants)    sleep.py (→ sync_utils)
-     ↓                          ↓                                        ↓
+context.py (→ constants, sync_utils)    study.py (→ sync_utils)    training.py (→ sync_utils, constants)    sleep.py (→ sync_utils)
+     ↓                                       ↓                          ↓                                        ↓
 icloud.py (→ constants)
      ↓
 orchestrator.py (→ all above, sync_utils)
@@ -160,7 +160,7 @@ orchestrator.py (→ all above, sync_utils)
 
 **Module responsibilities:**
 
-- **`constants.py`**: Daily-specific configuration (database paths, timing constants, iCloud paths)
+- **`constants.py`**: Daily-specific configuration (database paths, timing constants, iCloud paths, context tracking exclusions)
 
 - **`breaks.py`**: Break and overrun logic
   - `get_expected_break_minutes`, `_compute_dynamic_lunch_window`
@@ -170,8 +170,15 @@ orchestrator.py (→ all above, sync_utils)
   - `get_db_connection`, `core_data_to_datetime`, `dedupe_sessions`, `get_todays_sessions`
   - `BREAK_DEFAULTS` (module-level cache)
 
+- **`context.py`**: Context tracking for CONTEXT column
+  - `get_vault_files_modified_on_date` (walk vault, filter by mtime)
+  - `files_for_session`, `format_context_cell` (correlate files to sessions)
+  - Excludes `journal/`, `.obsidian/`, `excalidraw/` directories
+
 - **`study.py`**: Study section building
-  - `_extract_existing_notes`, `_build_study_section`
+  - `_extract_existing_notes`, `_build_study_section`, `_format_interrupt`
+  - Includes CONTEXT column with wikilinks to modified files
+  - Interrupt format: `+XhYYm` for ≥60min, `+XXm` otherwise
 
 - **`training.py`**: Training/workout/stretch handling
   - `_parse_training_table`, `_load_training_cache`, `_save_training_cache`

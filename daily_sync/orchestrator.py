@@ -36,6 +36,7 @@ from .study import _extract_existing_notes, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
 from .icloud import _load_status_file
+from .context import get_vault_files_modified_on_date, files_for_session, format_context_cell
 
 
 def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) -> str:
@@ -407,9 +408,19 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     if not lines:
         return None
 
+    # Discover files modified today for context tracking
+    vault_files = get_vault_files_modified_on_date(today)
+
+    def context_callback(session_start, session_end) -> str:
+        """Get formatted context string for a session."""
+        wikilinks = files_for_session(vault_files, session_start, session_end)
+        return format_context_cell(wikilinks)
+
     # Build study table (also computes focus_minutes on sessions)
     existing_notes = _extract_existing_notes(lines)
-    new_table_lines, total_focus_minutes = _build_study_section(sessions, existing_notes)
+    new_table_lines, total_focus_minutes = _build_study_section(
+        sessions, existing_notes, context_for_session=context_callback
+    )
     study_str = format_minutes(total_focus_minutes, always_show_both=True)
 
     yaml_end_idx = _find_yaml_end(lines)

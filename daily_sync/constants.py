@@ -39,3 +39,24 @@ TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.m
 # Cache for training entries so workout/stretch files can arrive in separate
 # runs without losing earlier entries for the same day.
 TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal_sync/training_entries.json")
+
+# Context tracking: directories to exclude from file modification tracking
+# (relative to vault root, with trailing slash for directories)
+CONTEXT_EXCLUDED_DIRS = (
+    "journal/",
+    ".obsidian/",
+    "excalidraw/",
+)
+
+# Buffer minutes after session end to still attribute a file modification
+# to that session (accounts for saves shortly after timer stops)
+CONTEXT_SESSION_BUFFER_MINUTES = 5
+
+# Files to exclude from context tracking (AI/meta files)
+CONTEXT_EXCLUDED_FILES = (
+    "GEMINI",
+    "AGENTS",
+    "PROTOCOL",
+    "TODO",
+)
+

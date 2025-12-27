@@ -11,6 +11,8 @@ from typing import Any
 
 from sync_utils import format_minutes, ceil_minutes, round_half_up
 
+from typing import Callable
+
 
 # Type alias for session dictionaries
 SessionDict = dict[str, Any]
@@ -28,7 +30,7 @@ def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
     """
     existing_notes: dict[str, str] = {}
     table_header_re = re.compile(
-        r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*NOTES\s*\|",
+        r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|(\s*CONTEXT\s*\|)?\s*NOTES\s*\|",
         re.IGNORECASE
     )
     header_idx = -1
@@ -51,15 +53,40 @@ def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
         if not time_match:
             continue
         start_key = time_match.group(1)
-        note_content = parts[6]
+        # NOTES is now the last column (index 7 if CONTEXT present, index 6 if not)
+        # Handle both old format (no CONTEXT) and new format (with CONTEXT)
+        if len(parts) >= 8:  # New format with CONTEXT
+            note_content = parts[7]
+        else:  # Old format without CONTEXT
+            note_content = parts[6]
         if note_content and note_content != "❌":
             existing_notes[start_key] = note_content
     return existing_notes
 
 
+def _format_interrupt(minutes: int) -> str:
+    """
+    Format interrupt duration for display.
+    
+    Uses XhYYm format for durations >= 60 minutes, +XXm otherwise.
+    
+    Args:
+        minutes: Interrupt duration in minutes
+        
+    Returns:
+        Formatted string like `+23m` or `+4h56m`
+    """
+    if minutes >= 60:
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"`+{hours}h{mins:02d}m`"
+    return f"`+{minutes:02d}m`"
+
+
 def _build_study_section(
     sessions: list[SessionDict],
     existing_notes: dict[str, str],
+    context_for_session: Callable[[Any, Any], str] | None = None,
 ) -> tuple[list[str], int]:
     """
     Build the study table lines and compute focus_minutes on each session.
@@ -67,6 +94,7 @@ def _build_study_section(
     Args:
         sessions: List of enriched session dictionaries
         existing_notes: Dict of existing notes keyed by start time
+        context_for_session: Optional callback(session_start, session_end) -> context string
 
     Returns:
         Tuple of (table_lines, total_focus_minutes)
@@ -74,8 +102,8 @@ def _build_study_section(
     if not sessions:
         return [], 0
 
-    header = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |"
-    separator = "| ---- | -------- | -------- | --------- | ----- | ----- |"
+    header = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
+    separator = "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |"
     table_lines = [header, separator]
 
     for session in sessions:
@@ -99,7 +127,7 @@ def _build_study_section(
         session['focus_minutes_rounded'] = focus_rounded
 
         duration_str = f"`{format_minutes(focus_rounded)}`"
-        interrupt_str = f"`+{interrupt_rounded:02d}m`" if interrupt_rounded > 0 else "`+00m`"
+        interrupt_str = _format_interrupt(interrupt_rounded)
 
         break_str = ""
         break_expected_val = session.get('break_expected', session.get('break_duration', 0)) or 0
@@ -121,8 +149,15 @@ def _build_study_section(
             else:
                 break_str = f"`{break_display}`"
 
-        notes_str = existing_notes.get(start_s, "")
-        row = f"| {time_str} | {activity_str} | {duration_str} | {interrupt_str} | {break_str} | {notes_str} |"
+        notes_str = existing_notes.get(start_s) or "–"
+        
+        # Build context cell if callback provided
+        if context_for_session:
+            context_str = context_for_session(session['start'], session['end'])
+        else:
+            context_str = "–"  # em-dash when no callback
+        
+        row = f"| {time_str} | {activity_str} | {duration_str} | {interrupt_str} | {break_str} | {context_str} | {notes_str} |"
         table_lines.append(row)
 
     total_focus = sum(s.get('focus_minutes_rounded', 0) for s in sessions)
