@@ -54,6 +54,8 @@ journal/
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
+- **`undo_last_session.py`**: Standalone utility to delete the most recent Flow session and its associated break from the database. Useful for accidentally started sessions. Run with `--confirm` flag to actually delete (preview mode by default). **Requires Flow to be closed.**
+
 ### Linting
 
 Use **ruff** for linting. Always run before committing:
