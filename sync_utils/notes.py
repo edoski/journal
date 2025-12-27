@@ -11,7 +11,6 @@ import hashlib
 import os
 import re
 import time
-from collections import OrderedDict
 from contextlib import contextmanager
 
 from .constants import LOCK_DIR

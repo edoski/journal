@@ -10,7 +10,6 @@ from sync_utils import (
     DEFAULT_MONTHLY_DIR,
     DEFAULT_QUARTERLY_DIR,
     locked_note,
-    MONTH_ABBR,
     parse_daily_note,
     daterange,
     month_range,
@@ -24,13 +23,9 @@ from sync_utils import (
     render_training_frequency_grid,
     render_monthly_study_grid,
     STUDY_TARGET_MIN,
-    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
-    round_half_up,
-    format_training_ratio,
-    parse_goal_tasks,
     render_goal_lines,
     goals_section_bounds,
     extract_subsection_tasks,
@@ -116,12 +111,10 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
         ma_metrics = compute_moving_average(prior_month_metrics, 3)
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
-    mood_avg = current_metrics["mood_avg"]
     workout_days = current_metrics["workout_count"]
     stretch_days = current_metrics["stretch_count"]
 
-    # Collect study minutes list and total from activity tables (more accurate than frontmatter)
-    study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
+    # Collect study total from activity tables (more accurate than frontmatter)
     activity_totals = aggregate_activity_totals(dates, daily_data)
     study_total_from_activities = sum(activity_totals.values())
 
@@ -553,7 +546,6 @@ def main():
             prev_month = target_date.month - 1
         
         prev_month_start, prev_month_end = month_range(prev_year, prev_month)
-        prev_month_abbr = MONTH_ABBR[prev_month - 1]
         prev_month_label = f"**[[{prev_year}-{prev_month:02d}\\|LAST MONTH]]**"
         current_month_label = "THIS MONTH"
 

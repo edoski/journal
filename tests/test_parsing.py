@@ -6,7 +6,6 @@ and other value transformation utilities.
 """
 from __future__ import annotations
 
-import pytest
 from collections import OrderedDict
 
 from sync_utils.parsing import (

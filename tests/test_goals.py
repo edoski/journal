@@ -5,8 +5,6 @@ Covers goal parsing, normalization, ID generation, and rendering.
 """
 from __future__ import annotations
 
-import pytest
-import re
 
 from sync_utils.goals import (
     _normalize_header,

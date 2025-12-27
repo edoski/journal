@@ -7,8 +7,6 @@ comparisons with exact expected output to catch any changes in chart rendering.
 from __future__ import annotations
 
 import datetime
-import pytest
-from typing import Any
 
 from sync_utils.charts import (
     render_sleep_stats_table,

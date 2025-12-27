@@ -19,13 +19,11 @@ from sync_utils import (
     render_bar_chart,
     render_weekly_training_grid,
     render_weekly_study_grid,
-    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
-    parse_goal_tasks,
     render_goal_lines,
     build_goals_block,
     trim_blank_lines,
@@ -90,7 +88,6 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     prev_week_label: wiki link like "[[2025-W50|LAST WEEK]]"
     prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
     """
-    days_in_period = 7
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
     today = datetime.date.today()
 
@@ -109,7 +106,6 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
-    mood_avg = current_metrics["mood_avg"]
     workout_days = current_metrics["workout_count"]
     stretch_days = current_metrics["stretch_count"]
 

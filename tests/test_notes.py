@@ -5,7 +5,6 @@ Covers note parsing, section manipulation, and metrics extraction.
 """
 from __future__ import annotations
 
-import pytest
 
 from sync_utils.notes import (
     find_header_idx,

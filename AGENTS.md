@@ -7,7 +7,7 @@ This repository hosts automation scripts that sync daily focus data from the Flo
 ```
 journal/
   sync_utils/          # Modular utility package (see Architecture below)
-    __init__.py        # Re-exports all functions for backward compatibility
+    __init__.py        # Re-exports all functions for convenient single-import usage
     constants.py       # Directory paths, study thresholds, chart dimensions
     dates.py           # Date range calculations (weeks, months, quarters, years)
     parsing.py         # Duration parsing, value formatting, percent changes
@@ -15,21 +15,34 @@ journal/
     metrics.py         # Period aggregation, delta computation
     charts.py          # All chart/table rendering functions
     notes.py           # File I/O, locking, markdown section manipulation
-  daily_sync.py        # Daily sync (Flow sessions, training, sleep, goals)
+  daily_sync/          # Modular daily sync package (run with: python -m daily_sync)
+    __init__.py        # Package entry point
+    __main__.py        # Entry point for `python -m daily_sync`
+    constants.py       # Daily-specific constants (DB_PATH, iCloud paths, etc.)
+    flow_db.py         # Flow database access, session deduplication
+    breaks.py          # Break linking, overrun calculations, lunch windows
+    study.py           # Study table building
+    training.py        # Training/workout/stretch handling
+    sleep.py           # Sleep section building
+    icloud.py          # Resilient iCloud status file loading
+    orchestrator.py    # Main update_markdown logic and goal management
   weekly_sync.py       # Weekly metrics aggregation
   monthly_sync.py      # Monthly metrics aggregation
   quarterly_sync.py    # Quarterly metrics aggregation
   yearly_sync.py       # Yearly metrics aggregation
   sync_all.sh          # Wrapper script that runs all syncs (called by LaunchAgent)
   AGENTS.md            # This file
+  tests/               # Pytest test suite
+    test_daily_sync*.py  # Tests for daily_sync package
+    test_*.py          # Tests for sync_utils modules
   __pycache__/         # Generated Python bytecode; safe to ignore
 ```
 
 ### Scripts Overview
 
-- **`sync_utils/`**: Modular utility package containing shared constants, formatting helpers, date utilities, chart rendering, and file operations. All functions are re-exported from `__init__.py` for backward-compatible imports like `from sync_utils import render_bar_chart`.
+- **`sync_utils/`**: Modular utility package containing shared constants, formatting helpers, date utilities, chart rendering, and file operations. All functions are re-exported from `__init__.py` for convenient single-import usage like `from sync_utils import render_bar_chart`.
 
-- **`daily_sync.py`**: Main entry point for daily syncing; reads Flow CoreData at `DB_PATH`, merges break defaults from `defaults` CLI, pulls workout/stretch/sleep JSON from `~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync`, writes/updates today's markdown file in `JOURNAL_DIR`, and copies unfinished Goals from yesterday into today (idempotent via goal IDs; safe to run multiple times per day).
+- **`daily_sync/`**: Modular package for daily syncing. Run with `python -m daily_sync`. Contains 9 focused modules for database access, section building, and orchestration.
 
 - **`weekly_sync.py`**: Aggregates daily notes into weekly metrics (study time, sleep, mood, training) with bar charts for study/sleep/mood and a compact frequency grid for training data. Includes a **Summary Table** with 4-week moving averages for trend tracking.
 
@@ -41,9 +54,21 @@ journal/
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence. Called by the LaunchAgent to keep all notes fresh.
 
+### Linting
+
+Use **ruff** for linting. Always run before committing:
+
+```bash
+# Check for issues
+ruff check .
+
+# Auto-fix what's possible
+ruff check . --fix
+```
+
 ### Configuration Constants
 
-All configuration constants are centralized in `sync_utils/constants.py`:
+Shared constants are in `sync_utils/constants.py`:
 - **Directory paths**: `JOURNAL_DIR`, `VAULT_DIR`, `LOCK_DIR`
 - **Template paths**: `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
 - **Defaults**: `DEFAULT_WEEKLY_DIR`, `DEFAULT_MONTHLY_DIR`, `DEFAULT_QUARTERLY_DIR`, `DEFAULT_YEARLY_DIR`
@@ -51,7 +76,10 @@ All configuration constants are centralized in `sync_utils/constants.py`:
 - **Chart dimensions**: `CHART_HEIGHT_*`, `CHART_Y_MAX_*`
 - **Labels**: `DAYS`, `MONTH_ABBR`
 
-Daily sync has additional constants in `daily_sync.py`: `DB_PATH`, `TEMPLATE_PATH`, `ICLOUD_JOURNALSYNC_DIR`, `TRAINING_CACHE_PATH`
+Daily-specific constants are in `daily_sync/constants.py`:
+- **Database**: `DB_PATH`, `CORE_DATA_EPOCH_OFFSET`
+- **Break timing**: `BREAK_GAP_CAP_SECONDS`, `BREAK_LINK_MAX_GAP_SECONDS`, `REGULAR_DAY_END`, `LUNCH_WINDOW_BASE`
+- **Paths**: `TEMPLATE_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`, `TRAINING_CACHE_PATH`
 
 ## Architecture
 
@@ -112,18 +140,54 @@ notes.py (→ constants, parsing, goals)
   - **Section manipulation**: `ensure_section_with_divider`, `goals_section_bounds`, `extract_subsection_tasks`
   - **File ops**: `ensure_note`, `replace_metrics_block`, `trim_blank_lines`, `join_sections`
 
-### Daily Sync (`daily_sync.py`)
-- **Goal management**: `_parse_daily_goal_subsections`, `_carry_forward_daily_tasks`; goal IDs (`^gid-…`) are mandatory and deterministic per period
-- **Section builders**: `_build_study_section`, `_build_training_section`, `_build_sleep_section`
-- **Training data**: `_load_training_cache`, `_save_training_cache`, `_activity_entries_from_data`, `_merge_training_entries`, `_render_training_entries`, `_parse_training_table`
-- **Status file handling**: `_load_status_file` (resilient iCloud sync with retry logic)
-- **Frontmatter**: `_parse_frontmatter`, `_update_frontmatter`
-- **Flow database**: `get_todays_sessions`, `dedupe_sessions`, `get_expected_break_minutes`
-- **Main orchestrator**: `update_markdown`
-  - Ensures top-level sections (`## Goals`, `## Metrics`, `## Reflections`) exist and each is followed by `---` via `ensure_section_with_divider`
-  - Rebuilds Goals block with weekly mirror + daily goals using `build_goals_block` and `goals_section_bounds`
-  - Builds Metrics subsections and splices them with `replace_metrics_block`, leaving later content untouched
-  - Updates frontmatter (study/workout/stretch/sleep) and writes atomically with temp-file swap under `locked_note`
+### Daily Sync Package (`daily_sync/`)
+
+The daily sync logic is organized into focused modules:
+
+```
+constants.py (no deps)
+     ↓
+breaks.py (→ constants)
+     ↓
+flow_db.py (→ constants, breaks)
+     ↓
+study.py (→ sync_utils)    training.py (→ sync_utils, constants)    sleep.py (→ sync_utils)
+     ↓                          ↓                                        ↓
+icloud.py (→ constants)
+     ↓
+orchestrator.py (→ all above, sync_utils)
+```
+
+**Module responsibilities:**
+
+- **`constants.py`**: Daily-specific configuration (database paths, timing constants, iCloud paths)
+
+- **`breaks.py`**: Break and overrun logic
+  - `get_expected_break_minutes`, `_compute_dynamic_lunch_window`
+  - `overlap_minutes_with_window`, `clamp_next_flow_within_day`, `anchor_lunch_window`
+
+- **`flow_db.py`**: Flow database access
+  - `get_db_connection`, `core_data_to_datetime`, `dedupe_sessions`, `get_todays_sessions`
+  - `BREAK_DEFAULTS` (module-level cache)
+
+- **`study.py`**: Study section building
+  - `_extract_existing_notes`, `_build_study_section`
+
+- **`training.py`**: Training/workout/stretch handling
+  - `_parse_training_table`, `_load_training_cache`, `_save_training_cache`
+  - `_activity_entries_from_data`, `_merge_training_entries`, `_render_training_entries`
+  - `_build_training_section`
+
+- **`sleep.py`**: Sleep section building
+  - `_build_sleep_table`, `_build_sleep_section`
+
+- **`icloud.py`**: Resilient iCloud status file loading
+  - `_load_status_file` (with retry logic, file stabilization, .invalid fallback)
+
+- **`orchestrator.py`**: Main orchestration
+  - **Goal management**: `_load_weekly_goals`, `_write_weekly_goals`, `_parse_daily_goal_subsections`, `_carry_forward_daily_tasks`
+  - **Note management**: `_read_daily_note`, `_find_yaml_end`, `_ensure_daily_sections`, `_update_frontmatter`
+  - **Main entry**: `update_markdown`
 
 ### Weekly/Monthly/Quarterly/Yearly Sync
 - `build_weekly_metrics` / `build_monthly_metrics` / `build_quarterly_metrics` / `build_yearly_metrics`: Generate aggregated metrics blocks

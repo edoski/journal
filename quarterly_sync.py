@@ -4,14 +4,11 @@ import datetime
 import os
 
 from sync_utils import (
-    JOURNAL_DIR,
     QUARTERLY_TEMPLATE_PATH,
     DEFAULT_QUARTERLY_DIR,
     MONTH_ABBR,
     locked_note,
-    parse_daily_note,
     daterange,
-    month_range,
     quarter_range,
     quarter_months,
     quarter_of_date,
@@ -22,9 +19,6 @@ from sync_utils import (
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
-    round_half_up,
-    format_training_ratio,
-    parse_goal_tasks,
     render_goal_lines,
     goals_section_bounds,
     extract_subsection_tasks,
@@ -34,7 +28,6 @@ from sync_utils import (
     render_summary_table,
     render_quarterly_study_coverage,
     STUDY_TARGET_MIN,
-    STUDY_LEGEND_LINE,
     quarter_id,
     compute_period_metrics,
     compute_moving_average,
@@ -42,7 +35,6 @@ from sync_utils import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
-    aggregate_activity_totals,
     aggregate_interrupt_overrun,
     compute_period_deltas,
 )

@@ -4,11 +4,9 @@ import datetime
 import os
 
 from sync_utils import (
-    JOURNAL_DIR,
     YEARLY_TEMPLATE_PATH,
     DEFAULT_YEARLY_DIR,
     locked_note,
-    parse_daily_note,
     daterange,
     year_range,
     year_quarters,
@@ -23,11 +21,9 @@ from sync_utils import (
     STUDY_TARGET_MIN,
     STUDY_SYMBOL_DEEP,
     STUDY_SYMBOL_NONE,
-    STUDY_LEGEND_LINE,
     wrap_code_block,
     ensure_note,
     replace_metrics_block,
-    round_half_up,
     compress_activity_time_order,
     _compress_days_time_order,
     goals_section_bounds,
@@ -41,7 +37,6 @@ from sync_utils import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
-    aggregate_interrupt_overrun,
     aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,

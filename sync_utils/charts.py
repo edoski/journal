@@ -7,7 +7,6 @@ and training/study grids at various time scales.
 from __future__ import annotations
 
 import datetime
-from typing import Any
 
 from .constants import (
     DAYS,
@@ -440,7 +439,7 @@ def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=3
     counts: list of (done, elapsed) tuples.
     """
     lines = []
-    max_label_len = max((len(l) for l in labels), default=0)
+    max_label_len = max((len(label) for label in labels), default=0)
     count_strs = [f"({done:02d}/{elapsed:02d})" if elapsed else "(00/00)" for done, elapsed in counts] if counts else []
     max_count_len = max((len(s) for s in count_strs), default=0)
 

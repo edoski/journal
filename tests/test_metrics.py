@@ -6,8 +6,6 @@ Covers period aggregation and delta computation functions.
 from __future__ import annotations
 
 import datetime
-import pytest
-from typing import Any
 
 from sync_utils.metrics import (
     compute_period_metrics,
