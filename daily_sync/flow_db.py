@@ -340,5 +340,44 @@ def get_todays_sessions() -> list[SessionDict]:
                 overrun = int(overrun_minutes + 0.5)
                 session['break_overrun'] = overrun
 
+    # Retroactive lunch detection: if session N starts after lunch window,
+    # and session N-1 didn't get lunch but gap overlaps lunch significantly,
+    # retroactively assign lunch to session N-1.
+    if lunch_window:
+        lunch_end_dt = datetime.datetime.combine(now.date(), lunch_window[1])
+        for idx in range(1, len(flow_sessions)):
+            current = flow_sessions[idx]
+            prev = flow_sessions[idx - 1]
+
+            # Skip if previous already has lunch
+            if prev.get('break_reason') == 'lunch':
+                continue
+
+            # Check if current session starts after lunch window ends
+            if current['start'] <= lunch_end_dt:
+                continue
+
+            # Check if gap between prev end and current start overlaps lunch window
+            gap_overlap = overlap_minutes_with_window(
+                prev['end'], current['start'], lunch_window
+            )
+            if gap_overlap < 30:  # Require significant overlap
+                continue
+
+            # Retroactively assign lunch to previous session
+            prev['break_expected'] = lunch_duration_minutes or 60
+            prev['break_duration'] = prev['break_expected']
+            prev['break_reason'] = 'lunch'
+            prev['break_missing'] = False
+
+            # Recalculate overrun for prev session
+            effective_next_start = clamp_next_flow_within_day(
+                prev['end'], current['start'], REGULAR_DAY_END
+            )
+            if effective_next_start and effective_next_start > prev['end']:
+                gap_minutes = (effective_next_start - prev['end']).total_seconds() / 60
+                overrun = max(0, int(gap_minutes - prev['break_expected'] + 0.5))
+                prev['break_overrun'] = overrun
+
     conn.close()
     return flow_sessions
