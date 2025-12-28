@@ -143,6 +143,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         bar_width=5,
         col_spacing=8,
         label_prefix="   ",
+        axis_trim=2,
     )
     study_lines.extend(wrap_code_block(chart_lines))
     study_lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
@@ -194,6 +195,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         bar_width=5,
         col_spacing=8,
         label_prefix="   ",
+        axis_trim=2,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
@@ -229,6 +231,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         col_spacing=8,
         label_prefix="   ",
         center_labels_on_bars=True,
+        axis_trim=2,
     )
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
