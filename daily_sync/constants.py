@@ -50,7 +50,7 @@ CONTEXT_EXCLUDED_DIRS = (
 
 # Buffer minutes after session end to still attribute a file modification
 # to that session (accounts for saves shortly after timer stops)
-CONTEXT_SESSION_BUFFER_MINUTES = 5
+CONTEXT_SESSION_BUFFER_MINUTES = 0
 
 # Files to exclude from context tracking (AI/meta files)
 CONTEXT_EXCLUDED_FILES = (

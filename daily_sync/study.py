@@ -7,6 +7,7 @@ the updated study section for daily notes.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any
 
 from sync_utils import format_minutes, ceil_minutes, round_half_up
@@ -99,6 +100,7 @@ def _build_study_section(
     existing_notes: dict[str, str],
     context_for_session: Callable[[Any, Any], str] | None = None,
     existing_context: dict[str, str] | None = None,
+    current_time: datetime | None = None,
 ) -> tuple[list[str], int]:
     """
     Build the study table lines and compute focus_minutes on each session.
@@ -107,13 +109,16 @@ def _build_study_section(
         sessions: List of enriched session dictionaries
         existing_notes: Dict of existing notes keyed by start time
         context_for_session: Optional callback(session_start, session_end) -> context string
-        existing_context: Dict of existing context keyed by start time (preserved)
+        existing_context: Dict of existing context keyed by start time (preserved for ended sessions)
+        current_time: Current time for determining if session has ended (defaults to now)
 
     Returns:
         Tuple of (table_lines, total_focus_minutes)
     """
     if existing_context is None:
         existing_context = {}
+    if current_time is None:
+        current_time = datetime.now()
     if not sessions:
         return [], 0
 
@@ -166,8 +171,10 @@ def _build_study_section(
 
         notes_str = existing_notes.get(start_s) or "–"
         
-        # Preserve existing context, only compute for new sessions
-        if start_s in existing_context:
+        # Preserve existing context only for sessions that have ended.
+        # Ongoing sessions always recompute to capture all files modified during the session.
+        session_ended = session['end'] < current_time
+        if start_s in existing_context and session_ended:
             context_str = existing_context[start_s]
         elif context_for_session:
             context_str = context_for_session(session['start'], session['end'])
