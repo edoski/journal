@@ -125,4 +125,4 @@ def format_context_cell(wikilinks: list[str]) -> str:
     """
     if not wikilinks:
         return "–"  # em-dash
-    return ", ".join(wikilinks)
+    return "<br>".join(wikilinks)
