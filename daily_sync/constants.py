@@ -38,7 +38,7 @@ TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.m
 
 # Cache for training entries so workout/stretch files can arrive in separate
 # runs without losing earlier entries for the same day.
-TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal_sync/training_entries.json")
+TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal/training_entries.json")
 
 # Context tracking: directories to exclude from file modification tracking
 # (relative to vault root, with trailing slash for directories)

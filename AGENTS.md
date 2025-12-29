@@ -223,8 +223,10 @@ Quarterly and yearly notes use per-period bar rows for workout and stretch with 
   - `python3 quarterly_sync.py [--quarter YYYY-Q#] [--file PATH]`
   - `python3 yearly_sync.py [--year YYYY] [--file PATH]`
 - Quick syntax check: `python3 -m compileall daily_sync.py weekly_sync.py monthly_sync.py quarterly_sync.py yearly_sync.py sync_utils/`
-- Goal carry-forward is ID-based (no guard files). Each goal line ends with a hidden block ID `^gid-xxxxxxxxxx` used for mirroring across daily/weekly/monthly notes.
-- The training cache at `~/.cache/journal_sync/training_entries.json` stores workout/stretch entries for the current day to handle status files arriving across separate runs.
+- Goal carry-forward uses a cache file at `~/.cache/journal/carried_goals.json` to track which goals have been offered for carry forward, preventing re-addition of intentionally deleted goals.
+- Each goal line ends with a hidden block ID `^gid-xxxxxxxxxx` used for mirroring across daily/weekly/monthly notes.
+- The training cache at `~/.cache/journal/training_entries.json` stores workout/stretch entries for the current day.
+- **Frontmatter**: Only daily notes may have YAML frontmatter properties. Weekly, monthly, quarterly, and yearly notes must NOT have frontmatter properties.
 
 ## LaunchAgent
 

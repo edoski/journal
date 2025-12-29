@@ -39,6 +39,8 @@ from sync_utils import (
     compute_period_deltas,
 )
 
+from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
 
 
 
@@ -440,6 +442,11 @@ def main():
         quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         ensure_goal_ids(quarterly_tasks, "quarterly", quarter_id(year, quarter_num))
 
+        qtr_key = quarter_id(year, quarter_num)
+        
+        # Clean up old cache entries - only keep current period
+        cleanup_old_entries("quarterly", [qtr_key])
+        
         prev_note_path = os.path.join(quarterly_dir, f"{quarter_id(prev_year, prev_quarter)}.md")
         prev_tasks = []
         try:
@@ -453,12 +460,25 @@ def main():
             prev_tasks = []
 
         open_prev = [t for t in prev_tasks if not t.get("done")]
+        previously_offered = get_carried_ids("quarterly", qtr_key)
         existing_ids = {t.get("id") for t in quarterly_tasks if t.get("id")}
+        newly_offered: list[str] = []
+        
         for t in open_prev:
-            if t.get("id") in existing_ids:
+            tid = t.get("id")
+            if not tid:
+                continue
+            if tid in existing_ids:
+                continue
+            if tid in previously_offered:
                 continue
             quarterly_tasks.append({**t, "done": False})
-            existing_ids.add(t.get("id"))
+            existing_ids.add(tid)
+            newly_offered.append(tid)
+        
+        # Record all offered goals
+        all_offered = list(previously_offered) + newly_offered
+        record_carried_ids("quarterly", qtr_key, all_offered)
 
         yearly_tasks = []
         yearly_lines = []

@@ -39,6 +39,8 @@ from sync_utils import (
     aggregate_interrupt_overrun,
 )
 
+from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
 
 
 def _load_monthly_goals(month_start, monthly_dir=None):
@@ -316,7 +318,13 @@ def main():
         ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
         ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
 
-        # Carry forward open weekly goals from prior week (ID-based, idempotent)
+        # Carry forward open weekly goals from prior week (with carry forward guard)
+        year, week_num, _ = target_date.isocalendar()
+        week_key = f"{year}-W{week_num:02d}"
+        
+        # Clean up old cache entries - only keep current period
+        cleanup_old_entries("weekly", [week_key])
+        
         prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
         prev_week_tasks = []
         if os.path.exists(prev_week_path):
@@ -327,13 +335,27 @@ def main():
                 ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
             except Exception:
                 prev_week_tasks = []
+        
         open_prev = [t for t in prev_week_tasks if not t.get("done")]
+        previously_offered = get_carried_ids("weekly", week_key)
         existing_ids = {t["id"] for t in weekly_tasks if t.get("id")}
+        newly_offered: list[str] = []
+        
         for t in open_prev:
-            if t.get("id") in existing_ids:
+            tid = t.get("id")
+            if not tid:
+                continue
+            if tid in existing_ids:
+                continue
+            if tid in previously_offered:
                 continue
             weekly_tasks.append({**t, "done": False})
-            existing_ids.add(t.get("id"))
+            existing_ids.add(tid)
+            newly_offered.append(tid)
+        
+        # Record all offered goals
+        all_offered = list(previously_offered) + newly_offered
+        record_carried_ids("weekly", week_key, all_offered)
 
         # Propagate MONTHLY status changes from weekly mirror to monthly source
         mirror_lookup = {t["id"]: t for t in monthly_mirror if t.get("id")}

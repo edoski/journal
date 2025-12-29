@@ -30,9 +30,11 @@ from sync_utils import (
     ensure_goal_ids,
 )
 
+from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
 from .constants import TEMPLATE_PATH
 from .flow_db import SessionDict
-from .study import _extract_existing_notes, _build_study_section
+from .study import _extract_existing_data, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
 from .icloud import _load_status_file
@@ -167,6 +169,10 @@ def _carry_forward_daily_tasks(
     """
     Carry forward unchecked DAILY goals from yesterday into today's daily tasks list.
 
+    Uses a cache to track which goals have been "offered" for carry forward.
+    If a goal was previously offered but is not in the current note, the user
+    deleted it intentionally and it won't be re-added.
+
     Args:
         today_date: Today's date
         yesterday_date: Yesterday's date
@@ -175,6 +181,11 @@ def _carry_forward_daily_tasks(
     Returns:
         Tuple of (updated_tasks_list, count_of_tasks_added)
     """
+    today_key = today_date.isoformat()
+    
+    # Clean up old cache entries - only keep current period
+    cleanup_old_entries("daily", [today_key])
+    
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     if not os.path.exists(yesterday_path):
         return existing_daily_tasks, 0
@@ -189,23 +200,43 @@ def _carry_forward_daily_tasks(
     y_daily = extract_subsection_tasks(y_lines, y_start, y_end, "DAILY")
 
     ensure_goal_ids(y_daily, "daily", yesterday_date.isoformat())
-    ensure_goal_ids(existing_daily_tasks, "daily", today_date.isoformat())
+    ensure_goal_ids(existing_daily_tasks, "daily", today_key)
 
     open_y = [t for t in y_daily if not t.get("done")]
     if not open_y:
         return existing_daily_tasks, 0
 
+    # Get goals that were already offered for carry forward to today
+    previously_offered = get_carried_ids("daily", today_key)
     existing_ids = {t["id"] for t in existing_daily_tasks if t.get("id")}
+    
     added = 0
+    newly_offered: list[str] = []
+    
     for task in open_y:
         tid = task.get("id")
+        if not tid:
+            continue
+        
+        # Skip if already in current note
         if tid in existing_ids:
             continue
+        
+        # Skip if previously offered but user deleted it
+        if tid in previously_offered:
+            continue
+        
+        # First time offering this goal - add it
         new_task = task.copy()
         new_task["done"] = False
         existing_daily_tasks.append(new_task)
         existing_ids.add(tid)
+        newly_offered.append(tid)
         added += 1
+
+    # Record all offered goals (already offered + newly offered)
+    all_offered = list(previously_offered) + newly_offered
+    record_carried_ids("daily", today_key, all_offered)
 
     return existing_daily_tasks, added
 
@@ -417,9 +448,10 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
         return format_context_cell(wikilinks)
 
     # Build study table (also computes focus_minutes on sessions)
-    existing_notes = _extract_existing_notes(lines)
+    existing_notes, existing_context = _extract_existing_data(lines)
     new_table_lines, total_focus_minutes = _build_study_section(
-        sessions, existing_notes, context_for_session=context_callback
+        sessions, existing_notes, context_for_session=context_callback,
+        existing_context=existing_context
     )
     study_str = format_minutes(total_focus_minutes, always_show_both=True)
 

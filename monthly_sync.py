@@ -45,6 +45,8 @@ from sync_utils import (
     aggregate_interrupt_overrun,
 )
 
+from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
 
 
 def _load_quarterly_goals(month_start, quarterly_dir=None):
@@ -474,6 +476,11 @@ def main():
         ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
 
         # Determine previous month path
+        month_key = f"{month_start.year}-{month_start.month:02d}"
+        
+        # Clean up old cache entries - only keep current period
+        cleanup_old_entries("monthly", [month_key])
+        
         if month_start.month == 1:
             prev_year = month_start.year - 1
             prev_month = 12
@@ -492,12 +499,25 @@ def main():
             prev_tasks = []
 
         open_prev = [t for t in prev_tasks if not t.get("done")]
+        previously_offered = get_carried_ids("monthly", month_key)
         existing_ids = {t["id"] for t in monthly_tasks if t.get("id")}
+        newly_offered: list[str] = []
+        
         for t in open_prev:
-            if t.get("id") in existing_ids:
+            tid = t.get("id")
+            if not tid:
+                continue
+            if tid in existing_ids:
+                continue
+            if tid in previously_offered:
                 continue
             monthly_tasks.append({**t, "done": False})
-            existing_ids.add(t.get("id"))
+            existing_ids.add(tid)
+            newly_offered.append(tid)
+        
+        # Record all offered goals
+        all_offered = list(previously_offered) + newly_offered
+        record_carried_ids("monthly", month_key, all_offered)
 
         # Load quarterly goals (source of truth) and propagate any completed statuses from the monthly mirror.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = _load_quarterly_goals(

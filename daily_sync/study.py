@@ -18,17 +18,18 @@ from typing import Callable
 SessionDict = dict[str, Any]
 
 
-def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
+def _extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
     """
-    Extract notes from existing study table keyed by start time (HH:MM).
+    Extract notes and context from existing study table keyed by start time (HH:MM).
 
     Args:
         lines: Lines from the daily note
 
     Returns:
-        Dict mapping start times (e.g., "09:00") to note content
+        Tuple of (notes_dict, context_dict) mapping start times to content
     """
     existing_notes: dict[str, str] = {}
+    existing_context: dict[str, str] = {}
     table_header_re = re.compile(
         r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|(\s*CONTEXT\s*\|)?\s*NOTES\s*\|",
         re.IGNORECASE
@@ -39,7 +40,7 @@ def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
             header_idx = i
             break
     if header_idx == -1:
-        return existing_notes
+        return existing_notes, existing_context
 
     row_start = header_idx + 2  # skip header and separator
     for i in range(row_start, len(lines)):
@@ -53,15 +54,25 @@ def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
         if not time_match:
             continue
         start_key = time_match.group(1)
-        # NOTES is now the last column (index 7 if CONTEXT present, index 6 if not)
         # Handle both old format (no CONTEXT) and new format (with CONTEXT)
         if len(parts) >= 8:  # New format with CONTEXT
+            context_content = parts[6]
             note_content = parts[7]
+            # Preserve context if it's not an em-dash (has actual content)
+            if context_content and context_content != "–":
+                existing_context[start_key] = context_content
         else:  # Old format without CONTEXT
             note_content = parts[6]
         if note_content and note_content != "❌":
             existing_notes[start_key] = note_content
-    return existing_notes
+    return existing_notes, existing_context
+
+
+# Backward compatibility alias
+def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
+    """Extract notes only (backward compatibility)."""
+    notes, _ = _extract_existing_data(lines)
+    return notes
 
 
 def _format_interrupt(minutes: int) -> str:
@@ -87,6 +98,7 @@ def _build_study_section(
     sessions: list[SessionDict],
     existing_notes: dict[str, str],
     context_for_session: Callable[[Any, Any], str] | None = None,
+    existing_context: dict[str, str] | None = None,
 ) -> tuple[list[str], int]:
     """
     Build the study table lines and compute focus_minutes on each session.
@@ -95,10 +107,13 @@ def _build_study_section(
         sessions: List of enriched session dictionaries
         existing_notes: Dict of existing notes keyed by start time
         context_for_session: Optional callback(session_start, session_end) -> context string
+        existing_context: Dict of existing context keyed by start time (preserved)
 
     Returns:
         Tuple of (table_lines, total_focus_minutes)
     """
+    if existing_context is None:
+        existing_context = {}
     if not sessions:
         return [], 0
 
@@ -151,8 +166,10 @@ def _build_study_section(
 
         notes_str = existing_notes.get(start_s) or "–"
         
-        # Build context cell if callback provided
-        if context_for_session:
+        # Preserve existing context, only compute for new sessions
+        if start_s in existing_context:
+            context_str = existing_context[start_s]
+        elif context_for_session:
             context_str = context_for_session(session['start'], session['end'])
         else:
             context_str = "–"  # em-dash when no callback

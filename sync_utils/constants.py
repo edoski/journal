@@ -25,7 +25,10 @@ DEFAULT_QUARTERLY_DIR = os.environ.get("QUARTERLY_DIR", JOURNAL_DIR)
 DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
 
 # Lock directory for note writes
-LOCK_DIR = os.path.expanduser("~/.cache/journal_sync/locks")
+LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
+
+# Cache file for tracking carried-forward goal IDs
+CARRIED_GOALS_PATH = os.path.expanduser("~/.cache/journal/carried_goals.json")
 
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
