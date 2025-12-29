@@ -16,9 +16,21 @@ from sync_utils import format_minutes_seconds
 
 from .constants import TRAINING_CACHE_PATH
 
+# Threshold in seconds: only show slack if it exceeds this
+SLACK_THRESHOLD_SECONDS = 30
+
 
 # Type alias for training entries
 TrainingEntry = dict[str, Any]
+
+
+def _parse_time_to_minutes(time_str: str) -> float | None:
+    """Parse HH:MM time string to minutes since midnight."""
+    try:
+        h, m = map(int, time_str.split(":"))
+        return h * 60 + m
+    except Exception:
+        return None
 
 
 def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
@@ -136,8 +148,26 @@ def _activity_entries_from_data(
             activity_val = entry.get("type") or default_activity_label
 
             duration_fmt = ""
+            duration_minutes = 0.0
             if dur_val is not None:
-                duration_fmt = format_minutes_seconds(float(dur_val))
+                duration_minutes = float(dur_val)
+                duration_fmt = format_minutes_seconds(duration_minutes)
+
+            # Calculate slack time (elapsed - duration) if we have start/end times
+            # Threshold is in seconds, so convert to minutes for comparison
+            slack_threshold_minutes = SLACK_THRESHOLD_SECONDS / 60.0
+            if start_raw and end_raw and duration_minutes > 0:
+                start_minutes = _parse_time_to_minutes(start_raw)
+                end_minutes = _parse_time_to_minutes(end_raw)
+                if start_minutes is not None and end_minutes is not None:
+                    # Handle midnight crossing
+                    if end_minutes < start_minutes:
+                        end_minutes += 24 * 60
+                    elapsed_minutes = end_minutes - start_minutes
+                    slack_minutes = elapsed_minutes - duration_minutes
+                    if slack_minutes > slack_threshold_minutes:
+                        slack_fmt = format_minutes_seconds(slack_minutes)
+                        duration_fmt = f"{duration_fmt} (+{slack_fmt})"
 
             calories_fmt = ""
             if kcal_val is not None:
