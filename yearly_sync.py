@@ -40,6 +40,7 @@ from sync_utils import (
     aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,
+    build_media_section,
 )
 
 YEARLY_STUDY_BAR_WIDTH = 45
@@ -427,6 +428,10 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     )
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
+
+    # MEDIA section
+    media_lines = build_media_section(year_start, year_end)
+    sections.append(trim_blank_lines(media_lines))
 
     combined = []
     for sec in sections:

@@ -37,6 +37,8 @@ from sync_utils import (
     render_interrupts_table,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
+    build_media_section,
+    filter_by_proximity,
 )
 
 from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
@@ -238,6 +240,10 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
+    # MEDIA section
+    media_lines = build_media_section(start_date, end_date)
+    sections.append(trim_blank_lines(media_lines))
+
     return join_sections(sections)
 
 
@@ -377,13 +383,16 @@ def main():
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
-        monthly_lines = render_goal_lines(monthly_tasks) if monthly_tasks else [
+        # Filter monthly tasks to only show those with deadlines within 30 days (or no deadline).
+        today = datetime.date.today()
+        filtered_monthly = filter_by_proximity(monthly_tasks, 30, today)
+        monthly_lines = render_goal_lines(filtered_monthly, today=today) if filtered_monthly else [
             "",
             "_No monthly goals have been defined yet._",
         ]
         goals_block = build_goals_block([
             ("MONTHLY", monthly_lines),
-            ("WEEKLY", render_goal_lines(weekly_tasks)),
+            ("WEEKLY", render_goal_lines(weekly_tasks, today=today)),
         ])
 
         g_start, g_end = goals_section_bounds(lines)

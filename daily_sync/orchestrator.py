@@ -28,6 +28,7 @@ from sync_utils import (
     ensure_section_with_divider,
     section_bounds,
     ensure_goal_ids,
+    filter_by_proximity,
 )
 
 from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
@@ -489,13 +490,15 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
         _write_weekly_goals(today, updated_weekly_tasks)
 
     # Rebuild Goals block with WEEKLY mirror then DAILY goals.
-    weekly_lines = render_goal_lines(updated_weekly_tasks) if updated_weekly_tasks else [
+    # Filter weekly tasks to only show those with deadlines within 7 days (or no deadline).
+    filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, today)
+    weekly_lines = render_goal_lines(filtered_weekly, today=today) if filtered_weekly else [
         "",
         "_No weekly goals have been defined yet._",
     ]
     goals_block = build_goals_block([
         ("WEEKLY", weekly_lines),
-        ("DAILY", render_goal_lines(existing_daily_tasks)),
+        ("DAILY", render_goal_lines(existing_daily_tasks, today=today)),
     ])
 
     g_start, g_end = goals_section_bounds(lines)

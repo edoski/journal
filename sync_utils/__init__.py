@@ -11,6 +11,8 @@ from __future__ import annotations
 from .constants import (
     JOURNAL_DIR,
     VAULT_DIR,
+    BOOKS_DIR,
+    PODCASTS_DIR,
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
     QUARTERLY_TEMPLATE_PATH,
@@ -79,6 +81,7 @@ from .goals import (
     generate_goal_id_for,
     extract_goal_id,
     ensure_goal_ids,
+    filter_by_proximity,
 )
 
 # Metrics utilities
@@ -134,10 +137,20 @@ from .notes import (
 # For backward compatibility with code that uses _normalize_header
 from .goals import _normalize_header
 
+# Media utilities
+from .media import (
+    scan_books,
+    scan_podcasts,
+    render_media_table,
+    build_media_section,
+)
+
 __all__ = [
     # Constants
     "JOURNAL_DIR",
     "VAULT_DIR",
+    "BOOKS_DIR",
+    "PODCASTS_DIR",
     "WEEKLY_TEMPLATE_PATH",
     "MONTHLY_TEMPLATE_PATH",
     "QUARTERLY_TEMPLATE_PATH",
@@ -197,6 +210,7 @@ __all__ = [
     "generate_goal_id_for",
     "extract_goal_id",
     "ensure_goal_ids",
+    "filter_by_proximity",
     # Metrics
     "load_daily_data",
     "compute_period_metrics",
@@ -239,4 +253,9 @@ __all__ = [
     "ensure_note",
     "replace_metrics_block",
     "_normalize_header",
+    # Media
+    "scan_books",
+    "scan_podcasts",
+    "render_media_table",
+    "build_media_section",
 ]

@@ -11,6 +11,8 @@ import os
 # Directory paths
 JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
 VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
+BOOKS_DIR = "/Users/edo/Documents/Obsidian/the-vault/notes/books"
+PODCASTS_DIR = "/Users/edo/Documents/Obsidian/the-vault/notes/podcasts"
 
 # Template paths
 WEEKLY_TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/weekly.md"

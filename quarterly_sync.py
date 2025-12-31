@@ -37,6 +37,8 @@ from sync_utils import (
     render_interrupts_table,
     aggregate_interrupt_overrun,
     compute_period_deltas,
+    build_media_section,
+    filter_by_proximity,
 )
 
 from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
@@ -389,6 +391,10 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
+    # MEDIA section
+    media_lines = build_media_section(quarter_start, quarter_end)
+    sections.append(trim_blank_lines(media_lines))
+
     combined = []
     for sec in sections:
         combined.extend(sec)
@@ -522,13 +528,17 @@ def main():
                     f.write("\n".join(yearly_lines).rstrip() + "\n")
                 os.replace(tmp, yearly_path)
 
-        yearly_lines_block = render_goal_lines(yearly_tasks) if yearly_tasks else [
+        # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
+        # Filter yearly tasks to only show those with deadlines within 365 days (or no deadline).
+        today = datetime.date.today()
+        filtered_yearly = filter_by_proximity(yearly_tasks, 365, today)
+        yearly_lines_block = render_goal_lines(filtered_yearly, today=today) if filtered_yearly else [
             "",
             "_No yearly goals have been defined yet._",
         ]
         new_goals_block = build_goals_block([
             ("YEARLY", yearly_lines_block),
-            ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+            ("QUARTERLY", render_goal_lines(quarterly_tasks, today=today)),
         ])
         if g_start == -1:
             lines = new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
