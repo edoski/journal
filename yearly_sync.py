@@ -430,7 +430,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(year_start, year_end)
+    media_lines = build_media_section(year_start, year_end, "year")
     sections.append(trim_blank_lines(media_lines))
 
     combined = []

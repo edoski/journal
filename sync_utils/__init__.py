@@ -145,6 +145,12 @@ from .media import (
     build_media_section,
 )
 
+# Reminder utilities
+from .reminders import (
+    generate_review_reminder_id,
+    get_review_reminders_for_date,
+)
+
 __all__ = [
     # Constants
     "JOURNAL_DIR",
@@ -258,4 +264,7 @@ __all__ = [
     "scan_podcasts",
     "render_media_table",
     "build_media_section",
+    # Reminders
+    "generate_review_reminder_id",
+    "get_review_reminders_for_date",
 ]

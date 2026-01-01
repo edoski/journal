@@ -435,7 +435,7 @@ def build_monthly_metrics(start_date, end_date, week_ranges, daily_data, prev_da
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(start_date, end_date)
+    media_lines = build_media_section(start_date, end_date, "month")
     sections.append(trim_blank_lines(media_lines))
 
     return join_sections(sections)

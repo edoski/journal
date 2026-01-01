@@ -227,6 +227,7 @@ def render_media_table(
 def build_media_section(
     start_date: datetime.date,
     end_date: datetime.date,
+    period_name: str = "period",
     books_dir: str = BOOKS_DIR,
     podcasts_dir: str = PODCASTS_DIR,
 ) -> list[str]:
@@ -236,6 +237,7 @@ def build_media_section(
     Args:
         start_date: Start of period (inclusive)
         end_date: End of period (inclusive)
+        period_name: Name of the period for empty message (e.g., "week", "month", "year")
         books_dir: Path to books directory
         podcasts_dir: Path to podcasts directory
     
@@ -248,7 +250,7 @@ def build_media_section(
     lines = ["### **MEDIA**", ""]
     
     if not books and not podcasts:
-        lines.append("_No media completed this period._")
+        lines.append(f"_No media completed this {period_name}._")
     else:
         lines.extend(render_media_table(books, podcasts))
     

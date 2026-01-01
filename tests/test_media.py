@@ -254,8 +254,8 @@ class TestBuildMediaSection:
         lines = build_media_section(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
-            str(book_dir),
-            str(podcast_dir),
+            books_dir=str(book_dir),
+            podcasts_dir=str(podcast_dir),
         )
         
         assert "### **MEDIA**" in lines[0]
@@ -279,8 +279,8 @@ completed: "[[2025-01-15]]"
         lines = build_media_section(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
-            str(book_dir),
-            str(podcast_dir),
+            books_dir=str(book_dir),
+            podcasts_dir=str(podcast_dir),
         )
         
         assert "### **MEDIA**" in lines[0]

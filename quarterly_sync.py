@@ -392,7 +392,7 @@ def build_quarterly_metrics(quarter_start, quarter_end, month_ranges, daily_data
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(quarter_start, quarter_end)
+    media_lines = build_media_section(quarter_start, quarter_end, "quarter")
     sections.append(trim_blank_lines(media_lines))
 
     combined = []

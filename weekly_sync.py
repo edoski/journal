@@ -241,7 +241,7 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(start_date, end_date)
+    media_lines = build_media_section(start_date, end_date, "week")
     sections.append(trim_blank_lines(media_lines))
 
     return join_sections(sections)

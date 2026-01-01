@@ -29,6 +29,7 @@ from sync_utils import (
     section_bounds,
     ensure_goal_ids,
     filter_by_proximity,
+    get_review_reminders_for_date,
 )
 
 from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
@@ -469,6 +470,14 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Carry forward yesterday's incomplete DAILY goals (ID-based, idempotent across runs).
     yesterday = today - datetime.timedelta(days=1)
     existing_daily_tasks, _ = _carry_forward_daily_tasks(today, yesterday, existing_daily_tasks)
+
+    # Inject periodic review reminders (weekly on Sunday, monthly on last day, yearly on Dec 31)
+    review_reminders = get_review_reminders_for_date(today)
+    existing_ids = {t.get("id") for t in existing_daily_tasks if t.get("id")}
+    for reminder in review_reminders:
+        if reminder["id"] not in existing_ids:
+            existing_daily_tasks.append(reminder)
+            existing_ids.add(reminder["id"])
 
     # Load weekly source goals and propagate status changes from daily mirror.
     weekly_tasks, weekly_path = _load_weekly_goals(today)

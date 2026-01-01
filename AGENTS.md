@@ -11,10 +11,12 @@ journal/
     constants.py       # Directory paths, study thresholds, chart dimensions
     dates.py           # Date range calculations (weeks, months, quarters, years)
     parsing.py         # Duration parsing, value formatting, percent changes
-    goals.py           # Goal parsing, ID generation, markdown rendering
+    goals.py           # Goal parsing, ID generation, markdown rendering, dated goals
     metrics.py         # Period aggregation, delta computation
     charts.py          # All chart/table rendering functions
     notes.py           # File I/O, locking, markdown section manipulation
+    media.py           # Book/podcast scanning and media tables for periodic notes
+    reminders.py       # Periodic review reminder generation (weekly/monthly/yearly)
   daily_sync/          # Modular daily sync package (run with: python -m daily_sync)
     __init__.py        # Package entry point
     __main__.py        # Entry point for `python -m daily_sync`
@@ -121,7 +123,11 @@ notes.py (→ constants, parsing, goals)
 - **`goals.py`**: Goal management
   - `canonical_goal`, `parse_goal_tasks`, `render_goal_lines`
   - `generate_goal_id`, `generate_goal_id_for`, `extract_goal_id`, `ensure_goal_ids`
-  - `find_subheader_idx`, `build_goals_block`
+  - `find_subheader_idx`, `build_goals_block`, `filter_by_proximity`
+  - **Dated goals**: `resolve_deadline`, `parse_goal_date`, `format_countdown`
+    - Supports inline deadlines: `` `2025-02-12` ``, `` `2025-W01` ``, `` `2025-01` ``, `` `2025-Q1` ``
+    - Countdown rendering: `— `43d``, `— `TODAY``, `— `LATE +5d``
+    - Early reminder offset: `` `2025-02-12 !14d` `` shows goal 14 days early
 
 - **`metrics.py`**: Period aggregation
   - `load_daily_data`, `compute_period_metrics`
@@ -141,6 +147,17 @@ notes.py (→ constants, parsing, goals)
   - **Section finding**: `find_header_idx`, `section_bounds`, `subsection_bounds`, `extract_block`
   - **Section manipulation**: `ensure_section_with_divider`, `goals_section_bounds`, `extract_subsection_tasks`
   - **File ops**: `ensure_note`, `replace_metrics_block`, `trim_blank_lines`, `join_sections`
+
+- **`media.py`**: Media tracking for periodic notes
+  - `scan_books`, `scan_podcasts`: Scan notes/books/ and notes/podcasts/ directories
+  - `render_media_table`, `build_media_section`: Build MEDIA section for periodic notes
+
+- **`reminders.py`**: Periodic review reminder generation
+  - `get_review_reminders_for_date`: Returns reminder tasks for reviews due on a date
+    - **Weekly**: Sundays → `Review [[2025-W01]]`
+    - **Monthly**: Last day of month → `Review [[2025-01]]`
+    - **Yearly**: Dec 31 → `Review [[2025]]`
+  - Reminders use dated goals syntax for LATE tracking if missed
 
 ### Daily Sync Package (`daily_sync/`)
 
