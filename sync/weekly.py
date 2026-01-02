@@ -41,7 +41,8 @@ from sync_utils import (
     filter_by_proximity,
 )
 
-from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
+from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
 
@@ -324,12 +325,9 @@ def main():
         ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
         ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
 
-        # Carry forward open weekly goals from prior week (with carry forward guard)
+        # Carry forward open weekly goals from prior week
         year, week_num, _ = target_date.isocalendar()
         week_key = f"{year}-W{week_num:02d}"
-        
-        # Clean up old cache entries - only keep current period
-        cleanup_old_entries("weekly", [week_key])
         
         prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
         prev_week_tasks = []
@@ -342,35 +340,10 @@ def main():
             except Exception:
                 prev_week_tasks = []
         
-        open_prev = [t for t in prev_week_tasks if not t.get("done")]
-        previously_offered = get_carried_ids("weekly", week_key)
-        existing_ids = {t["id"] for t in weekly_tasks if t.get("id")}
-        newly_offered: list[str] = []
-        
-        for t in open_prev:
-            tid = t.get("id")
-            if not tid:
-                continue
-            if tid in existing_ids:
-                continue
-            if tid in previously_offered:
-                continue
-            weekly_tasks.append({**t, "done": False})
-            existing_ids.add(tid)
-            newly_offered.append(tid)
-        
-        # Record all offered goals
-        all_offered = list(previously_offered) + newly_offered
-        record_carried_ids("weekly", week_key, all_offered)
+        weekly_tasks, _ = carry_forward_goals(prev_week_tasks, weekly_tasks, week_key, "weekly")
 
         # Propagate MONTHLY status changes from weekly mirror to monthly source
-        mirror_lookup = {t["id"]: t for t in monthly_mirror if t.get("id")}
-        monthly_changed = False
-        for task in monthly_tasks:
-            mirror = mirror_lookup.get(task.get("id"))
-            if mirror and mirror.get("done") and not task.get("done"):
-                task["done"] = True
-                monthly_changed = True
+        monthly_changed = propagate_goal_status(monthly_tasks, monthly_mirror)
 
         if monthly_changed:
             with locked_note(monthly_path):
@@ -402,10 +375,7 @@ def main():
             lines[g_start:g_end] = goals_block
 
         updated_lines = replace_metrics_block(lines, metrics_block)
-        tmp_path = note_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write("\n".join(updated_lines).rstrip() + "\n")
-        os.replace(tmp_path, note_path)
+        atomic_write_note(note_path, updated_lines)
 
 
 if __name__ == "__main__":

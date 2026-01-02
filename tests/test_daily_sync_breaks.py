@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import datetime
 
-from daily_sync.breaks import (
+from sync.daily.breaks import (
     get_expected_break_minutes,
     _compute_dynamic_lunch_window,
     overlap_minutes_with_window,

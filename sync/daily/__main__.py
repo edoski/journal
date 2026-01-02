@@ -3,7 +3,7 @@
 Entry point for running daily sync as a module.
 
 Usage:
-    python -m daily_sync
+    python -m sync.daily
 """
 from __future__ import annotations
 

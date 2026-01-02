@@ -43,6 +43,8 @@ from sync_utils import (
     build_media_section,
 )
 
+from sync.base import atomic_write_note
+
 YEARLY_STUDY_BAR_WIDTH = 45
 YEARLY_TRAINING_BAR_WIDTH = 45
 
@@ -529,10 +531,7 @@ def main():
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)
-        tmp_path = note_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write("\n".join(updated_lines).rstrip() + "\n")
-        os.replace(tmp_path, note_path)
+        atomic_write_note(note_path, updated_lines)
 
 
 if __name__ == "__main__":

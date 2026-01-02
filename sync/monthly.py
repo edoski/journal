@@ -47,7 +47,8 @@ from sync_utils import (
     filter_by_proximity,
 )
 
-from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
+from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
 
@@ -484,9 +485,6 @@ def main():
         # Determine previous month path
         month_key = f"{month_start.year}-{month_start.month:02d}"
         
-        # Clean up old cache entries - only keep current period
-        cleanup_old_entries("monthly", [month_key])
-        
         if month_start.month == 1:
             prev_year = month_start.year - 1
             prev_month = 12
@@ -504,38 +502,13 @@ def main():
         except Exception:
             prev_tasks = []
 
-        open_prev = [t for t in prev_tasks if not t.get("done")]
-        previously_offered = get_carried_ids("monthly", month_key)
-        existing_ids = {t["id"] for t in monthly_tasks if t.get("id")}
-        newly_offered: list[str] = []
-        
-        for t in open_prev:
-            tid = t.get("id")
-            if not tid:
-                continue
-            if tid in existing_ids:
-                continue
-            if tid in previously_offered:
-                continue
-            monthly_tasks.append({**t, "done": False})
-            existing_ids.add(tid)
-            newly_offered.append(tid)
-        
-        # Record all offered goals
-        all_offered = list(previously_offered) + newly_offered
-        record_carried_ids("monthly", month_key, all_offered)
+        monthly_tasks, _ = carry_forward_goals(prev_tasks, monthly_tasks, month_key, "monthly")
 
         # Load quarterly goals (source of truth) and propagate any completed statuses from the monthly mirror.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = _load_quarterly_goals(
             month_start, quarterly_dir
         )
-        mirror_lookup = {t.get("id"): t for t in quarterly_mirror if t.get("id")}
-        quarterly_changed = False
-        for task in quarterly_tasks:
-            mirror = mirror_lookup.get(task.get("id"))
-            if mirror and mirror.get("done") and not task.get("done"):
-                task["done"] = True
-                quarterly_changed = True
+        quarterly_changed = propagate_goal_status(quarterly_tasks, quarterly_mirror)
         if quarterly_changed:
             _write_quarterly_goals(quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines)
 
@@ -610,10 +583,7 @@ def main():
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)
-        tmp_path = note_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write("\n".join(updated_lines).rstrip() + "\n")
-        os.replace(tmp_path, note_path)
+        atomic_write_note(note_path, updated_lines)
 
 
 if __name__ == "__main__":

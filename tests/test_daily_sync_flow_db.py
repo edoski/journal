@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import datetime
 
-from daily_sync.flow_db import dedupe_sessions, core_data_to_datetime
-from daily_sync.constants import CORE_DATA_EPOCH_OFFSET
+from sync.daily.flow_db import dedupe_sessions, core_data_to_datetime
+from sync.daily.constants import CORE_DATA_EPOCH_OFFSET
 
 
 class TestCoreDataToDatetime:
@@ -211,7 +211,7 @@ class TestRetroactiveLunchDetection:
 
     def test_gap_overlap_detection(self):
         """Gap between sessions correctly detects lunch overlap."""
-        from daily_sync.breaks import overlap_minutes_with_window
+        from sync.daily.breaks import overlap_minutes_with_window
         
         # Session ends at 13:10, next starts at 14:35
         # Lunch window is 13:30-14:30
@@ -225,7 +225,7 @@ class TestRetroactiveLunchDetection:
 
     def test_gap_overlap_partial(self):
         """Partial overlap with lunch window is detected."""
-        from daily_sync.breaks import overlap_minutes_with_window
+        from sync.daily.breaks import overlap_minutes_with_window
         
         # Session ends at 14:00, next starts at 14:45
         # Lunch window is 13:30-14:30
@@ -239,7 +239,7 @@ class TestRetroactiveLunchDetection:
 
     def test_no_overlap_before_lunch(self):
         """Gap entirely before lunch window has no overlap."""
-        from daily_sync.breaks import overlap_minutes_with_window
+        from sync.daily.breaks import overlap_minutes_with_window
         
         # Session ends at 12:00, next starts at 13:00
         # Lunch window is 13:30-14:30

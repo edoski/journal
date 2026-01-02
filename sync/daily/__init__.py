@@ -6,7 +6,7 @@ reading Flow sessions from the database, processing training and sleep data
 from iCloud status files, and updating daily markdown notes.
 
 Usage:
-    python -m daily_sync
+    python -m sync.daily
 """
 from __future__ import annotations
 

@@ -8,10 +8,10 @@ from __future__ import annotations
 import sys
 import os
 
-# Add the journal directory to path so we can import daily_sync
+# Add the journal directory to path so we can import sync.daily
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from daily_sync.training import _parse_training_table
+from sync.daily.training import _parse_training_table
 
 
 class TestParseTrainingTable:

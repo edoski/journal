@@ -41,7 +41,8 @@ from sync_utils import (
     filter_by_proximity,
 )
 
-from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
+from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
 
@@ -450,9 +451,6 @@ def main():
 
         qtr_key = quarter_id(year, quarter_num)
         
-        # Clean up old cache entries - only keep current period
-        cleanup_old_entries("quarterly", [qtr_key])
-        
         prev_note_path = os.path.join(quarterly_dir, f"{quarter_id(prev_year, prev_quarter)}.md")
         prev_tasks = []
         try:
@@ -465,26 +463,7 @@ def main():
         except Exception:
             prev_tasks = []
 
-        open_prev = [t for t in prev_tasks if not t.get("done")]
-        previously_offered = get_carried_ids("quarterly", qtr_key)
-        existing_ids = {t.get("id") for t in quarterly_tasks if t.get("id")}
-        newly_offered: list[str] = []
-        
-        for t in open_prev:
-            tid = t.get("id")
-            if not tid:
-                continue
-            if tid in existing_ids:
-                continue
-            if tid in previously_offered:
-                continue
-            quarterly_tasks.append({**t, "done": False})
-            existing_ids.add(tid)
-            newly_offered.append(tid)
-        
-        # Record all offered goals
-        all_offered = list(previously_offered) + newly_offered
-        record_carried_ids("quarterly", qtr_key, all_offered)
+        quarterly_tasks, _ = carry_forward_goals(prev_tasks, quarterly_tasks, qtr_key, "quarterly")
 
         yearly_tasks = []
         yearly_lines = []
@@ -499,13 +478,7 @@ def main():
         ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
         # Propagate completed YEARLY goals from quarterly mirror back to the yearly source.
-        mirror_lookup = {t.get("id"): t for t in yearly_mirror if t.get("id")}
-        yearly_changed = False
-        for task in yearly_tasks:
-            mirror = mirror_lookup.get(task.get("id"))
-            if mirror and mirror.get("done") and not task.get("done"):
-                task["done"] = True
-                yearly_changed = True
+        yearly_changed = propagate_goal_status(yearly_tasks, yearly_mirror)
 
         if yearly_changed:
             with locked_note(yearly_path):
@@ -523,10 +496,7 @@ def main():
                     yearly_lines = new_yearly_block + ([""] if yearly_lines and yearly_lines[0].strip() else []) + yearly_lines
                 else:
                     yearly_lines[y_start:y_end] = new_yearly_block
-                tmp = yearly_path + ".tmp"
-                with open(tmp, "w") as f:
-                    f.write("\n".join(yearly_lines).rstrip() + "\n")
-                os.replace(tmp, yearly_path)
+                atomic_write_note(yearly_path, yearly_lines)
 
         # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
         # Filter yearly tasks to only show those with deadlines within 365 days (or no deadline).
@@ -588,11 +558,7 @@ def main():
         )
 
         updated_lines = replace_metrics_block(lines, metrics_block)
-
-        tmp_path = note_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write("\n".join(updated_lines).rstrip() + "\n")
-        os.replace(tmp_path, note_path)
+        atomic_write_note(note_path, updated_lines)
 
 
 if __name__ == "__main__":
