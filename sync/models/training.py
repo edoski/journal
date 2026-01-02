@@ -16,8 +16,7 @@ class TrainingEntry:
     end: datetime.time | None
     activity: str  # Actual workout type, e.g., "Traditional Strength Training"
     duration_minutes: float
-    calories: int | None = None
-    pause_minutes: float | None = None  # Slack time (elapsed - duration)
+    interrupt_minutes: float = 0.0  # Time elapsed beyond actual workout duration
 
 
 @dataclass

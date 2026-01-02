@@ -17,9 +17,6 @@ from sync.formatting import format_minutes_seconds
 
 from .constants import TRAINING_CACHE_PATH
 
-# Threshold in seconds: only show slack if it exceeds this
-SLACK_THRESHOLD_SECONDS = 30
-
 
 # Type alias for training entries
 TrainingEntry = dict[str, Any]
@@ -42,7 +39,7 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
         block_lines: Lines from an existing training block, or None
 
     Returns:
-        List of training entry dicts with keys: start, end, time_raw, activity, duration, calories
+        List of training entry dicts with keys: start, end, time_raw, activity, duration, interrupt
     """
     if block_lines is None:
         return []
@@ -66,7 +63,7 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
         raw_time = parts[1].strip("` ").replace("`", "")
         activity = parts[2]
         duration = parts[3].strip("` ").replace("`", "")
-        calories = parts[4].strip("` ").replace("`", "")
+        interrupt = parts[4].strip("` ").replace("`", "")
 
         start_val: str | None = None
         end_val: str | None = None
@@ -84,7 +81,7 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
                 "time_raw": raw_time,
                 "activity": activity,
                 "duration": duration,
-                "calories": calories,
+                "interrupt": interrupt,
             }
         )
     return entries
@@ -149,7 +146,6 @@ def _activity_entries_from_data(
             start_raw = (entry.get("start") or "").strip()
             end_raw = (entry.get("end") or "").strip()
             dur_val = entry.get("duration")
-            kcal_val = entry.get("kcal")
             activity_val = entry.get("type") or default_activity_label
 
             duration_fmt = ""
@@ -158,9 +154,8 @@ def _activity_entries_from_data(
                 duration_minutes = float(dur_val)
                 duration_fmt = format_minutes_seconds(duration_minutes)
 
-            # Calculate slack time (elapsed - duration) if we have start/end times
-            # Threshold is in seconds, so convert to minutes for comparison
-            slack_threshold_minutes = SLACK_THRESHOLD_SECONDS / 60.0
+            # Calculate interrupt time (elapsed - duration) if we have start/end times
+            interrupt_minutes = 0.0
             if start_raw and end_raw and duration_minutes > 0:
                 start_minutes = _parse_time_to_minutes(start_raw)
                 end_minutes = _parse_time_to_minutes(end_raw)
@@ -169,14 +164,7 @@ def _activity_entries_from_data(
                     if end_minutes < start_minutes:
                         end_minutes += 24 * 60
                     elapsed_minutes = end_minutes - start_minutes
-                    slack_minutes = elapsed_minutes - duration_minutes
-                    if slack_minutes > slack_threshold_minutes:
-                        slack_fmt = format_minutes_seconds(slack_minutes)
-                        duration_fmt = f"{duration_fmt} (+{slack_fmt})"
-
-            calories_fmt = ""
-            if kcal_val is not None:
-                calories_fmt = f"{int(round(float(kcal_val)))} kcal"
+                    interrupt_minutes = max(0, elapsed_minutes - duration_minutes)
 
             if start_raw and end_raw:
                 time_raw = f"{start_raw} - {end_raw}"
@@ -190,7 +178,7 @@ def _activity_entries_from_data(
                     "time_raw": time_raw,
                     "activity": activity_val,
                     "duration": duration_fmt,
-                    "calories": calories_fmt,
+                    "interrupt": interrupt_minutes,
                 }
             )
     except Exception:
@@ -220,7 +208,6 @@ def _merge_training_entries(
             entry.get("end") or "",
             (entry.get("activity") or "").strip().lower(),
             entry.get("duration") or "",
-            entry.get("calories") or "",
         )
 
     for e in existing:
@@ -254,9 +241,18 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
         mins = to_minutes(e.get("start") or "")
         return (mins if mins is not None else 24 * 60 + 1, e.get("activity") or "")
 
+    def format_interrupt(minutes: float) -> str:
+        """Format interrupt duration for display (same as study table)."""
+        mins = int(round(minutes))
+        if mins >= 60:
+            hours = mins // 60
+            remainder = mins % 60
+            return f"`+{hours}h{remainder:02d}m`"
+        return f"`+{mins:02d}m`"
+
     ordered = sorted(entries, key=sort_key)
-    header = "| TIME | ACTIVITY | DURATION | CALORIES |"
-    separator = "| ---- | -------- | -------- | -------- |"
+    header = "| TIME | ACTIVITY | DURATION | INTERRUPT |"
+    separator = "| ---- | -------- | -------- | --------- |"
     lines_out = [header, separator]
     for entry in ordered:
         if entry.get("start") and entry.get("end"):
@@ -269,9 +265,16 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
             time_cell = ""
 
         duration_cell = f"`{entry['duration']}`" if entry.get("duration") else ""
-        calories_cell = f"`{entry['calories']}`" if entry.get("calories") else ""
+        interrupt_val = entry.get("interrupt")
+        if isinstance(interrupt_val, (int, float)) and interrupt_val > 0:
+            interrupt_cell = format_interrupt(interrupt_val)
+        elif isinstance(interrupt_val, str) and interrupt_val:
+            # Already formatted from parsing existing table
+            interrupt_cell = f"`{interrupt_val}`" if not interrupt_val.startswith("`") else interrupt_val
+        else:
+            interrupt_cell = "`+00m`"
 
-        row = f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {calories_cell} |"
+        row = f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {interrupt_cell} |"
         lines_out.append(row)
     return lines_out
 

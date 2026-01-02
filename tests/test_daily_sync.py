@@ -39,10 +39,10 @@ class TestParseTrainingTable:
         lines = [
             "### **TRAINING**",
             "",
-            "| TIME | ACTIVITY | DURATION | CALORIES |",
-            "| ---- | -------- | -------- | -------- |",
-            "| `09:00 - 10:00` | Workout | `60m` | `300` |",
-            "| `14:00` | Stretching | `15m` | `50` |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `09:00 - 10:00` | Workout | `60m` | `+05m` |",
+            "| `14:00` | Stretching | `15m` | `+00m` |",
         ]
         result = _parse_training_table(lines)
         assert len(result) == 2
@@ -52,7 +52,7 @@ class TestParseTrainingTable:
         assert result[0]["end"] == "10:00"
         assert result[0]["activity"] == "Workout"
         assert result[0]["duration"] == "60m"
-        assert result[0]["calories"] == "300"
+        assert result[0]["interrupt"] == "+05m"
 
         # Second entry (no end time)
         assert result[1]["start"] == "14:00"
@@ -62,8 +62,8 @@ class TestParseTrainingTable:
     def test_handles_missing_columns_gracefully(self):
         """Rows with fewer than expected columns are skipped."""
         lines = [
-            "| TIME | ACTIVITY | DURATION | CALORIES |",
-            "| ---- | -------- | -------- | -------- |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
             "| `09:00` | Workout |",  # incomplete row
         ]
         result = _parse_training_table(lines)
