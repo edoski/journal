@@ -1,16 +1,17 @@
 """
 Tests for dated goals feature: date parsing, countdown formatting, and proximity filtering.
 """
+
 import datetime
 
-from sync_utils.goals import (
+from sync.models import Goal
+from sync.readers.goals import (
     resolve_deadline,
     parse_goal_date,
-    format_countdown,
     filter_by_proximity,
     parse_goal_tasks,
-    render_goal_lines,
 )
+from sync.writers.goals import render_goal_lines, format_countdown
 
 
 class TestResolveDeadline:
@@ -124,21 +125,27 @@ class TestParseGoalDate:
         assert offset == 0
 
     def test_preserves_other_backticks(self):
-        body, date_str, deadline, offset = parse_goal_date("`2025-02-12` Study `chapter 8`")
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-02-12` Study `chapter 8`"
+        )
         assert body == "Study `chapter 8`"
         assert date_str == "2025-02-12"
         assert offset == 0
 
     # Reminder offset tests
     def test_reminder_offset_days(self):
-        body, date_str, deadline, offset = parse_goal_date("`2025-02-12 !14d` Pass MIC exam")
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-02-12 !14d` Pass MIC exam"
+        )
         assert body == "Pass MIC exam"
         assert date_str == "2025-02-12"
         assert deadline == datetime.date(2025, 2, 12)
         assert offset == 14
 
     def test_reminder_offset_weeks(self):
-        body, date_str, deadline, offset = parse_goal_date("`2025-02-12 !2w` Pass MIC exam")
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-02-12 !2w` Pass MIC exam"
+        )
         assert body == "Pass MIC exam"
         assert date_str == "2025-02-12"
         assert deadline == datetime.date(2025, 2, 12)
@@ -151,7 +158,9 @@ class TestParseGoalDate:
         assert offset == 30  # 1 month = 30 days
 
     def test_reminder_offset_quarters(self):
-        body, date_str, deadline, offset = parse_goal_date("`2025-12-31 !1q` Year end review")
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-12-31 !1q` Year end review"
+        )
         assert body == "Year end review"
         assert date_str == "2025-12-31"
         assert offset == 90  # 1 quarter = 90 days
@@ -209,27 +218,47 @@ class TestFilterByProximity:
     def test_includes_tasks_within_threshold(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {"body": "Task 1", "deadline": datetime.date(2025, 1, 5), "done": False},
-            {"body": "Task 2", "deadline": datetime.date(2025, 1, 10), "done": False},
+            Goal(
+                id="gid-001",
+                body="Task 1",
+                deadline=datetime.date(2025, 1, 5),
+                done=False,
+            ),
+            Goal(
+                id="gid-002",
+                body="Task 2",
+                deadline=datetime.date(2025, 1, 10),
+                done=False,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
-        assert result[0]["body"] == "Task 1"
+        assert result[0].body == "Task 1"
 
     def test_includes_tasks_without_deadline(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {"body": "Task 1", "deadline": None, "done": False},
-            {"body": "Task 2", "deadline": datetime.date(2025, 3, 1), "done": False},
+            Goal(id="gid-003", body="Task 1", deadline=None, done=False),
+            Goal(
+                id="gid-004",
+                body="Task 2",
+                deadline=datetime.date(2025, 3, 1),
+                done=False,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
-        assert result[0]["body"] == "Task 1"
+        assert result[0].body == "Task 1"
 
     def test_includes_completed_tasks_regardless_of_deadline(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {"body": "Task far", "deadline": datetime.date(2025, 12, 31), "done": True},
+            Goal(
+                id="gid-005",
+                body="Task far",
+                deadline=datetime.date(2025, 12, 31),
+                done=True,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
@@ -237,7 +266,12 @@ class TestFilterByProximity:
     def test_includes_overdue_tasks(self):
         today = datetime.date(2025, 1, 10)
         tasks = [
-            {"body": "Overdue", "deadline": datetime.date(2025, 1, 5), "done": False},
+            Goal(
+                id="gid-006",
+                body="Overdue",
+                deadline=datetime.date(2025, 1, 5),
+                done=False,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
@@ -245,7 +279,12 @@ class TestFilterByProximity:
     def test_exact_threshold(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {"body": "Exactly 7d", "deadline": datetime.date(2025, 1, 8), "done": False},
+            Goal(
+                id="gid-007",
+                body="Exactly 7d",
+                deadline=datetime.date(2025, 1, 8),
+                done=False,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
@@ -254,12 +293,13 @@ class TestFilterByProximity:
         """Task 20 days away with 14-day reminder should appear in 7-day filter."""
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "Exam with reminder",
-                "deadline": datetime.date(2025, 1, 21),  # 20 days away
-                "done": False,
-                "reminder_offset": 14,  # Start showing 14 days early
-            },
+            Goal(
+                id="gid-008",
+                body="Exam with reminder",
+                deadline=datetime.date(2025, 1, 21),
+                done=False,
+                reminder_offset=14,
+            ),
         ]
         # Effective deadline is Jan 7 (21 - 14 = 7 days away), so should appear
         result = filter_by_proximity(tasks, 7, today)
@@ -269,12 +309,13 @@ class TestFilterByProximity:
         """Same task without reminder offset should NOT appear."""
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "Exam without reminder",
-                "deadline": datetime.date(2025, 1, 21),  # 20 days away
-                "done": False,
-                "reminder_offset": 0,
-            },
+            Goal(
+                id="gid-009",
+                body="Exam without reminder",
+                deadline=datetime.date(2025, 1, 21),
+                done=False,
+                reminder_offset=0,
+            ),
         ]
         result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 0
@@ -289,10 +330,10 @@ class TestParseGoalTasksWithDates:
         ]
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
-        assert tasks[0]["body"] == "Pass MIC exam"
-        assert tasks[0]["date_str"] == "2025-02-12"
-        assert tasks[0]["deadline"] == datetime.date(2025, 2, 12)
-        assert tasks[0]["reminder_offset"] == 0
+        assert tasks[0].body == "Pass MIC exam"
+        assert tasks[0].date_str == "2025-02-12"
+        assert tasks[0].deadline == datetime.date(2025, 2, 12)
+        assert tasks[0].reminder_offset == 0
 
     def test_parses_goal_without_date(self):
         lines = [
@@ -300,10 +341,10 @@ class TestParseGoalTasksWithDates:
         ]
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
-        assert tasks[0]["body"] == "Complete research"
-        assert tasks[0]["date_str"] is None
-        assert tasks[0]["deadline"] is None
-        assert tasks[0]["reminder_offset"] == 0
+        assert tasks[0].body == "Complete research"
+        assert tasks[0].date_str is None
+        assert tasks[0].deadline is None
+        assert tasks[0].reminder_offset == 0
 
     def test_parses_reminder_offset(self):
         lines = [
@@ -311,9 +352,9 @@ class TestParseGoalTasksWithDates:
         ]
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
-        assert tasks[0]["body"] == "Pass MIC exam"
-        assert tasks[0]["deadline"] == datetime.date(2025, 2, 12)
-        assert tasks[0]["reminder_offset"] == 14
+        assert tasks[0].body == "Pass MIC exam"
+        assert tasks[0].deadline == datetime.date(2025, 2, 12)
+        assert tasks[0].reminder_offset == 14
 
     def test_strips_existing_countdown(self):
         """Ensure existing countdown suffixes are removed during re-parsing."""
@@ -322,22 +363,22 @@ class TestParseGoalTasksWithDates:
         ]
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
-        assert tasks[0]["body"] == "Pass MIC exam"
-        assert "43d" not in tasks[0]["body"]
+        assert tasks[0].body == "Pass MIC exam"
+        assert "43d" not in tasks[0].body
 
     def test_strips_today_countdown(self):
         lines = [
             "- [ ] Submit draft — `TODAY` ^gid-abc123",
         ]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["body"] == "Submit draft"
+        assert tasks[0].body == "Submit draft"
 
     def test_strips_late_countdown(self):
         lines = [
             "- [ ] Overdue task — `LATE +5d` ^gid-abc123",
         ]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["body"] == "Overdue task"
+        assert tasks[0].body == "Overdue task"
 
 
 class TestRenderGoalLinesWithDates:
@@ -346,12 +387,12 @@ class TestRenderGoalLinesWithDates:
     def test_renders_countdown(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "Pass MIC exam",
-                "done": False,
-                "id": "gid-abc123",
-                "deadline": datetime.date(2025, 2, 13),
-            },
+            Goal(
+                id="gid-abc123",
+                body="Pass MIC exam",
+                done=False,
+                deadline=datetime.date(2025, 2, 13),
+            ),
         ]
         result = render_goal_lines(tasks, today=today)
         assert len(result) == 1
@@ -360,12 +401,12 @@ class TestRenderGoalLinesWithDates:
 
     def test_no_countdown_without_today(self):
         tasks = [
-            {
-                "body": "Pass MIC exam",
-                "done": False,
-                "id": "gid-abc123",
-                "deadline": datetime.date(2025, 2, 13),
-            },
+            Goal(
+                id="gid-abc123",
+                body="Pass MIC exam",
+                done=False,
+                deadline=datetime.date(2025, 2, 13),
+            ),
         ]
         result = render_goal_lines(tasks, today=None)
         assert len(result) == 1
@@ -374,12 +415,12 @@ class TestRenderGoalLinesWithDates:
     def test_no_countdown_when_done(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "Completed task",
-                "done": True,
-                "id": "gid-abc123",
-                "deadline": datetime.date(2025, 2, 13),
-            },
+            Goal(
+                id="gid-abc123",
+                body="Completed task",
+                done=True,
+                deadline=datetime.date(2025, 2, 13),
+            ),
         ]
         result = render_goal_lines(tasks, today=today)
         assert "— `" not in result[0]
@@ -388,12 +429,12 @@ class TestRenderGoalLinesWithDates:
     def test_no_countdown_without_deadline(self):
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "No deadline",
-                "done": False,
-                "id": "gid-abc123",
-                "deadline": None,
-            },
+            Goal(
+                id="gid-abc123",
+                body="No deadline",
+                done=False,
+                deadline=None,
+            ),
         ]
         result = render_goal_lines(tasks, today=today)
         assert "— `" not in result[0]
@@ -402,13 +443,13 @@ class TestRenderGoalLinesWithDates:
         """Verify countdown shows days to actual deadline, not effective deadline."""
         today = datetime.date(2025, 1, 1)
         tasks = [
-            {
-                "body": "Exam with reminder",
-                "done": False,
-                "id": "gid-abc123",
-                "deadline": datetime.date(2025, 1, 15),  # 14 days away
-                "reminder_offset": 7,  # but shown 7 days early
-            },
+            Goal(
+                id="gid-abc123",
+                body="Exam with reminder",
+                done=False,
+                deadline=datetime.date(2025, 1, 15),  # 14 days away
+                reminder_offset=7,  # but shown 7 days early
+            ),
         ]
         result = render_goal_lines(tasks, today=today)
         # Should show 14d (actual deadline), not 7d (effective)

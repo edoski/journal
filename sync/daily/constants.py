@@ -4,6 +4,7 @@ Constants for the daily sync module.
 Contains database paths, timing constants, and configuration values
 specific to daily synchronization with the Flow app.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -30,7 +31,9 @@ REGULAR_DAY_END = datetime.time(18, 0)
 LUNCH_WINDOW_BASE = (datetime.time(13, 30), datetime.time(14, 30))
 
 # iCloud paths for Shortcuts status files
-ICLOUD_SHORTCUTS_DIR = "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents"
+ICLOUD_SHORTCUTS_DIR = (
+    "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents"
+)
 ICLOUD_JOURNALSYNC_DIR = os.path.join(ICLOUD_SHORTCUTS_DIR, "JournalSync")
 
 # Daily note template path
@@ -59,4 +62,3 @@ CONTEXT_EXCLUDED_FILES = (
     "PROTOCOL",
     "TODO",
 )
-

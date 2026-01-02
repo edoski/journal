@@ -4,13 +4,14 @@ Study section building for daily sync.
 Provides functions to extract existing notes from study tables and build
 the updated study section for daily notes.
 """
+
 from __future__ import annotations
 
 import re
 from datetime import datetime
 from typing import Any
 
-from sync_utils import format_minutes, ceil_minutes, round_half_up
+from sync.formatting import format_minutes, ceil_minutes, round_half_up
 
 from typing import Callable
 
@@ -33,7 +34,7 @@ def _extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, 
     existing_context: dict[str, str] = {}
     table_header_re = re.compile(
         r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|(\s*CONTEXT\s*\|)?\s*NOTES\s*\|",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     header_idx = -1
     for i, line in enumerate(lines):
@@ -72,12 +73,12 @@ def _extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, 
 def _format_interrupt(minutes: int) -> str:
     """
     Format interrupt duration for display.
-    
+
     Uses XhYYm format for durations >= 60 minutes, +XXm otherwise.
-    
+
     Args:
         minutes: Interrupt duration in minutes
-        
+
     Returns:
         Formatted string like `+23m` or `+4h56m`
     """
@@ -120,39 +121,45 @@ def _build_study_section(
     table_lines = [header, separator]
 
     for session in sessions:
-        start_s = session['start'].strftime("%H:%M")
-        end_s = session['end'].strftime("%H:%M")
+        start_s = session["start"].strftime("%H:%M")
+        end_s = session["end"].strftime("%H:%M")
         time_str = f"`{start_s} - {end_s}`"
 
-        title = session['title']
+        title = session["title"]
         if title and title.lower() != "flow":
             activity_str = title
         else:
             activity_str = "Flow"
 
-        actual_minutes = session.get('actual_elapsed', 0) or 0
-        interrupt_minutes = (session.get('interruptions_duration', 0) or 0) / 60.0
+        actual_minutes = session.get("actual_elapsed", 0) or 0
+        interrupt_minutes = (session.get("interruptions_duration", 0) or 0) / 60.0
 
         interrupt_rounded = round_half_up(interrupt_minutes)
         focus_rounded = max(0, round_half_up(actual_minutes - interrupt_minutes))
 
-        session['focus_minutes'] = focus_rounded
-        session['focus_minutes_rounded'] = focus_rounded
+        session["focus_minutes"] = focus_rounded
+        session["focus_minutes_rounded"] = focus_rounded
 
         duration_str = f"`{format_minutes(focus_rounded)}`"
         interrupt_str = _format_interrupt(interrupt_rounded)
 
         break_str = ""
-        break_expected_val = session.get('break_expected', session.get('break_duration', 0)) or 0
+        break_expected_val = (
+            session.get("break_expected", session.get("break_duration", 0)) or 0
+        )
         break_min = ceil_minutes(break_expected_val)
-        overrun = int(session.get('break_overrun', 0))
-        break_reason = session.get('break_reason')
+        overrun = int(session.get("break_overrun", 0))
+        break_reason = session.get("break_reason")
         if break_min > 0:
-            break_display = f"{break_min}m" if break_reason == "lunch" else format_minutes(break_min)
+            break_display = (
+                f"{break_min}m"
+                if break_reason == "lunch"
+                else format_minutes(break_min)
+            )
             parts = []
             if break_reason and break_reason != "lunch":
                 parts.append(break_reason)
-            if session.get('break_missing', False):
+            if session.get("break_missing", False):
                 parts.append("missing")
             if overrun > 0:
                 parts.append(f"+{format_minutes(overrun)}")
@@ -163,19 +170,19 @@ def _build_study_section(
                 break_str = f"`{break_display}`"
 
         notes_str = existing_notes.get(start_s) or "–"
-        
+
         # Preserve existing context only for sessions that have ended.
         # Ongoing sessions always recompute to capture all files modified during the session.
-        session_ended = session['end'] < current_time
+        session_ended = session["end"] < current_time
         if start_s in existing_context and session_ended:
             context_str = existing_context[start_s]
         elif context_for_session:
-            context_str = context_for_session(session['start'], session['end'])
+            context_str = context_for_session(session["start"], session["end"])
         else:
             context_str = "–"  # em-dash when no callback
-        
+
         row = f"| {time_str} | {activity_str} | {duration_str} | {interrupt_str} | {break_str} | {context_str} | {notes_str} |"
         table_lines.append(row)
 
-    total_focus = sum(s.get('focus_minutes_rounded', 0) for s in sessions)
+    total_focus = sum(s.get("focus_minutes_rounded", 0) for s in sessions)
     return table_lines, total_focus

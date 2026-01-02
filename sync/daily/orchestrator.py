@@ -4,35 +4,35 @@ Main orchestration logic for daily sync.
 Provides the update_markdown function that coordinates all daily note updates,
 including goals, metrics sections, and frontmatter.
 """
+
 from __future__ import annotations
 
 import datetime
 import os
 from collections import OrderedDict
 
-from sync_utils import (
+from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
-    format_minutes,
+)
+from sync.notes import (
     locked_note,
     ensure_note,
     extract_block,
-    render_goal_lines,
     goals_section_bounds,
     extract_subsection_tasks,
-    build_goals_block,
     find_header_idx,
     replace_metrics_block,
-    iso_week_range,
     ensure_section_with_divider,
     section_bounds,
-    ensure_goal_ids,
-    filter_by_proximity,
-    get_review_reminders_for_date,
 )
-
-from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+from sync.dates import iso_week_range
+from sync.formatting import format_minutes
+from sync.reminders import get_review_reminders_for_date
+from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.readers.goals import filter_by_proximity, ensure_goal_ids
+from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
 from .constants import TEMPLATE_PATH
 from .flow_db import SessionDict
@@ -40,7 +40,11 @@ from .study import _extract_existing_data, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
 from .icloud import _load_status_file
-from .context import get_vault_files_modified_on_date, files_for_session, format_context_cell
+from .context import (
+    get_vault_files_modified_on_date,
+    files_for_session,
+    format_context_cell,
+)
 
 
 def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) -> str:
@@ -110,28 +114,43 @@ def _write_weekly_goals(
         g_start, g_end = goals_section_bounds(lines)
         if g_start == -1:
             # No Goals section: prepend it.
-            new_block = build_goals_block([
-                ("MONTHLY", [
-                    "",
-                    "_No monthly goals have been defined yet._",
-                ]),
-                ("WEEKLY", render_goal_lines(weekly_tasks)),
-            ])
+            new_block = build_goals_block(
+                [
+                    (
+                        "MONTHLY",
+                        [
+                            "",
+                            "_No monthly goals have been defined yet._",
+                        ],
+                    ),
+                    ("WEEKLY", render_goal_lines(weekly_tasks)),
+                ]
+            )
             lines = new_block + ([""] if lines and lines[0].strip() else []) + lines
         else:
             monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-            monthly_lines = render_goal_lines(monthly_tasks) if monthly_tasks else [
-                "",
-                "_No monthly goals have been defined yet._",
-            ]
-            new_block = build_goals_block([
-                ("MONTHLY", monthly_lines),
-                ("WEEKLY", render_goal_lines(weekly_tasks)),
-            ])
+            monthly_lines = (
+                render_goal_lines(monthly_tasks)
+                if monthly_tasks
+                else [
+                    "",
+                    "_No monthly goals have been defined yet._",
+                ]
+            )
+            new_block = build_goals_block(
+                [
+                    ("MONTHLY", monthly_lines),
+                    ("WEEKLY", render_goal_lines(weekly_tasks)),
+                ]
+            )
             lines[g_start:g_end] = new_block
             # Ensure a blank line separation if next line is not blank or header
             insert_pos = g_start + len(new_block)
-            if insert_pos < len(lines) and lines[insert_pos].strip() and not lines[insert_pos].startswith("## "):
+            if (
+                insert_pos < len(lines)
+                and lines[insert_pos].strip()
+                and not lines[insert_pos].startswith("## ")
+            ):
                 lines.insert(insert_pos, "")
 
         tmp_path = path + ".tmp"
@@ -184,10 +203,10 @@ def _carry_forward_daily_tasks(
         Tuple of (updated_tasks_list, count_of_tasks_added)
     """
     today_key = today_date.isoformat()
-    
+
     # Clean up old cache entries - only keep current period
     cleanup_old_entries("daily", [today_key])
-    
+
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     if not os.path.exists(yesterday_path):
         return existing_daily_tasks, 0
@@ -211,23 +230,23 @@ def _carry_forward_daily_tasks(
     # Get goals that were already offered for carry forward to today
     previously_offered = get_carried_ids("daily", today_key)
     existing_ids = {t["id"] for t in existing_daily_tasks if t.get("id")}
-    
+
     added = 0
     newly_offered: list[str] = []
-    
+
     for task in open_y:
         tid = task.get("id")
         if not tid:
             continue
-        
+
         # Skip if already in current note
         if tid in existing_ids:
             continue
-        
+
         # Skip if previously offered but user deleted it
         if tid in previously_offered:
             continue
-        
+
         # First time offering this goal - add it
         new_task = task.copy()
         new_task["done"] = False
@@ -273,7 +292,11 @@ def _update_frontmatter(
                 second_dash_idx = i
                 break
 
-    if first_dash_idx == -1 or second_dash_idx == -1 or second_dash_idx <= first_dash_idx:
+    if (
+        first_dash_idx == -1
+        or second_dash_idx == -1
+        or second_dash_idx <= first_dash_idx
+    ):
         return final_lines
 
     fm_lines = final_lines[first_dash_idx + 1 : second_dash_idx]
@@ -315,7 +338,9 @@ def _update_frontmatter(
 
     if sleep_data and (sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")):
         try:
-            total_min = float(sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes"))
+            total_min = float(
+                sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")
+            )
             hours = int(total_min) // 60
             mins = int(total_min) % 60
             sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
@@ -325,9 +350,7 @@ def _update_frontmatter(
 
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
     return (
-        final_lines[: first_dash_idx + 1]
-        + new_fm_lines
-        + final_lines[second_dash_idx:]
+        final_lines[: first_dash_idx + 1] + new_fm_lines + final_lines[second_dash_idx:]
     )
 
 
@@ -348,16 +371,26 @@ def _ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
     )
 
     # Metrics after Goals
-    _, goals_end = section_bounds(lines, goals_header_idx, level=2) if goals_header_idx != -1 else (-1, -1)
+    _, goals_end = (
+        section_bounds(lines, goals_header_idx, level=2)
+        if goals_header_idx != -1
+        else (-1, -1)
+    )
     metrics_header_idx, _ = ensure_section_with_divider(
         lines,
         "Metrics",
         level=2,
-        insert_pos=goals_end if goals_end != -1 else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0),
+        insert_pos=goals_end
+        if goals_end != -1
+        else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0),
     )
 
     # Reflections after Metrics
-    _, metrics_end = section_bounds(lines, metrics_header_idx, level=2) if metrics_header_idx != -1 else (-1, -1)
+    _, metrics_end = (
+        section_bounds(lines, metrics_header_idx, level=2)
+        if metrics_header_idx != -1
+        else (-1, -1)
+    )
     ensure_section_with_divider(
         lines,
         "Reflections",
@@ -452,8 +485,10 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Build study table (also computes focus_minutes on sessions)
     existing_notes, existing_context = _extract_existing_data(lines)
     new_table_lines, total_focus_minutes = _build_study_section(
-        sessions, existing_notes, context_for_session=context_callback,
-        existing_context=existing_context
+        sessions,
+        existing_notes,
+        context_for_session=context_callback,
+        existing_context=existing_context,
     )
     study_str = format_minutes(total_focus_minutes, always_show_both=True)
 
@@ -469,7 +504,9 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Carry forward yesterday's incomplete DAILY goals (ID-based, idempotent across runs).
     yesterday = today - datetime.timedelta(days=1)
-    existing_daily_tasks, _ = _carry_forward_daily_tasks(today, yesterday, existing_daily_tasks)
+    existing_daily_tasks, _ = _carry_forward_daily_tasks(
+        today, yesterday, existing_daily_tasks
+    )
 
     # Inject periodic review reminders (weekly on Sunday, monthly on last day, yearly on Dec 31)
     review_reminders = get_review_reminders_for_date(today)
@@ -501,14 +538,20 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Rebuild Goals block with WEEKLY mirror then DAILY goals.
     # Filter weekly tasks to only show those with deadlines within 7 days (or no deadline).
     filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, today)
-    weekly_lines = render_goal_lines(filtered_weekly, today=today) if filtered_weekly else [
-        "",
-        "_No weekly goals have been defined yet._",
-    ]
-    goals_block = build_goals_block([
-        ("WEEKLY", weekly_lines),
-        ("DAILY", render_goal_lines(existing_daily_tasks, today=today)),
-    ])
+    weekly_lines = (
+        render_goal_lines(filtered_weekly, today=today)
+        if filtered_weekly
+        else [
+            "",
+            "_No weekly goals have been defined yet._",
+        ]
+    )
+    goals_block = build_goals_block(
+        [
+            ("WEEKLY", weekly_lines),
+            ("DAILY", render_goal_lines(existing_daily_tasks, today=today)),
+        ]
+    )
 
     g_start, g_end = goals_section_bounds(lines)
     if g_start == -1:
@@ -572,7 +615,9 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     updated_lines = replace_metrics_block(lines, metrics_lines)
 
     # Update YAML frontmatter
-    updated_lines = _update_frontmatter(updated_lines, study_str, workout_done, stretch_done, sleep_data)
+    updated_lines = _update_frontmatter(
+        updated_lines, study_str, workout_done, stretch_done, sleep_data
+    )
 
     new_content = "\n".join(updated_lines)
 

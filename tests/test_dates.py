@@ -1,14 +1,15 @@
 """
-Tests for sync_utils.dates module.
+Tests for sync.dates module.
 
 Covers date range calculations for weeks, months, quarters, and years.
 """
+
 from __future__ import annotations
 
 import datetime
 import pytest
 
-from sync_utils.dates import (
+from sync.dates import (
     daterange,
     iso_week_range,
     month_range,
@@ -41,7 +42,7 @@ class TestDaterange:
 
     def test_week_range(self):
         start = datetime.date(2025, 12, 22)  # Monday
-        end = datetime.date(2025, 12, 28)    # Sunday
+        end = datetime.date(2025, 12, 28)  # Sunday
         result = list(daterange(start, end))
         assert len(result) == 7
 
@@ -75,7 +76,7 @@ class TestIsoWeekRange:
         assert start == datetime.date(2025, 12, 22)
         assert end == datetime.date(2025, 12, 28)
         assert start.isoweekday() == 1  # Monday
-        assert end.isoweekday() == 7    # Sunday
+        assert end.isoweekday() == 7  # Sunday
 
     def test_year_boundary(self):
         # Week spanning year boundary

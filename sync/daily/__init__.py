@@ -8,6 +8,7 @@ from iCloud status files, and updating daily markdown notes.
 Usage:
     python -m sync.daily
 """
+
 from __future__ import annotations
 
 from .flow_db import get_todays_sessions

@@ -3,12 +3,13 @@ Sleep section building for daily sync.
 
 Provides functions to build sleep tables and sections for daily notes.
 """
+
 from __future__ import annotations
 
 import datetime
 from typing import Any
 
-from sync_utils import format_minutes_seconds
+from sync.formatting import format_minutes_seconds
 
 
 # Type alias for sleep data
@@ -28,10 +29,15 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
     if not data:
         return []
     try:
+
         def parse_time(raw: str | None) -> str:
             if not raw:
                 return ""
-            for fmt in ("%d %b %Y at %H:%M", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S"):
+            for fmt in (
+                "%d %b %Y at %H:%M",
+                "%Y-%m-%dT%H:%M:%S%z",
+                "%Y-%m-%d %H:%M:%S",
+            ):
                 try:
                     dt = datetime.datetime.strptime(raw, fmt)
                     return dt.strftime("%H:%M")
@@ -39,7 +45,9 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
                     continue
             return raw
 
-        start_raw = data.get("start") or data.get("SleepBegin") or data.get("SleepStart")
+        start_raw = (
+            data.get("start") or data.get("SleepBegin") or data.get("SleepStart")
+        )
         end_raw = data.get("end") or data.get("SleepEnd")
         sleep_min = data.get("sleep_min") or data.get("SleepMinutes")
         awake_min = data.get("awake_min") or data.get("AwakeMinutes")
@@ -47,9 +55,19 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
 
         start_fmt = parse_time(start_raw)
         end_fmt = parse_time(end_raw)
-        time_cell = f"`{start_fmt} - {end_fmt}`" if start_fmt and end_fmt else (f"`{start_fmt}`" if start_fmt else "")
-        duration_cell = f"`{format_minutes_seconds(float(sleep_min))}`" if sleep_min is not None else ""
-        awake_cell = f"`{int(round(float(awake_min)))}m`" if awake_min is not None else ""
+        time_cell = (
+            f"`{start_fmt} - {end_fmt}`"
+            if start_fmt and end_fmt
+            else (f"`{start_fmt}`" if start_fmt else "")
+        )
+        duration_cell = (
+            f"`{format_minutes_seconds(float(sleep_min))}`"
+            if sleep_min is not None
+            else ""
+        )
+        awake_cell = (
+            f"`{int(round(float(awake_min)))}m`" if awake_min is not None else ""
+        )
         wakes_cell = f"`{int(awake_count)} times`" if awake_count is not None else ""
 
         header = "| TIME | DURATION | AWAKE | AWAKENINGS |"

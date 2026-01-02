@@ -4,11 +4,12 @@ Chart and table rendering utilities for the journal sync system.
 Provides functions for rendering bar charts, summary tables, activity tables,
 and training/study grids at various time scales.
 """
+
 from __future__ import annotations
 
 import datetime
 
-from .constants import (
+from sync.constants import (
     DAYS,
     MONTH_ABBR,
     STUDY_SYMBOL_DEEP,
@@ -16,13 +17,11 @@ from .constants import (
     STUDY_LEGEND_LINE,
     STUDY_TARGET_MIN,
 )
-from .parsing import (
-    round_half_up,
-)
-from .dates import daterange, format_week_label
+from sync.formatting import round_half_up
+from sync.dates import daterange, format_week_label
 
 # Import and re-export table functions from tables.py
-from .tables import (
+from sync.writers.tables import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
@@ -109,13 +108,19 @@ def render_bar_chart(
         overflow_row = label_prefix
         for bar_h, label in zip(bar_heights, value_labels):
             if bar_h == height:
-                label_str = str(label).strip('`') if label else ""
+                label_str = str(label).strip("`") if label else ""
                 if center_labels_on_bars and left_pad is None:
                     # Center label on bar when bars are centered
                     lbl_left_pad = computed_left_pad + (bar_width - len(label_str)) // 2
                 else:
-                    lbl_left_pad = computed_left_pad + (1 if center_labels_on_bars else 0)
-                overflow_row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
+                    lbl_left_pad = computed_left_pad + (
+                        1 if center_labels_on_bars else 0
+                    )
+                overflow_row += (
+                    " " * lbl_left_pad
+                    + label_str
+                    + " " * (col_spacing - lbl_left_pad - len(label_str))
+                )
             else:
                 overflow_row += " " * col_spacing
         lines.append(overflow_row.rstrip())
@@ -124,7 +129,7 @@ def render_bar_chart(
     for level in range(height, 0, -1):
         row = "│"
         for bar_h, label in zip(bar_heights, value_labels):
-            label_str = str(label).strip('`') if label else ""
+            label_str = str(label).strip("`") if label else ""
 
             # Compute label padding
             if center_labels_on_bars and left_pad is None:
@@ -140,16 +145,32 @@ def render_bar_chart(
 
             if bar_h == 0 and level == 1:
                 # Zero value - show label at level 1, no blocks
-                row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
+                row += (
+                    " " * lbl_left_pad
+                    + label_str
+                    + " " * (col_spacing - lbl_left_pad - len(label_str))
+                )
             elif bar_h == height and level <= height:
                 # Max value - blocks fill all levels (label on overflow line)
-                row += " " * computed_left_pad + bar_char * bar_width + " " * (col_spacing - computed_left_pad - bar_width)
+                row += (
+                    " " * computed_left_pad
+                    + bar_char * bar_width
+                    + " " * (col_spacing - computed_left_pad - bar_width)
+                )
             elif bar_h > 0 and bar_h < height and level == bar_h + 1:
                 # One level above top of bar (non-max) - show label
-                row += " " * lbl_left_pad + label_str + " " * (col_spacing - lbl_left_pad - len(label_str))
+                row += (
+                    " " * lbl_left_pad
+                    + label_str
+                    + " " * (col_spacing - lbl_left_pad - len(label_str))
+                )
             elif bar_h > 0 and level <= bar_h:
                 # Bar level - show block
-                row += " " * computed_left_pad + bar_char * bar_width + " " * (col_spacing - computed_left_pad - bar_width)
+                row += (
+                    " " * computed_left_pad
+                    + bar_char * bar_width
+                    + " " * (col_spacing - computed_left_pad - bar_width)
+                )
             else:
                 # Empty space
                 row += " " * col_spacing
@@ -161,7 +182,9 @@ def render_bar_chart(
     if axis_trim is None:
         # Dynamic: match widest bar row (original render_quarter_bar_chart behavior)
         # max_bar_row_len includes the │, so subtract 1 for dashes after └
-        axis_dashes = max_bar_row_len - 1 if max_bar_row_len > 0 else col_spacing * len(labels)
+        axis_dashes = (
+            max_bar_row_len - 1 if max_bar_row_len > 0 else col_spacing * len(labels)
+        )
     else:
         # Fixed trim: dashes = col_spacing * labels - axis_trim
         axis_dashes = col_spacing * len(labels) - axis_trim
@@ -191,14 +214,31 @@ def render_bar_chart(
         lines.append(delta_row.rstrip())
 
     return lines
-def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=30, bars_override=None, fill_char="■", empty_char="·"):
+
+
+def render_training_quarter_block(
+    labels,
+    counts,
+    delta_labels=None,
+    bar_width=30,
+    bars_override=None,
+    fill_char="■",
+    empty_char="·",
+):
     """
     Render per-quarter training rows (no header/footer), aligned counts and deltas.
     counts: list of (done, elapsed) tuples.
     """
     lines = []
     max_label_len = max((len(label) for label in labels), default=0)
-    count_strs = [f"({done:02d}/{elapsed:02d})" if elapsed else "(00/00)" for done, elapsed in counts] if counts else []
+    count_strs = (
+        [
+            f"({done:02d}/{elapsed:02d})" if elapsed else "(00/00)"
+            for done, elapsed in counts
+        ]
+        if counts
+        else []
+    )
     max_count_len = max((len(s) for s in count_strs), default=0)
 
     for idx, (label, (done, elapsed)) in enumerate(zip(labels, counts)):
@@ -223,7 +263,6 @@ def render_training_quarter_block(labels, counts, delta_labels=None, bar_width=3
         lines.append(line.rstrip())
 
     return lines
-
 
 
 def render_training_frequency_grid(
@@ -279,7 +318,7 @@ def render_training_frequency_grid(
         row = "│ "
         idx = 0
         for pos, day_count in enumerate(week_day_counts):
-            week = " ".join(symbols[idx:idx + day_count])
+            week = " ".join(symbols[idx : idx + day_count])
             row += week.ljust(week_width)
             idx += day_count
             if pos < len(week_day_counts) - 1:
@@ -298,7 +337,11 @@ def render_training_frequency_grid(
         row = "│ "
         for pos, label in enumerate(week_labels):
             left_pad = max((week_width - len(label)) // 2, 0)
-            row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+            row += (
+                " " * left_pad
+                + label
+                + " " * max(week_width - left_pad - len(label), 0)
+            )
             if pos < len(week_labels) - 1:
                 row += "   "
         return row.rstrip()
@@ -313,7 +356,11 @@ def render_training_frequency_grid(
             if label_str:
                 any_label = True
             left_pad = max((week_width - len(label_str)) // 2, 0)
-            row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
+            row += (
+                " " * left_pad
+                + label_str
+                + " " * max(week_width - left_pad - len(label_str), 0)
+            )
             if pos < len(week_day_counts) - 1:
                 row += "   "
         return row.rstrip() if any_label else None
@@ -334,7 +381,12 @@ def render_training_frequency_grid(
         label_row = _build_label_row()
         delta_row = _build_delta_row(deltas, prefix="└ ")
 
-        max_width = max(len(symbol_row), len(separator_row), len(label_row), len(delta_row) if delta_row else 0)
+        max_width = max(
+            len(symbol_row),
+            len(separator_row),
+            len(label_row),
+            len(delta_row) if delta_row else 0,
+        )
 
         block = [f"┌ {title}"]
         # Arrow line (or blank spacer) under the header
@@ -354,24 +406,30 @@ def render_training_frequency_grid(
             block.append(delta_row)
         return block
 
-    lines.extend(_build_activity_block("WORKOUT", workout_symbols, workout_delta_labels))
+    lines.extend(
+        _build_activity_block("WORKOUT", workout_symbols, workout_delta_labels)
+    )
     lines.append("")  # blank line between activity blocks
-    lines.extend(_build_activity_block("STRETCH", stretch_symbols, stretch_delta_labels))
+    lines.extend(
+        _build_activity_block("STRETCH", stretch_symbols, stretch_delta_labels)
+    )
 
     return lines
 
 
-def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count, current_date=None):
+def render_weekly_training_grid(
+    dates, daily_data, workout_count, stretch_count, current_date=None
+):
     """
     Render a compact frequency grid showing workout/stretch activity for a single week.
-    
+
     dates: list of 7 date objects (Monday-Sunday)
     daily_data: dict mapping date -> parsed daily note data
     workout_count: total number of workout days
     stretch_count: total number of stretch days
-    
+
     Returns list of lines for the frequency grid visualization.
-    
+
     Format:
     │ WORKOUT:  ███ ░░░ ███ ███ ░░░ ███ ███   (5/7)
     │ STRETCH:  ░░░ ███ ███ ░░░ ███ ░░░ ███   (4/7)
@@ -379,19 +437,19 @@ def render_weekly_training_grid(dates, daily_data, workout_count, stretch_count,
     │           MON TUE WED THU FRI SAT SUN
     """
     lines = []
-    
+
     # Build workout and stretch symbols
     workout_symbols = []
     stretch_symbols = []
-    
+
     for day in dates:
         entry = daily_data.get(day, {})
         has_workout = entry.get("workout", False)
         has_stretch = entry.get("stretch", False)
-        
+
         workout_symbols.append("███" if has_workout else "░░░")
         stretch_symbols.append("███" if has_stretch else "░░░")
-    
+
     prefix_workout = "│ WORKOUT:  "
     prefix_stretch = "│ STRETCH:  "
 
@@ -456,7 +514,9 @@ def render_weekly_study_grid(dates, daily_data, current_date=None):
         if day > today:
             study_symbols.append(none_symbol)
         else:
-            study_symbols.append(met_symbol if minutes and minutes >= STUDY_TARGET_MIN else none_symbol)
+            study_symbols.append(
+                met_symbol if minutes and minutes >= STUDY_TARGET_MIN else none_symbol
+            )
 
     study_done = sum(1 for sym in study_symbols if sym == met_symbol)
     study_total = len(dates)
@@ -483,7 +543,9 @@ def render_weekly_study_grid(dates, daily_data, current_date=None):
     return lines
 
 
-def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_labels=None):
+def render_monthly_study_grid(
+    week_ranges, daily_data, current_date=None, delta_labels=None
+):
     """
     Monthly study coverage grid (single block, per-day symbols, per-week grouping).
     Mirrors the training monthly grid for spacing and arrow logic.
@@ -506,7 +568,9 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_
             if day > today:
                 symbols.append(STUDY_SYMBOL_NONE)
             else:
-                symbol = study_intensity_symbol(daily_data.get(day, {}).get("study_minutes"))
+                symbol = study_intensity_symbol(
+                    daily_data.get(day, {}).get("study_minutes")
+                )
                 symbols.append(symbol)
                 total_elapsed += 1
                 if symbol == STUDY_SYMBOL_DEEP:
@@ -519,7 +583,7 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_
         row = "│ "
         idx = 0
         for pos, day_count in enumerate(week_day_counts):
-            week = " ".join(symbols[idx:idx + day_count])
+            week = " ".join(symbols[idx : idx + day_count])
             row += week.ljust(week_width)
             idx += day_count
             if pos < len(week_day_counts) - 1:
@@ -538,7 +602,11 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_
         row = "│ "
         for pos, label in enumerate(week_labels):
             left_pad = max((week_width - len(label)) // 2, 0)
-            row += " " * left_pad + label + " " * max(week_width - left_pad - len(label), 0)
+            row += (
+                " " * left_pad
+                + label
+                + " " * max(week_width - left_pad - len(label), 0)
+            )
             if pos < len(week_labels) - 1:
                 row += "   "
         return row.rstrip()
@@ -553,7 +621,11 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_
             if label_str:
                 any_label = True
             left_pad = max((week_width - len(label_str)) // 2, 0)
-            row += " " * left_pad + label_str + " " * max(week_width - left_pad - len(label_str), 0)
+            row += (
+                " " * left_pad
+                + label_str
+                + " " * max(week_width - left_pad - len(label_str), 0)
+            )
             if pos < len(week_day_counts) - 1:
                 row += "   "
         return row.rstrip() if any_label else None
@@ -571,9 +643,16 @@ def render_monthly_study_grid(week_ranges, daily_data, current_date=None, delta_
     separator_row = _build_separator_row()
     label_row = _build_label_row()
     delta_row = _build_delta_row()
-    max_width = max(len(symbol_row), len(separator_row), len(label_row), len(delta_row) if delta_row else 0)
+    max_width = max(
+        len(symbol_row),
+        len(separator_row),
+        len(label_row),
+        len(delta_row) if delta_row else 0,
+    )
 
-    header_suffix = f" ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else " (00/00)"
+    header_suffix = (
+        f" ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else " (00/00)"
+    )
     lines.append(f"┌ FULL STUDY DAYS{header_suffix}")
     if arrow_col is not None:
         arrow_line = [" "] * max_width
@@ -620,7 +699,7 @@ def _compress_symbols(symbols, target_width):
         start = int(start_f)
         end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
         end = min(end, total)
-        
+
         bucket = symbols[start:end]
         if not bucket:
             compressed.append(STUDY_SYMBOL_NONE)
@@ -632,7 +711,17 @@ def _compress_symbols(symbols, target_width):
     return "".join(compressed)
 
 
-def _compress_days_time_order(days, met_fn, target_width, *, allow_partial=False, fill_char="█", partial_char="░", empty_char="·", today=None):
+def _compress_days_time_order(
+    days,
+    met_fn,
+    target_width,
+    *,
+    allow_partial=False,
+    fill_char="█",
+    partial_char="░",
+    empty_char="·",
+    today=None,
+):
     """
     Compress a time-ordered list of days into a fixed-width string.
     - days: list of date objects in chronological order
@@ -645,7 +734,7 @@ def _compress_days_time_order(days, met_fn, target_width, *, allow_partial=False
     total = len(days)
     if target_width <= 0 or total == 0:
         return empty_char * max(target_width, 0)
-    
+
     # Use proportional mapping: each character covers (total / target_width) days
     # This ensures all characters represent actual days, no empty filler at end
     symbols = []
@@ -656,7 +745,7 @@ def _compress_days_time_order(days, met_fn, target_width, *, allow_partial=False
         start = int(start_f)
         end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
         end = min(end, total)
-        
+
         bucket = days[start:end]
         if not bucket:
             symbols.append(empty_char)
@@ -675,7 +764,9 @@ def _compress_days_time_order(days, met_fn, target_width, *, allow_partial=False
     return "".join(symbols)
 
 
-def compress_activity_time_order(days, has_activity_fn, target_width, *, fill_char="■", empty_char="·", today=None):
+def compress_activity_time_order(
+    days, has_activity_fn, target_width, *, fill_char="■", empty_char="·", today=None
+):
     """
     Time-ordered compression for binary activity (workout/stretch).
     """
@@ -691,7 +782,9 @@ def compress_activity_time_order(days, has_activity_fn, target_width, *, fill_ch
     )
 
 
-def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_labels=None):
+def render_quarterly_study_coverage(
+    month_ranges, daily_data, today=None, delta_labels=None
+):
     """
     Per-month study coverage rows (intensity symbols + counts).
     Optional delta_labels mirrors training monthly deltas (per-month percent change).
@@ -729,7 +822,11 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_
         total_done += done
         total_elapsed += elapsed_days
 
-    header = f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else "┌ FULL STUDY DAYS (00/00)"
+    header = (
+        f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})"
+        if total_elapsed
+        else "┌ FULL STUDY DAYS (00/00)"
+    )
     lines.append(header)
     lines.append("│")
 
@@ -737,11 +834,7 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_
         pad_between = (max_bar_len - len(bar)) + 1
         delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
         delta_str = delta.rjust(4) if delta else ""
-        line = (
-            f"│ {label} {bar}"
-            f"{' ' * pad_between}"
-            f"{count_str.rjust(max_count_len)}"
-        )
+        line = f"│ {label} {bar}{' ' * pad_between}{count_str.rjust(max_count_len)}"
         if delta_str:
             line += f"   {delta_str}"
         lines.append(line.rstrip())
@@ -751,7 +844,15 @@ def render_quarterly_study_coverage(month_ranges, daily_data, today=None, delta_
     return lines
 
 
-def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_width=30, delta_labels=None, bars_override=None, legend_line=STUDY_LEGEND_LINE):
+def render_yearly_study_coverage(
+    quarter_ranges,
+    daily_data,
+    today=None,
+    bar_width=30,
+    delta_labels=None,
+    bars_override=None,
+    legend_line=STUDY_LEGEND_LINE,
+):
     """
     Per-quarter study coverage rows (intensity symbols + counts).
 
@@ -779,7 +880,9 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_wid
             done = sum(
                 1
                 for d in days
-                if d <= today and study_intensity_symbol(daily_data.get(d, {}).get("study_minutes")) == STUDY_SYMBOL_DEEP
+                if d <= today
+                and study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
+                == STUDY_SYMBOL_DEEP
             )
         else:
             bar_chars = []
@@ -790,7 +893,9 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_wid
                     bar_chars.append(STUDY_SYMBOL_NONE)
                     continue
                 elapsed_days += 1
-                symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
+                symbol = study_intensity_symbol(
+                    daily_data.get(d, {}).get("study_minutes")
+                )
                 bar_chars.append(symbol)
                 if symbol != STUDY_SYMBOL_NONE:
                     done += 1
@@ -811,15 +916,11 @@ def render_yearly_study_coverage(quarter_ranges, daily_data, today=None, bar_wid
         pad_between = (max_bar_len - len(bar)) + 1
         delta = delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
         delta_str = delta.rjust(4) if delta else ""
-        line = (
-            f"│ {label} {bar}"
-            f"{' ' * pad_between}"
-            f"{count_str.rjust(max_count_len)}"
-        )
+        line = f"│ {label} {bar}{' ' * pad_between}{count_str.rjust(max_count_len)}"
         if delta_str:
             line += f"   {delta_str}"
         lines.append(line.rstrip())
     lines.append("└")
     lines.append("")
-    lines.append(STUDY_LEGEND_LINE)
+    lines.append(legend_line)
     return lines

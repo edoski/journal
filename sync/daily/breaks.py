@@ -4,6 +4,7 @@ Break linking and overrun calculation logic for daily sync.
 Provides functions to compute expected break durations, handle lunch windows,
 calculate time overlaps, and determine break overruns.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -102,7 +103,9 @@ def _compute_dynamic_lunch_window(
         base_end_dt += datetime.timedelta(days=1)
     window_duration = base_end_dt - base_start_dt
 
-    eligible = sorted((s for s in flow_sessions if s.get("end")), key=lambda s: s["end"])
+    eligible = sorted(
+        (s for s in flow_sessions if s.get("end")), key=lambda s: s["end"]
+    )
     shifted_start_dt = None
     for session in eligible:
         start_dt = session.get("start")

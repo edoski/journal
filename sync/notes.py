@@ -4,6 +4,7 @@ Note file I/O and manipulation utilities for the journal sync system.
 Provides functions for parsing daily notes, managing file locks,
 finding/manipulating markdown sections, and updating note content.
 """
+
 from __future__ import annotations
 
 import fcntl
@@ -15,8 +16,64 @@ import time
 from contextlib import contextmanager
 
 from .constants import LOCK_DIR
-from .parsing import parse_frontmatter, parse_duration_to_minutes, parse_bool
-from .goals import find_subheader_idx, _normalize_header
+from sync.readers.frontmatter import parse_frontmatter
+
+
+def _normalize_header(line: str) -> str:
+    """Normalize markdown headers for matching, ignoring emphasis markers."""
+    import re
+
+    stripped = line.strip()
+    cleaned = re.sub(r"\*+", "", stripped)
+    cleaned = re.sub(r"_+", "", cleaned)
+    return cleaned.lower()
+
+
+def _parse_duration_to_minutes(val) -> float | None:
+    """Parse duration string to minutes."""
+    import re
+
+    if val is None:
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip().strip("`")
+    if not s:
+        return None
+    hours = 0.0
+    minutes = 0.0
+    seconds = 0.0
+    match_h = re.search(r"(\d+(?:\.\d+)?)h", s)
+    match_m = re.search(r"(\d+(?:\.\d+)?)m", s)
+    match_s = re.search(r"(\d+(?:\.\d+)?)s", s)
+    if match_h:
+        hours = float(match_h.group(1))
+    if match_m:
+        minutes = float(match_m.group(1))
+    if match_s:
+        seconds = float(match_s.group(1))
+    return hours * 60 + minutes + (seconds / 60)
+
+
+def _parse_bool(val) -> bool:
+    """Parse a value as boolean."""
+    if isinstance(val, bool):
+        return val
+    if val is None:
+        return False
+    return str(val).strip().lower() == "true"
+
+
+def _find_subheader_idx(
+    lines: list[str], title: str, start: int = 0, end: int | None = None, level: int = 3
+) -> int:
+    """Find index of a subheader between start and end."""
+    end = end if end is not None else len(lines)
+    needle = _normalize_header(f"{'#' * level} {title}")
+    for idx in range(start, end):
+        if _normalize_header(lines[idx]) == needle:
+            return idx
+    return -1
 
 
 def _lockfile_for(path: str) -> str:
@@ -58,7 +115,7 @@ def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
     # Run cleanup ~1% of the time to avoid overhead
     if random.random() < 0.01:
         _cleanup_old_locks(30)
-    
+
     lock_path = _lockfile_for(path)
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
     deadline = time.time() + timeout
@@ -69,9 +126,7 @@ def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
                 break
             except BlockingIOError:
                 if time.time() >= deadline:
-                    raise TimeoutError(
-                        f"Could not lock {path} within {timeout}s."
-                    )
+                    raise TimeoutError(f"Could not lock {path} within {timeout}s.")
                 time.sleep(poll)
         yield
     finally:
@@ -79,39 +134,49 @@ def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
         os.close(fd)
 
 
-def find_header_idx(lines: list[str], title: str, level: int = 2, start: int = 0) -> int:
+def find_header_idx(
+    lines: list[str], title: str, level: int = 2, start: int = 0
+) -> int:
     """Find the index of a markdown header like ## Title or ### Title.
 
     Returns -1 when not found. Matching is case-insensitive and ignores extra
     emphasis markers (handled via _normalize_header).
     """
-    needle = _normalize_header(f"{'#'*level} {title}")
+    needle = _normalize_header(f"{'#' * level} {title}")
     for idx in range(start, len(lines)):
         if _normalize_header(lines[idx]) == needle:
             return idx
     return -1
 
 
-def section_bounds(lines: list[str], header_idx: int, level: int = 2) -> tuple[int, int]:
+def section_bounds(
+    lines: list[str], header_idx: int, level: int = 2
+) -> tuple[int, int]:
     """Return (start, end) indices for a header block delimited by same-level headers."""
     if header_idx == -1:
         return -1, -1
     end_idx = len(lines)
     header_prefix = "#" * level + " "
     for idx in range(header_idx + 1, len(lines)):
-        if lines[idx].strip().startswith(header_prefix) and _normalize_header(lines[idx]) != _normalize_header(lines[header_idx]):
+        if lines[idx].strip().startswith(header_prefix) and _normalize_header(
+            lines[idx]
+        ) != _normalize_header(lines[header_idx]):
             end_idx = idx
             break
     return header_idx, end_idx
 
 
-def subsection_bounds(lines: list[str], subheader_idx: int, parent_end_idx: int) -> tuple[int, int]:
+def subsection_bounds(
+    lines: list[str], subheader_idx: int, parent_end_idx: int
+) -> tuple[int, int]:
     """Return (start, end) indices for a ### subsection up to next ### or parent end."""
     if subheader_idx == -1:
         return -1, -1
     end_idx = parent_end_idx
     for idx in range(subheader_idx + 1, parent_end_idx):
-        if lines[idx].strip().startswith("### ") and _normalize_header(lines[idx]) != _normalize_header(lines[subheader_idx]):
+        if lines[idx].strip().startswith("### ") and _normalize_header(
+            lines[idx]
+        ) != _normalize_header(lines[subheader_idx]):
             end_idx = idx
             break
     return subheader_idx, end_idx
@@ -131,7 +196,10 @@ def extract_block(lines: list[str], header: str) -> list[str] | None:
     end = len(lines)
     for idx in range(start + 1, len(lines)):
         stripped = lines[idx].strip()
-        if stripped.startswith("#" * level + " ") and _normalize_header(stripped) != header_norm:
+        if (
+            stripped.startswith("#" * level + " ")
+            and _normalize_header(stripped) != header_norm
+        ):
             end = idx
             break
     return lines[start:end]
@@ -157,7 +225,7 @@ def ensure_section_with_divider(
         if pos > 0 and lines[pos - 1].strip() != "":
             lines.insert(pos, "")
             pos += 1
-        lines.insert(pos, f"{'#'*level} {title}")
+        lines.insert(pos, f"{'#' * level} {title}")
         header_idx = pos
         lines.insert(header_idx + 1, "---")
         return header_idx, header_idx + 1
@@ -179,11 +247,15 @@ def goals_section_bounds(lines: list[str]) -> tuple[int, int]:
     return goals_idx, end
 
 
-def extract_subsection_tasks(lines: list[str], parent_start: int, parent_end: int, sub_title: str) -> list[dict]:
+def extract_subsection_tasks(
+    lines: list[str], parent_start: int, parent_end: int, sub_title: str
+) -> list[dict]:
     """Extract checkbox tasks from a ### subsection within a parent block."""
-    from .goals import parse_goal_tasks
-    
-    sub_idx = find_subheader_idx(lines, sub_title, start=parent_start, end=parent_end, level=3)
+    from sync.readers.goals import parse_goal_tasks
+
+    sub_idx = _find_subheader_idx(
+        lines, sub_title, start=parent_start, end=parent_end, level=3
+    )
     if sub_idx == -1:
         return []
     sub_start, sub_end = subsection_bounds(lines, sub_idx, parent_end)
@@ -222,13 +294,17 @@ def parse_study_table(lines: list[str]) -> list[tuple]:
         return []
     header_idx = -1
     for i, line in enumerate(block):
-        if re.search(r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(DURATION|FOCUS)\s*\|", line, re.IGNORECASE):
+        if re.search(
+            r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(DURATION|FOCUS)\s*\|",
+            line,
+            re.IGNORECASE,
+        ):
             header_idx = i
             break
     if header_idx == -1:
         return []
     rows = []
-    for line in block[header_idx + 2:]:
+    for line in block[header_idx + 2 :]:
         if not line.strip().startswith("|"):
             break
         if re.search(r"no study sessions", line, re.IGNORECASE):
@@ -237,7 +313,7 @@ def parse_study_table(lines: list[str]) -> list[tuple]:
         if len(parts) < 6:
             continue
         activity = parts[2].strip("`")
-        duration_min = parse_duration_to_minutes(parts[3])
+        duration_min = _parse_duration_to_minutes(parts[3])
 
         # Parse interrupt minutes from INTERRUPT column (format: `+XXm`)
         interrupt_min = 0
@@ -254,14 +330,16 @@ def parse_study_table(lines: list[str]) -> list[tuple]:
             break_str = parts[5].strip("`").strip()
             if break_str:
                 planned_str = break_str.split("(", 1)[0].strip()
-                planned_break_min = parse_duration_to_minutes(planned_str) or 0
+                planned_break_min = _parse_duration_to_minutes(planned_str) or 0
             overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
             if overrun_match:
                 overrun_str = overrun_match.group(1)
-                overrun_min = parse_duration_to_minutes(overrun_str) or 0
+                overrun_min = _parse_duration_to_minutes(overrun_str) or 0
 
         if activity and duration_min:
-            rows.append((activity, duration_min, interrupt_min, overrun_min, planned_break_min))
+            rows.append(
+                (activity, duration_min, interrupt_min, overrun_min, planned_break_min)
+            )
     return rows
 
 
@@ -272,20 +350,24 @@ def parse_sleep_table(lines: list[str]) -> list[tuple]:
         return []
     header_idx = -1
     for i, line in enumerate(block):
-        if re.search(r"\|\s*TIME\s*\|\s*DURATION\s*\|\s*AWAKE\s*\|\s*AWAKENINGS\s*\|", line, re.IGNORECASE):
+        if re.search(
+            r"\|\s*TIME\s*\|\s*DURATION\s*\|\s*AWAKE\s*\|\s*AWAKENINGS\s*\|",
+            line,
+            re.IGNORECASE,
+        ):
             header_idx = i
             break
     if header_idx == -1:
         return []
     rows = []
-    for line in block[header_idx + 2:]:
+    for line in block[header_idx + 2 :]:
         if not line.strip().startswith("|"):
             break
         parts = [p.strip() for p in line.split("|")]
         if len(parts) < 5:
             continue
-        duration_min = parse_duration_to_minutes(parts[2])
-        awake_min = parse_duration_to_minutes(parts[3])
+        duration_min = _parse_duration_to_minutes(parts[2])
+        awake_min = _parse_duration_to_minutes(parts[3])
         awakenings = None
         if parts[4]:
             try:
@@ -309,8 +391,12 @@ def parse_daily_note(path: str) -> dict | None:
     sleep_rows = parse_sleep_table(lines)
 
     # Sleep still uses frontmatter if available (user may adjust for naps, etc.)
-    sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
-    sleep_total = sleep_from_fm if sleep_from_fm is not None else sum((r[0] or 0 for r in sleep_rows), 0)
+    sleep_from_fm = _parse_duration_to_minutes(fm.get("sleep"))
+    sleep_total = (
+        sleep_from_fm
+        if sleep_from_fm is not None
+        else sum((r[0] or 0 for r in sleep_rows), 0)
+    )
 
     mood_val = None
     if fm.get("mood") not in (None, ""):
@@ -319,8 +405,8 @@ def parse_daily_note(path: str) -> dict | None:
         except Exception:
             mood_val = None
 
-    workout = parse_bool(fm.get("workout"))
-    stretch = parse_bool(fm.get("stretch"))
+    workout = _parse_bool(fm.get("workout"))
+    stretch = _parse_bool(fm.get("stretch"))
 
     awake_total = sum((r[1] or 0 for r in sleep_rows), 0) if sleep_rows else None
     awakenings_total = None
@@ -388,11 +474,14 @@ def replace_metrics_block(lines: list[str], new_block_lines: list[str]) -> list[
 
     end_idx = len(lines)
     for idx in range(metrics_idx + 1, len(lines)):
-        if lines[idx].strip().startswith("## ") and lines[idx].strip().lower() != "## metrics":
+        if (
+            lines[idx].strip().startswith("## ")
+            and lines[idx].strip().lower() != "## metrics"
+        ):
             end_idx = idx
             break
 
-    new_lines = lines[:metrics_idx + 1]
+    new_lines = lines[: metrics_idx + 1]
     new_lines.append("---")
 
     # Insert new metrics content as-is (builders should control internal spacing)

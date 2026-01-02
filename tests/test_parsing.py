@@ -1,25 +1,28 @@
 """
-Tests for sync_utils.parsing module.
+Tests for formatting and parsing utilities.
 
 Covers duration parsing, value formatting, percent change calculations,
 and other value transformation utilities.
 """
+
 from __future__ import annotations
 
 from collections import OrderedDict
 
-from sync_utils.parsing import (
-    parse_frontmatter,
-    parse_duration_to_minutes,
+from sync.formatting import (
     format_minutes,
     format_minutes_seconds,
     ceil_minutes,
     round_half_up,
-    parse_bool,
     compute_percent_change,
     format_percent_change,
     format_training_ratio,
     format_mood_with_scale,
+)
+from sync.readers.frontmatter import parse_frontmatter
+from sync.notes import (
+    _parse_duration_to_minutes as parse_duration_to_minutes,
+    _parse_bool as parse_bool,
 )
 
 

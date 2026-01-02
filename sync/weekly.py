@@ -3,47 +3,51 @@ import argparse
 import datetime
 import os
 
-from sync_utils import (
+from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
     DEFAULT_MONTHLY_DIR,
-    locked_note,
     DAYS,
+)
+from sync.notes import (
+    locked_note,
     parse_daily_note,
-    daterange,
-    iso_week_range,
-    format_minutes,
-    render_summary_table,
-    render_bar_chart,
-    render_weekly_training_grid,
-    render_weekly_study_grid,
-    wrap_code_block,
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
-    render_goal_lines,
-    build_goals_block,
     trim_blank_lines,
     join_sections,
-    ensure_goal_ids,
+)
+from sync.dates import daterange, iso_week_range
+from sync.formatting import format_minutes
+from sync.metrics import (
     compute_period_metrics,
     compute_moving_average,
     load_daily_data,
+    aggregate_activity_totals,
+    aggregate_interrupt_overrun,
+)
+from sync.writers.tables import (
+    render_summary_table,
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
-    aggregate_activity_totals,
-    aggregate_interrupt_overrun,
-    build_media_section,
-    filter_by_proximity,
 )
+from sync.writers.charts import (
+    render_bar_chart,
+    render_weekly_training_grid,
+    render_weekly_study_grid,
+    wrap_code_block,
+)
+from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.media import build_media_section
+from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 
 
 from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
-
 
 
 def _load_monthly_goals(month_start, monthly_dir=None):
@@ -66,7 +70,11 @@ def _write_monthly_goals(path, tasks, existing_lines):
     g_start, g_end = goals_section_bounds(existing_lines)
     new_block = ["## Goals", "---"] + render_goal_lines(tasks)
     if g_start == -1:
-        lines = new_block + ([""] if existing_lines and existing_lines[0].strip() else []) + existing_lines
+        lines = (
+            new_block
+            + ([""] if existing_lines and existing_lines[0].strip() else [])
+            + existing_lines
+        )
     else:
         lines = existing_lines[:]
         lines[g_start:g_end] = new_block
@@ -85,11 +93,17 @@ def _parse_weekly_note_goals(lines):
     return monthly_mirror, weekly_tasks
 
 
-
-def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev_week_label, prior_week_metrics=None):
+def build_weekly_metrics(
+    start_date,
+    end_date,
+    daily_data,
+    prev_daily_data,
+    prev_week_label,
+    prior_week_metrics=None,
+):
     """
     Build the metrics block for a weekly note.
-    
+
     prev_week_label: wiki link like "[[2025-W50|LAST WEEK]]"
     prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
     """
@@ -98,7 +112,10 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
 
     # Compute metrics for current and previous week
     current_metrics = compute_period_metrics(dates, daily_data)
-    prev_dates = [start_date - datetime.timedelta(days=7) + datetime.timedelta(days=i) for i in range(7)]
+    prev_dates = [
+        start_date - datetime.timedelta(days=7) + datetime.timedelta(days=i)
+        for i in range(7)
+    ]
     prev_metrics = compute_period_metrics(prev_dates, prev_daily_data)
 
     # Compute 4-week moving average
@@ -119,11 +136,13 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     study_total_from_activities = sum(activity_totals.values())
 
     sections = []
-    
+
     # Summary with MA
     summary_lines = render_summary_table(
-        current_metrics, prev_metrics,
-        "THIS WEEK", prev_week_label,
+        current_metrics,
+        prev_metrics,
+        "THIS WEEK",
+        prev_week_label,
         ma_metrics=ma_metrics,
         ma_label="4-WK AVG" if ma_metrics else None,
         ma_training_unit="7",
@@ -138,7 +157,9 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         if d > today:
             study_values.append("")
         else:
-            study_values.append(format_minutes(m) if m is not None and m > 0 else "0h00m")
+            study_values.append(
+                format_minutes(m) if m is not None and m > 0 else "0h00m"
+            )
     chart_lines = render_bar_chart(
         DAYS,
         study_hours,
@@ -151,7 +172,9 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         axis_trim=2,
     )
     study_lines.extend(wrap_code_block(chart_lines))
-    study_lines.append(f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**")
+    study_lines.append(
+        f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**"
+    )
     study_lines.append("")
 
     # Activity table (activity_totals already computed above)
@@ -159,15 +182,19 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     study_lines.append("")
 
     current_week_date = today if start_date <= today <= end_date else None
-    study_grid = render_weekly_study_grid(dates, daily_data, current_date=current_week_date)
+    study_grid = render_weekly_study_grid(
+        dates, daily_data, current_date=current_week_date
+    )
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     # INTERRUPTIONS table
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(dates, daily_data)
+    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
+        dates, daily_data
+    )
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
-    
+
     study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
     study_lines.append("")
     sections.append(trim_blank_lines(study_lines))
@@ -190,7 +217,9 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
         if d > today:
             sleep_values.append("")
         else:
-            sleep_values.append(format_minutes(m) if m is not None and m > 0 else "0h00m")
+            sleep_values.append(
+                format_minutes(m) if m is not None and m > 0 else "0h00m"
+            )
     sleep_chart = render_bar_chart(
         DAYS,
         sleep_hours,
@@ -205,13 +234,19 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
-    awake_vals = [daily_data.get(d, {}).get("awake_minutes") for d in dates if daily_data.get(d)]
-    awakenings_vals = [daily_data.get(d, {}).get("awakenings") for d in dates if daily_data.get(d)]
+    awake_vals = [
+        daily_data.get(d, {}).get("awake_minutes") for d in dates if daily_data.get(d)
+    ]
+    awakenings_vals = [
+        daily_data.get(d, {}).get("awakenings") for d in dates if daily_data.get(d)
+    ]
     awake_vals = [v for v in awake_vals if v is not None]
     awakenings_vals = [v for v in awakenings_vals if v is not None]
 
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
-    avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
+    avg_awakenings = (
+        sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
+    )
 
     sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
@@ -249,7 +284,9 @@ def build_weekly_metrics(start_date, end_date, daily_data, prev_daily_data, prev
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate weekly metrics from daily notes.")
+    parser = argparse.ArgumentParser(
+        description="Generate weekly metrics from daily notes."
+    )
     parser.add_argument("--file", help="Path to weekly note")
     parser.add_argument("--date", help="Date within week (YYYY-MM-DD)")
     parser.add_argument("--weekly-dir", help="Directory for weekly notes")
@@ -301,7 +338,9 @@ def main():
 
         # Load 4 prior weeks for moving average calculation
         prior_week_metrics = []
-        for weeks_ago in range(4, 0, -1):  # 4 weeks ago, 3 weeks ago, 2 weeks ago, 1 week ago
+        for weeks_ago in range(
+            4, 0, -1
+        ):  # 4 weeks ago, 3 weeks ago, 2 weeks ago, 1 week ago
             prior_start = week_start - datetime.timedelta(days=7 * weeks_ago)
             prior_end = prior_start + datetime.timedelta(days=7)
             prior_data = load_daily_data(prior_start, prior_end)
@@ -310,8 +349,12 @@ def main():
             prior_week_metrics.append(prior_metrics)
 
         metrics_block = build_weekly_metrics(
-            week_start, week_end, daily_data, prev_daily_data, prev_week_label,
-            prior_week_metrics=prior_week_metrics
+            week_start,
+            week_end,
+            daily_data,
+            prev_daily_data,
+            prev_week_label,
+            prior_week_metrics=prior_week_metrics,
         )
 
         try:
@@ -328,8 +371,10 @@ def main():
         # Carry forward open weekly goals from prior week
         year, week_num, _ = target_date.isocalendar()
         week_key = f"{year}-W{week_num:02d}"
-        
-        prev_week_path = os.path.join(weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md")
+
+        prev_week_path = os.path.join(
+            weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md"
+        )
         prev_week_tasks = []
         if os.path.exists(prev_week_path):
             try:
@@ -339,8 +384,10 @@ def main():
                 ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
             except Exception:
                 prev_week_tasks = []
-        
-        weekly_tasks, _ = carry_forward_goals(prev_week_tasks, weekly_tasks, week_key, "weekly")
+
+        weekly_tasks, _ = carry_forward_goals(
+            prev_week_tasks, weekly_tasks, week_key, "weekly"
+        )
 
         # Propagate MONTHLY status changes from weekly mirror to monthly source
         monthly_changed = propagate_goal_status(monthly_tasks, monthly_mirror)
@@ -359,14 +406,20 @@ def main():
         # Filter monthly tasks to only show those with deadlines within 30 days (or no deadline).
         today = datetime.date.today()
         filtered_monthly = filter_by_proximity(monthly_tasks, 30, today)
-        monthly_lines = render_goal_lines(filtered_monthly, today=today) if filtered_monthly else [
-            "",
-            "_No monthly goals have been defined yet._",
-        ]
-        goals_block = build_goals_block([
-            ("MONTHLY", monthly_lines),
-            ("WEEKLY", render_goal_lines(weekly_tasks, today=today)),
-        ])
+        monthly_lines = (
+            render_goal_lines(filtered_monthly, today=today)
+            if filtered_monthly
+            else [
+                "",
+                "_No monthly goals have been defined yet._",
+            ]
+        )
+        goals_block = build_goals_block(
+            [
+                ("MONTHLY", monthly_lines),
+                ("WEEKLY", render_goal_lines(weekly_tasks, today=today)),
+            ]
+        )
 
         g_start, g_end = goals_section_bounds(lines)
         if g_start == -1:

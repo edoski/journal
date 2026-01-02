@@ -3,51 +3,57 @@ import argparse
 import datetime
 import os
 
-from sync_utils import (
+from sync.constants import (
     YEARLY_TEMPLATE_PATH,
     DEFAULT_YEARLY_DIR,
-    locked_note,
-    daterange,
-    year_range,
-    year_quarters,
-    format_minutes,
-    compute_percent_change,
-    format_percent_change,
-    render_bar_chart,
-    render_training_quarter_block,
-    render_summary_table,
-    render_yearly_study_coverage,
     YEARLY_STUDY_LEGEND_LINE,
     STUDY_TARGET_MIN,
     STUDY_SYMBOL_DEEP,
     STUDY_SYMBOL_NONE,
-    wrap_code_block,
+)
+from sync.notes import (
+    locked_note,
     ensure_note,
     replace_metrics_block,
-    compress_activity_time_order,
-    _compress_days_time_order,
     goals_section_bounds,
     extract_subsection_tasks,
-    build_goals_block,
-    render_goal_lines,
     trim_blank_lines,
-    ensure_goal_ids,
+)
+from sync.dates import daterange, year_range, year_quarters
+from sync.formatting import (
+    format_minutes,
+    compute_percent_change,
+    format_percent_change,
+)
+from sync.metrics import (
     load_daily_data,
     compute_period_metrics,
-    render_sleep_stats_table,
-    render_activity_table,
-    render_interrupts_table,
     aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,
-    build_media_section,
 )
+from sync.writers.tables import (
+    render_summary_table,
+    render_sleep_stats_table,
+    render_activity_table,
+    render_interrupts_table,
+)
+from sync.writers.charts import (
+    render_bar_chart,
+    render_training_quarter_block,
+    render_yearly_study_coverage,
+    wrap_code_block,
+    compress_activity_time_order,
+    _compress_days_time_order,
+)
+from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.media import build_media_section
+from sync.readers.goals import ensure_goal_ids
 
 from sync.base import atomic_write_note
 
 YEARLY_STUDY_BAR_WIDTH = 45
 YEARLY_TRAINING_BAR_WIDTH = 45
-
 
 
 def _quarter_totals(daily_data, quarter_ranges):
@@ -63,7 +69,16 @@ def _quarter_totals(daily_data, quarter_ranges):
     return totals
 
 
-def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarter_ranges, daily_data, prev_daily_data, prior_year_metrics=None):
+def build_yearly_metrics(
+    year,
+    year_start,
+    year_end,
+    quarter_ranges,
+    prev_quarter_ranges,
+    daily_data,
+    prev_daily_data,
+    prior_year_metrics=None,
+):
     today = datetime.date.today()
     sections = []
 
@@ -92,7 +107,7 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
 
     # STUDY (quarter bars, y_max=720h)
     study_lines = ["### **STUDY**"]
-    q_labels = [f"Q{i+1}" for i in range(4)]
+    q_labels = [f"Q{i + 1}" for i in range(4)]
     prev_quarter_totals = _quarter_totals(prev_daily_data, prev_quarter_ranges)
 
     activity_totals = {}
@@ -116,7 +131,9 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         if start > today:
             study_value_labels.append("")
         else:
-            study_value_labels.append(format_minutes(total_min) if total_min > 0 else "0h00m")
+            study_value_labels.append(
+                format_minutes(total_min) if total_min > 0 else "0h00m"
+            )
 
     for idx, (start, _) in enumerate(quarter_ranges):
         if start > today:
@@ -143,7 +160,9 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(study_chart))
-    study_lines.append(f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**")
+    study_lines.append(
+        f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
+    )
     study_lines.append("")
 
     study_lines.extend(render_activity_table(activity_totals))
@@ -158,12 +177,14 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         done = sum(
             1
             for d in days
-            if d <= today and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+            if d <= today
+            and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
         )
         study_counts.append((done, elapsed_days, start))
         bar = _compress_days_time_order(
             days,
-            lambda d: (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN,
+            lambda d: (daily_data.get(d, {}).get("study_minutes") or 0)
+            >= STUDY_TARGET_MIN,
             YEARLY_STUDY_BAR_WIDTH,
             allow_partial=True,
             fill_char=STUDY_SYMBOL_DEEP,
@@ -180,7 +201,9 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
         prev_study_baseline = sum(
             1
             for d in prev_days
-            if d <= today and (prev_daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+            if d <= today
+            and (prev_daily_data.get(d, {}).get("study_minutes") or 0)
+            >= STUDY_TARGET_MIN
         )
 
     study_delta_labels = []
@@ -207,17 +230,19 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(dates, daily_data)
+    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
+        dates, daily_data
+    )
     avg_interrupts = total_interrupts / max(1, study_day_count)
     avg_overruns = total_overruns / max(1, study_day_count)
-    
+
     study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
     study_lines.append("")
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING (quarter rows)
     training_lines = ["### **TRAINING**"]
-    quarter_labels = [f"Q{i+1}" for i in range(4)]
+    quarter_labels = [f"Q{i + 1}" for i in range(4)]
     workout_counts = []
     stretch_counts = []
     workout_done_year = 0
@@ -227,8 +252,12 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         elapsed_days = sum(1 for d in days if d <= today)
-        workout_done = sum(1 for d in days if d <= today and daily_data.get(d, {}).get("workout"))
-        stretch_done = sum(1 for d in days if d <= today and daily_data.get(d, {}).get("stretch"))
+        workout_done = sum(
+            1 for d in days if d <= today and daily_data.get(d, {}).get("workout")
+        )
+        stretch_done = sum(
+            1 for d in days if d <= today and daily_data.get(d, {}).get("stretch")
+        )
         workout_counts.append((workout_done, elapsed_days, start))
         stretch_counts.append((stretch_done, elapsed_days, start))
         workout_done_year += workout_done
@@ -241,15 +270,23 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     if prev_quarter_ranges:
         last_q_start, last_q_end = prev_quarter_ranges[-1]
         prev_days = list(daterange(last_q_start, last_q_end))
-        prev_workout_baseline = sum(1 for d in prev_days if prev_daily_data.get(d, {}).get("workout"))
-        prev_stretch_baseline = sum(1 for d in prev_days if prev_daily_data.get(d, {}).get("stretch"))
+        prev_workout_baseline = sum(
+            1 for d in prev_days if prev_daily_data.get(d, {}).get("workout")
+        )
+        prev_stretch_baseline = sum(
+            1 for d in prev_days if prev_daily_data.get(d, {}).get("stretch")
+        )
 
-    workout_delta_labels = compute_period_deltas(workout_counts, prev_workout_baseline, today)
-    stretch_delta_labels = compute_period_deltas(stretch_counts, prev_stretch_baseline, today)
+    workout_delta_labels = compute_period_deltas(
+        workout_counts, prev_workout_baseline, today
+    )
+    stretch_delta_labels = compute_period_deltas(
+        stretch_counts, prev_stretch_baseline, today
+    )
 
     workout_bars = []
     stretch_bars = []
-    for (start, end) in quarter_ranges:
+    for start, end in quarter_ranges:
         days = list(daterange(start, end))
         workout_bars.append(
             compress_activity_time_order(
@@ -316,13 +353,23 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     if prev_quarter_ranges:
         prev_q4_start, prev_q4_end = prev_quarter_ranges[-1]
         prev_q4_days = list(daterange(prev_q4_start, prev_q4_end))
-        prev_q4_vals = [prev_daily_data.get(d, {}).get("sleep_minutes") for d in prev_q4_days if prev_daily_data.get(d)]
+        prev_q4_vals = [
+            prev_daily_data.get(d, {}).get("sleep_minutes")
+            for d in prev_q4_days
+            if prev_daily_data.get(d)
+        ]
         prev_q4_vals = [v for v in prev_q4_vals if v is not None]
-        prev_q4_sleep_avg = (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
+        prev_q4_sleep_avg = (
+            (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
+        )
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
-        mins = [daily_data.get(d, {}).get("sleep_minutes") for d in days if daily_data.get(d)]
+        mins = [
+            daily_data.get(d, {}).get("sleep_minutes")
+            for d in days
+            if daily_data.get(d)
+        ]
         mins_clean = [m for m in mins if m is not None]
         if mins_clean:
             avg_min = sum(mins_clean) / len(mins_clean)
@@ -361,13 +408,19 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
-    awake_vals = [daily_data.get(d, {}).get("awake_minutes") for d in dates if daily_data.get(d)]
-    awakenings_vals = [daily_data.get(d, {}).get("awakenings") for d in dates if daily_data.get(d)]
+    awake_vals = [
+        daily_data.get(d, {}).get("awake_minutes") for d in dates if daily_data.get(d)
+    ]
+    awakenings_vals = [
+        daily_data.get(d, {}).get("awakenings") for d in dates if daily_data.get(d)
+    ]
     awake_vals = [v for v in awake_vals if v is not None]
     awakenings_vals = [v for v in awakenings_vals if v is not None]
 
     avg_awake = sum(awake_vals) / len(awake_vals) if awake_vals else None
-    avg_awakenings = sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
+    avg_awakenings = (
+        sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
+    )
     sleep_avg = current_metrics.get("sleep_avg_minutes")
 
     sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
@@ -385,9 +438,15 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
     if prev_quarter_ranges:
         prev_q4_start, prev_q4_end = prev_quarter_ranges[-1]
         prev_q4_days = list(daterange(prev_q4_start, prev_q4_end))
-        prev_q4_vals = [prev_daily_data.get(d, {}).get("mood") for d in prev_q4_days if prev_daily_data.get(d)]
+        prev_q4_vals = [
+            prev_daily_data.get(d, {}).get("mood")
+            for d in prev_q4_days
+            if prev_daily_data.get(d)
+        ]
         prev_q4_vals = [v for v in prev_q4_vals if v is not None]
-        prev_q4_mood_avg = (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
+        prev_q4_mood_avg = (
+            (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
+        )
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
@@ -443,7 +502,9 @@ def build_yearly_metrics(year, year_start, year_end, quarter_ranges, prev_quarte
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate yearly metrics from daily notes.")
+    parser = argparse.ArgumentParser(
+        description="Generate yearly metrics from daily notes."
+    )
     parser.add_argument("--file", help="Path to yearly note")
     parser.add_argument("--year", help="Year (YYYY)")
     parser.add_argument("--yearly-dir", help="Directory for yearly notes")
@@ -495,11 +556,15 @@ def main():
             yearly_tasks.append({**t, "done": False})
             existing_ids.add(t.get("id"))
 
-        new_goals_block = build_goals_block([
-            ("YEARLY", render_goal_lines(yearly_tasks)),
-        ])
+        new_goals_block = build_goals_block(
+            [
+                ("YEARLY", render_goal_lines(yearly_tasks)),
+            ]
+        )
         if g_start == -1:
-            lines = new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
+            lines = (
+                new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
+            )
         else:
             lines[g_start:g_end] = new_goals_block
 

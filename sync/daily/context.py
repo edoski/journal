@@ -4,13 +4,14 @@ Context tracking for daily sync.
 Provides functions to discover which vault files were modified during
 study sessions, enabling automatic CONTEXT column population.
 """
+
 from __future__ import annotations
 
 import os
 from datetime import datetime, date, timedelta
 from typing import Any
 
-from sync_utils import VAULT_DIR
+from sync.constants import VAULT_DIR
 
 from .constants import (
     CONTEXT_EXCLUDED_DIRS,
@@ -45,7 +46,8 @@ def get_vault_files_modified_on_date(
         # Skip excluded directories (modify dirs in-place to prevent descent)
         rel_root = os.path.relpath(root, vault_path)
         dirs[:] = [
-            d for d in dirs
+            d
+            for d in dirs
             if not any(
                 rel_root.startswith(excl.rstrip("/")) or d == excl.rstrip("/")
                 for excl in CONTEXT_EXCLUDED_DIRS
@@ -75,11 +77,13 @@ def get_vault_files_modified_on_date(
                 # Skip excluded files (AI/meta files)
                 if basename in CONTEXT_EXCLUDED_FILES:
                     continue
-                modified_files.append({
-                    "path": fpath,
-                    "basename": basename,
-                    "mtime": mtime,
-                })
+                modified_files.append(
+                    {
+                        "path": fpath,
+                        "basename": basename,
+                        "mtime": mtime,
+                    }
+                )
 
     return modified_files
 

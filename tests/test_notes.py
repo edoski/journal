@@ -1,12 +1,13 @@
 """
-Tests for sync_utils.notes module.
+Tests for notes module.
 
 Covers note parsing, section manipulation, and metrics extraction.
 """
+
 from __future__ import annotations
 
 
-from sync_utils.notes import (
+from sync.notes import (
     find_header_idx,
     section_bounds,
     subsection_bounds,
@@ -192,16 +193,20 @@ class TestExtractSubsectionTasks:
 
     def test_extracts_tasks(self, sample_goals_section_lines):
         start, end = goals_section_bounds(sample_goals_section_lines)
-        tasks = extract_subsection_tasks(sample_goals_section_lines, start, end, "STUDY")
+        tasks = extract_subsection_tasks(
+            sample_goals_section_lines, start, end, "STUDY"
+        )
         assert len(tasks) == 2
-        assert tasks[0]["body"] == "Complete chapter 5"
-        assert tasks[0]["done"] is True
-        assert tasks[1]["body"] == "Review notes"
-        assert tasks[1]["done"] is False
+        assert tasks[0].body == "Complete chapter 5"
+        assert tasks[0].done is True
+        assert tasks[1].body == "Review notes"
+        assert tasks[1].done is False
 
     def test_empty_when_subsection_missing(self, sample_goals_section_lines):
         start, end = goals_section_bounds(sample_goals_section_lines)
-        tasks = extract_subsection_tasks(sample_goals_section_lines, start, end, "MISSING")
+        tasks = extract_subsection_tasks(
+            sample_goals_section_lines, start, end, "MISSING"
+        )
         assert tasks == []
 
 
@@ -265,16 +270,16 @@ class TestParseStudyTable:
     def test_parses_table(self, sample_study_table_lines):
         rows = parse_study_table(sample_study_table_lines)
         assert len(rows) == 2
-        
+
         # First row: coding, 2h00m, +10m interrupt, 15m (+5m) break
         assert rows[0][0] == "coding"  # activity
-        assert rows[0][1] == 120.0      # duration minutes
-        assert rows[0][2] == 10         # interrupt minutes
-        assert rows[0][3] == 5          # overrun minutes
+        assert rows[0][1] == 120.0  # duration minutes
+        assert rows[0][2] == 10  # interrupt minutes
+        assert rows[0][3] == 5  # overrun minutes
 
     def test_parses_reading_row(self, sample_study_table_lines):
         rows = parse_study_table(sample_study_table_lines)
-        
+
         # Second row: reading, 1h30m, no interrupt, 10m break
         assert rows[1][0] == "reading"
         assert rows[1][1] == 90.0
@@ -297,10 +302,10 @@ class TestParseSleepTable:
     def test_parses_table(self, sample_sleep_table_lines):
         rows = parse_sleep_table(sample_sleep_table_lines)
         assert len(rows) == 1
-        
+
         duration, awake, awakenings = rows[0]
         assert duration == 480.0  # 8h00m = 480 minutes
-        assert awake == 20.0      # 20m
+        assert awake == 20.0  # 20m
         assert awakenings == 2
 
     def test_empty_when_no_table(self):
@@ -326,7 +331,7 @@ class TestReplaceMetricsBlock:
         ]
         new_block = ["New content 1", "New content 2"]
         result = replace_metrics_block(lines, new_block)
-        
+
         assert "## Metrics" in result
         assert "---" in result
         assert "New content 1" in result
@@ -342,9 +347,9 @@ class TestReplaceMetricsBlock:
             "Goal content",
         ]
         result = replace_metrics_block(lines, ["New"])
-        
+
         goals_idx = result.index("## Goals")
-        assert "Goal content" in result[goals_idx + 1:]
+        assert "Goal content" in result[goals_idx + 1 :]
 
     def test_returns_unchanged_if_no_metrics(self):
         lines = ["## Other", "Content"]

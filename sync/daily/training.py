@@ -4,6 +4,7 @@ Training section building for daily sync.
 Provides functions to parse, cache, merge, and render training (workout/stretch)
 data for daily notes.
 """
+
 from __future__ import annotations
 
 import json
@@ -12,7 +13,7 @@ import re
 from collections import OrderedDict
 from typing import Any
 
-from sync_utils import format_minutes_seconds
+from sync.formatting import format_minutes_seconds
 
 from .constants import TRAINING_CACHE_PATH
 
@@ -69,19 +70,23 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
 
         start_val: str | None = None
         end_val: str | None = None
-        time_match = re.match(r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$", raw_time)
+        time_match = re.match(
+            r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$", raw_time
+        )
         if time_match:
             start_val = time_match.group(1)
             end_val = time_match.group(2)
 
-        entries.append({
-            "start": start_val,
-            "end": end_val,
-            "time_raw": raw_time,
-            "activity": activity,
-            "duration": duration,
-            "calories": calories,
-        })
+        entries.append(
+            {
+                "start": start_val,
+                "end": end_val,
+                "time_raw": raw_time,
+                "activity": activity,
+                "duration": duration,
+                "calories": calories,
+            }
+        )
     return entries
 
 
@@ -178,14 +183,16 @@ def _activity_entries_from_data(
             else:
                 time_raw = start_raw or ""
 
-            entries_out.append({
-                "start": start_raw or None,
-                "end": end_raw or None,
-                "time_raw": time_raw,
-                "activity": activity_val,
-                "duration": duration_fmt,
-                "calories": calories_fmt,
-            })
+            entries_out.append(
+                {
+                    "start": start_raw or None,
+                    "end": end_raw or None,
+                    "time_raw": time_raw,
+                    "activity": activity_val,
+                    "duration": duration_fmt,
+                    "calories": calories_fmt,
+                }
+            )
     except Exception:
         entries_out = []
     return entries_out

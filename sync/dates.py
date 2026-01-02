@@ -4,6 +4,7 @@ Date range calculations for the journal sync system.
 Provides utilities for computing date ranges for weeks, months,
 quarters, and years.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -50,7 +51,9 @@ def quarter_range(year: int, quarter: int) -> tuple[datetime.date, datetime.date
     return start, end
 
 
-def quarter_months(year: int, quarter: int) -> list[tuple[datetime.date, datetime.date]]:
+def quarter_months(
+    year: int, quarter: int
+) -> list[tuple[datetime.date, datetime.date]]:
     """
     Return a list of (month_start, month_end) tuples for the quarter.
     """
@@ -82,7 +85,9 @@ def year_quarters(year: int) -> list[tuple[datetime.date, datetime.date]]:
     return ranges
 
 
-def month_week_ranges(year: int, month: int) -> list[tuple[datetime.date, datetime.date]]:
+def month_week_ranges(
+    year: int, month: int
+) -> list[tuple[datetime.date, datetime.date]]:
     """Return list of (week_start, week_end) tuples clipped to month boundaries."""
     month_start, month_end = month_range(year, month)
     weeks = OrderedDict()

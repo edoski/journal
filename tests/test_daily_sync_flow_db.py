@@ -3,6 +3,7 @@ Tests for daily_sync.flow_db module.
 
 Tests session deduplication and timestamp conversion.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -84,7 +85,8 @@ class TestDedupeSessions:
             {
                 "pk": 2,
                 "pks": [2],
-                "start": base_start + datetime.timedelta(seconds=30),  # 30s later, within tolerance
+                "start": base_start
+                + datetime.timedelta(seconds=30),  # 30s later, within tolerance
                 "end": datetime.datetime(2025, 12, 27, 10, 5),
                 "phase": "flow",
                 "title": "Work",
@@ -184,7 +186,8 @@ class TestDedupeSessions:
             {
                 "pk": 2,
                 "pks": [2],
-                "start": base_start + datetime.timedelta(seconds=10),  # Within tolerance
+                "start": base_start
+                + datetime.timedelta(seconds=10),  # Within tolerance
                 "end": datetime.datetime(2025, 12, 27, 10, 0),
                 "phase": "flow",
                 "title": "Work",
@@ -203,7 +206,7 @@ class TestDedupeSessions:
 
 class TestRetroactiveLunchDetection:
     """Tests for retroactive lunch detection logic.
-    
+
     Note: These tests verify the logic conceptually since get_todays_sessions
     requires a real database connection. The actual integration is tested
     via the overlap_minutes_with_window function from breaks module.
@@ -212,13 +215,13 @@ class TestRetroactiveLunchDetection:
     def test_gap_overlap_detection(self):
         """Gap between sessions correctly detects lunch overlap."""
         from sync.daily.breaks import overlap_minutes_with_window
-        
+
         # Session ends at 13:10, next starts at 14:35
         # Lunch window is 13:30-14:30
         prev_end = datetime.datetime(2025, 12, 27, 13, 10)
         current_start = datetime.datetime(2025, 12, 27, 14, 35)
         lunch_window = (datetime.time(13, 30), datetime.time(14, 30))
-        
+
         overlap = overlap_minutes_with_window(prev_end, current_start, lunch_window)
         # Gap 13:10-14:35 overlaps lunch 13:30-14:30 for 60 minutes
         assert overlap == 60
@@ -226,13 +229,13 @@ class TestRetroactiveLunchDetection:
     def test_gap_overlap_partial(self):
         """Partial overlap with lunch window is detected."""
         from sync.daily.breaks import overlap_minutes_with_window
-        
+
         # Session ends at 14:00, next starts at 14:45
         # Lunch window is 13:30-14:30
         prev_end = datetime.datetime(2025, 12, 27, 14, 0)
         current_start = datetime.datetime(2025, 12, 27, 14, 45)
         lunch_window = (datetime.time(13, 30), datetime.time(14, 30))
-        
+
         overlap = overlap_minutes_with_window(prev_end, current_start, lunch_window)
         # Gap 14:00-14:45 overlaps lunch 13:30-14:30 for 30 minutes (14:00-14:30)
         assert overlap == 30
@@ -240,13 +243,12 @@ class TestRetroactiveLunchDetection:
     def test_no_overlap_before_lunch(self):
         """Gap entirely before lunch window has no overlap."""
         from sync.daily.breaks import overlap_minutes_with_window
-        
+
         # Session ends at 12:00, next starts at 13:00
         # Lunch window is 13:30-14:30
         prev_end = datetime.datetime(2025, 12, 27, 12, 0)
         current_start = datetime.datetime(2025, 12, 27, 13, 0)
         lunch_window = (datetime.time(13, 30), datetime.time(14, 30))
-        
+
         overlap = overlap_minutes_with_window(prev_end, current_start, lunch_window)
         assert overlap == 0
-

@@ -1,6 +1,7 @@
 """
-Pytest configuration and shared fixtures for journal sync_utils tests.
+Pytest configuration and shared fixtures for journal sync tests.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -143,7 +144,7 @@ def assert_lines_equal(actual: list[str], expected: list[str], msg: str = "") ->
             if a != e:
                 diff_lines.append(f"  Line {i}: expected {repr(e)}")
                 diff_lines.append(f"           got      {repr(a)}")
-        
+
         full_msg = f"{msg}\n" if msg else ""
         full_msg += f"Line count: expected {len(expected)}, got {len(actual)}\n"
         full_msg += "Differences:\n" + "\n".join(diff_lines)

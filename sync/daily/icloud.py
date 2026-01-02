@@ -4,6 +4,7 @@ iCloud status file handling for daily sync.
 Provides resilient loading of status files from iCloud with retry logic,
 file size stabilization, and fallback to .invalid copies.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -34,7 +35,9 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
     """
     path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
 
-    def try_parse(target_path: str, delete_after: bool) -> tuple[bool, dict | None, Exception | None]:
+    def try_parse(
+        target_path: str, delete_after: bool
+    ) -> tuple[bool, dict | None, Exception | None]:
         last_size: int | None = None
         stable_count = 0
         max_attempts = 60
@@ -82,7 +85,9 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
         return False, None, last_err
 
     def cleanup_invalids(primary_path: str) -> None:
-        invalids = glob.glob(primary_path + ".invalid") + glob.glob(primary_path + ".*.invalid")
+        invalids = glob.glob(primary_path + ".invalid") + glob.glob(
+            primary_path + ".*.invalid"
+        )
         for inv in invalids:
             try:
                 os.remove(inv)
@@ -111,7 +116,9 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
 
     # Fallback: reprocess any existing .invalid copies (most recent first)
     candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
-    candidates = sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
+    candidates = sorted(
+        set(candidates), key=lambda p: os.path.getmtime(p), reverse=True
+    )
     for cand in candidates:
         success, data, _ = try_parse(cand, delete_after=False)
         if success:

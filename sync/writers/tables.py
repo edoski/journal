@@ -1,15 +1,12 @@
 """
-Table rendering utilities for the journal sync system.
-
-Provides functions for rendering various markdown tables:
-- Summary tables (STUDY, SLEEP, WORKOUT, STRETCH, MOOD)
-- Activity breakdown tables
-- Sleep statistics tables
-- Interrupts/overruns tables
+Table rendering for the journal sync system.
 """
+
 from __future__ import annotations
 
-from .parsing import (
+from typing import Any
+
+from sync.formatting import (
     format_minutes,
     format_training_ratio,
     format_mood_with_scale,
@@ -38,10 +35,22 @@ def render_sleep_stats_table(
     lines: list[str] = []
     lines.append("| ACTIVITY | AVERAGE |")
     lines.append("| -------- | ------- |")
-    lines.append(f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |" if sleep_avg is not None else "| **SLEEP**      | |")
-    lines.append(f"| **AWAKE**      | `{format_minutes(avg_awake)}` |" if avg_awake is not None else "| **AWAKE**      | |")
+    lines.append(
+        f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |"
+        if sleep_avg is not None
+        else "| **SLEEP**      | |"
+    )
+    lines.append(
+        f"| **AWAKE**      | `{format_minutes(avg_awake)}` |"
+        if avg_awake is not None
+        else "| **AWAKE**      | |"
+    )
     if avg_awakenings is not None:
-        awaken_val = f"{avg_awakenings:.1f}" if abs(avg_awakenings - round(avg_awakenings)) >= 0.05 else str(int(round(avg_awakenings)))
+        awaken_val = (
+            f"{avg_awakenings:.1f}"
+            if abs(avg_awakenings - round(avg_awakenings)) >= 0.05
+            else str(int(round(avg_awakenings)))
+        )
         lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
     else:
         lines.append("| **AWAKENINGS** | |")
@@ -63,8 +72,14 @@ def render_activity_table(activity_totals: dict[str, float]) -> list[str]:
     lines.append("| -------- | ---- | ----- |")
     total_activity = sum(activity_totals.values())
     if activity_totals:
-        for activity, mins in sorted(activity_totals.items(), key=lambda x: x[1], reverse=True):
-            share = f"{int(round((mins / total_activity) * 100))}%" if total_activity else "0%"
+        for activity, mins in sorted(
+            activity_totals.items(), key=lambda x: x[1], reverse=True
+        ):
+            share = (
+                f"{int(round((mins / total_activity) * 100))}%"
+                if total_activity
+                else "0%"
+            )
             lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
     else:
         lines.append("|  |  |  |")
@@ -85,190 +100,208 @@ def render_interrupts_table(avg_interrupts: float, avg_overruns: float) -> list[
     lines: list[str] = []
     lines.append("| METRIC | AVERAGE |")
     lines.append("| ------ | ------- |")
-    lines.append(f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |")
-    lines.append(f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |")
+    lines.append(
+        f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |"
+    )
+    lines.append(
+        f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |"
+    )
     return lines
 
 
 def render_summary_table(
-    current_metrics,
-    previous_metrics,
-    current_label,
-    previous_label,
-    ma_metrics=None,
-    ma_label=None,
-    ma_training_unit="7",
-):
+    current_metrics: dict[str, Any],
+    previous_metrics: dict[str, Any],
+    current_label: str,
+    previous_label: str,
+    ma_metrics: dict[str, Any] | None = None,
+    ma_label: str | None = None,
+    ma_training_unit: str = "7",
+) -> list[str]:
     """
     Generate markdown summary table with averages, previous values, MA, and % change.
-    
-    current_metrics and previous_metrics are dicts with keys:
-    - study_avg_minutes: daily average study in minutes
-    - study_total_minutes: total study in minutes
-    - sleep_avg_minutes: average sleep in minutes
-    - mood_avg: average mood
-    - workout_count: number of workout days
-    - stretch_count: number of stretch days
-    - total_days: number of days in period
-    
-    ma_metrics (optional) is a dict with keys:
-    - study_avg_minutes: MA of daily average study
-    - sleep_avg_minutes: MA of sleep average
-    - mood_avg: MA of mood average
-    - workout_avg: MA of workout count per period
-    - stretch_avg: MA of stretch count per period
-    
-    ma_label: Column header like "4-WK AVG", "3-MO AVG", etc.
-    ma_training_unit: Unit for training MA formatting ("7", "mo", "qtr", "yr")
-    
-    previous_label should be a wiki link like "[[2025-W50\\|LAST WEEK]]"
-    Order: STUDY → SLEEP → WORKOUT → STRETCH → MOOD
+
+    Args:
+        current_metrics: Dict with study_total_minutes, sleep_avg_minutes, mood_avg,
+                         workout_count, stretch_count, total_days, days_up_to_today
+        previous_metrics: Same structure as current_metrics
+        current_label: Column header for current period
+        previous_label: Column header (wiki link) for previous period
+        ma_metrics: Optional dict with MA values (study_avg_minutes, sleep_avg_minutes,
+                    mood_avg, workout_avg, stretch_avg)
+        ma_label: Column header like "4-WK AVG"
+        ma_training_unit: Unit for training MA ("7", "mo", "qtr", "yr")
+
+    Returns:
+        List of markdown lines for the SUMMARY section
     """
     lines = ["### **SUMMARY**", ""]
-    
-    # Determine if we're showing MA column
+
     show_ma = ma_metrics is not None and ma_label is not None
-    
+
     # Table header
     if show_ma:
-        lines.append(f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} |")
-        lines.append("| ------ | ----------- | ----------------------- | ------ | ---------- |")
+        lines.append(
+            f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} |"
+        )
+        lines.append(
+            "| ------ | ----------- | ----------------------- | ------ | ---------- |"
+        )
     else:
         lines.append(f"| METRIC | {current_label} | {previous_label} | CHANGE |")
         lines.append("| ------ | ----------- | ----------------------- | ------ |")
-    
-    # STUDY row (daily average)
+
+    # STUDY row
     curr_study_total = current_metrics.get("study_total_minutes") or 0
     prev_study_total = previous_metrics.get("study_total_minutes") or 0
-    # Use days_up_to_today for accurate daily average (not counting future days)
-    curr_days_for_avg = current_metrics.get("days_up_to_today") or current_metrics.get("total_days", 7)
-    prev_days_for_avg = previous_metrics.get("days_up_to_today") or previous_metrics.get("total_days", 7)
+    curr_days_for_avg = current_metrics.get("days_up_to_today") or current_metrics.get(
+        "total_days", 7
+    )
+    prev_days_for_avg = previous_metrics.get(
+        "days_up_to_today"
+    ) or previous_metrics.get("total_days", 7)
     curr_total_days = current_metrics.get("total_days", 7)
     prev_total_days = previous_metrics.get("total_days", 7)
-    
-    # Always show study average, even if zero
+
     curr_study_avg_mins = curr_study_total / max(1, curr_days_for_avg)
     curr_study_avg = format_minutes(curr_study_avg_mins, always_show_both=True) + "/day"
-    
     prev_study_avg_mins = prev_study_total / max(1, prev_days_for_avg)
     prev_study_avg = format_minutes(prev_study_avg_mins, always_show_both=True) + "/day"
-    
-    # MA for study
+
     ma_study_str = "—"
-    if show_ma and ma_metrics.get("study_avg_minutes") is not None:
-        ma_study_str = format_minutes(ma_metrics["study_avg_minutes"], always_show_both=True) + "/day"
-    
-    # Compute percentage change (show dash only if both are zero)
+    if (
+        show_ma
+        and ma_metrics is not None
+        and ma_metrics.get("study_avg_minutes") is not None
+    ):
+        ma_study_str = (
+            format_minutes(ma_metrics["study_avg_minutes"], always_show_both=True)
+            + "/day"
+        )
+
     if curr_study_avg_mins > 0 or prev_study_avg_mins > 0:
         study_pct = compute_percent_change(curr_study_avg_mins, prev_study_avg_mins)
         study_pct_str = format_percent_change(study_pct)
     else:
         study_pct_str = "—"
-    
+
     if show_ma:
-        lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` |")
+        lines.append(
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` |"
+        )
     else:
-        lines.append(f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` |")
-    
-    # SLEEP row (with /night suffix)
+        lines.append(
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` |"
+        )
+
+    # SLEEP row
     curr_sleep_avg = current_metrics.get("sleep_avg_minutes") or 0
     prev_sleep_avg = previous_metrics.get("sleep_avg_minutes") or 0
-    
-    # Always show sleep average, even if zero
     curr_sleep = format_minutes(curr_sleep_avg, always_show_both=True) + "/night"
     prev_sleep = format_minutes(prev_sleep_avg, always_show_both=True) + "/night"
-    
-    # MA for sleep
+
     ma_sleep_str = "—"
-    if show_ma and ma_metrics.get("sleep_avg_minutes") is not None:
-        ma_sleep_str = format_minutes(ma_metrics["sleep_avg_minutes"], always_show_both=True) + "/night"
-    
-    # Compute percentage change (show dash only if both are zero)
+    if (
+        show_ma
+        and ma_metrics is not None
+        and ma_metrics.get("sleep_avg_minutes") is not None
+    ):
+        ma_sleep_str = (
+            format_minutes(ma_metrics["sleep_avg_minutes"], always_show_both=True)
+            + "/night"
+        )
+
     if curr_sleep_avg > 0 or prev_sleep_avg > 0:
         sleep_pct = compute_percent_change(curr_sleep_avg, prev_sleep_avg)
         sleep_pct_str = format_percent_change(sleep_pct)
     else:
         sleep_pct_str = "—"
-    
+
     if show_ma:
-        lines.append(f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{ma_sleep_str}` |")
+        lines.append(
+            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{ma_sleep_str}` |"
+        )
     else:
-        lines.append(f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` |")
-    
+        lines.append(
+            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` |"
+        )
+
     # WORKOUT row
     curr_workout_count = current_metrics.get("workout_count", 0)
     prev_workout_count = previous_metrics.get("workout_count", 0)
-    
-    # Always show workout ratio, even if zero
     curr_workout = format_training_ratio(curr_workout_count, curr_total_days)
     prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
-    
-    # MA for workout
+
     ma_workout_str = "—"
-    if show_ma and ma_metrics.get("workout_avg") is not None:
-        ma_workout_str = format_ma_training_ratio(ma_metrics["workout_avg"], ma_training_unit)
-    
-    # Compute percentage change (show dash only if both are zero)
+    if show_ma and ma_metrics is not None and ma_metrics.get("workout_avg") is not None:
+        ma_workout_str = format_ma_training_ratio(
+            ma_metrics["workout_avg"], ma_training_unit
+        )
+
     if curr_workout_count > 0 or prev_workout_count > 0:
         workout_pct = compute_percent_change(curr_workout_count, prev_workout_count)
         workout_pct_str = format_percent_change(workout_pct)
     else:
         workout_pct_str = "—"
-    
+
     if show_ma:
-        lines.append(f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{ma_workout_str}` |")
+        lines.append(
+            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{ma_workout_str}` |"
+        )
     else:
-        lines.append(f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` |")
-    
+        lines.append(
+            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` |"
+        )
+
     # STRETCH row
     curr_stretch_count = current_metrics.get("stretch_count", 0)
     prev_stretch_count = previous_metrics.get("stretch_count", 0)
-    
-    # Always show stretch ratio, even if zero
     curr_stretch = format_training_ratio(curr_stretch_count, curr_total_days)
     prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
-    
-    # MA for stretch
+
     ma_stretch_str = "—"
-    if show_ma and ma_metrics.get("stretch_avg") is not None:
-        ma_stretch_str = format_ma_training_ratio(ma_metrics["stretch_avg"], ma_training_unit)
-    
-    # Compute percentage change (show dash only if both are zero)
+    if show_ma and ma_metrics is not None and ma_metrics.get("stretch_avg") is not None:
+        ma_stretch_str = format_ma_training_ratio(
+            ma_metrics["stretch_avg"], ma_training_unit
+        )
+
     if curr_stretch_count > 0 or prev_stretch_count > 0:
         stretch_pct = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_pct_str = format_percent_change(stretch_pct)
     else:
         stretch_pct_str = "—"
-    
+
     if show_ma:
-        lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{ma_stretch_str}` |")
+        lines.append(
+            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{ma_stretch_str}` |"
+        )
     else:
-        lines.append(f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` |")
-    
-    # MOOD row (with /10.0 suffix)
+        lines.append(
+            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` |"
+        )
+
+    # MOOD row
     curr_mood_avg = current_metrics.get("mood_avg") or 0
     prev_mood_avg = previous_metrics.get("mood_avg") or 0
-    
-    # Always show mood value, even if zero
     curr_mood = format_mood_with_scale(curr_mood_avg)
     prev_mood = format_mood_with_scale(prev_mood_avg)
-    
-    # MA for mood
+
     ma_mood_str = "—"
-    if show_ma and ma_metrics.get("mood_avg") is not None:
+    if show_ma and ma_metrics is not None and ma_metrics.get("mood_avg") is not None:
         ma_mood_str = format_mood_with_scale(ma_metrics["mood_avg"])
-    
-    # Compute percentage change (show dash only if both are zero)
+
     if curr_mood_avg > 0 or prev_mood_avg > 0:
         mood_pct = compute_percent_change(curr_mood_avg, prev_mood_avg)
         mood_pct_str = format_percent_change(mood_pct)
     else:
         mood_pct_str = "—"
-    
+
     if show_ma:
-        lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{ma_mood_str}` |")
+        lines.append(
+            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{ma_mood_str}` |"
+        )
     else:
         lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` |")
-    
+
     lines.append("")
     return lines

@@ -7,19 +7,20 @@ Provides common functionality used across weekly, monthly, quarterly, and yearly
 - Atomic file writes
 - Period data loading
 """
+
 from __future__ import annotations
 
 import datetime
 import os
 
-from sync_utils import (
-    JOURNAL_DIR,
-    parse_daily_note,
-)
-from sync_utils.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+from sync.constants import JOURNAL_DIR
+from sync.notes import parse_daily_note
+from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
 
-def load_period_data(start: datetime.date, end: datetime.date) -> dict[datetime.date, dict]:
+def load_period_data(
+    start: datetime.date, end: datetime.date
+) -> dict[datetime.date, dict]:
     """
     Load parsed daily notes for a date range.
 
@@ -30,8 +31,8 @@ def load_period_data(start: datetime.date, end: datetime.date) -> dict[datetime.
     Returns:
         Dict mapping dates to parsed daily note data
     """
-    from sync_utils import daterange  # Import here to avoid circular
-    
+    from sync.dates import daterange  # Import here to avoid circular
+
     daily_data: dict[datetime.date, dict] = {}
     for day in daterange(start, end):
         path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
@@ -136,6 +137,7 @@ def atomic_write_note(path: str, lines: list[str]) -> None:
         lines: Lines to write (will be joined with newlines)
     """
     import os
+
     tmp_path = path + ".tmp"
     with open(tmp_path, "w") as f:
         f.write("\n".join(lines).rstrip() + "\n")

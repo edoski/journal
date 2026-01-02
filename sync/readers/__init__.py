@@ -1,0 +1,30 @@
+"""
+Reader modules for the journal sync system.
+
+This package provides parsing functions that convert markdown content
+into typed dataclass models.
+"""
+
+from __future__ import annotations
+
+from .frontmatter import parse_frontmatter
+from .study import parse_study_table
+from .sleep import parse_sleep_table
+from .goals import parse_goal_tasks, resolve_deadline, parse_goal_date
+from .media import scan_books, scan_podcasts
+
+__all__ = [
+    # Frontmatter
+    "parse_frontmatter",
+    # Study
+    "parse_study_table",
+    # Sleep
+    "parse_sleep_table",
+    # Goals
+    "parse_goal_tasks",
+    "resolve_deadline",
+    "parse_goal_date",
+    # Media
+    "scan_books",
+    "scan_podcasts",
+]

@@ -3,6 +3,7 @@ Tests for daily_sync module internals.
 
 Covers training table parsing and other daily_sync-specific functions.
 """
+
 from __future__ import annotations
 
 import sys
@@ -45,14 +46,14 @@ class TestParseTrainingTable:
         ]
         result = _parse_training_table(lines)
         assert len(result) == 2
-        
+
         # First entry
         assert result[0]["start"] == "09:00"
         assert result[0]["end"] == "10:00"
         assert result[0]["activity"] == "Workout"
         assert result[0]["duration"] == "60m"
         assert result[0]["calories"] == "300"
-        
+
         # Second entry (no end time)
         assert result[1]["start"] == "14:00"
         assert result[1]["end"] is None

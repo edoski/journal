@@ -3,6 +3,7 @@ Tests for daily_sync.breaks module.
 
 Tests break duration logic, lunch window calculations, and overrun computations.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -66,10 +67,12 @@ class TestComputeDynamicLunchWindow:
         """No shift when session ends before window start."""
         base = (datetime.time(13, 30), datetime.time(14, 30))
         ref_date = datetime.date(2025, 12, 27)
-        sessions = [{
-            "start": datetime.datetime(2025, 12, 27, 10, 0),
-            "end": datetime.datetime(2025, 12, 27, 12, 0),
-        }]
+        sessions = [
+            {
+                "start": datetime.datetime(2025, 12, 27, 10, 0),
+                "end": datetime.datetime(2025, 12, 27, 12, 0),
+            }
+        ]
         result = _compute_dynamic_lunch_window(sessions, base, ref_date)
         assert result == base
 
@@ -77,10 +80,12 @@ class TestComputeDynamicLunchWindow:
         """Shifts when session straddles window start."""
         base = (datetime.time(13, 30), datetime.time(14, 30))
         ref_date = datetime.date(2025, 12, 27)
-        sessions = [{
-            "start": datetime.datetime(2025, 12, 27, 12, 0),
-            "end": datetime.datetime(2025, 12, 27, 14, 0),
-        }]
+        sessions = [
+            {
+                "start": datetime.datetime(2025, 12, 27, 12, 0),
+                "end": datetime.datetime(2025, 12, 27, 14, 0),
+            }
+        ]
         result = _compute_dynamic_lunch_window(sessions, base, ref_date)
         assert result is not None
         assert result[0] == datetime.time(14, 0)  # Shifted to session end

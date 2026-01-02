@@ -4,6 +4,7 @@ Period metrics computation for the journal sync system.
 Provides functions for aggregating study, sleep, mood, and training
 metrics across date ranges, and computing period-over-period deltas.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -11,15 +12,17 @@ import os
 from typing import Any
 
 from .constants import JOURNAL_DIR
-from .parsing import compute_percent_change, format_percent_change
+from .formatting import compute_percent_change, format_percent_change
 
 
-def load_daily_data(start_date: datetime.date, end_date: datetime.date) -> dict[datetime.date, dict[str, Any]]:
+def load_daily_data(
+    start_date: datetime.date, end_date: datetime.date
+) -> dict[datetime.date, dict[str, Any]]:
     """Load parsed daily notes for a date range."""
     # Import here to avoid circular dependency
     from .notes import parse_daily_note
     from .dates import daterange
-    
+
     data = {}
     for day in daterange(start_date, end_date):
         path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
@@ -205,7 +208,11 @@ def compute_moving_average(
     study_ma = sum(study_avgs) / len(study_avgs) if study_avgs else None
 
     # Sleep: average of averages
-    sleep_vals = [pm.get("sleep_avg_minutes") for pm in recent if pm.get("sleep_avg_minutes") is not None]
+    sleep_vals = [
+        pm.get("sleep_avg_minutes")
+        for pm in recent
+        if pm.get("sleep_avg_minutes") is not None
+    ]
     sleep_ma = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
 
     # Mood: average of averages
@@ -227,4 +234,3 @@ def compute_moving_average(
         "workout_avg": workout_ma,
         "stretch_avg": stretch_ma,
     }
-

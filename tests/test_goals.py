@@ -1,23 +1,26 @@
 """
-Tests for sync_utils.goals module.
+Tests for goal utilities.
 
 Covers goal parsing, normalization, ID generation, and rendering.
 """
+
 from __future__ import annotations
 
 
-from sync_utils.goals import (
-    _normalize_header,
-    canonical_goal,
+from sync.models import Goal
+from sync.readers.goals import (
+    _canonical_goal as canonical_goal,
     generate_goal_id,
     generate_goal_id_for,
-    extract_goal_id,
+    _extract_goal_id as extract_goal_id,
     parse_goal_tasks,
-    render_goal_lines,
     ensure_goal_ids,
-    build_goals_block,
-    find_subheader_idx,
 )
+from sync.writers.goals import (
+    render_goal_lines,
+    build_goals_block,
+)
+from sync.notes import _normalize_header, _find_subheader_idx as find_subheader_idx
 
 
 class TestNormalizeHeader:
@@ -59,7 +62,9 @@ class TestCanonicalGoal:
 
     def test_strips_wiki_links(self):
         assert canonical_goal("- [x] Read [[Book Name]]") == "read book name"
-        assert canonical_goal("Review [[Note]] and [[Other]]") == "review note and other"
+        assert (
+            canonical_goal("Review [[Note]] and [[Other]]") == "review note and other"
+        )
 
     def test_collapses_whitespace(self):
         assert canonical_goal("- [x] Task   with   spaces") == "task with spaces"
@@ -159,25 +164,25 @@ class TestParseGoalTasks:
             "- [✓] Checkmark done",
         ]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["done"] is True
-        assert tasks[1]["done"] is False
-        assert tasks[2]["done"] is True  # '-' is treated as done
-        assert tasks[3]["done"] is True
+        assert tasks[0].done is True
+        assert tasks[1].done is False
+        assert tasks[2].done is True  # '-' is treated as done
+        assert tasks[3].done is True
 
     def test_body_extraction(self):
         lines = ["- [x] Complete task ^gid-abc1234567"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["body"] == "Complete task"
+        assert tasks[0].body == "Complete task"
 
     def test_id_extraction(self):
         lines = ["- [x] Task ^gid-abc1234567"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["id"] == "gid-abc1234567"
+        assert tasks[0].id == "gid-abc1234567"
 
     def test_canonical_computed(self):
         lines = ["- [x] Complete [[Project]] task ^gid-abc1234567"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["canonical"] == "complete project task"
+        assert tasks[0].canonical == "complete project task"
 
     def test_skips_non_checkbox_lines(self):
         lines = [
@@ -189,30 +194,39 @@ class TestParseGoalTasks:
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
 
-    def test_missing_id(self):
+    def test_always_generates_id(self):
+        """IDs are always generated even for goals without explicit ^gid-."""
         lines = ["- [x] Task without id"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0]["id"] is None
+        assert tasks[0].id is not None
+        assert tasks[0].id.startswith("gid-")
 
 
 class TestRenderGoalLines:
     """Tests for render_goal_lines function."""
 
     def test_renders_done_task(self):
-        tasks = [{"body": "Complete task", "done": True, "id": "gid-abc1234567"}]
+        tasks = [Goal(id="gid-abc1234567", body="Complete task", done=True)]
         lines = render_goal_lines(tasks)
         assert lines == ["- [x] Complete task ^gid-abc1234567"]
 
     def test_renders_undone_task(self):
-        tasks = [{"body": "Pending task", "done": False, "id": "gid-def1234567"}]
+        tasks = [Goal(id="gid-def1234567", body="Pending task", done=False)]
         lines = render_goal_lines(tasks)
         assert lines == ["- [ ] Pending task ^gid-def1234567"]
 
-    def test_generates_id_if_missing(self):
-        tasks = [{"body": "Task without id", "done": False}]
+    def test_uses_existing_id(self):
+        tasks = [Goal(id="gid-existing123", body="Task with id", done=False)]
         lines = render_goal_lines(tasks)
         assert len(lines) == 1
-        assert lines[0].startswith("- [ ] Task without id ^gid-")
+        assert "^gid-existing123" in lines[0]
+
+    def test_render_generates_id(self):
+        """Rendering uses existing id."""
+        tasks = [Goal(id="gid-test123456", body="Task with id", done=False)]
+        lines = render_goal_lines(tasks)
+        assert len(lines) == 1
+        assert "^gid-test123456" in lines[0]
 
     def test_round_trip(self):
         """Parse and render should preserve content."""
@@ -236,7 +250,9 @@ class TestEnsureGoalIds:
 
     def test_preserves_existing_ids(self):
         original_id = "gid-existing123"
-        tasks = [{"body": "Task", "done": False, "id": original_id, "canonical": "task"}]
+        tasks = [
+            {"body": "Task", "done": False, "id": original_id, "canonical": "task"}
+        ]
         ensure_goal_ids(tasks, "weekly", "2025-W52")
         assert tasks[0]["id"] == original_id
 
@@ -265,7 +281,7 @@ class TestBuildGoalsBlock:
             ("HEALTH", ["- [ ] Workout ^gid-def1234567"]),
         ]
         lines = build_goals_block(subsections)
-        
+
         assert lines[0] == "## Goals"
         assert lines[1] == "---"
         assert "### **STUDY**" in lines
@@ -283,10 +299,13 @@ class TestBuildGoalsBlock:
 
     def test_multiple_tasks_per_subsection(self):
         subsections = [
-            ("STUDY", [
-                "- [x] Task 1 ^gid-abc1234567",
-                "- [ ] Task 2 ^gid-def1234567",
-            ]),
+            (
+                "STUDY",
+                [
+                    "- [x] Task 1 ^gid-abc1234567",
+                    "- [ ] Task 2 ^gid-def1234567",
+                ],
+            ),
         ]
         lines = build_goals_block(subsections)
         assert "- [x] Task 1 ^gid-abc1234567" in lines

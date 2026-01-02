@@ -12,6 +12,7 @@ Cache structure:
     "quarterly": {"2025-Q4": ["gid-jkl012", ...]}
 }
 """
+
 from __future__ import annotations
 
 import json
@@ -72,12 +73,12 @@ def record_carried_ids(period_type: str, period_key: str, goal_ids: list[str]) -
     cache = _load_cache()
     if period_type not in cache:
         cache[period_type] = {}
-    
+
     # Merge with existing IDs (don't overwrite)
     existing = set(cache[period_type].get(period_key, []))
     existing.update(goal_ids)
     cache[period_type][period_key] = sorted(existing)
-    
+
     _save_cache(cache)
 
 
@@ -92,9 +93,7 @@ def cleanup_old_entries(period_type: str, keep_keys: list[str]) -> None:
     cache = _load_cache()
     if period_type not in cache:
         return
-    
+
     keep_set = set(keep_keys)
-    cache[period_type] = {
-        k: v for k, v in cache[period_type].items() if k in keep_set
-    }
+    cache[period_type] = {k: v for k, v in cache[period_type].items() if k in keep_set}
     _save_cache(cache)
