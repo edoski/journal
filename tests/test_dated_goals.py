@@ -2,7 +2,6 @@
 Tests for dated goals feature: date parsing, countdown formatting, and proximity filtering.
 """
 import datetime
-import pytest
 
 from sync_utils.goals import (
     resolve_deadline,

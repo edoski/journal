@@ -146,10 +146,7 @@ from .media import (
 )
 
 # Reminder utilities
-from .reminders import (
-    generate_review_reminder_id,
-    get_review_reminders_for_date,
-)
+from .reminders import get_review_reminders_for_date
 
 __all__ = [
     # Constants
@@ -265,6 +262,5 @@ __all__ = [
     "render_media_table",
     "build_media_section",
     # Reminders
-    "generate_review_reminder_id",
     "get_review_reminders_for_date",
 ]

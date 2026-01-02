@@ -4,9 +4,6 @@ Tests for the media scanning and rendering module.
 from __future__ import annotations
 
 import datetime
-import os
-import tempfile
-import pytest
 
 from sync_utils.media import (
     _parse_date_link,

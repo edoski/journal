@@ -195,7 +195,7 @@ orchestrator.py (→ all above, sync_utils)
   - Excludes `journal/`, `.obsidian/`, `excalidraw/` directories
 
 - **`study.py`**: Study section building
-  - `_extract_existing_notes`, `_build_study_section`, `_format_interrupt`
+  - `_extract_existing_data`, `_build_study_section`, `_format_interrupt`
   - Includes CONTEXT column with wikilinks to modified files
   - Interrupt format: `+XhYYm` for ≥60min, `+XXm` otherwise
 

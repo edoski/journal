@@ -3,43 +3,8 @@ Tests for periodic review reminder generation.
 """
 import datetime
 
-import pytest
 
-from sync_utils.reminders import (
-    generate_review_reminder_id,
-    get_review_reminders_for_date,
-)
-
-
-class TestGenerateReviewReminderId:
-    """Tests for generate_review_reminder_id() function."""
-
-    def test_returns_hex_only(self):
-        """ID should contain only hex characters (0-9, a-f)."""
-        result = generate_review_reminder_id("weekly", "2025-W52")
-        assert result.startswith("gid-")
-        hex_part = result[4:]
-        assert len(hex_part) == 10
-        assert all(c in "0123456789abcdef" for c in hex_part)
-
-    def test_deterministic(self):
-        """Same inputs should produce same ID."""
-        id1 = generate_review_reminder_id("weekly", "2025-W52")
-        id2 = generate_review_reminder_id("weekly", "2025-W52")
-        assert id1 == id2
-
-    def test_different_periods_different_ids(self):
-        """Different periods should produce different IDs."""
-        weekly = generate_review_reminder_id("weekly", "2025-W52")
-        monthly = generate_review_reminder_id("monthly", "2025-12")
-        yearly = generate_review_reminder_id("yearly", "2025")
-        assert weekly != monthly != yearly
-
-    def test_different_weeks_different_ids(self):
-        """Different weeks should produce different IDs."""
-        w1 = generate_review_reminder_id("weekly", "2025-W01")
-        w2 = generate_review_reminder_id("weekly", "2025-W02")
-        assert w1 != w2
+from sync_utils.reminders import get_review_reminders_for_date
 
 
 class TestGetReviewRemindersForDate:

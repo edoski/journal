@@ -69,13 +69,6 @@ def _extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, 
     return existing_notes, existing_context
 
 
-# Backward compatibility alias
-def _extract_existing_notes(lines: list[str]) -> dict[str, str]:
-    """Extract notes only (backward compatibility)."""
-    notes, _ = _extract_existing_data(lines)
-    return notes
-
-
 def _format_interrupt(minutes: int) -> str:
     """
     Format interrupt duration for display.
