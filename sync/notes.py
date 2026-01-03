@@ -249,7 +249,7 @@ def goals_section_bounds(lines: list[str]) -> tuple[int, int]:
 
 def extract_subsection_tasks(
     lines: list[str], parent_start: int, parent_end: int, sub_title: str
-) -> list[dict]:
+) -> list:
     """Extract checkbox tasks from a ### subsection within a parent block."""
     from sync.readers.goals import parse_goal_tasks
 

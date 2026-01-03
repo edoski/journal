@@ -10,12 +10,14 @@ from __future__ import annotations
 import datetime
 import os
 from collections import OrderedDict
+from dataclasses import replace
 
 from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
 )
+from sync.logging import get_logger
 from sync.notes import (
     locked_note,
     ensure_note,
@@ -45,6 +47,8 @@ from .context import (
     files_for_session,
     format_context_cell,
 )
+
+logger = get_logger()
 
 
 def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) -> str:
@@ -185,8 +189,8 @@ def _parse_daily_goal_subsections(lines: list[str]) -> tuple[list[dict], list[di
 def _carry_forward_daily_tasks(
     today_date: datetime.date,
     yesterday_date: datetime.date,
-    existing_daily_tasks: list[dict],
-) -> tuple[list[dict], int]:
+    existing_daily_tasks: list,
+) -> tuple[list, int]:
     """
     Carry forward unchecked DAILY goals from yesterday into today's daily tasks list.
 
@@ -223,19 +227,19 @@ def _carry_forward_daily_tasks(
     ensure_goal_ids(y_daily, "daily", yesterday_date.isoformat())
     ensure_goal_ids(existing_daily_tasks, "daily", today_key)
 
-    open_y = [t for t in y_daily if not t.get("done")]
+    open_y = [t for t in y_daily if not t.done]
     if not open_y:
         return existing_daily_tasks, 0
 
     # Get goals that were already offered for carry forward to today
     previously_offered = get_carried_ids("daily", today_key)
-    existing_ids = {t["id"] for t in existing_daily_tasks if t.get("id")}
+    existing_ids = {t.id for t in existing_daily_tasks if t.id}
 
     added = 0
     newly_offered: list[str] = []
 
     for task in open_y:
-        tid = task.get("id")
+        tid = task.id
         if not tid:
             continue
 
@@ -247,9 +251,8 @@ def _carry_forward_daily_tasks(
         if tid in previously_offered:
             continue
 
-        # First time offering this goal - add it
-        new_task = task.copy()
-        new_task["done"] = False
+        # First time offering this goal - add it with done=False
+        new_task = replace(task, done=False)
         existing_daily_tasks.append(new_task)
         existing_ids.add(tid)
         newly_offered.append(tid)
@@ -268,7 +271,7 @@ def _update_frontmatter(
     workout_done: bool,
     stretch_done: bool,
     sleep_data: dict | None,
-) -> list[str]:
+) -> tuple[list[str], dict[str, str]]:
     """
     Update YAML frontmatter in final_lines with study time and status flags.
 
@@ -280,8 +283,10 @@ def _update_frontmatter(
         sleep_data: Sleep data dict or None
 
     Returns:
-        Updated lines list
+        Tuple of (updated lines, dict of changed metrics {key: new_value})
     """
+    changes: dict[str, str] = {}
+
     first_dash_idx = -1
     second_dash_idx = -1
     for i, line in enumerate(final_lines):
@@ -297,7 +302,7 @@ def _update_frontmatter(
         or second_dash_idx == -1
         or second_dash_idx <= first_dash_idx
     ):
-        return final_lines
+        return final_lines, changes
 
     fm_lines = final_lines[first_dash_idx + 1 : second_dash_idx]
 
@@ -318,6 +323,9 @@ def _update_frontmatter(
         fm_data[key] = value
 
     def set_value(key: str, value: str) -> None:
+        old_value = fm_data.get(key, "")
+        if old_value != value:
+            changes[key] = value
         if key not in fm_order:
             fm_order.append(key)
         fm_data[key] = value
@@ -350,8 +358,10 @@ def _update_frontmatter(
 
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
     return (
-        final_lines[: first_dash_idx + 1] + new_fm_lines + final_lines[second_dash_idx:]
+        final_lines[: first_dash_idx + 1] + new_fm_lines + final_lines[second_dash_idx:],
+        changes,
     )
+
 
 
 def _ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
@@ -418,7 +428,7 @@ def _read_daily_note(file_path: str) -> list[str]:
                     with open(file_path, "w") as f:
                         f.write(template_content)
                 except Exception as e:
-                    print(f"Error creating file from template: {e}")
+                    logger.error("Error creating file from template: %s", e)
                     return []
             else:
                 return []
@@ -510,25 +520,24 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Inject periodic review reminders (weekly on Sunday, monthly on last day, yearly on Dec 31)
     review_reminders = get_review_reminders_for_date(today)
-    existing_ids = {t.get("id") for t in existing_daily_tasks if t.get("id")}
+    existing_ids = {t.id for t in existing_daily_tasks if t.id}
     for reminder in review_reminders:
-        if reminder["id"] not in existing_ids:
+        if reminder.id not in existing_ids:
             existing_daily_tasks.append(reminder)
-            existing_ids.add(reminder["id"])
+            existing_ids.add(reminder.id)
 
     # Load weekly source goals and propagate status changes from daily mirror.
     weekly_tasks, weekly_path = _load_weekly_goals(today)
     updated_weekly_tasks = []
-    daily_weekly_lookup = {t["canonical"]: t for t in existing_weekly_tasks}
+    daily_weekly_lookup = {t.canonical: t for t in existing_weekly_tasks}
     for task in weekly_tasks:
-        canon = task["canonical"]
+        canon = task.canonical
         mirror = daily_weekly_lookup.get(canon)
-        done = task.get("done", False)
+        done = task.done
         if mirror:
-            if mirror.get("done") and not done:
+            if mirror.done and not done:
                 done = True  # done wins
-        updated = task.copy()
-        updated["done"] = done
+        updated = replace(task, done=done)
         updated_weekly_tasks.append(updated)
 
     # Write back weekly note if statuses changed.
@@ -614,8 +623,8 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Splice Metrics via shared helper (keeps content after Metrics intact)
     updated_lines = replace_metrics_block(lines, metrics_lines)
 
-    # Update YAML frontmatter
-    updated_lines = _update_frontmatter(
+    # Update YAML frontmatter and capture what changed
+    updated_lines, fm_changes = _update_frontmatter(
         updated_lines, study_str, workout_done, stretch_done, sleep_data
     )
 
@@ -636,5 +645,25 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
             f.write(new_content)
         os.replace(tmp_path, file_path)
 
-    print(f"Successfully updated {file_path} (Study Time: {study_str})")
+    # Log only the metrics that changed
+    if fm_changes:
+        parts = []
+        for key in ("study", "workout", "stretch", "sleep"):
+            if key in fm_changes:
+                val = fm_changes[key]
+                # Use checkmark for boolean flags
+                if val == "true":
+                    parts.append(f"{key}=✓")
+                elif val == "false":
+                    continue  # Don't log false transitions
+                else:
+                    parts.append(f"{key}={val}")
+        if parts:
+            logger.info("Updated %s — %s", today_str + ".md", ", ".join(parts))
+        else:
+            logger.info("Updated %s", today_str + ".md")
+    else:
+        logger.info("Updated %s", today_str + ".md")
+
     return True
+

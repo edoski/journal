@@ -45,11 +45,11 @@ def load_period_data(
 
 
 def carry_forward_goals(
-    prev_tasks: list[dict],
-    current_tasks: list[dict],
+    prev_tasks: list,
+    current_tasks: list,
     period_key: str,
     horizon: str,
-) -> tuple[list[dict], int]:
+) -> tuple[list, int]:
     """
     Carry forward open goals from previous period with cache guard.
 
@@ -64,27 +64,29 @@ def carry_forward_goals(
     Returns:
         Tuple of (updated current_tasks, count of tasks added)
     """
+    from dataclasses import replace
+
     # Clean up old cache entries - only keep current period
     cleanup_old_entries(horizon, [period_key])
 
-    open_prev = [t for t in prev_tasks if not t.get("done")]
+    open_prev = [t for t in prev_tasks if not t.done]
     if not open_prev:
         return current_tasks, 0
 
     previously_offered = get_carried_ids(horizon, period_key)
-    existing_ids = {t["id"] for t in current_tasks if t.get("id")}
+    existing_ids = {t.id for t in current_tasks if t.id}
     newly_offered: list[str] = []
     added = 0
 
     for task in open_prev:
-        tid = task.get("id")
+        tid = task.id
         if not tid:
             continue
         if tid in existing_ids:
             continue
         if tid in previously_offered:
             continue
-        current_tasks.append({**task, "done": False})
+        current_tasks.append(replace(task, done=False))
         existing_ids.add(tid)
         newly_offered.append(tid)
         added += 1
@@ -97,8 +99,8 @@ def carry_forward_goals(
 
 
 def propagate_goal_status(
-    source_tasks: list[dict],
-    mirror_tasks: list[dict],
+    source_tasks: list,
+    mirror_tasks: list,
 ) -> bool:
     """
     Propagate done=True from mirror to source.
@@ -113,16 +115,17 @@ def propagate_goal_status(
     Returns:
         True if any status was changed, False otherwise
     """
-    mirror_lookup = {t["id"]: t for t in mirror_tasks if t.get("id")}
+    mirror_lookup = {t.id: t for t in mirror_tasks if t.id}
     changed = False
 
-    for task in source_tasks:
-        tid = task.get("id")
+    for i, task in enumerate(source_tasks):
+        tid = task.id
         if not tid:
             continue
         mirror = mirror_lookup.get(tid)
-        if mirror and mirror.get("done") and not task.get("done"):
-            task["done"] = True
+        if mirror and mirror.done and not task.done:
+            from dataclasses import replace
+            source_tasks[i] = replace(task, done=True)
             changed = True
 
     return changed

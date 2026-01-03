@@ -10,9 +10,10 @@ from __future__ import annotations
 import datetime
 import os
 import subprocess
-import sys
 import sqlite3
 from typing import Any
+
+from sync.logging import get_logger
 
 from .constants import (
     DB_PATH,
@@ -28,6 +29,8 @@ from .breaks import (
     clamp_next_flow_within_day,
     anchor_lunch_window,
 )
+
+logger = get_logger()
 
 
 # Type aliases for clarity
@@ -61,8 +64,8 @@ BREAK_DEFAULTS = _read_break_defaults()
 def get_db_connection() -> sqlite3.Connection:
     """Get a read-only connection to the Flow database."""
     if not os.path.exists(DB_PATH):
-        print(f"Error: Database not found at {DB_PATH}")
-        sys.exit(1)
+        logger.error("Database not found at %s", DB_PATH)
+        raise FileNotFoundError(f"Flow database not found at {DB_PATH}")
     # Open in read-only mode to avoid locking
     return sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
 

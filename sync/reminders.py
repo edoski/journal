@@ -10,32 +10,26 @@ from __future__ import annotations
 import calendar
 import datetime
 
+from sync.models import Goal
 from sync.readers.goals import generate_goal_id_for
 
 
-def get_review_reminders_for_date(date: datetime.date) -> list[dict]:
+def get_review_reminders_for_date(date: datetime.date) -> list[Goal]:
     """
-    Generate review reminder task dicts for reviews due on the given date.
+    Generate review reminder Goals for reviews due on the given date.
 
     Reviews are due on:
     - Weekly: Sunday (last day of ISO week)
     - Monthly: Last day of month
     - Yearly: December 31
 
-    Each returned dict contains:
-    - body: e.g., "Review [[2025-W52]]"
-    - date_str: The due date in YYYY-MM-DD format
-    - deadline: Resolved deadline as date object
-    - id: Deterministic hex goal ID
-    - done: False
-
     Args:
         date: Date to check for due reviews
 
     Returns:
-        List of task dicts for reviews due on that date (may be empty)
+        List of Goal objects for reviews due on that date (may be empty)
     """
-    reminders: list[dict] = []
+    reminders: list[Goal] = []
 
     # Weekly review: due on Sunday (weekday 6 in Python, day 7 in ISO)
     if date.weekday() == 6:  # Sunday
@@ -43,14 +37,14 @@ def get_review_reminders_for_date(date: datetime.date) -> list[dict]:
         period_key = f"{year}-W{week_num:02d}"
         body = f"Review [[{period_key}]]"
         reminders.append(
-            {
-                "body": body,
-                "date_str": date.isoformat(),
-                "deadline": date,
-                "reminder_offset": 0,
-                "id": generate_goal_id_for("review", period_key, body, 0),
-                "done": False,
-            }
+            Goal(
+                id=generate_goal_id_for("review", period_key, body, 0),
+                body=body,
+                done=False,
+                date_str=date.isoformat(),
+                deadline=date,
+                reminder_offset=0,
+            )
         )
 
     # Monthly review: due on last day of month
@@ -59,14 +53,14 @@ def get_review_reminders_for_date(date: datetime.date) -> list[dict]:
         period_key = f"{date.year}-{date.month:02d}"
         body = f"Review [[{period_key}]]"
         reminders.append(
-            {
-                "body": body,
-                "date_str": date.isoformat(),
-                "deadline": date,
-                "reminder_offset": 0,
-                "id": generate_goal_id_for("review", period_key, body, 0),
-                "done": False,
-            }
+            Goal(
+                id=generate_goal_id_for("review", period_key, body, 0),
+                body=body,
+                done=False,
+                date_str=date.isoformat(),
+                deadline=date,
+                reminder_offset=0,
+            )
         )
 
     # Yearly review: due on December 31
@@ -74,14 +68,15 @@ def get_review_reminders_for_date(date: datetime.date) -> list[dict]:
         period_key = str(date.year)
         body = f"Review [[{period_key}]]"
         reminders.append(
-            {
-                "body": body,
-                "date_str": date.isoformat(),
-                "deadline": date,
-                "reminder_offset": 0,
-                "id": generate_goal_id_for("review", period_key, body, 0),
-                "done": False,
-            }
+            Goal(
+                id=generate_goal_id_for("review", period_key, body, 0),
+                body=body,
+                done=False,
+                date_str=date.isoformat(),
+                deadline=date,
+                reminder_offset=0,
+            )
         )
 
     return reminders
+

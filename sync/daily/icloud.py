@@ -13,7 +13,11 @@ import json
 import os
 import time
 
+from sync.logging import get_logger
+
 from .constants import ICLOUD_JOURNALSYNC_DIR
+
+logger = get_logger()
 
 
 def _load_status_file(filename: str) -> tuple[bool, dict | None]:
@@ -126,5 +130,6 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
             return True, data
 
     if last_err:
-        print(f"Failed to parse {os.path.basename(path)}: {last_err}")
+        logger.error("Failed to parse %s: %s", os.path.basename(path), last_err)
     return False, None
+

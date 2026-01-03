@@ -6,7 +6,9 @@ from __future__ import annotations
 
 import datetime
 
+from sync.constants import BOOKS_DIR, PODCASTS_DIR
 from sync.models import Book, Podcast
+from sync.readers.media import scan_books, scan_podcasts
 
 
 def _format_date_compact(d: datetime.date) -> str:
@@ -46,19 +48,26 @@ def render_media_table(
 
 
 def build_media_section(
-    books: list[Book],
-    podcasts: list[Podcast],
+    start_date: datetime.date,
+    end_date: datetime.date,
+    period_type: str = "",
 ) -> list[str]:
     """
     Build the complete MEDIA section for periodic notes.
 
+    Scans books and podcasts directories for items completed within the date range.
+
     Args:
-        books: List of Book dataclasses
-        podcasts: List of Podcast dataclasses
+        start_date: Start of date range (inclusive)
+        end_date: End of date range (inclusive)
+        period_type: Optional period identifier (unused, for future extension)
 
     Returns:
         List of markdown lines for the MEDIA section, or empty if no media
     """
+    books = scan_books(start_date, end_date, BOOKS_DIR)
+    podcasts = scan_podcasts(start_date, end_date, PODCASTS_DIR)
+
     if not books and not podcasts:
         return []
 
@@ -69,3 +78,4 @@ def build_media_section(
     lines.append("")
 
     return lines
+

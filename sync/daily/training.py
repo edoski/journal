@@ -279,6 +279,27 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
     return lines_out
 
 
+def _extract_data_date(data: dict | list | None) -> str | None:
+    """
+    Extract the date field from training data if present.
+
+    Args:
+        data: Raw JSON data from status file
+
+    Returns:
+        Date string (YYYY-MM-DD) or None if not present
+    """
+    if not data:
+        return None
+    try:
+        if isinstance(data, list):
+            # Use first entry's date
+            return data[0].get("date") if data else None
+        return data.get("date")
+    except Exception:
+        return None
+
+
 def _build_training_section(
     workout_data: dict | list | None,
     stretch_data: dict | list | None,
@@ -298,8 +319,19 @@ def _build_training_section(
         Tuple of (section_lines, merged_entries)
     """
     existing_entries = _parse_training_table(existing_block)
-    workout_entries = _activity_entries_from_data(workout_data, "Workout")
-    stretch_entries = _activity_entries_from_data(stretch_data, "Stretching")
+
+    # Only use workout/stretch data if its date matches today
+    workout_entries = []
+    stretch_entries = []
+
+    workout_date = _extract_data_date(workout_data)
+    if workout_date == today_str:
+        workout_entries = _activity_entries_from_data(workout_data, "Workout")
+
+    stretch_date = _extract_data_date(stretch_data)
+    if stretch_date == today_str:
+        stretch_entries = _activity_entries_from_data(stretch_data, "Stretching")
+
     new_entries = workout_entries + stretch_entries
 
     cache_entries = _load_training_cache(today_str)
@@ -310,8 +342,6 @@ def _build_training_section(
         _save_training_cache(today_str, merged)
     elif cache_entries:
         merged = cache_entries
-    elif existing_block:
-        merged = existing_entries
 
     lines_out = ["### **TRAINING**"]
     lines_out.append("")  # spacer between header and body
@@ -321,3 +351,4 @@ def _build_training_section(
         lines_out.append("_No training sessions completed today._")
 
     return lines_out, merged
+

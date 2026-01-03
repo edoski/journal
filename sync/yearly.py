@@ -548,13 +548,14 @@ def main():
         except Exception:
             prev_tasks = []
 
-        open_prev = [t for t in prev_tasks if not t.get("done")]
-        existing_ids = {t.get("id") for t in yearly_tasks if t.get("id")}
+        open_prev = [t for t in prev_tasks if not t.done]
+        existing_ids = {t.id for t in yearly_tasks if t.id}
         for t in open_prev:
-            if t.get("id") in existing_ids:
+            if t.id in existing_ids:
                 continue
-            yearly_tasks.append({**t, "done": False})
-            existing_ids.add(t.get("id"))
+            from dataclasses import replace as dc_replace
+            yearly_tasks.append(dc_replace(t, done=False))
+            existing_ids.add(t.id)
 
         new_goals_block = build_goals_block(
             [
