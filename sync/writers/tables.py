@@ -13,6 +13,16 @@ from sync.formatting import (
     format_ma_training_ratio,
     compute_percent_change,
     format_percent_change,
+    format_progress_bar,
+)
+from sync.constants import (
+    IDEAL_STUDY_MINUTES_DAILY,
+    IDEAL_SLEEP_MINUTES_NIGHTLY,
+    IDEAL_WORKOUT_WEEKLY,
+    IDEAL_STRETCH_WEEKLY,
+    IDEAL_PROGRESS_BAR_WIDTH,
+    IDEAL_PROGRESS_FILLED,
+    IDEAL_PROGRESS_EMPTY,
 )
 
 
@@ -304,4 +314,112 @@ def render_summary_table(
         lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` |")
 
     lines.append("")
+    return lines
+
+
+def render_ideals_table(
+    study_total_minutes: float,
+    sleep_avg_minutes: float | None,
+    workout_count: int,
+    stretch_count: int,
+    period_type: str,
+    total_days: int,
+) -> list[str]:
+    """
+    Render IDEALS progress table with bars and percentages.
+
+    Scales study/workout/stretch targets based on period_type.
+    Sleep target stays constant (nightly average).
+
+    Args:
+        study_total_minutes: Total study time for the period in minutes.
+        sleep_avg_minutes: Average sleep per night in minutes.
+        workout_count: Total workout days in the period.
+        stretch_count: Total stretch days in the period.
+        period_type: One of "week", "month", "quarter", "year".
+        total_days: Number of days in the period.
+
+    Returns:
+        List of markdown lines for the IDEALS subsection.
+    """
+    lines: list[str] = ["#### **IDEALS**", ""]
+
+    # Calculate targets based on period type
+    study_target_minutes = IDEAL_STUDY_MINUTES_DAILY * total_days
+    sleep_target_minutes = IDEAL_SLEEP_MINUTES_NIGHTLY  # Always nightly avg
+    
+    # Workout/stretch scale by number of weeks (workout/stretch are per-week targets)
+    weeks_in_period = total_days / 7
+    workout_target = int(round(IDEAL_WORKOUT_WEEKLY * weeks_in_period))
+    stretch_target = int(round(IDEAL_STRETCH_WEEKLY * weeks_in_period))
+
+    # Format target labels based on period type
+    study_hours = int(study_target_minutes // 60)
+    period_suffix = {
+        "week": "wk",
+        "month": "mo",
+        "quarter": "qtr",
+        "year": "yr",
+    }.get(period_type, "wk")
+
+    study_target_label = f"{study_hours}h/{period_suffix}"
+    sleep_target_label = "8h/night"
+    
+    if period_type == "week":
+        workout_target_label = f"{workout_target}/7"
+        stretch_target_label = f"{stretch_target}/7"
+    else:
+        workout_target_label = f"{workout_target}/{period_suffix}"
+        stretch_target_label = f"{stretch_target}/{period_suffix}"
+
+    # Compute progress bars
+    study_bar, study_pct = format_progress_bar(
+        study_total_minutes,
+        study_target_minutes,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+    
+    sleep_current = sleep_avg_minutes or 0
+    sleep_bar, sleep_pct = format_progress_bar(
+        sleep_current,
+        sleep_target_minutes,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+    
+    workout_bar, workout_pct = format_progress_bar(
+        workout_count,
+        workout_target,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+    
+    stretch_bar, stretch_pct = format_progress_bar(
+        stretch_count,
+        stretch_target,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
+    # Build table
+    lines.append("| METRIC | TARGET | PROGRESS |")
+    lines.append("| ------ | ------ | -------- |")
+    lines.append(
+        f"| **STUDY** | `{study_target_label}` | `{study_bar}` `{study_pct}%` |"
+    )
+    lines.append(
+        f"| **SLEEP** | `{sleep_target_label}` | `{sleep_bar}` `{sleep_pct}%` |"
+    )
+    lines.append(
+        f"| **WORKOUT** | `{workout_target_label}` | `{workout_bar}` `{workout_pct}%` |"
+    )
+    lines.append(
+        f"| **STRETCH** | `{stretch_target_label}` | `{stretch_bar}` `{stretch_pct}%` |"
+    )
+
     return lines

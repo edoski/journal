@@ -130,3 +130,32 @@ def format_ma_training_ratio(avg_count: float | None, unit: str) -> str:
         return f"{round(avg_count)}/{unit}"
     else:
         return f"{avg_count:.1f}/{unit}"
+
+
+def format_progress_bar(
+    current: float,
+    target: float,
+    width: int = 20,
+    filled_char: str = "█",
+    empty_char: str = "░",
+) -> tuple[str, int]:
+    """
+    Generate a progress bar and percentage.
+
+    Args:
+        current: Current value achieved.
+        target: Target value.
+        width: Width of the progress bar in characters.
+        filled_char: Character for filled portion.
+        empty_char: Character for empty portion.
+
+    Returns:
+        Tuple of (bar_string, percent_int).
+        Bar is capped at 100% visually but percent can exceed 100.
+    """
+    if target <= 0:
+        return empty_char * width, 0
+    percent = int(round((current / target) * 100))
+    filled_count = min(width, int(round((current / target) * width)))
+    bar = filled_char * filled_count + empty_char * (width - filled_count)
+    return bar, percent

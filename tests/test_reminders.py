@@ -17,11 +17,11 @@ class TestGetReviewRemindersForDate:
         sunday = datetime.date(2025, 1, 5)
         reminders = get_review_reminders_for_date(sunday)
 
-        weekly = [r for r in reminders if "W" in r["body"]]
+        weekly = [r for r in reminders if "W" in r.body]
         assert len(weekly) == 1
-        assert weekly[0]["body"] == "Review [[2025-W01]]"
-        assert weekly[0]["deadline"] == sunday
-        assert weekly[0]["done"] is False
+        assert weekly[0].body == "Review [[2025-W01]]"
+        assert weekly[0].deadline == sunday
+        assert weekly[0].done is False
 
     def test_non_sunday_no_weekly_review(self):
         """Non-Sunday should not generate a weekly review reminder."""
@@ -29,7 +29,7 @@ class TestGetReviewRemindersForDate:
         monday = datetime.date(2025, 1, 6)
         reminders = get_review_reminders_for_date(monday)
 
-        weekly = [r for r in reminders if "W" in r["body"]]
+        weekly = [r for r in reminders if "W" in r.body]
         assert len(weekly) == 0
 
     def test_last_day_of_month_generates_monthly_review(self):
@@ -38,9 +38,9 @@ class TestGetReviewRemindersForDate:
         last_jan = datetime.date(2025, 1, 31)
         reminders = get_review_reminders_for_date(last_jan)
 
-        monthly = [r for r in reminders if r["body"].startswith("Review [[2025-01]]")]
+        monthly = [r for r in reminders if r.body.startswith("Review [[2025-01]]")]
         assert len(monthly) == 1
-        assert monthly[0]["deadline"] == last_jan
+        assert monthly[0].deadline == last_jan
 
     def test_not_last_day_no_monthly_review(self):
         """Non-last day of month should not generate a monthly review reminder."""
@@ -48,9 +48,7 @@ class TestGetReviewRemindersForDate:
         jan_30 = datetime.date(2025, 1, 30)
         reminders = get_review_reminders_for_date(jan_30)
 
-        monthly = [
-            r for r in reminders if "2025-01" in r["body"] and "W" not in r["body"]
-        ]
+        monthly = [r for r in reminders if "2025-01" in r.body and "W" not in r.body]
         assert len(monthly) == 0
 
     def test_dec_31_generates_yearly_review(self):
@@ -58,9 +56,9 @@ class TestGetReviewRemindersForDate:
         dec_31 = datetime.date(2025, 12, 31)
         reminders = get_review_reminders_for_date(dec_31)
 
-        yearly = [r for r in reminders if r["body"] == "Review [[2025]]"]
+        yearly = [r for r in reminders if r.body == "Review [[2025]]"]
         assert len(yearly) == 1
-        assert yearly[0]["deadline"] == dec_31
+        assert yearly[0].deadline == dec_31
 
     def test_not_dec_31_no_yearly_review(self):
         """Non-December-31 should not generate a yearly review reminder."""
@@ -68,7 +66,7 @@ class TestGetReviewRemindersForDate:
         reminders = get_review_reminders_for_date(dec_30)
 
         # Dec 30 is not Dec 31, should not have yearly
-        yearly = [r for r in reminders if r["body"] == "Review [[2025]]"]
+        yearly = [r for r in reminders if r.body == "Review [[2025]]"]
         assert len(yearly) == 0
 
     def test_dec_31_sunday_generates_all_three(self):
@@ -79,26 +77,25 @@ class TestGetReviewRemindersForDate:
 
         # Should have all three types
         assert len(reminders) == 3
-        bodies = {r["body"] for r in reminders}
+        bodies = {r.body for r in reminders}
         assert any("W" in b for b in bodies)  # weekly
         assert "Review [[2028-12]]" in bodies  # monthly
         assert "Review [[2028]]" in bodies  # yearly
 
     def test_reminder_has_required_fields(self):
-        """Reminder should have all required task dict fields."""
+        """Reminder should have all required Goal fields."""
         sunday = datetime.date(2025, 1, 5)
         reminders = get_review_reminders_for_date(sunday)
 
         assert len(reminders) >= 1
         reminder = reminders[0]
 
-        assert "body" in reminder
-        assert "date_str" in reminder
-        assert "deadline" in reminder
-        assert "id" in reminder
-        assert "done" in reminder
-        assert "reminder_offset" in reminder
-        assert reminder["reminder_offset"] == 0
+        assert reminder.body is not None
+        assert reminder.date_str is not None
+        assert reminder.deadline is not None
+        assert reminder.id is not None
+        assert reminder.done is not None
+        assert reminder.reminder_offset == 0
 
     def test_february_leap_year(self):
         """February 29 in leap year should generate monthly review."""
@@ -106,7 +103,7 @@ class TestGetReviewRemindersForDate:
         feb_29 = datetime.date(2028, 2, 29)
         reminders = get_review_reminders_for_date(feb_29)
 
-        monthly = [r for r in reminders if "2028-02" in r["body"]]
+        monthly = [r for r in reminders if "2028-02" in r.body]
         assert len(monthly) == 1
 
     def test_february_non_leap_year(self):
@@ -115,5 +112,5 @@ class TestGetReviewRemindersForDate:
         feb_28 = datetime.date(2025, 2, 28)
         reminders = get_review_reminders_for_date(feb_28)
 
-        monthly = [r for r in reminders if "2025-02" in r["body"]]
+        monthly = [r for r in reminders if "2025-02" in r.body]
         assert len(monthly) == 1

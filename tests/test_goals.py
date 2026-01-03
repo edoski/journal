@@ -243,33 +243,31 @@ class TestEnsureGoalIds:
     """Tests for ensure_goal_ids function."""
 
     def test_assigns_deterministic_ids(self):
-        tasks = [{"body": "Task", "done": False, "canonical": "task"}]
+        tasks = [Goal(id="", body="Task", done=False)]
         ensure_goal_ids(tasks, "weekly", "2025-W52")
-        assert tasks[0]["id"] is not None
-        assert tasks[0]["id"].startswith("gid-")
+        assert tasks[0].id is not None
+        assert tasks[0].id.startswith("gid-")
 
     def test_preserves_existing_ids(self):
         original_id = "gid-existing123"
-        tasks = [
-            {"body": "Task", "done": False, "id": original_id, "canonical": "task"}
-        ]
+        tasks = [Goal(id=original_id, body="Task", done=False)]
         ensure_goal_ids(tasks, "weekly", "2025-W52")
-        assert tasks[0]["id"] == original_id
+        assert tasks[0].id == original_id
 
     def test_deterministic_same_run(self):
-        tasks1 = [{"body": "Task", "done": False, "canonical": "task"}]
-        tasks2 = [{"body": "Task", "done": False, "canonical": "task"}]
+        tasks1 = [Goal(id="", body="Task", done=False)]
+        tasks2 = [Goal(id="", body="Task", done=False)]
         ensure_goal_ids(tasks1, "weekly", "2025-W52")
         ensure_goal_ids(tasks2, "weekly", "2025-W52")
-        assert tasks1[0]["id"] == tasks2[0]["id"]
+        assert tasks1[0].id == tasks2[0].id
 
     def test_handles_duplicate_canonicals(self):
         tasks = [
-            {"body": "Task A", "done": False, "canonical": "task"},
-            {"body": "Task B", "done": False, "canonical": "task"},
+            Goal(id="", body="Task A", done=False),
+            Goal(id="", body="Task A", done=False),  # Same body = same canonical
         ]
         ensure_goal_ids(tasks, "weekly", "2025-W52")
-        assert tasks[0]["id"] != tasks[1]["id"]
+        assert tasks[0].id != tasks[1].id
 
 
 class TestBuildGoalsBlock:

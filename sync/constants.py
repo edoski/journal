@@ -77,3 +77,14 @@ CHART_Y_MAX_WEEKLY_STUDY = 10  # 10 hours
 CHART_Y_MAX_MONTHLY_STUDY = 40  # 40 hours per week
 CHART_Y_MAX_QUARTERLY_STUDY = 240  # 240 hours per month
 CHART_Y_MAX_YEARLY_STUDY = 720  # 720 hours per quarter
+
+# Ideal targets (weekly base values)
+IDEAL_STUDY_MINUTES_DAILY = 360  # 6h/day
+IDEAL_SLEEP_MINUTES_NIGHTLY = 480  # 8h/night
+IDEAL_WORKOUT_WEEKLY = 7  # 7/7 days
+IDEAL_STRETCH_WEEKLY = 7  # 7/7 days
+
+# Progress bar settings
+IDEAL_PROGRESS_BAR_WIDTH = 30
+IDEAL_PROGRESS_FILLED = "█"
+IDEAL_PROGRESS_EMPTY = "░"
