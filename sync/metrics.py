@@ -129,6 +129,29 @@ def aggregate_interrupt_overrun(
     return total_interrupts, total_overruns, study_day_count
 
 
+def aggregate_screen_time(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, dict[str, Any]],
+) -> dict[str, float]:
+    """
+    Aggregate screen time totals across a date range.
+
+    Args:
+        dates: List of date objects to aggregate.
+        daily_data: Dict mapping dates to parsed daily note data.
+
+    Returns:
+        Dict mapping app names to total minutes.
+    """
+    app_totals: dict[str, float] = {}
+    for d in dates:
+        daily = daily_data.get(d, {})
+        screen_time = daily.get("screen_time_totals", {})
+        for app, minutes in screen_time.items():
+            app_totals[app] = app_totals.get(app, 0) + minutes
+    return app_totals
+
+
 def compute_period_deltas(
     counts: list[tuple[int, int, datetime.date]],
     baseline: int | None,
@@ -213,11 +236,19 @@ def compute_moving_average(
         for pm in recent
         if pm.get("sleep_avg_minutes") is not None
     ]
-    sleep_ma = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
+    sleep_ma = (
+        sum(float(v) for v in sleep_vals if v is not None) / len(sleep_vals)
+        if sleep_vals
+        else None
+    )
 
     # Mood: average of averages
     mood_vals = [pm.get("mood_avg") for pm in recent if pm.get("mood_avg") is not None]
-    mood_ma = sum(mood_vals) / len(mood_vals) if mood_vals else None
+    mood_ma = (
+        sum(float(v) for v in mood_vals if v is not None) / len(mood_vals)
+        if mood_vals
+        else None
+    )
 
     # Workout: average count per period
     workout_counts = [pm.get("workout_count", 0) for pm in recent]

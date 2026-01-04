@@ -12,6 +12,7 @@ from .study import parse_study_table
 from .sleep import parse_sleep_table
 from .goals import parse_goal_tasks, resolve_deadline, parse_goal_date
 from .media import scan_books, scan_podcasts
+from .screen_time import parse_procrastination_table
 
 __all__ = [
     # Frontmatter
@@ -27,4 +28,7 @@ __all__ = [
     # Media
     "scan_books",
     "scan_podcasts",
+    # Screen time
+    "parse_procrastination_table",
 ]
+

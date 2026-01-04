@@ -17,6 +17,8 @@ from contextlib import contextmanager
 
 from .constants import LOCK_DIR
 from sync.readers.frontmatter import parse_frontmatter
+from sync.readers.screen_time import parse_procrastination_table
+from sync.models.goals import Goal
 
 
 def _normalize_header(line: str) -> str:
@@ -249,7 +251,7 @@ def goals_section_bounds(lines: list[str]) -> tuple[int, int]:
 
 def extract_subsection_tasks(
     lines: list[str], parent_start: int, parent_end: int, sub_title: str
-) -> list:
+) -> list[Goal]:
     """Extract checkbox tasks from a ### subsection within a parent block."""
     from sync.readers.goals import parse_goal_tasks
 
@@ -277,7 +279,7 @@ def trim_blank_lines(lines: list[str]) -> list[str]:
 
 def join_sections(sections: list[list[str]]) -> list[str]:
     """Join multiple line-blocks with a single blank line between non-empty blocks."""
-    result = []
+    result: list[str] = []
     for sec in sections:
         if not sec:
             continue
@@ -330,11 +332,11 @@ def parse_study_table(lines: list[str]) -> list[tuple]:
             break_str = parts[5].strip("`").strip()
             if break_str:
                 planned_str = break_str.split("(", 1)[0].strip()
-                planned_break_min = _parse_duration_to_minutes(planned_str) or 0
+                planned_break_min = int(_parse_duration_to_minutes(planned_str) or 0)
             overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
             if overrun_match:
                 overrun_str = overrun_match.group(1)
-                overrun_min = _parse_duration_to_minutes(overrun_str) or 0
+                overrun_min = int(_parse_duration_to_minutes(overrun_str) or 0)
 
         if activity and duration_min:
             rows.append(
@@ -401,7 +403,8 @@ def parse_daily_note(path: str) -> dict | None:
     mood_val = None
     if fm.get("mood") not in (None, ""):
         try:
-            mood_val = float(re.sub(r"[^0-9.\-]", "", fm.get("mood")))
+            mood_str = fm.get("mood") or ""
+            mood_val = float(re.sub(r"[^0-9.\-]", "", mood_str))
         except Exception:
             mood_val = None
 
@@ -415,7 +418,7 @@ def parse_daily_note(path: str) -> dict | None:
         if awak_counts:
             awakenings_total = sum(awak_counts)
 
-    activity_totals = {}
+    activity_totals: dict[str, float] = {}
     interrupt_total = 0
     overrun_total = 0
     planned_break_total = 0
@@ -435,6 +438,15 @@ def parse_daily_note(path: str) -> dict | None:
     # This ensures chart bars, SUM, SUMMARY avg, and percentages all match
     study_total = sum(activity_totals.values())
 
+    # Parse screen time from PROCRASTINATION table
+    screen_time_data = parse_procrastination_table(lines)
+    screen_time_totals: dict[str, float] = {}
+    if screen_time_data and screen_time_data.entries:
+        for entry in screen_time_data.entries:
+            screen_time_totals[entry.app] = (
+                screen_time_totals.get(entry.app, 0) + entry.minutes
+            )
+
     return {
         "study_minutes": study_total,
         "sleep_minutes": sleep_total,
@@ -447,6 +459,7 @@ def parse_daily_note(path: str) -> dict | None:
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
         "planned_break_minutes": planned_break_total,
+        "screen_time_totals": screen_time_totals,
     }
 
 

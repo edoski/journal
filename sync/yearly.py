@@ -31,6 +31,7 @@ from sync.metrics import (
     aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,
+    aggregate_screen_time,
 )
 from sync.writers.tables import (
     render_summary_table,
@@ -46,6 +47,8 @@ from sync.writers.charts import (
     wrap_code_block,
     compress_activity_time_order,
     _compress_days_time_order,
+    render_waterfall_chart,
+    render_screen_time_period_table,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -352,6 +355,24 @@ def build_yearly_metrics(
     training_lines.extend(wrap_code_block(workout_block + [""] + stretch_block))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
+
+    # PROCRASTINATION section (screen time waterfall + trend table)
+    screen_time_totals = aggregate_screen_time(dates, daily_data)
+    if screen_time_totals:
+        procrastination_lines = ["### **PROCRASTINATION**"]
+        waterfall_lines = render_waterfall_chart(screen_time_totals)
+        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
+        procrastination_lines.extend(wrap_code_block(chart_body))
+        procrastination_lines.append("")
+        # Quarterly trend table with wikilinks to quarterly notes
+        quarter_labels = [f"Q{i + 1}" for i in range(len(quarter_ranges))]
+        quarter_wikilinks = []
+        for i, _ in enumerate(quarter_ranges):
+            quarter_wikilinks.append(f"[[{year}-Q{i + 1}\\|Q{i + 1}]]")
+        procrastination_lines.extend(
+            render_screen_time_period_table(quarter_ranges, daily_data, "QTR", quarter_labels, quarter_wikilinks)
+        )
+        sections.append(trim_blank_lines(procrastination_lines))
 
     # SLEEP
     sleep_lines = ["### **SLEEP**"]

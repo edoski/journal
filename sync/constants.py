@@ -88,3 +88,6 @@ IDEAL_STRETCH_WEEKLY = 7  # 7/7 days
 IDEAL_PROGRESS_BAR_WIDTH = 30
 IDEAL_PROGRESS_FILLED = "█"
 IDEAL_PROGRESS_EMPTY = "░"
+
+# Screen time settings
+SCREEN_TIME_MIN_MINUTES = 5  # Ignore apps used < 5 minutes

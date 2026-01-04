@@ -40,6 +40,7 @@ from sync.metrics import (
     load_daily_data,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
+    aggregate_screen_time,
 )
 from sync.writers.tables import (
     render_summary_table,
@@ -53,6 +54,8 @@ from sync.writers.charts import (
     render_training_frequency_grid,
     render_monthly_study_grid,
     wrap_code_block,
+    render_waterfall_chart,
+    render_screen_time_period_table,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -353,6 +356,25 @@ def build_monthly_metrics(
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
+
+    # PROCRASTINATION section (screen time waterfall + trend table)
+    screen_time_totals = aggregate_screen_time(dates, daily_data)
+    if screen_time_totals:
+        procrastination_lines = ["### **PROCRASTINATION**"]
+        waterfall_lines = render_waterfall_chart(screen_time_totals)
+        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
+        procrastination_lines.extend(wrap_code_block(chart_body))
+        procrastination_lines.append("")
+        # Weekly trend table with wikilinks to weekly notes
+        week_labels = [format_week_label(s, e) for s, e in week_ranges]
+        week_wikilinks = []
+        for (s, _), label in zip(week_ranges, week_labels):
+            year, week_num, _ = s.isocalendar()
+            week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
+        procrastination_lines.extend(
+            render_screen_time_period_table(week_ranges, daily_data, "WEEK", week_labels, week_wikilinks)
+        )
+        sections.append(trim_blank_lines(procrastination_lines))
 
     # SLEEP section (5-char bars, weekly averages)
     sleep_lines = ["### **SLEEP**"]

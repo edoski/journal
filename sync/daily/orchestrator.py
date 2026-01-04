@@ -34,6 +34,7 @@ from sync.formatting import format_minutes
 from sync.reminders import get_review_reminders_for_date
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
+from sync.models.goals import Goal
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
 from .constants import TEMPLATE_PATH
@@ -41,6 +42,7 @@ from .flow_db import SessionDict
 from .study import _extract_existing_data, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
+from .screen_time import _load_screen_time_data, _build_procrastination_section
 from .icloud import _load_status_file
 from .context import (
     get_vault_files_modified_on_date,
@@ -62,7 +64,7 @@ def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) ->
 def _load_weekly_goals(
     date_obj: datetime.date,
     weekly_dir: str | None = None,
-) -> tuple[list[dict], str]:
+) -> tuple[list[Goal], str]:
     """
     Load weekly goals (source of truth) from the weekly note.
 
@@ -90,7 +92,7 @@ def _load_weekly_goals(
 
 def _write_weekly_goals(
     date_obj: datetime.date,
-    weekly_tasks: list[dict],
+    weekly_tasks: list[Goal],
     weekly_dir: str | None = None,
 ) -> str:
     """
@@ -164,7 +166,7 @@ def _write_weekly_goals(
     return path
 
 
-def _parse_daily_goal_subsections(lines: list[str]) -> tuple[list[dict], list[dict]]:
+def _parse_daily_goal_subsections(lines: list[str]) -> tuple[list[Goal], list[Goal]]:
     """
     Parse weekly and daily goal subsections from daily note lines.
 
@@ -189,8 +191,8 @@ def _parse_daily_goal_subsections(lines: list[str]) -> tuple[list[dict], list[di
 def _carry_forward_daily_tasks(
     today_date: datetime.date,
     yesterday_date: datetime.date,
-    existing_daily_tasks: list,
-) -> tuple[list, int]:
+    existing_daily_tasks: list[Goal],
+) -> tuple[list[Goal], int]:
     """
     Carry forward unchecked DAILY goals from yesterday into today's daily tasks list.
 
@@ -346,13 +348,13 @@ def _update_frontmatter(
 
     if sleep_data and (sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")):
         try:
-            total_min = float(
-                sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")
-            )
-            hours = int(total_min) // 60
-            mins = int(total_min) % 60
-            sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
-            set_value("sleep", sleep_str)
+            sleep_value = sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")
+            if sleep_value is not None:
+                total_min = float(sleep_value)
+                hours = int(total_min) // 60
+                mins = int(total_min) % 60
+                sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
+                set_value("sleep", sleep_str)
         except Exception:
             pass
 
@@ -528,7 +530,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Load weekly source goals and propagate status changes from daily mirror.
     weekly_tasks, weekly_path = _load_weekly_goals(today)
-    updated_weekly_tasks = []
+    updated_weekly_tasks: list[Goal] = []
     daily_weekly_lookup = {t.canonical: t for t in existing_weekly_tasks}
     for task in weekly_tasks:
         canon = task.canonical
@@ -610,8 +612,12 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
 
+    # Load screen time data and build procrastination section
+    screen_time_data = _load_screen_time_data(today_str)
+    procrastination_lines = _build_procrastination_section(screen_time_data)
+
     # Join metrics subsections with single blank between, none before first, none trailing
-    sections = [study_lines, training_lines, sleep_lines]
+    sections = [study_lines, training_lines, procrastination_lines, sleep_lines]
     metrics_lines: list[str] = []
     for sec in sections:
         if not sec:

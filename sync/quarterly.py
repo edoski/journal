@@ -35,6 +35,7 @@ from sync.metrics import (
     load_daily_data,
     aggregate_interrupt_overrun,
     compute_period_deltas,
+    aggregate_screen_time,
 )
 from sync.writers.tables import (
     render_summary_table,
@@ -47,6 +48,8 @@ from sync.writers.charts import (
     render_bar_chart,
     render_quarterly_study_coverage,
     wrap_code_block,
+    render_waterfall_chart,
+    render_screen_time_period_table,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -350,6 +353,24 @@ def build_quarterly_metrics(
     training_lines.append("")
 
     sections.append(trim_blank_lines(training_lines))
+
+    # PROCRASTINATION section (screen time waterfall + trend table)
+    screen_time_totals = aggregate_screen_time(dates, daily_data)
+    if screen_time_totals:
+        procrastination_lines = ["### **PROCRASTINATION**"]
+        waterfall_lines = render_waterfall_chart(screen_time_totals)
+        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
+        procrastination_lines.extend(wrap_code_block(chart_body))
+        procrastination_lines.append("")
+        # Monthly trend table with wikilinks to monthly notes
+        month_labels = [MONTH_ABBR[m[0].month - 1] for m in month_ranges]
+        month_wikilinks = []
+        for (start, _), label in zip(month_ranges, month_labels):
+            month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
+        procrastination_lines.extend(
+            render_screen_time_period_table(month_ranges, daily_data, "MONTH", month_labels, month_wikilinks)
+        )
+        sections.append(trim_blank_lines(procrastination_lines))
 
     # SLEEP
     sleep_lines = ["### **SLEEP**"]

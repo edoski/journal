@@ -29,6 +29,7 @@ from sync.metrics import (
     load_daily_data,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
+    aggregate_screen_time,
 )
 from sync.writers.tables import (
     render_summary_table,
@@ -42,6 +43,8 @@ from sync.writers.charts import (
     render_weekly_training_grid,
     render_weekly_study_grid,
     wrap_code_block,
+    render_waterfall_chart,
+    render_screen_time_trend_table,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -219,6 +222,18 @@ def build_weekly_metrics(
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
+
+    # PROCRASTINATION section (screen time waterfall + trend table)
+    screen_time_totals = aggregate_screen_time(dates, daily_data)
+    if screen_time_totals:
+        procrastination_lines = ["### **PROCRASTINATION**"]
+        waterfall_lines = render_waterfall_chart(screen_time_totals)
+        # Remove header from waterfall (it includes its own) and wrap in code block
+        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
+        procrastination_lines.extend(wrap_code_block(chart_body))
+        procrastination_lines.append("")
+        procrastination_lines.extend(render_screen_time_trend_table(dates, daily_data))
+        sections.append(trim_blank_lines(procrastination_lines))
 
     # SLEEP section (values on top of bars, 5-char bars like monthly)
     sleep_lines = ["### **SLEEP**"]

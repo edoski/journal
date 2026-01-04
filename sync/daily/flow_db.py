@@ -213,6 +213,8 @@ def get_todays_sessions() -> list[SessionDict]:
     for row in rows:
         pk, started_at, duration_planned, phase, title, completed_at = row
         start_dt = core_data_to_datetime(started_at)
+        if start_dt is None:
+            continue  # Skip sessions without start time
 
         completed_dt = core_data_to_datetime(completed_at) if completed_at else None
         if completed_dt:
@@ -223,7 +225,7 @@ def get_todays_sessions() -> list[SessionDict]:
             if end_dt < start_dt:
                 end_dt = start_dt
 
-        actual_duration_min = max(0, (end_dt - start_dt).total_seconds() / 60)
+        actual_duration_min = max(0.0, (end_dt - start_dt).total_seconds() / 60)
 
         all_sessions.append(
             {

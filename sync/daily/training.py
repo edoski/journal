@@ -318,8 +318,6 @@ def _build_training_section(
     Returns:
         Tuple of (section_lines, merged_entries)
     """
-    existing_entries = _parse_training_table(existing_block)
-
     # Only use workout/stretch data if its date matches today
     workout_entries = []
     stretch_entries = []
