@@ -91,6 +91,10 @@ def _parse_activity_field(activity_str: str | None) -> dict[str, float]:
     if not activity_str:
         return {}
 
+    # Handle multiple segments (e.g. from lunch exclusion) separated by ", "
+    # Normalize to newline-separated for consistent line-by-line parsing
+    activity_str = activity_str.replace(", ", "\n")
+
     result: dict[str, float] = {}
     for line in activity_str.split("\n"):
         parsed = _parse_activity_line(line)
