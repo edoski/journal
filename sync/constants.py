@@ -93,4 +93,8 @@ IDEAL_PROGRESS_EMPTY = "░"
 IDEAL_MOOD_TARGET = 7.0
 
 # Screen time settings
-SCREEN_TIME_MIN_MINUTES = 5  # Ignore apps used < 5 minutes
+SCREEN_TIME_MIN_MINUTES = 5  # Apps < 5 min go into "Miscellaneous"
+SCREEN_TIME_MISC_LABEL = "Miscellaneous"
+
+# Study schedule (for late start calculation)
+IDEAL_STUDY_START_HOUR = 8  # 8:00 AM

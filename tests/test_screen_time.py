@@ -150,6 +150,7 @@ class TestBuildProcrastinationSection:
         assert any("No screen time data" in line for line in lines)
 
     def test_empty_entries(self):
-        data = DailyScreenTimeData(entries=[])
+        """Empty entries with shortcut_ran=True renders TOTAL +0m."""
+        data = DailyScreenTimeData(entries=[], shortcut_ran=True)
         lines = _build_procrastination_section(data)
-        assert any("No screen time data" in line for line in lines)
+        assert any("**TOTAL**" in line and "+0m" in line for line in lines)

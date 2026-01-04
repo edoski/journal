@@ -8,6 +8,7 @@ including goals, metrics sections, and frontmatter.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 from collections import OrderedDict
 from dataclasses import replace
@@ -51,6 +52,56 @@ from .context import (
 )
 
 logger = get_logger()
+
+# iCloud path for study times JSON (read by iPad shortcut)
+STUDY_TIMES_ICLOUD_PATH = os.path.expanduser(
+    "~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync/study_times.json"
+)
+
+
+def _write_study_times_to_icloud(
+    sessions: list[SessionDict], today_str: str
+) -> None:
+    """
+    Write study session times to iCloud for iPad shortcut to read.
+
+    Args:
+        sessions: List of study session dicts
+        today_str: Today's date string (YYYY-MM-DD)
+    """
+    if not sessions:
+        return
+
+    first_start = sessions[0]["start"]
+    last_end = sessions[-1]["end"]
+
+    # Find last session ending between 12:00-15:00 (pre-lunch)
+    lunch_start = None
+    for session in sessions:
+        end_hour = session["end"].hour
+        if 12 <= end_hour < 15:
+            lunch_start = session["end"]
+
+    data = {
+        "date": today_str,
+        "morning_start": first_start.strftime("%H:%M"),
+        "lunch_start": lunch_start.strftime("%H:%M") if lunch_start else "13:30",
+        "afternoon_end": last_end.strftime("%H:%M"),
+    }
+
+    try:
+        # Skip write if content unchanged (avoids triggering file watcher)
+        if os.path.exists(STUDY_TIMES_ICLOUD_PATH):
+            with open(STUDY_TIMES_ICLOUD_PATH, "r") as f:
+                existing = json.load(f)
+            if existing == data:
+                return  # No change, skip write
+
+        os.makedirs(os.path.dirname(STUDY_TIMES_ICLOUD_PATH), exist_ok=True)
+        with open(STUDY_TIMES_ICLOUD_PATH, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        logger.warning("Failed to write study_times.json: %s", e)
 
 
 def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) -> str:
@@ -614,6 +665,33 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Load screen time data and build procrastination section
     screen_time_data = _load_screen_time_data(today_str)
+
+    # Inject deviation data from study sessions
+    if screen_time_data and sessions:
+        # Late start: first session vs 8:00 AM ideal
+        from sync.constants import IDEAL_STUDY_START_HOUR
+
+        first_start = sessions[0]["start"]
+        ideal_start = first_start.replace(
+            hour=IDEAL_STUDY_START_HOUR, minute=0, second=0, microsecond=0
+        )
+        late_start = 0.0
+        if first_start > ideal_start:
+            late_start = (first_start - ideal_start).total_seconds() / 60
+
+        # Sum interrupts (stored in seconds) and overruns (stored in minutes)
+        total_interrupts = sum(
+            (s.get("interruptions_duration", 0) or 0) / 60 for s in sessions
+        )
+        total_overruns = sum(s.get("break_overrun", 0) or 0 for s in sessions)
+
+        screen_time_data.interrupt_minutes = total_interrupts
+        screen_time_data.overrun_minutes = total_overruns
+        screen_time_data.late_start_minutes = late_start
+
+    # Write study times to iCloud for iPad shortcut
+    _write_study_times_to_icloud(sessions, today_str)
+
     procrastination_lines = _build_procrastination_section(screen_time_data)
 
     # Join metrics subsections with single blank between, none before first, none trailing

@@ -11,7 +11,7 @@ import json
 import os
 import re
 
-from sync.constants import SCREEN_TIME_MIN_MINUTES
+from sync.constants import SCREEN_TIME_MIN_MINUTES, SCREEN_TIME_MISC_LABEL
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 
@@ -141,25 +141,57 @@ def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
         pass
 
 
+def _group_by_threshold(
+    entries: dict[str, float], threshold: float
+) -> dict[str, float]:
+    """
+    Group apps by threshold: apps >= threshold stay individual,
+    apps < threshold get grouped into 'Miscellaneous'.
+
+    Args:
+        entries: Dict mapping app names to minutes
+        threshold: Minimum minutes to keep individual
+
+    Returns:
+        Dict with grouped entries
+    """
+    result: dict[str, float] = {}
+    misc_total = 0.0
+
+    for app, minutes in entries.items():
+        if minutes >= threshold:
+            result[app] = minutes
+        else:
+            misc_total += minutes
+
+    if misc_total > 0:
+        result[SCREEN_TIME_MISC_LABEL] = misc_total
+
+    return result
+
+
 def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
     """
     Load and parse screen time data from iCloud JSON file.
 
-    Merges entries from iPad and iPhone, sums duplicates, filters by threshold,
+    Merges entries from iPad and iPhone, groups small apps into Miscellaneous,
     and caches the result for persistence across sync runs.
 
     Args:
         today_str: Date string (YYYY-MM-DD) to validate against JSON date
 
     Returns:
-        DailyScreenTimeData with merged entries, or None if no data
+        DailyScreenTimeData with merged entries, or None if no data at all
     """
     # Try to load new data from status file
     success, data = _load_status_file("activity_status.json")
-    
+
     new_entries: dict[str, float] = {}
-    
+    shortcut_ran = False
+
     if success and data:
+        # Shortcut ran and provided data (even if empty)
+        shortcut_ran = True
         # Validate date matches (data is already in memory, file consumed)
         json_date = data.get("date", "")
         if not json_date or json_date == today_str:
@@ -183,23 +215,22 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
         merged = {**cache_entries, **new_entries}
         _save_screen_time_cache(today_str, merged)
     elif cache_entries:
-        # No new data, use cache
+        # No new data, use cache (shortcut may have run previously)
         merged = cache_entries
+        shortcut_ran = True  # Cache exists, so shortcut ran at some point
 
-    if not merged:
+    if not merged and not shortcut_ran:
+        # No data and shortcut never ran
         return None
 
-    # Filter by threshold and create entries
+    # Group by threshold: < 5 min goes to Miscellaneous
+    grouped = _group_by_threshold(merged, SCREEN_TIME_MIN_MINUTES)
+
     entries = [
-        ScreenTimeEntry(app=app, minutes=minutes)
-        for app, minutes in merged.items()
-        if minutes >= SCREEN_TIME_MIN_MINUTES
+        ScreenTimeEntry(app=app, minutes=minutes) for app, minutes in grouped.items()
     ]
 
-    if not entries:
-        return None
-
-    return DailyScreenTimeData(entries=entries)
+    return DailyScreenTimeData(entries=entries, shortcut_ran=shortcut_ran)
 
 
 def _build_procrastination_section(
@@ -216,25 +247,52 @@ def _build_procrastination_section(
     """
     lines = ["### **PROCRASTINATION**"]
 
-    if not screen_time_data or not screen_time_data.entries:
+    # No data at all (shortcut never ran)
+    if not screen_time_data:
         lines.append("")
         lines.append("_No screen time data available._")
+        return lines
+
+    # Shortcut ran but zero procrastination apps
+    if not screen_time_data.entries:
+        lines.append("")
+        lines.append("| SOURCE      | DURATION    |")
+        lines.append("| ----------- | ----------- |")
+        lines.append("| **TOTAL** | **`+0m`** |")
         return lines
 
     lines.append("")
     lines.append("| SOURCE      | DURATION    |")
     lines.append("| ----------- | ----------- |")
 
-    # Sort by duration descending
-    sorted_entries = screen_time_data.sorted_entries
+    # Build list of (name, minutes, is_total) for sorting
+    # DEVIATIONS is sorted with entries, TOTAL is always last
+    rows: list[tuple[str, float, bool]] = []
 
-    for entry in sorted_entries:
-        duration_str = f"`+{format_minutes(entry.minutes)}`"
-        lines.append(f"| {entry.app} | {duration_str} |")
+    for entry in screen_time_data.entries:
+        rows.append((entry.app, entry.minutes, False))
 
-    # Total row
-    total_minutes = screen_time_data.total_minutes
+    # Add DEVIATIONS if > 0 (sorted with entries by value)
+    deviation = screen_time_data.deviation_minutes
+    if deviation > 0:
+        rows.append(("DEVIATIONS", deviation, False))
+
+    # Sort non-total rows descending by minutes
+    rows.sort(key=lambda x: x[1], reverse=True)
+
+    # Render sorted rows
+    for name, minutes, _ in rows:
+        if name == "DEVIATIONS":
+            duration_str = f"`+{format_minutes(minutes)}`"
+            lines.append(f"| {name} | {duration_str} |")
+        else:
+            duration_str = f"`+{format_minutes(minutes)}`"
+            lines.append(f"| {name} | {duration_str} |")
+
+    # TOTAL row always last (screen time + deviations)
+    total_minutes = screen_time_data.total_minutes + deviation
     total_str = f"**`{format_minutes(total_minutes)}`**"
     lines.append(f"| **TOTAL** | {total_str} |")
 
     return lines
+
