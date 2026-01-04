@@ -47,7 +47,6 @@ from sync.writers.tables import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
-    render_ideals_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
@@ -162,17 +161,9 @@ def build_monthly_metrics(
         ma_metrics=ma_metrics,
         ma_label="3-MO AVG" if ma_metrics else None,
         ma_training_unit="mo",
-    )
-    # Add IDEALS progress table
-    ideals_lines = render_ideals_table(
-        study_total_minutes=current_metrics.get("study_total_minutes", 0),
-        sleep_avg_minutes=current_metrics.get("sleep_avg_minutes"),
-        workout_count=current_metrics.get("workout_count", 0),
-        stretch_count=current_metrics.get("stretch_count", 0),
         period_type="month",
         total_days=days_in_period,
     )
-    summary_lines.extend(ideals_lines)
     sections.append(trim_blank_lines(summary_lines))
 
     # STUDY section (using activity totals for accuracy)

@@ -23,6 +23,7 @@ from sync.constants import (
     IDEAL_PROGRESS_BAR_WIDTH,
     IDEAL_PROGRESS_FILLED,
     IDEAL_PROGRESS_EMPTY,
+    IDEAL_MOOD_TARGET,
 )
 
 
@@ -127,9 +128,11 @@ def render_summary_table(
     ma_metrics: dict[str, Any] | None = None,
     ma_label: str | None = None,
     ma_training_unit: str = "7",
+    period_type: str = "week",
+    total_days: int = 7,
 ) -> list[str]:
     """
-    Generate markdown summary table with averages, previous values, MA, and % change.
+    Generate markdown summary table with averages, previous values, MA, % change, targets, and progress.
 
     Args:
         current_metrics: Dict with study_total_minutes, sleep_avg_minutes, mood_avg,
@@ -141,6 +144,8 @@ def render_summary_table(
                     mood_avg, workout_avg, stretch_avg)
         ma_label: Column header like "4-WK AVG"
         ma_training_unit: Unit for training MA ("7", "mo", "qtr", "yr")
+        period_type: One of "week", "month", "quarter", "year"
+        total_days: Number of days in the period for target scaling
 
     Returns:
         List of markdown lines for the SUMMARY section
@@ -149,17 +154,50 @@ def render_summary_table(
 
     show_ma = ma_metrics is not None and ma_label is not None
 
+    # Period suffix for target labels
+    period_suffix = {
+        "week": "wk",
+        "month": "mo",
+        "quarter": "qtr",
+        "year": "yr",
+    }.get(period_type, "wk")
+
+    # Calculate scaled targets
+    study_target_minutes = IDEAL_STUDY_MINUTES_DAILY * total_days
+    sleep_target_minutes = IDEAL_SLEEP_MINUTES_NIGHTLY  # Always nightly avg
+    weeks_in_period = total_days / 7
+    workout_target = int(round(IDEAL_WORKOUT_WEEKLY * weeks_in_period))
+    stretch_target = int(round(IDEAL_STRETCH_WEEKLY * weeks_in_period))
+    mood_target = IDEAL_MOOD_TARGET
+
+    # Format target labels
+    study_hours = int(study_target_minutes // 60)
+    study_target_label = f"{study_hours}h/{period_suffix}"
+    sleep_target_label = "8h/night"
+    mood_target_label = f"{mood_target:.1f}/10"
+
+    if period_type == "week":
+        workout_target_label = f"{workout_target}/7"
+        stretch_target_label = f"{stretch_target}/7"
+    else:
+        workout_target_label = f"{workout_target}/{period_suffix}"
+        stretch_target_label = f"{stretch_target}/{period_suffix}"
+
     # Table header
     if show_ma:
         lines.append(
-            f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} |"
+            f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} | TARGET | PROGRESS |"
         )
         lines.append(
-            "| ------ | ----------- | ----------------------- | ------ | ---------- |"
+            "| ------ | ------------- | ----------------------- | ------ | ---------- | ------ | -------- |"
         )
     else:
-        lines.append(f"| METRIC | {current_label} | {previous_label} | CHANGE |")
-        lines.append("| ------ | ----------- | ----------------------- | ------ |")
+        lines.append(
+            f"| METRIC | {current_label} | {previous_label} | CHANGE | TARGET | PROGRESS |"
+        )
+        lines.append(
+            "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |"
+        )
 
     # STUDY row
     curr_study_total = current_metrics.get("study_total_minutes") or 0
@@ -195,13 +233,21 @@ def render_summary_table(
     else:
         study_pct_str = "—"
 
+    study_bar, study_progress_pct = format_progress_bar(
+        curr_study_total,
+        study_target_minutes,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
     if show_ma:
         lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` |"
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` | `{study_target_label}` | `{study_bar}` `{study_progress_pct}%` |"
         )
     else:
         lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` |"
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{study_target_label}` | `{study_bar}` `{study_progress_pct}%` |"
         )
 
     # SLEEP row
@@ -227,13 +273,21 @@ def render_summary_table(
     else:
         sleep_pct_str = "—"
 
+    sleep_bar, sleep_progress_pct = format_progress_bar(
+        curr_sleep_avg,
+        sleep_target_minutes,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
     if show_ma:
         lines.append(
-            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{ma_sleep_str}` |"
+            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{ma_sleep_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
         )
     else:
         lines.append(
-            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` |"
+            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
         )
 
     # WORKOUT row
@@ -254,13 +308,21 @@ def render_summary_table(
     else:
         workout_pct_str = "—"
 
+    workout_bar, workout_progress_pct = format_progress_bar(
+        curr_workout_count,
+        workout_target,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
     if show_ma:
         lines.append(
-            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{ma_workout_str}` |"
+            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{ma_workout_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
         )
     else:
         lines.append(
-            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` |"
+            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
         )
 
     # STRETCH row
@@ -281,13 +343,21 @@ def render_summary_table(
     else:
         stretch_pct_str = "—"
 
+    stretch_bar, stretch_progress_pct = format_progress_bar(
+        curr_stretch_count,
+        stretch_target,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
     if show_ma:
         lines.append(
-            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{ma_stretch_str}` |"
+            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{ma_stretch_str}` | `{stretch_target_label}` | `{stretch_bar}` `{stretch_progress_pct}%` |"
         )
     else:
         lines.append(
-            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` |"
+            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{stretch_target_label}` | `{stretch_bar}` `{stretch_progress_pct}%` |"
         )
 
     # MOOD row
@@ -306,120 +376,23 @@ def render_summary_table(
     else:
         mood_pct_str = "—"
 
+    mood_bar, mood_progress_pct = format_progress_bar(
+        curr_mood_avg,
+        mood_target,
+        IDEAL_PROGRESS_BAR_WIDTH,
+        IDEAL_PROGRESS_FILLED,
+        IDEAL_PROGRESS_EMPTY,
+    )
+
     if show_ma:
         lines.append(
-            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{ma_mood_str}` |"
+            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{ma_mood_str}` | `{mood_target_label}` | `{mood_bar}` `{mood_progress_pct}%` |"
         )
     else:
-        lines.append(f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` |")
+        lines.append(
+            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{mood_target_label}` | `{mood_bar}` `{mood_progress_pct}%` |"
+        )
 
     lines.append("")
     return lines
 
-
-def render_ideals_table(
-    study_total_minutes: float,
-    sleep_avg_minutes: float | None,
-    workout_count: int,
-    stretch_count: int,
-    period_type: str,
-    total_days: int,
-) -> list[str]:
-    """
-    Render IDEALS progress table with bars and percentages.
-
-    Scales study/workout/stretch targets based on period_type.
-    Sleep target stays constant (nightly average).
-
-    Args:
-        study_total_minutes: Total study time for the period in minutes.
-        sleep_avg_minutes: Average sleep per night in minutes.
-        workout_count: Total workout days in the period.
-        stretch_count: Total stretch days in the period.
-        period_type: One of "week", "month", "quarter", "year".
-        total_days: Number of days in the period.
-
-    Returns:
-        List of markdown lines for the IDEALS subsection.
-    """
-    lines: list[str] = ["#### **IDEALS**", ""]
-
-    # Calculate targets based on period type
-    study_target_minutes = IDEAL_STUDY_MINUTES_DAILY * total_days
-    sleep_target_minutes = IDEAL_SLEEP_MINUTES_NIGHTLY  # Always nightly avg
-    
-    # Workout/stretch scale by number of weeks (workout/stretch are per-week targets)
-    weeks_in_period = total_days / 7
-    workout_target = int(round(IDEAL_WORKOUT_WEEKLY * weeks_in_period))
-    stretch_target = int(round(IDEAL_STRETCH_WEEKLY * weeks_in_period))
-
-    # Format target labels based on period type
-    study_hours = int(study_target_minutes // 60)
-    period_suffix = {
-        "week": "wk",
-        "month": "mo",
-        "quarter": "qtr",
-        "year": "yr",
-    }.get(period_type, "wk")
-
-    study_target_label = f"{study_hours}h/{period_suffix}"
-    sleep_target_label = "8h/night"
-    
-    if period_type == "week":
-        workout_target_label = f"{workout_target}/7"
-        stretch_target_label = f"{stretch_target}/7"
-    else:
-        workout_target_label = f"{workout_target}/{period_suffix}"
-        stretch_target_label = f"{stretch_target}/{period_suffix}"
-
-    # Compute progress bars
-    study_bar, study_pct = format_progress_bar(
-        study_total_minutes,
-        study_target_minutes,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
-    )
-    
-    sleep_current = sleep_avg_minutes or 0
-    sleep_bar, sleep_pct = format_progress_bar(
-        sleep_current,
-        sleep_target_minutes,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
-    )
-    
-    workout_bar, workout_pct = format_progress_bar(
-        workout_count,
-        workout_target,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
-    )
-    
-    stretch_bar, stretch_pct = format_progress_bar(
-        stretch_count,
-        stretch_target,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
-    )
-
-    # Build table
-    lines.append("| METRIC | TARGET | PROGRESS |")
-    lines.append("| ------ | ------ | -------- |")
-    lines.append(
-        f"| **STUDY** | `{study_target_label}` | `{study_bar}` `{study_pct}%` |"
-    )
-    lines.append(
-        f"| **SLEEP** | `{sleep_target_label}` | `{sleep_bar}` `{sleep_pct}%` |"
-    )
-    lines.append(
-        f"| **WORKOUT** | `{workout_target_label}` | `{workout_bar}` `{workout_pct}%` |"
-    )
-    lines.append(
-        f"| **STRETCH** | `{stretch_target_label}` | `{stretch_bar}` `{stretch_pct}%` |"
-    )
-
-    return lines

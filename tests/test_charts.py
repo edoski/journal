@@ -143,7 +143,7 @@ class TestRenderSummaryTable:
         result = render_summary_table(current, previous, "THIS WEEK", "LAST WEEK")
 
         assert "### **SUMMARY**" in result
-        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE |" in result
+        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |" in result
         assert "**STUDY**" in str(result)
         assert "**SLEEP**" in str(result)
         assert "**WORKOUT**" in str(result)
@@ -169,7 +169,7 @@ class TestRenderSummaryTable:
             "workout_count": 0,
             "stretch_count": 0,
         }
-        result = render_summary_table(current, previous, "A", "B")
+        result = render_summary_table(current, previous, "A", "B", period_type="week", total_days=1)
         # 200 vs 100 = +100% change
         assert "`+100%`" in str(result)
 
@@ -660,9 +660,9 @@ class TestBarChartSnapshots:
         # Verify structure
         assert result[0] == "### **SUMMARY**"
         assert result[1] == ""
-        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE |" in result[2]
+        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |" in result[2]
         assert (
-            "| ------ | ----------- | ----------------------- | ------ |" in result[3]
+            "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |" in result[3]
         )
 
         # Verify row order: STUDY → SLEEP → WORKOUT → STRETCH → MOOD
