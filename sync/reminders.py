@@ -35,7 +35,7 @@ def get_review_reminders_for_date(date: datetime.date) -> list[Goal]:
     if date.weekday() == 6:  # Sunday
         year, week_num, _ = date.isocalendar()
         period_key = f"{year}-W{week_num:02d}"
-        body = f"Review [[{period_key}]]"
+        body = f"Review [[{period_key}]] + Goals"
         reminders.append(
             Goal(
                 id=generate_goal_id_for("review", period_key, body, 0),
@@ -51,7 +51,7 @@ def get_review_reminders_for_date(date: datetime.date) -> list[Goal]:
     _, last_day = calendar.monthrange(date.year, date.month)
     if date.day == last_day:
         period_key = f"{date.year}-{date.month:02d}"
-        body = f"Review [[{period_key}]]"
+        body = f"Review [[{period_key}]] + Goals"
         reminders.append(
             Goal(
                 id=generate_goal_id_for("review", period_key, body, 0),
@@ -66,7 +66,7 @@ def get_review_reminders_for_date(date: datetime.date) -> list[Goal]:
     # Yearly review: due on December 31
     if date.month == 12 and date.day == 31:
         period_key = str(date.year)
-        body = f"Review [[{period_key}]]"
+        body = f"Review [[{period_key}]] + Goals"
         reminders.append(
             Goal(
                 id=generate_goal_id_for("review", period_key, body, 0),
