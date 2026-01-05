@@ -20,6 +20,7 @@ journal/
       sleep.py            # Sleep section building
       context.py          # Context tracking for CONTEXT column
       icloud.py           # Resilient iCloud status file loading
+      screen_time.py      # Screen time data loading and PROCRASTINATION section
       constants.py        # Daily-specific constants
     weekly.py             # Weekly metrics aggregation
     monthly.py            # Monthly metrics aggregation
@@ -33,9 +34,10 @@ journal/
     notes.py              # File I/O, locking, markdown section manipulation
     reminders.py          # Periodic review reminder generation
     carried_goals.py      # Goal carry-forward cache management
+    logging.py            # Logging utilities
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (367 tests)
+  tests/                  # Pytest test suite (389 tests)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -43,12 +45,12 @@ journal/
 ### Scripts Overview
 
 - **`sync/`**: Unified sync package with layered architecture:
-  - **`models/`**: Dataclass models (Goal, Book, Podcast, StudySession, SleepEntry, etc.)
+  - **`models/`**: Dataclass models (Goal, Book, Podcast, StudySession, ScreenTimeEntry, etc.)
   - **`readers/`**: Parsing functions that convert markdown to models
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
 
-- **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts and training grids. Includes **Summary Table** with 4-week moving averages.
+- **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids, and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
 
 - **`sync/monthly.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns. Includes **Summary Table** with 3-month moving averages.
 
@@ -75,7 +77,7 @@ mypy sync/ --ignore-missing-imports
 vulture sync/ --min-confidence 80
 
 # Testing
-pytest tests/ -v          # Run all 367 tests
+pytest tests/ -v          # Run all 389 tests
 ```
 
 ### Configuration Constants
@@ -86,6 +88,9 @@ Shared constants are in `sync/constants.py`:
 - **Study thresholds**: `STUDY_TARGET_MIN`, `STUDY_SYMBOL_DEEP`, `STUDY_SYMBOL_NONE`
 - **Chart dimensions**: `CHART_HEIGHT_*`, `CHART_Y_MAX_*`
 - **Labels**: `DAYS`, `MONTH_ABBR`
+- **Ideal targets**: `IDEAL_STUDY_MINUTES_DAILY`, `IDEAL_SLEEP_MINUTES_NIGHTLY`, `IDEAL_WORKOUT_WEEKLY`, `IDEAL_STRETCH_WEEKLY`, `IDEAL_MOOD_TARGET`
+- **Progress bar**: `IDEAL_PROGRESS_BAR_WIDTH`, `IDEAL_PROGRESS_FILLED`, `IDEAL_PROGRESS_EMPTY`
+- **Screen time**: `SCREEN_TIME_MIN_MINUTES`, `SCREEN_TIME_MISC_LABEL`, `IDEAL_STUDY_START_HOUR`
 
 Daily-specific constants are in `sync/daily/constants.py`:
 - **Database**: `DB_PATH`, `CORE_DATA_EPOCH_OFFSET`
@@ -106,6 +111,7 @@ sync/
 │   ├── study.py      # StudySession, DailyStudyData
 │   ├── sleep.py      # SleepEntry, DailySleepData
 │   ├── training.py   # TrainingEntry, DailyTrainingData
+│   ├── screen_time.py # ScreenTimeEntry, DailyScreenTimeData
 │   ├── daily.py      # DailyData aggregate
 │   └── period.py     # PeriodMetrics
 │
@@ -114,10 +120,11 @@ sync/
 │   ├── goals.py        # parse_goal_tasks, resolve_deadline, filter_by_proximity
 │   ├── media.py        # scan_books, scan_podcasts
 │   ├── sleep.py        # parse_sleep_table
-│   └── study.py        # parse_study_table
+│   ├── study.py        # parse_study_table
+│   └── screen_time.py  # parse_procrastination_table
 │
 ├── writers/          # Rendering: models → markdown
-│   ├── charts.py       # render_bar_chart, training grids, study coverage
+│   ├── charts.py       # render_bar_chart, training grids, study coverage, waterfall charts
 │   ├── tables.py       # render_summary_table, render_sleep_stats_table
 │   ├── goals.py        # render_goal_lines, build_goals_block, format_countdown
 │   └── media.py        # render_media_table, build_media_section
@@ -130,7 +137,8 @@ sync/
 │   ├── training.py     # Training/workout/stretch handling
 │   ├── sleep.py        # Sleep section building
 │   ├── context.py      # Context tracking
-│   └── icloud.py       # iCloud status file loading
+│   ├── icloud.py       # iCloud status file loading
+│   └── screen_time.py  # Screen time data loading and procrastination section
 │
 └── [shared modules]
     ├── constants.py    # Configuration values
@@ -139,6 +147,7 @@ sync/
     ├── metrics.py      # Period aggregation
     ├── notes.py        # File I/O, markdown manipulation
     ├── reminders.py    # Review reminder generation
+    ├── logging.py      # Logging utilities
     └── base.py         # Cross-period utilities
 ```
 
@@ -150,18 +159,22 @@ sync/
 - `Goal`: Checkbox task with optional deadline, reminder offset, canonical form
 - `Book`, `Podcast`: Media items with dates and metadata
 - `StudySession`, `SleepEntry`, `TrainingEntry`: Daily activity records
+- `ScreenTimeEntry`, `DailyScreenTimeData`: Screen time tracking with deviation metrics
 - `PeriodMetrics`: Aggregated metrics for weekly/monthly/quarterly/yearly
 
 **Readers (`sync/readers/`):**
 - `parse_goal_tasks(lines)` → `list[Goal]`
 - `scan_books(start, end, dir)` → `list[Book]`
 - `parse_study_table(lines)` → `list[StudySession]`
+- `parse_procrastination_table(lines)` → `DailyScreenTimeData`
 - Dated goals: `resolve_deadline`, `parse_goal_date`, `filter_by_proximity`
 
 **Writers (`sync/writers/`):**
 - `render_goal_lines(goals, today)` → `list[str]`
 - `render_bar_chart(...)` → `list[str]`
-- `render_summary_table(...)` → `list[str]`
+- `render_summary_table(...)` → `list[str]` (includes TARGET and PROGRESS columns)
+- `render_waterfall_chart(...)` → `list[str]` (screen time by app)
+- `render_screen_time_trend_table(...)` → `list[str]`
 - `format_countdown(deadline, today, is_done)` → `str`
 
 **Shared Modules:**
@@ -178,11 +191,34 @@ Goals support inline deadlines with countdown rendering:
 - **Countdown**: `— `43d``, `— `TODAY``, `— `LATE +5d``
 - **Early reminder**: `` `2025-02-12 !14d` `` shows goal 14 days before deadline
 
-### Training Visualizations
+### Training Table
 
-- **Weekly grid**: `███` (completed) / `░░░` (skipped), inline counts `(2/7)`
-- **Monthly grid**: `■` (completed) / `·` (skipped), zero-padded counts `(06/31)`
-- **Quarterly/Yearly**: Per-period bar rows with percent deltas
+The training table tracks workout and stretch sessions:
+- **Columns**: START, END, ACTIVITY, DURATION, INTERRUPT
+- **INTERRUPT**: Time elapsed beyond actual workout duration (replaces deprecated CALORIES)
+- **Visualizations**: Weekly grid (`███`/`░░░`), monthly grid (`■`/`·`), frequency counts
+
+### Procrastination Tracking
+
+Screen time data from iOS Shortcuts is tracked in the PROCRASTINATION section:
+- **Data source**: iCloud JSON from iOS Shortcuts (iPad and iPhone)
+- **Segmented parsing**: Handles comma-separated activity entries per device
+- **Grouping**: Apps < 5 minutes are grouped into "Miscellaneous"
+- **Waterfall chart**: Horizontal bars showing app usage breakdown with percentages
+- **Deviation tracking**: Calculates non-phone procrastination (interrupts + overruns + late start − screen time)
+- **Trend tables**: Daily/weekly/monthly screen time trends with wikilinks to periodic notes
+
+### Summary Table with IDEALS Progress
+
+The summary table includes target tracking and progress visualization:
+- **Columns**: METRIC, AVG (or period label), PREV, MA, Δ, TARGET, PROGRESS
+- **Progress bars**: 25-character ASCII bars (`█`/`░`) showing % of ideal
+- **Ideal targets**:
+  - Study: 6h/day (scales by period)
+  - Sleep: 8h/night (constant)
+  - Workout: 7/7 days (scales by period)
+  - Stretch: 7/7 days (scales by period)
+  - Mood: 7.0/10.0 (constant)
 
 ## Build, Test, and Run
 
@@ -196,6 +232,7 @@ Goals support inline deadlines with countdown rendering:
   - `python sync/yearly.py [--year YYYY]`
 - Goal carry-forward cache: `~/.cache/journal/carried_goals.json`
 - Training cache: `~/.cache/journal/training_entries.json`
+- Screen time cache: `~/.cache/journal/screen_time_entries.json`
 - **Frontmatter**: Only daily notes may have YAML frontmatter properties.
 
 ## LaunchAgent
@@ -225,7 +262,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 367 tests
+pytest tests/ -v              # All 389 tests
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```

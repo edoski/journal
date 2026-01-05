@@ -82,11 +82,28 @@ def _write_study_times_to_icloud(
         if 12 <= end_hour < 15:
             lunch_start = session["end"]
 
+    # Compute afternoon start (1 hour after lunch)
+    afternoon_start = None
+    if lunch_start:
+        afternoon_start = lunch_start + datetime.timedelta(hours=1)
+
+    # Compute afternoon start time for comparison (use actual or default 14:30)
+    afternoon_start_time = afternoon_start if afternoon_start else first_start.replace(
+        hour=14, minute=30, second=0, microsecond=0
+    )
+
+    # Use last_end only if it's after afternoon_start, otherwise default to 18:00
+    if last_end >= afternoon_start_time:
+        afternoon_end_str = last_end.strftime("%H:%M")
+    else:
+        afternoon_end_str = "18:00"
+
     data = {
         "date": today_str,
         "morning_start": first_start.strftime("%H:%M"),
         "lunch_start": lunch_start.strftime("%H:%M") if lunch_start else "13:30",
-        "afternoon_end": last_end.strftime("%H:%M"),
+        "afternoon_start": afternoon_start.strftime("%H:%M") if afternoon_start else "14:30",
+        "afternoon_end": afternoon_end_str,
     }
 
     try:
