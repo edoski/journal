@@ -307,6 +307,11 @@ def main():
     parser.add_argument("--file", help="Path to weekly note")
     parser.add_argument("--date", help="Date within week (YYYY-MM-DD)")
     parser.add_argument("--weekly-dir", help="Directory for weekly notes")
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Skip cleanup of previous period (used internally to avoid recursion)",
+    )
     args = parser.parse_args()
 
     if args.date:
@@ -447,6 +452,22 @@ def main():
         updated_lines = replace_metrics_block(lines, metrics_block)
         atomic_write_note(note_path, updated_lines)
 
+    # One-time cleanup: re-sync previous week if it still has an arrow indicator
+    if not args.no_cleanup and os.path.exists(prev_week_path):
+        try:
+            with open(prev_week_path, "r") as f:
+                if "↓" in f.read():
+                    # Re-sync removes arrow since it's a past period (current_date=None)
+                    import subprocess
+                    subprocess.run(
+                        ["python", "-m", "sync.weekly", "--date", prev_week_start.isoformat(), "--no-cleanup"],
+                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        check=False,
+                    )
+        except Exception:
+            pass  # Best-effort cleanup
+
 
 if __name__ == "__main__":
     main()
+

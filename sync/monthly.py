@@ -528,6 +528,11 @@ def main():
     parser.add_argument("--month", help="Month (YYYY-MM)")
     parser.add_argument("--monthly-dir", help="Directory for monthly notes")
     parser.add_argument("--quarterly-dir", help="Directory for quarterly notes")
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Skip cleanup of previous period (used internally to avoid recursion)",
+    )
     args = parser.parse_args()
 
     if args.month:
@@ -681,6 +686,22 @@ def main():
 
         updated_lines = replace_metrics_block(lines, metrics_block)
         atomic_write_note(note_path, updated_lines)
+
+    # One-time cleanup: re-sync previous month if it still has an arrow indicator
+    prev_month_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
+    if not args.no_cleanup and os.path.exists(prev_month_path):
+        try:
+            with open(prev_month_path, "r") as f:
+                if "↓" in f.read():
+                    # Re-sync removes arrow since it's a past period (current_date=None)
+                    import subprocess
+                    subprocess.run(
+                        ["python", "-m", "sync.monthly", "--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
+                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        check=False,
+                    )
+        except Exception:
+            pass  # Best-effort cleanup
 
 
 if __name__ == "__main__":
