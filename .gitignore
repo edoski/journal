@@ -1,6 +1,25 @@
+# Python bytecode
 __pycache__/
-*.pyc
-*.pyo
+*/__pycache__/
+*.py[cod]
+
+# Virtualenv & environment files
+.venv/
+venv/
+.env
+.env.*
+
+# Tool caches & coverage
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# OS / editor cruft
 .DS_Store
 /.idea/
 /.vscode/
+.cursor/
