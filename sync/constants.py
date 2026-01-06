@@ -89,8 +89,8 @@ IDEAL_PROGRESS_BAR_WIDTH = 25
 IDEAL_PROGRESS_FILLED = "█"
 IDEAL_PROGRESS_EMPTY = "░"
 
-# Mood target (7.0 out of 10.0 scale, where 5.0 is neutral)
-IDEAL_MOOD_TARGET = 7.0
+# Mood target (6.0 out of 10.0 scale, where 5.0 is neutral)
+IDEAL_MOOD_TARGET = 6.0
 
 # Screen time settings
 SCREEN_TIME_MIN_MINUTES = 5  # Apps < 5 min go into "Miscellaneous"
