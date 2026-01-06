@@ -45,6 +45,17 @@ def format_countdown(
         return f"— `LATE +{-days_left}d`"
 
 
+def _format_reminder_offset(days: int) -> str:
+    """Convert reminder offset days back to shortest human-readable format."""
+    if days % 90 == 0 and days >= 90:
+        return f"!{days // 90}q"
+    if days % 30 == 0 and days >= 30:
+        return f"!{days // 30}m"
+    if days % 7 == 0 and days >= 7:
+        return f"!{days // 7}w"
+    return f"!{days}d"
+
+
 def render_goal_lines(
     goals: list[Goal],
     today: datetime.date | None = None,
@@ -64,6 +75,15 @@ def render_goal_lines(
         mark = "x" if goal.done else " "
         body = goal.body.strip()
         gid = goal.id or generate_goal_id()
+
+        # Include date ONLY in source notes (when today is None)
+        # Mirror notes (today provided) show countdown only
+        if goal.date_str and today is None:
+            if goal.reminder_offset:
+                offset_str = _format_reminder_offset(goal.reminder_offset)
+                body = f"{body} `{goal.date_str} {offset_str}`"
+            else:
+                body = f"{body} `{goal.date_str}`"
 
         # Add countdown if today is provided and goal has a deadline
         countdown = ""

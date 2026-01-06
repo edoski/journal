@@ -19,7 +19,7 @@ class TestGetReviewRemindersForDate:
 
         weekly = [r for r in reminders if "W" in r.body]
         assert len(weekly) == 1
-        assert weekly[0].body == "Review [[2025-W01]]"
+        assert weekly[0].body == "Review [[2025-W01]] + Goals"
         assert weekly[0].deadline == sunday
         assert weekly[0].done is False
 
@@ -56,7 +56,7 @@ class TestGetReviewRemindersForDate:
         dec_31 = datetime.date(2025, 12, 31)
         reminders = get_review_reminders_for_date(dec_31)
 
-        yearly = [r for r in reminders if r.body == "Review [[2025]]"]
+        yearly = [r for r in reminders if r.body == "Review [[2025]] + Goals"]
         assert len(yearly) == 1
         assert yearly[0].deadline == dec_31
 
@@ -66,7 +66,7 @@ class TestGetReviewRemindersForDate:
         reminders = get_review_reminders_for_date(dec_30)
 
         # Dec 30 is not Dec 31, should not have yearly
-        yearly = [r for r in reminders if r.body == "Review [[2025]]"]
+        yearly = [r for r in reminders if r.body == "Review [[2025]] + Goals"]
         assert len(yearly) == 0
 
     def test_dec_31_sunday_generates_all_three(self):
@@ -79,8 +79,8 @@ class TestGetReviewRemindersForDate:
         assert len(reminders) == 3
         bodies = {r.body for r in reminders}
         assert any("W" in b for b in bodies)  # weekly
-        assert "Review [[2028-12]]" in bodies  # monthly
-        assert "Review [[2028]]" in bodies  # yearly
+        assert "Review [[2028-12]] + Goals" in bodies  # monthly
+        assert "Review [[2028]] + Goals" in bodies  # yearly
 
     def test_reminder_has_required_fields(self):
         """Reminder should have all required Goal fields."""

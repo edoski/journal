@@ -238,6 +238,47 @@ class TestRenderGoalLines:
         rendered = render_goal_lines(tasks)
         assert rendered == original
 
+    def test_round_trip_with_date(self):
+        """Parse and render should preserve dated goals in source notes."""
+        original = [
+            "- [ ] `2025-02-12` Pass exam ^gid-abc1234567",
+        ]
+        expected = [
+            "- [ ] Pass exam `2025-02-12` ^gid-abc1234567",
+        ]
+        tasks = parse_goal_tasks(original)
+        # Source note: no today param -> shows date after body
+        rendered = render_goal_lines(tasks)
+        assert rendered == expected
+
+    def test_round_trip_with_date_and_reminder(self):
+        """Parse and render should preserve dated goals with reminder offset.
+
+        Note: The reminder offset is normalized to shortest unit (14d -> 2w).
+        """
+        original = [
+            "- [ ] `2025-02-12 !14d` Pass exam ^gid-abc1234567",
+        ]
+        expected = [
+            "- [ ] Pass exam `2025-02-12 !2w` ^gid-abc1234567",
+        ]
+        tasks = parse_goal_tasks(original)
+        # Source note: no today param -> shows date after body
+        rendered = render_goal_lines(tasks)
+        assert rendered == expected
+
+    def test_mirror_note_shows_countdown_only(self):
+        """Mirror notes (with today param) should show countdown, not date."""
+        import datetime
+
+        original = [
+            "- [ ] `2025-02-12` Pass exam ^gid-abc1234567",
+        ]
+        tasks = parse_goal_tasks(original)
+        # Mirror note: today param -> shows countdown only
+        rendered = render_goal_lines(tasks, today=datetime.date(2025, 1, 6))
+        assert rendered == ["- [ ] Pass exam — `37d` ^gid-abc1234567"]
+
 
 class TestEnsureGoalIds:
     """Tests for ensure_goal_ids function."""
