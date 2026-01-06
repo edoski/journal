@@ -279,6 +279,31 @@ class TestRenderBarChart:
         expected_dashes = 12 * 3 - 3
         assert axis_line.count("─") == expected_dashes
 
+    def test_half_block_precision(self):
+        """Half values (0.5+) should render with lower half block (▄) on top."""
+        labels = ["A", "B", "C", "D"]
+        values = [4.0, 4.5, 5.0, 5.7]  # 4, 4.5, 5, 5.7
+        value_labels = ["4.0", "4.5", "5.0", "5.7"]
+
+        result = render_bar_chart(
+            labels=labels,
+            values=values,
+            value_labels=value_labels,
+            height=10,
+            y_max=10,
+        )
+
+        # 4.5 and 5.7 should show half block (▄)
+        assert any("▄" in line for line in result)
+
+        # Only 4.0 and 5.0 should NOT have half blocks rendered for them
+        # Count full bars: 4.0→4, 4.5→4+half, 5.0→5, 5.7→5+half
+        bar_rows = [r for r in result if "│" in r]
+        # At level 5: should see half-blocks for 4.5 (at level 5)
+        # At level 6: should see half-blocks for 5.7 (at level 6)
+        half_block_lines = [r for r in result if "▄" in r]
+        assert len(half_block_lines) == 2  # Two levels have half-blocks
+
 
 class TestRenderTrainingQuarterBlock:
     """Tests for render_training_quarter_block function."""

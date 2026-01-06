@@ -77,8 +77,13 @@ def render_bar_chart(
 
     Returns:
         List of strings representing the chart lines.
+
+    Note:
+        Uses floor-based bar heights with half-block (▄) for 0.5+ fractional values,
+        providing visual precision to 0.5 increments (e.g., 30-minute intervals for time).
     """
     bar_char = "█"
+    half_bar_char = "▄"
 
     if y_max is None:
         y_max = height
@@ -89,14 +94,23 @@ def render_bar_chart(
     else:
         computed_left_pad = left_pad
 
-    # Scale values to visual height
+    # Scale values to visual height using floor + half-block for 0.5+ fractional
     scale = height / y_max if y_max > 0 else 1
     bar_heights: list[int] = []
+    has_half_block: list[bool] = []
     for val in values:
         if val is None or val == 0:
             bar_heights.append(0)
+            has_half_block.append(False)
         else:
-            bar_heights.append(min(height, max(0, round_half_up(val * scale))))
+            scaled = val * scale
+            full_height = int(scaled)  # floor
+            fractional = scaled - full_height
+            has_half = fractional >= 0.5
+            # Cap at height (full blocks can't exceed height)
+            bar_heights.append(min(height, max(0, full_height)))
+            has_half_block.append(has_half and full_height < height)
+
 
     lines: list[str] = []
     bar_rows: list[str] = []
@@ -128,8 +142,9 @@ def render_bar_chart(
     # Y-axis and bars with value labels on top
     for level in range(height, 0, -1):
         row = "│"
-        for bar_h, label in zip(bar_heights, value_labels):
+        for idx, (bar_h, label) in enumerate(zip(bar_heights, value_labels)):
             label_str = str(label).strip("`") if label else ""
+            bar_has_half = has_half_block[idx]
 
             # Compute label padding
             if center_labels_on_bars and left_pad is None:
@@ -143,7 +158,11 @@ def render_bar_chart(
             else:
                 lbl_left_pad = computed_left_pad
 
-            if bar_h == 0 and level == 1:
+            # Determine the effective top level (including half-block)
+            top_level = bar_h + 1 if bar_has_half else bar_h
+            label_level = top_level + 1 if top_level < height else None
+
+            if bar_h == 0 and not bar_has_half and level == 1:
                 # Zero value - show label at level 1, no blocks
                 row += (
                     " " * lbl_left_pad
@@ -157,15 +176,22 @@ def render_bar_chart(
                     + bar_char * bar_width
                     + " " * (col_spacing - computed_left_pad - bar_width)
                 )
-            elif bar_h > 0 and bar_h < height and level == bar_h + 1:
+            elif label_level is not None and level == label_level and top_level < height:
                 # One level above top of bar (non-max) - show label
                 row += (
                     " " * lbl_left_pad
                     + label_str
                     + " " * (col_spacing - lbl_left_pad - len(label_str))
                 )
+            elif bar_has_half and level == bar_h + 1:
+                # Half-block level - show ▄
+                row += (
+                    " " * computed_left_pad
+                    + half_bar_char * bar_width
+                    + " " * (col_spacing - computed_left_pad - bar_width)
+                )
             elif bar_h > 0 and level <= bar_h:
-                # Bar level - show block
+                # Full bar level - show block
                 row += (
                     " " * computed_left_pad
                     + bar_char * bar_width
