@@ -683,33 +683,57 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Load screen time data and build procrastination section
     screen_time_data = _load_screen_time_data(today_str)
 
-    # Inject deviation data from study sessions
-    if screen_time_data and sessions:
-        # Late start: first session vs 8:00 AM ideal
-        from sync.constants import IDEAL_STUDY_START_HOUR
+    # Build deviation data from study sessions and workout
+    from sync.constants import IDEAL
+    from sync.models.deviation import DailyDeviationData
 
+    deviation_data = DailyDeviationData()
+
+    if sessions:
+        # Late study start: first session vs ideal start hour
         first_start = sessions[0]["start"]
-        ideal_start = first_start.replace(
-            hour=IDEAL_STUDY_START_HOUR, minute=0, second=0, microsecond=0
+        ideal_study_start = first_start.replace(
+            hour=IDEAL.study_start_hour, minute=0, second=0, microsecond=0
         )
-        late_start = 0.0
-        if first_start > ideal_start:
-            late_start = (first_start - ideal_start).total_seconds() / 60
+        if first_start > ideal_study_start:
+            deviation_data.late_study_start_minutes = (
+                first_start - ideal_study_start
+            ).total_seconds() / 60
 
         # Sum interrupts (stored in seconds) and overruns (stored in minutes)
-        total_interrupts = sum(
+        deviation_data.interrupt_minutes = sum(
             (s.get("interruptions_duration", 0) or 0) / 60 for s in sessions
         )
-        total_overruns = sum(s.get("break_overrun", 0) or 0 for s in sessions)
+        deviation_data.overrun_minutes = sum(
+            s.get("break_overrun", 0) or 0 for s in sessions
+        )
 
-        screen_time_data.interrupt_minutes = total_interrupts
-        screen_time_data.overrun_minutes = total_overruns
-        screen_time_data.late_start_minutes = late_start
+    # Late workout start: first workout start vs 6:00 PM ideal
+    if workout_data:
+        workout_entries = workout_data if isinstance(workout_data, list) else [workout_data]
+        # Find earliest workout start time
+        earliest_workout_start = None
+        for entry in workout_entries:
+            start_str = (entry.get("start") or "").strip()
+            if start_str and (entry.get("type") or "").lower() != "stretching":
+                try:
+                    h, m = map(int, start_str.split(":"))
+                    start_minutes = h * 60 + m
+                    if earliest_workout_start is None or start_minutes < earliest_workout_start:
+                        earliest_workout_start = start_minutes
+                except Exception:
+                    pass
+        if earliest_workout_start is not None:
+            ideal_workout_minutes = IDEAL.workout_start_hour * 60  # 6:00 PM = 18:00
+            if earliest_workout_start > ideal_workout_minutes:
+                deviation_data.late_workout_start_minutes = (
+                    earliest_workout_start - ideal_workout_minutes
+                )
 
     # Write study times to iCloud for iPad shortcut
     _write_study_times_to_icloud(sessions, today_str)
 
-    procrastination_lines = _build_procrastination_section(screen_time_data)
+    procrastination_lines = _build_procrastination_section(screen_time_data, deviation_data)
 
     # Join metrics subsections with single blank between, none before first, none trailing
     sections = [study_lines, training_lines, procrastination_lines, sleep_lines]

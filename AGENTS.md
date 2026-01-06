@@ -82,15 +82,18 @@ pytest tests/ -v          # Run all 389 tests
 
 ### Configuration Constants
 
-Shared constants are in `sync/constants.py`:
-- **Directory paths**: `JOURNAL_DIR`, `VAULT_DIR`, `LOCK_DIR`
-- **Template paths**: `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, etc.
-- **Study thresholds**: `STUDY_TARGET_MIN`, `STUDY_SYMBOL_DEEP`, `STUDY_SYMBOL_NONE`
-- **Chart dimensions**: `CHART_HEIGHT_*`, `CHART_Y_MAX_*`
+Shared constants are in `sync/constants.py`, organized into frozen dataclasses with backward-compatible aliases:
+
+**Config Dataclasses** (use `IDEAL.`, `CHART.`, `RENDER.`, `SCREEN_TIME.` singletons):
+- **`IdealSchedule`** (`IDEAL`): Schedule targets — `study_start_hour`, `workout_start_hour`, `study_minutes_daily`, `sleep_minutes_nightly`, `workout_days_weekly`, `stretch_days_weekly`, `mood_target`
+- **`ChartConfig`** (`CHART`): Chart dimensions — `height_default`, `height_quarterly`, `height_yearly`, `y_max_*_study`
+- **`RenderConfig`** (`RENDER`): Progress bars & symbols — `progress_bar_width`, `progress_filled`, `progress_empty`, `study_symbol_*`, `study_legend`
+- **`ScreenTimeConfig`** (`SCREEN_TIME`): Thresholds — `min_minutes`, `percent_threshold`, `misc_label`
+
+**Other constants** (not in dataclasses):
+- **Paths**: `JOURNAL_DIR`, `VAULT_DIR`, `LOCK_DIR`, template paths
 - **Labels**: `DAYS`, `MONTH_ABBR`
-- **Ideal targets**: `IDEAL_STUDY_MINUTES_DAILY`, `IDEAL_SLEEP_MINUTES_NIGHTLY`, `IDEAL_WORKOUT_WEEKLY`, `IDEAL_STRETCH_WEEKLY`, `IDEAL_MOOD_TARGET`
-- **Progress bar**: `IDEAL_PROGRESS_BAR_WIDTH`, `IDEAL_PROGRESS_FILLED`, `IDEAL_PROGRESS_EMPTY`
-- **Screen time**: `SCREEN_TIME_MIN_MINUTES` (10 min), `SCREEN_TIME_PERCENT_THRESHOLD` (5%), `SCREEN_TIME_MISC_LABEL`, `IDEAL_STUDY_START_HOUR`
+- **Study threshold**: `STUDY_TARGET_MIN` (360 min)
 
 Daily-specific constants are in `sync/daily/constants.py`:
 - **Database**: `DB_PATH`, `CORE_DATA_EPOCH_OFFSET`
@@ -112,6 +115,7 @@ sync/
 │   ├── sleep.py      # SleepEntry, DailySleepData
 │   ├── training.py   # TrainingEntry, DailyTrainingData
 │   ├── screen_time.py # ScreenTimeEntry, DailyScreenTimeData
+│   ├── deviation.py  # DailyDeviationData (schedule adherence metrics)
 │   ├── daily.py      # DailyData aggregate
 │   └── period.py     # PeriodMetrics
 │
@@ -159,7 +163,8 @@ sync/
 - `Goal`: Checkbox task with optional deadline, reminder offset, canonical form
 - `Book`, `Podcast`: Media items with dates and metadata
 - `StudySession`, `SleepEntry`, `TrainingEntry`: Daily activity records
-- `ScreenTimeEntry`, `DailyScreenTimeData`: Screen time tracking with deviation metrics
+- `ScreenTimeEntry`, `DailyScreenTimeData`: Screen time tracking
+- `DailyDeviationData`: Schedule adherence (interrupts, overruns, late study/workout start)
 - `PeriodMetrics`: Aggregated metrics for weekly/monthly/quarterly/yearly
 
 **Readers (`sync/readers/`):**
@@ -206,7 +211,8 @@ Screen time data from iOS Shortcuts is tracked in the PROCRASTINATION section:
 - **Dual-threshold grouping**: Apps need `≥10 min AND >5%` to stay individual; others go to "Miscellaneous"
 - **Periodic re-grouping**: Weekly/monthly/quarterly/yearly charts re-apply 5% threshold after aggregation
 - **Waterfall chart**: Horizontal bars showing app usage breakdown with percentages (largest remainder method ensures 100% sum)
-- **Deviation tracking**: Calculates non-phone procrastination (interrupts + overruns + late start − screen time)
+- **Deviation tracking**: Calculates non-phone procrastination (interrupts + overruns + late study start + late workout start − screen time)
+- **Ideal schedule**: Study 8:00 AM (`IDEAL_STUDY_START_HOUR`), Workout 6:00 PM (`IDEAL_WORKOUT_START_HOUR`)
 - **Trend tables**: Daily/weekly/monthly screen time trends with wikilinks to periodic notes
 
 ### Summary Table with IDEALS Progress

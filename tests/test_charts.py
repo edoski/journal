@@ -30,7 +30,7 @@ from sync.writers.charts import (
     render_quarterly_study_coverage,
     render_yearly_study_coverage,
 )
-from sync.constants import STUDY_TARGET_MIN, STUDY_SYMBOL_DEEP, STUDY_SYMBOL_NONE
+from sync.constants import STUDY_TARGET_MIN, RENDER
 
 
 class TestRenderSleepStatsTable:
@@ -387,19 +387,19 @@ class TestStudyIntensitySymbol:
     """Tests for study_intensity_symbol function."""
 
     def test_at_target(self):
-        assert study_intensity_symbol(STUDY_TARGET_MIN) == STUDY_SYMBOL_DEEP
+        assert study_intensity_symbol(STUDY_TARGET_MIN) == RENDER.study_symbol_deep
 
     def test_above_target(self):
-        assert study_intensity_symbol(STUDY_TARGET_MIN + 60) == STUDY_SYMBOL_DEEP
+        assert study_intensity_symbol(STUDY_TARGET_MIN + 60) == RENDER.study_symbol_deep
 
     def test_below_target(self):
-        assert study_intensity_symbol(STUDY_TARGET_MIN - 1) == STUDY_SYMBOL_NONE
+        assert study_intensity_symbol(STUDY_TARGET_MIN - 1) == RENDER.study_symbol_none
 
     def test_zero(self):
-        assert study_intensity_symbol(0) == STUDY_SYMBOL_NONE
+        assert study_intensity_symbol(0) == RENDER.study_symbol_none
 
     def test_none(self):
-        assert study_intensity_symbol(None) == STUDY_SYMBOL_NONE
+        assert study_intensity_symbol(None) == RENDER.study_symbol_none
 
 
 class TestRenderWeeklyStudyGrid:
@@ -439,25 +439,25 @@ class TestCompressSymbols:
     """Tests for _compress_symbols function."""
 
     def test_no_compression_needed(self):
-        symbols = [STUDY_SYMBOL_DEEP, STUDY_SYMBOL_NONE, STUDY_SYMBOL_DEEP]
+        symbols = [RENDER.study_symbol_deep, RENDER.study_symbol_none, RENDER.study_symbol_deep]
         result = _compress_symbols(symbols, 5)
         # 3 symbols into 5 width - should pad with NONE
         assert len(result) == 5
 
     def test_compression(self):
         # 10 symbols compressed to 5
-        symbols = [STUDY_SYMBOL_DEEP] * 10
+        symbols = [RENDER.study_symbol_deep] * 10
         result = _compress_symbols(symbols, 5)
         assert len(result) == 5
-        assert all(c == STUDY_SYMBOL_DEEP for c in result)
+        assert all(c == RENDER.study_symbol_deep for c in result)
 
     def test_empty_input(self):
         result = _compress_symbols([], 5)
         assert len(result) == 5
-        assert all(c == STUDY_SYMBOL_NONE for c in result)
+        assert all(c == RENDER.study_symbol_none for c in result)
 
     def test_zero_width(self):
-        result = _compress_symbols([STUDY_SYMBOL_DEEP], 0)
+        result = _compress_symbols([RENDER.study_symbol_deep], 0)
         assert result == ""
 
 

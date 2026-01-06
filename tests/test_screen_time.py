@@ -154,3 +154,44 @@ class TestBuildProcrastinationSection:
         data = DailyScreenTimeData(entries=[], shortcut_ran=True)
         lines = _build_procrastination_section(data)
         assert any("**TOTAL**" in line and "+0m" in line for line in lines)
+
+    def test_with_deviations(self):
+        """Deviation data is included in the output when non-phone deviation > 0."""
+        from sync.models.deviation import DailyDeviationData
+
+        screen_data = DailyScreenTimeData(
+            entries=[
+                ScreenTimeEntry(app="YouTube", minutes=30),
+            ]
+        )
+        # 60 min deviation total, 30 min screen time = 30 min non-phone deviation
+        deviation_data = DailyDeviationData(
+            late_study_start_minutes=40,
+            late_workout_start_minutes=20,
+        )
+        lines = _build_procrastination_section(screen_data, deviation_data)
+
+        assert any("DEVIATIONS" in line and "`+30m`" in line for line in lines)
+        assert any("YouTube" in line and "`+30m`" in line for line in lines)
+        # Total = 30 (screen) + 30 (non-phone deviation) = 60m = 1h00m
+        assert any("**TOTAL**" in line and "`1h00m`" in line for line in lines)
+
+    def test_deviation_covered_by_screen_time(self):
+        """When screen time exceeds deviation, no DEVIATIONS row appears."""
+        from sync.models.deviation import DailyDeviationData
+
+        screen_data = DailyScreenTimeData(
+            entries=[
+                ScreenTimeEntry(app="YouTube", minutes=60),
+            ]
+        )
+        # 30 min deviation, but 60 min screen time = 0 non-phone deviation
+        deviation_data = DailyDeviationData(
+            late_study_start_minutes=30,
+        )
+        lines = _build_procrastination_section(screen_data, deviation_data)
+
+        assert not any("DEVIATIONS" in line for line in lines)
+        # Total is just screen time since no non-phone deviation
+        assert any("**TOTAL**" in line and "`1h00m`" in line for line in lines)
+

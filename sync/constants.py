@@ -61,41 +61,67 @@ MONTH_ABBR = [
 # Study intensity thresholds (minutes)
 STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
 
-# Symbols for study intensity (binary default; yearly overrides with partial)
-STUDY_SYMBOL_DEEP = "█"  # target met
-STUDY_SYMBOL_NONE = "·"  # target not met or no study
-STUDY_LEGEND_LINE = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
-YEARLY_STUDY_LEGEND_LINE = (
-    "1 POMODORO = 90m → █ all days ≥ 4 POM | ░ some days | · none"
-)
 
-# Chart dimension constants
-CHART_HEIGHT_DEFAULT = 10
-CHART_HEIGHT_QUARTERLY = 12
-CHART_HEIGHT_YEARLY = 12
-CHART_Y_MAX_WEEKLY_STUDY = 10  # 10 hours
-CHART_Y_MAX_MONTHLY_STUDY = 40  # 40 hours per week
-CHART_Y_MAX_QUARTERLY_STUDY = 240  # 240 hours per month
-CHART_Y_MAX_YEARLY_STUDY = 720  # 720 hours per quarter
 
-# Ideal targets (weekly base values)
-IDEAL_STUDY_MINUTES_DAILY = 360  # 6h/day
-IDEAL_SLEEP_MINUTES_NIGHTLY = 480  # 8h/night
-IDEAL_WORKOUT_WEEKLY = 7  # 7/7 days
-IDEAL_STRETCH_WEEKLY = 7  # 7/7 days
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration Dataclasses
+# ─────────────────────────────────────────────────────────────────────────────
 
-# Progress bar settings
-IDEAL_PROGRESS_BAR_WIDTH = 25
-IDEAL_PROGRESS_FILLED = "█"
-IDEAL_PROGRESS_EMPTY = "░"
+from dataclasses import dataclass
 
-# Mood target (6.0 out of 10.0 scale, where 5.0 is neutral)
-IDEAL_MOOD_TARGET = 6.0
 
-# Screen time settings
-SCREEN_TIME_MIN_MINUTES = 10  # Apps < 10 min go into "Miscellaneous"
-SCREEN_TIME_PERCENT_THRESHOLD = 0.05  # Apps ≤ 5% of total go into "Miscellaneous"
-SCREEN_TIME_MISC_LABEL = "Miscellaneous"
+@dataclass(frozen=True)
+class IdealSchedule:
+    """Ideal daily/weekly targets for tracking schedule adherence."""
 
-# Study schedule (for late start calculation)
-IDEAL_STUDY_START_HOUR = 8  # 8:00 AM
+    study_start_hour: int = 8  # 8:00 AM
+    workout_start_hour: int = 18  # 6:00 PM
+    study_minutes_daily: int = 360  # 6h/day
+    sleep_minutes_nightly: int = 480  # 8h/night
+    workout_days_weekly: int = 7  # 7/7
+    stretch_days_weekly: int = 7  # 7/7
+    mood_target: float = 6.0  # 6.0/10
+
+
+@dataclass(frozen=True)
+class ChartConfig:
+    """Chart dimension constants for bar charts and grids."""
+
+    height_default: int = 10
+    height_quarterly: int = 12
+    height_yearly: int = 12
+    y_max_weekly_study: int = 10  # 10 hours
+    y_max_monthly_study: int = 40  # 40 hours/week
+    y_max_quarterly_study: int = 240  # 240 hours/month
+    y_max_yearly_study: int = 720  # 720 hours/quarter
+
+
+@dataclass(frozen=True)
+class RenderConfig:
+    """Rendering symbols and progress bar settings."""
+
+    progress_bar_width: int = 25
+    progress_filled: str = "█"
+    progress_empty: str = "░"
+    study_symbol_deep: str = "█"  # target met
+    study_symbol_none: str = "·"  # target not met
+    study_legend: str = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
+    yearly_study_legend: str = "1 POMODORO = 90m → █ all days ≥ 4 POM | ░ some days | · none"
+
+
+@dataclass(frozen=True)
+class ScreenTimeConfig:
+    """Screen time grouping thresholds."""
+
+    min_minutes: int = 10  # Apps < 10 min → Miscellaneous
+    percent_threshold: float = 0.05  # Apps ≤ 5% → Miscellaneous
+    misc_label: str = "Miscellaneous"
+
+
+# Singleton instances
+IDEAL = IdealSchedule()
+CHART = ChartConfig()
+RENDER = RenderConfig()
+SCREEN_TIME = ScreenTimeConfig()
+
+

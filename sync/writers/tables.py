@@ -15,16 +15,7 @@ from sync.formatting import (
     format_percent_change,
     format_progress_bar,
 )
-from sync.constants import (
-    IDEAL_STUDY_MINUTES_DAILY,
-    IDEAL_SLEEP_MINUTES_NIGHTLY,
-    IDEAL_WORKOUT_WEEKLY,
-    IDEAL_STRETCH_WEEKLY,
-    IDEAL_PROGRESS_BAR_WIDTH,
-    IDEAL_PROGRESS_FILLED,
-    IDEAL_PROGRESS_EMPTY,
-    IDEAL_MOOD_TARGET,
-)
+from sync.constants import IDEAL, RENDER
 
 
 def render_sleep_stats_table(
@@ -163,12 +154,12 @@ def render_summary_table(
     }.get(period_type, "wk")
 
     # Calculate scaled targets
-    study_target_minutes = IDEAL_STUDY_MINUTES_DAILY * total_days
-    sleep_target_minutes = IDEAL_SLEEP_MINUTES_NIGHTLY  # Always nightly avg
+    study_target_minutes = IDEAL.study_minutes_daily * total_days
+    sleep_target_minutes = IDEAL.sleep_minutes_nightly  # Always nightly avg
     weeks_in_period = total_days / 7
-    workout_target = int(round(IDEAL_WORKOUT_WEEKLY * weeks_in_period))
-    stretch_target = int(round(IDEAL_STRETCH_WEEKLY * weeks_in_period))
-    mood_target = IDEAL_MOOD_TARGET
+    workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
+    stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
+    mood_target = IDEAL.mood_target
 
     # Format target labels
     study_hours = int(study_target_minutes // 60)
@@ -236,9 +227,9 @@ def render_summary_table(
     study_bar, study_progress_pct = format_progress_bar(
         curr_study_total,
         study_target_minutes,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
     )
 
     if show_ma:
@@ -276,9 +267,9 @@ def render_summary_table(
     sleep_bar, sleep_progress_pct = format_progress_bar(
         curr_sleep_avg,
         sleep_target_minutes,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
     )
 
     if show_ma:
@@ -311,9 +302,9 @@ def render_summary_table(
     workout_bar, workout_progress_pct = format_progress_bar(
         curr_workout_count,
         workout_target,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
     )
 
     if show_ma:
@@ -346,9 +337,9 @@ def render_summary_table(
     stretch_bar, stretch_progress_pct = format_progress_bar(
         curr_stretch_count,
         stretch_target,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
     )
 
     if show_ma:
@@ -379,9 +370,9 @@ def render_summary_table(
     mood_bar, mood_progress_pct = format_progress_bar(
         curr_mood_avg,
         mood_target,
-        IDEAL_PROGRESS_BAR_WIDTH,
-        IDEAL_PROGRESS_FILLED,
-        IDEAL_PROGRESS_EMPTY,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
     )
 
     if show_ma:

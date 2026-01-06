@@ -11,13 +11,10 @@ import json
 import os
 import re
 
-from sync.constants import (
-    SCREEN_TIME_MIN_MINUTES,
-    SCREEN_TIME_MISC_LABEL,
-    SCREEN_TIME_PERCENT_THRESHOLD,
-)
+from sync.constants import SCREEN_TIME
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
+from sync.models.deviation import DailyDeviationData
 
 from .icloud import _load_status_file
 
@@ -177,7 +174,7 @@ def _group_by_threshold(
             misc_total += minutes
 
     if misc_total > 0:
-        result[SCREEN_TIME_MISC_LABEL] = misc_total
+        result[SCREEN_TIME.misc_label] = misc_total
 
     return result
 
@@ -237,7 +234,7 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
 
     # Group by dual threshold: must be >= 10 min AND > 5% to stay individual
     grouped = _group_by_threshold(
-        merged, SCREEN_TIME_MIN_MINUTES, SCREEN_TIME_PERCENT_THRESHOLD
+        merged, SCREEN_TIME.min_minutes, SCREEN_TIME.percent_threshold
     )
 
     entries = [
@@ -249,12 +246,14 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
 
 def _build_procrastination_section(
     screen_time_data: DailyScreenTimeData | None,
+    deviation_data: DailyDeviationData | None = None,
 ) -> list[str]:
     """
     Build the PROCRASTINATION section markdown lines.
 
     Args:
         screen_time_data: Screen time data, or None if no data
+        deviation_data: Schedule deviation data, or None if no deviations
 
     Returns:
         List of markdown lines for the section
@@ -267,8 +266,14 @@ def _build_procrastination_section(
         lines.append("_No screen time data available._")
         return lines
 
-    # Shortcut ran but zero procrastination apps
-    if not screen_time_data.entries:
+    # Compute non-phone deviation: total deviation - screen time
+    # (time lost that wasn't spent on phone apps)
+    total_deviation = deviation_data.total_minutes if deviation_data else 0.0
+    screen_total = screen_time_data.total_minutes
+    non_phone_deviation = max(0.0, total_deviation - screen_total)
+
+    # Shortcut ran but zero procrastination apps and no deviations
+    if not screen_time_data.entries and non_phone_deviation == 0:
         lines.append("")
         lines.append("| SOURCE      | DURATION    |")
         lines.append("| ----------- | ----------- |")
@@ -279,32 +284,26 @@ def _build_procrastination_section(
     lines.append("| SOURCE      | DURATION    |")
     lines.append("| ----------- | ----------- |")
 
-    # Build list of (name, minutes, is_total) for sorting
-    # DEVIATIONS is sorted with entries, TOTAL is always last
-    rows: list[tuple[str, float, bool]] = []
+    # Build list of (name, minutes) for sorting
+    rows: list[tuple[str, float]] = []
 
     for entry in screen_time_data.entries:
-        rows.append((entry.app, entry.minutes, False))
+        rows.append((entry.app, entry.minutes))
 
     # Add DEVIATIONS if > 0 (sorted with entries by value)
-    deviation = screen_time_data.deviation_minutes
-    if deviation > 0:
-        rows.append(("DEVIATIONS", deviation, False))
+    if non_phone_deviation > 0:
+        rows.append(("DEVIATIONS", non_phone_deviation))
 
-    # Sort non-total rows descending by minutes
+    # Sort rows descending by minutes
     rows.sort(key=lambda x: x[1], reverse=True)
 
     # Render sorted rows
-    for name, minutes, _ in rows:
-        if name == "DEVIATIONS":
-            duration_str = f"`+{format_minutes(minutes)}`"
-            lines.append(f"| {name} | {duration_str} |")
-        else:
-            duration_str = f"`+{format_minutes(minutes)}`"
-            lines.append(f"| {name} | {duration_str} |")
+    for name, minutes in rows:
+        duration_str = f"`+{format_minutes(minutes)}`"
+        lines.append(f"| {name} | {duration_str} |")
 
-    # TOTAL row always last (screen time + deviations)
-    total_minutes = screen_time_data.total_minutes + deviation
+    # TOTAL row always last (screen time + non-phone deviations)
+    total_minutes = screen_total + non_phone_deviation
     total_str = f"**`{format_minutes(total_minutes)}`**"
     lines.append(f"| **TOTAL** | {total_str} |")
 

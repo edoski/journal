@@ -11,6 +11,7 @@ from .study import StudySession, DailyStudyData
 from .sleep import SleepEntry, DailySleepData
 from .training import TrainingEntry, DailyTrainingData
 from .screen_time import ScreenTimeEntry, DailyScreenTimeData
+from .deviation import DailyDeviationData
 from .daily import DailyData
 from .period import PeriodMetrics
 from .goals import Goal
@@ -29,6 +30,8 @@ __all__ = [
     # Screen time
     "ScreenTimeEntry",
     "DailyScreenTimeData",
+    # Deviation
+    "DailyDeviationData",
     # Daily aggregate
     "DailyData",
     # Period metrics

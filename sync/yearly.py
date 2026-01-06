@@ -6,10 +6,8 @@ import os
 from sync.constants import (
     YEARLY_TEMPLATE_PATH,
     DEFAULT_YEARLY_DIR,
-    YEARLY_STUDY_LEGEND_LINE,
     STUDY_TARGET_MIN,
-    STUDY_SYMBOL_DEEP,
-    STUDY_SYMBOL_NONE,
+    RENDER,
 )
 from sync.notes import (
     locked_note,
@@ -194,9 +192,9 @@ def build_yearly_metrics(
             >= STUDY_TARGET_MIN,
             YEARLY_STUDY_BAR_WIDTH,
             allow_partial=True,
-            fill_char=STUDY_SYMBOL_DEEP,
+            fill_char=RENDER.study_symbol_deep,
             partial_char="░",
-            empty_char=STUDY_SYMBOL_NONE,
+            empty_char=RENDER.study_symbol_none,
             today=today,
         )
         study_bars.append(bar)
@@ -232,7 +230,7 @@ def build_yearly_metrics(
         bar_width=YEARLY_STUDY_BAR_WIDTH,
         delta_labels=study_delta_labels,
         bars_override=study_bars,
-        legend_line=YEARLY_STUDY_LEGEND_LINE,
+        legend_line=RENDER.yearly_study_legend,
     )
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")

@@ -9,34 +9,9 @@ from __future__ import annotations
 
 import datetime
 
-from sync.constants import (
-    DAYS,
-    MONTH_ABBR,
-    STUDY_SYMBOL_DEEP,
-    STUDY_SYMBOL_NONE,
-    STUDY_LEGEND_LINE,
-    STUDY_TARGET_MIN,
-)
+from sync.constants import DAYS, MONTH_ABBR, STUDY_TARGET_MIN, RENDER
 from sync.formatting import round_half_up
 from sync.dates import daterange, format_week_label
-
-# Import and re-export table functions from tables.py
-from sync.writers.tables import (
-    render_sleep_stats_table,
-    render_activity_table,
-    render_interrupts_table,
-    render_summary_table,
-)
-
-# Re-export for backward compatibility
-__all__ = [
-    "render_sleep_stats_table",
-    "render_activity_table",
-    "render_interrupts_table",
-    "render_summary_table",
-    "wrap_code_block",
-    "render_bar_chart",
-]
 
 
 def wrap_code_block(lines):
@@ -524,7 +499,7 @@ def render_weekly_training_grid(
 def study_intensity_symbol(minutes):
     """Binary mapping: target met vs not met."""
     mins = minutes or 0
-    return STUDY_SYMBOL_DEEP if mins >= STUDY_TARGET_MIN else STUDY_SYMBOL_NONE
+    return RENDER.study_symbol_deep if mins >= STUDY_TARGET_MIN else RENDER.study_symbol_none
 
 
 def render_weekly_study_grid(dates, daily_data, current_date=None):
@@ -569,7 +544,7 @@ def render_weekly_study_grid(dates, daily_data, current_date=None):
     lines.append("│ " + " ".join(["───"] * 7))
     lines.append("└ " + " ".join(DAYS))
     lines.append("")
-    lines.append(STUDY_LEGEND_LINE.replace("█", "███").replace("·", "░░░"))
+    lines.append(RENDER.study_legend.replace("█", "███").replace("·", "░░░"))
     return lines
 
 
@@ -596,14 +571,14 @@ def render_monthly_study_grid(
 
         for day in week_days:
             if day > today:
-                symbols.append(STUDY_SYMBOL_NONE)
+                symbols.append(RENDER.study_symbol_none)
             else:
                 symbol = study_intensity_symbol(
                     daily_data.get(day, {}).get("study_minutes")
                 )
                 symbols.append(symbol)
                 total_elapsed += 1
-                if symbol == STUDY_SYMBOL_DEEP:
+                if symbol == RENDER.study_symbol_deep:
                     total_done += 1
 
     max_days = max(week_day_counts) if week_day_counts else 0
@@ -702,7 +677,7 @@ def render_monthly_study_grid(
     else:
         lines.append("└")
     lines.append("")
-    lines.append(STUDY_LEGEND_LINE)
+    lines.append(RENDER.study_legend)
     return lines
 
 
@@ -715,9 +690,9 @@ def _compress_symbols(symbols, target_width):
         return ""
     total = len(symbols)
     if total == 0:
-        return STUDY_SYMBOL_NONE * target_width
+        return RENDER.study_symbol_none * target_width
     if total <= target_width:
-        return "".join(symbols) + STUDY_SYMBOL_NONE * (target_width - total)
+        return "".join(symbols) + RENDER.study_symbol_none * (target_width - total)
 
     # Use proportional mapping: each character covers (total / target_width) symbols
     # This ensures all characters represent actual days, no empty filler at end
@@ -732,12 +707,12 @@ def _compress_symbols(symbols, target_width):
 
         bucket = symbols[start:end]
         if not bucket:
-            compressed.append(STUDY_SYMBOL_NONE)
+            compressed.append(RENDER.study_symbol_none)
             continue
-        if STUDY_SYMBOL_DEEP in bucket:
-            compressed.append(STUDY_SYMBOL_DEEP)
+        if RENDER.study_symbol_deep in bucket:
+            compressed.append(RENDER.study_symbol_deep)
         else:
-            compressed.append(STUDY_SYMBOL_NONE)
+            compressed.append(RENDER.study_symbol_none)
     return "".join(compressed)
 
 
@@ -836,11 +811,11 @@ def render_quarterly_study_coverage(
         elapsed_days = 0
         for d in days:
             if d > today:
-                bar_chars.append(STUDY_SYMBOL_NONE)
+                bar_chars.append(RENDER.study_symbol_none)
                 continue
             symbol = study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
             bar_chars.append(symbol)
-            if symbol != STUDY_SYMBOL_NONE:
+            if symbol != RENDER.study_symbol_none:
                 done += 1
             elapsed_days += 1
         bar = "".join(bar_chars)
@@ -870,7 +845,7 @@ def render_quarterly_study_coverage(
         lines.append(line.rstrip())
     lines.append("└")
     lines.append("")
-    lines.append(STUDY_LEGEND_LINE)
+    lines.append(RENDER.study_legend)
     return lines
 
 
@@ -881,7 +856,7 @@ def render_yearly_study_coverage(
     bar_width=30,
     delta_labels=None,
     bars_override=None,
-    legend_line=STUDY_LEGEND_LINE,
+    legend_line=RENDER.study_legend,
 ):
     """
     Per-quarter study coverage rows (intensity symbols + counts).
@@ -912,7 +887,7 @@ def render_yearly_study_coverage(
                 for d in days
                 if d <= today
                 and study_intensity_symbol(daily_data.get(d, {}).get("study_minutes"))
-                == STUDY_SYMBOL_DEEP
+                == RENDER.study_symbol_deep
             )
         else:
             bar_chars = []
@@ -920,14 +895,14 @@ def render_yearly_study_coverage(
             elapsed_days = 0
             for d in days:
                 if d > today:
-                    bar_chars.append(STUDY_SYMBOL_NONE)
+                    bar_chars.append(RENDER.study_symbol_none)
                     continue
                 elapsed_days += 1
                 symbol = study_intensity_symbol(
                     daily_data.get(d, {}).get("study_minutes")
                 )
                 bar_chars.append(symbol)
-                if symbol != STUDY_SYMBOL_NONE:
+                if symbol != RENDER.study_symbol_none:
                     done += 1
             bar = _compress_symbols(bar_chars, bar_width)
         bars.append((label, bar, done, elapsed_days))
