@@ -81,6 +81,10 @@ def render_bar_chart(
     Note:
         Uses floor-based bar heights with half-block (▄) for 0.5+ fractional values,
         providing visual precision to 0.5 increments (e.g., 30-minute intervals for time).
+
+        For time-based charts (sleep/study), callers should pre-round values to nearest
+        0.5 using: round(hours * 2) / 2. This ensures 7h57m (7.95h) displays as 8 bars
+        rather than 7+half, giving proportionally accurate visuals while labels stay exact.
     """
     bar_char = "█"
     half_bar_char = "▄"

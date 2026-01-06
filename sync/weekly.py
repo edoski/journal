@@ -156,7 +156,7 @@ def build_weekly_metrics(
 
     # STUDY section (using activity totals for accuracy)
     study_lines = ["### **STUDY**"]
-    study_hours = [m / 60 if m is not None and m > 0 else 0 for m in study_minutes]
+    study_hours = [round((m / 60) * 2) / 2 if m is not None and m > 0 else 0 for m in study_minutes]
     study_values = []
     for d, m in zip(dates, study_minutes):
         if d > today:
@@ -228,7 +228,7 @@ def build_weekly_metrics(
 
     # SLEEP section (values on top of bars, 5-char bars like monthly)
     sleep_lines = ["### **SLEEP**"]
-    sleep_hours = [m / 60 if m is not None else 0 for m in sleep_minutes]
+    sleep_hours = [round((m / 60) * 2) / 2 if m is not None else 0 for m in sleep_minutes]
     sleep_values = []
     for d, m in zip(dates, sleep_minutes):
         if d > today:

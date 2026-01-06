@@ -186,7 +186,7 @@ def build_quarterly_metrics(
             for activity, mins in daily.get("activity_totals", {}).items():
                 activity_totals[activity] = activity_totals.get(activity, 0) + mins
                 total_min += mins
-        hours = total_min / 60
+        hours = round((total_min / 60) * 2) / 2  # Round to nearest 0.5h
         study_chart_vals.append(hours)
         study_totals_minutes.append(total_min)
         if start > today:
@@ -383,7 +383,7 @@ def build_quarterly_metrics(
         mins_clean = [m for m in mins if m is not None]
         if mins_clean:
             avg_min = sum(mins_clean) / len(mins_clean)
-            sleep_chart_vals.append(avg_min / 60)
+            sleep_chart_vals.append(round((avg_min / 60) * 2) / 2)  # Round to nearest 0.5h
             sleep_avgs_minutes.append(avg_min)
             sleep_value_labels.append(format_minutes(avg_min))
         else:

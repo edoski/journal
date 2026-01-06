@@ -185,7 +185,7 @@ def build_monthly_metrics(
         mins = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
         mins = [m for m in mins if m is not None]
         total_min = sum(mins) if mins else 0
-        study_chart_vals.append(total_min / 60)  # Convert to hours for chart
+        study_chart_vals.append(round((total_min / 60) * 2) / 2)  # Round to nearest 0.5h
         # Always use 0h00m format for zero values
         if start > today:
             study_value_labels.append("")
@@ -379,7 +379,7 @@ def build_monthly_metrics(
         start = week_days[0]
         if mins:
             avg_min = sum(mins) / len(mins)  # AVERAGE for sleep
-            sleep_chart_vals.append(avg_min / 60)
+            sleep_chart_vals.append(round((avg_min / 60) * 2) / 2)  # Round to nearest 0.5h
             if start > today:
                 sleep_value_labels.append("")
             else:
