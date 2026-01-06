@@ -72,6 +72,15 @@ def _write_study_times_to_icloud(
     if not sessions:
         return
 
+    # All calculations anchor to the note date to keep fallbacks deterministic
+    note_date = datetime.date.fromisoformat(today_str)
+
+    # Default schedule used when actual times would create invalid ranges
+    default_morning = datetime.datetime.combine(note_date, datetime.time(8, 0))
+    default_lunch = datetime.datetime.combine(note_date, datetime.time(13, 30))
+    default_afternoon = datetime.datetime.combine(note_date, datetime.time(14, 30))
+    default_afternoon_end = datetime.datetime.combine(note_date, datetime.time(18, 0))
+
     first_start = sessions[0]["start"]
     last_end = sessions[-1]["end"]
 
@@ -92,18 +101,64 @@ def _write_study_times_to_icloud(
         hour=14, minute=30, second=0, microsecond=0
     )
 
-    # Use last_end only if it's after afternoon_start, otherwise default to 18:00
-    if last_end >= afternoon_start_time:
-        afternoon_end_str = last_end.strftime("%H:%M")
-    else:
-        afternoon_end_str = "18:00"
+    afternoon_end = (
+        last_end if last_end >= afternoon_start_time else default_afternoon_end
+    )
+
+    def _normalize_study_times(
+        morning: datetime.datetime,
+        lunch: datetime.datetime | None,
+        afternoon: datetime.datetime | None,
+        end: datetime.datetime | None,
+    ) -> tuple[datetime.datetime, datetime.datetime, datetime.datetime, datetime.datetime]:
+        """Clamp times to a safe, monotonic schedule for the Shortcut.
+
+        Ensures: morning <= lunch <= afternoon <= end, with minimal defaults when
+        real data would violate ordering. Equal times are nudged forward by 1 minute
+        to keep the Shortcut's "between" action happy with positive windows.
+        """
+
+        minute = datetime.timedelta(minutes=1)
+
+        m_start = morning or default_morning
+        l_start = lunch or default_lunch
+        a_start = afternoon or default_afternoon
+        a_end = end or default_afternoon_end
+
+        # If the first session starts after (or exactly at) lunch, fall back to the
+        # canonical schedule to avoid an inverted window.
+        if m_start >= l_start:
+            m_start = default_morning
+            l_start = default_lunch
+
+        # Keep lunch before/at afternoon
+        if l_start > a_start:
+            a_start = max(l_start, default_afternoon)
+
+        # Keep afternoon before/at end
+        if a_start > a_end:
+            a_end = max(a_start, default_afternoon_end)
+
+        # Nudge equalities to keep strictly increasing ranges
+        if m_start == l_start:
+            l_start = l_start + minute
+        if l_start == a_start:
+            a_start = a_start + minute
+        if a_start == a_end:
+            a_end = a_end + minute
+
+        return m_start, l_start, a_start, a_end
+
+    m_start, l_start, a_start, a_end = _normalize_study_times(
+        first_start, lunch_start, afternoon_start, afternoon_end
+    )
 
     data = {
         "date": today_str,
-        "morning_start": first_start.strftime("%H:%M"),
-        "lunch_start": lunch_start.strftime("%H:%M") if lunch_start else "13:30",
-        "afternoon_start": afternoon_start.strftime("%H:%M") if afternoon_start else "14:30",
-        "afternoon_end": afternoon_end_str,
+        "morning_start": m_start.strftime("%H:%M"),
+        "lunch_start": l_start.strftime("%H:%M"),
+        "afternoon_start": a_start.strftime("%H:%M"),
+        "afternoon_end": a_end.strftime("%H:%M"),
     }
 
     try:
@@ -791,4 +846,3 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
         logger.info("Updated %s", today_str + ".md")
 
     return True
-
