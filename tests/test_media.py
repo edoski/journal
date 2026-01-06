@@ -219,9 +219,9 @@ class TestRenderMediaTable:
         lines = render_media_table(books, podcasts)
 
         assert "| TYPE | TITLE | DATE |" in lines[0]
-        assert "BOOK" in lines[2]
+        assert "**BOOK**" in lines[2]
         assert "[[Deep Work]]" in lines[2]
-        assert "PODCAST" in lines[3]
+        assert "**PODCAST**" in lines[3]
         assert "[[Great Episode]]" in lines[3]
 
     def test_empty_returns_header_only(self):
@@ -245,7 +245,7 @@ class TestRenderMediaTable:
         lines = render_media_table(books, [])
 
         assert len(lines) == 3  # header, separator, one row
-        assert "BOOK" in lines[2]
+        assert "**BOOK**" in lines[2]
 
 
 class TestBuildMediaSection:

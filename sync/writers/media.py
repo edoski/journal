@@ -37,12 +37,12 @@ def render_media_table(
     # Add books
     for book in books:
         date_str = _format_date_compact(book.completed)
-        lines.append(f"| BOOK | [[{book.title}]] | {date_str} |")
+        lines.append(f"| **BOOK** | [[{book.title}]] | {date_str} |")
 
     # Add podcasts
     for podcast in podcasts:
         date_str = _format_date_compact(podcast.date)
-        lines.append(f"| PODCAST | [[{podcast.title}]] | {date_str} |")
+        lines.append(f"| **PODCAST** | [[{podcast.title}]] | {date_str} |")
 
     return lines
 
