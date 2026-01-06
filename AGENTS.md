@@ -242,7 +242,7 @@ All syncs are triggered via LaunchAgent at `~/Library/LaunchAgents/com.edo.journ
 - Runs `sync_all.sh` which executes all syncs in sequence
 - Watches Flow's CoreData database and iCloud status files
 - Runs every 15 minutes as a fail-safe
-- Logs to `/tmp/journalsync.out` and `/tmp/journalsync.err`
+- Logs to `/tmp/com.edo.journal.out` and `/tmp/com.edo.journal.err`
 
 To reload:
 ```bash
