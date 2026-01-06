@@ -36,6 +36,7 @@ from sync.metrics import (
     aggregate_interrupt_overrun,
     compute_period_deltas,
     aggregate_screen_time,
+    group_screen_time_by_percent,
 )
 from sync.writers.tables import (
     render_summary_table,
@@ -347,6 +348,7 @@ def build_quarterly_metrics(
 
     # PROCRASTINATION section (screen time waterfall + trend table)
     screen_time_totals = aggregate_screen_time(dates, daily_data)
+    screen_time_totals = group_screen_time_by_percent(screen_time_totals)
     if screen_time_totals:
         procrastination_lines = ["### **PROCRASTINATION**"]
         waterfall_lines = render_waterfall_chart(screen_time_totals)

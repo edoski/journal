@@ -90,7 +90,7 @@ Shared constants are in `sync/constants.py`:
 - **Labels**: `DAYS`, `MONTH_ABBR`
 - **Ideal targets**: `IDEAL_STUDY_MINUTES_DAILY`, `IDEAL_SLEEP_MINUTES_NIGHTLY`, `IDEAL_WORKOUT_WEEKLY`, `IDEAL_STRETCH_WEEKLY`, `IDEAL_MOOD_TARGET`
 - **Progress bar**: `IDEAL_PROGRESS_BAR_WIDTH`, `IDEAL_PROGRESS_FILLED`, `IDEAL_PROGRESS_EMPTY`
-- **Screen time**: `SCREEN_TIME_MIN_MINUTES`, `SCREEN_TIME_MISC_LABEL`, `IDEAL_STUDY_START_HOUR`
+- **Screen time**: `SCREEN_TIME_MIN_MINUTES` (10 min), `SCREEN_TIME_PERCENT_THRESHOLD` (5%), `SCREEN_TIME_MISC_LABEL`, `IDEAL_STUDY_START_HOUR`
 
 Daily-specific constants are in `sync/daily/constants.py`:
 - **Database**: `DB_PATH`, `CORE_DATA_EPOCH_OFFSET`
@@ -203,8 +203,9 @@ The training table tracks workout and stretch sessions:
 Screen time data from iOS Shortcuts is tracked in the PROCRASTINATION section:
 - **Data source**: iCloud JSON from iOS Shortcuts (iPad and iPhone)
 - **Segmented parsing**: Handles comma-separated activity entries per device
-- **Grouping**: Apps < 5 minutes are grouped into "Miscellaneous"
-- **Waterfall chart**: Horizontal bars showing app usage breakdown with percentages
+- **Dual-threshold grouping**: Apps need `≥10 min AND >5%` to stay individual; others go to "Miscellaneous"
+- **Periodic re-grouping**: Weekly/monthly/quarterly/yearly charts re-apply 5% threshold after aggregation
+- **Waterfall chart**: Horizontal bars showing app usage breakdown with percentages (largest remainder method ensures 100% sum)
 - **Deviation tracking**: Calculates non-phone procrastination (interrupts + overruns + late start − screen time)
 - **Trend tables**: Daily/weekly/monthly screen time trends with wikilinks to periodic notes
 

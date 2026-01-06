@@ -1000,16 +1000,30 @@ def render_waterfall_chart(
     max_name_len = max(len(app) for app, _ in sorted_apps)
     max_name_len = max(max_name_len, 5)  # At least "TOTAL" width
 
+    # Calculate percentages using largest remainder method (ensures sum = 100%)
+    exact_pcts = [
+        (minutes / total_minutes * 100) if total_minutes > 0 else 0
+        for _, minutes in sorted_apps
+    ]
+    floored = [int(pct) for pct in exact_pcts]
+    remainders = [(i, pct - floored[i]) for i, pct in enumerate(exact_pcts)]
+    remainder_needed = 100 - sum(floored)
+
+    # Sort by remainder descending, add 1 to top entries
+    remainders.sort(key=lambda x: x[1], reverse=True)
+    for i in range(min(remainder_needed, len(remainders))):
+        floored[remainders[i][0]] += 1
+
     # Build waterfall rows - first pass to calculate bars and total_width
     bar_rows = []
     offset = 0
-    for app, minutes in sorted_apps:
+    for idx, (app, minutes) in enumerate(sorted_apps):
         # Calculate bar width proportional to total
         bar_len = round(minutes / total_minutes * bar_width) if total_minutes > 0 else 0
         bar_len = max(1, min(bar_width - offset, bar_len))  # At least 1 char
 
-        # Calculate percentage
-        pct = round(minutes / total_minutes * 100) if total_minutes > 0 else 0
+        # Use pre-calculated percentage from largest remainder method
+        pct = floored[idx]
 
         # Build the bar with offset
         bar = " " * offset + fill_char * bar_len

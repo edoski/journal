@@ -11,7 +11,11 @@ import json
 import os
 import re
 
-from sync.constants import SCREEN_TIME_MIN_MINUTES, SCREEN_TIME_MISC_LABEL
+from sync.constants import (
+    SCREEN_TIME_MIN_MINUTES,
+    SCREEN_TIME_MISC_LABEL,
+    SCREEN_TIME_PERCENT_THRESHOLD,
+)
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 
@@ -142,24 +146,32 @@ def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
 
 
 def _group_by_threshold(
-    entries: dict[str, float], threshold: float
+    entries: dict[str, float],
+    min_minutes: float,
+    percent_threshold: float,
 ) -> dict[str, float]:
     """
-    Group apps by threshold: apps >= threshold stay individual,
-    apps < threshold get grouped into 'Miscellaneous'.
+    Group apps into Miscellaneous if they fail either threshold.
+
+    Apps must satisfy BOTH conditions to stay individual:
+    - minutes >= min_minutes (absolute threshold)
+    - percentage > percent_threshold (relative to total)
 
     Args:
         entries: Dict mapping app names to minutes
-        threshold: Minimum minutes to keep individual
+        min_minutes: Minimum minutes to keep individual
+        percent_threshold: Minimum percentage of total to keep individual
 
     Returns:
         Dict with grouped entries
     """
+    total = sum(entries.values())
     result: dict[str, float] = {}
     misc_total = 0.0
 
     for app, minutes in entries.items():
-        if minutes >= threshold:
+        pct = minutes / total if total > 0 else 0
+        if minutes >= min_minutes and pct > percent_threshold:
             result[app] = minutes
         else:
             misc_total += minutes
@@ -223,8 +235,10 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
         # No data and shortcut never ran
         return None
 
-    # Group by threshold: < 5 min goes to Miscellaneous
-    grouped = _group_by_threshold(merged, SCREEN_TIME_MIN_MINUTES)
+    # Group by dual threshold: must be >= 10 min AND > 5% to stay individual
+    grouped = _group_by_threshold(
+        merged, SCREEN_TIME_MIN_MINUTES, SCREEN_TIME_PERCENT_THRESHOLD
+    )
 
     entries = [
         ScreenTimeEntry(app=app, minutes=minutes) for app, minutes in grouped.items()
