@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "journal-sync"
+version = "0.0.0"
+description = "Daily/periodic journal sync automation"
+requires-python = ">=3.10"
+readme = "AGENTS.md"
+authors = [{ name = "Edo", email = "edo@example.com" }]
+
+[tool.setuptools]
+packages = ["sync"]

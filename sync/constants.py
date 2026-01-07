@@ -8,6 +8,7 @@ symbols for rendering, and chart dimension constants.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 
 # Directory paths
 JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
@@ -66,8 +67,6 @@ STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration Dataclasses
 # ─────────────────────────────────────────────────────────────────────────────
-
-from dataclasses import dataclass
 
 
 @dataclass(frozen=True)

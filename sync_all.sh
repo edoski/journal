@@ -13,3 +13,7 @@ python3 -m sync.weekly
 python3 -m sync.monthly
 python3 -m sync.quarterly
 python3 -m sync.yearly
+
+
+
+

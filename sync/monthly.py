@@ -2,6 +2,9 @@
 import argparse
 import datetime
 import os
+from dataclasses import replace
+
+from sync.models import Goal
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -593,12 +596,17 @@ def main():
             prev_tasks, monthly_tasks, month_key, "monthly"
         )
 
-        # Load quarterly goals (source of truth) and propagate any completed statuses from the monthly mirror.
+        # Load quarterly goals (source of truth) and propagate any completed statuses from mirrors.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
             _load_quarterly_goals(month_start, quarterly_dir)
         )
         quarterly_changed = propagate_goal_status(quarterly_tasks, quarterly_mirror)
-        if quarterly_changed:
+
+        # Propagate yearly goal status from monthly_tasks (pierced goals) to quarterly's yearly mirror.
+        # This will then propagate to yearly note on next quarterly.py run.
+        yearly_changed = propagate_goal_status(yearly_mirror, monthly_tasks)
+
+        if quarterly_changed or yearly_changed:
             _write_quarterly_goals(
                 quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines
             )
@@ -615,10 +623,35 @@ def main():
                 "_No quarterly goals have been defined yet._",
             ]
         )
+
+        # MONTHLY source section: monthly goals + pierced yearly goals (≤90d deadline)
+        # Separate original monthly goals from previously-pierced yearly goals by ID
+        yearly_ids = {g.id for g in yearly_mirror if g.id}
+        original_monthly = [g for g in monthly_tasks if g.id not in yearly_ids]
+
+        # Transfer done status from parsed yearly goals to source yearly_mirror
+        parsed_status = {g.id: g.done for g in monthly_tasks if g.id in yearly_ids}
+        updated_yearly: list[Goal] = []
+        for g in yearly_mirror:
+            if g.id in parsed_status and parsed_status[g.id] and not g.done:
+                updated_yearly.append(replace(g, done=True))
+            else:
+                updated_yearly.append(g)
+
+        # Filter yearly from source (has correct deadlines) for piercing
+        pierced_yearly = filter_by_proximity(updated_yearly, 90, today)
+        pierced_yearly = [g for g in pierced_yearly if g.deadline is not None]
+
+        # Render: original monthly goals (preserve dates) + pierced yearly (countdown)
+        monthly_source_lines = render_goal_lines(original_monthly)
+        if pierced_yearly:
+            pierced_lines = render_goal_lines(pierced_yearly, today=today)
+            monthly_source_lines = monthly_source_lines + pierced_lines
+
         new_goals_block = build_goals_block(
             [
                 ("QUARTERLY", quarterly_lines_rendered),
-                ("MONTHLY", render_goal_lines(monthly_tasks, today=today)),
+                ("MONTHLY", monthly_source_lines),
             ]
         )
         if g_start == -1:

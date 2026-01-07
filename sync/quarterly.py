@@ -632,7 +632,8 @@ def main():
         new_goals_block = build_goals_block(
             [
                 ("YEARLY", yearly_lines_block),
-                ("QUARTERLY", render_goal_lines(quarterly_tasks, today=today)),
+                # QUARTERLY is the source (not a mirror), so omit today to preserve deadline dates
+                ("QUARTERLY", render_goal_lines(quarterly_tasks)),
             ]
         )
         if g_start == -1:

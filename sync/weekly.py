@@ -2,13 +2,18 @@
 import argparse
 import datetime
 import os
+from dataclasses import replace
+
+from sync.models import Goal
 
 from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
+    QUARTERLY_TEMPLATE_PATH,
     DEFAULT_WEEKLY_DIR,
     DEFAULT_MONTHLY_DIR,
+    DEFAULT_QUARTERLY_DIR,
     DAYS,
 )
 from sync.notes import (
@@ -21,7 +26,7 @@ from sync.notes import (
     trim_blank_lines,
     join_sections,
 )
-from sync.dates import daterange, iso_week_range
+from sync.dates import daterange, iso_week_range, quarter_of_date, quarter_id
 from sync.formatting import format_minutes
 from sync.metrics import (
     compute_period_metrics,
@@ -54,7 +59,44 @@ from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
+def _load_quarterly_goals(month_start, quarterly_dir=None):
+    """
+    Load quarterly note goals for the quarter containing month_start.
+
+    Returns:
+        Tuple of (yearly_mirror, quarterly_tasks, path, lines)
+    """
+    quarterly_dir = quarterly_dir or DEFAULT_QUARTERLY_DIR
+    q_year, q_num = quarter_of_date(month_start)
+    quarter_key = quarter_id(q_year, q_num)
+    filename = f"{quarter_key}.md"
+    path = os.path.join(quarterly_dir, filename)
+    ensure_note(path, QUARTERLY_TEMPLATE_PATH)
+    try:
+        with open(path, "r") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return [], [], path, []
+
+    g_start, g_end = goals_section_bounds(lines)
+    yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
+    quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
+    ensure_goal_ids(yearly_mirror, "yearly", str(q_year))
+    ensure_goal_ids(quarterly_tasks, "quarterly", quarter_key)
+    return yearly_mirror, quarterly_tasks, path, lines
+
+
 def _load_monthly_goals(month_start, monthly_dir=None):
+    """
+    Load goals from monthly note.
+
+    Returns:
+        Tuple of (monthly_tasks, quarterly_mirror, path, lines)
+        - monthly_tasks: Goals from MONTHLY section (source, may contain pierced yearly)
+        - quarterly_mirror: Goals from QUARTERLY section (mirror from quarterly note)
+        - path: Path to monthly note
+        - lines: Raw lines of monthly note
+    """
     monthly_dir = monthly_dir or DEFAULT_MONTHLY_DIR
     path = os.path.join(monthly_dir, f"{month_start.year}-{month_start.month:02d}.md")
     ensure_note(path, MONTHLY_TEMPLATE_PATH)
@@ -62,12 +104,14 @@ def _load_monthly_goals(month_start, monthly_dir=None):
         with open(path, "r") as f:
             lines = f.read().splitlines()
     except Exception:
-        return [], path, []
+        return [], [], path, []
 
     g_start, g_end = goals_section_bounds(lines)
-    tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-    ensure_goal_ids(tasks, "monthly", month_start.isoformat())
-    return tasks, path, lines
+    monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+    quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
+    ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
+
+    return monthly_tasks, quarterly_mirror, path, lines
 
 
 def _write_monthly_goals(path, tasks, existing_lines):
@@ -330,7 +374,10 @@ def main():
 
     # Determine month note for the target week (use week_start's month).
     month_start = datetime.date(week_start.year, week_start.month, 1)
-    monthly_tasks, monthly_path, monthly_lines = _load_monthly_goals(month_start)
+    monthly_tasks, quarterly_mirror, monthly_path, monthly_lines = _load_monthly_goals(month_start)
+
+    # Load quarterly note to get yearly goals for piercing
+    yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = _load_quarterly_goals(month_start)
 
     with locked_note(note_path):
         ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
@@ -413,8 +460,11 @@ def main():
             prev_week_tasks, weekly_tasks, week_key, "weekly"
         )
 
-        # Propagate MONTHLY status changes from weekly mirror to monthly source
+        # Propagate status changes from weekly mirrors to sources
         monthly_changed = propagate_goal_status(monthly_tasks, monthly_mirror)
+        # Propagate quarterly/yearly status from pierced goals in WEEKLY to their sources
+        quarterly_changed = propagate_goal_status(quarterly_tasks, weekly_tasks)
+        yearly_changed = propagate_goal_status(yearly_mirror, weekly_tasks)
 
         if monthly_changed:
             with locked_note(monthly_path):
@@ -426,11 +476,31 @@ def main():
                     monthly_lines = []
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
+        # Write back quarterly note if quarterly or yearly status changed
+        if quarterly_changed or yearly_changed:
+            from sync.writers.goals import build_goals_block as bg
+            with locked_note(quarterly_path):
+                try:
+                    with open(quarterly_path, "r") as qf:
+                        quarterly_lines = qf.read().splitlines()
+                except Exception:
+                    quarterly_lines = []
+                g_start_q, g_end_q = goals_section_bounds(quarterly_lines)
+                new_q_block = bg([
+                    ("YEARLY", render_goal_lines(yearly_mirror)),
+                    ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+                ])
+                if g_start_q == -1:
+                    quarterly_lines = new_q_block + ([""] if quarterly_lines and quarterly_lines[0].strip() else []) + quarterly_lines
+                else:
+                    quarterly_lines[g_start_q:g_end_q] = new_q_block
+                atomic_write_note(quarterly_path, quarterly_lines)
+
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
         # Filter monthly tasks to only show those with deadlines within 30 days (or no deadline).
         today = datetime.date.today()
         filtered_monthly = filter_by_proximity(monthly_tasks, 30, today)
-        monthly_lines = (
+        monthly_rendered = (
             render_goal_lines(filtered_monthly, today=today)
             if filtered_monthly
             else [
@@ -438,10 +508,47 @@ def main():
                 "_No monthly goals have been defined yet._",
             ]
         )
+
+        # WEEKLY source: weekly goals + pierced quarterly/yearly goals (≤30d deadline)
+        # Separate original weekly goals from previously-pierced quarterly/yearly goals by ID
+        quarterly_ids = {g.id for g in quarterly_tasks if g.id}
+        yearly_ids = {g.id for g in yearly_mirror if g.id}
+        pierced_ids = quarterly_ids | yearly_ids
+        original_weekly = [g for g in weekly_tasks if g.id not in pierced_ids]
+
+        # Transfer done status from parsed goals to source goals
+        parsed_status = {g.id: g.done for g in weekly_tasks if g.id in pierced_ids}
+
+        updated_quarterly: list[Goal] = []
+        for g in quarterly_tasks:
+            if g.id in parsed_status and parsed_status[g.id] and not g.done:
+                updated_quarterly.append(replace(g, done=True))
+            else:
+                updated_quarterly.append(g)
+
+        updated_yearly: list[Goal] = []
+        for g in yearly_mirror:
+            if g.id in parsed_status and parsed_status[g.id] and not g.done:
+                updated_yearly.append(replace(g, done=True))
+            else:
+                updated_yearly.append(g)
+
+        # Filter from source (has correct deadlines) for piercing
+        pierced_quarterly = filter_by_proximity(updated_quarterly, 30, today)
+        pierced_quarterly = [g for g in pierced_quarterly if g.deadline is not None]
+        pierced_yearly = filter_by_proximity(updated_yearly, 30, today)
+        pierced_yearly = [g for g in pierced_yearly if g.deadline is not None]
+
+        # Render: original weekly goals (preserve dates) + pierced goals (countdown)
+        weekly_source_lines = render_goal_lines(original_weekly)
+        if pierced_quarterly or pierced_yearly:
+            pierced_lines = render_goal_lines(pierced_quarterly + pierced_yearly, today=today)
+            weekly_source_lines = weekly_source_lines + pierced_lines
+
         goals_block = build_goals_block(
             [
-                ("MONTHLY", monthly_lines),
-                ("WEEKLY", render_goal_lines(weekly_tasks, today=today)),
+                ("MONTHLY", monthly_rendered),
+                ("WEEKLY", weekly_source_lines),
             ]
         )
 
