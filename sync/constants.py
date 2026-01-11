@@ -77,8 +77,8 @@ class IdealSchedule:
     workout_start_hour: int = 18  # 6:00 PM
     study_minutes_daily: int = 360  # 6h/day
     sleep_minutes_nightly: int = 480  # 8h/night
-    workout_days_weekly: int = 7  # 7/7
-    stretch_days_weekly: int = 7  # 7/7
+    workout_days_weekly: int = 6  # 6/7
+    stretch_days_weekly: int = 6  # 6/7
     mood_target: float = 6.0  # 6.0/10
 
 
@@ -122,5 +122,4 @@ IDEAL = IdealSchedule()
 CHART = ChartConfig()
 RENDER = RenderConfig()
 SCREEN_TIME = ScreenTimeConfig()
-
 
