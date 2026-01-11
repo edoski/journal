@@ -161,7 +161,7 @@ def build_yearly_metrics(
         col_spacing=11,
         left_pad=2,
         label_prefix="    ",
-        axis_trim=None,
+        axis_trim=2,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(study_chart))
@@ -426,7 +426,7 @@ def build_yearly_metrics(
         col_spacing=11,
         left_pad=2,
         label_prefix="    ",
-        axis_trim=None,
+        axis_trim=4,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -507,7 +507,7 @@ def build_yearly_metrics(
         col_spacing=11,
         left_pad=2,
         label_prefix="    ",
-        axis_trim=None,
+        axis_trim=4,
         center_labels_on_bars=True,
         delta_labels=mood_delta_labels,
     )

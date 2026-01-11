@@ -104,8 +104,8 @@ class RenderConfig:
     progress_empty: str = "░"
     study_symbol_deep: str = "█"  # target met
     study_symbol_none: str = "·"  # target not met
-    study_legend: str = "1 POMODORO = 90m → █ ≥ 4 POM. | · < 4 POM."
-    yearly_study_legend: str = "1 POMODORO = 90m → █ all days ≥ 4 POM | ░ some days | · none"
+    study_legend: str = "1 POMODORO = 90m | █ ≥ 4 POM. | · < 4 POM."
+    yearly_study_legend: str = "1 POMODORO = 90m | █ all days ≥ 4 POM | ░ some days | · none"
 
 
 @dataclass(frozen=True)
@@ -122,4 +122,3 @@ IDEAL = IdealSchedule()
 CHART = ChartConfig()
 RENDER = RenderConfig()
 SCREEN_TIME = ScreenTimeConfig()
-
