@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import os
+import sys
 from dataclasses import replace
 
 from sync.models import Goal
@@ -731,7 +732,7 @@ def main():
                     # Re-sync removes arrow since it's a past period (current_date=None)
                     import subprocess
                     subprocess.run(
-                        ["python", "-m", "sync.monthly", "--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
+                        [sys.executable, "-m", "sync.monthly", "--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )

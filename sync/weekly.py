@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import os
+import sys
 from dataclasses import replace
 
 from sync.models import Goal
@@ -569,7 +570,7 @@ def main():
                     # Re-sync removes arrow since it's a past period (current_date=None)
                     import subprocess
                     subprocess.run(
-                        ["python", "-m", "sync.weekly", "--date", prev_week_start.isoformat(), "--no-cleanup"],
+                        [sys.executable, "-m", "sync.weekly", "--date", prev_week_start.isoformat(), "--no-cleanup"],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )
@@ -579,4 +580,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
