@@ -4,8 +4,8 @@ import datetime
 import os
 
 from sync.constants import (
+    JOURNAL_DIR,
     YEARLY_TEMPLATE_PATH,
-    DEFAULT_YEARLY_DIR,
     STUDY_TARGET_MIN,
     RENDER,
 )
@@ -47,6 +47,9 @@ from sync.writers.charts import (
     _compress_days_time_order,
     render_waterfall_chart,
     render_screen_time_period_table,
+    YEARLY_4QTR_STUDY,
+    YEARLY_4QTR_METRIC,
+    YEARLY_4QTR_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -155,13 +158,7 @@ def build_yearly_metrics(
         q_labels,
         study_values_hours,
         study_value_labels,
-        height=12,
-        y_max=720,
-        bar_width=7,
-        col_spacing=11,
-        left_pad=2,
-        label_prefix="    ",
-        axis_trim=2,
+        preset=YEARLY_4QTR_STUDY,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(study_chart))
@@ -420,13 +417,7 @@ def build_yearly_metrics(
         q_labels,
         sleep_chart_vals,
         sleep_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=11,
-        left_pad=2,
-        label_prefix="    ",
-        axis_trim=4,
+        preset=YEARLY_4QTR_METRIC,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -501,14 +492,7 @@ def build_yearly_metrics(
         q_labels,
         mood_chart_vals,
         mood_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=11,
-        left_pad=2,
-        label_prefix="    ",
-        axis_trim=4,
-        center_labels_on_bars=True,
+        preset=YEARLY_4QTR_MOOD,
         delta_labels=mood_delta_labels,
     )
     mood_lines.extend(wrap_code_block(mood_chart))
@@ -531,7 +515,6 @@ def main():
     )
     parser.add_argument("--file", help="Path to yearly note")
     parser.add_argument("--year", help="Year (YYYY)")
-    parser.add_argument("--yearly-dir", help="Directory for yearly notes")
     args = parser.parse_args()
 
     if args.year:
@@ -542,8 +525,7 @@ def main():
     year_start, year_end = year_range(year)
     filename = f"{year}.md"
 
-    yearly_dir = args.yearly_dir or DEFAULT_YEARLY_DIR
-    note_path = args.file or os.path.join(yearly_dir, filename)
+    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
 
     prev_year = year - 1
     prev_year_start, prev_year_end = year_range(prev_year)
@@ -562,7 +544,7 @@ def main():
         ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
         prev_tasks = []
-        prev_note_path = os.path.join(yearly_dir, f"{prev_year}.md")
+        prev_note_path = os.path.join(JOURNAL_DIR, f"{prev_year}.md")
         try:
             with open(prev_note_path, "r") as pf:
                 prev_lines = pf.read().splitlines()

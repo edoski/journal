@@ -11,8 +11,6 @@ from sync.constants import (
     JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
     QUARTERLY_TEMPLATE_PATH,
-    DEFAULT_MONTHLY_DIR,
-    DEFAULT_QUARTERLY_DIR,
     STUDY_TARGET_MIN,
 )
 from sync.notes import (
@@ -60,6 +58,9 @@ from sync.writers.charts import (
     wrap_code_block,
     render_waterfall_chart,
     render_screen_time_period_table,
+    MONTHLY_WEEK_STUDY,
+    MONTHLY_WEEK_METRIC,
+    MONTHLY_WEEK_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -69,16 +70,15 @@ from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
-def _load_quarterly_goals(month_start, quarterly_dir=None):
+def _load_quarterly_goals(month_start):
     """
     Load quarterly note goals for the quarter containing month_start.
     Returns (yearly_mirror, quarterly_tasks, path, lines).
     """
-    quarterly_dir = quarterly_dir or DEFAULT_QUARTERLY_DIR
     q_year, q_num = quarter_of_date(month_start)
     quarter_key = quarter_id(q_year, q_num)
     filename = f"{quarter_key}.md"
-    path = os.path.join(quarterly_dir, filename)
+    path = os.path.join(JOURNAL_DIR, filename)
     ensure_note(path, QUARTERLY_TEMPLATE_PATH)
     try:
         with open(path, "r") as f:
@@ -230,11 +230,7 @@ def build_monthly_metrics(
         week_labels,
         study_chart_vals,
         study_value_labels,
-        height=10,
-        y_max=40,
-        bar_width=6,
-        col_spacing=12,
-        left_pad=2,
+        preset=MONTHLY_WEEK_STUDY,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(chart_lines))
@@ -426,11 +422,7 @@ def build_monthly_metrics(
         week_labels,
         sleep_chart_vals,
         sleep_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=12,
-        left_pad=2,
+        preset=MONTHLY_WEEK_METRIC,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -508,12 +500,7 @@ def build_monthly_metrics(
         week_labels,
         mood_chart_vals,
         mood_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=12,
-        left_pad=2,
-        center_labels_on_bars=True,
+        preset=MONTHLY_WEEK_MOOD,
         delta_labels=mood_delta_labels,
     )
     mood_lines.extend(wrap_code_block(mood_chart))
@@ -532,8 +519,6 @@ def main():
     )
     parser.add_argument("--file", help="Path to monthly note")
     parser.add_argument("--month", help="Month (YYYY-MM)")
-    parser.add_argument("--monthly-dir", help="Directory for monthly notes")
-    parser.add_argument("--quarterly-dir", help="Directory for quarterly notes")
     parser.add_argument(
         "--no-cleanup",
         action="store_true",
@@ -551,9 +536,7 @@ def main():
     month_start, month_end = month_range(target_date.year, target_date.month)
     filename = f"{target_date.year}-{target_date.month:02d}.md"
 
-    monthly_dir = args.monthly_dir or DEFAULT_MONTHLY_DIR
-    quarterly_dir = args.quarterly_dir or DEFAULT_QUARTERLY_DIR
-    note_path = args.file or os.path.join(monthly_dir, filename)
+    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
 
     with locked_note(note_path):
         ensure_note(note_path, MONTHLY_TEMPLATE_PATH)
@@ -583,7 +566,7 @@ def main():
             prev_year = month_start.year
             prev_month = month_start.month - 1
         prev_month_start, _ = month_range(prev_year, prev_month)
-        prev_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
+        prev_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
         try:
             with open(prev_path, "r") as pf:
                 prev_lines = pf.read().splitlines()
@@ -599,7 +582,7 @@ def main():
 
         # Load quarterly goals (source of truth) and propagate any completed statuses from mirrors.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
-            _load_quarterly_goals(month_start, quarterly_dir)
+            _load_quarterly_goals(month_start)
         )
         quarterly_changed = propagate_goal_status(quarterly_tasks, quarterly_mirror)
 
@@ -724,7 +707,7 @@ def main():
         atomic_write_note(note_path, updated_lines)
 
     # One-time cleanup: re-sync previous month if it still has an arrow indicator
-    prev_month_path = os.path.join(monthly_dir, f"{prev_year}-{prev_month:02d}.md")
+    prev_month_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
     if not args.no_cleanup and os.path.exists(prev_month_path):
         try:
             with open(prev_month_path, "r") as f:

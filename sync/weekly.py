@@ -12,9 +12,6 @@ from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
     QUARTERLY_TEMPLATE_PATH,
-    DEFAULT_WEEKLY_DIR,
-    DEFAULT_MONTHLY_DIR,
-    DEFAULT_QUARTERLY_DIR,
     DAYS,
 )
 from sync.notes import (
@@ -51,6 +48,8 @@ from sync.writers.charts import (
     wrap_code_block,
     render_waterfall_chart,
     render_screen_time_trend_table,
+    WEEKLY_7DAY_CHART,
+    WEEKLY_7DAY_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -60,18 +59,17 @@ from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
 
 
-def _load_quarterly_goals(month_start, quarterly_dir=None):
+def _load_quarterly_goals(month_start):
     """
     Load quarterly note goals for the quarter containing month_start.
 
     Returns:
         Tuple of (yearly_mirror, quarterly_tasks, path, lines)
     """
-    quarterly_dir = quarterly_dir or DEFAULT_QUARTERLY_DIR
     q_year, q_num = quarter_of_date(month_start)
     quarter_key = quarter_id(q_year, q_num)
     filename = f"{quarter_key}.md"
-    path = os.path.join(quarterly_dir, filename)
+    path = os.path.join(JOURNAL_DIR, filename)
     ensure_note(path, QUARTERLY_TEMPLATE_PATH)
     try:
         with open(path, "r") as f:
@@ -87,7 +85,7 @@ def _load_quarterly_goals(month_start, quarterly_dir=None):
     return yearly_mirror, quarterly_tasks, path, lines
 
 
-def _load_monthly_goals(month_start, monthly_dir=None):
+def _load_monthly_goals(month_start):
     """
     Load goals from monthly note.
 
@@ -98,8 +96,7 @@ def _load_monthly_goals(month_start, monthly_dir=None):
         - path: Path to monthly note
         - lines: Raw lines of monthly note
     """
-    monthly_dir = monthly_dir or DEFAULT_MONTHLY_DIR
-    path = os.path.join(monthly_dir, f"{month_start.year}-{month_start.month:02d}.md")
+    path = os.path.join(JOURNAL_DIR, f"{month_start.year}-{month_start.month:02d}.md")
     ensure_note(path, MONTHLY_TEMPLATE_PATH)
     try:
         with open(path, "r") as f:
@@ -215,12 +212,7 @@ def build_weekly_metrics(
         DAYS,
         study_hours,
         study_values,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=8,
-        label_prefix="   ",
-        axis_trim=2,
+        preset=WEEKLY_7DAY_CHART,
     )
     study_lines.extend(wrap_code_block(chart_lines))
     study_lines.append(
@@ -288,12 +280,7 @@ def build_weekly_metrics(
         DAYS,
         sleep_hours,
         sleep_values,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=8,
-        label_prefix="   ",
-        axis_trim=2,
+        preset=WEEKLY_7DAY_CHART,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
@@ -329,13 +316,7 @@ def build_weekly_metrics(
         DAYS,
         mood_chart_vals,
         mood_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=8,
-        label_prefix="   ",
-        center_labels_on_bars=True,
-        axis_trim=2,
+        preset=WEEKLY_7DAY_MOOD,
     )
     mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
@@ -353,7 +334,6 @@ def main():
     )
     parser.add_argument("--file", help="Path to weekly note")
     parser.add_argument("--date", help="Date within week (YYYY-MM-DD)")
-    parser.add_argument("--weekly-dir", help="Directory for weekly notes")
     parser.add_argument(
         "--no-cleanup",
         action="store_true",
@@ -370,8 +350,7 @@ def main():
     year, week_num, _ = target_date.isocalendar()
     filename = f"{year}-W{week_num:02d}.md"
 
-    weekly_dir = args.weekly_dir or DEFAULT_WEEKLY_DIR
-    note_path = args.file or os.path.join(weekly_dir, filename)
+    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
 
     # Determine month note for the target week (use week_start's month).
     month_start = datetime.date(week_start.year, week_start.month, 1)
@@ -445,7 +424,7 @@ def main():
         week_key = f"{year}-W{week_num:02d}"
 
         prev_week_path = os.path.join(
-            weekly_dir, f"{prev_year}-W{prev_week_num:02d}.md"
+            JOURNAL_DIR, f"{prev_year}-W{prev_week_num:02d}.md"
         )
         prev_week_tasks = []
         if os.path.exists(prev_week_path):

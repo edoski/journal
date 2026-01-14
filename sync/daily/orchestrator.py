@@ -16,7 +16,6 @@ from dataclasses import replace
 from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
-    DEFAULT_WEEKLY_DIR,
 )
 from sync.logging import get_logger
 from sync.notes import (
@@ -177,24 +176,21 @@ def _write_study_times_to_icloud(
         logger.warning("Failed to write study_times.json: %s", e)
 
 
-def _weekly_note_path(date_obj: datetime.date, weekly_dir: str | None = None) -> str:
+def _weekly_note_path(date_obj: datetime.date) -> str:
     """Get the path to the weekly note for a given date."""
-    weekly_dir = weekly_dir or DEFAULT_WEEKLY_DIR
     year, week_num, _ = date_obj.isocalendar()
     filename = f"{year}-W{week_num:02d}.md"
-    return os.path.join(weekly_dir, filename)
+    return os.path.join(JOURNAL_DIR, filename)
 
 
 def _load_weekly_goals(
     date_obj: datetime.date,
-    weekly_dir: str | None = None,
 ) -> tuple[list[Goal], list[Goal], list[Goal], list[Goal], str]:
     """
     Load all goals from the weekly note for daily sync.
 
     Args:
         date_obj: Date to load goals for
-        weekly_dir: Override for weekly notes directory
 
     Returns:
         Tuple of (weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, path)
@@ -204,7 +200,7 @@ def _load_weekly_goals(
         - yearly_tasks: Goals from YEARLY section in quarterly note (preserves deadline info)
         - path: Path to weekly note
     """
-    path = _weekly_note_path(date_obj, weekly_dir)
+    path = _weekly_note_path(date_obj)
     if not os.path.exists(path):
         return [], [], [], [], path
     try:
@@ -219,13 +215,12 @@ def _load_weekly_goals(
 
     # Load goals from SOURCE notes (not mirrors) to preserve deadline/reminder_offset.
     # Mirror sections (e.g., weekly's MONTHLY) only have countdown text, not original dates.
-    from sync.constants import DEFAULT_MONTHLY_DIR, MONTHLY_TEMPLATE_PATH
-    from sync.constants import DEFAULT_QUARTERLY_DIR, QUARTERLY_TEMPLATE_PATH
+    from sync.constants import MONTHLY_TEMPLATE_PATH, QUARTERLY_TEMPLATE_PATH
     from sync.dates import quarter_of_date, quarter_id
 
     month_start = datetime.date(date_obj.year, date_obj.month, 1)
     month_key = f"{month_start.year}-{month_start.month:02d}"
-    monthly_path = os.path.join(DEFAULT_MONTHLY_DIR, f"{month_key}.md")
+    monthly_path = os.path.join(JOURNAL_DIR, f"{month_key}.md")
 
     monthly_tasks: list[Goal] = []
     quarterly_tasks: list[Goal] = []
@@ -245,7 +240,7 @@ def _load_weekly_goals(
     # Load QUARTERLY and YEARLY goals from quarterly note (source for both)
     q_year, q_num = quarter_of_date(date_obj)
     qtr_key = quarter_id(q_year, q_num)
-    quarterly_path = os.path.join(DEFAULT_QUARTERLY_DIR, f"{qtr_key}.md")
+    quarterly_path = os.path.join(JOURNAL_DIR, f"{qtr_key}.md")
     try:
         ensure_note(quarterly_path, QUARTERLY_TEMPLATE_PATH)
         with open(quarterly_path, "r") as qf:
@@ -268,7 +263,6 @@ def _write_weekly_goals(
     monthly_tasks: list[Goal] | None = None,
     quarterly_tasks: list[Goal] | None = None,
     yearly_tasks: list[Goal] | None = None,
-    weekly_dir: str | None = None,
 ) -> str:
     """
     Update the WEEKLY subsection in the weekly note and propagate status to monthly/quarterly.
@@ -279,14 +273,13 @@ def _write_weekly_goals(
         monthly_tasks: Monthly tasks with updated status (if changed)
         quarterly_tasks: Quarterly tasks with updated status (if changed)
         yearly_tasks: Yearly tasks with updated status (if changed)
-        weekly_dir: Override for weekly notes directory
 
     Returns:
         Path to the updated weekly note
     """
     from sync.base import atomic_write_note
 
-    path = _weekly_note_path(date_obj, weekly_dir)
+    path = _weekly_note_path(date_obj)
     with locked_note(path):
         ensure_note(path, WEEKLY_TEMPLATE_PATH)
         try:
@@ -344,10 +337,10 @@ def _write_weekly_goals(
 
     # Propagate status changes to monthly note if monthly goals were updated
     if monthly_tasks:
-        from sync.constants import DEFAULT_MONTHLY_DIR, MONTHLY_TEMPLATE_PATH
+        from sync.constants import MONTHLY_TEMPLATE_PATH
         month_start = datetime.date(date_obj.year, date_obj.month, 1)
         monthly_path = os.path.join(
-            DEFAULT_MONTHLY_DIR, f"{month_start.year}-{month_start.month:02d}.md"
+            JOURNAL_DIR, f"{month_start.year}-{month_start.month:02d}.md"
         )
         with locked_note(monthly_path):
             ensure_note(monthly_path, MONTHLY_TEMPLATE_PATH)
@@ -384,12 +377,12 @@ def _write_weekly_goals(
 
     # Propagate status changes to quarterly note if quarterly/yearly goals were updated
     if quarterly_tasks or yearly_tasks:
-        from sync.constants import DEFAULT_QUARTERLY_DIR, QUARTERLY_TEMPLATE_PATH
+        from sync.constants import QUARTERLY_TEMPLATE_PATH
         from sync.dates import quarter_of_date, quarter_id
 
         q_year, q_num = quarter_of_date(date_obj)
         qtr_key = quarter_id(q_year, q_num)
-        quarterly_path = os.path.join(DEFAULT_QUARTERLY_DIR, f"{qtr_key}.md")
+        quarterly_path = os.path.join(JOURNAL_DIR, f"{qtr_key}.md")
         with locked_note(quarterly_path):
             ensure_note(quarterly_path, QUARTERLY_TEMPLATE_PATH)
             try:

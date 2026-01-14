@@ -9,9 +9,154 @@ from __future__ import annotations
 
 import datetime
 
+from dataclasses import dataclass
+
 from sync.constants import DAYS, MONTH_ABBR, STUDY_TARGET_MIN, RENDER
 from sync.formatting import round_half_up
 from sync.dates import daterange, format_week_label
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bar Chart Presets
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class BarChartPreset:
+    """Configuration for a specific bar chart layout."""
+
+    height: int
+    y_max: float
+    bar_width: int
+    col_spacing: int
+    label_prefix: str
+    axis_trim: int = 2  # Subtracted from col_spacing * labels for axis length
+    left_pad: int | None = None  # None = auto-center bars in column
+    center_labels_on_bars: bool = False
+    delta_label_offset: int = 0  # Horizontal character shift for delta labels (negative = left)
+
+
+# Weekly charts (7 days: MON-SUN)
+WEEKLY_7DAY_CHART = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=8,
+    label_prefix="   ",
+)
+
+WEEKLY_7DAY_MOOD = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=8,
+    label_prefix="   ",
+    center_labels_on_bars=True,
+)
+
+# Monthly charts (4-5 weeks, axis dynamically sized)
+MONTHLY_WEEK_STUDY = BarChartPreset(
+    height=10,
+    y_max=40,
+    bar_width=6,
+    col_spacing=12,
+    label_prefix=" ",
+    left_pad=2,
+)
+
+MONTHLY_WEEK_METRIC = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=12,
+    label_prefix=" ",
+    left_pad=2,
+)
+
+MONTHLY_WEEK_MOOD = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=12,
+    label_prefix=" ",
+    left_pad=2,
+    center_labels_on_bars=True,
+)
+
+# Quarterly charts (3 months: JAN/FEB/MAR etc.)
+QUARTERLY_3MONTH_STUDY = BarChartPreset(
+    height=12,
+    y_max=240,
+    bar_width=7,
+    col_spacing=11,
+    label_prefix="     ",
+    left_pad=2,
+)
+
+QUARTERLY_3MONTH_METRIC = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=12,
+    label_prefix="    ",
+    axis_trim=5,
+    left_pad=2,
+)
+
+QUARTERLY_3MONTH_MOOD = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=12,
+    label_prefix="    ",
+    axis_trim=5,
+    left_pad=2,
+    center_labels_on_bars=True,
+)
+
+# Yearly charts (4 quarters: Q1-Q4)
+YEARLY_4QTR_STUDY = BarChartPreset(
+    height=12,
+    y_max=720,
+    bar_width=7,
+    col_spacing=11,
+    label_prefix="    ",
+    left_pad=2,
+    delta_label_offset=-1,
+)
+
+YEARLY_4QTR_METRIC = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=11,
+    label_prefix="    ",
+    axis_trim=4,
+    left_pad=2,
+    delta_label_offset=-1,
+)
+
+YEARLY_4QTR_MOOD = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=11,
+    label_prefix="    ",
+    axis_trim=4,
+    left_pad=2,
+    center_labels_on_bars=True,
+    delta_label_offset=-1,
+)
+
+# Test preset (used in unit tests)
+TEST_CHART = BarChartPreset(
+    height=10,
+    y_max=10,
+    bar_width=5,
+    col_spacing=12,
+    label_prefix=" ",
+    axis_trim=3,  # 12 * 3 - 3 = 33 for 3 labels
+)
 
 
 def wrap_code_block(lines):
@@ -23,14 +168,7 @@ def render_bar_chart(
     values: list[float | None],
     value_labels: list[str],
     *,
-    height: int = 10,
-    y_max: float | None = None,
-    bar_width: int = 5,
-    col_spacing: int = 12,
-    left_pad: int | None = None,
-    label_prefix: str = " ",
-    axis_trim: int | None = 3,
-    center_labels_on_bars: bool = False,
+    preset: BarChartPreset,
     delta_labels: list[str] | None = None,
 ) -> list[str]:
     """
@@ -40,14 +178,7 @@ def render_bar_chart(
         labels: X-axis labels (e.g., ["MON", "TUE", ...] or ["DEC 01-07", ...])
         values: Numeric values for bar heights (None/0 = no bar)
         value_labels: Formatted strings to display above bars
-        height: Number of visual rows for bars (default 10)
-        y_max: Maximum value on Y-axis for scaling (default same as height)
-        bar_width: Number of █ characters per bar (default 5)
-        col_spacing: Spacing between column starts (default 12)
-        left_pad: Spaces before bar in column (None = center bars)
-        label_prefix: Prefix string for label/delta rows (default " ")
-        axis_trim: Characters to trim from axis (None = dynamic to match widest row)
-        center_labels_on_bars: If True, center value labels on bars (default False)
+        preset: BarChartPreset configuration for this chart type
         delta_labels: Optional list of delta strings to show below x-axis labels
 
     Returns:
@@ -64,8 +195,15 @@ def render_bar_chart(
     bar_char = "█"
     half_bar_char = "▄"
 
-    if y_max is None:
-        y_max = height
+    # Extract preset values
+    height = preset.height
+    y_max = preset.y_max
+    bar_width = preset.bar_width
+    col_spacing = preset.col_spacing
+    left_pad = preset.left_pad
+    label_prefix = preset.label_prefix
+    center_labels_on_bars = preset.center_labels_on_bars
+    delta_label_offset = preset.delta_label_offset
 
     # Compute left_pad if not specified (center bars in column)
     if left_pad is None:
@@ -90,10 +228,8 @@ def render_bar_chart(
             bar_heights.append(min(height, max(0, full_height)))
             has_half_block.append(has_half and full_height < height)
 
-
     lines: list[str] = []
     bar_rows: list[str] = []
-    max_bar_row_len = 0
 
     # Check if any value is at max (needs overflow line for label)
     has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
@@ -180,20 +316,11 @@ def render_bar_chart(
                 # Empty space
                 row += " " * col_spacing
         row = row.rstrip()
-        max_bar_row_len = max(max_bar_row_len, len(row))
         bar_rows.append(row)
 
-    # Axis row
-    if axis_trim is None:
-        # Dynamic: match widest bar row (original render_quarter_bar_chart behavior)
-        # max_bar_row_len includes the │, so subtract 1 for dashes after └
-        axis_dashes = (
-            max_bar_row_len - 1 if max_bar_row_len > 0 else col_spacing * len(labels)
-        )
-    else:
-        # Fixed trim: dashes = col_spacing * labels - axis_trim
-        axis_dashes = col_spacing * len(labels) - axis_trim
-    axis_row = "└" + "─" * max(0, axis_dashes)
+    # Axis row (length computed from labels count and preset spacing)
+    axis_dashes = preset.col_spacing * len(labels) - preset.axis_trim
+    axis_row = "└" + "─" * axis_dashes
 
     lines.extend(bar_rows)
     lines.append(axis_row)
@@ -211,7 +338,8 @@ def render_bar_chart(
         for idx, delta in enumerate(delta_labels):
             delta_str = str(delta) if delta is not None else ""
             label_len = len(str(labels[idx])) if idx < len(labels) else col_spacing
-            delta_left_pad = max((label_len - len(delta_str)) // 2, 0)
+            center_pad = (label_len - len(delta_str)) // 2
+            delta_left_pad = max(center_pad + delta_label_offset, 0)
             remaining = col_spacing - delta_left_pad - len(delta_str)
             if remaining < 0:
                 remaining = 0

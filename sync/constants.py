@@ -30,12 +30,6 @@ YEARLY_TEMPLATE_PATH = (
     "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
 )
 
-# Default directories (can be overridden via environment)
-DEFAULT_WEEKLY_DIR = os.environ.get("WEEKLY_DIR", JOURNAL_DIR)
-DEFAULT_MONTHLY_DIR = os.environ.get("MONTHLY_DIR", JOURNAL_DIR)
-DEFAULT_QUARTERLY_DIR = os.environ.get("QUARTERLY_DIR", JOURNAL_DIR)
-DEFAULT_YEARLY_DIR = os.environ.get("YEARLY_DIR", JOURNAL_DIR)
-
 # Lock directory for note writes
 LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
 

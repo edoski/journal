@@ -4,8 +4,8 @@ import datetime
 import os
 
 from sync.constants import (
+    JOURNAL_DIR,
     QUARTERLY_TEMPLATE_PATH,
-    DEFAULT_QUARTERLY_DIR,
     MONTH_ABBR,
     STUDY_TARGET_MIN,
 )
@@ -50,6 +50,9 @@ from sync.writers.charts import (
     wrap_code_block,
     render_waterfall_chart,
     render_screen_time_period_table,
+    QUARTERLY_3MONTH_STUDY,
+    QUARTERLY_3MONTH_METRIC,
+    QUARTERLY_3MONTH_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
@@ -214,13 +217,7 @@ def build_quarterly_metrics(
         month_labels,
         study_chart_vals,
         study_value_labels,
-        height=12,
-        y_max=240,
-        bar_width=7,
-        col_spacing=11,
-        left_pad=2,
-        label_prefix="     ",
-        axis_trim=2,
+        preset=QUARTERLY_3MONTH_STUDY,
         delta_labels=study_delta_labels,
     )
     study_lines.extend(wrap_code_block(chart_lines))
@@ -421,13 +418,7 @@ def build_quarterly_metrics(
         sleep_labels,
         sleep_chart_vals,
         sleep_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=12,
-        left_pad=2,
-        label_prefix="    ",
-        axis_trim=5,
+        preset=QUARTERLY_3MONTH_METRIC,
         delta_labels=sleep_delta_labels,
     )
     sleep_lines.extend(wrap_code_block(sleep_chart))
@@ -484,14 +475,7 @@ def build_quarterly_metrics(
         mood_labels,
         mood_chart_vals,
         mood_value_labels,
-        height=10,
-        y_max=10,
-        bar_width=5,
-        col_spacing=12,
-        left_pad=2,
-        label_prefix="    ",
-        axis_trim=5,
-        center_labels_on_bars=True,
+        preset=QUARTERLY_3MONTH_MOOD,
         delta_labels=mood_delta_labels,
     )
     mood_lines.extend(wrap_code_block(mood_chart))
@@ -514,7 +498,6 @@ def main():
     )
     parser.add_argument("--file", help="Path to quarterly note")
     parser.add_argument("--quarter", help="Quarter (YYYY-Qn, e.g., 2025-Q4)")
-    parser.add_argument("--quarterly-dir", help="Directory for quarterly notes")
     args = parser.parse_args()
 
     if args.quarter:
@@ -530,8 +513,7 @@ def main():
     quarter_start, quarter_end = quarter_range(year, quarter_num)
     filename = f"{quarter_id(year, quarter_num)}.md"
 
-    quarterly_dir = args.quarterly_dir or DEFAULT_QUARTERLY_DIR
-    note_path = args.file or os.path.join(quarterly_dir, filename)
+    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
 
     if quarter_num == 1:
         prev_year = year - 1
@@ -559,7 +541,7 @@ def main():
         qtr_key = quarter_id(year, quarter_num)
 
         prev_note_path = os.path.join(
-            quarterly_dir, f"{quarter_id(prev_year, prev_quarter)}.md"
+            JOURNAL_DIR, f"{quarter_id(prev_year, prev_quarter)}.md"
         )
         prev_tasks = []
         try:
@@ -578,7 +560,7 @@ def main():
 
         yearly_tasks = []
         yearly_lines = []
-        yearly_path = os.path.join(quarterly_dir, f"{year}.md")
+        yearly_path = os.path.join(JOURNAL_DIR, f"{year}.md")
         try:
             with open(yearly_path, "r") as yf:
                 yearly_lines = yf.read().splitlines()

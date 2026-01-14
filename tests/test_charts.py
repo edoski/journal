@@ -29,6 +29,9 @@ from sync.writers.charts import (
     compress_activity_time_order,
     render_quarterly_study_coverage,
     render_yearly_study_coverage,
+    BarChartPreset,
+    TEST_CHART,
+    WEEKLY_7DAY_CHART,
 )
 from sync.constants import STUDY_TARGET_MIN, RENDER
 
@@ -187,8 +190,7 @@ class TestRenderBarChart:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
+            preset=TEST_CHART,
         )
 
         # Should have axis
@@ -212,8 +214,7 @@ class TestRenderBarChart:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
+            preset=TEST_CHART,
         )
 
         # Max value label should be on first line (overflow)
@@ -229,8 +230,7 @@ class TestRenderBarChart:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
+            preset=TEST_CHART,
         )
 
         # Find the bottom-most bar row (just before axis)
@@ -250,8 +250,7 @@ class TestRenderBarChart:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
+            preset=TEST_CHART,
             delta_labels=delta_labels,
         )
 
@@ -264,14 +263,21 @@ class TestRenderBarChart:
         values = [5, 5, 5]
         value_labels = ["5", "5", "5"]
 
+        # Create preset with specific axis_trim (12*3-3=33 dashes)
+        preset = BarChartPreset(
+            height=10,
+            y_max=10,
+            bar_width=5,
+            col_spacing=12,
+            label_prefix=" ",
+            axis_trim=3,
+        )
+
         result = render_bar_chart(
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
-            col_spacing=12,
-            axis_trim=3,
+            preset=preset,
         )
 
         axis_line = next(line for line in result if "└" in line)
@@ -289,8 +295,7 @@ class TestRenderBarChart:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
+            preset=TEST_CHART,
         )
 
         # 4.5 and 5.7 should show half block (▄)
@@ -637,10 +642,7 @@ class TestBarChartSnapshots:
             labels=labels,
             values=values,
             value_labels=value_labels,
-            height=10,
-            y_max=10,
-            bar_width=5,
-            col_spacing=12,
+            preset=WEEKLY_7DAY_CHART,
         )
 
         # Verify key structural elements

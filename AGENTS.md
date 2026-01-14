@@ -37,7 +37,7 @@ journal/
     logging.py            # Logging utilities
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (389 tests)
+  tests/                  # Pytest test suite (397 tests)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -77,18 +77,22 @@ mypy sync/ --ignore-missing-imports
 vulture sync/ --min-confidence 80
 
 # Testing
-pytest tests/ -v          # Run all 389 tests
+pytest tests/ -v          # Run all 397 tests
 ```
 
 ### Configuration Constants
 
-Shared constants are in `sync/constants.py`, organized into frozen dataclasses with backward-compatible aliases:
+Shared constants are in `sync/constants.py`, organized into frozen dataclasses:
 
 **Config Dataclasses** (use `IDEAL.`, `CHART.`, `RENDER.`, `SCREEN_TIME.` singletons):
 - **`IdealSchedule`** (`IDEAL`): Schedule targets — `study_start_hour`, `workout_start_hour`, `study_minutes_daily`, `sleep_minutes_nightly`, `workout_days_weekly`, `stretch_days_weekly`, `mood_target`
 - **`ChartConfig`** (`CHART`): Chart dimensions — `height_default`, `height_quarterly`, `height_yearly`, `y_max_*_study`
 - **`RenderConfig`** (`RENDER`): Progress bars & symbols — `progress_bar_width`, `progress_filled`, `progress_empty`, `study_symbol_*`, `study_legend`
 - **`ScreenTimeConfig`** (`SCREEN_TIME`): Thresholds — `min_minutes`, `percent_threshold`, `misc_label`
+
+**Bar Chart Presets** (in `sync/writers/charts.py`):
+- **`BarChartPreset`** dataclass: Encapsulates all bar chart parameters (`height`, `y_max`, `bar_width`, `col_spacing`, `label_prefix`, `axis_trim`, `left_pad`, `center_labels_on_bars`)
+- **Named presets**: `WEEKLY_7DAY_CHART`, `WEEKLY_7DAY_MOOD`, `MONTHLY_WEEK_STUDY`, `MONTHLY_WEEK_METRIC`, `MONTHLY_WEEK_MOOD`, `QUARTERLY_3MONTH_STUDY`, `QUARTERLY_3MONTH_METRIC`, `QUARTERLY_3MONTH_MOOD`, `YEARLY_4QTR_STUDY`, `YEARLY_4QTR_METRIC`, `YEARLY_4QTR_MOOD`
 
 **Other constants** (not in dataclasses):
 - **Paths**: `JOURNAL_DIR`, `VAULT_DIR`, `LOCK_DIR`, template paths
@@ -128,7 +132,7 @@ sync/
 │   └── screen_time.py  # parse_procrastination_table
 │
 ├── writers/          # Rendering: models → markdown
-│   ├── charts.py       # render_bar_chart, training grids, study coverage, waterfall charts
+│   ├── charts.py       # render_bar_chart, BarChartPreset, training grids, study coverage, waterfall charts
 │   ├── tables.py       # render_summary_table, render_sleep_stats_table
 │   ├── goals.py        # render_goal_lines, build_goals_block, format_countdown
 │   └── media.py        # render_media_table, build_media_section
@@ -269,7 +273,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 389 tests
+pytest tests/ -v              # All 397 tests
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```
