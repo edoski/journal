@@ -22,7 +22,7 @@ DATE_QUARTER_RE = re.compile(r"^(\d{4})-Q([1-4])$")  # YYYY-Qn
 # Regex to find backtick-wrapped date (with optional reminder offset) in goal body
 GOAL_DATE_RE = re.compile(
     r"`(\d{4}(?:-(?:W\d{2}|\d{2}(?:-\d{2})?|Q[1-4])))"
-    r"(?:\s*!(\d+)([dwmq]))?`"
+    r"(?:\s*!\s*(\d+)\s*([dwmq]))?`"
 )
 
 # Reminder offset units in days
