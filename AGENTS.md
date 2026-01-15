@@ -35,6 +35,11 @@ journal/
     reminders.py          # Periodic review reminder generation
     carried_goals.py      # Goal carry-forward cache management
     logging.py            # Logging utilities
+  utils/                  # Flow database CLI utilities
+    flow_db.py            # Shared DB helpers (connection, queries, formatting)
+    undo_last_session.py  # Delete most recent session (dry-run default)
+    rename_session.py     # Rename most recent session (dry-run default)
+    session_preview.py    # View session stats (read-only)
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
   tests/                  # Pytest test suite (397 tests)
@@ -60,7 +65,11 @@ journal/
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence.
 
-- **`undo_last_session.py`**: Utility to delete the most recent Flow session. Run with `--confirm` to actually delete.
+- **`utils/`**: CLI utilities for the Flow database:
+  - `session_preview.py`: View current/recent session stats with `python3 session_preview.py [-n COUNT]`
+  - `rename_session.py`: Rename most recent session with `python3 rename_session.py "Title" [--confirm]`
+  - `undo_last_session.py`: Delete most recent session with `python3 undo_last_session.py [--confirm]`
+  - All write operations default to dry-run mode; use `--confirm` to execute.
 
 ### Linting & Testing
 
