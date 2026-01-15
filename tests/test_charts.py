@@ -303,7 +303,6 @@ class TestRenderBarChart:
 
         # Only 4.0 and 5.0 should NOT have half blocks rendered for them
         # Count full bars: 4.0→4, 4.5→4+half, 5.0→5, 5.7→5+half
-        bar_rows = [r for r in result if "│" in r]
         # At level 5: should see half-blocks for 4.5 (at level 5)
         # At level 6: should see half-blocks for 5.7 (at level 6)
         half_block_lines = [r for r in result if "▄" in r]

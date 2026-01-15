@@ -204,7 +204,7 @@ Goals support inline deadlines with countdown rendering:
 
 The training table tracks workout and stretch sessions:
 - **Columns**: START, END, ACTIVITY, DURATION, INTERRUPT
-- **INTERRUPT**: Time elapsed beyond actual workout duration (replaces deprecated CALORIES)
+- **INTERRUPT**: Time elapsed beyond actual workout duration
 - **Visualizations**: Weekly grid (`███`/`░░░`), monthly grid (`■`/`·`), frequency counts
 
 ### Procrastination Tracking
