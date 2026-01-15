@@ -73,6 +73,12 @@ journal/
 
 ### Linting & Testing
 
+First, activate the virtual environment:
+```bash
+source .venv/bin/activate
+```
+
+Then run linting and tests:
 ```bash
 # Linting
 ruff check .              # Check for issues
@@ -86,7 +92,7 @@ mypy sync/ --ignore-missing-imports
 vulture sync/ --min-confidence 80
 
 # Testing
-pytest tests/ -v          # Run all 397 tests
+pytest tests/ -v          # Run all 399 tests
 ```
 
 ### Configuration Constants
@@ -186,6 +192,7 @@ sync/
 - `parse_study_table(lines)` → `list[StudySession]`
 - `parse_procrastination_table(lines)` → `DailyScreenTimeData`
 - Dated goals: `resolve_deadline`, `parse_goal_date`, `filter_by_proximity`
+- Piercing: `filter_by_proximity` excludes completed goals from piercing into child periods
 
 **Writers (`sync/writers/`):**
 - `render_goal_lines(goals, today)` → `list[str]`

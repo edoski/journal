@@ -602,12 +602,33 @@ def main():
             )
 
         # Rewrite Goals block with QUARTERLY mirror + MONTHLY source.
-        # Filter quarterly tasks to only show those with deadlines within 90 days (or no deadline).
+        # QUARTERLY mirror: preserve existing + add new from filter_by_proximity
         today = datetime.date.today()
-        filtered_quarterly = filter_by_proximity(quarterly_tasks, 90, today)
+        existing_quarterly = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
+        existing_quarterly_ids = {g.id for g in existing_quarterly if g.id}
+
+        # Get new quarterly goals that aren't already in the note
+        new_quarterly = filter_by_proximity(quarterly_tasks, 90, today)
+        new_quarterly = [g for g in new_quarterly if g.id not in existing_quarterly_ids]
+
+        # Restore deadline info from source for existing quarterly goals (for countdown)
+        source_quarterly_info = {g.id: g for g in quarterly_tasks if g.id}
+        restored_existing_quarterly = []
+        for g in existing_quarterly:
+            if g.id in source_quarterly_info:
+                src = source_quarterly_info[g.id]
+                restored_existing_quarterly.append(replace(g,
+                    deadline=src.deadline,
+                    date_str=src.date_str,
+                    reminder_offset=src.reminder_offset,
+                ))
+            else:
+                restored_existing_quarterly.append(g)
+
+        final_quarterly = restored_existing_quarterly + new_quarterly
         quarterly_lines_rendered = (
-            render_goal_lines(filtered_quarterly, today=today)
-            if filtered_quarterly
+            render_goal_lines(final_quarterly, today=today)
+            if final_quarterly
             else [
                 "",
                 "_No quarterly goals have been defined yet._",
@@ -615,9 +636,11 @@ def main():
         )
 
         # MONTHLY source section: monthly goals + pierced yearly goals (≤90d deadline)
-        # Separate original monthly goals from previously-pierced yearly goals by ID
+        # Separate original monthly goals from existing pierced yearly goals
         yearly_ids = {g.id for g in yearly_mirror if g.id}
         original_monthly = [g for g in monthly_tasks if g.id not in yearly_ids]
+        existing_pierced = [g for g in monthly_tasks if g.id in yearly_ids]
+        existing_pierced_ids = {g.id for g in existing_pierced}
 
         # Transfer done status from parsed yearly goals to source yearly_mirror
         parsed_status = {g.id: g.done for g in monthly_tasks if g.id in yearly_ids}
@@ -628,14 +651,33 @@ def main():
             else:
                 updated_yearly.append(g)
 
-        # Filter yearly from source (has correct deadlines) for piercing
-        pierced_yearly = filter_by_proximity(updated_yearly, 90, today)
-        pierced_yearly = [g for g in pierced_yearly if g.deadline is not None]
+        # Get NEW pierced yearly goals from source (only those not already in the note)
+        # Existing pierced goals are preserved to keep completed goals visible
+        new_pierced_yearly = filter_by_proximity(updated_yearly, 90, today)
+        new_pierced_yearly = [g for g in new_pierced_yearly
+                              if g.deadline is not None and g.id not in existing_pierced_ids]
 
-        # Render: original monthly goals (preserve dates) + pierced yearly (countdown)
+        # Restore deadline info from source for existing pierced yearly goals (for countdown)
+        source_yearly_info = {g.id: g for g in updated_yearly if g.id}
+        restored_existing_pierced = []
+        for g in existing_pierced:
+            if g.id in source_yearly_info:
+                src = source_yearly_info[g.id]
+                restored_existing_pierced.append(replace(g,
+                    deadline=src.deadline,
+                    date_str=src.date_str,
+                    reminder_offset=src.reminder_offset,
+                ))
+            else:
+                restored_existing_pierced.append(g)
+
+        # Final pierced = existing (with restored deadlines) + new (from source)
+        final_pierced = restored_existing_pierced + new_pierced_yearly
+
+        # Render: original monthly goals (preserve dates) + final pierced yearly (countdown)
         monthly_source_lines = render_goal_lines(original_monthly)
-        if pierced_yearly:
-            pierced_lines = render_goal_lines(pierced_yearly, today=today)
+        if final_pierced:
+            pierced_lines = render_goal_lines(final_pierced, today=today)
             monthly_source_lines = monthly_source_lines + pierced_lines
 
         new_goals_block = build_goals_block(

@@ -202,20 +202,24 @@ def filter_by_proximity(
     today: datetime.date,
 ) -> list[Goal]:
     """
-    Filter tasks to include only those with deadlines within max_days.
+    Filter tasks to include only open goals within proximity.
 
-    Tasks without deadlines are always included.
-    Completed tasks with deadlines are excluded from filtering (always shown).
-    Tasks with reminder_offset have their effective deadline shifted earlier.
+    - Done goals are always excluded (should not pierce into new child periods)
+    - Open goals without deadlines are always included
+    - Open goals with deadlines are included if within max_days (adjusted by reminder_offset)
     """
     result = []
     for task in tasks:
+        # Completed goals should never pierce into new child periods
+        if task.done:
+            continue
+
         deadline = task.deadline
         if deadline is None:
-            result.append(task)
-        elif task.done:
+            # Open goals without deadlines always included
             result.append(task)
         else:
+            # Open goals with deadlines: check proximity
             reminder_offset = task.reminder_offset or 0
             effective_deadline = deadline - datetime.timedelta(days=reminder_offset)
             days_left = (effective_deadline - today).days

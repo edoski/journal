@@ -250,7 +250,8 @@ class TestFilterByProximity:
         assert len(result) == 1
         assert result[0].body == "Task 1"
 
-    def test_includes_completed_tasks_regardless_of_deadline(self):
+    def test_excludes_completed_tasks_with_deadlines(self):
+        """Completed tasks with deadlines should not pierce into child periods."""
         today = datetime.date(2025, 1, 1)
         tasks = [
             Goal(
@@ -261,7 +262,36 @@ class TestFilterByProximity:
             ),
         ]
         result = filter_by_proximity(tasks, 7, today)
+        assert len(result) == 0
+
+    def test_excludes_completed_tasks_without_deadlines(self):
+        """Completed tasks without deadlines should not pierce into child periods."""
+        today = datetime.date(2025, 1, 1)
+        tasks = [
+            Goal(
+                id="gid-010",
+                body="Open-ended task",
+                deadline=None,
+                done=True,
+            ),
+        ]
+        result = filter_by_proximity(tasks, 7, today)
+        assert len(result) == 0
+
+    def test_includes_open_tasks_without_deadlines(self):
+        """Open tasks without deadlines should pierce into child periods."""
+        today = datetime.date(2025, 1, 1)
+        tasks = [
+            Goal(
+                id="gid-011",
+                body="Open-ended task",
+                deadline=None,
+                done=False,
+            ),
+        ]
+        result = filter_by_proximity(tasks, 7, today)
         assert len(result) == 1
+        assert result[0].body == "Open-ended task"
 
     def test_includes_overdue_tasks(self):
         today = datetime.date(2025, 1, 10)
