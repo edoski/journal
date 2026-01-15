@@ -59,9 +59,7 @@ STUDY_TIMES_ICLOUD_PATH = os.path.expanduser(
 )
 
 
-def _write_study_times_to_icloud(
-    sessions: list[SessionDict], today_str: str
-) -> None:
+def _write_study_times_to_icloud(sessions: list[SessionDict], today_str: str) -> None:
     """
     Write study session times to iCloud for iPad shortcut to read.
 
@@ -97,8 +95,10 @@ def _write_study_times_to_icloud(
         afternoon_start = lunch_start + datetime.timedelta(hours=1)
 
     # Compute afternoon start time for comparison (use actual or default 14:30)
-    afternoon_start_time = afternoon_start if afternoon_start else first_start.replace(
-        hour=14, minute=30, second=0, microsecond=0
+    afternoon_start_time = (
+        afternoon_start
+        if afternoon_start
+        else first_start.replace(hour=14, minute=30, second=0, microsecond=0)
     )
 
     afternoon_end = (
@@ -110,7 +110,9 @@ def _write_study_times_to_icloud(
         lunch: datetime.datetime | None,
         afternoon: datetime.datetime | None,
         end: datetime.datetime | None,
-    ) -> tuple[datetime.datetime, datetime.datetime, datetime.datetime, datetime.datetime]:
+    ) -> tuple[
+        datetime.datetime, datetime.datetime, datetime.datetime, datetime.datetime
+    ]:
         """Clamp times to a safe, monotonic schedule for the Shortcut.
 
         Ensures: morning <= lunch <= afternoon <= end, with minimal defaults when
@@ -232,7 +234,9 @@ def _load_weekly_goals(
         with open(monthly_path, "r") as mf:
             monthly_lines = mf.read().splitlines()
         m_start, m_end = goals_section_bounds(monthly_lines)
-        monthly_tasks = extract_subsection_tasks(monthly_lines, m_start, m_end, "MONTHLY")
+        monthly_tasks = extract_subsection_tasks(
+            monthly_lines, m_start, m_end, "MONTHLY"
+        )
         ensure_goal_ids(monthly_tasks, "monthly", month_key)
     except Exception:
         pass
@@ -246,15 +250,18 @@ def _load_weekly_goals(
         with open(quarterly_path, "r") as qf:
             quarterly_lines = qf.read().splitlines()
         q_start, q_end = goals_section_bounds(quarterly_lines)
-        quarterly_tasks = extract_subsection_tasks(quarterly_lines, q_start, q_end, "QUARTERLY")
-        yearly_tasks = extract_subsection_tasks(quarterly_lines, q_start, q_end, "YEARLY")
+        quarterly_tasks = extract_subsection_tasks(
+            quarterly_lines, q_start, q_end, "QUARTERLY"
+        )
+        yearly_tasks = extract_subsection_tasks(
+            quarterly_lines, q_start, q_end, "YEARLY"
+        )
         ensure_goal_ids(quarterly_tasks, "quarterly", qtr_key)
         ensure_goal_ids(yearly_tasks, "yearly", str(q_year))
     except Exception:
         pass
 
     return weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, path
-
 
 
 def _write_weekly_goals(
@@ -305,7 +312,9 @@ def _write_weekly_goals(
             )
             lines = new_block + ([""] if lines and lines[0].strip() else []) + lines
         else:
-            existing_monthly = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
+            existing_monthly = extract_subsection_tasks(
+                lines, g_start, g_end, "MONTHLY"
+            )
             monthly_lines = (
                 render_goal_lines(existing_monthly)
                 if existing_monthly
@@ -338,6 +347,7 @@ def _write_weekly_goals(
     # Propagate status changes to monthly note if monthly goals were updated
     if monthly_tasks:
         from sync.constants import MONTHLY_TEMPLATE_PATH
+
         month_start = datetime.date(date_obj.year, date_obj.month, 1)
         monthly_path = os.path.join(
             JOURNAL_DIR, f"{month_start.year}-{month_start.month:02d}.md"
@@ -399,7 +409,9 @@ def _write_weekly_goals(
             )
             # Use updated tasks if provided, otherwise use existing
             yearly_to_write = yearly_tasks if yearly_tasks else existing_yearly
-            quarterly_to_write = quarterly_tasks if quarterly_tasks else existing_quarterly_src
+            quarterly_to_write = (
+                quarterly_tasks if quarterly_tasks else existing_quarterly_src
+            )
             new_q_block = build_goals_block(
                 [
                     ("YEARLY", render_goal_lines(yearly_to_write)),
@@ -613,10 +625,11 @@ def _update_frontmatter(
 
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
     return (
-        final_lines[: first_dash_idx + 1] + new_fm_lines + final_lines[second_dash_idx:],
+        final_lines[: first_dash_idx + 1]
+        + new_fm_lines
+        + final_lines[second_dash_idx:],
         changes,
     )
-
 
 
 def _ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
@@ -782,7 +795,9 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
             existing_ids.add(reminder.id)
 
     # Load weekly goals (and monthly/quarterly/yearly for piercing) and propagate status changes.
-    weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, weekly_path = _load_weekly_goals(today)
+    weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, weekly_path = (
+        _load_weekly_goals(today)
+    )
     updated_weekly_tasks: list[Goal] = []
     daily_weekly_lookup = {t.canonical: t for t in existing_weekly_tasks}
     for task in weekly_tasks:
@@ -953,7 +968,9 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Late workout start: first workout start vs 6:00 PM ideal
     if workout_data:
-        workout_entries = workout_data if isinstance(workout_data, list) else [workout_data]
+        workout_entries = (
+            workout_data if isinstance(workout_data, list) else [workout_data]
+        )
         # Find earliest workout start time
         earliest_workout_start = None
         for entry in workout_entries:
@@ -962,7 +979,10 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
                 try:
                     h, m = map(int, start_str.split(":"))
                     start_minutes = h * 60 + m
-                    if earliest_workout_start is None or start_minutes < earliest_workout_start:
+                    if (
+                        earliest_workout_start is None
+                        or start_minutes < earliest_workout_start
+                    ):
                         earliest_workout_start = start_minutes
                 except Exception:
                     pass
@@ -976,7 +996,9 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Write study times to iCloud for iPad shortcut
     _write_study_times_to_icloud(sessions, today_str)
 
-    procrastination_lines = _build_procrastination_section(screen_time_data, deviation_data)
+    procrastination_lines = _build_procrastination_section(
+        screen_time_data, deviation_data
+    )
 
     # Join metrics subsections with single blank between, none before first, none trailing
     sections = [study_lines, training_lines, procrastination_lines, sleep_lines]

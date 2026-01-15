@@ -270,7 +270,11 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
             interrupt_cell = format_interrupt(interrupt_val)
         elif isinstance(interrupt_val, str) and interrupt_val:
             # Already formatted from parsing existing table
-            interrupt_cell = f"`{interrupt_val}`" if not interrupt_val.startswith("`") else interrupt_val
+            interrupt_cell = (
+                f"`{interrupt_val}`"
+                if not interrupt_val.startswith("`")
+                else interrupt_val
+            )
         else:
             interrupt_cell = "`+00m`"
 
@@ -349,4 +353,3 @@ def _build_training_section(
         lines_out.append("_No training sessions completed today._")
 
     return lines_out, merged
-

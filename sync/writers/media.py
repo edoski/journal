@@ -78,4 +78,3 @@ def build_media_section(
     lines.append("")
 
     return lines
-

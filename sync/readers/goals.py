@@ -237,4 +237,3 @@ def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> lis
             t.id = generate_goal_id_for(horizon_key, period_key, canon, idx)
         counts[canon] = counts.get(canon, 0) + 1
     return tasks
-

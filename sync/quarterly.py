@@ -358,7 +358,9 @@ def build_quarterly_metrics(
         for (start, _), label in zip(month_ranges, month_labels):
             month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
         procrastination_lines.extend(
-            render_screen_time_period_table(month_ranges, daily_data, "MONTH", month_labels, month_wikilinks)
+            render_screen_time_period_table(
+                month_ranges, daily_data, "MONTH", month_labels, month_wikilinks
+            )
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -382,7 +384,9 @@ def build_quarterly_metrics(
         mins_clean = [m for m in mins if m is not None]
         if mins_clean:
             avg_min = sum(mins_clean) / len(mins_clean)
-            sleep_chart_vals.append(round((avg_min / 60) * 2) / 2)  # Round to nearest 0.5h
+            sleep_chart_vals.append(
+                round((avg_min / 60) * 2) / 2
+            )  # Round to nearest 0.5h
             sleep_avgs_minutes.append(avg_min)
             sleep_value_labels.append(format_minutes(avg_min))
         else:

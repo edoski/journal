@@ -308,4 +308,3 @@ def _build_procrastination_section(
     lines.append(f"| **TOTAL** | {total_str} |")
 
     return lines
-

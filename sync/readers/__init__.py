@@ -31,4 +31,3 @@ __all__ = [
     # Screen time
     "parse_procrastination_table",
 ]
-

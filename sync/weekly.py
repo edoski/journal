@@ -199,7 +199,9 @@ def build_weekly_metrics(
 
     # STUDY section (using activity totals for accuracy)
     study_lines = ["### **STUDY**"]
-    study_hours = [round((m / 60) * 2) / 2 if m is not None and m > 0 else 0 for m in study_minutes]
+    study_hours = [
+        round((m / 60) * 2) / 2 if m is not None and m > 0 else 0 for m in study_minutes
+    ]
     study_values = []
     for d, m in zip(dates, study_minutes):
         if d > today:
@@ -267,7 +269,9 @@ def build_weekly_metrics(
 
     # SLEEP section (values on top of bars, 5-char bars like monthly)
     sleep_lines = ["### **SLEEP**"]
-    sleep_hours = [round((m / 60) * 2) / 2 if m is not None else 0 for m in sleep_minutes]
+    sleep_hours = [
+        round((m / 60) * 2) / 2 if m is not None else 0 for m in sleep_minutes
+    ]
     sleep_values = []
     for d, m in zip(dates, sleep_minutes):
         if d > today:
@@ -354,10 +358,14 @@ def main():
 
     # Determine month note for the target week (use week_start's month).
     month_start = datetime.date(week_start.year, week_start.month, 1)
-    monthly_tasks, quarterly_mirror, monthly_path, monthly_lines = _load_monthly_goals(month_start)
+    monthly_tasks, quarterly_mirror, monthly_path, monthly_lines = _load_monthly_goals(
+        month_start
+    )
 
     # Load quarterly note to get yearly goals for piercing
-    yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = _load_quarterly_goals(month_start)
+    yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
+        _load_quarterly_goals(month_start)
+    )
 
     with locked_note(note_path):
         ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
@@ -459,6 +467,7 @@ def main():
         # Write back quarterly note if quarterly or yearly status changed
         if quarterly_changed or yearly_changed:
             from sync.writers.goals import build_goals_block as bg
+
             with locked_note(quarterly_path):
                 try:
                     with open(quarterly_path, "r") as qf:
@@ -466,12 +475,22 @@ def main():
                 except Exception:
                     quarterly_lines = []
                 g_start_q, g_end_q = goals_section_bounds(quarterly_lines)
-                new_q_block = bg([
-                    ("YEARLY", render_goal_lines(yearly_mirror)),
-                    ("QUARTERLY", render_goal_lines(quarterly_tasks)),
-                ])
+                new_q_block = bg(
+                    [
+                        ("YEARLY", render_goal_lines(yearly_mirror)),
+                        ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+                    ]
+                )
                 if g_start_q == -1:
-                    quarterly_lines = new_q_block + ([""] if quarterly_lines and quarterly_lines[0].strip() else []) + quarterly_lines
+                    quarterly_lines = (
+                        new_q_block
+                        + (
+                            [""]
+                            if quarterly_lines and quarterly_lines[0].strip()
+                            else []
+                        )
+                        + quarterly_lines
+                    )
                 else:
                     quarterly_lines[g_start_q:g_end_q] = new_q_block
                 atomic_write_note(quarterly_path, quarterly_lines)
@@ -522,7 +541,9 @@ def main():
         # Render: original weekly goals (preserve dates) + pierced goals (countdown)
         weekly_source_lines = render_goal_lines(original_weekly)
         if pierced_quarterly or pierced_yearly:
-            pierced_lines = render_goal_lines(pierced_quarterly + pierced_yearly, today=today)
+            pierced_lines = render_goal_lines(
+                pierced_quarterly + pierced_yearly, today=today
+            )
             weekly_source_lines = weekly_source_lines + pierced_lines
 
         goals_block = build_goals_block(
@@ -548,8 +569,16 @@ def main():
                 if "↓" in f.read():
                     # Re-sync removes arrow since it's a past period (current_date=None)
                     import subprocess
+
                     subprocess.run(
-                        [sys.executable, "-m", "sync.weekly", "--date", prev_week_start.isoformat(), "--no-cleanup"],
+                        [
+                            sys.executable,
+                            "-m",
+                            "sync.weekly",
+                            "--date",
+                            prev_week_start.isoformat(),
+                            "--no-cleanup",
+                        ],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )

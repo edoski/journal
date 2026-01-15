@@ -95,7 +95,7 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
         return None
 
     entries: list[ScreenTimeEntry] = []
-    for line in block[header_idx + 2:]:  # Skip header and separator
+    for line in block[header_idx + 2 :]:  # Skip header and separator
         if not line.strip().startswith("|"):
             break
 

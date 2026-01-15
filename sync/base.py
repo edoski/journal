@@ -125,6 +125,7 @@ def propagate_goal_status(
         mirror = mirror_lookup.get(tid)
         if mirror and mirror.done and not task.done:
             from dataclasses import replace
+
             source_tasks[i] = replace(task, done=True)
             changed = True
 

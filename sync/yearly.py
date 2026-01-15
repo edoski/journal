@@ -135,7 +135,9 @@ def build_yearly_metrics(
                 total_min += mins
 
         study_totals_minutes.append(total_min)
-        study_values_hours.append(round((total_min / 60) * 2) / 2 if total_min else 0)  # Round to nearest 0.5h
+        study_values_hours.append(
+            round((total_min / 60) * 2) / 2 if total_min else 0
+        )  # Round to nearest 0.5h
         if start > today:
             study_value_labels.append("")
         else:
@@ -358,7 +360,9 @@ def build_yearly_metrics(
         for i, _ in enumerate(quarter_ranges):
             quarter_wikilinks.append(f"[[{year}-Q{i + 1}\\|Q{i + 1}]]")
         procrastination_lines.extend(
-            render_screen_time_period_table(quarter_ranges, daily_data, "QTR", quarter_labels, quarter_wikilinks)
+            render_screen_time_period_table(
+                quarter_ranges, daily_data, "QTR", quarter_labels, quarter_wikilinks
+            )
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -394,7 +398,9 @@ def build_yearly_metrics(
         mins_clean = [m for m in mins if m is not None]
         if mins_clean:
             avg_min = sum(mins_clean) / len(mins_clean)
-            sleep_chart_vals.append(round((avg_min / 60) * 2) / 2)  # Round to nearest 0.5h
+            sleep_chart_vals.append(
+                round((avg_min / 60) * 2) / 2
+            )  # Round to nearest 0.5h
             sleep_avgs_minutes.append(avg_min)
             sleep_value_labels.append(format_minutes(avg_min))
         else:
@@ -560,6 +566,7 @@ def main():
             if t.id in existing_ids:
                 continue
             from dataclasses import replace as dc_replace
+
             yearly_tasks.append(dc_replace(t, done=False))
             existing_ids.add(t.id)
 

@@ -190,7 +190,9 @@ def build_monthly_metrics(
         mins = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
         mins = [m for m in mins if m is not None]
         total_min = sum(mins) if mins else 0
-        study_chart_vals.append(round((total_min / 60) * 2) / 2)  # Round to nearest 0.5h
+        study_chart_vals.append(
+            round((total_min / 60) * 2) / 2
+        )  # Round to nearest 0.5h
         # Always use 0h00m format for zero values
         if start > today:
             study_value_labels.append("")
@@ -365,7 +367,9 @@ def build_monthly_metrics(
             year, week_num, _ = s.isocalendar()
             week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
         procrastination_lines.extend(
-            render_screen_time_period_table(week_ranges, daily_data, "WEEK", week_labels, week_wikilinks)
+            render_screen_time_period_table(
+                week_ranges, daily_data, "WEEK", week_labels, week_wikilinks
+            )
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -381,7 +385,9 @@ def build_monthly_metrics(
         start = week_days[0]
         if mins:
             avg_min = sum(mins) / len(mins)  # AVERAGE for sleep
-            sleep_chart_vals.append(round((avg_min / 60) * 2) / 2)  # Round to nearest 0.5h
+            sleep_chart_vals.append(
+                round((avg_min / 60) * 2) / 2
+            )  # Round to nearest 0.5h
             if start > today:
                 sleep_value_labels.append("")
             else:
@@ -714,8 +720,16 @@ def main():
                 if "↓" in f.read():
                     # Re-sync removes arrow since it's a past period (current_date=None)
                     import subprocess
+
                     subprocess.run(
-                        [sys.executable, "-m", "sync.monthly", "--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
+                        [
+                            sys.executable,
+                            "-m",
+                            "sync.monthly",
+                            "--month",
+                            f"{prev_year}-{prev_month:02d}",
+                            "--no-cleanup",
+                        ],
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )

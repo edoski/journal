@@ -57,7 +57,6 @@ MONTH_ABBR = [
 STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
 
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration Dataclasses
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +98,9 @@ class RenderConfig:
     study_symbol_deep: str = "█"  # target met
     study_symbol_none: str = "·"  # target not met
     study_legend: str = "1 POMODORO = 90m | █ ≥ 4 POM. | · < 4 POM."
-    yearly_study_legend: str = "1 POMODORO = 90m | █ all days ≥ 4 POM | ░ some days | · none"
+    yearly_study_legend: str = (
+        "1 POMODORO = 90m | █ all days ≥ 4 POM | ░ some days | · none"
+    )
 
 
 @dataclass(frozen=True)

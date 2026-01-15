@@ -132,4 +132,3 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
     if last_err:
         logger.error("Failed to parse %s: %s", os.path.basename(path), last_err)
     return False, None
-

@@ -33,7 +33,9 @@ class BarChartPreset:
     axis_trim: int = 2  # Subtracted from col_spacing * labels for axis length
     left_pad: int | None = None  # None = auto-center bars in column
     center_labels_on_bars: bool = False
-    delta_label_offset: int = 0  # Horizontal character shift for delta labels (negative = left)
+    delta_label_offset: int = (
+        0  # Horizontal character shift for delta labels (negative = left)
+    )
 
 
 # Weekly charts (7 days: MON-SUN)
@@ -291,7 +293,9 @@ def render_bar_chart(
                     + bar_char * bar_width
                     + " " * (col_spacing - computed_left_pad - bar_width)
                 )
-            elif label_level is not None and level == label_level and top_level < height:
+            elif (
+                label_level is not None and level == label_level and top_level < height
+            ):
                 # One level above top of bar (non-max) - show label
                 row += (
                     " " * lbl_left_pad
@@ -627,7 +631,11 @@ def render_weekly_training_grid(
 def study_intensity_symbol(minutes):
     """Binary mapping: target met vs not met."""
     mins = minutes or 0
-    return RENDER.study_symbol_deep if mins >= STUDY_TARGET_MIN else RENDER.study_symbol_none
+    return (
+        RENDER.study_symbol_deep
+        if mins >= STUDY_TARGET_MIN
+        else RENDER.study_symbol_none
+    )
 
 
 def render_weekly_study_grid(dates, daily_data, current_date=None):
@@ -1184,7 +1192,11 @@ def render_screen_time_trend_table(
 
     total_minutes = 0.0
     for i, d in enumerate(dates):
-        day_name = DAYS[i] if period_label == "DAY" and i < len(DAYS) else d.strftime("%a").upper()
+        day_name = (
+            DAYS[i]
+            if period_label == "DAY" and i < len(DAYS)
+            else d.strftime("%a").upper()
+        )
         # Wikilink to daily note: [[2025-01-06\|MON]]
         label = f"[[{d.isoformat()}\\|{day_name}]]"
         data = daily_data.get(d, {})
@@ -1269,5 +1281,3 @@ def render_screen_time_period_table(
     lines.append(f"| **TOTAL** | **{total_str}** |")
 
     return lines
-
-

@@ -146,7 +146,9 @@ class TestRenderSummaryTable:
         result = render_summary_table(current, previous, "THIS WEEK", "LAST WEEK")
 
         assert "### **SUMMARY**" in result
-        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |" in result
+        assert (
+            "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |" in result
+        )
         assert "**STUDY**" in str(result)
         assert "**SLEEP**" in str(result)
         assert "**WORKOUT**" in str(result)
@@ -172,7 +174,9 @@ class TestRenderSummaryTable:
             "workout_count": 0,
             "stretch_count": 0,
         }
-        result = render_summary_table(current, previous, "A", "B", period_type="week", total_days=1)
+        result = render_summary_table(
+            current, previous, "A", "B", period_type="week", total_days=1
+        )
         # 200 vs 100 = +100% change
         assert "`+100%`" in str(result)
 
@@ -443,7 +447,11 @@ class TestCompressSymbols:
     """Tests for _compress_symbols function."""
 
     def test_no_compression_needed(self):
-        symbols = [RENDER.study_symbol_deep, RENDER.study_symbol_none, RENDER.study_symbol_deep]
+        symbols = [
+            RENDER.study_symbol_deep,
+            RENDER.study_symbol_none,
+            RENDER.study_symbol_deep,
+        ]
         result = _compress_symbols(symbols, 5)
         # 3 symbols into 5 width - should pad with NONE
         assert len(result) == 5
@@ -686,9 +694,13 @@ class TestBarChartSnapshots:
         # Verify structure
         assert result[0] == "### **SUMMARY**"
         assert result[1] == ""
-        assert "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |" in result[2]
         assert (
-            "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |" in result[3]
+            "| METRIC | THIS WEEK | LAST WEEK | CHANGE | TARGET | PROGRESS |"
+            in result[2]
+        )
+        assert (
+            "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |"
+            in result[3]
         )
 
         # Verify row order: STUDY → SLEEP → WORKOUT → STRETCH → MOOD

@@ -79,4 +79,3 @@ def get_review_reminders_for_date(date: datetime.date) -> list[Goal]:
         )
 
     return reminders
-

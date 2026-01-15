@@ -136,7 +136,11 @@ class TestBuildProcrastinationSection:
             ]
         )
         lines = _build_procrastination_section(data)
-        table_lines = [line for line in lines if line.startswith("| ") and "SOURCE" not in line and "---" not in line]
+        table_lines = [
+            line
+            for line in lines
+            if line.startswith("| ") and "SOURCE" not in line and "---" not in line
+        ]
 
         # First entry should be Large (100m), then Medium (30m), then Small (5m), then TOTAL
         assert "Large" in table_lines[0]
@@ -194,4 +198,3 @@ class TestBuildProcrastinationSection:
         assert not any("DEVIATIONS" in line for line in lines)
         # Total is just screen time since no non-phone deviation
         assert any("**TOTAL**" in line and "`1h00m`" in line for line in lines)
-

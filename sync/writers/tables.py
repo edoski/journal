@@ -386,4 +386,3 @@ def render_summary_table(
 
     lines.append("")
     return lines
-
