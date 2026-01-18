@@ -159,8 +159,6 @@ def _build_study_section(
             parts = []
             if break_reason and break_reason != "lunch":
                 parts.append(break_reason)
-            if session.get("break_missing", False):
-                parts.append("missing")
             if overrun > 0:
                 parts.append(f"+{format_minutes(overrun)}")
 
