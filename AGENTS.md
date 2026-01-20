@@ -69,6 +69,8 @@ journal/
   - `session_preview.py`: View current/recent session stats with `python3 session_preview.py [-n COUNT]`
   - `rename_session.py`: Rename most recent session with `python3 rename_session.py "Title" [--confirm]`
   - `undo_last_session.py`: Delete most recent session with `python3 undo_last_session.py [--confirm]`
+  - `flow_skip.py`: Skip current Flow session and start break (called by launchd)
+  - `toggle_flow_skip.py`: Enable/disable skip automation with `python3 -m utils.toggle_flow_skip [on|off]`
   - All write operations default to dry-run mode; use `--confirm` to execute.
 
 ### Linting & Testing
@@ -274,6 +276,35 @@ To reload:
 ```bash
 launchctl unload ~/Library/LaunchAgents/com.edo.journalsync.plist
 launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
+```
+
+## Flow Skip Automation
+
+Automatically skips Flow sessions at scheduled times and starts the break. Configured via `utils/skip_schedule.json`:
+```json
+{
+  "skip_times": ["09:30", "11:30", "13:30", "16:00"],
+  "enabled": true
+}
+```
+
+**Toggle on/off:**
+```bash
+python3 -m utils.toggle_flow_skip       # Toggle
+python3 -m utils.toggle_flow_skip on    # Enable
+python3 -m utils.toggle_flow_skip off   # Disable
+```
+
+**LaunchAgent:** `~/Library/LaunchAgents/com.edo.flow-skip.plist`
+- Runs at each skip time defined in the plist
+- Logs to `/tmp/flow-skip.log`
+- Only skips if Flow is in an active "Flow" phase
+- Shows the Flow UI after skipping (reminder to start next session)
+
+To reload:
+```bash
+launchctl unload ~/Library/LaunchAgents/com.edo.flow-skip.plist
+launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 ```
 
 ## Coding Style & Naming Conventions
