@@ -75,12 +75,12 @@ journal/
 
 ### Linting & Testing
 
-First, activate the virtual environment:
+First, activate the virtual environment (required for `pytest` and `ruff`):
 ```bash
 source .venv/bin/activate
 ```
 
-Then run linting and tests:
+Then run linting and tests using `python3`:
 ```bash
 # Linting
 ruff check .              # Check for issues
@@ -94,7 +94,8 @@ mypy sync/ --ignore-missing-imports
 vulture sync/ --min-confidence 80
 
 # Testing
-pytest tests/ -v          # Run all 399 tests
+python3 -m pytest tests/ -v          # Run all tests
+python3 -m pytest tests/test_reminders.py -v  # Run specific test file
 ```
 
 ### Configuration Constants
@@ -209,7 +210,7 @@ sync/
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
 - `metrics.py`: `load_daily_data`, `compute_period_metrics`, `compute_moving_average`
 - `notes.py`: `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`
-- `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews)
+- `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
 
 ### Dated Goals
 
@@ -217,6 +218,14 @@ Goals support inline deadlines with countdown rendering:
 - **Date formats**: `` `2025-02-12` ``, `` `2025-W01` ``, `` `2025-01` ``, `` `2025-Q1` ``
 - **Countdown**: `— `43d``, `— `TODAY``, `— `LATE +5d``
 - **Early reminder**: `` `2025-02-12 !14d` `` shows goal 14 days before deadline
+
+### Periodic Reminders
+
+Periodic maintenance reminders are generated automatically and injected into daily notes:
+- **Restart MacBook**: Every 2 weeks on odd ISO weeks (Sunday). Uses ISO week parity (`week_num % 2 == 1`).
+- Reminders show `— TODAY` on due date, `— LATE +Nd` if uncompleted on subsequent days.
+- Implemented in `sync/reminders.py` via `get_periodic_reminders_for_date()`.
+- Carry-forward logic in `sync/daily/orchestrator.py` ensures persistence.
 
 ### Training Table
 

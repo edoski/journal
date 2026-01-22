@@ -5,7 +5,7 @@ Tests for periodic review reminder generation.
 import datetime
 
 
-from sync.reminders import get_review_reminders_for_date
+from sync.reminders import get_review_reminders_for_date, get_periodic_reminders_for_date
 
 
 class TestGetReviewRemindersForDate:
@@ -114,3 +114,77 @@ class TestGetReviewRemindersForDate:
 
         monthly = [r for r in reminders if "2025-02" in r.body]
         assert len(monthly) == 1
+
+
+class TestGetPeriodicRemindersForDate:
+    """Tests for get_periodic_reminders_for_date() function."""
+
+    def test_odd_week_sunday_generates_restart_reminder(self):
+        """Sunday of an odd ISO week should generate restart reminder."""
+        # 2026-02-01 is Sunday of ISO week 5 (odd)
+        sunday_odd = datetime.date(2026, 2, 1)
+        reminders = get_periodic_reminders_for_date(sunday_odd)
+
+        assert len(reminders) == 1
+        assert reminders[0].body == "Restart MacBook"
+        assert reminders[0].deadline == sunday_odd
+
+    def test_even_week_sunday_no_restart_reminder(self):
+        """Sunday of an even ISO week should NOT generate restart reminder."""
+        # 2026-02-08 is Sunday of ISO week 6 (even)
+        sunday_even = datetime.date(2026, 2, 8)
+        reminders = get_periodic_reminders_for_date(sunday_even)
+
+        assert len(reminders) == 0
+
+    def test_odd_week_non_sunday_no_reminder(self):
+        """Non-Sunday of an odd week should NOT generate restart reminder."""
+        # 2026-01-21 is Wednesday of ISO week 4 (even) - let's use week 5
+        # 2026-01-22 is Thursday of ISO week 4... wait, let me check
+        # Actually: 2026-01-19 (Mon) to 2026-01-25 (Sun) is week 4
+        # 2026-01-26 (Sun) ends week 5? No - ISO week ends on Sunday
+        # Let me use a Monday of week 5: 2026-01-26 is Sunday ending week 4
+        # Week 5 is Jan 26 (Mon) - Feb 1 (Sun)? No, ISO weeks start Monday.
+        # 2026-01-26 is a Sunday. isocalendar() = (2026, 5, 7)
+        # So Monday Jan 26 would be week 5 day 1? No, Jan 26 2026 is Sunday.
+        # Let's use Jan 20, 2026 (Tuesday of week 4)
+        tuesday_week4 = datetime.date(2026, 1, 20)
+        reminders = get_periodic_reminders_for_date(tuesday_week4)
+
+        assert len(reminders) == 0
+
+    def test_two_weeks_apart_both_trigger(self):
+        """Two Sundays 14 days apart should both trigger if both are odd weeks."""
+        # Week 5 Sunday and Week 7 Sunday (both odd)
+        week5_sunday = datetime.date(2026, 2, 1)  # Wait, need to verify
+        # Let me recalculate: Jan 26, 2026 isocalendar = (2026, 5, 7) ✓
+        # Feb 8, 2026 should be week 6 Sunday (even) - no
+        # Feb 8, 2026 isocalendar = (2026, 6, 7) - even, no reminder
+        # Feb 15, 2026 isocalendar = (2026, 7, 7) - odd, reminder!
+        week5 = datetime.date(2026, 1, 25)  # Actually Jan 25 is week 4
+        # Simpler: Jan 26 is week 5, +14 days = Feb 9 is week 7
+        jan_26 = datetime.date(2026, 1, 25)  # Let me just check Feb 8
+        feb_8 = datetime.date(2026, 2, 8)
+        
+        # Feb 8, 2026: isocalendar = (2026, 6, 7) - even week Sunday
+        reminders_feb8 = get_periodic_reminders_for_date(feb_8)
+        assert len(reminders_feb8) == 0  # even week, no reminder
+        
+        # Feb 15, 2026: isocalendar = (2026, 7, 7) - odd week Sunday
+        feb_15 = datetime.date(2026, 2, 15)
+        reminders_feb15 = get_periodic_reminders_for_date(feb_15)
+        assert len(reminders_feb15) == 1  # odd week, reminder!
+
+    def test_restart_reminder_has_deadline(self):
+        """Restart reminder should have deadline set for TODAY/LATE rendering."""
+        sunday = datetime.date(2026, 1, 25)  # Need odd week Sunday
+        # Jan 25, 2026 isocalendar = (2026, 4, 7) - even week 4
+        # Use Jan 18, 2026 = (2026, 3, 7) - odd week 3
+        sunday_odd = datetime.date(2026, 1, 18)
+        reminders = get_periodic_reminders_for_date(sunday_odd)
+
+        assert len(reminders) == 1
+        assert reminders[0].deadline == sunday_odd
+        assert reminders[0].date_str == "2026-01-18"
+        assert reminders[0].done is False
+

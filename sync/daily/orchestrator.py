@@ -31,7 +31,7 @@ from sync.notes import (
 )
 from sync.dates import iso_week_range
 from sync.formatting import format_minutes
-from sync.reminders import get_review_reminders_for_date
+from sync.reminders import get_review_reminders_for_date, get_periodic_reminders_for_date
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 from sync.models.goals import Goal
@@ -790,6 +790,13 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     review_reminders = get_review_reminders_for_date(today)
     existing_ids = {t.id for t in existing_daily_tasks if t.id}
     for reminder in review_reminders:
+        if reminder.id not in existing_ids:
+            existing_daily_tasks.append(reminder)
+            existing_ids.add(reminder.id)
+
+    # Inject periodic maintenance reminders (e.g., bi-weekly MacBook restart)
+    periodic_reminders = get_periodic_reminders_for_date(today)
+    for reminder in periodic_reminders:
         if reminder.id not in existing_ids:
             existing_daily_tasks.append(reminder)
             existing_ids.add(reminder.id)
