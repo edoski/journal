@@ -199,7 +199,6 @@ def render_summary_table(
     prev_days_for_avg = previous_metrics.get(
         "days_up_to_today"
     ) or previous_metrics.get("total_days", 7)
-    curr_total_days = current_metrics.get("total_days", 7)
     prev_total_days = previous_metrics.get("total_days", 7)
 
     curr_study_avg_mins = curr_study_total / max(1, curr_days_for_avg)
@@ -281,10 +280,12 @@ def render_summary_table(
             f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
         )
 
-    # WORKOUT row
+    # WORKOUT row — use elapsed days for current period (pace-based comparison)
     curr_workout_count = current_metrics.get("workout_count", 0)
     prev_workout_count = previous_metrics.get("workout_count", 0)
-    curr_workout = format_training_ratio(curr_workout_count, curr_total_days)
+    # Current period uses elapsed days (for fair mid-period comparison)
+    curr_workout = format_training_ratio(curr_workout_count, curr_days_for_avg)
+    # Previous period uses total days (it's complete)
     prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
 
     ma_workout_str = "—"
@@ -293,8 +294,11 @@ def render_summary_table(
             ma_metrics["workout_avg"], ma_training_unit
         )
 
+    # Compare completion rates (pace) instead of raw counts
     if curr_workout_count > 0 or prev_workout_count > 0:
-        workout_pct = compute_percent_change(curr_workout_count, prev_workout_count)
+        curr_workout_rate = curr_workout_count / max(1, curr_days_for_avg)
+        prev_workout_rate = prev_workout_count / max(1, prev_days_for_avg)
+        workout_pct = compute_percent_change(curr_workout_rate, prev_workout_rate)
         workout_pct_str = format_percent_change(workout_pct)
     else:
         workout_pct_str = "—"
@@ -316,10 +320,12 @@ def render_summary_table(
             f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
         )
 
-    # STRETCH row
+    # STRETCH row — use elapsed days for current period (pace-based comparison)
     curr_stretch_count = current_metrics.get("stretch_count", 0)
     prev_stretch_count = previous_metrics.get("stretch_count", 0)
-    curr_stretch = format_training_ratio(curr_stretch_count, curr_total_days)
+    # Current period uses elapsed days (for fair mid-period comparison)
+    curr_stretch = format_training_ratio(curr_stretch_count, curr_days_for_avg)
+    # Previous period uses total days (it's complete)
     prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
 
     ma_stretch_str = "—"
@@ -328,8 +334,11 @@ def render_summary_table(
             ma_metrics["stretch_avg"], ma_training_unit
         )
 
+    # Compare completion rates (pace) instead of raw counts
     if curr_stretch_count > 0 or prev_stretch_count > 0:
-        stretch_pct = compute_percent_change(curr_stretch_count, prev_stretch_count)
+        curr_stretch_rate = curr_stretch_count / max(1, curr_days_for_avg)
+        prev_stretch_rate = prev_stretch_count / max(1, prev_days_for_avg)
+        stretch_pct = compute_percent_change(curr_stretch_rate, prev_stretch_rate)
         stretch_pct_str = format_percent_change(stretch_pct)
     else:
         stretch_pct_str = "—"

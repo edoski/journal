@@ -180,6 +180,97 @@ class TestRenderSummaryTable:
         # 200 vs 100 = +100% change
         assert "`+100%`" in str(result)
 
+    def test_training_elapsed_days_display(self):
+        """Current period training uses elapsed days as denominator."""
+        current = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 4,  # Day 4 of 7
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 3,
+            "stretch_count": 2,
+        }
+        previous = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,  # Complete week
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 5,
+            "stretch_count": 4,
+        }
+        result = render_summary_table(current, previous, "THIS WEEK", "LAST WEEK")
+        result_str = str(result)
+
+        # Current period should show x/4 (elapsed days)
+        assert "`3/4`" in result_str  # workout
+        assert "`2/4`" in result_str  # stretch
+        # Previous period should show x/7 (total days)
+        assert "`5/7`" in result_str  # workout
+        assert "`4/7`" in result_str  # stretch
+
+    def test_training_pace_based_percent_change(self):
+        """Training % change compares completion rates, not raw counts."""
+        # Current: 3/4 = 75% rate
+        # Previous: 5/7 ≈ 71% rate
+        # Change: (0.75 - 0.714) / 0.714 ≈ +5%
+        current = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 4,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 3,
+            "stretch_count": 0,
+        }
+        previous = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 5,
+            "stretch_count": 0,
+        }
+        result = render_summary_table(current, previous, "A", "B")
+        result_str = str(result)
+
+        # If using raw counts (3 vs 5), would be -40%
+        # If using rates (0.75 vs 0.714), should be +5%
+        assert "`-40%`" not in result_str
+        assert "`+5%`" in result_str
+
+    def test_training_complete_period_uses_total_days(self):
+        """When both periods are complete, both use total_days."""
+        current = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,  # Complete week
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 5,
+            "stretch_count": 3,
+        }
+        previous = {
+            "study_total_minutes": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 4,
+            "stretch_count": 4,
+        }
+        result = render_summary_table(current, previous, "THIS WEEK", "LAST WEEK")
+        result_str = str(result)
+
+        # Both periods should show x/7
+        assert "`5/7`" in result_str
+        assert "`4/7`" in result_str
+        assert "`3/7`" in result_str
+        # Workout: 5/7 vs 4/7 = +25% (raw counts match rates when days match)
+        assert "`+25%`" in result_str
+
 
 class TestRenderBarChart:
     """Tests for render_bar_chart function - CRITICAL for visual consistency."""

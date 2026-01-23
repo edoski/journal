@@ -257,6 +257,7 @@ The summary table includes target tracking and progress visualization:
   - Workout: 7/7 days (scales by period)
   - Stretch: 7/7 days (scales by period)
   - Mood: 7.0/10.0 (constant)
+- **Pace-based training comparison**: For workout/stretch, CHANGE column compares *completion rates* (count/elapsed days for current period, count/total days for previous period). This answers "What is my current pace vs last period's pace?" and provides meaningful mid-period comparisons. Example: on day 4 of a week, `3/4` (75%) vs `5/7` (71%) → +6%.
 
 ## Build, Test, and Run
 
