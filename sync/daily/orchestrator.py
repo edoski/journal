@@ -50,7 +50,7 @@ from .study import _extract_existing_data, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
 from .screen_time import _load_screen_time_data, _build_procrastination_section
-from .icloud import _load_status_file
+from .icloud import _load_status_file, write_study_times_to_icloud
 from .context import (
     get_vault_files_modified_on_date,
     files_for_session,
@@ -58,130 +58,6 @@ from .context import (
 )
 
 logger = get_logger()
-
-# iCloud path for study times JSON (read by iPad shortcut)
-STUDY_TIMES_ICLOUD_PATH = os.path.expanduser(
-    "~/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync/study_times.json"
-)
-
-
-def _write_study_times_to_icloud(sessions: list[SessionDict], today_str: str) -> None:
-    """
-    Write study session times to iCloud for iPad shortcut to read.
-
-    Args:
-        sessions: List of study session dicts
-        today_str: Today's date string (YYYY-MM-DD)
-    """
-    if not sessions:
-        return
-
-    # All calculations anchor to the note date to keep fallbacks deterministic
-    note_date = datetime.date.fromisoformat(today_str)
-
-    # Default schedule used when actual times would create invalid ranges
-    default_morning = datetime.datetime.combine(note_date, datetime.time(8, 0))
-    default_lunch = datetime.datetime.combine(note_date, datetime.time(13, 30))
-    default_afternoon = datetime.datetime.combine(note_date, datetime.time(14, 30))
-    default_afternoon_end = datetime.datetime.combine(note_date, datetime.time(18, 0))
-
-    first_start = sessions[0]["start"]
-    last_end = sessions[-1]["end"]
-
-    # Find last session ending between 12:00-15:00 (pre-lunch)
-    lunch_start = None
-    for session in sessions:
-        end_hour = session["end"].hour
-        if 12 <= end_hour < 15:
-            lunch_start = session["end"]
-
-    # Compute afternoon start (1 hour after lunch)
-    afternoon_start = None
-    if lunch_start:
-        afternoon_start = lunch_start + datetime.timedelta(hours=1)
-
-    # Compute afternoon start time for comparison (use actual or default 14:30)
-    afternoon_start_time = (
-        afternoon_start
-        if afternoon_start
-        else first_start.replace(hour=14, minute=30, second=0, microsecond=0)
-    )
-
-    afternoon_end = (
-        last_end if last_end >= afternoon_start_time else default_afternoon_end
-    )
-
-    def _normalize_study_times(
-        morning: datetime.datetime,
-        lunch: datetime.datetime | None,
-        afternoon: datetime.datetime | None,
-        end: datetime.datetime | None,
-    ) -> tuple[
-        datetime.datetime, datetime.datetime, datetime.datetime, datetime.datetime
-    ]:
-        """Clamp times to a safe, monotonic schedule for the Shortcut.
-
-        Ensures: morning <= lunch <= afternoon <= end, with minimal defaults when
-        real data would violate ordering. Equal times are nudged forward by 1 minute
-        to keep the Shortcut's "between" action happy with positive windows.
-        """
-
-        minute = datetime.timedelta(minutes=1)
-
-        m_start = morning or default_morning
-        l_start = lunch or default_lunch
-        a_start = afternoon or default_afternoon
-        a_end = end or default_afternoon_end
-
-        # If the first session starts after (or exactly at) lunch, fall back to the
-        # canonical schedule to avoid an inverted window.
-        if m_start >= l_start:
-            m_start = default_morning
-            l_start = default_lunch
-
-        # Keep lunch before/at afternoon
-        if l_start > a_start:
-            a_start = max(l_start, default_afternoon)
-
-        # Keep afternoon before/at end
-        if a_start > a_end:
-            a_end = max(a_start, default_afternoon_end)
-
-        # Nudge equalities to keep strictly increasing ranges
-        if m_start == l_start:
-            l_start = l_start + minute
-        if l_start == a_start:
-            a_start = a_start + minute
-        if a_start == a_end:
-            a_end = a_end + minute
-
-        return m_start, l_start, a_start, a_end
-
-    m_start, l_start, a_start, a_end = _normalize_study_times(
-        first_start, lunch_start, afternoon_start, afternoon_end
-    )
-
-    data = {
-        "date": today_str,
-        "morning_start": m_start.strftime("%H:%M"),
-        "lunch_start": l_start.strftime("%H:%M"),
-        "afternoon_start": a_start.strftime("%H:%M"),
-        "afternoon_end": a_end.strftime("%H:%M"),
-    }
-
-    try:
-        # Skip write if content unchanged (avoids triggering file watcher)
-        if os.path.exists(STUDY_TIMES_ICLOUD_PATH):
-            with open(STUDY_TIMES_ICLOUD_PATH, "r") as f:
-                existing = json.load(f)
-            if existing == data:
-                return  # No change, skip write
-
-        os.makedirs(os.path.dirname(STUDY_TIMES_ICLOUD_PATH), exist_ok=True)
-        with open(STUDY_TIMES_ICLOUD_PATH, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        logger.warning("Failed to write study_times.json: %s", e)
 
 
 def _update_frontmatter(
@@ -619,7 +495,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
                 )
 
     # Write study times to iCloud for iPad shortcut
-    _write_study_times_to_icloud(sessions, today_str)
+    write_study_times_to_icloud(sessions, today_str)
 
     procrastination_lines = _build_procrastination_section(
         screen_time_data, deviation_data

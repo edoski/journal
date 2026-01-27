@@ -1,6 +1,6 @@
 import datetime
 import json
-import sync.daily.orchestrator as orch
+import sync.daily.icloud as icloud
 
 
 def _session(start_hm: str, end_hm: str) -> dict:
@@ -17,10 +17,10 @@ def _session(start_hm: str, end_hm: str) -> dict:
 
 def test_study_times_late_start_falls_back(monkeypatch, tmp_path):
     path = tmp_path / "study_times.json"
-    monkeypatch.setattr(orch, "STUDY_TIMES_ICLOUD_PATH", path)
+    monkeypatch.setattr(icloud, "STUDY_TIMES_ICLOUD_PATH", str(path))
 
     sessions = [_session("17:00", "18:00")]
-    orch._write_study_times_to_icloud(sessions, "2025-01-01")
+    icloud.write_study_times_to_icloud(sessions, "2025-01-01")
 
     data = json.loads(path.read_text())
     assert data == {
@@ -34,13 +34,13 @@ def test_study_times_late_start_falls_back(monkeypatch, tmp_path):
 
 def test_study_times_normal_day(monkeypatch, tmp_path):
     path = tmp_path / "study_times.json"
-    monkeypatch.setattr(orch, "STUDY_TIMES_ICLOUD_PATH", path)
+    monkeypatch.setattr(icloud, "STUDY_TIMES_ICLOUD_PATH", str(path))
 
     sessions = [
         _session("09:00", "11:00"),
         _session("14:00", "15:00"),
     ]
-    orch._write_study_times_to_icloud(sessions, "2025-01-01")
+    icloud.write_study_times_to_icloud(sessions, "2025-01-01")
 
     data = json.loads(path.read_text())
     assert data == {
@@ -50,3 +50,4 @@ def test_study_times_normal_day(monkeypatch, tmp_path):
         "afternoon_start": "14:30",
         "afternoon_end": "15:00",
     }
+
