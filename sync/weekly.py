@@ -113,8 +113,30 @@ def _load_monthly_goals(month_start):
 
 
 def _write_monthly_goals(path, tasks, existing_lines):
+    """
+    Update the MONTHLY section in the monthly note while preserving QUARTERLY mirror.
+
+    Args:
+        path: Path to monthly note
+        tasks: Updated MONTHLY tasks to write
+        existing_lines: Current lines of the monthly note
+    """
     g_start, g_end = goals_section_bounds(existing_lines)
-    new_block = ["## Goals", "---"] + render_goal_lines(tasks)
+
+    # Preserve existing QUARTERLY mirror section
+    existing_quarterly = extract_subsection_tasks(existing_lines, g_start, g_end, "QUARTERLY")
+    quarterly_rendered = (
+        render_goal_lines(existing_quarterly)
+        if existing_quarterly
+        else ["", "_No quarterly goals have been defined yet._"]
+    )
+
+    # Rebuild Goals block with proper structure
+    new_block = build_goals_block([
+        ("QUARTERLY", quarterly_rendered),
+        ("MONTHLY", render_goal_lines(tasks)),
+    ])
+
     if g_start == -1:
         lines = (
             new_block
