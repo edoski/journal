@@ -9,7 +9,10 @@ import os
 import re
 from collections import OrderedDict
 
+from sync.logging import get_logger
 from sync.models import Book, Podcast
+
+logger = get_logger()
 
 
 def _parse_frontmatter(lines: list[str]) -> OrderedDict[str, str]:
@@ -103,7 +106,10 @@ def scan_books(
         try:
             with open(filepath, "r") as f:
                 lines = f.read().splitlines()
-        except Exception:
+        except FileNotFoundError:
+            continue
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read book file %s: %s", filepath, e)
             continue
 
         frontmatter = _parse_frontmatter(lines)
@@ -175,7 +181,10 @@ def scan_podcasts(
         try:
             with open(filepath, "r") as f:
                 lines = f.read().splitlines()
-        except Exception:
+        except FileNotFoundError:
+            continue
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read podcast file %s: %s", filepath, e)
             continue
 
         frontmatter = _parse_frontmatter(lines)

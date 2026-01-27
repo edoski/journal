@@ -17,6 +17,9 @@ from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
 
 from .icloud import _load_status_file
+from sync.logging import get_logger
+
+logger = get_logger()
 
 # Cache path for screen time entries (same pattern as training)
 SCREEN_TIME_CACHE_PATH = os.path.expanduser("~/.cache/journal/screen_time_entries.json")
@@ -121,8 +124,12 @@ def _load_screen_time_cache(date_str: str) -> dict[str, float]:
             obj = json.load(f)
         if obj.get("date") == date_str and isinstance(obj.get("entries"), dict):
             return obj.get("entries") or {}
-    except Exception:
-        pass
+    except FileNotFoundError:
+        logger.debug("No screen time cache found at %s", SCREEN_TIME_CACHE_PATH)
+    except json.JSONDecodeError as e:
+        logger.debug("Corrupt screen time cache: %s", e)
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read screen time cache: %s", e)
     return {}
 
 
@@ -138,8 +145,8 @@ def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
         os.makedirs(os.path.dirname(SCREEN_TIME_CACHE_PATH), exist_ok=True)
         with open(SCREEN_TIME_CACHE_PATH, "w") as f:
             json.dump({"date": date_str, "entries": entries}, f)
-    except Exception:
-        pass
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to write screen time cache: %s", e)
 
 
 def _group_by_threshold(

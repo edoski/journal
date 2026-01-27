@@ -148,8 +148,8 @@ def _update_frontmatter(
                 mins = int(total_min) % 60
                 sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
                 set_value("sleep", sleep_str)
-        except Exception:
-            pass
+        except (ValueError, TypeError, KeyError) as e:
+            logger.debug("Failed to parse sleep data for frontmatter: %s", e)
 
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
     return (
@@ -223,7 +223,7 @@ def _read_daily_note(file_path: str) -> list[str]:
                         template_content = tf.read()
                     with open(file_path, "w") as f:
                         f.write(template_content)
-                except Exception as e:
+                except (PermissionError, OSError) as e:
                     logger.error("Error creating file from template: %s", e)
                     return []
             else:
@@ -485,7 +485,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
                         or start_minutes < earliest_workout_start
                     ):
                         earliest_workout_start = start_minutes
-                except Exception:
+                except (ValueError, AttributeError):
                     pass
         if earliest_workout_start is not None:
             ideal_workout_minutes = IDEAL.workout_start_hour * 60  # 6:00 PM = 18:00

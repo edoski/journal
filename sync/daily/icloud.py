@@ -84,10 +84,10 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
                 if delete_after:
                     try:
                         os.remove(target_path)
-                    except Exception:
+                    except (PermissionError, OSError):
                         pass
                 return True, data, None
-            except Exception as e:
+            except (json.JSONDecodeError, PermissionError, OSError) as e:
                 last_err = e
                 time.sleep(1.0)
 
@@ -100,7 +100,7 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
         for inv in invalids:
             try:
                 os.remove(inv)
-            except Exception:
+            except (PermissionError, OSError):
                 pass
 
     # First try the primary path
@@ -117,7 +117,7 @@ def _load_status_file(filename: str) -> tuple[bool, dict | None]:
                 ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
                 backup_path = f"{path}.{ts}.invalid"
             os.replace(path, backup_path)
-        except Exception:
+        except (PermissionError, OSError):
             pass
     else:
         # Missing is expected most of the time; treat as no new data.

@@ -557,7 +557,11 @@ def main() -> None:
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "YEARLY")
             prev_tasks = ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
-        except Exception:
+        except FileNotFoundError:
+            logger.debug("Previous year note not found at %s", prev_note_path)
+            prev_tasks = []
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read previous year note at %s: %s", prev_note_path, e)
             prev_tasks = []
 
         open_prev = [t for t in prev_tasks if not t.done]

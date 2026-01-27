@@ -14,8 +14,11 @@ from collections import OrderedDict
 from typing import Any
 
 from sync.formatting import format_minutes_seconds
+from sync.logging import get_logger
 
 from .constants import TRAINING_CACHE_PATH
+
+logger = get_logger()
 
 
 # Type alias for training entries
@@ -27,7 +30,8 @@ def _parse_time_to_minutes(time_str: str) -> float | None:
     try:
         h, m = map(int, time_str.split(":"))
         return h * 60 + m
-    except Exception:
+    except (ValueError, AttributeError):
+        # Expected: malformed time string
         return None
 
 
@@ -102,8 +106,12 @@ def _load_training_cache(date_str: str) -> list[TrainingEntry]:
             obj = json.load(f)
         if obj.get("date") == date_str and isinstance(obj.get("entries"), list):
             return obj.get("entries") or []
-    except Exception:
-        pass
+    except FileNotFoundError:
+        logger.debug("No training cache found at %s", TRAINING_CACHE_PATH)
+    except json.JSONDecodeError as e:
+        logger.debug("Corrupt training cache: %s", e)
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read training cache: %s", e)
     return []
 
 
@@ -119,8 +127,8 @@ def _save_training_cache(date_str: str, entries: list[TrainingEntry]) -> None:
         os.makedirs(os.path.dirname(TRAINING_CACHE_PATH), exist_ok=True)
         with open(TRAINING_CACHE_PATH, "w") as f:
             json.dump({"date": date_str, "entries": entries}, f)
-    except Exception:
-        pass
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to write training cache: %s", e)
 
 
 def _activity_entries_from_data(
@@ -181,7 +189,8 @@ def _activity_entries_from_data(
                     "interrupt": interrupt_minutes,
                 }
             )
-    except Exception:
+    except (ValueError, TypeError, KeyError) as e:
+        logger.debug("Failed to parse training entry: %s", e)
         entries_out = []
     return entries_out
 
@@ -234,7 +243,7 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
         try:
             h, m = map(int, val.split(":"))
             return h * 60 + m
-        except Exception:
+        except (ValueError, AttributeError):
             return None
 
     def sort_key(e: TrainingEntry) -> tuple:
@@ -300,7 +309,7 @@ def _extract_data_date(data: dict | list | None) -> str | None:
             # Use first entry's date
             return data[0].get("date") if data else None
         return data.get("date")
-    except Exception:
+    except (ValueError, TypeError, KeyError, IndexError):
         return None
 
 

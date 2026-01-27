@@ -10,6 +10,9 @@ import datetime
 from typing import Any
 
 from sync.formatting import format_minutes_seconds
+from sync.logging import get_logger
+
+logger = get_logger()
 
 
 # Type alias for sleep data
@@ -41,7 +44,7 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
                 try:
                     dt = datetime.datetime.strptime(raw, fmt)
                     return dt.strftime("%H:%M")
-                except Exception:
+                except (ValueError, OverflowError):
                     continue
             return raw
 
@@ -74,7 +77,8 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
         separator = "| ---- | -------- | ----- | ---------- |"
         row = f"| {time_cell} | {duration_cell} | {awake_cell} | {wakes_cell} |"
         return [header, separator, row]
-    except Exception:
+    except (ValueError, TypeError, KeyError) as e:
+        logger.debug("Failed to parse sleep data: %s", e)
         return []
 
 

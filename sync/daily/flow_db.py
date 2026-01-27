@@ -52,7 +52,11 @@ def _read_break_defaults() -> dict[str, int | None]:
             val = int(out.strip())
             if val > 0:
                 result[key] = val
-        except Exception:
+        except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+            # Expected: defaults not set or command unavailable
+            continue
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read Flow defaults for %s: %s", key, e)
             continue
     return result
 
@@ -286,7 +290,8 @@ def get_todays_sessions() -> list[SessionDict]:
             lunch_duration_minutes = int(
                 round((lunch_end_dt - lunch_start_dt).total_seconds() / 60.0)
             )
-        except Exception:
+        except (ValueError, TypeError) as e:
+            logger.debug("Failed to parse lunch window: %s", e)
             lunch_duration_minutes = 0
 
     for idx, session in enumerate(flow_sessions):

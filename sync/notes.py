@@ -374,7 +374,7 @@ def parse_sleep_table(lines: list[str]) -> list[tuple]:
         if parts[4]:
             try:
                 awakenings = int(re.sub(r"[^0-9]", "", parts[4]))
-            except Exception:
+            except (ValueError, TypeError):
                 awakenings = None
         rows.append((duration_min, awake_min, awakenings))
     return rows
@@ -384,7 +384,9 @@ def parse_daily_note(path: str) -> dict | None:
     """Parse a daily note file and return extracted metrics."""
     try:
         text = open(path, "r").read()
-    except Exception:
+    except FileNotFoundError:
+        return None
+    except (PermissionError, OSError):
         return None
     lines = text.splitlines()
     fm = parse_frontmatter(lines)
@@ -405,7 +407,7 @@ def parse_daily_note(path: str) -> dict | None:
         try:
             mood_str = fm.get("mood") or ""
             mood_val = float(re.sub(r"[^0-9.\-]", "", mood_str))
-        except Exception:
+        except (ValueError, TypeError):
             mood_val = None
 
     workout = _parse_bool(fm.get("workout"))

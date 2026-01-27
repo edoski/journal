@@ -555,7 +555,11 @@ def main() -> None:
             p_body = extract_subsection_tasks(prev_lines, p_start, p_end, "QUARTERLY")
             p_body = ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
             prev_tasks = p_body
-        except Exception:
+        except FileNotFoundError:
+            logger.debug("Previous quarter note not found at %s", prev_note_path)
+            prev_tasks = []
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read previous quarter note at %s: %s", prev_note_path, e)
             prev_tasks = []
 
         quarterly_tasks, _ = carry_forward_goals(
@@ -572,7 +576,11 @@ def main() -> None:
             yearly_tasks = extract_subsection_tasks(
                 yearly_lines, y_start, y_end, "YEARLY"
             )
-        except Exception:
+        except FileNotFoundError:
+            logger.debug("Yearly note not found at %s", yearly_path)
+            yearly_tasks = []
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read yearly note at %s: %s", yearly_path, e)
             yearly_tasks = []
         yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
@@ -585,8 +593,10 @@ def main() -> None:
                 try:
                     with open(yearly_path, "r") as yf:
                         yearly_lines = yf.read().splitlines()
-                except Exception:
-                    yearly_lines = yearly_lines or []
+                except FileNotFoundError:
+                    logger.debug("Yearly note not found at %s", yearly_path)
+                except (PermissionError, OSError) as e:
+                    logger.warning("Failed to read yearly note at %s: %s", yearly_path, e)
                 y_start, y_end = goals_section_bounds(yearly_lines)
                 new_yearly_block = build_goals_block(
                     [

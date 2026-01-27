@@ -11,6 +11,7 @@ import os
 from dataclasses import replace
 
 from sync.constants import JOURNAL_DIR, WEEKLY_TEMPLATE_PATH
+from sync.logging import get_logger
 from sync.models import Goal
 from sync.notes import (
     locked_note,
@@ -22,6 +23,8 @@ from sync.dates import iso_week_range
 from sync.readers.goals import ensure_goal_ids
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+
+logger = get_logger()
 
 
 def weekly_note_path(date_obj: datetime.date) -> str:
@@ -54,7 +57,11 @@ def load_weekly_goals(
     try:
         with open(path, "r") as f:
             lines = f.read().splitlines()
-    except Exception:
+    except FileNotFoundError:
+        logger.debug("Weekly note not found at %s", path)
+        return [], [], [], [], path
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read weekly note at %s: %s", path, e)
         return [], [], [], [], path
 
     g_start, g_end = goals_section_bounds(lines)
@@ -84,8 +91,10 @@ def load_weekly_goals(
             monthly_lines, m_start, m_end, "MONTHLY"
         )
         monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_key)
-    except Exception:
-        pass
+    except FileNotFoundError:
+        logger.debug("Monthly note not found at %s", monthly_path)
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read monthly note at %s: %s", monthly_path, e)
 
     # Load QUARTERLY and YEARLY goals from quarterly note (source for both)
     q_year, q_num = quarter_of_date(date_obj)
@@ -104,8 +113,10 @@ def load_weekly_goals(
         )
         quarterly_tasks = ensure_goal_ids(quarterly_tasks, "quarterly", qtr_key)
         yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(q_year))
-    except Exception:
-        pass
+    except FileNotFoundError:
+        logger.debug("Quarterly note not found at %s", quarterly_path)
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read quarterly note at %s: %s", quarterly_path, e)
 
     return weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, path
 
@@ -138,7 +149,11 @@ def write_weekly_goals(
         try:
             with open(path, "r") as f:
                 lines = f.read().splitlines()
-        except Exception:
+        except FileNotFoundError:
+            logger.debug("Weekly note not found at %s", path)
+            lines = []
+        except (PermissionError, OSError) as e:
+            logger.warning("Failed to read weekly note at %s: %s", path, e)
             lines = []
 
         g_start, g_end = goals_section_bounds(lines)
@@ -203,7 +218,11 @@ def write_weekly_goals(
             try:
                 with open(monthly_path, "r") as mf:
                     monthly_lines = mf.read().splitlines()
-            except Exception:
+            except FileNotFoundError:
+                logger.debug("Monthly note not found at %s", monthly_path)
+                monthly_lines = []
+            except (PermissionError, OSError) as e:
+                logger.warning("Failed to read monthly note at %s: %s", monthly_path, e)
                 monthly_lines = []
             m_start, m_end = goals_section_bounds(monthly_lines)
             # Read existing QUARTERLY mirror and update MONTHLY source
@@ -244,7 +263,11 @@ def write_weekly_goals(
             try:
                 with open(quarterly_path, "r") as qf:
                     quarterly_lines = qf.read().splitlines()
-            except Exception:
+            except FileNotFoundError:
+                logger.debug("Quarterly note not found at %s", quarterly_path)
+                quarterly_lines = []
+            except (PermissionError, OSError) as e:
+                logger.warning("Failed to read quarterly note at %s: %s", quarterly_path, e)
                 quarterly_lines = []
             q_start, q_end = goals_section_bounds(quarterly_lines)
             existing_yearly = extract_subsection_tasks(
@@ -331,7 +354,11 @@ def carry_forward_daily_tasks(
     try:
         with open(yesterday_path, "r") as f:
             y_lines = f.read().splitlines()
-    except Exception:
+    except FileNotFoundError:
+        logger.debug("Yesterday's note not found at %s", yesterday_path)
+        return existing_daily_tasks, 0
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to read yesterday's note at %s: %s", yesterday_path, e)
         return existing_daily_tasks, 0
 
     y_start, y_end = goals_section_bounds(y_lines)

@@ -163,7 +163,8 @@ sync/
 │   ├── training.py     # Training/workout/stretch handling
 │   ├── sleep.py        # Sleep section building
 │   ├── context.py      # Context tracking
-│   ├── icloud.py       # iCloud status file loading
+│   ├── goals.py        # Goal management (carry-forward, weekly/daily parsing)
+│   ├── icloud.py       # iCloud status file loading and study times export
 │   └── screen_time.py  # Screen time data loading and procrastination section
 │
 └── [shared modules]

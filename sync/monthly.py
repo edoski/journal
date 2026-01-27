@@ -730,8 +730,8 @@ def main() -> None:
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )
-        except Exception:
-            pass  # Best-effort cleanup
+        except (PermissionError, OSError, subprocess.SubprocessError) as e:
+            logger.debug("Cleanup subprocess failed: %s", e)
 
 
 if __name__ == "__main__":

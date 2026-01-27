@@ -447,7 +447,11 @@ def main() -> None:
                     prev_lines = pf.read().splitlines()
                 _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
                 prev_week_tasks = ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
-            except Exception:
+            except FileNotFoundError:
+                logger.debug("Previous week note not found at %s", prev_week_path)
+                prev_week_tasks = []
+            except (PermissionError, OSError) as e:
+                logger.warning("Failed to read previous week note at %s: %s", prev_week_path, e)
                 prev_week_tasks = []
 
         weekly_tasks, _ = carry_forward_goals(
@@ -466,7 +470,11 @@ def main() -> None:
                 try:
                     with open(monthly_path, "r") as mf:
                         monthly_lines = mf.read().splitlines()
-                except Exception:
+                except FileNotFoundError:
+                    logger.debug("Monthly note not found at %s", monthly_path)
+                    monthly_lines = []
+                except (PermissionError, OSError) as e:
+                    logger.warning("Failed to read monthly note at %s: %s", monthly_path, e)
                     monthly_lines = []
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
@@ -478,7 +486,11 @@ def main() -> None:
                 try:
                     with open(quarterly_path, "r") as qf:
                         quarterly_lines = qf.read().splitlines()
-                except Exception:
+                except FileNotFoundError:
+                    logger.debug("Quarterly note not found at %s", quarterly_path)
+                    quarterly_lines = []
+                except (PermissionError, OSError) as e:
+                    logger.warning("Failed to read quarterly note at %s: %s", quarterly_path, e)
                     quarterly_lines = []
                 g_start_q, g_end_q = goals_section_bounds(quarterly_lines)
                 new_q_block = bg(
@@ -586,8 +598,8 @@ def main() -> None:
                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                         check=False,
                     )
-        except Exception:
-            pass  # Best-effort cleanup
+        except (PermissionError, OSError, subprocess.SubprocessError) as e:
+            logger.debug("Cleanup subprocess failed: %s", e)
 
 
 if __name__ == "__main__":
