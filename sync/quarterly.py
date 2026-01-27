@@ -3,6 +3,10 @@ import argparse
 import datetime
 import os
 
+from sync.logging import get_logger
+
+logger = get_logger()
+
 from sync.constants import (
     JOURNAL_DIR,
     QUARTERLY_TEMPLATE_PATH,

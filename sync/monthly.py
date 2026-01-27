@@ -8,6 +8,8 @@ from dataclasses import replace
 from sync.models import Goal
 from sync.logging import get_logger
 
+logger = get_logger()
+
 from sync.constants import (
     JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
