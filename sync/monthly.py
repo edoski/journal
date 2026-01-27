@@ -67,31 +67,12 @@ from sync.writers.media import build_media_section
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 
 
-from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
-
-
-def _load_quarterly_goals(month_start):
-    """
-    Load quarterly note goals for the quarter containing month_start.
-    Returns (yearly_mirror, quarterly_tasks, path, lines).
-    """
-    q_year, q_num = quarter_of_date(month_start)
-    quarter_key = quarter_id(q_year, q_num)
-    filename = f"{quarter_key}.md"
-    path = os.path.join(JOURNAL_DIR, filename)
-    ensure_note(path, QUARTERLY_TEMPLATE_PATH)
-    try:
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-    except Exception:
-        return [], [], path, []
-
-    g_start, g_end = goals_section_bounds(lines)
-    yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-    quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-    ensure_goal_ids(yearly_mirror, "yearly", str(q_year))
-    ensure_goal_ids(quarterly_tasks, "quarterly", quarter_key)
-    return yearly_mirror, quarterly_tasks, path, lines
+from sync.base import (
+    carry_forward_goals,
+    propagate_goal_status,
+    atomic_write_note,
+    load_quarterly_goals,
+)
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
@@ -519,7 +500,7 @@ def build_monthly_metrics(
     return join_sections(sections)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate monthly metrics from daily notes."
     )
@@ -588,7 +569,7 @@ def main():
 
         # Load quarterly goals (source of truth) and propagate any completed statuses from mirrors.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
-            _load_quarterly_goals(month_start)
+            load_quarterly_goals(month_start)
         )
         quarterly_changed = propagate_goal_status(quarterly_tasks, quarterly_mirror)
 

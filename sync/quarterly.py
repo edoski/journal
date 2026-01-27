@@ -496,7 +496,7 @@ def build_quarterly_metrics(
     return trim_blank_lines(combined)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate quarterly metrics from daily notes."
     )
