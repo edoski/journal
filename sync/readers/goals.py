@@ -226,13 +226,23 @@ def filter_by_proximity(
 def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> list[Goal]:
     """
     Ensure every Goal has a valid 'id'.
+    
     Uses deterministic IDs for missing ones to avoid duplicates across runs.
+    Returns a new list with updated Goal objects (does not mutate originals).
     """
+    from dataclasses import replace
+    
     counts: dict[str, int] = {}
+    result: list[Goal] = []
+    
     for t in tasks:
         canon = t.canonical or ""
         if not t.id:
             idx = counts.get(canon, 0)
-            t.id = generate_goal_id_for(horizon_key, period_key, canon, idx)
+            new_id = generate_goal_id_for(horizon_key, period_key, canon, idx)
+            result.append(replace(t, id=new_id))
+        else:
+            result.append(t)
         counts[canon] = counts.get(canon, 0) + 1
-    return tasks
+    
+    return result

@@ -6,6 +6,7 @@ import sys
 from dataclasses import replace
 
 from sync.models import Goal
+from sync.logging import get_logger
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -66,12 +67,12 @@ from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 
-
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
     atomic_write_note,
     load_quarterly_goals,
+    process_pierced_goals,
 )
 
 
@@ -538,10 +539,10 @@ def main() -> None:
         g_start, g_end = goals_section_bounds(lines)
         quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-        ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
+        monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
         q_year, q_num = quarter_of_date(month_start)
         quarter_key = quarter_id(q_year, q_num)
-        ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
+        quarterly_mirror = ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
 
         # Determine previous month path
         month_key = f"{month_start.year}-{month_start.month:02d}"
@@ -559,8 +560,12 @@ def main() -> None:
                 prev_lines = pf.read().splitlines()
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
-            ensure_goal_ids(prev_tasks, "monthly", prev_month_start.isoformat())
-        except Exception:
+            prev_tasks = ensure_goal_ids(prev_tasks, "monthly", prev_month_start.isoformat())
+        except FileNotFoundError:
+            get_logger().debug("No previous monthly note at %s", prev_path)
+            prev_tasks = []
+        except (PermissionError, OSError) as e:
+            get_logger().warning("Failed to load previous monthly note from %s: %s", prev_path, e)
             prev_tasks = []
 
         monthly_tasks, _ = carry_forward_goals(
@@ -617,43 +622,12 @@ def main() -> None:
         )
 
         # MONTHLY source section: monthly goals + pierced yearly goals (≤90d deadline)
-        # Separate original monthly goals from existing pierced yearly goals
-        yearly_ids = {g.id for g in yearly_mirror if g.id}
-        original_monthly = [g for g in monthly_tasks if g.id not in yearly_ids]
-        existing_pierced = [g for g in monthly_tasks if g.id in yearly_ids]
-        existing_pierced_ids = {g.id for g in existing_pierced}
-
-        # Transfer done status from parsed yearly goals to source yearly_mirror
-        parsed_status = {g.id: g.done for g in monthly_tasks if g.id in yearly_ids}
-        updated_yearly: list[Goal] = []
-        for g in yearly_mirror:
-            if g.id in parsed_status and parsed_status[g.id] and not g.done:
-                updated_yearly.append(replace(g, done=True))
-            else:
-                updated_yearly.append(g)
-
-        # Get NEW pierced yearly goals from source (only those not already in the note)
-        # Existing pierced goals are preserved to keep completed goals visible
-        new_pierced_yearly = filter_by_proximity(updated_yearly, 90, today)
-        new_pierced_yearly = [g for g in new_pierced_yearly
-                              if g.deadline is not None and g.id not in existing_pierced_ids]
-
-        # Restore deadline info from source for existing pierced yearly goals (for countdown)
-        source_yearly_info = {g.id: g for g in updated_yearly if g.id}
-        restored_existing_pierced = []
-        for g in existing_pierced:
-            if g.id in source_yearly_info:
-                src = source_yearly_info[g.id]
-                restored_existing_pierced.append(replace(g,
-                    deadline=src.deadline,
-                    date_str=src.date_str,
-                    reminder_offset=src.reminder_offset,
-                ))
-            else:
-                restored_existing_pierced.append(g)
-
-        # Final pierced = existing (with restored deadlines) + new (from source)
-        final_pierced = restored_existing_pierced + new_pierced_yearly
+        original_monthly, final_pierced, [updated_yearly] = process_pierced_goals(
+            existing_tasks=monthly_tasks,
+            source_goal_lists=[yearly_mirror],
+            proximity_days=90,
+            today=today,
+        )
 
         # Render: original monthly goals (preserve dates) + final pierced yearly (countdown)
         monthly_source_lines = render_goal_lines(original_monthly)

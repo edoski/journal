@@ -547,7 +547,7 @@ def main() -> None:
 
         g_start, g_end = goals_section_bounds(lines)
         yearly_tasks = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        ensure_goal_ids(yearly_tasks, "yearly", str(year))
+        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
         prev_tasks = []
         prev_note_path = os.path.join(JOURNAL_DIR, f"{prev_year}.md")
@@ -556,7 +556,7 @@ def main() -> None:
                 prev_lines = pf.read().splitlines()
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "YEARLY")
-            ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
+            prev_tasks = ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
         except Exception:
             prev_tasks = []
 

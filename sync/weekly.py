@@ -6,6 +6,7 @@ import sys
 from dataclasses import replace
 
 from sync.models import Goal
+from sync.logging import get_logger
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -55,14 +56,13 @@ from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 
-
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
     atomic_write_note,
     load_quarterly_goals,
+    process_pierced_goals,
 )
-
 
 
 def _load_monthly_goals(month_start):
@@ -81,13 +81,17 @@ def _load_monthly_goals(month_start):
     try:
         with open(path, "r") as f:
             lines = f.read().splitlines()
-    except Exception:
+    except FileNotFoundError:
+        get_logger().debug("No monthly note at %s", path)
+        return [], [], path, []
+    except (PermissionError, OSError) as e:
+        get_logger().warning("Failed to load monthly note from %s: %s", path, e)
         return [], [], path, []
 
     g_start, g_end = goals_section_bounds(lines)
     monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
     quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-    ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
+    monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
 
     return monthly_tasks, quarterly_mirror, path, lines
 
@@ -426,8 +430,8 @@ def main() -> None:
 
         # Parse existing goals in the weekly note
         monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
-        ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
-        ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
+        monthly_mirror = ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
+        weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
 
         # Carry forward open weekly goals from prior week
         year, week_num, _ = target_date.isocalendar()
@@ -442,7 +446,7 @@ def main() -> None:
                 with open(prev_week_path, "r") as pf:
                     prev_lines = pf.read().splitlines()
                 _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
-                ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
+                prev_week_tasks = ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
             except Exception:
                 prev_week_tasks = []
 
@@ -533,57 +537,12 @@ def main() -> None:
         )
 
         # WEEKLY source: weekly goals + pierced quarterly/yearly goals (≤30d deadline)
-        # Separate original weekly goals from existing pierced goals
-        quarterly_ids = {g.id for g in quarterly_tasks if g.id}
-        yearly_ids = {g.id for g in yearly_mirror if g.id}
-        pierced_ids = quarterly_ids | yearly_ids
-        original_weekly = [g for g in weekly_tasks if g.id not in pierced_ids]
-        existing_pierced = [g for g in weekly_tasks if g.id in pierced_ids]
-        existing_pierced_ids = {g.id for g in existing_pierced}
-
-        # Transfer done status from parsed goals to source goals
-        parsed_status = {g.id: g.done for g in weekly_tasks if g.id in pierced_ids}
-
-        updated_quarterly: list[Goal] = []
-        for g in quarterly_tasks:
-            if g.id in parsed_status and parsed_status[g.id] and not g.done:
-                updated_quarterly.append(replace(g, done=True))
-            else:
-                updated_quarterly.append(g)
-
-        updated_yearly: list[Goal] = []
-        for g in yearly_mirror:
-            if g.id in parsed_status and parsed_status[g.id] and not g.done:
-                updated_yearly.append(replace(g, done=True))
-            else:
-                updated_yearly.append(g)
-
-        # Get NEW pierced goals from source (only those not already in the note)
-        # Existing pierced goals are preserved to keep completed goals visible
-        new_pierced_quarterly = filter_by_proximity(updated_quarterly, 30, today)
-        new_pierced_quarterly = [g for g in new_pierced_quarterly
-                                 if g.deadline is not None and g.id not in existing_pierced_ids]
-
-        new_pierced_yearly = filter_by_proximity(updated_yearly, 30, today)
-        new_pierced_yearly = [g for g in new_pierced_yearly
-                              if g.deadline is not None and g.id not in existing_pierced_ids]
-
-        # Restore deadline info from source for existing pierced goals (for countdown)
-        source_goal_info = {g.id: g for g in updated_quarterly + updated_yearly if g.id}
-        restored_existing_pierced = []
-        for g in existing_pierced:
-            if g.id in source_goal_info:
-                src = source_goal_info[g.id]
-                restored_existing_pierced.append(replace(g,
-                    deadline=src.deadline,
-                    date_str=src.date_str,
-                    reminder_offset=src.reminder_offset,
-                ))
-            else:
-                restored_existing_pierced.append(g)
-
-        # Final pierced = existing (with restored deadlines) + new (from source)
-        final_pierced = restored_existing_pierced + new_pierced_quarterly + new_pierced_yearly
+        original_weekly, final_pierced, [updated_quarterly, updated_yearly] = process_pierced_goals(
+            existing_tasks=weekly_tasks,
+            source_goal_lists=[quarterly_tasks, yearly_mirror],
+            proximity_days=30,
+            today=today,
+        )
 
         # Render: original weekly goals (preserve dates) + final pierced goals (countdown)
         weekly_source_lines = render_goal_lines(original_weekly)

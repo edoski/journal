@@ -538,9 +538,9 @@ def main() -> None:
 
         g_start, g_end = goals_section_bounds(lines)
         yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        ensure_goal_ids(yearly_mirror, "yearly", str(year))
+        yearly_mirror = ensure_goal_ids(yearly_mirror, "yearly", str(year))
         quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-        ensure_goal_ids(quarterly_tasks, "quarterly", quarter_id(year, quarter_num))
+        quarterly_tasks = ensure_goal_ids(quarterly_tasks, "quarterly", quarter_id(year, quarter_num))
 
         qtr_key = quarter_id(year, quarter_num)
 
@@ -553,7 +553,7 @@ def main() -> None:
                 prev_lines = pf.read().splitlines()
             p_start, p_end = goals_section_bounds(prev_lines)
             p_body = extract_subsection_tasks(prev_lines, p_start, p_end, "QUARTERLY")
-            ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
+            p_body = ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
             prev_tasks = p_body
         except Exception:
             prev_tasks = []
@@ -574,7 +574,7 @@ def main() -> None:
             )
         except Exception:
             yearly_tasks = []
-        ensure_goal_ids(yearly_tasks, "yearly", str(year))
+        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
         # Propagate completed YEARLY goals from quarterly mirror back to the yearly source.
         yearly_changed = propagate_goal_status(yearly_tasks, yearly_mirror)
