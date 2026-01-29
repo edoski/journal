@@ -36,6 +36,10 @@ LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
 # Cache file for tracking carried-forward goal IDs
 CARRIED_GOALS_PATH = os.path.expanduser("~/.cache/journal/carried_goals.json")
 
+# Cache for media dates (podcasts/books) to detect and self-heal corrupted
+# frontmatter dates caused by Obsidian Sync re-triggering Templater.
+MEDIA_CACHE_PATH = os.path.expanduser("~/.cache/journal/media_dates.json")
+
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 MONTH_ABBR = [

@@ -5,8 +5,24 @@ Pytest configuration and shared fixtures for journal sync tests.
 from __future__ import annotations
 
 import datetime
+import tempfile
 import pytest
 from typing import Any
+from unittest.mock import patch
+
+
+@pytest.fixture(autouse=True)
+def isolate_media_cache(tmp_path):
+    """
+    Automatically isolate all tests from the production media cache.
+    
+    Uses a temp file for each test to prevent test data from polluting
+    the real ~/.cache/journal/media_dates.json cache.
+    """
+    temp_cache = tmp_path / "media_dates.json"
+    # Patch where the constant is used, not where it's defined
+    with patch("sync.readers.media.MEDIA_CACHE_PATH", str(temp_cache)):
+        yield
 
 
 @pytest.fixture
