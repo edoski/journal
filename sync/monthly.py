@@ -274,15 +274,18 @@ def build_monthly_metrics(
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
+    mindful_delta_labels = []
     workout_delta_labels = []
     stretch_delta_labels = []
     for idx, week_days in enumerate(week_day_lists):
         week_start = week_days[0]
         if is_current_month and week_start > today:
+            mindful_delta_labels.append("")
             workout_delta_labels.append("")
             stretch_delta_labels.append("")
             continue
         if idx == 0:
+            mindful_delta_labels.append("—")
             workout_delta_labels.append("—")
             stretch_delta_labels.append("—")
             continue
@@ -290,6 +293,15 @@ def build_monthly_metrics(
         prev_week_days = week_day_lists[idx - 1]
 
         # Compare full periods (no partial-window truncation)
+        curr_mindful_count = sum(
+            1 for d in week_days if daily_data.get(d, {}).get("meditate")
+        )
+        prev_mindful_count = sum(
+            1 for d in prev_week_days if daily_data.get(d, {}).get("meditate")
+        )
+        mindful_delta = compute_percent_change(curr_mindful_count, prev_mindful_count)
+        mindful_delta_labels.append(format_percent_change(mindful_delta))
+
         curr_workout_count = sum(
             1 for d in week_days if daily_data.get(d, {}).get("workout")
         )
@@ -308,12 +320,15 @@ def build_monthly_metrics(
         stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
         stretch_delta_labels.append(format_percent_change(stretch_delta))
 
+    mindful_days = current_metrics["mindful_count"]
     training_grid = render_training_frequency_grid(
         week_ranges,
         daily_data,
+        mindful_days,
         workout_days,
         stretch_days,
         days_in_period,
+        mindful_delta_labels=mindful_delta_labels,
         workout_delta_labels=workout_delta_labels,
         stretch_delta_labels=stretch_delta_labels,
         current_date=current_month_date,
@@ -322,6 +337,10 @@ def build_monthly_metrics(
     elapsed_days = current_metrics.get("days_up_to_today", days_in_period)
     if training_grid:
         for idx, line in enumerate(training_grid):
+            if line.startswith("┌ MINDFUL"):
+                training_grid[idx] = (
+                    f"┌ MINDFUL ({mindful_days:02d}/{elapsed_days:02d})"
+                )
             if line.startswith("┌ WORKOUT"):
                 training_grid[idx] = (
                     f"┌ WORKOUT ({workout_days:02d}/{elapsed_days:02d})"

@@ -139,19 +139,7 @@ def build_quarterly_metrics(
 
     # Summary with MA
     current_metrics = compute_period_metrics(dates, daily_data)
-    prev_metrics = (
-        compute_period_metrics(prev_dates, prev_daily_data)
-        if prev_daily_data
-        else {
-            "study_total_minutes": 0,
-            "sleep_avg_minutes": None,
-            "mood_avg": None,
-            "workout_count": 0,
-            "stretch_count": 0,
-            "total_days": len(prev_dates),
-            "days_up_to_today": len(prev_dates),
-        }
-    )
+    prev_metrics = compute_period_metrics(prev_dates, prev_daily_data)
 
     # Compute 4-quarter moving average
     ma_metrics = None
@@ -290,9 +278,13 @@ def build_quarterly_metrics(
         done = sum(1 for d in days if d <= today and source_data.get(d, {}).get(key))
         return done, elapsed, start
 
+    mindful_counts = [_month_count(rng, "meditate", daily_data) for rng in month_ranges]
     workout_counts = [_month_count(rng, "workout", daily_data) for rng in month_ranges]
     stretch_counts = [_month_count(rng, "stretch", daily_data) for rng in month_ranges]
     if prev_last_month_range:
+        prev_mindful_baseline = _month_count(
+            prev_last_month_range, "meditate", prev_daily_data
+        )[0]
         prev_workout_baseline = _month_count(
             prev_last_month_range, "workout", prev_daily_data
         )[0]
@@ -300,9 +292,13 @@ def build_quarterly_metrics(
             prev_last_month_range, "stretch", prev_daily_data
         )[0]
     else:
+        prev_mindful_baseline = None
         prev_workout_baseline = None
         prev_stretch_baseline = None
 
+    mindful_delta_labels = compute_period_deltas(
+        mindful_counts, prev_mindful_baseline, today
+    )
     workout_delta_labels = compute_period_deltas(
         workout_counts, prev_workout_baseline, today
     )
@@ -310,19 +306,9 @@ def build_quarterly_metrics(
         stretch_counts, prev_stretch_baseline, today
     )
 
-    def _build_training_block(title, activity_key, deltas):
-        total_done = sum(
-            d
-            for d, _, _ in (
-                workout_counts if activity_key == "workout" else stretch_counts
-            )
-        )
-        total_elapsed = sum(
-            e
-            for _, e, _ in (
-                workout_counts if activity_key == "workout" else stretch_counts
-            )
-        )
+    def _build_training_block(title, activity_key, counts, deltas):
+        total_done = sum(d for d, _, _ in counts)
+        total_elapsed = sum(e for _, e, _ in counts)
         block = [f"┌ {title} ({total_done:02d}/{total_elapsed:02d})", "│"]
         block.extend(
             render_quarterly_training_bars(
@@ -334,13 +320,19 @@ def build_quarterly_metrics(
 
     training_block = []
     training_block.extend(
-        _build_training_block("WORKOUT", "workout", workout_delta_labels)
+        _build_training_block("MINDFUL", "meditate", mindful_counts, mindful_delta_labels)
+    )
+    training_block.append(
+        ""
+    )  # blank line between blocks
+    training_block.extend(
+        _build_training_block("WORKOUT", "workout", workout_counts, workout_delta_labels)
     )
     training_block.append(
         ""
     )  # blank line between workout and stretch inside same block
     training_block.extend(
-        _build_training_block("STRETCH", "stretch", stretch_delta_labels)
+        _build_training_block("STRETCH", "stretch", stretch_counts, stretch_delta_labels)
     )
     training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")

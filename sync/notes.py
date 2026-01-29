@@ -412,6 +412,7 @@ def parse_daily_note(path: str) -> dict | None:
 
     workout = _parse_bool(fm.get("workout"))
     stretch = _parse_bool(fm.get("stretch"))
+    meditate = _parse_bool(fm.get("meditate"))
 
     awake_total = sum((r[1] or 0 for r in sleep_rows), 0) if sleep_rows else None
     awakenings_total = None
@@ -455,6 +456,7 @@ def parse_daily_note(path: str) -> dict | None:
         "mood": mood_val,
         "workout": workout,
         "stretch": stretch,
+        "meditate": meditate,
         "awake_minutes": awake_total,
         "awakenings": awakenings_total,
         "activity_totals": activity_totals,

@@ -316,24 +316,27 @@ def _extract_data_date(data: dict | list | None) -> str | None:
 def _build_training_section(
     workout_data: dict | list | None,
     stretch_data: dict | list | None,
+    meditation_data: dict | list | None,
     existing_block: list[str] | None,
     today_str: str,
 ) -> tuple[list[str], list[TrainingEntry]]:
     """
-    Build training section lines from workout/stretch data.
+    Build training section lines from workout/stretch/meditation data.
 
     Args:
         workout_data: Raw workout JSON data
         stretch_data: Raw stretch JSON data
+        meditation_data: Raw meditation JSON data
         existing_block: Lines from existing training block in note
         today_str: Today's date as YYYY-MM-DD string
 
     Returns:
         Tuple of (section_lines, merged_entries)
     """
-    # Only use workout/stretch data if its date matches today
+    # Only use data if its date matches today
     workout_entries = []
     stretch_entries = []
+    meditation_entries = []
 
     workout_date = _extract_data_date(workout_data)
     if workout_date == today_str:
@@ -343,7 +346,11 @@ def _build_training_section(
     if stretch_date == today_str:
         stretch_entries = _activity_entries_from_data(stretch_data, "Stretching")
 
-    new_entries = workout_entries + stretch_entries
+    meditation_date = _extract_data_date(meditation_data)
+    if meditation_date == today_str:
+        meditation_entries = _activity_entries_from_data(meditation_data, "Meditation")
+
+    new_entries = workout_entries + stretch_entries + meditation_entries
 
     cache_entries = _load_training_cache(today_str)
 

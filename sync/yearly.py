@@ -251,8 +251,10 @@ def build_yearly_metrics(
     # TRAINING (quarter rows)
     training_lines = ["### **TRAINING**"]
     quarter_labels = [f"Q{i + 1}" for i in range(4)]
+    mindful_counts = []
     workout_counts = []
     stretch_counts = []
+    mindful_done_year = 0
     workout_done_year = 0
     stretch_done_year = 0
     elapsed_year = 0
@@ -260,24 +262,33 @@ def build_yearly_metrics(
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         elapsed_days = sum(1 for d in days if d <= today)
+        mindful_done = sum(
+            1 for d in days if d <= today and daily_data.get(d, {}).get("meditate")
+        )
         workout_done = sum(
             1 for d in days if d <= today and daily_data.get(d, {}).get("workout")
         )
         stretch_done = sum(
             1 for d in days if d <= today and daily_data.get(d, {}).get("stretch")
         )
+        mindful_counts.append((mindful_done, elapsed_days, start))
         workout_counts.append((workout_done, elapsed_days, start))
         stretch_counts.append((stretch_done, elapsed_days, start))
+        mindful_done_year += mindful_done
         workout_done_year += workout_done
         stretch_done_year += stretch_done
         elapsed_year += elapsed_days
 
     # Baseline is last quarter of previous year
+    prev_mindful_baseline = None
     prev_workout_baseline = None
     prev_stretch_baseline = None
     if prev_quarter_ranges:
         last_q_start, last_q_end = prev_quarter_ranges[-1]
         prev_days = list(daterange(last_q_start, last_q_end))
+        prev_mindful_baseline = sum(
+            1 for d in prev_days if prev_daily_data.get(d, {}).get("meditate")
+        )
         prev_workout_baseline = sum(
             1 for d in prev_days if prev_daily_data.get(d, {}).get("workout")
         )
@@ -285,6 +296,9 @@ def build_yearly_metrics(
             1 for d in prev_days if prev_daily_data.get(d, {}).get("stretch")
         )
 
+    mindful_delta_labels = compute_period_deltas(
+        mindful_counts, prev_mindful_baseline, today
+    )
     workout_delta_labels = compute_period_deltas(
         workout_counts, prev_workout_baseline, today
     )
@@ -292,10 +306,21 @@ def build_yearly_metrics(
         stretch_counts, prev_stretch_baseline, today
     )
 
+    mindful_bars = []
     workout_bars = []
     stretch_bars = []
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
+        mindful_bars.append(
+            compress_activity_time_order(
+                days,
+                lambda d: daily_data.get(d, {}).get("meditate"),
+                YEARLY_TRAINING_BAR_WIDTH,
+                fill_char="█",
+                empty_char="·",
+                today=today,
+            )
+        )
         workout_bars.append(
             compress_activity_time_order(
                 days,
@@ -316,6 +341,20 @@ def build_yearly_metrics(
                 today=today,
             )
         )
+
+    mindful_block = [f"┌ MINDFUL ({mindful_done_year:02d}/{elapsed_year:02d})", "│"]
+    mindful_block.extend(
+        render_training_quarter_block(
+            quarter_labels,
+            [(d, t) for d, t, _ in mindful_counts],
+            mindful_delta_labels,
+            bar_width=YEARLY_TRAINING_BAR_WIDTH,
+            bars_override=mindful_bars,
+            fill_char="█",
+            empty_char="·",
+        )
+    )
+    mindful_block.append("└")
 
     workout_block = [f"┌ WORKOUT ({workout_done_year:02d}/{elapsed_year:02d})", "│"]
     workout_block.extend(
@@ -345,7 +384,7 @@ def build_yearly_metrics(
     )
     stretch_block.append("└")
 
-    training_lines.extend(wrap_code_block(workout_block + [""] + stretch_block))
+    training_lines.extend(wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 

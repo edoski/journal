@@ -157,6 +157,7 @@ def render_summary_table(
     study_target_minutes = IDEAL.study_minutes_daily * total_days
     sleep_target_minutes = IDEAL.sleep_minutes_nightly  # Always nightly avg
     weeks_in_period = total_days / 7
+    mindful_target = int(round(IDEAL.mindful_days_weekly * weeks_in_period))
     workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
     stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
     mood_target = IDEAL.mood_target
@@ -168,9 +169,11 @@ def render_summary_table(
     mood_target_label = f"{mood_target:.1f}/10"
 
     if period_type == "week":
+        mindful_target_label = f"{mindful_target}/7"
         workout_target_label = f"{workout_target}/7"
         stretch_target_label = f"{stretch_target}/7"
     else:
+        mindful_target_label = f"{mindful_target}/{period_suffix}"
         workout_target_label = f"{workout_target}/{period_suffix}"
         stretch_target_label = f"{stretch_target}/{period_suffix}"
 
@@ -278,6 +281,46 @@ def render_summary_table(
     else:
         lines.append(
             f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
+        )
+
+    # MINDFUL row — use elapsed days for current period (pace-based comparison)
+    curr_mindful_count = current_metrics.get("mindful_count", 0)
+    prev_mindful_count = previous_metrics.get("mindful_count", 0)
+    # Current period uses elapsed days (for fair mid-period comparison)
+    curr_mindful = format_training_ratio(curr_mindful_count, curr_days_for_avg)
+    # Previous period uses total days (it's complete)
+    prev_mindful = format_training_ratio(prev_mindful_count, prev_total_days)
+
+    ma_mindful_str = "—"
+    if show_ma and ma_metrics is not None and ma_metrics.get("mindful_avg") is not None:
+        ma_mindful_str = format_ma_training_ratio(
+            ma_metrics["mindful_avg"], ma_training_unit
+        )
+
+    # Compare completion rates (pace) instead of raw counts
+    if curr_mindful_count > 0 or prev_mindful_count > 0:
+        curr_mindful_rate = curr_mindful_count / max(1, curr_days_for_avg)
+        prev_mindful_rate = prev_mindful_count / max(1, prev_days_for_avg)
+        mindful_pct = compute_percent_change(curr_mindful_rate, prev_mindful_rate)
+        mindful_pct_str = format_percent_change(mindful_pct)
+    else:
+        mindful_pct_str = "—"
+
+    mindful_bar, mindful_progress_pct = format_progress_bar(
+        curr_mindful_count,
+        mindful_target,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
+    )
+
+    if show_ma:
+        lines.append(
+            f"| **MINDFUL** | `{curr_mindful}` | `{prev_mindful}` | `{mindful_pct_str}` | `{ma_mindful_str}` | `{mindful_target_label}` | `{mindful_bar}` `{mindful_progress_pct}%` |"
+        )
+    else:
+        lines.append(
+            f"| **MINDFUL** | `{curr_mindful}` | `{prev_mindful}` | `{mindful_pct_str}` | `{mindful_target_label}` | `{mindful_bar}` `{mindful_progress_pct}%` |"
         )
 
     # WORKOUT row — use elapsed days for current period (pace-based comparison)

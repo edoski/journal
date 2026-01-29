@@ -65,6 +65,7 @@ def _update_frontmatter(
     study_str: str,
     workout_done: bool,
     stretch_done: bool,
+    meditate_done: bool,
     sleep_data: dict | None,
 ) -> tuple[list[str], dict[str, str]]:
     """
@@ -75,6 +76,7 @@ def _update_frontmatter(
         study_str: Formatted study time string
         workout_done: Whether workout was completed
         stretch_done: Whether stretch was completed
+        meditate_done: Whether meditation was completed
         sleep_data: Sleep data dict or None
 
     Returns:
@@ -126,6 +128,12 @@ def _update_frontmatter(
         fm_data[key] = value
 
     set_value("study", study_str)
+
+    if meditate_done:
+        set_value("meditate", "true")
+    else:
+        current = fm_data.get("meditate", "")
+        set_value("meditate", current if current else "false")
 
     if workout_done:
         set_value("workout", "true")
@@ -418,6 +426,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Load activity status files
     workout_done, workout_data = _load_status_file("workout_status.json")
     stretch_done, stretch_data = _load_status_file("stretching_status.json")
+    meditate_done, meditation_data = _load_status_file("meditation_status.json")
     sleep_done, sleep_data = _load_status_file("sleep_status.json")
 
     # Extract existing blocks for fallback (using shared extract_block)
@@ -434,7 +443,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
         study_lines.append("_No study sessions completed today._")
 
     training_lines, _ = _build_training_section(
-        workout_data, stretch_data, existing_training_block, today_str
+        workout_data, stretch_data, meditation_data, existing_training_block, today_str
     )
 
     sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
@@ -516,7 +525,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
 
     # Update YAML frontmatter and capture what changed
     updated_lines, fm_changes = _update_frontmatter(
-        updated_lines, study_str, workout_done, stretch_done, sleep_data
+        updated_lines, study_str, workout_done, stretch_done, meditate_done, sleep_data
     )
 
     new_content = "\n".join(updated_lines)
@@ -539,7 +548,7 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     # Log only the metrics that changed
     if fm_changes:
         parts = []
-        for key in ("study", "workout", "stretch", "sleep"):
+        for key in ("study", "meditate", "workout", "stretch", "sleep"):
             if key in fm_changes:
                 val = fm_changes[key]
                 # Use checkmark for boolean flags

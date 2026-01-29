@@ -405,18 +405,27 @@ def render_training_quarter_block(
 def render_training_frequency_grid(
     week_ranges,
     daily_data,
+    mindful_count,
     workout_count,
     stretch_count,
     days_in_period,
+    mindful_delta_labels=None,
     workout_delta_labels=None,
     stretch_delta_labels=None,
     current_date=None,
 ):
     """
-    Render the monthly training grid as two stacked blocks (WORKOUT, STRETCH)
+    Render the monthly training grid as three stacked blocks (MINDFUL, WORKOUT, STRETCH)
     with per-week separators and deltas beneath the week labels.
 
     Example shape:
+    ┌ MINDFUL
+    │
+    │ ■ · ■ ■ · ■ ■   …
+    │ ─────────────   …
+    │   DEC 01-07     …
+    │       —         …
+
     ┌ WORKOUT
     │
     │ ■ · ■ ■ · ■ ■   …
@@ -433,6 +442,7 @@ def render_training_frequency_grid(
     """
     lines = []
 
+    mindful_symbols = []
     workout_symbols = []
     stretch_symbols = []
     week_labels = []
@@ -445,6 +455,7 @@ def render_training_frequency_grid(
 
         for day in week_days:
             entry = daily_data.get(day, {})
+            mindful_symbols.append("■" if entry.get("meditate") else "·")
             workout_symbols.append("■" if entry.get("workout") else "·")
             stretch_symbols.append("■" if entry.get("stretch") else "·")
 
@@ -502,7 +513,7 @@ def render_training_frequency_grid(
                 row += "   "
         return row.rstrip() if any_label else None
 
-    # Pre-compute arrow placement (shared by workout/stretch blocks)
+    # Pre-compute arrow placement (shared by all activity blocks)
     arrow_col = None
     if current_date:
         for w_idx, (start, end) in enumerate(week_ranges):
@@ -544,6 +555,10 @@ def render_training_frequency_grid(
         return block
 
     lines.extend(
+        _build_activity_block("MINDFUL", mindful_symbols, mindful_delta_labels)
+    )
+    lines.append("")  # blank line between activity blocks
+    lines.extend(
         _build_activity_block("WORKOUT", workout_symbols, workout_delta_labels)
     )
     lines.append("")  # blank line between activity blocks
@@ -555,42 +570,49 @@ def render_training_frequency_grid(
 
 
 def render_weekly_training_grid(
-    dates, daily_data, workout_count, stretch_count, current_date=None
+    dates, daily_data, mindful_count, workout_count, stretch_count, current_date=None
 ):
     """
-    Render a compact frequency grid showing workout/stretch activity for a single week.
+    Render a compact frequency grid showing mindful/workout/stretch activity for a single week.
 
     dates: list of 7 date objects (Monday-Sunday)
     daily_data: dict mapping date -> parsed daily note data
+    mindful_count: total number of mindful days
     workout_count: total number of workout days
     stretch_count: total number of stretch days
 
     Returns list of lines for the frequency grid visualization.
 
     Format:
+    │ MINDFUL:  ███ ░░░ ███ ███ ░░░ ███ ███   (5/7)
     │ WORKOUT:  ███ ░░░ ███ ███ ░░░ ███ ███   (5/7)
     │ STRETCH:  ░░░ ███ ███ ░░░ ███ ░░░ ███   (4/7)
     │           ─── ─── ─── ─── ─── ─── ───
-    │           MON TUE WED THU FRI SAT SUN
+    └           MON TUE WED THU FRI SAT SUN
     """
     lines = []
 
-    # Build workout and stretch symbols
+    # Build mindful, workout and stretch symbols
+    mindful_symbols = []
     workout_symbols = []
     stretch_symbols = []
 
     for day in dates:
         entry = daily_data.get(day, {})
+        has_mindful = entry.get("meditate", False)
         has_workout = entry.get("workout", False)
         has_stretch = entry.get("stretch", False)
 
+        mindful_symbols.append("███" if has_mindful else "░░░")
         workout_symbols.append("███" if has_workout else "░░░")
         stretch_symbols.append("███" if has_stretch else "░░░")
 
+    prefix_mindful = "│ MINDFUL:  "
     prefix_workout = "│ WORKOUT:  "
     prefix_stretch = "│ STRETCH:  "
 
-    # Build the two main rows (each day takes 4 chars: 3-char block + 1 space)
+    # Build the three main rows (each day takes 4 chars: 3-char block + 1 space)
+    mindful_row = prefix_mindful + " ".join(mindful_symbols) + f"   ({mindful_count}/7)"
     workout_row = prefix_workout + " ".join(workout_symbols) + f"   ({workout_count}/7)"
     stretch_row = prefix_stretch + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
 
@@ -599,8 +621,8 @@ def render_weekly_training_grid(
     if current_date and dates[0] <= current_date <= dates[-1]:
         day_idx = (current_date - dates[0]).days
         day_idx = max(0, min(day_idx, 6))
-        arrow_col = len(prefix_workout) + day_idx * 4 + 1  # center of 3-char block
-        width = len(workout_row)
+        arrow_col = len(prefix_mindful) + day_idx * 4 + 1  # center of 3-char block
+        width = len(mindful_row)
         if arrow_col >= width:
             width = arrow_col + 1
         arrow_chars = [" "] * width
@@ -614,6 +636,7 @@ def render_weekly_training_grid(
     else:
         lines.append("┌")
 
+    lines.append(mindful_row)
     lines.append(workout_row)
     lines.append(stretch_row)
 

@@ -65,6 +65,7 @@ def compute_period_metrics(
 
     workout_count = sum(1 for d in dates if daily_data.get(d, {}).get("workout"))
     stretch_count = sum(1 for d in dates if daily_data.get(d, {}).get("stretch"))
+    mindful_count = sum(1 for d in dates if daily_data.get(d, {}).get("meditate"))
 
     return {
         "study_total_minutes": study_total,
@@ -72,6 +73,7 @@ def compute_period_metrics(
         "mood_avg": mood_avg,
         "workout_count": workout_count,
         "stretch_count": stretch_count,
+        "mindful_count": mindful_count,
         "total_days": len(dates),
         "days_up_to_today": days_up_to_today,
     }
@@ -255,6 +257,7 @@ def compute_moving_average(
         "mood_avg": None,
         "workout_avg": None,
         "stretch_avg": None,
+        "mindful_avg": None,
     }
 
     if len(period_metrics) < n_periods:
@@ -299,10 +302,15 @@ def compute_moving_average(
     stretch_counts = [pm.get("stretch_count", 0) for pm in recent]
     stretch_ma = sum(stretch_counts) / len(stretch_counts) if stretch_counts else None
 
+    # Mindful: average count per period
+    mindful_counts = [pm.get("mindful_count", 0) for pm in recent]
+    mindful_ma = sum(mindful_counts) / len(mindful_counts) if mindful_counts else None
+
     return {
         "study_avg_minutes": study_ma,
         "sleep_avg_minutes": sleep_ma,
         "mood_avg": mood_ma,
         "workout_avg": workout_ma,
         "stretch_avg": stretch_ma,
+        "mindful_avg": mindful_ma,
     }
