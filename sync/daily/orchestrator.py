@@ -159,7 +159,11 @@ def _update_frontmatter(
         except (ValueError, TypeError, KeyError) as e:
             logger.debug("Failed to parse sleep data for frontmatter: %s", e)
 
-    new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in fm_order]
+    # Enforce canonical order: sleep, study, mood, meditate, workout, stretch, then rest
+    canonical_order = ["sleep", "study", "mood", "meditate", "workout", "stretch"]
+    ordered_keys = [k for k in canonical_order if k in fm_order]
+    ordered_keys += [k for k in fm_order if k not in canonical_order]
+    new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in ordered_keys]
     return (
         final_lines[: first_dash_idx + 1]
         + new_fm_lines
