@@ -10,6 +10,7 @@ import hashlib
 import re
 
 from sync.models import Goal
+from sync.models.goals import canonical_goal_text
 from sync.writers.goals import generate_goal_id
 
 
@@ -117,15 +118,7 @@ def parse_goal_date(body: str) -> tuple[str, str | None, datetime.date | None, i
     return body_without_date, date_str, deadline, reminder_offset
 
 
-def _canonical_goal(text: str) -> str:
-    """Normalize a goal line for idempotent matching."""
-    cleaned = re.sub(r"^\s*[-*]\s*\[[^\]]?\]\s*", "", text)
-    cleaned = re.sub(r"(\s+\^gid-[0-9a-fA-F]{1,32})+\s*$", "", cleaned)
-    cleaned = re.sub(r"\[\[(.*?)\]\]", r"\1", cleaned)
-    cleaned = cleaned.strip(" `")
-    cleaned = re.sub(r"\s+", " ", cleaned)
-    cleaned = cleaned.rstrip(".,;:-—– ")
-    return cleaned.lower()
+
 
 
 def _extract_goal_id(line: str) -> str | None:

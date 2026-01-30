@@ -9,6 +9,31 @@ import re
 from dataclasses import dataclass, field
 
 
+def canonical_goal_text(text: str) -> str:
+    """
+    Normalize goal text for comparison and deduplication.
+
+    - Strips checkbox markers
+    - Strips wikilinks (keeps inner text)
+    - Strips goal IDs
+    - Strips backticks
+    - Collapses whitespace
+    - Lowercases and removes trailing punctuation
+    """
+    # Strip checkbox markers
+    text = re.sub(r"^[-*]\s*\[[x ]\]\s*", "", text.strip(), flags=re.IGNORECASE)
+    # Strip wikilinks but keep inner text
+    text = re.sub(r"\[\[([^\]]+)\]\]", r"\1", text)
+    # Strip goal IDs
+    text = re.sub(r"\^gid-[a-f0-9]+", "", text)
+    # Collapse whitespace
+    text = re.sub(r"\s+", " ", text)
+    # Strip backticks
+    text = text.strip(" `")
+    # Lowercase and strip trailing punctuation
+    return text.rstrip(".,;:!?").lower()
+
+
 @dataclass
 class Goal:
     """A checkbox task with optional deadline."""
@@ -23,26 +48,5 @@ class Goal:
 
     def __post_init__(self) -> None:
         """Compute canonical form for deduplication."""
-        self.canonical = self._compute_canonical(self.body)
+        self.canonical = canonical_goal_text(self.body)
 
-    @staticmethod
-    def _compute_canonical(text: str) -> str:
-        """
-        Normalize goal text for comparison.
-
-        - Strips checkbox markers
-        - Strips wikilinks (keeps inner text)
-        - Strips goal IDs
-        - Collapses whitespace
-        - Lowercases and removes trailing punctuation
-        """
-        # Strip checkbox markers
-        text = re.sub(r"^[-*]\s*\[[x ]\]\s*", "", text.strip(), flags=re.IGNORECASE)
-        # Strip wikilinks but keep inner text
-        text = re.sub(r"\[\[([^\]]+)\]\]", r"\1", text)
-        # Strip goal IDs
-        text = re.sub(r"\^gid-[a-f0-9]+", "", text)
-        # Collapse whitespace
-        text = re.sub(r"\s+", " ", text)
-        # Lowercase and strip trailing punctuation
-        return text.strip().rstrip(".,;:!?").lower()

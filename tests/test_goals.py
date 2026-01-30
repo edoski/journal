@@ -8,8 +8,8 @@ from __future__ import annotations
 
 
 from sync.models import Goal
+from sync.models.goals import canonical_goal_text as canonical_goal
 from sync.readers.goals import (
-    _canonical_goal as canonical_goal,
     generate_goal_id,
     generate_goal_id_for,
     _extract_goal_id as extract_goal_id,
