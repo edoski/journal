@@ -20,6 +20,7 @@ from sync.notes import (
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
+    safe_read_file,
 )
 from sync.dates import daterange, year_range, year_quarters
 from sync.formatting import (
@@ -582,11 +583,7 @@ def main() -> None:
     with locked_note(note_path):
         ensure_note(note_path, YEARLY_TEMPLATE_PATH)
 
-        try:
-            with open(note_path, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            lines = []
+        lines = safe_read_file(note_path) or []
 
         g_start, g_end = goals_section_bounds(lines)
         yearly_tasks = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
@@ -594,18 +591,11 @@ def main() -> None:
 
         prev_tasks = []
         prev_note_path = os.path.join(JOURNAL_DIR, f"{prev_year}.md")
-        try:
-            with open(prev_note_path, "r") as pf:
-                prev_lines = pf.read().splitlines()
+        prev_lines = safe_read_file(prev_note_path)
+        if prev_lines is not None:
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "YEARLY")
             prev_tasks = ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
-        except FileNotFoundError:
-            logger.debug("Previous year note not found at %s", prev_note_path)
-            prev_tasks = []
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read previous year note at %s: %s", prev_note_path, e)
-            prev_tasks = []
 
         open_prev = [t for t in prev_tasks if not t.done]
         existing_ids = {t.id for t in yearly_tasks if t.id}

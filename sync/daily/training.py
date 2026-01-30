@@ -15,6 +15,7 @@ from typing import Any
 
 from sync.formatting import format_minutes_seconds
 from sync.logging import get_logger
+from sync.io import safe_save_json, safe_load_dated_cache
 
 from .constants import TRAINING_CACHE_PATH
 
@@ -101,18 +102,8 @@ def _load_training_cache(date_str: str) -> list[TrainingEntry]:
     Returns:
         List of cached training entries, or empty list if none
     """
-    try:
-        with open(TRAINING_CACHE_PATH, "r") as f:
-            obj = json.load(f)
-        if obj.get("date") == date_str and isinstance(obj.get("entries"), list):
-            return obj.get("entries") or []
-    except FileNotFoundError:
-        logger.debug("No training cache found at %s", TRAINING_CACHE_PATH)
-    except json.JSONDecodeError as e:
-        logger.debug("Corrupt training cache: %s", e)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to read training cache: %s", e)
-    return []
+    entries = safe_load_dated_cache(TRAINING_CACHE_PATH, date_str, entries_type=list)
+    return entries or []
 
 
 def _save_training_cache(date_str: str, entries: list[TrainingEntry]) -> None:
@@ -123,12 +114,7 @@ def _save_training_cache(date_str: str, entries: list[TrainingEntry]) -> None:
         date_str: Date string in YYYY-MM-DD format
         entries: List of training entries to cache
     """
-    try:
-        os.makedirs(os.path.dirname(TRAINING_CACHE_PATH), exist_ok=True)
-        with open(TRAINING_CACHE_PATH, "w") as f:
-            json.dump({"date": date_str, "entries": entries}, f)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to write training cache: %s", e)
+    safe_save_json(TRAINING_CACHE_PATH, {"date": date_str, "entries": entries})
 
 
 def _activity_entries_from_data(

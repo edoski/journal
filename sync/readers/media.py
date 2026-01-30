@@ -13,6 +13,8 @@ from collections import OrderedDict
 from sync.constants import MEDIA_CACHE_PATH
 from sync.logging import get_logger
 from sync.models import Book, Podcast
+from sync.readers.frontmatter import parse_frontmatter
+from sync.io import safe_read_file, safe_load_json, safe_save_json
 
 logger = get_logger()
 
@@ -29,31 +31,19 @@ def _load_media_cache() -> dict[str, dict[str, str]]:
     Returns:
         Dict with 'podcasts' and 'books' keys, each mapping title -> date string
     """
-    try:
-        with open(MEDIA_CACHE_PATH, "r") as f:
-            data = json.load(f)
-        # Ensure structure
-        if not isinstance(data, dict):
-            return {"podcasts": {}, "books": {}}
-        return {
-            "podcasts": data.get("podcasts", {}),
-            "books": data.get("books", {}),
-        }
-    except FileNotFoundError:
-        return {"podcasts": {}, "books": {}}
-    except (json.JSONDecodeError, PermissionError, OSError) as e:
-        logger.warning("Failed to load media cache: %s", e)
-        return {"podcasts": {}, "books": {}}
+    default = {"podcasts": {}, "books": {}}
+    data = safe_load_json(MEDIA_CACHE_PATH, default)
+    if not isinstance(data, dict):
+        return default
+    return {
+        "podcasts": data.get("podcasts", {}),
+        "books": data.get("books", {}),
+    }
 
 
 def _save_media_cache(cache: dict[str, dict[str, str]]) -> None:
     """Save media dates cache to disk."""
-    try:
-        os.makedirs(os.path.dirname(MEDIA_CACHE_PATH), exist_ok=True)
-        with open(MEDIA_CACHE_PATH, "w") as f:
-            json.dump(cache, f, indent=2)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to save media cache: %s", e)
+    safe_save_json(MEDIA_CACHE_PATH, cache)
 
 
 def _heal_frontmatter_date(
@@ -101,29 +91,6 @@ def _heal_frontmatter_date(
             logger.warning("Failed to heal frontmatter in %s: %s", filepath, e)
 
 
-
-
-def _parse_frontmatter(lines: list[str]) -> OrderedDict[str, str]:
-    """Parse YAML frontmatter from markdown lines."""
-    data: OrderedDict[str, str] = OrderedDict()
-    if not lines or lines[0].strip() != "---":
-        return data
-    end_idx = None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            end_idx = i
-            break
-    if end_idx is None:
-        return data
-    for line in lines[1:end_idx]:
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if ":" not in stripped:
-            continue
-        key, value = stripped.split(":", 1)
-        data[key.strip()] = value.strip()
-    return data
 
 
 def _parse_date_link(value: str) -> datetime.date | None:
@@ -197,16 +164,11 @@ def scan_books(
         if not os.path.isfile(filepath):
             continue
 
-        try:
-            with open(filepath, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            continue
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read book file %s: %s", filepath, e)
+        lines = safe_read_file(filepath)
+        if lines is None:
             continue
 
-        frontmatter = _parse_frontmatter(lines)
+        frontmatter = parse_frontmatter(lines)
 
         # Parse completed date
         completed_str = frontmatter.get("completed", "")
@@ -301,16 +263,11 @@ def scan_podcasts(
         if not os.path.isfile(filepath):
             continue
 
-        try:
-            with open(filepath, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            continue
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read podcast file %s: %s", filepath, e)
+        lines = safe_read_file(filepath)
+        if lines is None:
             continue
 
-        frontmatter = _parse_frontmatter(lines)
+        frontmatter = parse_frontmatter(lines)
 
         # Parse date
         date_str = frontmatter.get("date", "")

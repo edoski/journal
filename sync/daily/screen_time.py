@@ -15,6 +15,7 @@ from sync.constants import SCREEN_TIME
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
+from sync.io import safe_save_json, safe_load_dated_cache
 
 from .icloud import _load_status_file
 from sync.logging import get_logger
@@ -119,18 +120,8 @@ def _load_screen_time_cache(date_str: str) -> dict[str, float]:
     Returns:
         Dict mapping app names to minutes, or empty dict if none
     """
-    try:
-        with open(SCREEN_TIME_CACHE_PATH, "r") as f:
-            obj = json.load(f)
-        if obj.get("date") == date_str and isinstance(obj.get("entries"), dict):
-            return obj.get("entries") or {}
-    except FileNotFoundError:
-        logger.debug("No screen time cache found at %s", SCREEN_TIME_CACHE_PATH)
-    except json.JSONDecodeError as e:
-        logger.debug("Corrupt screen time cache: %s", e)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to read screen time cache: %s", e)
-    return {}
+    entries = safe_load_dated_cache(SCREEN_TIME_CACHE_PATH, date_str, entries_type=dict)
+    return entries or {}
 
 
 def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
@@ -141,12 +132,7 @@ def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
         date_str: Date string in YYYY-MM-DD format
         entries: Dict mapping app names to minutes
     """
-    try:
-        os.makedirs(os.path.dirname(SCREEN_TIME_CACHE_PATH), exist_ok=True)
-        with open(SCREEN_TIME_CACHE_PATH, "w") as f:
-            json.dump({"date": date_str, "entries": entries}, f)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to write screen time cache: %s", e)
+    safe_save_json(SCREEN_TIME_CACHE_PATH, {"date": date_str, "entries": entries})
 
 
 def _group_by_threshold(

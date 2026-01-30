@@ -25,6 +25,7 @@ from sync.notes import (
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
+    safe_read_file,
 )
 from sync.dates import (
     daterange,
@@ -550,11 +551,7 @@ def main() -> None:
     with locked_note(note_path):
         ensure_note(note_path, MONTHLY_TEMPLATE_PATH)
 
-        try:
-            with open(note_path, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            lines = []
+        lines = safe_read_file(note_path) or []
 
         # Parse goals (existing mirrors + monthly source) and carry forward open monthly goals.
         g_start, g_end = goals_section_bounds(lines)
@@ -576,17 +573,12 @@ def main() -> None:
             prev_month = month_start.month - 1
         prev_month_start, _ = month_range(prev_year, prev_month)
         prev_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
-        try:
-            with open(prev_path, "r") as pf:
-                prev_lines = pf.read().splitlines()
+        prev_lines = safe_read_file(prev_path)
+        if prev_lines is not None:
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
             prev_tasks = ensure_goal_ids(prev_tasks, "monthly", prev_month_start.isoformat())
-        except FileNotFoundError:
-            get_logger().debug("No previous monthly note at %s", prev_path)
-            prev_tasks = []
-        except (PermissionError, OSError) as e:
-            get_logger().warning("Failed to load previous monthly note from %s: %s", prev_path, e)
+        else:
             prev_tasks = []
 
         monthly_tasks, _ = carry_forward_goals(

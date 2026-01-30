@@ -446,11 +446,12 @@ class TestRenderWeeklyTrainingGrid:
         result = render_weekly_training_grid(
             dates=sample_week_dates,
             daily_data=sample_daily_data,
+            mindful_count=2,
             workout_count=3,
             stretch_count=2,
         )
 
-        # Should have header, workout row, stretch row, separator, labels
+        assert any("MINDFUL:" in line for line in result)
         assert any("WORKOUT:" in line for line in result)
         assert any("STRETCH:" in line for line in result)
         assert any("MON" in line for line in result)
@@ -460,6 +461,7 @@ class TestRenderWeeklyTrainingGrid:
         result = render_weekly_training_grid(
             dates=sample_week_dates,
             daily_data=sample_daily_data,
+            mindful_count=2,
             workout_count=3,
             stretch_count=2,
         )
@@ -473,6 +475,7 @@ class TestRenderWeeklyTrainingGrid:
         result = render_weekly_training_grid(
             dates=sample_week_dates,
             daily_data=sample_daily_data,
+            mindful_count=2,
             workout_count=3,
             stretch_count=2,
             current_date=current,
@@ -694,11 +697,13 @@ class TestRenderTrainingFrequencyGrid:
         result = render_training_frequency_grid(
             week_ranges=week_ranges,
             daily_data=daily_data,
+            mindful_count=1,
             workout_count=1,
             stretch_count=1,
             days_in_period=14,
         )
 
+        assert any("MINDFUL" in line for line in result)
         assert any("WORKOUT" in line for line in result)
         assert any("STRETCH" in line for line in result)
         assert any("DEC" in line for line in result)
@@ -712,6 +717,7 @@ class TestRenderTrainingFrequencyGrid:
         result = render_training_frequency_grid(
             week_ranges=week_ranges,
             daily_data=daily_data,
+            mindful_count=0,
             workout_count=1,
             stretch_count=0,
             days_in_period=7,

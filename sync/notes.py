@@ -20,11 +20,16 @@ from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.screen_time import parse_procrastination_table
 from sync.models.goals import Goal
 
+from sync.logging import get_logger
+
+# Import from io.py and re-export for backward compatibility
+from sync.io import safe_read_file  # noqa: F401
+
+_logger = get_logger()
+
 
 def _normalize_header(line: str) -> str:
     """Normalize markdown headers for matching, ignoring emphasis markers."""
-    import re
-
     stripped = line.strip()
     cleaned = re.sub(r"\*+", "", stripped)
     cleaned = re.sub(r"_+", "", cleaned)
@@ -33,8 +38,6 @@ def _normalize_header(line: str) -> str:
 
 def _parse_duration_to_minutes(val) -> float | None:
     """Parse duration string to minutes."""
-    import re
-
     if val is None:
         return None
     if isinstance(val, (int, float)):
@@ -382,13 +385,10 @@ def parse_sleep_table(lines: list[str]) -> list[tuple]:
 
 def parse_daily_note(path: str) -> dict | None:
     """Parse a daily note file and return extracted metrics."""
-    try:
-        text = open(path, "r").read()
-    except FileNotFoundError:
+    lines = safe_read_file(path)
+    if lines is None:
         return None
-    except (PermissionError, OSError):
-        return None
-    lines = text.splitlines()
+
     fm = parse_frontmatter(lines)
 
     study_rows = parse_study_table(lines)

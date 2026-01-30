@@ -4,7 +4,6 @@ Shared base patterns for periodic sync modules.
 Provides common functionality used across weekly, monthly, quarterly, and yearly sync:
 - Goal carry-forward with cache guard
 - Goal status propagation from mirror to source
-- Atomic file writes
 - Period data loading
 """
 
@@ -14,7 +13,8 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
-from sync.notes import parse_daily_note
+from sync.notes import parse_daily_note, safe_read_file
+from sync.io import atomic_write_note  # noqa: F401
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
 
@@ -132,21 +132,6 @@ def propagate_goal_status(
     return changed
 
 
-def atomic_write_note(path: str, lines: list[str]) -> None:
-    """
-    Write a note atomically via temp file + replace.
-
-    Args:
-        path: Target file path
-        lines: Lines to write (will be joined with newlines)
-    """
-    import os
-
-    tmp_path = path + ".tmp"
-    with open(tmp_path, "w") as f:
-        f.write("\n".join(lines).rstrip() + "\n")
-    os.replace(tmp_path, path)
-
 
 def load_quarterly_goals(month_start: datetime.date) -> tuple[list, list, str, list[str]]:
     """
@@ -176,14 +161,8 @@ def load_quarterly_goals(month_start: datetime.date) -> tuple[list, list, str, l
     path = os.path.join(JOURNAL_DIR, filename)
     ensure_note(path, QUARTERLY_TEMPLATE_PATH)
 
-    try:
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-    except FileNotFoundError:
-        logger.debug("No quarterly note at %s", path)
-        return [], [], path, []
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to load quarterly note from %s: %s", path, e)
+    lines = safe_read_file(path)
+    if lines is None:
         return [], [], path, []
 
     g_start, g_end = goals_section_bounds(lines)

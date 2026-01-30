@@ -20,6 +20,7 @@ from sync.notes import (
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
+    safe_read_file,
 )
 from sync.dates import (
     daterange,
@@ -526,11 +527,7 @@ def main() -> None:
     with locked_note(note_path):
         ensure_note(note_path, QUARTERLY_TEMPLATE_PATH)
 
-        try:
-            with open(note_path, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            lines = []
+        lines = safe_read_file(note_path) or []
 
         g_start, g_end = goals_section_bounds(lines)
         yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
@@ -544,40 +541,27 @@ def main() -> None:
             JOURNAL_DIR, f"{quarter_id(prev_year, prev_quarter)}.md"
         )
         prev_tasks = []
-        try:
-            with open(prev_note_path, "r") as pf:
-                prev_lines = pf.read().splitlines()
+        prev_lines = safe_read_file(prev_note_path)
+        if prev_lines is not None:
             p_start, p_end = goals_section_bounds(prev_lines)
             p_body = extract_subsection_tasks(prev_lines, p_start, p_end, "QUARTERLY")
             p_body = ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
             prev_tasks = p_body
-        except FileNotFoundError:
-            logger.debug("Previous quarter note not found at %s", prev_note_path)
-            prev_tasks = []
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read previous quarter note at %s: %s", prev_note_path, e)
-            prev_tasks = []
 
         quarterly_tasks, _ = carry_forward_goals(
             prev_tasks, quarterly_tasks, qtr_key, "quarterly"
         )
 
         yearly_tasks = []
-        yearly_lines = []
         yearly_path = os.path.join(JOURNAL_DIR, f"{year}.md")
-        try:
-            with open(yearly_path, "r") as yf:
-                yearly_lines = yf.read().splitlines()
+        yearly_lines = safe_read_file(yearly_path)
+        if yearly_lines is not None:
             y_start, y_end = goals_section_bounds(yearly_lines)
             yearly_tasks = extract_subsection_tasks(
                 yearly_lines, y_start, y_end, "YEARLY"
             )
-        except FileNotFoundError:
-            logger.debug("Yearly note not found at %s", yearly_path)
-            yearly_tasks = []
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read yearly note at %s: %s", yearly_path, e)
-            yearly_tasks = []
+        else:
+            yearly_lines = []
         yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
         # Propagate completed YEARLY goals from quarterly mirror back to the yearly source.
@@ -585,14 +569,7 @@ def main() -> None:
 
         if yearly_changed:
             with locked_note(yearly_path):
-                # Reload yearly note in case it changed while we were working.
-                try:
-                    with open(yearly_path, "r") as yf:
-                        yearly_lines = yf.read().splitlines()
-                except FileNotFoundError:
-                    logger.debug("Yearly note not found at %s", yearly_path)
-                except (PermissionError, OSError) as e:
-                    logger.warning("Failed to read yearly note at %s: %s", yearly_path, e)
+                yearly_lines = safe_read_file(yearly_path) or yearly_lines
                 y_start, y_end = goals_section_bounds(yearly_lines)
                 new_yearly_block = build_goals_block(
                     [
@@ -638,16 +615,6 @@ def main() -> None:
         daily_data = load_daily_data(quarter_start, quarter_end)
         prev_daily_data = load_daily_data(prev_start, prev_end)
         month_ranges = quarter_months(year, quarter_num)
-
-        metrics_block = build_quarterly_metrics(
-            quarter_start,
-            quarter_end,
-            month_ranges,
-            daily_data,
-            prev_daily_data,
-            prev_year,
-            prev_quarter,
-        )
 
         # Load 4 prior quarters for moving average calculation
         prior_quarter_metrics = []

@@ -26,6 +26,7 @@ from sync.notes import (
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
+    safe_read_file,
 )
 from sync.dates import daterange, iso_week_range, quarter_of_date, quarter_id
 from sync.formatting import format_minutes
@@ -80,14 +81,8 @@ def _load_monthly_goals(month_start):
     """
     path = os.path.join(JOURNAL_DIR, f"{month_start.year}-{month_start.month:02d}.md")
     ensure_note(path, MONTHLY_TEMPLATE_PATH)
-    try:
-        with open(path, "r") as f:
-            lines = f.read().splitlines()
-    except FileNotFoundError:
-        get_logger().debug("No monthly note at %s", path)
-        return [], [], path, []
-    except (PermissionError, OSError) as e:
-        get_logger().warning("Failed to load monthly note from %s: %s", path, e)
+    lines = safe_read_file(path)
+    if lines is None:
         return [], [], path, []
 
     g_start, g_end = goals_section_bounds(lines)
@@ -425,11 +420,7 @@ def main() -> None:
             prior_week_metrics=prior_week_metrics,
         )
 
-        try:
-            with open(note_path, "r") as f:
-                lines = f.read().splitlines()
-        except FileNotFoundError:
-            lines = []
+        lines = safe_read_file(note_path) or []
 
         # Parse existing goals in the weekly note
         monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
@@ -445,17 +436,10 @@ def main() -> None:
         )
         prev_week_tasks = []
         if os.path.exists(prev_week_path):
-            try:
-                with open(prev_week_path, "r") as pf:
-                    prev_lines = pf.read().splitlines()
+            prev_lines = safe_read_file(prev_week_path)
+            if prev_lines is not None:
                 _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
                 prev_week_tasks = ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
-            except FileNotFoundError:
-                logger.debug("Previous week note not found at %s", prev_week_path)
-                prev_week_tasks = []
-            except (PermissionError, OSError) as e:
-                logger.warning("Failed to read previous week note at %s: %s", prev_week_path, e)
-                prev_week_tasks = []
 
         weekly_tasks, _ = carry_forward_goals(
             prev_week_tasks, weekly_tasks, week_key, "weekly"
@@ -469,16 +453,7 @@ def main() -> None:
 
         if monthly_changed:
             with locked_note(monthly_path):
-                # refresh monthly_lines in case file changed
-                try:
-                    with open(monthly_path, "r") as mf:
-                        monthly_lines = mf.read().splitlines()
-                except FileNotFoundError:
-                    logger.debug("Monthly note not found at %s", monthly_path)
-                    monthly_lines = []
-                except (PermissionError, OSError) as e:
-                    logger.warning("Failed to read monthly note at %s: %s", monthly_path, e)
-                    monthly_lines = []
+                monthly_lines = safe_read_file(monthly_path) or []
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
         # Write back quarterly note if quarterly or yearly status changed
@@ -486,15 +461,7 @@ def main() -> None:
             from sync.writers.goals import build_goals_block as bg
 
             with locked_note(quarterly_path):
-                try:
-                    with open(quarterly_path, "r") as qf:
-                        quarterly_lines = qf.read().splitlines()
-                except FileNotFoundError:
-                    logger.debug("Quarterly note not found at %s", quarterly_path)
-                    quarterly_lines = []
-                except (PermissionError, OSError) as e:
-                    logger.warning("Failed to read quarterly note at %s: %s", quarterly_path, e)
-                    quarterly_lines = []
+                quarterly_lines = safe_read_file(quarterly_path) or []
                 g_start_q, g_end_q = goals_section_bounds(quarterly_lines)
                 new_q_block = bg(
                     [
