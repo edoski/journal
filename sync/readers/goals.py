@@ -8,10 +8,10 @@ import calendar
 import datetime
 import hashlib
 import re
+import uuid
 
 from sync.models import Goal
 from sync.models.goals import canonical_goal_text
-from sync.writers.goals import generate_goal_id
 
 
 # Regex patterns for date formats in goals
@@ -129,6 +129,11 @@ def _extract_goal_id(line: str) -> str | None:
     if m:
         return f"gid-{m.group(1).lower()}"
     return None
+
+
+def generate_goal_id() -> str:
+    """Return a short random goal id (gid-xxxxxxxxxx)."""
+    return f"gid-{uuid.uuid4().hex[:10]}"
 
 
 def generate_goal_id_for(

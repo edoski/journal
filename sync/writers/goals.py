@@ -5,14 +5,9 @@ Goal rendering for the journal sync system.
 from __future__ import annotations
 
 import datetime
-import uuid
 
 from sync.models import Goal
-
-
-def generate_goal_id() -> str:
-    """Return a short goal id (gid-xxxxxxxxxx)."""
-    return f"gid-{uuid.uuid4().hex[:10]}"
+from sync.readers.goals import generate_goal_id  # noqa: F401
 
 
 def format_countdown(
