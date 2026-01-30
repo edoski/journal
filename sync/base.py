@@ -153,7 +153,7 @@ def load_quarterly_goals(month_start: datetime.date) -> tuple[list, list, str, l
     from sync.constants import QUARTERLY_TEMPLATE_PATH
     from sync.logging import get_logger
 
-    logger = get_logger()
+    get_logger()
 
     q_year, q_num = quarter_of_date(month_start)
     quarter_key = quarter_id(q_year, q_num)

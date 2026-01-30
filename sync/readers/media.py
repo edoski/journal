@@ -5,10 +5,8 @@ Media (books and podcasts) scanning for the journal sync system.
 from __future__ import annotations
 
 import datetime
-import json
 import os
 import re
-from collections import OrderedDict
 
 from sync.constants import MEDIA_CACHE_PATH
 from sync.logging import get_logger
@@ -31,7 +29,7 @@ def _load_media_cache() -> dict[str, dict[str, str]]:
     Returns:
         Dict with 'podcasts' and 'books' keys, each mapping title -> date string
     """
-    default = {"podcasts": {}, "books": {}}
+    default: dict[str, dict[str, str]] = {"podcasts": {}, "books": {}}
     data = safe_load_json(MEDIA_CACHE_PATH, default)
     if not isinstance(data, dict):
         return default

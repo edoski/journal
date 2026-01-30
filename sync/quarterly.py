@@ -5,7 +5,8 @@ import os
 
 from sync.logging import get_logger
 
-logger = get_logger()
+
+
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -65,6 +66,8 @@ from sync.writers.media import build_media_section
 from sync.readers.goals import filter_by_proximity, ensure_goal_ids
 
 from sync.base import carry_forward_goals, propagate_goal_status, atomic_write_note
+
+logger = get_logger()
 
 
 def render_quarterly_training_bars(
@@ -544,8 +547,8 @@ def main() -> None:
         prev_tasks = []
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
-            p_start, p_end = goals_section_bounds(prev_lines)
-            p_body = extract_subsection_tasks(prev_lines, p_start, p_end, "QUARTERLY")
+            g_start, g_end = goals_section_bounds(prev_lines)
+            p_body = extract_subsection_tasks(prev_lines, g_start, g_end, "QUARTERLY")
             p_body = ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
             prev_tasks = p_body
 

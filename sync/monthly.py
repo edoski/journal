@@ -5,15 +5,14 @@ import os
 import sys
 from dataclasses import replace
 
-from sync.models import Goal
 from sync.logging import get_logger
 
-logger = get_logger()
+
+
 
 from sync.constants import (
     JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
-    QUARTERLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
 )
 from sync.notes import (
@@ -78,6 +77,8 @@ from sync.base import (
     load_quarterly_goals,
     process_pierced_goals,
 )
+
+logger = get_logger()
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):

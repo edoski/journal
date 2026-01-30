@@ -11,7 +11,6 @@ import re
 import uuid
 
 from sync.models import Goal
-from sync.models.goals import canonical_goal_text
 
 
 # Regex patterns for date formats in goals

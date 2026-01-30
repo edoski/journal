@@ -119,7 +119,7 @@ def safe_load_dated_cache(
     path: str,
     date_str: str,
     entries_type: type = list,
-) -> list | dict | None:
+) -> Any:
     """
     Load a date-validated cache file.
 

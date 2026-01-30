@@ -5,7 +5,8 @@ import os
 
 from sync.logging import get_logger
 
-logger = get_logger()
+
+
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -62,6 +63,8 @@ from sync.writers.media import build_media_section
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import atomic_write_note
+
+logger = get_logger()
 
 YEARLY_STUDY_BAR_WIDTH = 45
 YEARLY_TRAINING_BAR_WIDTH = 45
@@ -594,8 +597,8 @@ def main() -> None:
         prev_note_path = os.path.join(JOURNAL_DIR, f"{prev_year}.md")
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
-            p_start, p_end = goals_section_bounds(prev_lines)
-            prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "YEARLY")
+            g_start, g_end = goals_section_bounds(prev_lines)
+            prev_tasks = extract_subsection_tasks(prev_lines, g_start, g_end, "YEARLY")
             prev_tasks = ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
 
         open_prev = [t for t in prev_tasks if not t.done]

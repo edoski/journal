@@ -8,28 +8,25 @@ including goals, metrics sections, and frontmatter.
 from __future__ import annotations
 
 import datetime
-import json
 import os
 from collections import OrderedDict
 from dataclasses import replace
 
 from sync.constants import (
     JOURNAL_DIR,
-    WEEKLY_TEMPLATE_PATH,
 )
 from sync.logging import get_logger
 from sync.notes import (
     locked_note,
-    ensure_note,
     extract_block,
     goals_section_bounds,
-    extract_subsection_tasks,
+
     find_header_idx,
     replace_metrics_block,
     ensure_section_with_divider,
     section_bounds,
 )
-from sync.dates import iso_week_range
+
 from sync.formatting import format_minutes
 from sync.reminders import get_review_reminders_for_date, get_periodic_reminders_for_date
 from sync.writers.goals import render_goal_lines, build_goals_block
@@ -40,9 +37,9 @@ from sync.base import propagate_goal_status, process_pierced_goals
 from .constants import TEMPLATE_PATH
 from .flow_db import SessionDict
 from .goals import (
-    weekly_note_path,
     load_weekly_goals,
     write_weekly_goals,
+
     parse_daily_goal_subsections,
     carry_forward_daily_tasks,
 )

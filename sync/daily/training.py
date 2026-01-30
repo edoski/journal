@@ -7,8 +7,8 @@ data for daily notes.
 
 from __future__ import annotations
 
-import json
-import os
+
+
 import re
 from collections import OrderedDict
 from typing import Any

@@ -5,16 +5,15 @@ import os
 import sys
 from dataclasses import replace
 
-from sync.models import Goal
 from sync.logging import get_logger
 
-logger = get_logger()
+
+
 
 from sync.constants import (
     JOURNAL_DIR,
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
-    QUARTERLY_TEMPLATE_PATH,
     DAYS,
 )
 from sync.notes import (
@@ -28,7 +27,7 @@ from sync.notes import (
     join_sections,
     safe_read_file,
 )
-from sync.dates import daterange, iso_week_range, quarter_of_date, quarter_id
+from sync.dates import daterange, iso_week_range
 from sync.formatting import format_minutes
 from sync.metrics import (
     compute_period_metrics,
@@ -66,6 +65,8 @@ from sync.base import (
     load_quarterly_goals,
     process_pierced_goals,
 )
+
+logger = get_logger()
 
 
 def _load_monthly_goals(month_start):
