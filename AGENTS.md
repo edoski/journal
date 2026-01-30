@@ -31,7 +31,8 @@ journal/
     dates.py              # Date range calculations
     formatting.py         # Value parsing and formatting
     metrics.py            # Period aggregation and delta computation
-    notes.py              # File I/O, locking, markdown section manipulation
+    notes.py              # File locking and markdown section manipulation
+    io.py                 # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     reminders.py          # Periodic review reminder generation
     carried_goals.py      # Goal carry-forward cache management
     logging.py            # Logging utilities
@@ -42,7 +43,7 @@ journal/
     session_preview.py    # View session stats (read-only)
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (397 tests)
+  tests/                  # Pytest test suite (412 tests)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -172,7 +173,8 @@ sync/
     ├── dates.py        # Date range calculations
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation
-    ├── notes.py        # File I/O, markdown manipulation
+    ├── notes.py         # File locking, markdown manipulation
+    ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     ├── reminders.py    # Review reminder generation
     ├── logging.py      # Logging utilities
     └── base.py         # Cross-period utilities
@@ -210,7 +212,8 @@ sync/
 - `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
 - `metrics.py`: `load_daily_data`, `compute_period_metrics`, `compute_moving_average`
-- `notes.py`: `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`
+- `notes.py`: `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`, `splice_goals_section`
+- `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
 - `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
 
 ### Dated Goals
@@ -331,7 +334,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 397 tests
+pytest tests/ -v              # All 412 tests
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```

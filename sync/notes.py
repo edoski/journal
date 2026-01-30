@@ -252,6 +252,41 @@ def goals_section_bounds(lines: list[str]) -> tuple[int, int]:
     return goals_idx, end
 
 
+def splice_goals_section(
+    lines: list[str], new_block: list[str], insert_if_missing: bool = False
+) -> bool:
+    """
+    Replace the Goals section in lines with new_block.
+
+    This consolidates the repeated pattern:
+        g_start, g_end = goals_section_bounds(lines)
+        if g_start == -1:
+            lines[:] = new_block + ([""] if lines and lines[0].strip() else []) + lines
+        else:
+            lines[g_start:g_end] = new_block
+
+    Args:
+        lines: The note lines to modify (in-place)
+        new_block: The new Goals section content (including header)
+        insert_if_missing: If True, prepend new_block when Goals section doesn't exist
+
+    Returns:
+        True if the section was found and replaced (or inserted), False if not found
+        and insert_if_missing was False
+    """
+    g_start, g_end = goals_section_bounds(lines)
+    if g_start < 0:
+        if insert_if_missing:
+            # Prepend with blank line separator if content exists
+            separator = [""] if lines and lines[0].strip() else []
+            lines[:] = new_block + separator + lines[:]
+            return True
+        return False
+    lines[g_start:g_end] = new_block
+    return True
+
+
+
 def extract_subsection_tasks(
     lines: list[str], parent_start: int, parent_end: int, sub_title: str
 ) -> list[Goal]:

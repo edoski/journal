@@ -14,6 +14,7 @@ from sync.notes import (
     extract_block,
     ensure_section_with_divider,
     goals_section_bounds,
+    splice_goals_section,
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
@@ -187,6 +188,54 @@ class TestGoalsSectionBounds:
         assert start == -1
         assert end == -1
 
+
+class TestSpliceGoalsSection:
+    """Tests for splice_goals_section function."""
+
+    def test_replaces_existing_section(self):
+        lines = [
+            "## Goals",
+            "### WEEKLY",
+            "- [ ] Old task",
+            "## Metrics",
+            "Content",
+        ]
+        new_block = ["## Goals", "### WEEKLY", "- [ ] New task"]
+        result = splice_goals_section(lines, new_block)
+        assert result is True
+        assert lines == ["## Goals", "### WEEKLY", "- [ ] New task", "## Metrics", "Content"]
+
+    def test_returns_false_when_missing(self):
+        lines = ["## Metrics", "Content"]
+        new_block = ["## Goals", "- [ ] Task"]
+        result = splice_goals_section(lines, new_block)
+        assert result is False
+        assert lines == ["## Metrics", "Content"]  # unchanged
+
+    def test_insert_if_missing_prepends(self):
+        lines = ["## Metrics", "Content"]
+        new_block = ["## Goals", "- [ ] Task"]
+        result = splice_goals_section(lines, new_block, insert_if_missing=True)
+        assert result is True
+        assert lines == ["## Goals", "- [ ] Task", "", "## Metrics", "Content"]
+
+    def test_insert_if_missing_with_existing_replaces(self):
+        lines = [
+            "## Goals",
+            "- [ ] Old task",
+            "## Metrics",
+        ]
+        new_block = ["## Goals", "- [ ] New task"]
+        result = splice_goals_section(lines, new_block, insert_if_missing=True)
+        assert result is True
+        assert lines == ["## Goals", "- [ ] New task", "## Metrics"]
+
+    def test_prepend_no_separator_on_empty(self):
+        lines = []
+        new_block = ["## Goals", "- [ ] Task"]
+        result = splice_goals_section(lines, new_block, insert_if_missing=True)
+        assert result is True
+        assert lines == ["## Goals", "- [ ] Task"]
 
 class TestExtractSubsectionTasks:
     """Tests for extract_subsection_tasks function."""

@@ -26,6 +26,7 @@ from sync.notes import (
     trim_blank_lines,
     join_sections,
     safe_read_file,
+    splice_goals_section,
 )
 from sync.dates import (
     daterange,
@@ -80,22 +81,14 @@ from sync.base import (
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
-    g_start, g_end = goals_section_bounds(existing_lines)
     new_block = build_goals_block(
         [
             ("YEARLY", render_goal_lines(yearly_tasks)),
             ("QUARTERLY", render_goal_lines(quarterly_tasks)),
         ]
     )
-    if g_start == -1:
-        lines = (
-            new_block
-            + ([""] if existing_lines and existing_lines[0].strip() else [])
-            + existing_lines
-        )
-    else:
-        lines = existing_lines[:]
-        lines[g_start:g_end] = new_block
+    lines = existing_lines[:]
+    splice_goals_section(lines, new_block, insert_if_missing=True)
     tmp = path + ".tmp"
     with open(tmp, "w") as f:
         f.write("\n".join(lines).rstrip() + "\n")
@@ -654,12 +647,7 @@ def main() -> None:
                 ("MONTHLY", monthly_source_lines),
             ]
         )
-        if g_start == -1:
-            lines = (
-                new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
-            )
-        else:
-            lines[g_start:g_end] = new_goals_block
+        splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         # Load current month's daily data
         daily_data = {}

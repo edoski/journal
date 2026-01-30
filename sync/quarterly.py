@@ -21,6 +21,7 @@ from sync.notes import (
     extract_subsection_tasks,
     trim_blank_lines,
     safe_read_file,
+    splice_goals_section,
 )
 from sync.dates import (
     daterange,
@@ -605,12 +606,7 @@ def main() -> None:
                 ("QUARTERLY", render_goal_lines(quarterly_tasks)),
             ]
         )
-        if g_start == -1:
-            lines = (
-                new_goals_block + ([""] if lines and lines[0].strip() else []) + lines
-            )
-        else:
-            lines[g_start:g_end] = new_goals_block
+        splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         daily_data = load_daily_data(quarter_start, quarter_end)
         prev_daily_data = load_daily_data(prev_start, prev_end)
