@@ -286,7 +286,6 @@ def splice_goals_section(
     return True
 
 
-
 def extract_subsection_tasks(
     lines: list[str], parent_start: int, parent_end: int, sub_title: str
 ) -> list[Goal]:

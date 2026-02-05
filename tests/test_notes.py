@@ -203,7 +203,13 @@ class TestSpliceGoalsSection:
         new_block = ["## Goals", "### WEEKLY", "- [ ] New task"]
         result = splice_goals_section(lines, new_block)
         assert result is True
-        assert lines == ["## Goals", "### WEEKLY", "- [ ] New task", "## Metrics", "Content"]
+        assert lines == [
+            "## Goals",
+            "### WEEKLY",
+            "- [ ] New task",
+            "## Metrics",
+            "Content",
+        ]
 
     def test_returns_false_when_missing(self):
         lines = ["## Metrics", "Content"]
@@ -236,6 +242,7 @@ class TestSpliceGoalsSection:
         result = splice_goals_section(lines, new_block, insert_if_missing=True)
         assert result is True
         assert lines == ["## Goals", "- [ ] Task"]
+
 
 class TestExtractSubsectionTasks:
     """Tests for extract_subsection_tasks function."""

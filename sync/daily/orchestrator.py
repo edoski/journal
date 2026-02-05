@@ -20,7 +20,6 @@ from sync.notes import (
     locked_note,
     extract_block,
     goals_section_bounds,
-
     find_header_idx,
     replace_metrics_block,
     ensure_section_with_divider,
@@ -28,7 +27,10 @@ from sync.notes import (
 )
 
 from sync.formatting import format_minutes
-from sync.reminders import get_review_reminders_for_date, get_periodic_reminders_for_date
+from sync.reminders import (
+    get_review_reminders_for_date,
+    get_periodic_reminders_for_date,
+)
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.readers.goals import filter_by_proximity
 from sync.models.goals import Goal
@@ -39,7 +41,6 @@ from .flow_db import SessionDict
 from .goals import (
     load_weekly_goals,
     write_weekly_goals,
-
     parse_daily_goal_subsections,
     carry_forward_daily_tasks,
 )
@@ -380,7 +381,11 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
     )
 
     # DAILY source: daily goals + pierced monthly/quarterly/yearly goals (≤7d deadline)
-    original_daily, final_pierced, [updated_monthly, updated_quarterly, updated_yearly] = process_pierced_goals(
+    (
+        original_daily,
+        final_pierced,
+        [updated_monthly, updated_quarterly, updated_yearly],
+    ) = process_pierced_goals(
         existing_tasks=existing_daily_tasks,
         source_goal_lists=[monthly_tasks, quarterly_tasks, yearly_tasks],
         proximity_days=7,

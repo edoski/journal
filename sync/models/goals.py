@@ -49,4 +49,3 @@ class Goal:
     def __post_init__(self) -> None:
         """Compute canonical form for deduplication."""
         self.canonical = canonical_goal_text(self.body)
-

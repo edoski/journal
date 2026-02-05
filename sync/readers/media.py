@@ -84,11 +84,11 @@ def _heal_frontmatter_date(
         try:
             with open(filepath, "w") as f:
                 f.write("\n".join(new_lines))
-            logger.info("Healed %s in %s -> %s", date_key, os.path.basename(filepath), date_str)
+            logger.info(
+                "Healed %s in %s -> %s", date_key, os.path.basename(filepath), date_str
+            )
         except (PermissionError, OSError) as e:
             logger.warning("Failed to heal frontmatter in %s: %s", filepath, e)
-
-
 
 
 def _parse_date_link(value: str) -> datetime.date | None:
@@ -223,7 +223,6 @@ def scan_books(
     books.sort(key=lambda b: b.completed)
 
     return books
-
 
 
 def scan_podcasts(

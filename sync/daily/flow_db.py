@@ -358,7 +358,9 @@ def get_todays_sessions() -> list[SessionDict]:
         else:
             next_flow_start = flow_sessions[idx + 1]["start"]
             # If actual break (gap) is less than expected, overwrite expected with actual
-            actual_break_minutes = (next_flow_start - session["end"]).total_seconds() / 60
+            actual_break_minutes = (
+                next_flow_start - session["end"]
+            ).total_seconds() / 60
             if actual_break_minutes < session.get("break_expected", 0):
                 session["break_expected"] = int(actual_break_minutes + 0.5)
                 session["break_duration"] = session["break_expected"]

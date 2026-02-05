@@ -117,9 +117,6 @@ def parse_goal_date(body: str) -> tuple[str, str | None, datetime.date | None, i
     return body_without_date, date_str, deadline, reminder_offset
 
 
-
-
-
 def _extract_goal_id(line: str) -> str | None:
     """Extract a gid-... block ID from a line, if present."""
     if not line:
@@ -223,15 +220,15 @@ def filter_by_proximity(
 def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> list[Goal]:
     """
     Ensure every Goal has a valid 'id'.
-    
+
     Uses deterministic IDs for missing ones to avoid duplicates across runs.
     Returns a new list with updated Goal objects (does not mutate originals).
     """
     from dataclasses import replace
-    
+
     counts: dict[str, int] = {}
     result: list[Goal] = []
-    
+
     for t in tasks:
         canon = t.canonical or ""
         if not t.id:
@@ -241,5 +238,5 @@ def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> lis
         else:
             result.append(t)
         counts[canon] = counts.get(canon, 0) + 1
-    
+
     return result

@@ -12,7 +12,10 @@ import sqlite3
 from pathlib import Path
 
 # Flow database path
-DB_PATH = Path.home() / "Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite"
+DB_PATH = (
+    Path.home()
+    / "Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite"
+)
 
 # CoreData uses an epoch starting at 2001-01-01 instead of 1970-01-01
 CORE_DATA_EPOCH_OFFSET = 978307200
@@ -33,14 +36,14 @@ def datetime_to_core_data(dt: datetime.datetime) -> float:
 def get_connection(readonly: bool = True) -> sqlite3.Connection:
     """
     Open a connection to the Flow database.
-    
+
     Args:
         readonly: If True, opens in read-only mode (safer for previews).
                   If False, opens in read-write mode (for modifications).
-    
+
     Returns:
         sqlite3.Connection to the Flow database.
-    
+
     Raises:
         sqlite3.Error: If the database cannot be opened.
     """
@@ -53,7 +56,7 @@ def get_connection(readonly: bool = True) -> sqlite3.Connection:
 def get_recent_sessions(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
     """
     Get the N most recent sessions from the database.
-    
+
     Returns a list of dicts with keys:
         pk, phase, duration, start, completed, title
     """
@@ -98,7 +101,7 @@ def get_session_by_pk(conn: sqlite3.Connection, pk: int) -> dict | None:
     row = cursor.fetchone()
     if not row:
         return None
-    
+
     pk, phase, duration, started_at, completed_at, title = row
     return {
         "pk": pk,
@@ -110,7 +113,9 @@ def get_session_by_pk(conn: sqlite3.Connection, pk: int) -> dict | None:
     }
 
 
-def get_interruptions_for_session(conn: sqlite3.Connection, session_pk: int) -> list[dict]:
+def get_interruptions_for_session(
+    conn: sqlite3.Connection, session_pk: int
+) -> list[dict]:
     """Get all interruptions for a given session."""
     cursor = conn.cursor()
     cursor.execute(
@@ -122,44 +127,46 @@ def get_interruptions_for_session(conn: sqlite3.Connection, session_pk: int) -> 
     """,
         (session_pk,),
     )
-    
+
     results = []
     for row in cursor.fetchall():
         pk, started_at, finished_at, phase = row
         start = core_data_to_datetime(started_at)
         end = core_data_to_datetime(finished_at)
-        
+
         # Calculate duration in minutes
         duration = None
         if start and end:
             duration = (end - start).total_seconds() / 60
-        
-        results.append({
-            "pk": pk,
-            "start": start,
-            "end": end,
-            "duration": duration,
-            "phase": phase,
-        })
+
+        results.append(
+            {
+                "pk": pk,
+                "start": start,
+                "end": end,
+                "duration": duration,
+                "phase": phase,
+            }
+        )
     return results
 
 
 def format_session(session: dict, include_pk: bool = False) -> str:
     """Format a session dict as a human-readable string."""
     lines = []
-    
+
     if include_pk:
         lines.append(f"  PK:       {session['pk']}")
-    
+
     lines.append(f"  Phase:    {session['phase']}")
     lines.append(f"  Title:    {session['title'] or '(no title)'}")
-    
+
     if session["start"]:
         lines.append(f"  Started:  {session['start'].strftime('%Y-%m-%d %H:%M:%S')}")
-    
+
     lines.append(f"  Duration: {session['duration']} min (planned)")
-    
+
     status = "✓ completed" if session["completed"] else "⏳ in-progress"
     lines.append(f"  Status:   {status}")
-    
+
     return "\n".join(lines)

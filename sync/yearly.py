@@ -6,8 +6,6 @@ import os
 from sync.logging import get_logger
 
 
-
-
 from sync.constants import (
     JOURNAL_DIR,
     YEARLY_TEMPLATE_PATH,
@@ -389,7 +387,9 @@ def build_yearly_metrics(
     )
     stretch_block.append("└")
 
-    training_lines.extend(wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block))
+    training_lines.extend(
+        wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block)
+    )
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 

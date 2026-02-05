@@ -50,4 +50,3 @@ def test_study_times_normal_day(monkeypatch, tmp_path):
         "afternoon_start": "14:30",
         "afternoon_end": "15:00",
     }
-

@@ -137,8 +137,9 @@ def propagate_goal_status(
     return changed
 
 
-
-def load_quarterly_goals(month_start: datetime.date) -> tuple[list, list, str, list[str]]:
+def load_quarterly_goals(
+    month_start: datetime.date,
+) -> tuple[list, list, str, list[str]]:
     """
     Load quarterly note goals for the quarter containing month_start.
 
@@ -251,11 +252,14 @@ def process_pierced_goals(
     for g in existing_pierced:
         if g.id in source_goal_info:
             src = source_goal_info[g.id]
-            restored_existing_pierced.append(replace(g,
-                deadline=src.deadline,
-                date_str=src.date_str,
-                reminder_offset=src.reminder_offset,
-            ))
+            restored_existing_pierced.append(
+                replace(
+                    g,
+                    deadline=src.deadline,
+                    date_str=src.date_str,
+                    reminder_offset=src.reminder_offset,
+                )
+            )
         else:
             restored_existing_pierced.append(g)
 

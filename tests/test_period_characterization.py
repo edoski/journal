@@ -1,0 +1,224 @@
+"""
+Characterization tests for period metric block builders.
+
+These tests lock down high-level markdown output by comparing stable hashes
+for fixed synthetic datasets.
+"""
+
+from __future__ import annotations
+
+import datetime
+import hashlib
+
+import sync.monthly as monthly
+import sync.quarterly as quarterly
+import sync.weekly as weekly
+import sync.yearly as yearly
+from sync.dates import (
+    daterange,
+    iso_week_range,
+    month_range,
+    month_week_ranges,
+    quarter_months,
+    quarter_range,
+    year_quarters,
+    year_range,
+)
+from sync.metrics import compute_period_metrics
+
+
+_FIXTURE_MEDIA_SECTION = [
+    "### **MEDIA**",
+    "",
+    "| TYPE | TITLE | DATE |",
+    "| ---- | ----- | ---- |",
+    "| **BOOK** | [[Fixture Book]] | `2020-01-01` |",
+    "",
+]
+
+
+def _payload_for_date(day: datetime.date) -> dict:
+    """Create deterministic daily payload for characterization testing."""
+    idx = day.toordinal()
+    study = float((idx % 8) * 60)
+    coding = float(round(study * 0.65))
+    reading = float(max(0.0, study - coding))
+    return {
+        "study_minutes": study,
+        "sleep_minutes": float(390 + (idx % 7) * 15),
+        "mood": float(4.5 + (idx % 11) * 0.5),
+        "workout": idx % 3 == 0,
+        "stretch": idx % 2 == 0,
+        "meditate": idx % 4 in {0, 1},
+        "awake_minutes": float(10 + (idx % 5) * 5),
+        "awakenings": int((idx % 4) + 1),
+        "activity_totals": (
+            {"coding": coding, "reading": reading} if study > 0 else {}
+        ),
+        "interrupt_minutes": float((idx % 6) * 3),
+        "overrun_minutes": float((idx % 5) * 2),
+        "planned_break_minutes": float(5 + (idx % 3) * 5),
+        "screen_time_totals": {
+            "YouTube": float((idx % 4) * 12),
+            "X": float((idx % 3) * 7),
+            "Netflix": float(20 if idx % 5 == 0 else 0),
+        },
+    }
+
+
+def _range_data(start: datetime.date, end: datetime.date) -> dict[datetime.date, dict]:
+    return {d: _payload_for_date(d) for d in daterange(start, end)}
+
+
+def _hash_lines(lines: list[str]) -> str:
+    joined = "\n".join(lines)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+def _patch_media_sections(monkeypatch) -> None:
+    monkeypatch.setattr(
+        weekly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
+    )
+    monkeypatch.setattr(
+        monthly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
+    )
+    monkeypatch.setattr(
+        quarterly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
+    )
+    monkeypatch.setattr(
+        yearly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
+    )
+
+
+def test_weekly_metrics_block_characterization(monkeypatch):
+    _patch_media_sections(monkeypatch)
+
+    start, end = iso_week_range(datetime.date(2020, 5, 13))
+    daily_data = _range_data(start, end)
+    prev_start = start - datetime.timedelta(days=7)
+    prev_end = end - datetime.timedelta(days=7)
+    prev_daily_data = _range_data(prev_start, prev_end)
+
+    prior_week_metrics = []
+    for weeks_ago in range(4, 0, -1):
+        p_start = start - datetime.timedelta(days=7 * weeks_ago)
+        p_end = p_start + datetime.timedelta(days=6)
+        p_data = _range_data(p_start, p_end)
+        p_dates = [p_start + datetime.timedelta(days=i) for i in range(7)]
+        prior_week_metrics.append(compute_period_metrics(p_dates, p_data))
+
+    lines = weekly.build_weekly_metrics(
+        start,
+        end,
+        daily_data,
+        prev_daily_data,
+        "**[[2020-W19\\|LAST WEEK]]**",
+        prior_week_metrics=prior_week_metrics,
+    )
+
+    assert (
+        _hash_lines(lines)
+        == "82a2a38e6a0f687c3b2ac7c876f238435ff60904a3a1136fad976e8ec8e4cf25"
+    )
+
+
+def test_monthly_metrics_block_characterization(monkeypatch):
+    _patch_media_sections(monkeypatch)
+
+    start, end = month_range(2020, 5)
+    week_ranges = month_week_ranges(2020, 5)
+    daily_data = _range_data(start, end)
+    prev_start, prev_end = month_range(2020, 4)
+    prev_daily_data = _range_data(prev_start, prev_end)
+
+    prior_month_metrics = []
+    for month_num in (2, 3, 4):
+        p_start, p_end = month_range(2020, month_num)
+        p_data = _range_data(p_start, p_end)
+        p_dates = list(daterange(p_start, p_end))
+        prior_month_metrics.append(compute_period_metrics(p_dates, p_data))
+
+    lines = monthly.build_monthly_metrics(
+        start,
+        end,
+        week_ranges,
+        daily_data,
+        prev_daily_data,
+        "THIS MONTH",
+        "**[[2020-04\\|LAST MONTH]]**",
+        prior_month_metrics=prior_month_metrics,
+    )
+
+    assert (
+        _hash_lines(lines)
+        == "33bf6a5935eac76cc545772a4554adbb915db23421c4ff740b9cc8b8294da739"
+    )
+
+
+def test_quarterly_metrics_block_characterization(monkeypatch):
+    _patch_media_sections(monkeypatch)
+
+    start, end = quarter_range(2020, 3)
+    month_ranges = quarter_months(2020, 3)
+    daily_data = _range_data(start, end)
+    prev_start, prev_end = quarter_range(2020, 2)
+    prev_daily_data = _range_data(prev_start, prev_end)
+
+    prior_quarter_metrics = []
+    for year_num, quarter_num in ((2019, 3), (2019, 4), (2020, 1), (2020, 2)):
+        p_start, p_end = quarter_range(year_num, quarter_num)
+        p_data = _range_data(p_start, p_end)
+        p_dates = list(daterange(p_start, p_end))
+        prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
+
+    lines = quarterly.build_quarterly_metrics(
+        start,
+        end,
+        month_ranges,
+        daily_data,
+        prev_daily_data,
+        2020,
+        2,
+        prior_quarter_metrics=prior_quarter_metrics,
+    )
+
+    assert (
+        _hash_lines(lines)
+        == "161a230dad6b0894f5ee9dfce99e2b8f1a17035e364fc0bee0fe03e7e2b44a93"
+    )
+
+
+def test_yearly_metrics_block_characterization(monkeypatch):
+    _patch_media_sections(monkeypatch)
+
+    year = 2020
+    start, end = year_range(year)
+    prev_start, prev_end = year_range(year - 1)
+    quarter_ranges = year_quarters(year)
+    prev_quarter_ranges = year_quarters(year - 1)
+
+    daily_data = _range_data(start, end)
+    prev_daily_data = _range_data(prev_start, prev_end)
+
+    prior_year_metrics = []
+    for year_num in (2017, 2018, 2019):
+        p_start, p_end = year_range(year_num)
+        p_data = _range_data(p_start, p_end)
+        p_dates = list(daterange(p_start, p_end))
+        prior_year_metrics.append(compute_period_metrics(p_dates, p_data))
+
+    lines = yearly.build_yearly_metrics(
+        year,
+        start,
+        end,
+        quarter_ranges,
+        prev_quarter_ranges,
+        daily_data,
+        prev_daily_data,
+        prior_year_metrics=prior_year_metrics,
+    )
+
+    assert (
+        _hash_lines(lines)
+        == "a287ac89142a9373ff92c717ee563e5f17aec2c5fb2f1d45279c02d7b86b1ca5"
+    )

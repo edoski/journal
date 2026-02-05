@@ -42,9 +42,7 @@ def rename_session(conn, pk: int, new_title: str) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Rename the most recent Flow session."
-    )
+    parser = argparse.ArgumentParser(description="Rename the most recent Flow session.")
     parser.add_argument(
         "title",
         help="The new title for the session.",
@@ -78,7 +76,7 @@ def main():
     print("\nCURRENT:")
     print(format_session(flow, include_pk=True))
 
-    print(f"\nNEW TITLE: \"{args.title}\"")
+    print(f'\nNEW TITLE: "{args.title}"')
 
     print("\n" + "=" * 60)
 
@@ -94,7 +92,7 @@ def main():
     conn.commit()
     conn.close()
 
-    print(f"\n✅ Done! Session renamed to \"{args.title}\"")
+    print(f'\n✅ Done! Session renamed to "{args.title}"')
 
 
 if __name__ == "__main__":

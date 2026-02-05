@@ -2,12 +2,11 @@
 import argparse
 import datetime
 import os
+import subprocess
 import sys
 from dataclasses import replace
 
 from sync.logging import get_logger
-
-
 
 
 from sync.constants import (
@@ -106,7 +105,9 @@ def _write_monthly_goals(path, tasks, existing_lines):
     g_start, g_end = goals_section_bounds(existing_lines)
 
     # Preserve existing QUARTERLY mirror section
-    existing_quarterly = extract_subsection_tasks(existing_lines, g_start, g_end, "QUARTERLY")
+    existing_quarterly = extract_subsection_tasks(
+        existing_lines, g_start, g_end, "QUARTERLY"
+    )
     quarterly_rendered = (
         render_goal_lines(existing_quarterly)
         if existing_quarterly
@@ -114,10 +115,12 @@ def _write_monthly_goals(path, tasks, existing_lines):
     )
 
     # Rebuild Goals block with proper structure
-    new_block = build_goals_block([
-        ("QUARTERLY", quarterly_rendered),
-        ("MONTHLY", render_goal_lines(tasks)),
-    ])
+    new_block = build_goals_block(
+        [
+            ("QUARTERLY", quarterly_rendered),
+            ("MONTHLY", render_goal_lines(tasks)),
+        ]
+    )
 
     if g_start == -1:
         lines = (
@@ -253,7 +256,12 @@ def build_weekly_metrics(
     current_week_date = today if start_date <= today <= end_date else None
     mindful_days = current_metrics["mindful_count"]
     training_grid = render_weekly_training_grid(
-        dates, daily_data, mindful_days, workout_days, stretch_days, current_date=current_week_date
+        dates,
+        daily_data,
+        mindful_days,
+        workout_days,
+        stretch_days,
+        current_date=current_week_date,
     )
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
@@ -425,7 +433,9 @@ def main() -> None:
 
         # Parse existing goals in the weekly note
         monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
-        monthly_mirror = ensure_goal_ids(monthly_mirror, "monthly", month_start.isoformat())
+        monthly_mirror = ensure_goal_ids(
+            monthly_mirror, "monthly", month_start.isoformat()
+        )
         weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
 
         # Carry forward open weekly goals from prior week
@@ -440,7 +450,9 @@ def main() -> None:
             prev_lines = safe_read_file(prev_week_path)
             if prev_lines is not None:
                 _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
-                prev_week_tasks = ensure_goal_ids(prev_week_tasks, "weekly", prev_week_start.isoformat())
+                prev_week_tasks = ensure_goal_ids(
+                    prev_week_tasks, "weekly", prev_week_start.isoformat()
+                )
 
         weekly_tasks, _ = carry_forward_goals(
             prev_week_tasks, weekly_tasks, week_key, "weekly"
@@ -501,11 +513,14 @@ def main() -> None:
         for g in existing_monthly:
             if g.id in source_monthly_info:
                 src = source_monthly_info[g.id]
-                restored_existing_monthly.append(replace(g,
-                    deadline=src.deadline,
-                    date_str=src.date_str,
-                    reminder_offset=src.reminder_offset,
-                ))
+                restored_existing_monthly.append(
+                    replace(
+                        g,
+                        deadline=src.deadline,
+                        date_str=src.date_str,
+                        reminder_offset=src.reminder_offset,
+                    )
+                )
             else:
                 restored_existing_monthly.append(g)
 
@@ -520,11 +535,13 @@ def main() -> None:
         )
 
         # WEEKLY source: weekly goals + pierced quarterly/yearly goals (≤30d deadline)
-        original_weekly, final_pierced, [updated_quarterly, updated_yearly] = process_pierced_goals(
-            existing_tasks=weekly_tasks,
-            source_goal_lists=[quarterly_tasks, yearly_mirror],
-            proximity_days=30,
-            today=today,
+        original_weekly, final_pierced, [updated_quarterly, updated_yearly] = (
+            process_pierced_goals(
+                existing_tasks=weekly_tasks,
+                source_goal_lists=[quarterly_tasks, yearly_mirror],
+                proximity_days=30,
+                today=today,
+            )
         )
 
         # Render: original weekly goals (preserve dates) + final pierced goals (countdown)
@@ -555,8 +572,6 @@ def main() -> None:
             with open(prev_week_path, "r") as f:
                 if "↓" in f.read():
                     # Re-sync removes arrow since it's a past period (current_date=None)
-                    import subprocess
-
                     subprocess.run(
                         [
                             sys.executable,

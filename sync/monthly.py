@@ -2,12 +2,11 @@
 import argparse
 import datetime
 import os
+import subprocess
 import sys
 from dataclasses import replace
 
 from sync.logging import get_logger
-
-
 
 
 from sync.constants import (
@@ -551,7 +550,9 @@ def main() -> None:
         g_start, g_end = goals_section_bounds(lines)
         quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-        monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_start.isoformat())
+        monthly_tasks = ensure_goal_ids(
+            monthly_tasks, "monthly", month_start.isoformat()
+        )
         q_year, q_num = quarter_of_date(month_start)
         quarter_key = quarter_id(q_year, q_num)
         quarterly_mirror = ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
@@ -571,7 +572,9 @@ def main() -> None:
         if prev_lines is not None:
             p_start, p_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
-            prev_tasks = ensure_goal_ids(prev_tasks, "monthly", prev_month_start.isoformat())
+            prev_tasks = ensure_goal_ids(
+                prev_tasks, "monthly", prev_month_start.isoformat()
+            )
         else:
             prev_tasks = []
 
@@ -597,7 +600,9 @@ def main() -> None:
         # Rewrite Goals block with QUARTERLY mirror + MONTHLY source.
         # QUARTERLY mirror: preserve existing + add new from filter_by_proximity
         today = datetime.date.today()
-        existing_quarterly = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
+        existing_quarterly = extract_subsection_tasks(
+            lines, g_start, g_end, "QUARTERLY"
+        )
         existing_quarterly_ids = {g.id for g in existing_quarterly if g.id}
 
         # Get new quarterly goals that aren't already in the note
@@ -610,11 +615,14 @@ def main() -> None:
         for g in existing_quarterly:
             if g.id in source_quarterly_info:
                 src = source_quarterly_info[g.id]
-                restored_existing_quarterly.append(replace(g,
-                    deadline=src.deadline,
-                    date_str=src.date_str,
-                    reminder_offset=src.reminder_offset,
-                ))
+                restored_existing_quarterly.append(
+                    replace(
+                        g,
+                        deadline=src.deadline,
+                        date_str=src.date_str,
+                        reminder_offset=src.reminder_offset,
+                    )
+                )
             else:
                 restored_existing_quarterly.append(g)
 
@@ -718,8 +726,6 @@ def main() -> None:
             with open(prev_month_path, "r") as f:
                 if "↓" in f.read():
                     # Re-sync removes arrow since it's a past period (current_date=None)
-                    import subprocess
-
                     subprocess.run(
                         [
                             sys.executable,

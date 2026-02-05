@@ -173,7 +173,10 @@ def _build_study_section(
         # Ongoing sessions always recompute to capture all files modified during the session.
         # Use is_open/completed_at to determine if session is active (not end time comparison,
         # since for active sessions end is set to 'now' at fetch time and will be < current_time).
-        session_ended = not session.get("is_open", False) and session.get("completed_at") is not None
+        session_ended = (
+            not session.get("is_open", False)
+            and session.get("completed_at") is not None
+        )
         if start_s in existing_context and session_ended:
             context_str = existing_context[start_s]
         elif context_for_session:

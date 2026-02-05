@@ -5,7 +5,10 @@ Tests for periodic review reminder generation.
 import datetime
 
 
-from sync.reminders import get_review_reminders_for_date, get_periodic_reminders_for_date
+from sync.reminders import (
+    get_review_reminders_for_date,
+    get_periodic_reminders_for_date,
+)
 
 
 class TestGetReviewRemindersForDate:
@@ -155,21 +158,14 @@ class TestGetPeriodicRemindersForDate:
 
     def test_two_weeks_apart_both_trigger(self):
         """Two Sundays 14 days apart should both trigger if both are odd weeks."""
-        # Week 5 Sunday and Week 7 Sunday (both odd)
-        week5_sunday = datetime.date(2026, 2, 1)  # Wait, need to verify
-        # Let me recalculate: Jan 26, 2026 isocalendar = (2026, 5, 7) ✓
-        # Feb 8, 2026 should be week 6 Sunday (even) - no
-        # Feb 8, 2026 isocalendar = (2026, 6, 7) - even, no reminder
-        # Feb 15, 2026 isocalendar = (2026, 7, 7) - odd, reminder!
-        week5 = datetime.date(2026, 1, 25)  # Actually Jan 25 is week 4
-        # Simpler: Jan 26 is week 5, +14 days = Feb 9 is week 7
-        jan_26 = datetime.date(2026, 1, 25)  # Let me just check Feb 8
+        # 2026-02-08 is Sunday of ISO week 6 (even), so no reminder.
+        # 2026-02-15 is Sunday of ISO week 7 (odd), so reminder.
         feb_8 = datetime.date(2026, 2, 8)
-        
+
         # Feb 8, 2026: isocalendar = (2026, 6, 7) - even week Sunday
         reminders_feb8 = get_periodic_reminders_for_date(feb_8)
         assert len(reminders_feb8) == 0  # even week, no reminder
-        
+
         # Feb 15, 2026: isocalendar = (2026, 7, 7) - odd week Sunday
         feb_15 = datetime.date(2026, 2, 15)
         reminders_feb15 = get_periodic_reminders_for_date(feb_15)
@@ -177,9 +173,7 @@ class TestGetPeriodicRemindersForDate:
 
     def test_restart_reminder_has_deadline(self):
         """Restart reminder should have deadline set for TODAY/LATE rendering."""
-        sunday = datetime.date(2026, 1, 25)  # Need odd week Sunday
-        # Jan 25, 2026 isocalendar = (2026, 4, 7) - even week 4
-        # Use Jan 18, 2026 = (2026, 3, 7) - odd week 3
+        # Jan 18, 2026 is Sunday of ISO week 3 (odd).
         sunday_odd = datetime.date(2026, 1, 18)
         reminders = get_periodic_reminders_for_date(sunday_odd)
 
@@ -187,4 +181,3 @@ class TestGetPeriodicRemindersForDate:
         assert reminders[0].deadline == sunday_odd
         assert reminders[0].date_str == "2026-01-18"
         assert reminders[0].done is False
-

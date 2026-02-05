@@ -6,8 +6,6 @@ import os
 from sync.logging import get_logger
 
 
-
-
 from sync.constants import (
     JOURNAL_DIR,
     QUARTERLY_TEMPLATE_PATH,
@@ -325,19 +323,23 @@ def build_quarterly_metrics(
 
     training_block = []
     training_block.extend(
-        _build_training_block("MINDFUL", "meditate", mindful_counts, mindful_delta_labels)
+        _build_training_block(
+            "MINDFUL", "meditate", mindful_counts, mindful_delta_labels
+        )
     )
-    training_block.append(
-        ""
-    )  # blank line between blocks
+    training_block.append("")  # blank line between blocks
     training_block.extend(
-        _build_training_block("WORKOUT", "workout", workout_counts, workout_delta_labels)
+        _build_training_block(
+            "WORKOUT", "workout", workout_counts, workout_delta_labels
+        )
     )
     training_block.append(
         ""
     )  # blank line between workout and stretch inside same block
     training_block.extend(
-        _build_training_block("STRETCH", "stretch", stretch_counts, stretch_delta_labels)
+        _build_training_block(
+            "STRETCH", "stretch", stretch_counts, stretch_delta_labels
+        )
     )
     training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")
@@ -537,7 +539,9 @@ def main() -> None:
         yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
         yearly_mirror = ensure_goal_ids(yearly_mirror, "yearly", str(year))
         quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-        quarterly_tasks = ensure_goal_ids(quarterly_tasks, "quarterly", quarter_id(year, quarter_num))
+        quarterly_tasks = ensure_goal_ids(
+            quarterly_tasks, "quarterly", quarter_id(year, quarter_num)
+        )
 
         qtr_key = quarter_id(year, quarter_num)
 
@@ -549,7 +553,9 @@ def main() -> None:
         if prev_lines is not None:
             g_start, g_end = goals_section_bounds(prev_lines)
             p_body = extract_subsection_tasks(prev_lines, g_start, g_end, "QUARTERLY")
-            p_body = ensure_goal_ids(p_body, "quarterly", quarter_id(prev_year, prev_quarter))
+            p_body = ensure_goal_ids(
+                p_body, "quarterly", quarter_id(prev_year, prev_quarter)
+            )
             prev_tasks = p_body
 
         quarterly_tasks, _ = carry_forward_goals(

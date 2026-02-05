@@ -263,4 +263,3 @@ def write_study_times_to_icloud(sessions: list[SessionDict], today_str: str) -> 
                 json.dump(data, f, indent=2)
         except (PermissionError, OSError) as e:
             logger.warning("Failed to write study_times.json: %s", e)
-

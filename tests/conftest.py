@@ -5,7 +5,6 @@ Pytest configuration and shared fixtures for journal sync tests.
 from __future__ import annotations
 
 import datetime
-import tempfile
 import pytest
 from typing import Any
 from unittest.mock import patch
@@ -15,7 +14,7 @@ from unittest.mock import patch
 def isolate_media_cache(tmp_path):
     """
     Automatically isolate all tests from the production media cache.
-    
+
     Uses a temp file for each test to prevent test data from polluting
     the real ~/.cache/journal/media_dates.json cache.
     """

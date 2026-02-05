@@ -1,8 +1,5 @@
 """Tests for carried_goals cache management."""
 
-import datetime
-import json
-import os
 import pytest
 from unittest.mock import patch
 
@@ -82,9 +79,7 @@ class TestCacheIntegration:
 
     def test_monthly_transition_preserves_prior_month(self, temp_cache):
         """Test that transitioning months doesn't lose prior month's data."""
-        with patch(
-            "sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)
-        ):
+        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
             # January: record some goals
             record_carried_ids("monthly", "2026-01", ["gid-jan-1", "gid-jan-2"])
 
@@ -99,9 +94,7 @@ class TestCacheIntegration:
 
     def test_monthly_transition_without_fix_loses_data(self, temp_cache):
         """Demonstrate the bug if we only keep current period."""
-        with patch(
-            "sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)
-        ):
+        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
             # January: record some goals
             record_carried_ids("monthly", "2026-01", ["gid-jan-1", "gid-jan-2"])
 
@@ -114,9 +107,7 @@ class TestCacheIntegration:
 
     def test_deleted_goal_not_re_added_across_month_boundary(self, temp_cache):
         """Test the full scenario: goal deleted in Jan shouldn't reappear in Feb."""
-        with patch(
-            "sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)
-        ):
+        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
             # Scenario: User has goal "gid-abc" in January
             # It gets offered for carry-forward to January
             record_carried_ids("monthly", "2026-01", ["gid-abc"])
