@@ -2,7 +2,6 @@
 import argparse
 import datetime
 import os
-from dataclasses import replace
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -63,13 +62,14 @@ from sync.writers.charts import (
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
-from sync.readers.goals import filter_by_proximity, ensure_goal_ids
+from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
     atomic_write_note,
     load_quarterly_goals,
+    merge_mirror_goals,
     process_pierced_goals,
 )
 from sync.period_cleanup import resync_if_marker
@@ -590,30 +590,9 @@ def main() -> None:
         existing_quarterly = extract_subsection_tasks(
             lines, g_start, g_end, "QUARTERLY"
         )
-        existing_quarterly_ids = {g.id for g in existing_quarterly if g.id}
-
-        # Get new quarterly goals that aren't already in the note
-        new_quarterly = filter_by_proximity(quarterly_tasks, 90, today)
-        new_quarterly = [g for g in new_quarterly if g.id not in existing_quarterly_ids]
-
-        # Restore deadline info from source for existing quarterly goals (for countdown)
-        source_quarterly_info = {g.id: g for g in quarterly_tasks if g.id}
-        restored_existing_quarterly = []
-        for g in existing_quarterly:
-            if g.id in source_quarterly_info:
-                src = source_quarterly_info[g.id]
-                restored_existing_quarterly.append(
-                    replace(
-                        g,
-                        deadline=src.deadline,
-                        date_str=src.date_str,
-                        reminder_offset=src.reminder_offset,
-                    )
-                )
-            else:
-                restored_existing_quarterly.append(g)
-
-        final_quarterly = restored_existing_quarterly + new_quarterly
+        final_quarterly = merge_mirror_goals(
+            existing_quarterly, quarterly_tasks, proximity_days=90, today=today
+        )
         quarterly_lines_rendered = (
             render_goal_lines(final_quarterly, today=today)
             if final_quarterly

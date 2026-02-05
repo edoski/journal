@@ -10,10 +10,17 @@ from __future__ import annotations
 from .frontmatter import parse_frontmatter
 from .study import parse_study_table
 from .sleep import parse_sleep_table
-from .daily import parse_daily_note
 from .goals import parse_goal_tasks, resolve_deadline, parse_goal_date
 from .media import scan_books, scan_podcasts
 from .screen_time import parse_procrastination_table
+
+
+def parse_daily_note(path: str) -> dict | None:
+    """Lazily import daily parser to avoid package import cycles."""
+    from .daily import parse_daily_note as _parse_daily_note
+
+    return _parse_daily_note(path)
+
 
 __all__ = [
     # Frontmatter

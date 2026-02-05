@@ -237,3 +237,42 @@ def process_pierced_goals(
     final_pierced = restored_existing_pierced + new_pierced
 
     return original_tasks, final_pierced, updated_source_lists
+
+
+def merge_mirror_goals(
+    existing_mirror: list,
+    source_tasks: list,
+    proximity_days: int,
+    today: datetime.date,
+) -> list:
+    """
+    Merge mirror goals with source goals while preserving countdown metadata.
+
+    Existing mirror goals retain their local done state, but deadline/date/reminder
+    fields are refreshed from source so countdown rendering stays accurate. New
+    source goals within proximity are appended if not already mirrored.
+    """
+    from dataclasses import replace
+    from sync.readers.goals import filter_by_proximity
+
+    existing_ids = {g.id for g in existing_mirror if g.id}
+    new_goals = filter_by_proximity(source_tasks, proximity_days, today)
+    new_goals = [g for g in new_goals if g.id not in existing_ids]
+
+    source_lookup = {g.id: g for g in source_tasks if g.id}
+    restored_existing: list = []
+    for goal in existing_mirror:
+        source = source_lookup.get(goal.id)
+        if source:
+            restored_existing.append(
+                replace(
+                    goal,
+                    deadline=source.deadline,
+                    date_str=source.date_str,
+                    reminder_offset=source.reminder_offset,
+                )
+            )
+        else:
+            restored_existing.append(goal)
+
+    return restored_existing + new_goals

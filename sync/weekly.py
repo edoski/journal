@@ -2,7 +2,6 @@
 import argparse
 import datetime
 import os
-from dataclasses import replace
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -51,13 +50,14 @@ from sync.writers.charts import (
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.writers.media import build_media_section
-from sync.readers.goals import filter_by_proximity, ensure_goal_ids
+from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
     atomic_write_note,
     load_quarterly_goals,
+    merge_mirror_goals,
     process_pierced_goals,
 )
 from sync.period_cleanup import resync_if_marker
@@ -463,30 +463,9 @@ def main() -> None:
         today = datetime.date.today()
         g_start, g_end = goals_section_bounds(lines)
         existing_monthly = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-        existing_monthly_ids = {g.id for g in existing_monthly if g.id}
-
-        # Get new monthly goals that aren't already in the note
-        new_monthly = filter_by_proximity(monthly_tasks, 30, today)
-        new_monthly = [g for g in new_monthly if g.id not in existing_monthly_ids]
-
-        # Restore deadline info from source for existing monthly goals (for countdown)
-        source_monthly_info = {g.id: g for g in monthly_tasks if g.id}
-        restored_existing_monthly = []
-        for g in existing_monthly:
-            if g.id in source_monthly_info:
-                src = source_monthly_info[g.id]
-                restored_existing_monthly.append(
-                    replace(
-                        g,
-                        deadline=src.deadline,
-                        date_str=src.date_str,
-                        reminder_offset=src.reminder_offset,
-                    )
-                )
-            else:
-                restored_existing_monthly.append(g)
-
-        final_monthly = restored_existing_monthly + new_monthly
+        final_monthly = merge_mirror_goals(
+            existing_monthly, monthly_tasks, proximity_days=30, today=today
+        )
         monthly_rendered = (
             render_goal_lines(final_monthly, today=today)
             if final_monthly
