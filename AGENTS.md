@@ -6,44 +6,60 @@ This repository hosts automation scripts that sync daily focus data from the Flo
 
 ```
 journal/
-  sync/                   # Unified sync package with layered architecture
-    __init__.py           # Package entry point
-    models/               # Dataclass models (Goal, Book, Podcast, StudySession, etc.)
-    readers/              # Parsing functions (parse_goal_tasks, scan_books, etc.)
-    writers/              # Rendering functions (render_goal_lines, charts, tables)
-    daily/                # Daily note orchestration (run with: python -m sync.daily)
-      orchestrator.py     # Main update_markdown logic and goal management
-      flow_db.py          # Flow database access, session deduplication
-      breaks.py           # Break linking, overrun calculations
-      study.py            # Study table building
-      training.py         # Training/workout/stretch handling
-      sleep.py            # Sleep section building
-      context.py          # Context tracking for CONTEXT column
-      icloud.py           # Resilient iCloud status file loading
-      screen_time.py      # Screen time data loading and PROCRASTINATION section
-      constants.py        # Daily-specific constants
-    weekly.py             # Weekly metrics aggregation
-    monthly.py            # Monthly metrics aggregation
-    quarterly.py          # Quarterly metrics aggregation
-    yearly.py             # Yearly metrics aggregation
-    base.py               # Cross-period utilities (goal carry-forward, atomic writes)
-    constants.py          # Shared constants (paths, thresholds, dimensions)
-    dates.py              # Date range calculations
-    formatting.py         # Value parsing and formatting
-    metrics.py            # Period aggregation and delta computation
-    notes.py              # File locking and markdown section manipulation
-    io.py                 # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
-    reminders.py          # Periodic review reminder generation
-    carried_goals.py      # Goal carry-forward cache management
-    logging.py            # Logging utilities
-  utils/                  # Flow database CLI utilities
-    flow_db.py            # Shared DB helpers (connection, queries, formatting)
-    undo_last_session.py  # Delete most recent session (dry-run default)
-    rename_session.py     # Rename most recent session (dry-run default)
-    session_preview.py    # View session stats (read-only)
+  sync/                       # Unified sync package with layered architecture
+    __init__.py               # Package entry point
+    models/                   # Dataclass models (Goal, Book, Podcast, StudySession, etc.)
+    readers/                  # Parsing functions and shared reader helpers
+      common.py               # Header normalization, section extraction, duration parsing
+      daily.py                # Daily note parser adapter
+      frontmatter.py          # YAML frontmatter parsing
+      goals.py                # Goal parsing, deadline handling, proximity filtering
+      media.py                # Book/Podcast scanners
+      sleep.py                # Sleep-table parser
+      study.py                # Study-table parser
+      screen_time.py          # Procrastination-table parser
+    writers/                  # Rendering functions (render_goal_lines, charts, tables)
+    daily/                    # Daily note orchestration (run with: python -m sync.daily)
+      orchestrator.py         # Main update_markdown logic and goal management
+      flow_db.py              # Flow database access, session deduplication
+      breaks.py               # Break linking, overrun calculations
+      study.py                # Study table building
+      training.py             # Training/workout/stretch handling
+      sleep.py                # Sleep section building
+      context.py              # Context tracking for CONTEXT column
+      goals.py                # Daily/weekly goal carry-forward and note updates
+      icloud.py               # Resilient iCloud status file loading
+      screen_time.py          # Screen time data loading and PROCRASTINATION section
+      constants.py            # Daily-specific constants
+    weekly.py                 # Weekly metrics aggregation
+    monthly.py                # Monthly metrics aggregation
+    quarterly.py              # Quarterly metrics aggregation
+    yearly.py                 # Yearly metrics aggregation
+    base.py                   # Cross-period goal helpers (carry-forward, piercing, mirror merge)
+    period_cleanup.py         # Shared cleanup re-sync helper for prior periods
+    constants.py              # Shared constants (paths, thresholds, dimensions)
+    dates.py                  # Date range + period-shift calculations
+    formatting.py             # Value parsing and formatting
+    metrics.py                # Period aggregation, moving averages, shared data loaders
+    notes.py                  # Compatibility facade for note utilities
+    notes_locking.py          # File-locking primitives
+    notes_sections.py         # Markdown section extraction/manipulation
+    notes_parsing.py          # Daily note metrics extraction
+    io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
+    reminders.py              # Periodic review reminder generation
+    carried_goals.py          # Goal carry-forward cache management
+    logging.py                # Logging utilities
+  utils/                      # Flow database & automation CLI utilities
+    flow_db.py                # Shared DB helpers (connection, queries, formatting)
+    session_preview.py        # View session stats (read-only)
+    rename_session.py         # Rename most recent session (dry-run default)
+    undo_last_session.py      # Delete most recent session (dry-run default)
+    flow_skip.py              # Skip active Flow session and start break
+    toggle_flow_skip.py       # Enable/disable skip automation
+    skip_schedule.json        # Flow skip schedule config
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (412 tests)
+  tests/                  # Pytest test suite (447 tests on current branch)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -52,9 +68,11 @@ journal/
 
 - **`sync/`**: Unified sync package with layered architecture:
   - **`models/`**: Dataclass models (Goal, Book, Podcast, StudySession, ScreenTimeEntry, etc.)
-  - **`readers/`**: Parsing functions that convert markdown to models
+  - **`readers/`**: Parsing functions and shared parsing helpers (`common.py`, `daily.py`)
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
+  - **`notes.py`**: Backward-compatible facade that delegates to `notes_locking.py`, `notes_sections.py`, and `notes_parsing.py`
+  - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
 
 - **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids, and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
 
@@ -143,6 +161,8 @@ sync/
 │   └── period.py     # PeriodMetrics
 │
 ├── readers/          # Parsing: markdown → models
+│   ├── common.py       # normalize_header, extract_block, parse_duration_to_minutes
+│   ├── daily.py        # parse_daily_note adapter
 │   ├── frontmatter.py  # parse_frontmatter
 │   ├── goals.py        # parse_goal_tasks, resolve_deadline, filter_by_proximity
 │   ├── media.py        # scan_books, scan_podcasts
@@ -170,17 +190,21 @@ sync/
 │
 └── [shared modules]
     ├── constants.py    # Configuration values
-    ├── dates.py        # Date range calculations
+    ├── dates.py        # Date ranges + period shifting
     ├── formatting.py   # Value parsing and formatting
-    ├── metrics.py      # Period aggregation
-    ├── notes.py         # File locking, markdown manipulation
+    ├── metrics.py      # Period aggregation + shared period data loaders
+    ├── notes.py        # Compatibility facade for note API
+    ├── notes_locking.py # Advisory file locking
+    ├── notes_sections.py # Markdown section extraction/manipulation
+    ├── notes_parsing.py # Daily-note metric extraction
+    ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     ├── reminders.py    # Review reminder generation
     ├── logging.py      # Logging utilities
-    └── base.py         # Cross-period utilities
+    └── base.py         # Cross-period goal/piercing/mirror helpers
 ```
 
-**Data flow**: `markdown → readers → models → writers → markdown`
+**Data flow**: `markdown → readers/notes_parsing → models → writers → markdown`
 
 ### Module Responsibilities
 
@@ -197,6 +221,8 @@ sync/
 - `scan_books(start, end, dir)` → `list[Book]`
 - `parse_study_table(lines)` → `list[StudySession]`
 - `parse_procrastination_table(lines)` → `DailyScreenTimeData`
+- `parse_daily_note(path)` → `dict | None` (daily metrics adapter)
+- Shared helpers: `normalize_header`, `extract_block`, `parse_duration_to_minutes`
 - Dated goals: `resolve_deadline`, `parse_goal_date`, `filter_by_proximity`
 - Piercing: `filter_by_proximity` excludes completed goals from piercing into child periods
 
@@ -209,10 +235,15 @@ sync/
 - `format_countdown(deadline, today, is_done)` → `str`
 
 **Shared Modules:**
-- `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`
+- `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`, `shift_month`, `shift_quarter`, `previous_month`, `previous_quarter`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
-- `metrics.py`: `load_daily_data`, `compute_period_metrics`, `compute_moving_average`
-- `notes.py`: `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`, `splice_goals_section`
+- `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`
+- `notes.py`: compatibility facade exporting `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`, `splice_goals_section`, etc.
+- `notes_locking.py`: lockfile lifecycle + `locked_note`
+- `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
+- `notes_parsing.py`: `parse_daily_note`, `parse_study_table`, `parse_sleep_table`
+- `base.py`: `carry_forward_goals`, `propagate_goal_status`, `process_pierced_goals`, `merge_mirror_goals`
+- `period_cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
 - `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
 
@@ -334,7 +365,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 412 tests
+pytest tests/ -v              # All 447 tests (current branch)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```
