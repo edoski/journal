@@ -5,13 +5,15 @@ Integration-style tests for daily orchestrator end-to-end behavior.
 from __future__ import annotations
 
 import datetime
+import hashlib
 
 import sync.daily.orchestrator as orchestrator
+import sync.daily.goals as daily_goals
 
 
-def _session_for_today() -> dict:
+def _session_for_today(today: datetime.date | None = None) -> dict:
     """Build a minimal session payload consumed by update_markdown()."""
-    today = datetime.date.today()
+    today = today or datetime.date.today()
     start = datetime.datetime.combine(today, datetime.time(9, 0))
     end = datetime.datetime.combine(today, datetime.time(10, 0))
     return {
@@ -100,3 +102,43 @@ def test_update_markdown_is_idempotent_on_second_run(monkeypatch, tmp_path):
 
     assert first is True
     assert second is False
+
+
+def test_update_markdown_output_characterization(monkeypatch, tmp_path):
+    """
+    Lock down full daily note markdown output for deterministic inputs.
+
+    Uses a fixed date to avoid drift from runtime date.
+    """
+    fixed_today = datetime.date(2025, 1, 15)
+
+    class _FixedDate(datetime.date):
+        @classmethod
+        def today(cls):
+            return cls(2025, 1, 15)
+
+    class _FixedDateTime(datetime.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            base = cls(2025, 1, 15, 12, 0, 0)
+            if tz is not None:
+                return base.replace(tzinfo=tz)
+            return base
+
+    monkeypatch.setattr(orchestrator.datetime, "date", _FixedDate)
+    monkeypatch.setattr(orchestrator.datetime, "datetime", _FixedDateTime)
+    monkeypatch.setattr(daily_goals.datetime, "date", _FixedDate)
+
+    journal_dir = _prepare_isolated_orchestrator(monkeypatch, tmp_path)
+    session = _session_for_today(fixed_today)
+    changed = orchestrator.update_markdown([session])
+    assert changed is True
+
+    note_path = journal_dir / f"{fixed_today:%Y-%m-%d}.md"
+    content = note_path.read_text()
+    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    assert (
+        content_hash
+        == "654d4b7785d4593f44ff11644e7bbf38e0e3e351764792d2d167e31c088cfdf7"
+    )
