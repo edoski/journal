@@ -21,7 +21,7 @@ def load_daily_data_for_dates(
 ) -> dict[datetime.date, dict[str, Any]]:
     """Load parsed daily notes for an explicit sequence of dates."""
     # Import here to avoid circular dependency
-    from .notes import parse_daily_note
+    from .readers.daily import parse_daily_note
 
     data: dict[datetime.date, dict[str, Any]] = {}
     for day in dates:

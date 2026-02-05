@@ -264,9 +264,9 @@ class TestLoadDailyData:
                 return None
             return None
 
-        import sync.notes as notes
+        import sync.readers.daily as daily_reader
 
-        monkeypatch.setattr(notes, "parse_daily_note", _fake_parse_daily_note)
+        monkeypatch.setattr(daily_reader, "parse_daily_note", _fake_parse_daily_note)
 
         result = load_daily_data_for_dates([day_1, day_2, day_3])
 
