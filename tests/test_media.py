@@ -12,7 +12,8 @@ from sync.readers.media import (
     scan_books,
     scan_podcasts,
 )
-from sync.writers.media import render_media_table, build_media_section
+from sync.media_section import build_media_section
+from sync.writers.media import render_media_table
 
 
 class TestParseDateLink:

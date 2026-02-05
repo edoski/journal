@@ -20,7 +20,6 @@ from .goals import (
 )
 from .media import (
     render_media_table,
-    build_media_section,
 )
 
 __all__ = [
@@ -35,5 +34,4 @@ __all__ = [
     "format_countdown",
     # Media
     "render_media_table",
-    "build_media_section",
 ]

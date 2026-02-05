@@ -49,7 +49,7 @@ from sync.writers.charts import (
     WEEKLY_7DAY_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.writers.media import build_media_section
+from sync.media_section import build_media_section
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (

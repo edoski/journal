@@ -6,10 +6,9 @@ from __future__ import annotations
 
 import calendar
 import datetime
-import hashlib
 import re
-import uuid
 
+from sync.goal_identity import generate_goal_id, generate_goal_id_for
 from sync.models import Goal
 
 
@@ -125,20 +124,6 @@ def _extract_goal_id(line: str) -> str | None:
     if m:
         return f"gid-{m.group(1).lower()}"
     return None
-
-
-def generate_goal_id() -> str:
-    """Return a short random goal id (gid-xxxxxxxxxx)."""
-    return f"gid-{uuid.uuid4().hex[:10]}"
-
-
-def generate_goal_id_for(
-    horizon_key: str, period_key: str, canonical: str, index: int = 0
-) -> str:
-    """Deterministic goal id for a horizon + period + canonical text + occurrence index."""
-    base = f"{horizon_key}|{period_key}|{canonical}|{index}"
-    digest = hashlib.sha1(base.encode()).hexdigest()[:10]
-    return f"gid-{digest}"
 
 
 def parse_goal_tasks(lines: list[str]) -> list[Goal]:
