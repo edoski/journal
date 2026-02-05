@@ -13,7 +13,6 @@ import os
 
 from sync.constants import JOURNAL_DIR
 from sync.io import safe_read_file
-from sync.io import atomic_write_note  # noqa: F401
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
 

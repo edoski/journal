@@ -6,9 +6,10 @@ These tests lock down current parser semantics before compatibility removals.
 
 from __future__ import annotations
 
-from sync.notes_parsing import parse_daily_note as legacy_parse_daily_note
-from sync.notes_parsing import parse_study_table
-from sync.readers.daily import parse_daily_note as reader_parse_daily_note
+from sync.readers.daily import (
+    parse_daily_note,
+    parse_study_table,
+)
 
 
 def _write_note(tmp_path, lines: list[str], name: str = "2025-01-15.md") -> str:
@@ -17,7 +18,7 @@ def _write_note(tmp_path, lines: list[str], name: str = "2025-01-15.md") -> str:
     return str(path)
 
 
-def test_parse_daily_note_characterization_matches_legacy_output(tmp_path):
+def test_parse_daily_note_characterization(tmp_path):
     note_path = _write_note(
         tmp_path,
         [
@@ -56,11 +57,9 @@ def test_parse_daily_note_characterization_matches_legacy_output(tmp_path):
         ],
     )
 
-    legacy = legacy_parse_daily_note(note_path)
-    reader = reader_parse_daily_note(note_path)
+    parsed = parse_daily_note(note_path)
 
-    assert legacy == reader
-    assert legacy == {
+    assert parsed == {
         "study_minutes": 210.0,
         "sleep_minutes": 435.0,  # frontmatter overrides sleep table sum
         "mood": 7.5,
@@ -99,5 +98,4 @@ def test_parse_study_table_interrupt_hour_format_characterization():
 
 def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
     missing = tmp_path / "missing.md"
-    assert legacy_parse_daily_note(str(missing)) is None
-    assert reader_parse_daily_note(str(missing)) is None
+    assert parse_daily_note(str(missing)) is None

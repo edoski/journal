@@ -5,7 +5,6 @@ Daily note reader for aggregate metric dictionaries.
 from __future__ import annotations
 
 import re
-
 from sync.io import safe_read_file
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
@@ -80,6 +79,11 @@ def _parse_study_table_rows(lines: list[str]) -> list[tuple]:
     return rows
 
 
+def parse_study_table(lines: list[str]) -> list[tuple]:
+    """Parse the STUDY table into tuple rows for aggregate metrics."""
+    return _parse_study_table_rows(lines)
+
+
 def _parse_sleep_table_rows(lines: list[str]) -> list[tuple]:
     """Parse the SLEEP table into tuple rows for aggregate metrics."""
     block = extract_block(lines, "### **SLEEP**")
@@ -122,6 +126,11 @@ def _parse_sleep_table_rows(lines: list[str]) -> list[tuple]:
     return rows
 
 
+def parse_sleep_table(lines: list[str]) -> list[tuple]:
+    """Parse the SLEEP table into tuple rows for aggregate metrics."""
+    return _parse_sleep_table_rows(lines)
+
+
 def parse_daily_note(path: str) -> dict | None:
     """Parse a daily note file and return extracted aggregate metrics."""
     lines = safe_read_file(path)
@@ -129,8 +138,8 @@ def parse_daily_note(path: str) -> dict | None:
         return None
 
     fm = parse_frontmatter(lines)
-    study_rows = _parse_study_table_rows(lines)
-    sleep_rows = _parse_sleep_table_rows(lines)
+    study_rows = parse_study_table(lines)
+    sleep_rows = parse_sleep_table(lines)
 
     sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
     sleep_total = (

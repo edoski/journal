@@ -5,9 +5,14 @@ Goal rendering for the journal sync system.
 from __future__ import annotations
 
 import datetime
+import uuid
 
 from sync.models import Goal
-from sync.readers.goals import generate_goal_id  # noqa: F401
+
+
+def _generate_goal_id() -> str:
+    """Return a short random goal id (gid-xxxxxxxxxx)."""
+    return f"gid-{uuid.uuid4().hex[:10]}"
 
 
 def format_countdown(
@@ -69,7 +74,7 @@ def render_goal_lines(
     for goal in goals:
         mark = "x" if goal.done else " "
         body = goal.body.strip()
-        gid = goal.id or generate_goal_id()
+        gid = goal.id or _generate_goal_id()
 
         # Include date ONLY in source notes (when today is None)
         # Mirror notes (today provided) show countdown only

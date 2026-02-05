@@ -6,7 +6,7 @@ Covers note parsing, section manipulation, and metrics extraction.
 
 from __future__ import annotations
 
-from sync.notes_parsing import (
+from sync.readers.daily import (
     parse_study_table,
     parse_sleep_table,
 )
