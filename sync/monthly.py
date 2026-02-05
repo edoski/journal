@@ -16,7 +16,6 @@ from sync.constants import (
 )
 from sync.notes import (
     locked_note,
-    parse_daily_note,
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
@@ -42,7 +41,8 @@ from sync.formatting import (
 from sync.metrics import (
     compute_period_metrics,
     compute_moving_average,
-    load_daily_data,
+    load_daily_data_for_dates,
+    load_prior_period_metrics,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
     aggregate_screen_time,
@@ -89,10 +89,7 @@ def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
     )
     lines = existing_lines[:]
     splice_goals_section(lines, new_block, insert_if_missing=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write("\n".join(lines).rstrip() + "\n")
-    os.replace(tmp, path)
+    atomic_write_note(path, lines)
 
 
 def build_monthly_metrics(
@@ -659,14 +656,8 @@ def main() -> None:
         splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         # Load current month's daily data
-        daily_data = {}
-        for day in daterange(month_start, month_end):
-            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-            if not os.path.exists(path):
-                continue
-            parsed = parse_daily_note(path)
-            if parsed:
-                daily_data[day] = parsed
+        month_dates = list(daterange(month_start, month_end))
+        daily_data = load_daily_data_for_dates(month_dates)
 
         # Load previous month's daily data for comparison
         if target_date.month == 1:
@@ -680,29 +671,21 @@ def main() -> None:
         prev_month_label = f"**[[{prev_year}-{prev_month:02d}\\|LAST MONTH]]**"
         current_month_label = "THIS MONTH"
 
-        prev_daily_data = {}
-        for day in daterange(prev_month_start, prev_month_end):
-            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-            if not os.path.exists(path):
-                continue
-            parsed = parse_daily_note(path)
-            if parsed:
-                prev_daily_data[day] = parsed
+        prev_month_dates = list(daterange(prev_month_start, prev_month_end))
+        prev_daily_data = load_daily_data_for_dates(prev_month_dates)
 
         # Load 3 prior months for moving average calculation
-        prior_month_metrics = []
-        for months_ago in range(3, 0, -1):  # 3 months ago, 2 months ago, 1 month ago
-            # Calculate prior month date
+        def _prior_month_bounds(months_ago: int) -> tuple[datetime.date, datetime.date]:
             prior_year = target_date.year
             prior_month_num = target_date.month - months_ago
             while prior_month_num <= 0:
                 prior_year -= 1
                 prior_month_num += 12
-            prior_start, prior_end = month_range(prior_year, prior_month_num)
-            prior_data = load_daily_data(prior_start, prior_end)
-            prior_dates = list(daterange(prior_start, prior_end))
-            prior_metrics = compute_period_metrics(prior_dates, prior_data)
-            prior_month_metrics.append(prior_metrics)
+            return month_range(prior_year, prior_month_num)
+
+        prior_month_metrics = load_prior_period_metrics(
+            range(3, 0, -1), _prior_month_bounds
+        )
 
         week_ranges = month_week_ranges(target_date.year, target_date.month)
         metrics_block = build_monthly_metrics(

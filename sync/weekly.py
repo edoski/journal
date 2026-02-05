@@ -17,11 +17,11 @@ from sync.constants import (
 )
 from sync.notes import (
     locked_note,
-    parse_daily_note,
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
+    splice_goals_section,
     trim_blank_lines,
     join_sections,
     safe_read_file,
@@ -31,7 +31,8 @@ from sync.formatting import format_minutes
 from sync.metrics import (
     compute_period_metrics,
     compute_moving_average,
-    load_daily_data,
+    load_daily_data_for_dates,
+    load_prior_period_metrics,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
     aggregate_screen_time,
@@ -122,19 +123,9 @@ def _write_monthly_goals(path, tasks, existing_lines):
         ]
     )
 
-    if g_start == -1:
-        lines = (
-            new_block
-            + ([""] if existing_lines and existing_lines[0].strip() else [])
-            + existing_lines
-        )
-    else:
-        lines = existing_lines[:]
-        lines[g_start:g_end] = new_block
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
-        f.write("\n".join(lines).rstrip() + "\n")
-    os.replace(tmp, path)
+    lines = existing_lines[:]
+    splice_goals_section(lines, new_block, insert_if_missing=True)
+    atomic_write_note(path, lines)
 
 
 def _parse_weekly_note_goals(lines):
@@ -384,14 +375,8 @@ def main() -> None:
         ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
 
         # Load current week's daily data
-        daily_data = {}
-        for day in daterange(week_start, week_end):
-            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-            if not os.path.exists(path):
-                continue
-            parsed = parse_daily_note(path)
-            if parsed:
-                daily_data[day] = parsed
+        week_dates = list(daterange(week_start, week_end))
+        daily_data = load_daily_data_for_dates(week_dates)
 
         # Load previous week's daily data for comparison
         prev_week_start = week_start - datetime.timedelta(days=7)
@@ -399,26 +384,19 @@ def main() -> None:
         prev_year, prev_week_num, _ = prev_week_start.isocalendar()
         prev_week_label = f"**[[{prev_year}-W{prev_week_num:02d}\\|LAST WEEK]]**"
 
-        prev_daily_data = {}
-        for day in daterange(prev_week_start, prev_week_end):
-            path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-            if not os.path.exists(path):
-                continue
-            parsed = parse_daily_note(path)
-            if parsed:
-                prev_daily_data[day] = parsed
+        prev_week_dates = list(daterange(prev_week_start, prev_week_end))
+        prev_daily_data = load_daily_data_for_dates(prev_week_dates)
 
         # Load 4 prior weeks for moving average calculation
-        prior_week_metrics = []
-        for weeks_ago in range(
-            4, 0, -1
-        ):  # 4 weeks ago, 3 weeks ago, 2 weeks ago, 1 week ago
-            prior_start = week_start - datetime.timedelta(days=7 * weeks_ago)
-            prior_end = prior_start + datetime.timedelta(days=7)
-            prior_data = load_daily_data(prior_start, prior_end)
-            prior_dates = [prior_start + datetime.timedelta(days=i) for i in range(7)]
-            prior_metrics = compute_period_metrics(prior_dates, prior_data)
-            prior_week_metrics.append(prior_metrics)
+        prior_week_metrics = load_prior_period_metrics(
+            range(4, 0, -1),
+            lambda weeks_ago: (
+                week_start - datetime.timedelta(days=7 * weeks_ago),
+                week_start
+                - datetime.timedelta(days=7 * weeks_ago)
+                + datetime.timedelta(days=6),
+            ),
+        )
 
         metrics_block = build_weekly_metrics(
             week_start,
@@ -475,25 +453,15 @@ def main() -> None:
 
             with locked_note(quarterly_path):
                 quarterly_lines = safe_read_file(quarterly_path) or []
-                g_start_q, g_end_q = goals_section_bounds(quarterly_lines)
                 new_q_block = bg(
                     [
                         ("YEARLY", render_goal_lines(yearly_mirror)),
                         ("QUARTERLY", render_goal_lines(quarterly_tasks)),
                     ]
                 )
-                if g_start_q == -1:
-                    quarterly_lines = (
-                        new_q_block
-                        + (
-                            [""]
-                            if quarterly_lines and quarterly_lines[0].strip()
-                            else []
-                        )
-                        + quarterly_lines
-                    )
-                else:
-                    quarterly_lines[g_start_q:g_end_q] = new_q_block
+                splice_goals_section(
+                    quarterly_lines, new_q_block, insert_if_missing=True
+                )
                 atomic_write_note(quarterly_path, quarterly_lines)
 
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)

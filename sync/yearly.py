@@ -19,6 +19,7 @@ from sync.notes import (
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
+    join_sections,
     safe_read_file,
     splice_goals_section,
 )
@@ -34,6 +35,7 @@ from sync.metrics import (
     aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,
+    load_prior_period_metrics,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
@@ -556,11 +558,7 @@ def build_yearly_metrics(
     media_lines = build_media_section(year_start, year_end, "year")
     sections.append(trim_blank_lines(media_lines))
 
-    combined = []
-    for sec in sections:
-        combined.extend(sec)
-        combined.append("")
-    return trim_blank_lines(combined)
+    return join_sections(sections)
 
 
 def main() -> None:
@@ -625,14 +623,10 @@ def main() -> None:
         prev_quarter_ranges = year_quarters(prev_year)
 
         # Load 3 prior years for moving average calculation
-        prior_year_metrics = []
-        for years_ago in range(3, 0, -1):  # 3 years ago... 1 year ago
-            p_year = year - years_ago
-            p_start, p_end = year_range(p_year)
-            p_data = load_daily_data(p_start, p_end)
-            p_dates = list(daterange(p_start, p_end))
-            p_metrics = compute_period_metrics(p_dates, p_data)
-            prior_year_metrics.append(p_metrics)
+        prior_year_metrics = load_prior_period_metrics(
+            range(3, 0, -1),
+            lambda years_ago: year_range(year - years_ago),
+        )
 
         metrics_block = build_yearly_metrics(
             year,

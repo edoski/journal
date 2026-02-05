@@ -19,6 +19,7 @@ from sync.notes import (
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
+    join_sections,
     safe_read_file,
     splice_goals_section,
 )
@@ -38,6 +39,7 @@ from sync.metrics import (
     compute_period_metrics,
     compute_moving_average,
     load_daily_data,
+    load_prior_period_metrics,
     aggregate_interrupt_overrun,
     compute_period_deltas,
     aggregate_screen_time,
@@ -492,11 +494,7 @@ def build_quarterly_metrics(
     media_lines = build_media_section(quarter_start, quarter_end, "quarter")
     sections.append(trim_blank_lines(media_lines))
 
-    combined = []
-    for sec in sections:
-        combined.extend(sec)
-        combined.append("")
-    return trim_blank_lines(combined)
+    return join_sections(sections)
 
 
 def main() -> None:
@@ -580,20 +578,14 @@ def main() -> None:
         if yearly_changed:
             with locked_note(yearly_path):
                 yearly_lines = safe_read_file(yearly_path) or yearly_lines
-                y_start, y_end = goals_section_bounds(yearly_lines)
                 new_yearly_block = build_goals_block(
                     [
                         ("YEARLY", render_goal_lines(yearly_tasks)),
                     ]
                 )
-                if y_start == -1:
-                    yearly_lines = (
-                        new_yearly_block
-                        + ([""] if yearly_lines and yearly_lines[0].strip() else [])
-                        + yearly_lines
-                    )
-                else:
-                    yearly_lines[y_start:y_end] = new_yearly_block
+                splice_goals_section(
+                    yearly_lines, new_yearly_block, insert_if_missing=True
+                )
                 atomic_write_note(yearly_path, yearly_lines)
 
         # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
@@ -622,21 +614,16 @@ def main() -> None:
         month_ranges = quarter_months(year, quarter_num)
 
         # Load 4 prior quarters for moving average calculation
-        prior_quarter_metrics = []
-        for q_ago in range(4, 0, -1):  # 4 quarters ago... 1 quarter ago
-            # Calculate prior quarter (year, q)
-            # Logic: total_q = current_total_q - q_ago
-            # current_total_q = year * 4 + (quarter_num - 1)
+        def _prior_quarter_bounds(q_ago: int) -> tuple[datetime.date, datetime.date]:
             curr_total = year * 4 + (quarter_num - 1)
             target_total = curr_total - q_ago
             p_year = target_total // 4
             p_q = (target_total % 4) + 1
+            return quarter_range(p_year, p_q)
 
-            p_start, p_end = quarter_range(p_year, p_q)
-            p_data = load_daily_data(p_start, p_end)
-            p_dates = list(daterange(p_start, p_end))
-            p_metrics = compute_period_metrics(p_dates, p_data)
-            prior_quarter_metrics.append(p_metrics)
+        prior_quarter_metrics = load_prior_period_metrics(
+            range(4, 0, -1), _prior_quarter_bounds
+        )
 
         metrics_block = build_quarterly_metrics(
             quarter_start,

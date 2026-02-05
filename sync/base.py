@@ -13,7 +13,7 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
-from sync.notes import parse_daily_note, safe_read_file
+from sync.notes import safe_read_file
 from sync.io import atomic_write_note  # noqa: F401
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
 
@@ -32,16 +32,9 @@ def load_period_data(
         Dict mapping dates to parsed daily note data
     """
     from sync.dates import daterange  # Import here to avoid circular
+    from sync.metrics import load_daily_data_for_dates
 
-    daily_data: dict[datetime.date, dict] = {}
-    for day in daterange(start, end):
-        path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
-        if not os.path.exists(path):
-            continue
-        parsed = parse_daily_note(path)
-        if parsed:
-            daily_data[day] = parsed
-    return daily_data
+    return load_daily_data_for_dates(daterange(start, end))
 
 
 def carry_forward_goals(
