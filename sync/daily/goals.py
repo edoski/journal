@@ -11,14 +11,14 @@ import os
 from dataclasses import replace
 
 from sync.constants import JOURNAL_DIR, WEEKLY_TEMPLATE_PATH
+from sync.io import safe_read_file, atomic_write_note
 from sync.logging import get_logger
 from sync.models import Goal
-from sync.notes import (
-    locked_note,
+from sync.notes_locking import locked_note
+from sync.notes_sections import (
     ensure_note,
     goals_section_bounds,
     extract_subsection_tasks,
-    safe_read_file,
 )
 from sync.dates import iso_week_range
 from sync.readers.goals import ensure_goal_ids
@@ -124,8 +124,6 @@ def write_weekly_goals(
     Returns:
         Path to the updated weekly note
     """
-    from sync.base import atomic_write_note
-
     path = weekly_note_path(date_obj)
     with locked_note(path):
         ensure_note(path, WEEKLY_TEMPLATE_PATH)

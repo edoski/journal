@@ -9,8 +9,9 @@ from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
     DAYS,
 )
-from sync.notes import (
-    locked_note,
+from sync.io import safe_read_file, atomic_write_note
+from sync.notes_locking import locked_note
+from sync.notes_sections import (
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
@@ -18,7 +19,6 @@ from sync.notes import (
     splice_goals_section,
     trim_blank_lines,
     join_sections,
-    safe_read_file,
 )
 from sync.dates import daterange, iso_week_range
 from sync.formatting import format_minutes
@@ -55,7 +55,6 @@ from sync.readers.goals import ensure_goal_ids
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
-    atomic_write_note,
     load_quarterly_goals,
     merge_mirror_goals,
     process_pierced_goals,

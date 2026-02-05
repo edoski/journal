@@ -20,10 +20,8 @@ from sync.formatting import (
     format_mood_with_scale,
 )
 from sync.readers.frontmatter import parse_frontmatter
-from sync.notes import (
-    _parse_duration_to_minutes as parse_duration_to_minutes,
-    _parse_bool as parse_bool,
-)
+from sync.readers.common import parse_duration_to_minutes
+from sync.readers.daily import _parse_bool as parse_bool
 
 
 class TestParseFrontmatter:

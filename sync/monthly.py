@@ -8,15 +8,15 @@ from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
 )
-from sync.notes import (
-    locked_note,
+from sync.io import safe_read_file, atomic_write_note
+from sync.notes_locking import locked_note
+from sync.notes_sections import (
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
-    safe_read_file,
     splice_goals_section,
 )
 from sync.dates import (
@@ -67,7 +67,6 @@ from sync.readers.goals import ensure_goal_ids
 from sync.base import (
     carry_forward_goals,
     propagate_goal_status,
-    atomic_write_note,
     load_quarterly_goals,
     merge_mirror_goals,
     process_pierced_goals,

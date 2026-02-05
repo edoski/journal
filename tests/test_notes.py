@@ -6,8 +6,11 @@ Covers note parsing, section manipulation, and metrics extraction.
 
 from __future__ import annotations
 
-
-from sync.notes import (
+from sync.notes_parsing import (
+    parse_study_table,
+    parse_sleep_table,
+)
+from sync.notes_sections import (
     find_header_idx,
     section_bounds,
     subsection_bounds,
@@ -18,8 +21,6 @@ from sync.notes import (
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
-    parse_study_table,
-    parse_sleep_table,
     replace_metrics_block,
 )
 
