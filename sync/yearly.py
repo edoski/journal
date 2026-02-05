@@ -2,6 +2,7 @@
 import argparse
 import datetime
 import os
+from dataclasses import replace
 
 from sync.logging import get_logger
 
@@ -604,9 +605,7 @@ def main() -> None:
         for t in open_prev:
             if t.id in existing_ids:
                 continue
-            from dataclasses import replace as dc_replace
-
-            yearly_tasks.append(dc_replace(t, done=False))
+            yearly_tasks.append(replace(t, done=False))
             existing_ids.add(t.id)
 
         new_goals_block = build_goals_block(

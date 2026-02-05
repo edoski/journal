@@ -38,6 +38,17 @@ def month_range(year: int, month: int) -> tuple[datetime.date, datetime.date]:
     return start, end
 
 
+def shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
+    """Shift a year/month pair by delta months and return (year, month)."""
+    total_months = (year * 12) + (month - 1) + delta
+    return total_months // 12, (total_months % 12) + 1
+
+
+def previous_month(year: int, month: int) -> tuple[int, int]:
+    """Return (year, month) for the previous month."""
+    return shift_month(year, month, -1)
+
+
 def quarter_range(year: int, quarter: int) -> tuple[datetime.date, datetime.date]:
     """
     Return (start_date, end_date) for a given quarter number (1-4).
@@ -49,6 +60,19 @@ def quarter_range(year: int, quarter: int) -> tuple[datetime.date, datetime.date
     end_month = start_month + 2
     _, end = month_range(year, end_month)
     return start, end
+
+
+def shift_quarter(year: int, quarter: int, delta: int) -> tuple[int, int]:
+    """Shift a year/quarter pair by delta quarters and return (year, quarter)."""
+    if quarter < 1 or quarter > 4:
+        raise ValueError("quarter must be in 1..4")
+    total_quarters = (year * 4) + (quarter - 1) + delta
+    return total_quarters // 4, (total_quarters % 4) + 1
+
+
+def previous_quarter(year: int, quarter: int) -> tuple[int, int]:
+    """Return (year, quarter) for the previous quarter."""
+    return shift_quarter(year, quarter, -1)
 
 
 def quarter_months(

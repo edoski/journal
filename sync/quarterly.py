@@ -27,6 +27,8 @@ from sync.dates import (
     daterange,
     quarter_range,
     quarter_months,
+    previous_quarter,
+    shift_quarter,
     quarter_of_date,
     quarter_id,
 )
@@ -520,12 +522,7 @@ def main() -> None:
 
     note_path = args.file or os.path.join(JOURNAL_DIR, filename)
 
-    if quarter_num == 1:
-        prev_year = year - 1
-        prev_quarter = 4
-    else:
-        prev_year = year
-        prev_quarter = quarter_num - 1
+    prev_year, prev_quarter = previous_quarter(year, quarter_num)
     prev_start, prev_end = quarter_range(prev_year, prev_quarter)
 
     with locked_note(note_path):
@@ -615,10 +612,7 @@ def main() -> None:
 
         # Load 4 prior quarters for moving average calculation
         def _prior_quarter_bounds(q_ago: int) -> tuple[datetime.date, datetime.date]:
-            curr_total = year * 4 + (quarter_num - 1)
-            target_total = curr_total - q_ago
-            p_year = target_total // 4
-            p_q = (target_total % 4) + 1
+            p_year, p_q = shift_quarter(year, quarter_num, -q_ago)
             return quarter_range(p_year, p_q)
 
         prior_quarter_metrics = load_prior_period_metrics(

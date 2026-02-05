@@ -13,7 +13,11 @@ from sync.dates import (
     daterange,
     iso_week_range,
     month_range,
+    shift_month,
+    previous_month,
     quarter_range,
+    shift_quarter,
+    previous_quarter,
     quarter_months,
     quarter_of_date,
     year_range,
@@ -115,6 +119,20 @@ class TestMonthRange:
         assert end == datetime.date(2025, 12, 31)
 
 
+class TestShiftMonth:
+    """Tests for month shifting helpers."""
+
+    def test_shift_month_backward(self):
+        assert shift_month(2025, 1, -1) == (2024, 12)
+
+    def test_shift_month_forward(self):
+        assert shift_month(2025, 11, 3) == (2026, 2)
+
+    def test_previous_month(self):
+        assert previous_month(2025, 1) == (2024, 12)
+        assert previous_month(2025, 8) == (2025, 7)
+
+
 class TestQuarterRange:
     """Tests for quarter_range function."""
 
@@ -163,6 +181,24 @@ class TestQuarterMonths:
         assert months[0] == (datetime.date(2025, 10, 1), datetime.date(2025, 10, 31))
         assert months[1] == (datetime.date(2025, 11, 1), datetime.date(2025, 11, 30))
         assert months[2] == (datetime.date(2025, 12, 1), datetime.date(2025, 12, 31))
+
+
+class TestShiftQuarter:
+    """Tests for quarter shifting helpers."""
+
+    def test_shift_quarter_backward(self):
+        assert shift_quarter(2025, 1, -1) == (2024, 4)
+
+    def test_shift_quarter_forward(self):
+        assert shift_quarter(2025, 4, 1) == (2026, 1)
+
+    def test_previous_quarter(self):
+        assert previous_quarter(2025, 1) == (2024, 4)
+        assert previous_quarter(2025, 3) == (2025, 2)
+
+    def test_shift_quarter_invalid(self):
+        with pytest.raises(ValueError):
+            shift_quarter(2025, 0, 1)
 
 
 class TestQuarterOfDate:

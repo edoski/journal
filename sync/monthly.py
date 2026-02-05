@@ -2,12 +2,7 @@
 import argparse
 import datetime
 import os
-import subprocess
-import sys
 from dataclasses import replace
-
-from sync.logging import get_logger
-
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -30,6 +25,7 @@ from sync.dates import (
     month_range,
     month_week_ranges,
     format_week_label,
+    shift_month,
     quarter_of_date,
     quarter_id,
 )
@@ -76,8 +72,7 @@ from sync.base import (
     load_quarterly_goals,
     process_pierced_goals,
 )
-
-logger = get_logger()
+from sync.period_cleanup import resync_if_marker
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
@@ -557,12 +552,7 @@ def main() -> None:
         # Determine previous month path
         month_key = f"{month_start.year}-{month_start.month:02d}"
 
-        if month_start.month == 1:
-            prev_year = month_start.year - 1
-            prev_month = 12
-        else:
-            prev_year = month_start.year
-            prev_month = month_start.month - 1
+        prev_year, prev_month = shift_month(month_start.year, month_start.month, -1)
         prev_month_start, _ = month_range(prev_year, prev_month)
         prev_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
         prev_lines = safe_read_file(prev_path)
@@ -660,12 +650,7 @@ def main() -> None:
         daily_data = load_daily_data_for_dates(month_dates)
 
         # Load previous month's daily data for comparison
-        if target_date.month == 1:
-            prev_year = target_date.year - 1
-            prev_month = 12
-        else:
-            prev_year = target_date.year
-            prev_month = target_date.month - 1
+        prev_year, prev_month = shift_month(target_date.year, target_date.month, -1)
 
         prev_month_start, prev_month_end = month_range(prev_year, prev_month)
         prev_month_label = f"**[[{prev_year}-{prev_month:02d}\\|LAST MONTH]]**"
@@ -676,11 +661,9 @@ def main() -> None:
 
         # Load 3 prior months for moving average calculation
         def _prior_month_bounds(months_ago: int) -> tuple[datetime.date, datetime.date]:
-            prior_year = target_date.year
-            prior_month_num = target_date.month - months_ago
-            while prior_month_num <= 0:
-                prior_year -= 1
-                prior_month_num += 12
+            prior_year, prior_month_num = shift_month(
+                target_date.year, target_date.month, -months_ago
+            )
             return month_range(prior_year, prior_month_num)
 
         prior_month_metrics = load_prior_period_metrics(
@@ -704,25 +687,13 @@ def main() -> None:
 
     # One-time cleanup: re-sync previous month if it still has an arrow indicator
     prev_month_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
-    if not args.no_cleanup and os.path.exists(prev_month_path):
-        try:
-            with open(prev_month_path, "r") as f:
-                if "↓" in f.read():
-                    # Re-sync removes arrow since it's a past period (current_date=None)
-                    subprocess.run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "sync.monthly",
-                            "--month",
-                            f"{prev_year}-{prev_month:02d}",
-                            "--no-cleanup",
-                        ],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        check=False,
-                    )
-        except (PermissionError, OSError, subprocess.SubprocessError) as e:
-            logger.debug("Cleanup subprocess failed: %s", e)
+    if not args.no_cleanup:
+        # Re-sync removes arrow since it's a past period (current_date=None)
+        resync_if_marker(
+            prev_month_path,
+            "sync.monthly",
+            ["--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
+        )
 
 
 if __name__ == "__main__":

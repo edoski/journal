@@ -4,7 +4,6 @@ Shared base patterns for periodic sync modules.
 Provides common functionality used across weekly, monthly, quarterly, and yearly sync:
 - Goal carry-forward with cache guard
 - Goal status propagation from mirror to source
-- Period data loading
 """
 
 from __future__ import annotations
@@ -16,25 +15,6 @@ from sync.constants import JOURNAL_DIR
 from sync.notes import safe_read_file
 from sync.io import atomic_write_note  # noqa: F401
 from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
-
-
-def load_period_data(
-    start: datetime.date, end: datetime.date
-) -> dict[datetime.date, dict]:
-    """
-    Load parsed daily notes for a date range.
-
-    Args:
-        start: Start date (inclusive)
-        end: End date (exclusive)
-
-    Returns:
-        Dict mapping dates to parsed daily note data
-    """
-    from sync.dates import daterange  # Import here to avoid circular
-    from sync.metrics import load_daily_data_for_dates
-
-    return load_daily_data_for_dates(daterange(start, end))
 
 
 def carry_forward_goals(
@@ -150,9 +130,6 @@ def load_quarterly_goals(
     from sync.notes import ensure_note, goals_section_bounds, extract_subsection_tasks
     from sync.readers.goals import ensure_goal_ids
     from sync.constants import QUARTERLY_TEMPLATE_PATH
-    from sync.logging import get_logger
-
-    get_logger()
 
     q_year, q_num = quarter_of_date(month_start)
     quarter_key = quarter_id(q_year, q_num)

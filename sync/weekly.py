@@ -2,12 +2,7 @@
 import argparse
 import datetime
 import os
-import subprocess
-import sys
 from dataclasses import replace
-
-from sync.logging import get_logger
-
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -65,8 +60,7 @@ from sync.base import (
     load_quarterly_goals,
     process_pierced_goals,
 )
-
-logger = get_logger()
+from sync.period_cleanup import resync_if_marker
 
 
 def _load_monthly_goals(month_start):
@@ -535,25 +529,13 @@ def main() -> None:
         atomic_write_note(note_path, updated_lines)
 
     # One-time cleanup: re-sync previous week if it still has an arrow indicator
-    if not args.no_cleanup and os.path.exists(prev_week_path):
-        try:
-            with open(prev_week_path, "r") as f:
-                if "↓" in f.read():
-                    # Re-sync removes arrow since it's a past period (current_date=None)
-                    subprocess.run(
-                        [
-                            sys.executable,
-                            "-m",
-                            "sync.weekly",
-                            "--date",
-                            prev_week_start.isoformat(),
-                            "--no-cleanup",
-                        ],
-                        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        check=False,
-                    )
-        except (PermissionError, OSError, subprocess.SubprocessError) as e:
-            logger.debug("Cleanup subprocess failed: %s", e)
+    if not args.no_cleanup:
+        # Re-sync removes arrow since it's a past period (current_date=None)
+        resync_if_marker(
+            prev_week_path,
+            "sync.weekly",
+            ["--date", prev_week_start.isoformat(), "--no-cleanup"],
+        )
 
 
 if __name__ == "__main__":
