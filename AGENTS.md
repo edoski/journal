@@ -11,7 +11,7 @@ journal/
     models/                   # Dataclass models (Goal, Book, Podcast, StudySession, etc.)
     readers/                  # Parsing functions and shared reader helpers
       common.py               # Header normalization, section extraction, duration parsing
-      daily.py                # Daily note parser adapter
+      daily.py                # Daily note aggregate parser (canonical metrics parser)
       frontmatter.py          # YAML frontmatter parsing
       goals.py                # Goal parsing, deadline handling, proximity filtering
       media.py                # Book/Podcast scanners
@@ -41,10 +41,10 @@ journal/
     dates.py                  # Date range + period-shift calculations
     formatting.py             # Value parsing and formatting
     metrics.py                # Period aggregation, moving averages, shared data loaders
-    notes.py                  # Compatibility facade for note utilities
+    goal_identity.py          # Shared goal canonicalization + ID helpers
+    media_section.py          # MEDIA section orchestration (reader scan + writer render)
     notes_locking.py          # File-locking primitives
     notes_sections.py         # Markdown section extraction/manipulation
-    notes_parsing.py          # Daily note metrics extraction
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     reminders.py              # Periodic review reminder generation
     carried_goals.py          # Goal carry-forward cache management
@@ -59,7 +59,7 @@ journal/
     skip_schedule.json        # Flow skip schedule config
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (447 tests on current branch)
+  tests/                  # Pytest test suite (454 tests on current branch)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -71,7 +71,8 @@ journal/
   - **`readers/`**: Parsing functions and shared parsing helpers (`common.py`, `daily.py`)
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
-  - **`notes.py`**: Backward-compatible facade that delegates to `notes_locking.py`, `notes_sections.py`, and `notes_parsing.py`
+  - **`goal_identity.py`**: Shared goal canonicalization and ID generation helpers
+  - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
   - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
 
 - **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids, and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
@@ -162,7 +163,7 @@ sync/
 │
 ├── readers/          # Parsing: markdown → models
 │   ├── common.py       # normalize_header, extract_block, parse_duration_to_minutes
-│   ├── daily.py        # parse_daily_note adapter
+│   ├── daily.py        # parse_daily_note (canonical aggregate parser)
 │   ├── frontmatter.py  # parse_frontmatter
 │   ├── goals.py        # parse_goal_tasks, resolve_deadline, filter_by_proximity
 │   ├── media.py        # scan_books, scan_podcasts
@@ -174,7 +175,7 @@ sync/
 │   ├── charts.py       # render_bar_chart, BarChartPreset, training grids, study coverage, waterfall charts
 │   ├── tables.py       # render_summary_table, render_sleep_stats_table
 │   ├── goals.py        # render_goal_lines, build_goals_block, format_countdown
-│   └── media.py        # render_media_table, build_media_section
+│   └── media.py        # render_media_table
 │
 ├── daily/            # Daily note orchestration
 │   ├── orchestrator.py # Main update_markdown logic
@@ -193,10 +194,10 @@ sync/
     ├── dates.py        # Date ranges + period shifting
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation + shared period data loaders
-    ├── notes.py        # Compatibility facade for note API
+    ├── goal_identity.py # Shared goal canonicalization + deterministic/random IDs
+    ├── media_section.py # MEDIA section orchestration (scan + render composition)
     ├── notes_locking.py # Advisory file locking
     ├── notes_sections.py # Markdown section extraction/manipulation
-    ├── notes_parsing.py # Daily-note metric extraction
     ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     ├── reminders.py    # Review reminder generation
@@ -204,7 +205,7 @@ sync/
     └── base.py         # Cross-period goal/piercing/mirror helpers
 ```
 
-**Data flow**: `markdown → readers/notes_parsing → models → writers → markdown`
+**Data flow**: `markdown → readers → models → writers → markdown`
 
 ### Module Responsibilities
 
@@ -221,7 +222,7 @@ sync/
 - `scan_books(start, end, dir)` → `list[Book]`
 - `parse_study_table(lines)` → `list[StudySession]`
 - `parse_procrastination_table(lines)` → `DailyScreenTimeData`
-- `parse_daily_note(path)` → `dict | None` (daily metrics adapter)
+- `parse_daily_note(path)` → `dict | None` (canonical daily aggregate parser)
 - Shared helpers: `normalize_header`, `extract_block`, `parse_duration_to_minutes`
 - Dated goals: `resolve_deadline`, `parse_goal_date`, `filter_by_proximity`
 - Piercing: `filter_by_proximity` excludes completed goals from piercing into child periods
@@ -238,10 +239,10 @@ sync/
 - `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`, `shift_month`, `shift_quarter`, `previous_month`, `previous_quarter`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
 - `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`
-- `notes.py`: compatibility facade exporting `locked_note`, `parse_daily_note`, `ensure_note`, `replace_metrics_block`, `splice_goals_section`, etc.
 - `notes_locking.py`: lockfile lifecycle + `locked_note`
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
-- `notes_parsing.py`: `parse_daily_note`, `parse_study_table`, `parse_sleep_table`
+- `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
+- `media_section.py`: `build_media_section` (scans via readers, renders via writers)
 - `base.py`: `carry_forward_goals`, `propagate_goal_status`, `process_pierced_goals`, `merge_mirror_goals`
 - `period_cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
@@ -365,7 +366,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 447 tests (current branch)
+pytest tests/ -v              # All 454 tests (current branch)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```
