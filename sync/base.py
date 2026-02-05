@@ -66,8 +66,13 @@ def carry_forward_goals(
     """
     from dataclasses import replace
 
-    # Clean up old cache entries - only keep current period
-    cleanup_old_entries(horizon, [period_key])
+    # Clean up old cache entries - keep current + prior period
+    # (prior needed to check if goals from previous period were already offered)
+    from sync.carried_goals import get_prior_period_key
+
+    prior_key = get_prior_period_key(horizon, period_key)
+    keep_keys = [period_key] if prior_key is None else [prior_key, period_key]
+    cleanup_old_entries(horizon, keep_keys)
 
     open_prev = [t for t in prev_tasks if not t.done]
     if not open_prev:

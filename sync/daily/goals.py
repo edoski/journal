@@ -303,8 +303,13 @@ def carry_forward_daily_tasks(
     """
     today_key = today_date.isoformat()
 
-    # Clean up old cache entries - only keep current period
-    cleanup_old_entries("daily", [today_key])
+    # Clean up old cache entries - keep today + yesterday
+    # (yesterday needed to check if goals were already offered)
+    from sync.carried_goals import get_prior_period_key
+
+    yesterday_key = get_prior_period_key("daily", today_key)
+    keep_keys = [today_key] if yesterday_key is None else [yesterday_key, today_key]
+    cleanup_old_entries("daily", keep_keys)
 
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     y_lines = safe_read_file(yesterday_path)

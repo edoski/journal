@@ -22,6 +22,53 @@ from typing import Any
 from .constants import CARRIED_GOALS_PATH
 
 
+def get_prior_period_key(period_type: str, current_key: str) -> str | None:
+    """
+    Get the prior period key for cache retention.
+
+    When cleaning up old cache entries, we need to keep the prior period
+    so that carry-forward can check if goals were already offered.
+
+    Args:
+        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        current_key: Current period identifier (e.g., "2026-02", "2026-W06")
+
+    Returns:
+        Prior period key, or None if it can't be computed
+    """
+    import datetime
+
+    if period_type == "daily":
+        # Parse YYYY-MM-DD, subtract 1 day
+        d = datetime.datetime.strptime(current_key, "%Y-%m-%d").date()
+        prior = d - datetime.timedelta(days=1)
+        return prior.isoformat()
+
+    elif period_type == "weekly":
+        # Parse YYYY-Www, subtract 7 days
+        year, week = int(current_key[:4]), int(current_key[6:])
+        d = datetime.datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
+        prior = d - datetime.timedelta(days=7)
+        prior_year, prior_week, _ = prior.isocalendar()
+        return f"{prior_year}-W{prior_week:02d}"
+
+    elif period_type == "monthly":
+        # Parse YYYY-MM, subtract 1 month
+        year, month = int(current_key[:4]), int(current_key[5:])
+        if month == 1:
+            return f"{year - 1}-12"
+        return f"{year}-{month - 1:02d}"
+
+    elif period_type == "quarterly":
+        # Parse YYYY-Qn, subtract 1 quarter
+        year, quarter = int(current_key[:4]), int(current_key[-1])
+        if quarter == 1:
+            return f"{year - 1}-Q4"
+        return f"{year}-Q{quarter - 1}"
+
+    return None
+
+
 def _load_cache() -> dict[str, Any]:
     """Load the carried goals cache from disk."""
     if not os.path.exists(CARRIED_GOALS_PATH):
