@@ -16,6 +16,10 @@ import time
 from contextlib import contextmanager
 
 from .constants import LOCK_DIR
+from sync.readers.common import (
+    normalize_header as _normalize_header,
+    parse_duration_to_minutes as _parse_duration_to_minutes,
+)
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.screen_time import parse_procrastination_table
 from sync.models.goals import Goal
@@ -26,38 +30,6 @@ from sync.logging import get_logger
 from sync.io import safe_read_file  # noqa: F401
 
 _logger = get_logger()
-
-
-def _normalize_header(line: str) -> str:
-    """Normalize markdown headers for matching, ignoring emphasis markers."""
-    stripped = line.strip()
-    cleaned = re.sub(r"\*+", "", stripped)
-    cleaned = re.sub(r"_+", "", cleaned)
-    return cleaned.lower()
-
-
-def _parse_duration_to_minutes(val) -> float | None:
-    """Parse duration string to minutes."""
-    if val is None:
-        return None
-    if isinstance(val, (int, float)):
-        return float(val)
-    s = str(val).strip().strip("`")
-    if not s:
-        return None
-    hours = 0.0
-    minutes = 0.0
-    seconds = 0.0
-    match_h = re.search(r"(\d+(?:\.\d+)?)h", s)
-    match_m = re.search(r"(\d+(?:\.\d+)?)m", s)
-    match_s = re.search(r"(\d+(?:\.\d+)?)s", s)
-    if match_h:
-        hours = float(match_h.group(1))
-    if match_m:
-        minutes = float(match_m.group(1))
-    if match_s:
-        seconds = float(match_s.group(1))
-    return hours * 60 + minutes + (seconds / 60)
 
 
 def _parse_bool(val) -> bool:
