@@ -22,8 +22,8 @@ from sync.goals.note_store import (
     ensure_note_lines,
     extract_goals,
     render_goals_or_empty,
-    write_goals_sections,
 )
+from sync.goals.period_pipeline import SourceWriteConfig, propagate_source_sections
 
 logger = get_logger()
 
@@ -150,14 +150,13 @@ def write_weekly_goals(
     with locked_note(path):
         lines = ensure_note_lines(path, WEEKLY_TEMPLATE_PATH)
         existing_monthly = extract_goals(lines, "MONTHLY")
-        write_goals_sections(
-            path,
-            lines,
-            [
+        propagate_source_sections(
+            config=SourceWriteConfig(path=path),
+            sections=[
                 ("MONTHLY", render_goals_or_empty("MONTHLY", existing_monthly)),
                 ("WEEKLY", render_goal_lines(weekly_tasks)),
             ],
-            insert_if_missing=True,
+            existing_lines=lines,
         )
 
     # Propagate status changes to monthly note if monthly goals were updated
@@ -171,17 +170,16 @@ def write_weekly_goals(
         with locked_note(monthly_path):
             monthly_lines = ensure_note_lines(monthly_path, MONTHLY_TEMPLATE_PATH)
             existing_quarterly = extract_goals(monthly_lines, "QUARTERLY")
-            write_goals_sections(
-                monthly_path,
-                monthly_lines,
-                [
+            propagate_source_sections(
+                config=SourceWriteConfig(path=monthly_path),
+                sections=[
                     (
                         "QUARTERLY",
                         render_goals_or_empty("QUARTERLY", existing_quarterly),
                     ),
                     ("MONTHLY", render_goal_lines(monthly_tasks)),
                 ],
-                insert_if_missing=True,
+                existing_lines=monthly_lines,
             )
 
     # Propagate status changes to quarterly note if quarterly/yearly goals were updated
@@ -201,14 +199,13 @@ def write_weekly_goals(
             quarterly_to_write = (
                 quarterly_tasks if quarterly_tasks else existing_quarterly_src
             )
-            write_goals_sections(
-                quarterly_path,
-                quarterly_lines,
-                [
+            propagate_source_sections(
+                config=SourceWriteConfig(path=quarterly_path),
+                sections=[
                     ("YEARLY", render_goal_lines(yearly_to_write)),
                     ("QUARTERLY", render_goal_lines(quarterly_to_write)),
                 ],
-                insert_if_missing=True,
+                existing_lines=quarterly_lines,
             )
 
     return path

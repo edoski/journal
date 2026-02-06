@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
-import os
 
 from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
+    QUARTERLY_TEMPLATE_PATH,
     DAYS,
 )
-from sync.io import safe_read_file
 from sync.notes.locking import locked_note
 from sync.notes.sections import (
     trim_blank_lines,
@@ -46,13 +45,9 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.goals.carry_forward import carry_forward_with_tombstones
 
 from sync.goals.reconcile import (
     load_quarterly_goals,
-    reconcile_goal_lists,
-    merge_mirror_goals,
-    process_pierced_goals,
 )
 from sync.periods.runtime import (
     journal_path,
@@ -67,7 +62,16 @@ from sync.goals.note_store import (
     ensure_note_lines,
     extract_goals,
     render_goals_or_empty,
-    write_goals_sections,
+)
+from sync.goals.period_pipeline import (
+    CarryForwardConfig,
+    MirrorSyncConfig,
+    PiercingSyncConfig,
+    SourceWriteConfig,
+    load_source_tasks_with_carry_forward,
+    propagate_source_sections,
+    sync_mirror_section,
+    sync_pierced_source_section,
 )
 
 
@@ -328,105 +332,84 @@ def main() -> None:
             horizon="monthly",
             period_key=month_start.isoformat(),
         )
-        weekly_tasks = extract_goals(
+        weekly_tasks = load_source_tasks_with_carry_forward(
             lines,
-            "WEEKLY",
-            horizon="weekly",
-            period_key=window.start.isoformat(),
-        )
-
-        # Carry forward open weekly goals from prior week
-        week_key = f"{window.year}-W{window.week_num:02d}"
-
-        prev_week_path = journal_path(window.previous_filename)
-        prev_week_tasks = []
-        if os.path.exists(prev_week_path):
-            prev_lines = safe_read_file(prev_week_path)
-            if prev_lines is not None:
-                prev_week_tasks = extract_goals(
-                    prev_lines,
-                    "WEEKLY",
-                    horizon="weekly",
-                    period_key=window.previous_start.isoformat(),
-                )
-
-        weekly_tasks, _ = carry_forward_with_tombstones(
-            prev_week_tasks, weekly_tasks, week_key, "weekly"
+            config=CarryForwardConfig(
+                section="WEEKLY",
+                horizon="weekly",
+                period_key=f"{window.year}-W{window.week_num:02d}",
+                current_id_key=window.start.isoformat(),
+                previous_note_path=journal_path(window.previous_filename),
+                previous_id_key=window.previous_start.isoformat(),
+            ),
         )
 
         # Reconcile MONTHLY source <-> WEEKLY MONTHLY-mirror state.
-        monthly_tasks, monthly_mirror, monthly_changed, _ = reconcile_goal_lists(
+        today = datetime.date.today()
+        monthly_sync = sync_mirror_section(
             monthly_tasks,
             monthly_mirror,
-            monthly_path,
-            note_path,
+            config=MirrorSyncConfig(
+                mirror_section="MONTHLY",
+                source_path=monthly_path,
+                mirror_path=note_path,
+                proximity_days=30,
+            ),
+            today=today,
         )
+        monthly_tasks = monthly_sync.source_tasks
+        monthly_mirror = monthly_sync.mirror_tasks
+        monthly_changed = monthly_sync.source_changed
 
         if monthly_changed:
             with locked_note(monthly_path):
                 monthly_lines = ensure_note_lines(monthly_path, MONTHLY_TEMPLATE_PATH)
                 existing_quarterly = extract_goals(monthly_lines, "QUARTERLY")
-                write_goals_sections(
-                    monthly_path,
-                    monthly_lines,
-                    [
+                propagate_source_sections(
+                    config=SourceWriteConfig(path=monthly_path),
+                    sections=[
                         (
                             "QUARTERLY",
                             render_goals_or_empty("QUARTERLY", existing_quarterly),
                         ),
                         ("MONTHLY", render_goal_lines(monthly_tasks)),
                     ],
-                    insert_if_missing=True,
+                    existing_lines=monthly_lines,
                 )
 
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
         # MONTHLY mirror: preserve existing + add new from filter_by_proximity
-        today = datetime.date.today()
-        final_monthly = merge_mirror_goals(
-            monthly_mirror,
-            monthly_tasks,
-            proximity_days=30,
-            today=today,
-            source_path=monthly_path,
-            mirror_path=note_path,
-        )
-        monthly_rendered = render_goals_or_empty("MONTHLY", final_monthly, today=today)
+        monthly_rendered = monthly_sync.mirror_lines
 
         # WEEKLY source: weekly goals + pierced quarterly/yearly goals (≤30d deadline)
-        original_weekly, final_pierced, [updated_quarterly, updated_yearly] = (
-            process_pierced_goals(
-                existing_tasks=weekly_tasks,
-                source_goal_lists=[quarterly_tasks, yearly_mirror],
-                proximity_days=30,
-                today=today,
+        source_sync = sync_pierced_source_section(
+            existing_tasks=weekly_tasks,
+            source_goal_lists=[quarterly_tasks, yearly_mirror],
+            config=PiercingSyncConfig(
                 note_path=note_path,
-                source_paths=[quarterly_path, quarterly_path],
-            )
+                source_paths=(quarterly_path, quarterly_path),
+                proximity_days=30,
+            ),
+            today=today,
         )
-        quarterly_changed = updated_quarterly != quarterly_tasks
-        yearly_changed = updated_yearly != yearly_mirror
-        quarterly_tasks = updated_quarterly
-        yearly_mirror = updated_yearly
+        weekly_source_lines = source_sync.source_lines
+        quarterly_tasks, yearly_mirror = source_sync.updated_source_lists
+        quarterly_changed, yearly_changed = source_sync.source_changes
 
         # Write back quarterly note if quarterly or yearly status changed.
         if quarterly_changed or yearly_changed:
             with locked_note(quarterly_path):
-                quarterly_lines = safe_read_file(quarterly_path) or []
-                write_goals_sections(
-                    quarterly_path,
-                    quarterly_lines,
-                    [
+                quarterly_lines = ensure_note_lines(
+                    quarterly_path, QUARTERLY_TEMPLATE_PATH
+                )
+                propagate_source_sections(
+                    config=SourceWriteConfig(path=quarterly_path),
+                    sections=[
                         ("YEARLY", render_goal_lines(yearly_mirror)),
                         ("QUARTERLY", render_goal_lines(quarterly_tasks)),
                     ],
-                    insert_if_missing=True,
+                    existing_lines=quarterly_lines,
                 )
-
-        # Render: original weekly goals (preserve dates) + final pierced goals (countdown)
-        weekly_source_lines = render_goal_lines(original_weekly)
-        if final_pierced:
-            pierced_lines = render_goal_lines(final_pierced, today=today)
-            weekly_source_lines = weekly_source_lines + pierced_lines
 
         lines = apply_goals_sections(
             lines,

@@ -60,6 +60,7 @@ journal/
       state.py                # Bidirectional source/mirror goal state reconciliation cache
       reconcile.py            # Goal piercing + mirror/source reconciliation helpers
       note_store.py           # Canonical Goals-section read/write helpers for notes
+      period_pipeline.py      # Shared period-goal orchestration pipeline
       reminders.py            # Periodic review and maintenance reminder generation
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
@@ -99,7 +100,7 @@ journal/
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
   - **`study/`**: Study ingestion package (Flow DB access, break logic, STUDY section rendering)
-  - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, canonical goal note I/O, reminders)
+  - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, canonical note I/O, period-goal pipeline, reminders)
   - **`periods/`**: Weekly/monthly/quarterly/yearly sync modules + shared period helpers
 
 - **`sync/periods/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
@@ -240,6 +241,7 @@ sync/
 │   ├── state.py        # cache-backed source/mirror done-state reconciliation
 │   ├── reconcile.py    # goal piercing + mirror/source reconciliation
 │   ├── note_store.py   # canonical goal subsection read/write helpers
+│   ├── period_pipeline.py # shared period-goal orchestration configs + helpers
 │   └── reminders.py    # periodic review/maintenance reminder generation
 │
 ├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
@@ -322,6 +324,7 @@ sync/
 - `periods/media.py`: `build_media_section` (scans via readers, renders via writers)
 - `goals/reconcile.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `goals/note_store.py`: `extract_goals`, `render_goals_or_empty`, `apply_goals_sections`, `write_goals_sections`
+- `goals/period_pipeline.py`: typed configs for carry-forward/mirror/piercing/source-write flows used by period sync entrypoints
 - `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `periods/cleanup.py`: `resync_if_marker`

@@ -57,9 +57,15 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.goals.carry_forward import carry_forward_with_tombstones
 
-from sync.goals.reconcile import reconcile_goal_lists, merge_mirror_goals
+from sync.goals.period_pipeline import (
+    CarryForwardConfig,
+    MirrorSyncConfig,
+    SourceWriteConfig,
+    load_source_tasks_with_carry_forward,
+    propagate_source_sections,
+    sync_mirror_section,
+)
 from sync.periods.runtime import (
     journal_path,
     open_period_note,
@@ -70,8 +76,6 @@ from sync.periods.windows import build_quarter_window
 from sync.goals.note_store import (
     apply_goals_sections,
     extract_goals,
-    render_goals_or_empty,
-    write_goals_sections,
 )
 
 logger = get_logger()
@@ -521,28 +525,18 @@ def main() -> None:
             horizon="yearly",
             period_key=str(window.year),
         )
-        quarterly_tasks = extract_goals(
+        quarterly_tasks = load_source_tasks_with_carry_forward(
             lines,
-            "QUARTERLY",
-            horizon="quarterly",
-            period_key=quarter_id(window.year, window.quarter),
-        )
-
-        qtr_key = quarter_id(window.year, window.quarter)
-
-        prev_note_path = journal_path(window.previous_filename)
-        prev_tasks = []
-        prev_lines = safe_read_file(prev_note_path)
-        if prev_lines is not None:
-            prev_tasks = extract_goals(
-                prev_lines,
-                "QUARTERLY",
+            config=CarryForwardConfig(
+                section="QUARTERLY",
                 horizon="quarterly",
-                period_key=quarter_id(window.previous_year, window.previous_quarter),
-            )
-
-        quarterly_tasks, _ = carry_forward_with_tombstones(
-            prev_tasks, quarterly_tasks, qtr_key, "quarterly"
+                period_key=quarter_id(window.year, window.quarter),
+                current_id_key=quarter_id(window.year, window.quarter),
+                previous_note_path=journal_path(window.previous_filename),
+                previous_id_key=quarter_id(
+                    window.previous_year, window.previous_quarter
+                ),
+            ),
         )
 
         yearly_tasks = []
@@ -559,36 +553,33 @@ def main() -> None:
             yearly_lines = []
 
         # Reconcile YEARLY source <-> QUARTERLY YEARLY-mirror state.
-        yearly_tasks, yearly_mirror, yearly_changed, _ = reconcile_goal_lists(
+        today = datetime.date.today()
+        yearly_sync = sync_mirror_section(
             yearly_tasks,
             yearly_mirror,
-            yearly_path,
-            note_path,
+            config=MirrorSyncConfig(
+                mirror_section="YEARLY",
+                source_path=yearly_path,
+                mirror_path=note_path,
+                proximity_days=365,
+            ),
+            today=today,
         )
+        yearly_tasks = yearly_sync.source_tasks
+        yearly_mirror = yearly_sync.mirror_tasks
+        yearly_changed = yearly_sync.source_changed
 
         if yearly_changed:
             with locked_note(yearly_path):
                 yearly_lines = safe_read_file(yearly_path) or yearly_lines
-                write_goals_sections(
-                    yearly_path,
-                    yearly_lines,
-                    [("YEARLY", render_goal_lines(yearly_tasks))],
-                    insert_if_missing=True,
+                propagate_source_sections(
+                    config=SourceWriteConfig(path=yearly_path),
+                    sections=[("YEARLY", render_goal_lines(yearly_tasks))],
+                    existing_lines=yearly_lines,
                 )
 
         # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
-        today = datetime.date.today()
-        filtered_yearly = merge_mirror_goals(
-            yearly_mirror,
-            yearly_tasks,
-            proximity_days=365,
-            today=today,
-            source_path=yearly_path,
-            mirror_path=note_path,
-        )
-        yearly_lines_block = render_goals_or_empty(
-            "YEARLY", filtered_yearly, today=today
-        )
+        yearly_lines_block = yearly_sync.mirror_lines
         lines = apply_goals_sections(
             lines,
             [
