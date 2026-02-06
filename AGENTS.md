@@ -184,6 +184,12 @@ journal/
   - `files_modified_on_date(day) -> list[VaultFileRecord]`
   - `links_for_window(files, start, end) -> list[str]`
 
+## Canonical Markdown Schemas
+
+- Daily `STUDY` tables are canonical only when they include:
+  - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |`
+- Legacy `STUDY` tables without `CONTEXT` are rejected with explicit errors.
+
 ## Data Flow
 
 - parsing path: `markdown -> readers -> contracts/models`

@@ -13,8 +13,20 @@ from typing import Callable
 
 from sync.contracts.study import StudySessionRecord
 from sync.formatting import format_minutes, ceil_minutes, round_half_up
+from sync.logging import get_logger
 
 from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
+
+logger = get_logger()
+
+_CANONICAL_STUDY_HEADER_RE = re.compile(
+    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*CONTEXT\s*\|\s*NOTES\s*\|$",
+    re.IGNORECASE,
+)
+_LEGACY_STUDY_HEADER_RE = re.compile(
+    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*NOTES\s*\|$",
+    re.IGNORECASE,
+)
 
 
 def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
@@ -29,15 +41,16 @@ def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, s
     """
     existing_notes: dict[str, str] = {}
     existing_context: dict[str, str] = {}
-    table_header_re = re.compile(
-        r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|(\s*CONTEXT\s*\|)?\s*NOTES\s*\|",
-        re.IGNORECASE,
-    )
     header_idx = -1
     for i, line in enumerate(lines):
-        if table_header_re.match(line.strip()):
+        stripped = line.strip()
+        if _CANONICAL_STUDY_HEADER_RE.match(stripped):
             header_idx = i
             break
+        if _LEGACY_STUDY_HEADER_RE.match(stripped):
+            msg = "Legacy STUDY table header without CONTEXT is no longer supported"
+            logger.error(msg)
+            raise ValueError(msg)
     if header_idx == -1:
         return existing_notes, existing_context
 
@@ -46,22 +59,23 @@ def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, s
         if not lines[i].lstrip().startswith("|"):
             break
         parts = [p.strip() for p in lines[i].split("|")]
-        if len(parts) < 7:
-            continue
+        if len(parts) < 9:
+            msg = (
+                "Invalid STUDY table row: expected TIME/ACTIVITY/DURATION/"
+                "INTERRUPT/BREAK/CONTEXT/NOTES columns"
+            )
+            logger.error(msg)
+            raise ValueError(msg)
         time_cell = parts[1].replace("`", "")
         time_match = re.search(r"([0-2][0-9]:[0-5][0-9])", time_cell)
         if not time_match:
             continue
         start_key = time_match.group(1)
-        # Handle both old format (no CONTEXT) and new format (with CONTEXT)
-        if len(parts) >= 8:  # New format with CONTEXT
-            context_content = parts[6]
-            note_content = parts[7]
-            # Preserve context if it's not an em-dash (has actual content)
-            if context_content and context_content != "–":
-                existing_context[start_key] = context_content
-        else:  # Old format without CONTEXT
-            note_content = parts[6]
+        context_content = parts[6]
+        note_content = parts[7]
+        # Preserve context if it's not an em-dash (has actual content)
+        if context_content and context_content != "–":
+            existing_context[start_key] = context_content
         if note_content and note_content != "❌":
             existing_notes[start_key] = note_content
     return existing_notes, existing_context
