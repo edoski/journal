@@ -6,7 +6,7 @@ import datetime
 from pathlib import Path
 
 import sync.periods.engine as period_engine
-import sync.periods.sections as period_sections
+from sync.contracts.media import MediaBundle
 from sync.dates import (
     daterange,
     iso_week_range,
@@ -18,17 +18,22 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
+from sync.models.media import Book
 from sync.models.goals import Goal
 from sync.writers.goals import build_goals_block, render_goal_lines
 
-FIXTURE_MEDIA_SECTION = [
-    "### **MEDIA**",
-    "",
-    "| TYPE | TITLE | DATE |",
-    "| ---- | ----- | ---- |",
-    "| **BOOK** | [[Fixture Book]] | `2020-01-01` |",
-    "",
-]
+FIXTURE_MEDIA_BUNDLE = MediaBundle(
+    books=[
+        Book(
+            title="Fixture Book",
+            author="Fixture Author",
+            started=datetime.date(2019, 12, 1),
+            completed=datetime.date(2020, 1, 1),
+            rating=None,
+        )
+    ],
+    podcasts=[],
+)
 
 SNAPSHOT_DIR = Path(__file__).parents[1] / "fixtures" / "render_baseline"
 
@@ -82,16 +87,8 @@ def _assert_snapshot(name: str, lines: list[str]) -> None:
     assert actual_raw == expected_raw, f"Raw newline/spacing drift in snapshot {path}"
 
 
-def _patch_media_sections(monkeypatch) -> None:
-    monkeypatch.setattr(
-        period_sections,
-        "build_media_section",
-        lambda *_a, **_kw: FIXTURE_MEDIA_SECTION,
-    )
-
-
 def test_weekly_metrics_snapshot(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = iso_week_range(datetime.date(2020, 5, 13))
     daily_data = _range_data(start, end)
@@ -113,6 +110,7 @@ def test_weekly_metrics_snapshot(monkeypatch):
         daily_data,
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
+        FIXTURE_MEDIA_BUNDLE,
         prior_week_metrics=prior_week_metrics,
     )
 
@@ -120,7 +118,7 @@ def test_weekly_metrics_snapshot(monkeypatch):
 
 
 def test_monthly_metrics_snapshot(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = month_range(2020, 5)
     week_ranges = month_week_ranges(2020, 5)
@@ -143,6 +141,7 @@ def test_monthly_metrics_snapshot(monkeypatch):
         prev_daily_data,
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
+        FIXTURE_MEDIA_BUNDLE,
         prior_month_metrics=prior_month_metrics,
     )
 
@@ -150,7 +149,7 @@ def test_monthly_metrics_snapshot(monkeypatch):
 
 
 def test_quarterly_metrics_snapshot(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = quarter_range(2020, 3)
     month_ranges = quarter_months(2020, 3)
@@ -173,6 +172,7 @@ def test_quarterly_metrics_snapshot(monkeypatch):
         prev_daily_data,
         2020,
         2,
+        FIXTURE_MEDIA_BUNDLE,
         prior_quarter_metrics=prior_quarter_metrics,
     )
 
@@ -180,7 +180,7 @@ def test_quarterly_metrics_snapshot(monkeypatch):
 
 
 def test_yearly_metrics_snapshot(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     year = 2020
     start, end = year_range(year)
@@ -206,6 +206,7 @@ def test_yearly_metrics_snapshot(monkeypatch):
         prev_quarter_ranges,
         daily_data,
         prev_daily_data,
+        FIXTURE_MEDIA_BUNDLE,
         prior_year_metrics=prior_year_metrics,
     )
 

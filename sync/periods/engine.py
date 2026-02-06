@@ -79,6 +79,7 @@ def build_weekly_metrics(
     daily_data,
     prev_daily_data,
     prev_week_label,
+    media_bundle,
     prior_week_metrics=None,
 ):
     """
@@ -257,7 +258,7 @@ def build_weekly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    append_media_section(sections, start_date, end_date, "week")
+    append_media_section(sections, media_bundle)
 
     return join_sections(sections)
 
@@ -270,6 +271,7 @@ def build_monthly_metrics(
     prev_daily_data,
     current_month_label,
     prev_month_label,
+    media_bundle,
     prior_month_metrics=None,
 ):
     """
@@ -667,7 +669,7 @@ def build_monthly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    append_media_section(sections, start_date, end_date, "month")
+    append_media_section(sections, media_bundle)
 
     return join_sections(sections)
 
@@ -736,6 +738,7 @@ def build_quarterly_metrics(
     prev_daily_data,
     prev_year,
     prev_quarter,
+    media_bundle,
     prior_quarter_metrics=None,
 ):
     today = datetime.date.today()
@@ -1083,7 +1086,7 @@ def build_quarterly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    append_media_section(sections, quarter_start, quarter_end, "quarter")
+    append_media_section(sections, media_bundle)
 
     return join_sections(sections)
 
@@ -1109,6 +1112,7 @@ def build_yearly_metrics(
     prev_quarter_ranges,
     daily_data,
     prev_daily_data,
+    media_bundle,
     prior_year_metrics=None,
 ):
     today = datetime.date.today()
@@ -1563,6 +1567,6 @@ def build_yearly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    append_media_section(sections, year_start, year_end, "year")
+    append_media_section(sections, media_bundle)
 
     return join_sections(sections)

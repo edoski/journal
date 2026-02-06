@@ -7,13 +7,14 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from sync.periods.media import build_media_section
+from sync.contracts.media import MediaBundle
 from sync.metrics import (
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
 )
 from sync.notes.sections import trim_blank_lines
 from sync.writers.charts import render_waterfall_chart, wrap_code_block
+from sync.writers.media import render_media_table
 from sync.writers.tables import (
     render_interrupts_table,
     render_summary_table,
@@ -98,10 +99,13 @@ def build_procrastination_section(
 
 def append_media_section(
     sections: list[list[str]],
-    start_date: datetime.date,
-    end_date: datetime.date,
-    period_type: str,
+    media_bundle: MediaBundle,
 ) -> None:
     """Render and append MEDIA section lines for the period."""
-    media_lines = build_media_section(start_date, end_date, period_type)
+    if not media_bundle.books and not media_bundle.podcasts:
+        return
+
+    media_lines: list[str] = ["### **MEDIA**", ""]
+    media_lines.extend(render_media_table(media_bundle.books, media_bundle.podcasts))
+    media_lines.append("")
     sections.append(trim_blank_lines(media_lines))

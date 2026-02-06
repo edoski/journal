@@ -100,7 +100,6 @@ journal/
       windows.py
       runtime.py
       sections.py
-      media.py
       cleanup.py
       weekly.py                # Composition root
       monthly.py               # Composition root
@@ -159,6 +158,7 @@ journal/
 - `DailySyncService`: builds and writes daily note metrics/frontmatter, delegates goal orchestration to `GoalSyncService`.
 - `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation).
 - `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
+  - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by TUI.
 
 ### Ports

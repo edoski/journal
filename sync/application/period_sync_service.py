@@ -28,6 +28,7 @@ from sync.periods.runtime import (
 )
 from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWindow
 from sync.ports.daily_aggregates import DailyAggregateSource
+from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
 
 from .goal_sync_service import GoalSyncService
@@ -39,6 +40,7 @@ class PeriodSyncService:
 
     note_store: NoteStore
     aggregate_source: DailyAggregateSource
+    media_source: MediaSource
     goal_sync_service: GoalSyncService
 
     def _load_range(
@@ -92,6 +94,7 @@ class PeriodSyncService:
                 range(4, 0, -1),
                 window.prior_bounds,
             )
+            media_bundle = self.media_source.scan(window.start, window.end)
 
             metrics_block = build_weekly_metrics(
                 window.start,
@@ -99,6 +102,7 @@ class PeriodSyncService:
                 daily_data,
                 prev_daily_data,
                 window.previous_label,
+                media_bundle,
                 prior_week_metrics=prior_week_metrics,
             )
 
@@ -140,6 +144,7 @@ class PeriodSyncService:
                 range(3, 0, -1),
                 window.prior_bounds,
             )
+            media_bundle = self.media_source.scan(month_start, month_end)
 
             metrics_block = build_monthly_metrics(
                 month_start,
@@ -149,6 +154,7 @@ class PeriodSyncService:
                 prev_daily_data,
                 window.current_label,
                 window.previous_label,
+                media_bundle,
                 prior_month_metrics=prior_month_metrics,
             )
 
@@ -182,6 +188,7 @@ class PeriodSyncService:
                 range(4, 0, -1),
                 window.prior_bounds,
             )
+            media_bundle = self.media_source.scan(window.start, window.end)
 
             metrics_block = build_quarterly_metrics(
                 window.start,
@@ -191,6 +198,7 @@ class PeriodSyncService:
                 prev_daily_data,
                 window.previous_year,
                 window.previous_quarter,
+                media_bundle,
                 prior_quarter_metrics=prior_quarter_metrics,
             )
 
@@ -213,6 +221,7 @@ class PeriodSyncService:
                 range(3, 0, -1),
                 window.prior_bounds,
             )
+            media_bundle = self.media_source.scan(window.start, window.end)
 
             metrics_block = build_yearly_metrics(
                 window.year,
@@ -222,6 +231,7 @@ class PeriodSyncService:
                 window.previous_quarter_ranges,
                 daily_data,
                 prev_daily_data,
+                media_bundle,
                 prior_year_metrics=prior_year_metrics,
             )
 

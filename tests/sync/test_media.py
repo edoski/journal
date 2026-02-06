@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import datetime
 
+from sync.contracts.media import MediaBundle
 from sync.models import Book, Podcast
+from sync.periods.sections import append_media_section
 from sync.readers.media import (
     _parse_date_link,
     scan_books,
     scan_podcasts,
 )
-from sync.periods.media import build_media_section
 from sync.writers.media import render_media_table
 
 
@@ -249,28 +250,31 @@ class TestRenderMediaTable:
         assert "**BOOK**" in lines[2]
 
 
-class TestBuildMediaSection:
-    """Tests for build_media_section function."""
+class TestAppendMediaSection:
+    """Tests for period MEDIA section assembly."""
 
-    def test_no_media_returns_empty(self, tmp_path):
-        """Returns empty list when no media in the date range."""
-        # Use dates far in the past to ensure no media matches
-        lines = build_media_section(
-            datetime.date(1900, 1, 1),
-            datetime.date(1900, 1, 31),
-        )
-        assert lines == []
+    def test_no_media_bundle_does_not_append_section(self):
+        sections: list[list[str]] = []
+        append_media_section(sections, MediaBundle(books=[], podcasts=[]))
+        assert sections == []
 
-    def test_with_media_shows_section(self, tmp_path):
-        """Shows section with header when media present."""
-        # This test requires actual books/podcasts in the configured directories
-        # Since we can't easily mock the directories, we test the function signature
-        # and that it returns a list type
-        lines = build_media_section(
-            datetime.date(2025, 1, 1),
-            datetime.date(2025, 1, 31),
+    def test_media_bundle_appends_media_section(self):
+        sections: list[list[str]] = []
+        bundle = MediaBundle(
+            books=[
+                Book(
+                    title="Deep Work",
+                    author="Cal Newport",
+                    started=datetime.date(2025, 1, 5),
+                    completed=datetime.date(2025, 1, 22),
+                    rating=None,
+                )
+            ],
+            podcasts=[],
         )
-        # Function returns either empty list or list with MEDIA header
-        assert isinstance(lines, list)
-        if lines:
-            assert "### **MEDIA**" in lines[0]
+
+        append_media_section(sections, bundle)
+        assert len(sections) == 1
+        media_lines = sections[0]
+        assert media_lines[0] == "### **MEDIA**"
+        assert "| **BOOK** | [[Deep Work]] | `2025-01-22` |" in media_lines

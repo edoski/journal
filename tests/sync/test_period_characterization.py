@@ -11,7 +11,7 @@ import datetime
 import hashlib
 
 import sync.periods.engine as period_engine
-import sync.periods.sections as period_sections
+from sync.contracts.media import MediaBundle
 from sync.dates import (
     daterange,
     iso_week_range,
@@ -23,16 +23,21 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
+from sync.models.media import Book
 
 
-_FIXTURE_MEDIA_SECTION = [
-    "### **MEDIA**",
-    "",
-    "| TYPE | TITLE | DATE |",
-    "| ---- | ----- | ---- |",
-    "| **BOOK** | [[Fixture Book]] | `2020-01-01` |",
-    "",
-]
+_FIXTURE_MEDIA_BUNDLE = MediaBundle(
+    books=[
+        Book(
+            title="Fixture Book",
+            author="Fixture Author",
+            started=datetime.date(2019, 12, 1),
+            completed=datetime.date(2020, 1, 1),
+            rating=None,
+        )
+    ],
+    podcasts=[],
+)
 
 
 def _payload_for_date(day: datetime.date) -> dict:
@@ -73,16 +78,8 @@ def _hash_lines(lines: list[str]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
-def _patch_media_sections(monkeypatch) -> None:
-    monkeypatch.setattr(
-        period_sections,
-        "build_media_section",
-        lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION,
-    )
-
-
 def test_weekly_metrics_block_characterization(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = iso_week_range(datetime.date(2020, 5, 13))
     daily_data = _range_data(start, end)
@@ -104,6 +101,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         daily_data,
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
+        _FIXTURE_MEDIA_BUNDLE,
         prior_week_metrics=prior_week_metrics,
     )
 
@@ -114,7 +112,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
 
 
 def test_monthly_metrics_block_characterization(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = month_range(2020, 5)
     week_ranges = month_week_ranges(2020, 5)
@@ -137,6 +135,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
+        _FIXTURE_MEDIA_BUNDLE,
         prior_month_metrics=prior_month_metrics,
     )
 
@@ -147,7 +146,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
 
 
 def test_quarterly_metrics_block_characterization(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     start, end = quarter_range(2020, 3)
     month_ranges = quarter_months(2020, 3)
@@ -170,6 +169,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         2020,
         2,
+        _FIXTURE_MEDIA_BUNDLE,
         prior_quarter_metrics=prior_quarter_metrics,
     )
 
@@ -180,7 +180,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
 
 
 def test_yearly_metrics_block_characterization(monkeypatch):
-    _patch_media_sections(monkeypatch)
+    _ = monkeypatch
 
     year = 2020
     start, end = year_range(year)
@@ -206,6 +206,7 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         prev_quarter_ranges,
         daily_data,
         prev_daily_data,
+        _FIXTURE_MEDIA_BUNDLE,
         prior_year_metrics=prior_year_metrics,
     )
 

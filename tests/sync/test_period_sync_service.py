@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 
 from sync.application.period_sync_service import PeriodSyncService
+from sync.contracts.media import MediaBundle
 from sync.periods.windows import build_week_window, build_year_window
 
 
@@ -60,12 +61,23 @@ class _StubGoalSyncService:
         return lines
 
 
+class _StubMediaSource:
+    def __init__(self) -> None:
+        self.calls: list[tuple[datetime.date, datetime.date]] = []
+
+    def scan(self, start: datetime.date, end: datetime.date) -> MediaBundle:
+        self.calls.append((start, end))
+        return MediaBundle(books=[], podcasts=[])
+
+
 def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
     goal_sync_service = _StubGoalSyncService()
+    media_source = _StubMediaSource()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
+        media_source=media_source,
         goal_sync_service=goal_sync_service,
     )
 
@@ -113,14 +125,17 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     assert enabled is True
     assert module_name == "sync.periods.weekly"
     assert module_args[-1] == "--no-cleanup"
+    assert media_source.calls == [(window.start, window.end)]
 
 
 def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
     goal_sync_service = _StubGoalSyncService()
+    media_source = _StubMediaSource()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
+        media_source=media_source,
         goal_sync_service=goal_sync_service,
     )
 
@@ -144,3 +159,4 @@ def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
     assert written is not None
     assert written[-1] == "year"
     assert goal_sync_service.year_calls == 1
+    assert media_source.calls == [(window.start, window.end)]

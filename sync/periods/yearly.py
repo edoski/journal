@@ -9,6 +9,7 @@ import datetime
 from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
 from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
+from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
 from sync.periods.runtime import resolve_note_path
@@ -36,6 +37,7 @@ def main() -> None:
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=MarkdownDailyAggregateSource(),
+        media_source=ObsidianMediaSource(),
         goal_sync_service=GoalSyncService(note_store=note_store, goal_store=goal_store),
     )
     service.sync_year(window, note_path)

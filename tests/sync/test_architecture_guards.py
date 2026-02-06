@@ -76,6 +76,7 @@ def test_removed_legacy_module_files_do_not_exist():
         "sync/daily/breaks.py",
         "sync/daily/study.py",
         "sync/daily/goals.py",
+        "sync/periods/media.py",
         "utils",
     ]
     existing = [path for path in legacy_paths if (ROOT / path).exists()]
@@ -141,6 +142,7 @@ def test_deprecated_import_paths_are_not_used():
         "sync.daily.flow_db",
         "sync.daily.breaks",
         "sync.daily.study",
+        "sync.periods.media",
     }
     violations: list[str] = []
 
