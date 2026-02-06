@@ -4,11 +4,9 @@ from __future__ import annotations
 
 import datetime
 
+from sync.constants import REMINDERS_PATH
 from sync.goals.reconcile import reconcile_goal_lists, process_pierced_goals
-from sync.goals.reminders import (
-    get_periodic_reminders_for_date,
-    get_review_reminders_for_date,
-)
+from sync.goals.reminders import get_reminders_for_date, load_reminder_rules
 from sync.notes.sections import goals_section_bounds
 from sync.readers.goals import filter_by_proximity
 from sync.writers.goals import build_goals_block, render_goal_lines
@@ -37,17 +35,11 @@ def apply_goals_section(
         today, yesterday, existing_daily_tasks
     )
 
-    # Inject periodic review reminders (weekly on Sunday, monthly on last day, yearly on Dec 31)
-    review_reminders = get_review_reminders_for_date(today)
+    # Inject configured reminders from REMINDERS.md (required file).
+    rules = load_reminder_rules(REMINDERS_PATH)
+    reminders = get_reminders_for_date(today, rules)
     existing_ids = {t.id for t in existing_daily_tasks if t.id}
-    for reminder in review_reminders:
-        if reminder.id not in existing_ids:
-            existing_daily_tasks.append(reminder)
-            existing_ids.add(reminder.id)
-
-    # Inject periodic maintenance reminders (e.g., bi-weekly MacBook restart)
-    periodic_reminders = get_periodic_reminders_for_date(today)
-    for reminder in periodic_reminders:
+    for reminder in reminders:
         if reminder.id not in existing_ids:
             existing_daily_tasks.append(reminder)
             existing_ids.add(reminder.id)

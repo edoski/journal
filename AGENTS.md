@@ -77,18 +77,20 @@ journal/
       sections.py             # Markdown section extraction/manipulation
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     logging.py                # Logging utilities
-  utils/                      # Flow database & automation CLI utilities
-    flow_db.py                # Shared DB helpers (connection, queries, formatting)
-    session_preview.py        # View session stats (read-only)
-    rename_session.py         # Rename most recent session (dry-run default)
-    undo_last_session.py      # Delete most recent session (dry-run default)
-    flow_skip.py              # Skip active Flow session and start break
-    toggle_flow_skip.py       # Enable/disable skip automation
-    skip_schedule.json        # Flow skip schedule config
+  tui/                        # Interactive terminal UI + CLI utilities
+    __main__.py               # Runs full-screen curses app (`python -m tui`)
+    app.py                    # App loop and key handling
+    cli.py                    # Non-interactive commands (`python -m tui.cli ...`)
+    state.py                  # Shared UI state model
+    keymap.py                 # Key mapping helpers
+    data/                     # Query + edit stores
+    views/                    # Screen renderers
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (478 tests on current branch)
-    test_*.py             # Tests for all sync modules
+  tests/                  # Pytest suite split by domain
+    sync/                 # Sync package tests and architecture guards
+    tui/                  # TUI package tests
+    fixtures/             # Shared render baselines
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
 
@@ -113,13 +115,13 @@ journal/
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence.
 
-- **`utils/`**: CLI utilities for the Flow database:
-  - `session_preview.py`: View current/recent session stats with `python3 -m utils.session_preview [-n COUNT]`
-  - `rename_session.py`: Rename most recent session with `python3 -m utils.rename_session "Title" [--confirm]`
-  - `undo_last_session.py`: Delete most recent session with `python3 -m utils.undo_last_session [--confirm]`
-  - `flow_skip.py`: Skip current Flow session and start break (called by launchd)
-  - `toggle_flow_skip.py`: Enable/disable skip automation with `python3 -m utils.toggle_flow_skip [on|off]`
-  - All write operations default to dry-run mode; use `--confirm` to execute.
+- **`tui/`**: Terminal UI and CLI utilities:
+  - `python3 -m tui`: Full-screen interactive TUI (query by period/metric + source editing)
+  - `python3 -m tui.cli session-preview [-n COUNT] [--all-phases]`: View session stats
+  - `python3 -m tui.cli rename-session "Title" [--confirm]`: Rename most recent focus session
+  - `python3 -m tui.cli undo-last-session [--confirm]`: Delete most recent focus session (+ break)
+  - `python3 -m tui.cli skip-now`: Execute skip automation immediately (uses config)
+  - `python3 -m tui.cli skip-toggle [on|off]`: Toggle skip automation state
 
 ### Linting & Testing
 
@@ -142,9 +144,10 @@ mypy sync/ --ignore-missing-imports
 vulture sync/ --min-confidence 80
 
 # Testing
-python3 -m pytest tests/ -v          # Run all tests
-python3 -m pytest tests/test_reminders.py -v  # Run specific test file
-python3 -m pytest tests/test_architecture_guards.py -v  # Enforce package/layering guardrails
+python3 -m pytest tests/ -v               # Run all tests
+python3 -m pytest tests/sync/test_reminders.py -v  # Run specific sync test file
+python3 -m pytest tests/sync/test_architecture_guards.py -v  # Enforce guardrails
+python3 -m pytest tests/tui -v            # Run TUI tests
 ```
 
 ### Configuration Constants
@@ -243,7 +246,7 @@ sync/
 │   ├── reconcile.py    # goal piercing + mirror/source reconciliation
 │   ├── note_store.py   # canonical goal subsection read/write helpers
 │   ├── period_pipeline.py # shared period-goal orchestration configs + helpers
-│   └── reminders.py    # periodic review/maintenance reminder generation
+│   └── reminders.py    # markdown-configured reminder parsing/evaluation
 │
 ├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
 │   ├── windows.py      # Typed period windows + prior-period bound callbacks
@@ -330,7 +333,7 @@ sync/
 - `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `periods/cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
-- `goals/reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
+- `goals/reminders.py`: `load_reminder_rules(path)` + `get_reminders_for_date(date, rules)` from `REMINDERS.md`
 
 ### Dated Goals
 
@@ -341,11 +344,13 @@ Goals support inline deadlines with countdown rendering:
 
 ### Periodic Reminders
 
-Periodic maintenance reminders are generated automatically and injected into daily notes:
-- **Restart MacBook**: Every 2 weeks on odd ISO weeks (Sunday). Uses ISO week parity (`week_num % 2 == 1`).
-- Reminders show `— TODAY` on due date, `— LATE +Nd` if uncompleted on subsequent days.
-- Implemented in `sync/goals/reminders.py` via `get_periodic_reminders_for_date()`.
-- Carry-forward logic in `sync/daily/orchestrator/goal_pipeline.py` ensures persistence.
+Reminder generation is file-driven and injected into DAILY goals:
+- **Source of truth**: `REMINDERS.md` in `JOURNAL_DIR`
+- **Parser**: `sync/goals/reminders.py` (`load_reminder_rules`, `get_reminders_for_date`)
+- **Schema**: strict markdown table with columns `ID | ENABLED | SCHEDULE | BODY`
+- **Supported schedules**: `WEEKLY:<WEEKDAY>`, `MONTHLY:LAST_DAY`, `YEARLY:MM-DD`, `BIWEEKLY_ODD_ISO:<WEEKDAY>`, `BIWEEKLY_EVEN_ISO:<WEEKDAY>`
+- **Behavior**: due date is always the trigger date (no configurable offset column)
+- Missing or invalid `REMINDERS.md` is a hard error (no fallback defaults)
 
 ### Training Table
 
@@ -422,7 +427,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 
 ## Flow Skip Automation
 
-Automatically skips Flow sessions at scheduled times and starts the break. Configured via `utils/skip_schedule.json`:
+Automatically skips Flow sessions at scheduled times and starts the break. Configured via `~/.config/journal/skip_schedule.json`:
 ```json
 {
   "skip_times": ["09:30", "11:30", "13:30", "16:00"],
@@ -432,13 +437,14 @@ Automatically skips Flow sessions at scheduled times and starts the break. Confi
 
 **Toggle on/off:**
 ```bash
-python3 -m utils.toggle_flow_skip       # Toggle
-python3 -m utils.toggle_flow_skip on    # Enable
-python3 -m utils.toggle_flow_skip off   # Disable
+python3 -m tui.cli skip-toggle       # Toggle
+python3 -m tui.cli skip-toggle on    # Enable
+python3 -m tui.cli skip-toggle off   # Disable
 ```
 
 **LaunchAgent:** `~/Library/LaunchAgents/com.edo.flow-skip.plist`
 - Runs at each skip time defined in the plist
+- Executes `python3 -m tui.cli skip-now`
 - Logs to `/tmp/flow-skip.log`
 - Only skips if Flow is in an active "Flow" phase
 - Shows the Flow UI after skipping (reminder to start next session)
@@ -462,7 +468,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 478 tests (current branch)
+pytest tests/ -v              # Full suite (sync + tui)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```
@@ -471,8 +477,8 @@ Validate:
 - Idempotency: run twice, confirm stable output
 - Edge cases: open sessions, missing JSON, dynamic lunch windows
 - Historical aggregation with `--date`/`--month`/`--quarter`/`--year` flags
-- Architecture: `tests/test_architecture_guards.py` enforces domain package layout and bans removed legacy module paths/imports
-- Render diff gates: `tests/test_render_baseline_snapshots.py` enforces line-for-line period metrics + goals block snapshots, including newline/spacing invariance
+- Architecture: `tests/sync/test_architecture_guards.py` enforces domain package layout and bans removed legacy imports/APIs
+- Render diff gates: `tests/sync/test_render_baseline_snapshots.py` enforces line-for-line period metrics + goals block snapshots, including newline/spacing invariance
 
 ## Commit & Pull Request Guidelines
 

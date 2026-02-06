@@ -8,7 +8,7 @@ import ast
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _iter_python_files(*relative_dirs: str) -> list[Path]:
@@ -75,6 +75,7 @@ def test_removed_legacy_module_files_do_not_exist():
         "sync/daily/flow_db.py",
         "sync/daily/breaks.py",
         "sync/daily/study.py",
+        "utils",
     ]
     existing = [path for path in legacy_paths if (ROOT / path).exists()]
     assert not existing, "Removed legacy module files reappeared:\n" + "\n".join(
@@ -91,6 +92,7 @@ def test_required_domain_packages_exist():
         "sync/metrics",
         "sync/daily/orchestrator",
         "sync/writers/charts",
+        "tui",
     ]
     missing = [path for path in required_dirs if not (ROOT / path).is_dir()]
     assert not missing, (
@@ -304,4 +306,65 @@ def test_daily_goal_writes_use_period_pipeline_helper():
     assert "propagate_source_sections" in imported, (
         "sync/daily/goals.py must route goal source writes through "
         "sync.goals.period_pipeline.propagate_source_sections"
+    )
+
+
+def test_sync_package_does_not_import_tui():
+    violations: list[str] = []
+    for path in _iter_python_files("sync"):
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "tui" or alias.name.startswith("tui."):
+                        violations.append(f"{path}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod == "tui" or mod.startswith("tui."):
+                    imported = ", ".join(alias.name for alias in node.names)
+                    violations.append(f"{path}: from {mod} import {imported}")
+    assert not violations, "sync must not import tui:\n" + "\n".join(violations)
+
+
+def test_removed_utils_package_is_not_imported():
+    violations: list[str] = []
+    for path in _iter_python_files("sync", "tests", "tui"):
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "utils" or alias.name.startswith("utils."):
+                        violations.append(f"{path}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod == "utils" or mod.startswith("utils."):
+                    imported = ", ".join(alias.name for alias in node.names)
+                    violations.append(f"{path}: from {mod} import {imported}")
+    assert not violations, "Removed utils package is still imported:\n" + "\n".join(
+        violations
+    )
+
+
+def test_removed_reminder_functions_are_not_referenced():
+    violations: list[str] = []
+    for path in _iter_python_files("sync", "tests", "tui"):
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            mod = node.module or ""
+            if mod != "sync.goals.reminders":
+                continue
+            names = {alias.name for alias in node.names}
+            banned = {
+                "get_review_reminders_for_date",
+                "get_periodic_reminders_for_date",
+            }
+            used = sorted(names & banned)
+            if used:
+                violations.append(
+                    f"{path}: removed reminder API imported: {', '.join(used)}"
+                )
+    assert not violations, "Removed reminder API references found:\n" + "\n".join(
+        violations
     )

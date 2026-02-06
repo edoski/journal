@@ -8,6 +8,7 @@ import datetime
 import pytest
 from typing import Any
 from unittest.mock import patch
+import sync.readers.media as readers_media
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +21,7 @@ def isolate_media_cache(tmp_path):
     """
     temp_cache = tmp_path / "media_dates.json"
     # Patch where the constant is used, not where it's defined
-    with patch("sync.readers.media.MEDIA_CACHE_PATH", str(temp_cache)):
+    with patch.object(readers_media, "MEDIA_CACHE_PATH", str(temp_cache)):
         yield
 
 

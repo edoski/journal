@@ -33,7 +33,7 @@ FIXTURE_MEDIA_SECTION = [
     "",
 ]
 
-SNAPSHOT_DIR = Path(__file__).parent / "fixtures" / "render_baseline"
+SNAPSHOT_DIR = Path(__file__).parents[1] / "fixtures" / "render_baseline"
 
 
 def _payload_for_date(day: datetime.date) -> dict:

@@ -16,6 +16,7 @@ from .daily import DailyData
 from .period import PeriodMetrics
 from .goals import Goal
 from .media import Book, Podcast
+from .reminders import ReminderRule, ScheduleKind
 
 __all__ = [
     # Study
@@ -38,6 +39,9 @@ __all__ = [
     "PeriodMetrics",
     # Goals
     "Goal",
+    # Reminder rules
+    "ReminderRule",
+    "ScheduleKind",
     # Media
     "Book",
     "Podcast",

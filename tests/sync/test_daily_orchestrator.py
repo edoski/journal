@@ -7,6 +7,8 @@ from __future__ import annotations
 import datetime
 import hashlib
 
+import pytest
+
 import sync.daily.orchestrator.goal_pipeline as goal_pipeline
 import sync.daily.orchestrator.metrics_pipeline as metrics_pipeline
 import sync.daily.orchestrator.note_io as note_io
@@ -62,8 +64,8 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
         ),
     )
     monkeypatch.setattr(goal_pipeline, "write_weekly_goals", lambda *_a, **_kw: None)
-    monkeypatch.setattr(goal_pipeline, "get_review_reminders_for_date", lambda _d: [])
-    monkeypatch.setattr(goal_pipeline, "get_periodic_reminders_for_date", lambda _d: [])
+    monkeypatch.setattr(goal_pipeline, "load_reminder_rules", lambda _path: [])
+    monkeypatch.setattr(goal_pipeline, "get_reminders_for_date", lambda _d, _r: [])
     monkeypatch.setattr(
         metrics_pipeline, "_load_status_file", lambda _name: (False, None)
     )
@@ -166,3 +168,16 @@ def test_update_markdown_output_characterization(monkeypatch, tmp_path):
         compat_hash
         == "654d4b7785d4593f44ff11644e7bbf38e0e3e351764792d2d167e31c088cfdf7"
     )
+
+
+def test_update_markdown_fails_without_reminders_config(monkeypatch, tmp_path):
+    _prepare_isolated_orchestrator(monkeypatch, tmp_path)
+    session = _session_for_today()
+
+    def _raise_missing(_path):
+        raise FileNotFoundError("Required reminder config not found")
+
+    monkeypatch.setattr(goal_pipeline, "load_reminder_rules", _raise_missing)
+
+    with pytest.raises(FileNotFoundError, match="Required reminder config not found"):
+        orchestrator.update_markdown([session])

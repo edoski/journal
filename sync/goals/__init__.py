@@ -11,7 +11,12 @@ from .reconcile import (
     propagate_goal_status,
     reconcile_goal_lists,
 )
-from .reminders import get_periodic_reminders_for_date, get_review_reminders_for_date
+from .reminders import (
+    get_reminders_for_date,
+    load_reminder_rules,
+    render_reminder_rules_markdown,
+    save_reminder_rules,
+)
 from .state import (
     load_goal_sync_state,
     locked_goal_sync_state,
@@ -41,8 +46,10 @@ __all__ = [
     "merge_mirror_goals",
     "propagate_goal_status",
     "load_quarterly_goals",
-    "get_periodic_reminders_for_date",
-    "get_review_reminders_for_date",
+    "load_reminder_rules",
+    "get_reminders_for_date",
+    "render_reminder_rules_markdown",
+    "save_reminder_rules",
     "load_goal_sync_state",
     "save_goal_sync_state",
     "record_note_state",

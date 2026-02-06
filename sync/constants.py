@@ -30,6 +30,9 @@ YEARLY_TEMPLATE_PATH = (
     "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
 )
 
+# Reminder rules markdown path (required, user-managed)
+REMINDERS_PATH = os.path.join(JOURNAL_DIR, "REMINDERS.md")
+
 # Lock directory for note writes
 LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
 
