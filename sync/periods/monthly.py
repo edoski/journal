@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
-import os
 
 from sync.constants import (
-    JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
 )
 from sync.io import safe_read_file, atomic_write_note
-from sync.notes.locking import locked_note
 from sync.notes.sections import (
-    ensure_note,
-    replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
@@ -21,10 +16,7 @@ from sync.notes.sections import (
 )
 from sync.dates import (
     daterange,
-    month_range,
-    month_week_ranges,
     format_week_label,
-    shift_month,
     quarter_of_date,
     quarter_id,
 )
@@ -73,7 +65,14 @@ from sync.goals.reconcile import (
     merge_mirror_goals,
     process_pierced_goals,
 )
-from sync.periods.cleanup import resync_if_marker
+from sync.periods.runtime import (
+    journal_path,
+    maybe_cleanup_previous,
+    open_period_note,
+    resolve_note_path,
+    write_note_metrics,
+)
+from sync.periods.windows import build_month_window
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
@@ -518,15 +517,11 @@ def main() -> None:
         today = datetime.date.today()
         target_date = datetime.date(today.year, today.month, 1)
 
-    month_start, month_end = month_range(target_date.year, target_date.month)
-    filename = f"{target_date.year}-{target_date.month:02d}.md"
+    window = build_month_window(target_date)
+    note_path = resolve_note_path(window.filename, args.file)
 
-    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
-
-    with locked_note(note_path):
-        ensure_note(note_path, MONTHLY_TEMPLATE_PATH)
-
-        lines = safe_read_file(note_path) or []
+    with open_period_note(note_path, MONTHLY_TEMPLATE_PATH) as lines:
+        month_start, month_end = window.start, window.end
 
         # Parse goals (existing mirrors + monthly source) and carry forward open monthly goals.
         g_start, g_end = goals_section_bounds(lines)
@@ -540,11 +535,10 @@ def main() -> None:
         quarterly_mirror = ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
 
         # Determine previous month path
-        month_key = f"{month_start.year}-{month_start.month:02d}"
+        month_key = f"{window.year}-{window.month:02d}"
 
-        prev_year, prev_month = shift_month(month_start.year, month_start.month, -1)
-        prev_month_start, _ = month_range(prev_year, prev_month)
-        prev_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
+        prev_month_start = window.previous_start
+        prev_path = journal_path(window.previous_filename)
         prev_lines = safe_read_file(prev_path)
         if prev_lines is not None:
             p_start, p_end = goals_section_bounds(prev_lines)
@@ -627,50 +621,38 @@ def main() -> None:
         daily_data = load_daily_data_for_dates(month_dates)
 
         # Load previous month's daily data for comparison
-        prev_year, prev_month = shift_month(target_date.year, target_date.month, -1)
-
-        prev_month_start, prev_month_end = month_range(prev_year, prev_month)
-        prev_month_label = f"**[[{prev_year}-{prev_month:02d}\\|LAST MONTH]]**"
-        current_month_label = "THIS MONTH"
-
-        prev_month_dates = list(daterange(prev_month_start, prev_month_end))
+        prev_month_dates = list(daterange(window.previous_start, window.previous_end))
         prev_daily_data = load_daily_data_for_dates(prev_month_dates)
 
         # Load 3 prior months for moving average calculation
-        def _prior_month_bounds(months_ago: int) -> tuple[datetime.date, datetime.date]:
-            prior_year, prior_month_num = shift_month(
-                target_date.year, target_date.month, -months_ago
-            )
-            return month_range(prior_year, prior_month_num)
-
         prior_month_metrics = load_prior_period_metrics(
-            range(3, 0, -1), _prior_month_bounds
+            range(3, 0, -1), window.prior_bounds
         )
 
-        week_ranges = month_week_ranges(target_date.year, target_date.month)
         metrics_block = build_monthly_metrics(
             month_start,
             month_end,
-            week_ranges,
+            window.week_ranges,
             daily_data,
             prev_daily_data,
-            current_month_label,
-            prev_month_label,
+            window.current_label,
+            window.previous_label,
             prior_month_metrics=prior_month_metrics,
         )
 
-        updated_lines = replace_metrics_block(lines, metrics_block)
-        atomic_write_note(note_path, updated_lines)
+        write_note_metrics(note_path, lines, metrics_block)
 
     # One-time cleanup: re-sync previous month if it still has an arrow indicator
-    prev_month_path = os.path.join(JOURNAL_DIR, f"{prev_year}-{prev_month:02d}.md")
-    if not args.no_cleanup:
-        # Re-sync removes arrow since it's a past period (current_date=None)
-        resync_if_marker(
-            prev_month_path,
-            "sync.periods.monthly",
-            ["--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
-        )
+    maybe_cleanup_previous(
+        enabled=not args.no_cleanup,
+        previous_note_path=journal_path(window.previous_filename),
+        module_name="sync.periods.monthly",
+        module_args=[
+            "--month",
+            f"{window.previous_year}-{window.previous_month:02d}",
+            "--no-cleanup",
+        ],
+    )
 
 
 if __name__ == "__main__":

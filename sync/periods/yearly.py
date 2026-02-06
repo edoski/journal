@@ -1,30 +1,25 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
-import os
 from dataclasses import replace
 
 from sync.logging import get_logger
 
 
 from sync.constants import (
-    JOURNAL_DIR,
     YEARLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
     RENDER,
 )
-from sync.io import safe_read_file, atomic_write_note
-from sync.notes.locking import locked_note
+from sync.io import safe_read_file
 from sync.notes.sections import (
-    ensure_note,
-    replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
     splice_goals_section,
 )
-from sync.dates import daterange, year_range, year_quarters
+from sync.dates import daterange, year_range
 from sync.formatting import (
     format_minutes,
     compute_percent_change,
@@ -64,6 +59,13 @@ from sync.periods.sections import (
     build_procrastination_section,
 )
 from sync.readers.goals import ensure_goal_ids
+from sync.periods.runtime import (
+    journal_path,
+    open_period_note,
+    resolve_note_path,
+    write_note_metrics,
+)
+from sync.periods.windows import build_year_window
 
 logger = get_logger()
 
@@ -564,30 +566,23 @@ def main() -> None:
     else:
         year = datetime.date.today().year
 
-    year_start, year_end = year_range(year)
-    filename = f"{year}.md"
+    window = build_year_window(year)
+    note_path = resolve_note_path(window.filename, args.file)
 
-    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
-
-    prev_year = year - 1
-    prev_year_start, prev_year_end = year_range(prev_year)
-
-    with locked_note(note_path):
-        ensure_note(note_path, YEARLY_TEMPLATE_PATH)
-
-        lines = safe_read_file(note_path) or []
-
+    with open_period_note(note_path, YEARLY_TEMPLATE_PATH) as lines:
         g_start, g_end = goals_section_bounds(lines)
         yearly_tasks = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
+        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(window.year))
 
         prev_tasks = []
-        prev_note_path = os.path.join(JOURNAL_DIR, f"{prev_year}.md")
+        prev_note_path = journal_path(window.previous_filename)
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
             g_start, g_end = goals_section_bounds(prev_lines)
             prev_tasks = extract_subsection_tasks(prev_lines, g_start, g_end, "YEARLY")
-            prev_tasks = ensure_goal_ids(prev_tasks, "yearly", str(prev_year))
+            prev_tasks = ensure_goal_ids(
+                prev_tasks, "yearly", str(window.previous_year)
+            )
 
         open_prev = [t for t in prev_tasks if not t.done]
         existing_ids = {t.id for t in yearly_tasks if t.id}
@@ -604,31 +599,24 @@ def main() -> None:
         )
         splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
-        daily_data = load_daily_data(year_start, year_end)
-        prev_daily_data = load_daily_data(prev_year_start, prev_year_end)
-
-        quarter_ranges = year_quarters(year)
-        prev_quarter_ranges = year_quarters(prev_year)
-
-        # Load 3 prior years for moving average calculation
+        daily_data = load_daily_data(window.start, window.end)
+        prev_daily_data = load_daily_data(window.previous_start, window.previous_end)
         prior_year_metrics = load_prior_period_metrics(
-            range(3, 0, -1),
-            lambda years_ago: year_range(year - years_ago),
+            range(3, 0, -1), window.prior_bounds
         )
 
         metrics_block = build_yearly_metrics(
-            year,
-            year_start,
-            year_end,
-            quarter_ranges,
-            prev_quarter_ranges,
+            window.year,
+            window.start,
+            window.end,
+            window.quarter_ranges,
+            window.previous_quarter_ranges,
             daily_data,
             prev_daily_data,
             prior_year_metrics=prior_year_metrics,
         )
 
-        updated_lines = replace_metrics_block(lines, metrics_block)
-        atomic_write_note(note_path, updated_lines)
+        write_note_metrics(note_path, lines, metrics_block)
 
 
 if __name__ == "__main__":

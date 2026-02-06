@@ -43,6 +43,8 @@ journal/
       section.py              # STUDY table extraction/building
     periods/                  # Weekly/monthly/quarterly/yearly sync entrypoints + helpers
       __init__.py             # Period package marker
+      windows.py              # Typed period-window builders (current/previous/prior bounds)
+      runtime.py              # Shared period runtime helpers (path/lock/write/cleanup)
       weekly.py               # Weekly metrics aggregation
       monthly.py              # Monthly metrics aggregation
       quarterly.py            # Quarterly metrics aggregation
@@ -239,6 +241,8 @@ sync/
 │   └── reminders.py    # periodic review/maintenance reminder generation
 │
 ├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
+│   ├── windows.py      # Typed period windows + prior-period bound callbacks
+│   ├── runtime.py      # Common path resolution, note lock/read/write, cleanup wrapper
 │   ├── weekly.py       # Weekly note sync entrypoint
 │   ├── monthly.py      # Monthly note sync entrypoint
 │   ├── quarterly.py    # Quarterly note sync entrypoint
@@ -308,6 +312,8 @@ sync/
 - `notes/locking.py`: lockfile lifecycle + `locked_note`
 - `notes/markdown.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes/sections.py`: header lookup, section bounds, goal splicing, section joining
+- `periods/windows.py`: typed current/previous period windows + moving-average prior-bound callbacks
+- `periods/runtime.py`: period note path resolution, lock/read lifecycle, metrics write helper, optional prior-period cleanup wrapper
 - `periods/sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
 - `goals/identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)

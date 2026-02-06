@@ -13,14 +13,13 @@ from sync.io import safe_read_file, atomic_write_note
 from sync.notes.locking import locked_note
 from sync.notes.sections import (
     ensure_note,
-    replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
     splice_goals_section,
     trim_blank_lines,
     join_sections,
 )
-from sync.dates import daterange, iso_week_range
+from sync.dates import daterange
 from sync.formatting import format_minutes
 from sync.metrics import (
     compute_period_metrics,
@@ -61,7 +60,14 @@ from sync.goals.reconcile import (
     merge_mirror_goals,
     process_pierced_goals,
 )
-from sync.periods.cleanup import resync_if_marker
+from sync.periods.runtime import (
+    journal_path,
+    maybe_cleanup_previous,
+    open_period_note,
+    resolve_note_path,
+    write_note_metrics,
+)
+from sync.periods.windows import build_week_window
 
 
 def _load_monthly_goals(month_start):
@@ -339,14 +345,11 @@ def main() -> None:
     else:
         target_date = datetime.date.today()
 
-    week_start, week_end = iso_week_range(target_date)
-    year, week_num, _ = target_date.isocalendar()
-    filename = f"{year}-W{week_num:02d}.md"
-
-    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
+    window = build_week_window(target_date)
+    note_path = resolve_note_path(window.filename, args.file)
 
     # Determine month note for the target week (use week_start's month).
-    month_start = datetime.date(week_start.year, week_start.month, 1)
+    month_start = datetime.date(window.start.year, window.start.month, 1)
     monthly_tasks, _quarterly_mirror, monthly_path, _monthly_lines = (
         _load_monthly_goals(month_start)
     )
@@ -356,65 +359,48 @@ def main() -> None:
         load_quarterly_goals(month_start)
     )
 
-    with locked_note(note_path):
-        ensure_note(note_path, WEEKLY_TEMPLATE_PATH)
-
+    with open_period_note(note_path, WEEKLY_TEMPLATE_PATH) as lines:
         # Load current week's daily data
-        week_dates = list(daterange(week_start, week_end))
+        week_dates = list(daterange(window.start, window.end))
         daily_data = load_daily_data_for_dates(week_dates)
 
         # Load previous week's daily data for comparison
-        prev_week_start = week_start - datetime.timedelta(days=7)
-        prev_week_end = week_end - datetime.timedelta(days=7)
-        prev_year, prev_week_num, _ = prev_week_start.isocalendar()
-        prev_week_label = f"**[[{prev_year}-W{prev_week_num:02d}\\|LAST WEEK]]**"
-
-        prev_week_dates = list(daterange(prev_week_start, prev_week_end))
+        prev_week_dates = list(daterange(window.previous_start, window.previous_end))
         prev_daily_data = load_daily_data_for_dates(prev_week_dates)
 
         # Load 4 prior weeks for moving average calculation
         prior_week_metrics = load_prior_period_metrics(
             range(4, 0, -1),
-            lambda weeks_ago: (
-                week_start - datetime.timedelta(days=7 * weeks_ago),
-                week_start
-                - datetime.timedelta(days=7 * weeks_ago)
-                + datetime.timedelta(days=6),
-            ),
+            window.prior_bounds,
         )
 
         metrics_block = build_weekly_metrics(
-            week_start,
-            week_end,
+            window.start,
+            window.end,
             daily_data,
             prev_daily_data,
-            prev_week_label,
+            window.previous_label,
             prior_week_metrics=prior_week_metrics,
         )
-
-        lines = safe_read_file(note_path) or []
 
         # Parse existing goals in the weekly note
         monthly_mirror, weekly_tasks = _parse_weekly_note_goals(lines)
         monthly_mirror = ensure_goal_ids(
             monthly_mirror, "monthly", month_start.isoformat()
         )
-        weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
+        weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", window.start.isoformat())
 
         # Carry forward open weekly goals from prior week
-        year, week_num, _ = target_date.isocalendar()
-        week_key = f"{year}-W{week_num:02d}"
+        week_key = f"{window.year}-W{window.week_num:02d}"
 
-        prev_week_path = os.path.join(
-            JOURNAL_DIR, f"{prev_year}-W{prev_week_num:02d}.md"
-        )
+        prev_week_path = journal_path(window.previous_filename)
         prev_week_tasks = []
         if os.path.exists(prev_week_path):
             prev_lines = safe_read_file(prev_week_path)
             if prev_lines is not None:
                 _, prev_week_tasks = _parse_weekly_note_goals(prev_lines)
                 prev_week_tasks = ensure_goal_ids(
-                    prev_week_tasks, "weekly", prev_week_start.isoformat()
+                    prev_week_tasks, "weekly", window.previous_start.isoformat()
                 )
 
         weekly_tasks, _ = carry_forward_with_tombstones(
@@ -506,17 +492,15 @@ def main() -> None:
         else:
             lines[g_start:g_end] = goals_block
 
-        updated_lines = replace_metrics_block(lines, metrics_block)
-        atomic_write_note(note_path, updated_lines)
+        write_note_metrics(note_path, lines, metrics_block)
 
     # One-time cleanup: re-sync previous week if it still has an arrow indicator
-    if not args.no_cleanup:
-        # Re-sync removes arrow since it's a past period (current_date=None)
-        resync_if_marker(
-            prev_week_path,
-            "sync.periods.weekly",
-            ["--date", prev_week_start.isoformat(), "--no-cleanup"],
-        )
+    maybe_cleanup_previous(
+        enabled=not args.no_cleanup,
+        previous_note_path=journal_path(window.previous_filename),
+        module_name="sync.periods.weekly",
+        module_args=["--date", window.previous_start.isoformat(), "--no-cleanup"],
+    )
 
 
 if __name__ == "__main__":

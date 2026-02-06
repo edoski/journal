@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
-import os
 
 from sync.logging import get_logger
 
 
 from sync.constants import (
-    JOURNAL_DIR,
     QUARTERLY_TEMPLATE_PATH,
     MONTH_ABBR,
     STUDY_TARGET_MIN,
@@ -15,8 +13,6 @@ from sync.constants import (
 from sync.io import safe_read_file, atomic_write_note
 from sync.notes.locking import locked_note
 from sync.notes.sections import (
-    ensure_note,
-    replace_metrics_block,
     goals_section_bounds,
     extract_subsection_tasks,
     trim_blank_lines,
@@ -25,10 +21,7 @@ from sync.notes.sections import (
 )
 from sync.dates import (
     daterange,
-    quarter_range,
     quarter_months,
-    previous_quarter,
-    shift_quarter,
     quarter_of_date,
     quarter_id,
 )
@@ -71,6 +64,13 @@ from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.readers.goals import ensure_goal_ids
 
 from sync.goals.reconcile import reconcile_goal_lists, merge_mirror_goals
+from sync.periods.runtime import (
+    journal_path,
+    open_period_note,
+    resolve_note_path,
+    write_note_metrics,
+)
+from sync.periods.windows import build_quarter_window
 
 logger = get_logger()
 
@@ -509,39 +509,30 @@ def main() -> None:
         today = datetime.date.today()
         year, quarter_num = quarter_of_date(today)
 
-    quarter_start, quarter_end = quarter_range(year, quarter_num)
-    filename = f"{quarter_id(year, quarter_num)}.md"
+    window = build_quarter_window(year, quarter_num)
+    note_path = resolve_note_path(window.filename, args.file)
 
-    note_path = args.file or os.path.join(JOURNAL_DIR, filename)
-
-    prev_year, prev_quarter = previous_quarter(year, quarter_num)
-    prev_start, prev_end = quarter_range(prev_year, prev_quarter)
-
-    with locked_note(note_path):
-        ensure_note(note_path, QUARTERLY_TEMPLATE_PATH)
-
-        lines = safe_read_file(note_path) or []
-
+    with open_period_note(note_path, QUARTERLY_TEMPLATE_PATH) as lines:
         g_start, g_end = goals_section_bounds(lines)
         yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        yearly_mirror = ensure_goal_ids(yearly_mirror, "yearly", str(year))
+        yearly_mirror = ensure_goal_ids(yearly_mirror, "yearly", str(window.year))
         quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
         quarterly_tasks = ensure_goal_ids(
-            quarterly_tasks, "quarterly", quarter_id(year, quarter_num)
+            quarterly_tasks, "quarterly", quarter_id(window.year, window.quarter)
         )
 
-        qtr_key = quarter_id(year, quarter_num)
+        qtr_key = quarter_id(window.year, window.quarter)
 
-        prev_note_path = os.path.join(
-            JOURNAL_DIR, f"{quarter_id(prev_year, prev_quarter)}.md"
-        )
+        prev_note_path = journal_path(window.previous_filename)
         prev_tasks = []
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
             g_start, g_end = goals_section_bounds(prev_lines)
             p_body = extract_subsection_tasks(prev_lines, g_start, g_end, "QUARTERLY")
             p_body = ensure_goal_ids(
-                p_body, "quarterly", quarter_id(prev_year, prev_quarter)
+                p_body,
+                "quarterly",
+                quarter_id(window.previous_year, window.previous_quarter),
             )
             prev_tasks = p_body
 
@@ -550,7 +541,7 @@ def main() -> None:
         )
 
         yearly_tasks = []
-        yearly_path = os.path.join(JOURNAL_DIR, f"{year}.md")
+        yearly_path = journal_path(f"{window.year}.md")
         yearly_lines = safe_read_file(yearly_path)
         if yearly_lines is not None:
             y_start, y_end = goals_section_bounds(yearly_lines)
@@ -559,7 +550,7 @@ def main() -> None:
             )
         else:
             yearly_lines = []
-        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
+        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(window.year))
 
         # Reconcile YEARLY source <-> QUARTERLY YEARLY-mirror state.
         yearly_tasks, yearly_mirror, yearly_changed, _ = reconcile_goal_lists(
@@ -609,32 +600,24 @@ def main() -> None:
         )
         splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
-        daily_data = load_daily_data(quarter_start, quarter_end)
-        prev_daily_data = load_daily_data(prev_start, prev_end)
-        month_ranges = quarter_months(year, quarter_num)
-
-        # Load 4 prior quarters for moving average calculation
-        def _prior_quarter_bounds(q_ago: int) -> tuple[datetime.date, datetime.date]:
-            p_year, p_q = shift_quarter(year, quarter_num, -q_ago)
-            return quarter_range(p_year, p_q)
-
+        daily_data = load_daily_data(window.start, window.end)
+        prev_daily_data = load_daily_data(window.previous_start, window.previous_end)
         prior_quarter_metrics = load_prior_period_metrics(
-            range(4, 0, -1), _prior_quarter_bounds
+            range(4, 0, -1), window.prior_bounds
         )
 
         metrics_block = build_quarterly_metrics(
-            quarter_start,
-            quarter_end,
-            month_ranges,
+            window.start,
+            window.end,
+            window.month_ranges,
             daily_data,
             prev_daily_data,
-            prev_year,
-            prev_quarter,
+            window.previous_year,
+            window.previous_quarter,
             prior_quarter_metrics=prior_quarter_metrics,
         )
 
-        updated_lines = replace_metrics_block(lines, metrics_block)
-        atomic_write_note(note_path, updated_lines)
+        write_note_metrics(note_path, lines, metrics_block)
 
 
 if __name__ == "__main__":
