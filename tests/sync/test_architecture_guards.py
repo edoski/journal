@@ -221,9 +221,9 @@ def test_period_entrypoints_import_service_and_windows():
     )
 
 
-def test_period_goal_orchestration_lives_in_period_service():
+def test_period_goal_orchestration_lives_in_goal_service():
     period_modules = _iter_python_files("sync/periods")
-    service_path = ROOT / "sync" / "application" / "period_sync_service.py"
+    service_path = ROOT / "sync" / "application" / "goal_sync_service.py"
     pipeline_imports = _imported_from(service_path, "sync.goals.period_pipeline")
     expected_pipeline_imports = {
         "CarryForwardConfig",
@@ -237,7 +237,7 @@ def test_period_goal_orchestration_lives_in_period_service():
     }
     missing_pipeline = sorted(expected_pipeline_imports - pipeline_imports)
     assert not missing_pipeline, (
-        "sync/application/period_sync_service.py must own goal pipeline orchestration:\n"
+        "sync/application/goal_sync_service.py must own goal pipeline orchestration:\n"
         + ", ".join(missing_pipeline)
     )
 
@@ -246,7 +246,7 @@ def test_period_goal_orchestration_lives_in_period_service():
         "sync.goals.carry_forward",
     )
     assert "carry_forward_with_tombstones" in carry_forward_imports, (
-        "sync/application/period_sync_service.py must own yearly carry-forward flow"
+        "sync/application/goal_sync_service.py must own yearly carry-forward flow"
     )
 
     violations: list[str] = []
@@ -264,7 +264,7 @@ def test_period_goal_orchestration_lives_in_period_service():
                 violations.append(f"{path}: period entrypoints must not import {mod}")
 
     assert not violations, (
-        "Period goal orchestration must live in sync.application.period_sync_service:\n"
+        "Period goal orchestration must live in sync.application.goal_sync_service:\n"
         + "\n".join(violations)
     )
 

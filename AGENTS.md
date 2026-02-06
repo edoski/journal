@@ -33,6 +33,7 @@ journal/
       constants.py            # Daily-specific constants
     application/              # Service orchestration over ports/contracts
       daily_sync_service.py   # Daily note sync service (replaces pipeline orchestration)
+      goal_sync_service.py    # Canonical goal synchronization (daily + period flows)
       period_sync_service.py  # Weekly/monthly/quarterly/yearly sync service over ports/contracts
     study/                    # Study ingestion domain (Flow DB + breaks + STUDY section)
       __init__.py             # Study domain exports
@@ -311,7 +312,7 @@ Canonical interface contracts (phase 3):
 
 Daily service boundary (phase 4):
 - `sync.application.daily_sync_service.DailySyncService` is the only daily orchestrator; it owns goals + metrics assembly and frontmatter writes
-- Daily composition root (`sync/daily/__main__.py`) wires `FlowStudySessionSource`, `ICloudDailyStatusSource`, `VaultContextSource`, `MarkdownNoteStore`, and `MarkdownReminderRuleStore` into `DailySyncService`
+- Daily composition root (`sync/daily/__main__.py`) wires `FlowStudySessionSource`, `ICloudDailyStatusSource`, `VaultContextSource`, `MarkdownNoteStore`, `MarkdownGoalStore`, and `MarkdownReminderRuleStore` into `DailySyncService` + `GoalSyncService`
 - Removed modules: `sync/daily/orchestrator/goal_pipeline.py` and `sync/daily/orchestrator/metrics_pipeline.py`
 
 Canonical aggregate parser ownership (phase 5):
@@ -536,3 +537,7 @@ Validate:
 - `sync.application.period_sync_service.PeriodSyncService` owns weekly/monthly/quarterly/yearly orchestration and goal pipeline wiring
 - `sync.periods.engine` owns period metrics rendering (`build_weekly_metrics`, `build_monthly_metrics`, `build_quarterly_metrics`, `build_yearly_metrics`)
 - Period entrypoints (`sync/periods/{weekly,monthly,quarterly,yearly}.py`) are composition roots only (argument parsing + window resolution + service wiring)
+
+Goal service boundary:
+- `sync.application.goal_sync_service.GoalSyncService` owns all daily/weekly/monthly/quarterly/yearly goal orchestration (carry-forward, mirror sync, pierced-goal reconciliation, and source propagation)
+- `DailySyncService` and `PeriodSyncService` delegate goal flows to `GoalSyncService` rather than performing goal orchestration directly

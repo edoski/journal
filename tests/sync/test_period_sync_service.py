@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 
 from sync.application.period_sync_service import PeriodSyncService
-from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
 from sync.periods.windows import build_week_window, build_year_window
 
 
@@ -33,30 +32,41 @@ class _StubAggregateSource:
         return {day: {} for day in dates}
 
 
-class _StubGoalStore:
-    def extract(
-        self,
-        _lines: list[str],
-        _section: str,
-        horizon: str | None = None,
-        period_key: str | None = None,
-    ):
-        _ = horizon, period_key
-        return []
+class _StubGoalSyncService:
+    def __init__(self) -> None:
+        self.week_calls = 0
+        self.month_calls = 0
+        self.quarter_calls = 0
+        self.year_calls = 0
 
-    def apply(self, lines: list[str], _sections):
+    def sync_weekly_note(self, lines, *, note_path, window):
+        _ = note_path, window
+        self.week_calls += 1
         return lines
 
-    def write(self, _path: str, lines: list[str], _sections):
+    def sync_monthly_note(self, lines, *, note_path, window):
+        _ = note_path, window
+        self.month_calls += 1
+        return lines
+
+    def sync_quarterly_note(self, lines, *, note_path, window):
+        _ = note_path, window
+        self.quarter_calls += 1
+        return lines
+
+    def sync_yearly_note(self, lines, *, window):
+        _ = window
+        self.year_calls += 1
         return lines
 
 
-def test_sync_week_uses_engine_and_cleanup(monkeypatch, tmp_path):
+def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
+    goal_sync_service = _StubGoalSyncService()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
-        goal_store=_StubGoalStore(),
+        goal_sync_service=goal_sync_service,
     )
 
     day = datetime.date(2026, 2, 6)
@@ -71,24 +81,8 @@ def test_sync_week_uses_engine_and_cleanup(monkeypatch, tmp_path):
         lambda filename: str(base_dir / filename),
     )
     monkeypatch.setattr(
-        "sync.application.period_sync_service.load_quarterly_goals",
-        lambda _month_start: ([], [], str(base_dir / "2026-Q1.md"), []),
-    )
-    monkeypatch.setattr(
         "sync.application.period_sync_service.build_weekly_metrics",
         lambda *_a, **_kw: ["### **SUMMARY**", "", "week"],
-    )
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.load_source_tasks_with_carry_forward",
-        lambda *_a, **_kw: [],
-    )
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.sync_mirror_section",
-        lambda *_a, **_kw: MirrorSyncResult([], [], False, []),
-    )
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.sync_pierced_source_section",
-        lambda *_a, **_kw: PiercingSyncResult([], [[], []], [False, False]),
     )
     monkeypatch.setattr(
         "sync.application.period_sync_service.write_note_metrics",
@@ -113,6 +107,7 @@ def test_sync_week_uses_engine_and_cleanup(monkeypatch, tmp_path):
     written = note_store.read(note_path)
     assert written is not None
     assert written[-1] == "week"
+    assert goal_sync_service.week_calls == 1
     assert cleanup_calls
     enabled, _prev_path, module_name, module_args = cleanup_calls[0]
     assert enabled is True
@@ -120,23 +115,18 @@ def test_sync_week_uses_engine_and_cleanup(monkeypatch, tmp_path):
     assert module_args[-1] == "--no-cleanup"
 
 
-def test_sync_year_applies_carry_forward(monkeypatch, tmp_path):
+def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
+    goal_sync_service = _StubGoalSyncService()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
-        goal_store=_StubGoalStore(),
+        goal_sync_service=goal_sync_service,
     )
 
     window = build_year_window(2026)
     note_path = str(tmp_path / window.filename)
 
-    base_dir = tmp_path / "journal"
-    base_dir.mkdir()
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.journal_path",
-        lambda filename: str(base_dir / filename),
-    )
     monkeypatch.setattr(
         "sync.application.period_sync_service.build_yearly_metrics",
         lambda *_a, **_kw: ["### **SUMMARY**", "", "year"],
@@ -148,21 +138,9 @@ def test_sync_year_applies_carry_forward(monkeypatch, tmp_path):
         ),
     )
 
-    carry_calls: list[tuple[str, str]] = []
-
-    def _carry(prev_tasks, current_tasks, period_key, horizon):
-        _ = prev_tasks, current_tasks
-        carry_calls.append((period_key, horizon))
-        return [], 0
-
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.carry_forward_with_tombstones",
-        _carry,
-    )
-
     service.sync_year(window, note_path)
 
-    assert carry_calls == [("2026", "yearly")]
     written = note_store.read(note_path)
     assert written is not None
     assert written[-1] == "year"
+    assert goal_sync_service.year_calls == 1

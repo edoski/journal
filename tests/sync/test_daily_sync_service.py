@@ -52,6 +52,20 @@ class _StubReminderStore:
         return None
 
 
+class _StubGoalSyncService:
+    def sync_daily_note(
+        self,
+        lines,
+        *,
+        day,
+        note_path,
+        yaml_end_idx,
+        reminder_rules,
+    ):
+        _ = day, note_path, yaml_end_idx, reminder_rules
+        return lines
+
+
 def _session_for_day(day: datetime.date) -> dict:
     start = datetime.datetime.combine(day, datetime.time(9, 0))
     end = datetime.datetime.combine(day, datetime.time(10, 0))
@@ -75,32 +89,14 @@ def _build_service(
     journal_dir.mkdir()
     template_path = tmp_path / "daily_template.md"
     template_path.write_text("---\nmood: 6.0\n---\n", encoding="utf-8")
-
-    def _load_weekly_goals(_day):
-        return (
-            [],
-            [],
-            [],
-            [],
-            str(journal_dir / "dummy-weekly.md"),
-            str(journal_dir / "dummy-monthly.md"),
-            str(journal_dir / "dummy-quarterly.md"),
-        )
-
-    monkeypatch.setattr(
-        "sync.application.daily_sync_service.load_weekly_goals",
-        _load_weekly_goals,
-    )
-    monkeypatch.setattr(
-        "sync.application.daily_sync_service.write_weekly_goals",
-        lambda *_a, **_kw: None,
-    )
+    _ = monkeypatch
 
     service = DailySyncService(
         note_store=MarkdownNoteStore(),
         status_source=_StubStatusSource(),
         context_source=_StubContextSource(),
         reminder_store=reminder_store or _StubReminderStore(),
+        goal_sync_service=_StubGoalSyncService(),
         journal_dir=str(journal_dir),
         template_path=str(template_path),
     )
@@ -159,7 +155,7 @@ def test_sync_day_output_characterization(monkeypatch, tmp_path):
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     assert (
         content_hash
-        == "3f01483701bc6d3c8204056f71eb9756b4e6522228bcfb58092d614a629439b7"
+        == "2dc949bd8ef5dc305f717f44cafb171cbb76942acd851732750daececc2ba221"
     )
 
 

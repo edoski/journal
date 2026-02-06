@@ -11,36 +11,23 @@ from sync.constants import IDEAL, JOURNAL_DIR
 from sync.contracts.study import StudySessionRecord
 from sync.daily.constants import TEMPLATE_PATH
 from sync.daily.context import format_context_cell
-from sync.daily.goals import (
-    carry_forward_daily_tasks,
-    load_weekly_goals,
-    parse_daily_goal_subsections,
-    write_weekly_goals,
-)
 from sync.daily.orchestrator.frontmatter import update_frontmatter
 from sync.daily.orchestrator.note_io import ensure_daily_sections, find_yaml_end
 from sync.daily.screen_time import build_procrastination_section
 from sync.daily.sleep import build_sleep_section
 from sync.daily.training import build_training_section
 from sync.formatting import format_minutes
-from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
-from sync.goals.reminders import get_reminders_for_date
 from sync.logging import get_logger
 from sync.models.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
-from sync.notes.sections import (
-    extract_block,
-    find_header_idx,
-    goals_section_bounds,
-    replace_metrics_block,
-)
+from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block
 from sync.ports.context import ContextSource
 from sync.ports.notes import NoteStore
 from sync.ports.reminders import ReminderRuleStore
 from sync.ports.status import DailyStatusSource
-from sync.readers.goals import filter_by_proximity
 from sync.study.section import build_study_section, extract_existing_data
-from sync.writers.goals import build_goals_block, render_goal_lines
+
+from .goal_sync_service import GoalSyncService
 
 logger = get_logger()
 
@@ -64,6 +51,7 @@ class DailySyncService:
         status_source: DailyStatusSource,
         context_source: ContextSource,
         reminder_store: ReminderRuleStore,
+        goal_sync_service: GoalSyncService,
         journal_dir: str = JOURNAL_DIR,
         template_path: str = TEMPLATE_PATH,
     ) -> None:
@@ -71,6 +59,7 @@ class DailySyncService:
         self.status_source = status_source
         self.context_source = context_source
         self.reminder_store = reminder_store
+        self.goal_sync_service = goal_sync_service
         self.journal_dir = journal_dir
         self.template_path = template_path
 
@@ -107,7 +96,7 @@ class DailySyncService:
 
         yaml_end_idx = find_yaml_end(lines)
         ensure_daily_sections(lines, yaml_end_idx)
-        self._apply_goals_section(lines, day, file_path, yaml_end_idx)
+        lines = self._apply_goals_section(lines, day, file_path, yaml_end_idx)
         metrics_result = self._apply_metrics_block(
             lines, sessions, day, new_table_lines
         )
@@ -172,92 +161,15 @@ class DailySyncService:
         day: datetime.date,
         file_path: str,
         yaml_end_idx: int,
-    ) -> None:
-        existing_weekly_tasks, existing_daily_tasks = parse_daily_goal_subsections(
-            lines
-        )
-
-        yesterday = day - datetime.timedelta(days=1)
-        existing_daily_tasks, _ = carry_forward_daily_tasks(
-            day, yesterday, existing_daily_tasks
-        )
-
+    ) -> list[str]:
         rules = self.reminder_store.load()
-        reminders = get_reminders_for_date(day, rules)
-        existing_ids = {task.id for task in existing_daily_tasks if task.id}
-        for reminder in reminders:
-            if reminder.id not in existing_ids:
-                existing_daily_tasks.append(reminder)
-                existing_ids.add(reminder.id)
-
-        (
-            weekly_tasks,
-            monthly_tasks,
-            quarterly_tasks,
-            yearly_tasks,
-            weekly_path,
-            monthly_path,
-            quarterly_path,
-        ) = load_weekly_goals(day)
-
-        updated_weekly_tasks, _, weekly_changed, _ = reconcile_goal_lists(
-            weekly_tasks,
-            existing_weekly_tasks,
-            weekly_path,
-            file_path,
-        )
-
-        filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, day)
-        weekly_lines = (
-            render_goal_lines(filtered_weekly, today=day)
-            if filtered_weekly
-            else ["", "_No weekly goals have been defined yet._"]
-        )
-
-        (
-            original_daily,
-            final_pierced,
-            [updated_monthly, updated_quarterly, updated_yearly],
-        ) = process_pierced_goals(
-            existing_tasks=existing_daily_tasks,
-            source_goal_lists=[monthly_tasks, quarterly_tasks, yearly_tasks],
-            proximity_days=7,
-            today=day,
+        return self.goal_sync_service.sync_daily_note(
+            lines,
+            day=day,
             note_path=file_path,
-            source_paths=[monthly_path, quarterly_path, quarterly_path],
+            yaml_end_idx=yaml_end_idx,
+            reminder_rules=rules,
         )
-        monthly_changed = updated_monthly != monthly_tasks
-        quarterly_changed = updated_quarterly != quarterly_tasks
-        yearly_changed = updated_yearly != yearly_tasks
-
-        if weekly_changed or monthly_changed or quarterly_changed or yearly_changed:
-            write_weekly_goals(
-                day,
-                updated_weekly_tasks,
-                updated_monthly if monthly_changed else None,
-                updated_quarterly if quarterly_changed else None,
-                updated_yearly if yearly_changed else None,
-            )
-
-        daily_source_lines = render_goal_lines(original_daily, today=day)
-        if final_pierced:
-            daily_source_lines = daily_source_lines + render_goal_lines(
-                final_pierced, today=day
-            )
-
-        goals_block = build_goals_block(
-            [
-                ("WEEKLY", weekly_lines),
-                ("DAILY", daily_source_lines),
-            ]
-        )
-
-        g_start, g_end = goals_section_bounds(lines)
-        if g_start == -1:
-            insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
-            lines[insert_pos:insert_pos] = goals_block
-        else:
-            lines[g_start:g_end] = goals_block
 
     def _apply_metrics_block(
         self,
