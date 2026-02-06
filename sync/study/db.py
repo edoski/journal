@@ -1,8 +1,5 @@
 """
-Flow database access and session fetching for daily sync.
-
-Provides functions to connect to the Flow CoreData database, convert
-timestamps, fetch today's sessions, and deduplicate overlapping entries.
+Study-session database access and enrichment for daily sync.
 """
 
 from __future__ import annotations
@@ -15,18 +12,24 @@ from typing import Any
 
 from sync.logging import get_logger
 
-from .constants import (
+from sync.study.constants import (
     DB_PATH,
     CORE_DATA_EPOCH_OFFSET,
     BREAK_LINK_MAX_GAP_SECONDS,
+    FLOW_APP_DEFAULTS_DOMAIN,
+    FLOW_BREAK_DEFAULT_KEYS,
+    FLOW_BREAK_PHASES,
+    FLOW_PHASE_LONG_BREAK,
+    FLOW_PHASE_SHORT_BREAK,
+    FLOW_PHASE_STUDY,
     LUNCH_WINDOW_BASE,
     REGULAR_DAY_END,
 )
-from .breaks import (
+from sync.study.breaks import (
     get_expected_break_minutes,
     _compute_dynamic_lunch_window,
     overlap_minutes_with_window,
-    clamp_next_flow_within_day,
+    clamp_next_study_within_day,
     anchor_lunch_window,
 )
 
@@ -42,11 +45,19 @@ def _read_break_defaults() -> dict[str, int | None]:
     Read Flow's configured break lengths.
     Returns a dict with keys 'shortBreak' and 'longBreak' (ints or None).
     """
-    result: dict[str, int | None] = {"shortBreak": None, "longBreak": None}
-    for key in ("longBreak", "shortBreak"):
+    result: dict[str, int | None] = {
+        FLOW_PHASE_SHORT_BREAK: None,
+        FLOW_PHASE_LONG_BREAK: None,
+    }
+    for key in FLOW_BREAK_DEFAULT_KEYS:
         try:
             out = subprocess.check_output(
-                ["defaults", "read", "design.yugen.Flow", f"{key}.durationInMinutes"],
+                [
+                    "defaults",
+                    "read",
+                    FLOW_APP_DEFAULTS_DOMAIN,
+                    f"{key}.durationInMinutes",
+                ],
                 text=True,
             )
             val = int(out.strip())
@@ -183,10 +194,10 @@ def dedupe_sessions(
 
 def get_todays_sessions() -> list[SessionDict]:
     """
-    Fetch and process today's Flow sessions from the database.
+    Fetch and process today's study sessions from the database.
 
     Returns a list of enriched session dictionaries with:
-    - Deduplicated flow sessions
+    - Deduplicated study sessions
     - Linked break information
     - Interruption counts and durations
     - Break overrun calculations
@@ -249,17 +260,15 @@ def get_todays_sessions() -> list[SessionDict]:
             }
         )
 
-    # Process Sessions:
-    # 1. Filter for FLOW sessions only.
-    # 2. Enrich with Interruptions and Breaks.
+    # Process sessions:
+    # 1. Filter for study-phase sessions only.
+    # 2. Enrich with interruptions and breaks.
 
-    flow_sessions = [s for s in all_sessions if s["phase"] == "flow"]
-    break_sessions = [
-        s for s in all_sessions if s["phase"] in ["shortBreak", "longBreak"]
-    ]
+    study_sessions = [s for s in all_sessions if s["phase"] == FLOW_PHASE_STUDY]
+    break_sessions = [s for s in all_sessions if s["phase"] in FLOW_BREAK_PHASES]
 
-    flow_sessions = dedupe_sessions(flow_sessions)
-    flow_sessions.sort(key=lambda x: x["start"])
+    study_sessions = dedupe_sessions(study_sessions)
+    study_sessions.sort(key=lambda x: x["start"])
 
     def enrich_break(b: SessionDict) -> SessionDict:
         completed_dt = b["completed_at"] if b.get("completed_at") else None
@@ -277,7 +286,7 @@ def get_todays_sessions() -> list[SessionDict]:
     break_sessions.sort(key=lambda x: x["start"])
 
     lunch_window = _compute_dynamic_lunch_window(
-        flow_sessions, LUNCH_WINDOW_BASE, reference_date=now.date()
+        study_sessions, LUNCH_WINDOW_BASE, reference_date=now.date()
     )
     lunch_duration_minutes = 0
     if lunch_window:
@@ -294,7 +303,7 @@ def get_todays_sessions() -> list[SessionDict]:
             logger.debug("Failed to parse lunch window: %s", e)
             lunch_duration_minutes = 0
 
-    for idx, session in enumerate(flow_sessions):
+    for idx, session in enumerate(study_sessions):
         # Fetch Interruptions for this session
         pk_list = session.get("interrupt_pks") or session.get("pks") or [session["pk"]]
         total_count = 0
@@ -327,7 +336,7 @@ def get_todays_sessions() -> list[SessionDict]:
 
         anchored = anchor_lunch_window(session["end"], lunch_window)
         if anchored:
-            # Lunch takes precedence for display/expectation even if Flow logged a shortBreak.
+            # Lunch takes precedence for display/expectation even if the app logged a shortBreak.
             session["anchored_lunch_window"] = anchored
             session["break_expected"] = lunch_duration_minutes or 60
             session["break_duration"] = session["break_expected"]
@@ -351,21 +360,22 @@ def get_todays_sessions() -> list[SessionDict]:
             session["break_missing"] = True
             session["break_reason"] = None
 
-        # Overrun calculation: gap until next flow (or end of day), less lunch, less expected break
-        if idx == len(flow_sessions) - 1:
-            # No future flow: do not accrue overrun past the final block
+        # Overrun calculation: gap until next study block (or end of day),
+        # less lunch and less expected break.
+        if idx == len(study_sessions) - 1:
+            # No future study block: do not accrue overrun past the final block
             session["break_overrun"] = 0
         else:
-            next_flow_start = flow_sessions[idx + 1]["start"]
+            next_study_start = study_sessions[idx + 1]["start"]
             # If actual break (gap) is less than expected, overwrite expected with actual
             actual_break_minutes = (
-                next_flow_start - session["end"]
+                next_study_start - session["end"]
             ).total_seconds() / 60
             if actual_break_minutes < session.get("break_expected", 0):
                 session["break_expected"] = int(actual_break_minutes + 0.5)
                 session["break_duration"] = session["break_expected"]
-            effective_next_start = clamp_next_flow_within_day(
-                session["end"], next_flow_start, REGULAR_DAY_END
+            effective_next_start = clamp_next_study_within_day(
+                session["end"], next_study_start, REGULAR_DAY_END
             )
             if not effective_next_start or effective_next_start <= session["end"]:
                 session["break_overrun"] = 0
@@ -397,9 +407,9 @@ def get_todays_sessions() -> list[SessionDict]:
     # retroactively assign lunch to session N-1.
     if lunch_window:
         lunch_end_dt = datetime.datetime.combine(now.date(), lunch_window[1])
-        for idx in range(1, len(flow_sessions)):
-            current = flow_sessions[idx]
-            prev = flow_sessions[idx - 1]
+        for idx in range(1, len(study_sessions)):
+            current = study_sessions[idx]
+            prev = study_sessions[idx - 1]
 
             # Skip if previous already has lunch
             if prev.get("break_reason") == "lunch":
@@ -423,7 +433,7 @@ def get_todays_sessions() -> list[SessionDict]:
             prev["break_missing"] = False
 
             # Recalculate overrun for prev session
-            effective_next_start = clamp_next_flow_within_day(
+            effective_next_start = clamp_next_study_within_day(
                 prev["end"], current["start"], REGULAR_DAY_END
             )
             if effective_next_start and effective_next_start > prev["end"]:
@@ -432,4 +442,4 @@ def get_todays_sessions() -> list[SessionDict]:
                 prev["break_overrun"] = overrun
 
     conn.close()
-    return flow_sessions
+    return study_sessions

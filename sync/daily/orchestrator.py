@@ -35,14 +35,14 @@ from sync.readers.goals import filter_by_proximity
 from sync.goals.reconcile import reconcile_goal_lists, process_pierced_goals
 
 from .constants import TEMPLATE_PATH
-from .flow_db import SessionDict
+from sync.study.db import SessionDict
 from .goals import (
     load_weekly_goals,
     write_weekly_goals,
     parse_daily_goal_subsections,
     carry_forward_daily_tasks,
 )
-from .study import _extract_existing_data, _build_study_section
+from sync.study.section import _extract_existing_data, _build_study_section
 from .training import _build_training_section
 from .sleep import _build_sleep_section
 from .screen_time import _load_screen_time_data, _build_procrastination_section

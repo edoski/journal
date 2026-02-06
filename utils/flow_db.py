@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
-from sync.daily.constants import DB_PATH, CORE_DATA_EPOCH_OFFSET
+
+from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
 
 def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:

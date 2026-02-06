@@ -1,5 +1,5 @@
 """
-Tests for daily_sync.breaks module.
+Tests for sync.study.breaks module.
 
 Tests break duration logic, lunch window calculations, and overrun computations.
 """
@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import datetime
 
-from sync.daily.breaks import (
+from sync.study.breaks import (
     get_expected_break_minutes,
     _compute_dynamic_lunch_window,
     overlap_minutes_with_window,
-    clamp_next_flow_within_day,
+    clamp_next_study_within_day,
     anchor_lunch_window,
 )
 
@@ -133,15 +133,15 @@ class TestOverlapMinutesWithWindow:
         assert result == 0
 
 
-class TestClampNextFlowWithinDay:
-    """Tests for clamp_next_flow_within_day function."""
+class TestClampNextStudyWithinDay:
+    """Tests for clamp_next_study_within_day function."""
 
     def test_clamps_to_cutoff(self):
         """Next start after cutoff is clamped to cutoff."""
         session_end = datetime.datetime(2025, 12, 27, 17, 0)
         next_start = datetime.datetime(2025, 12, 27, 19, 0)
         cutoff = datetime.time(18, 0)
-        result = clamp_next_flow_within_day(session_end, next_start, cutoff)
+        result = clamp_next_study_within_day(session_end, next_start, cutoff)
         assert result == datetime.datetime(2025, 12, 27, 18, 0)
 
     def test_preserves_earlier_next_start(self):
@@ -149,7 +149,7 @@ class TestClampNextFlowWithinDay:
         session_end = datetime.datetime(2025, 12, 27, 16, 0)
         next_start = datetime.datetime(2025, 12, 27, 17, 0)
         cutoff = datetime.time(18, 0)
-        result = clamp_next_flow_within_day(session_end, next_start, cutoff)
+        result = clamp_next_study_within_day(session_end, next_start, cutoff)
         assert result == next_start
 
     def test_returns_none_when_no_gap(self):
@@ -157,7 +157,7 @@ class TestClampNextFlowWithinDay:
         session_end = datetime.datetime(2025, 12, 27, 18, 0)
         next_start = datetime.datetime(2025, 12, 27, 19, 0)
         cutoff = datetime.time(18, 0)
-        result = clamp_next_flow_within_day(session_end, next_start, cutoff)
+        result = clamp_next_study_within_day(session_end, next_start, cutoff)
         assert result is None
 
 

@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from sync.formatting import format_minutes, ceil_minutes, round_half_up
 
-from typing import Callable
+from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
 
 
 # Type alias for session dictionaries
@@ -125,11 +125,11 @@ def _build_study_section(
         end_s = session["end"].strftime("%H:%M")
         time_str = f"`{start_s} - {end_s}`"
 
-        title = session["title"]
-        if title and title.lower() != "flow":
+        title = (session.get("title") or "").strip()
+        if title and title.casefold() != FLOW_DEFAULT_TITLE:
             activity_str = title
         else:
-            activity_str = "Flow"
+            activity_str = DEFAULT_ACTIVITY_LABEL
 
         actual_minutes = session.get("actual_elapsed", 0) or 0
         interrupt_minutes = (session.get("interruptions_duration", 0) or 0) / 60.0

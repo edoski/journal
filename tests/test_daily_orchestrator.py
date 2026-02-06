@@ -95,6 +95,7 @@ def test_update_markdown_creates_and_populates_daily_note(monkeypatch, tmp_path)
         "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
         in content
     )
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in content
     assert "### **TRAINING**" in content
     assert "### **PROCRASTINATION**" in content
     assert "### **SLEEP**" in content
@@ -144,9 +145,19 @@ def test_update_markdown_output_characterization(monkeypatch, tmp_path):
 
     note_path = journal_dir / f"{fixed_today:%Y-%m-%d}.md"
     content = note_path.read_text()
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in content
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
 
     assert (
         content_hash
+        == "3f01483701bc6d3c8204056f71eb9756b4e6522228bcfb58092d614a629439b7"
+    )
+
+    # Phase-2 compatibility gate: if only the fallback activity label differs,
+    # converting "Study" back to "Flow" reproduces the prior locked snapshot.
+    compat_content = content.replace("| Study |", "| Flow |")
+    compat_hash = hashlib.sha256(compat_content.encode("utf-8")).hexdigest()
+    assert (
+        compat_hash
         == "654d4b7785d4593f44ff11644e7bbf38e0e3e351764792d2d167e31c088cfdf7"
     )

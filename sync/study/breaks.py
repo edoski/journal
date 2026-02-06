@@ -10,6 +10,12 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+from sync.study.constants import (
+    FLOW_BREAK_DEFAULT_KEYS,
+    FLOW_PHASE_LONG_BREAK,
+    FLOW_PHASE_SHORT_BREAK,
+)
+
 
 # Type alias for session dictionaries
 SessionDict = dict[str, Any]
@@ -36,8 +42,8 @@ def get_expected_break_minutes(
     Returns:
         Expected break duration in minutes
     """
-    default_short = break_defaults.get("shortBreak")
-    default_long = break_defaults.get("longBreak")
+    default_short = break_defaults.get(FLOW_PHASE_SHORT_BREAK)
+    default_long = break_defaults.get(FLOW_PHASE_LONG_BREAK)
     tol_minutes = 2
 
     if break_session:
@@ -46,9 +52,9 @@ def get_expected_break_minutes(
         dur_val = int(dur) if isinstance(dur, (int, float)) and dur > 0 else None
 
         # Direct phase mapping first
-        if phase == "longBreak" and default_long:
+        if phase == FLOW_PHASE_LONG_BREAK and default_long:
             return default_long
-        if phase == "shortBreak" and default_short:
+        if phase == FLOW_PHASE_SHORT_BREAK and default_short:
             chosen = default_short
         else:
             chosen = None
@@ -66,7 +72,7 @@ def get_expected_break_minutes(
             return dur_val
 
     # No session or no usable value; pick best available default
-    for phase_key in ("longBreak", "shortBreak"):
+    for phase_key in FLOW_BREAK_DEFAULT_KEYS:
         val = break_defaults.get(phase_key)
         if val:
             return val
@@ -74,25 +80,25 @@ def get_expected_break_minutes(
 
 
 def _compute_dynamic_lunch_window(
-    flow_sessions: list[SessionDict],
+    study_sessions: list[SessionDict],
     base_window: TimeWindow | None,
     reference_date: datetime.date | None = None,
 ) -> TimeWindow | None:
     """
-    Shift the lunch window later when a flow session straddles the nominal start.
+    Shift the lunch window later when a study session straddles the nominal start.
 
     A session qualifies if it begins before the base start and ends after it;
     purely post-lunch sessions are ignored.
 
     Args:
-        flow_sessions: List of flow session dicts with 'start' and 'end' datetimes
+        study_sessions: List of study session dicts with 'start' and 'end' datetimes
         base_window: Tuple of (start_time, end_time) for base lunch window
         reference_date: Date to use for combining times (defaults to today)
 
     Returns:
         Shifted (start_time, end_time) tuple, or original base_window if no shift needed
     """
-    if not base_window or not flow_sessions:
+    if not base_window or not study_sessions:
         return base_window
 
     base_start_t, base_end_t = base_window
@@ -104,7 +110,7 @@ def _compute_dynamic_lunch_window(
     window_duration = base_end_dt - base_start_dt
 
     eligible = sorted(
-        (s for s in flow_sessions if s.get("end")), key=lambda s: s["end"]
+        (s for s in study_sessions if s.get("end")), key=lambda s: s["end"]
     )
     shifted_start_dt = None
     for session in eligible:
@@ -155,9 +161,9 @@ def overlap_minutes_with_window(
     return (earliest_end - latest_start).total_seconds() / 60
 
 
-def clamp_next_flow_within_day(
+def clamp_next_study_within_day(
     session_end_dt: datetime.datetime,
-    next_flow_start_dt: datetime.datetime,
+    next_study_start_dt: datetime.datetime,
     cutoff_time: datetime.time,
 ) -> datetime.datetime | None:
     """
@@ -168,14 +174,14 @@ def clamp_next_flow_within_day(
 
     Args:
         session_end_dt: When the current session ended
-        next_flow_start_dt: When the next session starts
+        next_study_start_dt: When the next session starts
         cutoff_time: End of regular study day (e.g., 18:00)
 
     Returns:
         Clamped next start datetime, or None if no overrun applies
     """
     cutoff_dt = datetime.datetime.combine(session_end_dt.date(), cutoff_time)
-    effective_next = min(next_flow_start_dt, cutoff_dt)
+    effective_next = min(next_study_start_dt, cutoff_dt)
     if effective_next <= session_end_dt:
         return None
     return effective_next

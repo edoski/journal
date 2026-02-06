@@ -17,7 +17,7 @@ import time
 from sync.logging import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
-from .flow_db import SessionDict
+from sync.study.db import SessionDict
 
 logger = get_logger()
 

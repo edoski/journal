@@ -21,9 +21,6 @@ journal/
     writers/                  # Rendering functions (render_goal_lines, charts, tables)
     daily/                    # Daily note orchestration (run with: python -m sync.daily)
       orchestrator.py         # Main update_markdown logic and goal management
-      flow_db.py              # Flow database access, session deduplication
-      breaks.py               # Break linking, overrun calculations
-      study.py                # Study table building
       training.py             # Training/workout/stretch handling
       sleep.py                # Sleep section building
       context.py              # Context tracking for CONTEXT column
@@ -31,6 +28,13 @@ journal/
       icloud.py               # Resilient iCloud status file loading
       screen_time.py          # Screen time data loading and PROCRASTINATION section
       constants.py            # Daily-specific constants
+    study/                    # Study ingestion domain (Flow DB + breaks + STUDY section)
+      __init__.py             # Study domain exports
+      constants.py            # Flow integration constants + break window config
+      labels.py               # Activity label normalization constants
+      db.py                   # Flow database access + session deduplication/enrichment
+      breaks.py               # Break linking + overrun calculations
+      section.py              # STUDY table extraction/building
     weekly.py                 # Weekly metrics aggregation
     monthly.py                # Monthly metrics aggregation
     quarterly.py              # Quarterly metrics aggregation
@@ -77,6 +81,7 @@ journal/
   - **`readers/`**: Parsing functions and shared parsing helpers (`common.py`, `daily.py`)
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
+  - **`study/`**: Study ingestion package (Flow DB access, break logic, STUDY section rendering)
   - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, reminders)
   - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
   - **`period_sections.py`**: Shared weekly/monthly/quarterly/yearly section assembly helpers
@@ -186,15 +191,19 @@ sync/
 │
 ├── daily/            # Daily note orchestration
 │   ├── orchestrator.py # Main update_markdown logic
-│   ├── flow_db.py      # Flow database access
-│   ├── breaks.py       # Break linking, overrun calculations
-│   ├── study.py        # Study section building
 │   ├── training.py     # Training/workout/stretch handling
 │   ├── sleep.py        # Sleep section building
 │   ├── context.py      # Context tracking
 │   ├── goals.py        # Goal management (carry-forward, weekly/daily parsing)
 │   ├── icloud.py       # iCloud status file loading and study times export
 │   └── screen_time.py  # Screen time data loading and procrastination section
+│
+├── study/            # Study ingestion domain
+│   ├── constants.py    # Flow integration constants + break window config
+│   ├── labels.py       # Activity label normalization constants
+│   ├── db.py           # Flow session fetch/dedupe/enrichment
+│   ├── breaks.py       # Break linking + overrun calculations
+│   └── section.py      # STUDY section extraction/building
 │
 ├── goals/            # Goal domain logic
 │   ├── identity.py     # canonical_goal_text + goal ID helpers
@@ -255,6 +264,10 @@ sync/
 - `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`, `shift_month`, `shift_quarter`, `previous_month`, `previous_quarter`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
 - `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`, `aggregate_training_type_session_stats`
+- `study/constants.py`: Flow app integration constants + study break boundaries
+- `study/db.py`: `get_todays_sessions`, `dedupe_sessions`, `core_data_to_datetime`
+- `study/breaks.py`: expected-break calculation, lunch window shifting, overrun clamping
+- `study/section.py`: STUDY table extraction/building with default activity label normalization (`Study`)
 - `notes_locking.py`: lockfile lifecycle + `locked_note`
 - `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
