@@ -458,6 +458,7 @@ Validate:
 - Idempotency: run twice, confirm stable output
 - Edge cases: open sessions, missing JSON, dynamic lunch windows
 - Historical aggregation with `--date`/`--month`/`--quarter`/`--year` flags
+- Architecture: `tests/test_architecture_guards.py` enforces domain package layout and bans removed legacy module paths/imports
 
 ## Commit & Pull Request Guidelines
 
