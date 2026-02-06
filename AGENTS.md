@@ -35,10 +35,15 @@ journal/
       db.py                   # Flow database access + session deduplication/enrichment
       breaks.py               # Break linking + overrun calculations
       section.py              # STUDY table extraction/building
-    weekly.py                 # Weekly metrics aggregation
-    monthly.py                # Monthly metrics aggregation
-    quarterly.py              # Quarterly metrics aggregation
-    yearly.py                 # Yearly metrics aggregation
+    periods/                  # Weekly/monthly/quarterly/yearly sync entrypoints + helpers
+      __init__.py             # Period package marker
+      weekly.py               # Weekly metrics aggregation
+      monthly.py              # Monthly metrics aggregation
+      quarterly.py            # Quarterly metrics aggregation
+      yearly.py               # Yearly metrics aggregation
+      sections.py             # Shared periodic section assembly helpers
+      cleanup.py              # Shared cleanup re-sync helper for prior periods
+      media.py                # MEDIA section orchestration (reader scan + writer render)
     goals/                    # Goal domain logic (identity, carry-forward, reconcile, reminders)
       __init__.py             # Goal domain public exports
       identity.py             # Goal canonicalization + deterministic/random IDs
@@ -47,13 +52,10 @@ journal/
       state.py                # Bidirectional source/mirror goal state reconciliation cache
       reconcile.py            # Goal piercing + mirror/source reconciliation helpers
       reminders.py            # Periodic review and maintenance reminder generation
-    period_sections.py        # Shared periodic section assembly helpers (summary/interrupts/training/procrastination/media)
-    period_cleanup.py         # Shared cleanup re-sync helper for prior periods
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
     formatting.py             # Value parsing and formatting
     metrics.py                # Period aggregation, moving averages, shared data loaders
-    media_section.py          # MEDIA section orchestration (reader scan + writer render)
     notes/                    # Note infrastructure (locking + markdown/section helpers)
       __init__.py             # Notes package exports
       locking.py              # File-locking primitives
@@ -85,17 +87,15 @@ journal/
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
   - **`study/`**: Study ingestion package (Flow DB access, break logic, STUDY section rendering)
   - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, reminders)
-  - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
-  - **`period_sections.py`**: Shared weekly/monthly/quarterly/yearly section assembly helpers
-  - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
+  - **`periods/`**: Weekly/monthly/quarterly/yearly sync modules + shared period helpers
 
-- **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
+- **`sync/periods/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
 
-- **`sync/monthly.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns. Includes **Summary Table** with 3-month moving averages.
+- **`sync/periods/monthly.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns. Includes **Summary Table** with 3-month moving averages.
 
-- **`sync/quarterly.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Includes **Summary Table** with 4-quarter moving averages.
+- **`sync/periods/quarterly.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Includes **Summary Table** with 4-quarter moving averages.
 
-- **`sync/yearly.py`**: Aggregates daily notes into yearly metrics with quarter-level breakdowns. Includes **Summary Table** with 3-year moving averages.
+- **`sync/periods/yearly.py`**: Aggregates daily notes into yearly metrics with quarter-level breakdowns. Includes **Summary Table** with 3-year moving averages.
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence.
 
@@ -215,18 +215,24 @@ sync/
 │   ├── reconcile.py    # goal piercing + mirror/source reconciliation
 │   └── reminders.py    # periodic review/maintenance reminder generation
 │
+├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
+│   ├── weekly.py       # Weekly note sync entrypoint
+│   ├── monthly.py      # Monthly note sync entrypoint
+│   ├── quarterly.py    # Quarterly note sync entrypoint
+│   ├── yearly.py       # Yearly note sync entrypoint
+│   ├── sections.py     # Shared periodic section assembly helpers
+│   ├── cleanup.py      # Prior-period cleanup re-sync helper
+│   └── media.py        # MEDIA section orchestration (scan + render composition)
+│
 └── [shared modules]
     ├── constants.py    # Configuration values
     ├── dates.py        # Date ranges + period shifting
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation + shared period data loaders
-    ├── media_section.py # MEDIA section orchestration (scan + render composition)
     ├── notes/
     │   ├── locking.py    # Advisory file locking
     │   ├── markdown.py   # Shared markdown header normalization + extract_block
     │   └── sections.py   # Markdown section extraction/manipulation
-    ├── period_sections.py # Shared periodic section assembly helpers
-    ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     └── logging.py      # Logging utilities
 ```
@@ -274,14 +280,14 @@ sync/
 - `notes/locking.py`: lockfile lifecycle + `locked_note`
 - `notes/markdown.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes/sections.py`: header lookup, section bounds, goal splicing, section joining
-- `period_sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
+- `periods/sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
 - `goals/identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
-- `media_section.py`: `build_media_section` (scans via readers, renders via writers)
+- `periods/media.py`: `build_media_section` (scans via readers, renders via writers)
 - `goals/reconcile.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
-- `period_cleanup.py`: `resync_if_marker`
+- `periods/cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
 - `goals/reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
 
@@ -344,10 +350,10 @@ The summary table includes target tracking and progress visualization:
 - Run all syncs: `./sync_all.sh`
 - Run individual syncs:
   - `python -m sync.daily`
-  - `python sync/weekly.py [--date YYYY-MM-DD]`
-  - `python sync/monthly.py [--month YYYY-MM]`
-  - `python sync/quarterly.py [--quarter YYYY-Q#]`
-  - `python sync/yearly.py [--year YYYY]`
+  - `python -m sync.periods.weekly [--date YYYY-MM-DD]`
+  - `python -m sync.periods.monthly [--month YYYY-MM]`
+  - `python -m sync.periods.quarterly [--quarter YYYY-Q#]`
+  - `python -m sync.periods.yearly [--year YYYY]`
 - Goal carry-forward cache: `~/.cache/journal/carried_goals.json`
   - Stores offered goal IDs per period key (for same-period delete suppression)
   - Stores deleted-goal tombstones in `_deleted` for cross-period suppression

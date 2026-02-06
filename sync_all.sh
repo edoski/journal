@@ -9,10 +9,10 @@ export PATH="/opt/homebrew/bin:$PATH"
 cd /Users/edo/scripts/journal
 
 python3 -m sync.daily
-python3 -m sync.weekly
-python3 -m sync.monthly
-python3 -m sync.quarterly
-python3 -m sync.yearly
+python3 -m sync.periods.weekly
+python3 -m sync.periods.monthly
+python3 -m sync.periods.quarterly
+python3 -m sync.periods.yearly
 
 
 

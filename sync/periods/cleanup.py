@@ -29,7 +29,7 @@ def resync_if_marker(
 
     Args:
         previous_note_path: Path to prior period note.
-        module_name: Module to execute (for example, ``sync.weekly``).
+        module_name: Module to execute (for example, ``sync.periods.weekly``).
         module_args: Additional module arguments.
         marker: Marker text that triggers cleanup resync.
 

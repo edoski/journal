@@ -60,7 +60,7 @@ from sync.writers.charts import (
     QUARTERLY_3MONTH_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.period_sections import (
+from sync.periods.sections import (
     append_interrupts_table,
     append_media_section,
     append_summary_section,

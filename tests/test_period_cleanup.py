@@ -1,18 +1,18 @@
 """
-Tests for sync.period_cleanup module.
+Tests for sync.periods.cleanup module.
 """
 
 from __future__ import annotations
 
 import subprocess
 
-import sync.period_cleanup as period_cleanup
+import sync.periods.cleanup as period_cleanup
 
 
 def test_resync_if_marker_returns_false_for_missing_note(tmp_path):
     missing = tmp_path / "missing.md"
     result = period_cleanup.resync_if_marker(
-        str(missing), "sync.weekly", ["--date", "2025-01-01", "--no-cleanup"]
+        str(missing), "sync.periods.weekly", ["--date", "2025-01-01", "--no-cleanup"]
     )
     assert result is False
 
@@ -31,7 +31,7 @@ def test_resync_if_marker_returns_false_without_marker(tmp_path, monkeypatch):
     monkeypatch.setattr(period_cleanup.subprocess, "run", _fake_run)
 
     result = period_cleanup.resync_if_marker(
-        str(note), "sync.weekly", ["--date", "2025-01-01", "--no-cleanup"]
+        str(note), "sync.periods.weekly", ["--date", "2025-01-01", "--no-cleanup"]
     )
     assert result is False
     assert called is False
@@ -53,13 +53,13 @@ def test_resync_if_marker_runs_command_when_marker_present(tmp_path, monkeypatch
     monkeypatch.setattr(period_cleanup, "_repo_root", lambda: "/tmp/repo")
 
     result = period_cleanup.resync_if_marker(
-        str(note), "sync.monthly", ["--month", "2025-01", "--no-cleanup"]
+        str(note), "sync.periods.monthly", ["--month", "2025-01", "--no-cleanup"]
     )
     assert result is True
     assert captured["cmd"] == [
         period_cleanup.sys.executable,
         "-m",
-        "sync.monthly",
+        "sync.periods.monthly",
         "--month",
         "2025-01",
         "--no-cleanup",
@@ -80,6 +80,6 @@ def test_resync_if_marker_handles_subprocess_error(tmp_path, monkeypatch):
     )
 
     result = period_cleanup.resync_if_marker(
-        str(note), "sync.weekly", ["--date", "2025-01-01", "--no-cleanup"]
+        str(note), "sync.periods.weekly", ["--date", "2025-01-01", "--no-cleanup"]
     )
     assert result is False

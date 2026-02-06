@@ -10,11 +10,11 @@ from __future__ import annotations
 import datetime
 import hashlib
 
-import sync.monthly as monthly
-import sync.period_sections as period_sections
-import sync.quarterly as quarterly
-import sync.weekly as weekly
-import sync.yearly as yearly
+import sync.periods.monthly as monthly
+import sync.periods.sections as period_sections
+import sync.periods.quarterly as quarterly
+import sync.periods.weekly as weekly
+import sync.periods.yearly as yearly
 from sync.dates import (
     daterange,
     iso_week_range,

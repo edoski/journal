@@ -57,7 +57,7 @@ from sync.writers.charts import (
     MONTHLY_WEEK_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.period_sections import (
+from sync.periods.sections import (
     append_interrupts_table,
     append_media_section,
     append_summary_section,
@@ -73,7 +73,7 @@ from sync.goals.reconcile import (
     merge_mirror_goals,
     process_pierced_goals,
 )
-from sync.period_cleanup import resync_if_marker
+from sync.periods.cleanup import resync_if_marker
 
 
 def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
@@ -668,7 +668,7 @@ def main() -> None:
         # Re-sync removes arrow since it's a past period (current_date=None)
         resync_if_marker(
             prev_month_path,
-            "sync.monthly",
+            "sync.periods.monthly",
             ["--month", f"{prev_year}-{prev_month:02d}", "--no-cleanup"],
         )
 

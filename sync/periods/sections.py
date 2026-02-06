@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from sync.media_section import build_media_section
+from sync.periods.media import build_media_section
 from sync.metrics import (
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
