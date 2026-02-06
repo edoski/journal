@@ -11,6 +11,7 @@ import datetime
 import hashlib
 
 import sync.monthly as monthly
+import sync.period_sections as period_sections
 import sync.quarterly as quarterly
 import sync.weekly as weekly
 import sync.yearly as yearly
@@ -77,16 +78,9 @@ def _hash_lines(lines: list[str]) -> str:
 
 def _patch_media_sections(monkeypatch) -> None:
     monkeypatch.setattr(
-        weekly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
-    )
-    monkeypatch.setattr(
-        monthly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
-    )
-    monkeypatch.setattr(
-        quarterly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
-    )
-    monkeypatch.setattr(
-        yearly, "build_media_section", lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION
+        period_sections,
+        "build_media_section",
+        lambda *_a, **_kw: _FIXTURE_MEDIA_SECTION,
     )
 
 

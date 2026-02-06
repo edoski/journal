@@ -39,31 +39,31 @@ from sync.metrics import (
     load_daily_data_for_dates,
     load_prior_period_metrics,
     aggregate_activity_totals,
-    aggregate_interrupt_overrun,
-    aggregate_training_type_session_stats,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
 from sync.writers.tables import (
-    render_summary_table,
     render_sleep_stats_table,
     render_activity_table,
-    render_interrupts_table,
-    render_training_type_sessions_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
     render_training_frequency_grid,
     render_monthly_study_grid,
     wrap_code_block,
-    render_waterfall_chart,
     render_screen_time_period_table,
     MONTHLY_WEEK_STUDY,
     MONTHLY_WEEK_METRIC,
     MONTHLY_WEEK_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.media_section import build_media_section
+from sync.period_sections import (
+    append_interrupts_table,
+    append_media_section,
+    append_summary_section,
+    append_training_type_table,
+    build_procrastination_section,
+)
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
@@ -129,7 +129,8 @@ def build_monthly_metrics(
     sections = []
 
     # Summary with MA
-    summary_lines = render_summary_table(
+    append_summary_section(
+        sections,
         current_metrics,
         prev_metrics,
         current_month_label,
@@ -140,7 +141,6 @@ def build_monthly_metrics(
         period_type="month",
         total_days=days_in_period,
     )
-    sections.append(trim_blank_lines(summary_lines))
 
     # STUDY section (using activity totals for accuracy)
     study_lines = ["### **STUDY**"]
@@ -249,14 +249,7 @@ def build_monthly_metrics(
     study_lines.append("")
 
     # INTERRUPTIONS table
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
-        dates, daily_data
-    )
-    avg_interrupts = total_interrupts / max(1, study_day_count)
-    avg_overruns = total_overruns / max(1, study_day_count)
-
-    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
-    study_lines.append("")
+    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING section
@@ -339,30 +332,24 @@ def build_monthly_metrics(
 
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
-    training_stats = aggregate_training_type_session_stats(dates, daily_data)
-    training_lines.extend(render_training_type_sessions_table(training_stats))
-    training_lines.append("")
+    append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
 
     # PROCRASTINATION section (screen time waterfall + trend table)
     screen_time_totals = aggregate_screen_time(dates, daily_data)
     screen_time_totals = group_screen_time_by_percent(screen_time_totals)
     if screen_time_totals:
-        procrastination_lines = ["### **PROCRASTINATION**"]
-        waterfall_lines = render_waterfall_chart(screen_time_totals)
-        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
-        procrastination_lines.extend(wrap_code_block(chart_body))
-        procrastination_lines.append("")
         # Weekly trend table with wikilinks to weekly notes
         week_labels = [format_week_label(s, e) for s, e in week_ranges]
         week_wikilinks = []
         for (s, _), label in zip(week_ranges, week_labels):
             year, week_num, _ = s.isocalendar()
             week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
-        procrastination_lines.extend(
+        procrastination_lines = build_procrastination_section(
+            screen_time_totals,
             render_screen_time_period_table(
                 week_ranges, daily_data, "WEEK", week_labels, week_wikilinks
-            )
+            ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -506,8 +493,7 @@ def build_monthly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(start_date, end_date, "month")
-    sections.append(trim_blank_lines(media_lines))
+    append_media_section(sections, start_date, end_date, "month")
 
     return join_sections(sections)
 

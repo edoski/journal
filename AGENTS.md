@@ -36,6 +36,7 @@ journal/
     quarterly.py              # Quarterly metrics aggregation
     yearly.py                 # Yearly metrics aggregation
     base.py                   # Cross-period goal helpers (carry-forward, piercing, mirror/source reconcile)
+    period_sections.py        # Shared periodic section assembly helpers (summary/interrupts/training/procrastination/media)
     period_cleanup.py         # Shared cleanup re-sync helper for prior periods
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
@@ -76,6 +77,7 @@ journal/
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
   - **`goal_identity.py`**: Shared goal canonicalization and ID generation helpers
   - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
+  - **`period_sections.py`**: Shared weekly/monthly/quarterly/yearly section assembly helpers
   - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
 
 - **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
@@ -203,6 +205,7 @@ sync/
     ├── notes_locking.py # Advisory file locking
     ├── markdown_common.py # Shared markdown header normalization + extract_block
     ├── notes_sections.py # Markdown section extraction/manipulation
+    ├── period_sections.py # Shared periodic section assembly helpers
     ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     ├── reminders.py    # Review reminder generation
@@ -250,6 +253,7 @@ sync/
 - `notes_locking.py`: lockfile lifecycle + `locked_note`
 - `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
+- `period_sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals_engine.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)

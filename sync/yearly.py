@@ -33,20 +33,15 @@ from sync.formatting import (
 from sync.metrics import (
     load_daily_data,
     compute_period_metrics,
-    aggregate_interrupt_overrun,
     compute_period_deltas,
     compute_moving_average,
     load_prior_period_metrics,
-    aggregate_training_type_session_stats,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
 from sync.writers.tables import (
-    render_summary_table,
     render_sleep_stats_table,
     render_activity_table,
-    render_interrupts_table,
-    render_training_type_sessions_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
@@ -55,14 +50,19 @@ from sync.writers.charts import (
     wrap_code_block,
     compress_activity_time_order,
     _compress_days_time_order,
-    render_waterfall_chart,
     render_screen_time_period_table,
     YEARLY_4QTR_STUDY,
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.media_section import build_media_section
+from sync.period_sections import (
+    append_interrupts_table,
+    append_media_section,
+    append_summary_section,
+    append_training_type_table,
+    build_procrastination_section,
+)
 from sync.readers.goals import ensure_goal_ids
 
 logger = get_logger()
@@ -110,7 +110,8 @@ def build_yearly_metrics(
 
     # SUMMARY
     days_in_year = (year_end - year_start).days + 1
-    summary_lines = render_summary_table(
+    append_summary_section(
+        sections,
         current_metrics,
         prev_metrics,
         "THIS YEAR",
@@ -121,7 +122,6 @@ def build_yearly_metrics(
         period_type="year",
         total_days=days_in_year,
     )
-    sections.append(trim_blank_lines(summary_lines))
 
     # STUDY (quarter bars, y_max=720h)
     study_lines = ["### **STUDY**"]
@@ -244,14 +244,7 @@ def build_yearly_metrics(
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
-        dates, daily_data
-    )
-    avg_interrupts = total_interrupts / max(1, study_day_count)
-    avg_overruns = total_overruns / max(1, study_day_count)
-
-    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
-    study_lines.append("")
+    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING (quarter rows)
@@ -394,29 +387,23 @@ def build_yearly_metrics(
         wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block)
     )
     training_lines.append("")
-    training_stats = aggregate_training_type_session_stats(dates, daily_data)
-    training_lines.extend(render_training_type_sessions_table(training_stats))
-    training_lines.append("")
+    append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
 
     # PROCRASTINATION section (screen time waterfall + trend table)
     screen_time_totals = aggregate_screen_time(dates, daily_data)
     screen_time_totals = group_screen_time_by_percent(screen_time_totals)
     if screen_time_totals:
-        procrastination_lines = ["### **PROCRASTINATION**"]
-        waterfall_lines = render_waterfall_chart(screen_time_totals)
-        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
-        procrastination_lines.extend(wrap_code_block(chart_body))
-        procrastination_lines.append("")
         # Quarterly trend table with wikilinks to quarterly notes
         quarter_labels = [f"Q{i + 1}" for i in range(len(quarter_ranges))]
         quarter_wikilinks = []
         for i, _ in enumerate(quarter_ranges):
             quarter_wikilinks.append(f"[[{year}-Q{i + 1}\\|Q{i + 1}]]")
-        procrastination_lines.extend(
+        procrastination_lines = build_procrastination_section(
+            screen_time_totals,
             render_screen_time_period_table(
                 quarter_ranges, daily_data, "QTR", quarter_labels, quarter_wikilinks
-            )
+            ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -559,8 +546,7 @@ def build_yearly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(year_start, year_end, "year")
-    sections.append(trim_blank_lines(media_lines))
+    append_media_section(sections, year_start, year_end, "year")
 
     return join_sections(sections)
 

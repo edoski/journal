@@ -28,30 +28,30 @@ from sync.metrics import (
     load_daily_data_for_dates,
     load_prior_period_metrics,
     aggregate_activity_totals,
-    aggregate_interrupt_overrun,
-    aggregate_training_type_session_stats,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
 from sync.writers.tables import (
-    render_summary_table,
     render_sleep_stats_table,
     render_activity_table,
-    render_interrupts_table,
-    render_training_type_sessions_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
     render_weekly_training_grid,
     render_weekly_study_grid,
     wrap_code_block,
-    render_waterfall_chart,
     render_screen_time_trend_table,
     WEEKLY_7DAY_CHART,
     WEEKLY_7DAY_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.media_section import build_media_section
+from sync.period_sections import (
+    append_interrupts_table,
+    append_media_section,
+    append_summary_section,
+    append_training_type_table,
+    build_procrastination_section,
+)
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
@@ -177,7 +177,8 @@ def build_weekly_metrics(
     sections = []
 
     # Summary with MA
-    summary_lines = render_summary_table(
+    append_summary_section(
+        sections,
         current_metrics,
         prev_metrics,
         "THIS WEEK",
@@ -188,7 +189,6 @@ def build_weekly_metrics(
         period_type="week",
         total_days=7,
     )
-    sections.append(trim_blank_lines(summary_lines))
 
     # STUDY section (using activity totals for accuracy)
     study_lines = ["### **STUDY**"]
@@ -227,14 +227,7 @@ def build_weekly_metrics(
     study_lines.append("")
 
     # INTERRUPTIONS table
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
-        dates, daily_data
-    )
-    avg_interrupts = total_interrupts / max(1, study_day_count)
-    avg_overruns = total_overruns / max(1, study_day_count)
-
-    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
-    study_lines.append("")
+    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING section
@@ -251,22 +244,17 @@ def build_weekly_metrics(
     )
     training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
-    training_stats = aggregate_training_type_session_stats(dates, daily_data)
-    training_lines.extend(render_training_type_sessions_table(training_stats))
-    training_lines.append("")
+    append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
 
     # PROCRASTINATION section (screen time waterfall + trend table)
     screen_time_totals = aggregate_screen_time(dates, daily_data)
     screen_time_totals = group_screen_time_by_percent(screen_time_totals)
-    if screen_time_totals:
-        procrastination_lines = ["### **PROCRASTINATION**"]
-        waterfall_lines = render_waterfall_chart(screen_time_totals)
-        # Remove header from waterfall (it includes its own) and wrap in code block
-        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
-        procrastination_lines.extend(wrap_code_block(chart_body))
-        procrastination_lines.append("")
-        procrastination_lines.extend(render_screen_time_trend_table(dates, daily_data))
+    procrastination_lines = build_procrastination_section(
+        screen_time_totals,
+        render_screen_time_trend_table(dates, daily_data),
+    )
+    if procrastination_lines:
         sections.append(trim_blank_lines(procrastination_lines))
 
     # SLEEP section (values on top of bars, 5-char bars like monthly)
@@ -328,8 +316,7 @@ def build_weekly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(start_date, end_date, "week")
-    sections.append(trim_blank_lines(media_lines))
+    append_media_section(sections, start_date, end_date, "week")
 
     return join_sections(sections)
 

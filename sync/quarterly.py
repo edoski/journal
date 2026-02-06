@@ -42,31 +42,31 @@ from sync.metrics import (
     compute_moving_average,
     load_daily_data,
     load_prior_period_metrics,
-    aggregate_interrupt_overrun,
     compute_period_deltas,
-    aggregate_training_type_session_stats,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
 from sync.writers.tables import (
-    render_summary_table,
     render_sleep_stats_table,
     render_activity_table,
-    render_interrupts_table,
-    render_training_type_sessions_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
     render_quarterly_study_coverage,
     wrap_code_block,
-    render_waterfall_chart,
     render_screen_time_period_table,
     QUARTERLY_3MONTH_STUDY,
     QUARTERLY_3MONTH_METRIC,
     QUARTERLY_3MONTH_MOOD,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.media_section import build_media_section
+from sync.period_sections import (
+    append_interrupts_table,
+    append_media_section,
+    append_summary_section,
+    append_training_type_table,
+    build_procrastination_section,
+)
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import carry_forward_goals, reconcile_goal_lists, merge_mirror_goals
@@ -157,7 +157,8 @@ def build_quarterly_metrics(
 
     prev_label = f"**[[{quarter_id(prev_year, prev_quarter)}\\|LAST QUARTER]]**"
     days_in_quarter = (quarter_end - quarter_start).days + 1
-    summary_lines = render_summary_table(
+    append_summary_section(
+        sections,
         current_metrics,
         prev_metrics,
         "THIS QUARTER",
@@ -168,7 +169,6 @@ def build_quarterly_metrics(
         period_type="quarter",
         total_days=days_in_quarter,
     )
-    sections.append(trim_blank_lines(summary_lines))
 
     prev_month_ranges = quarter_months(prev_year, prev_quarter)
     prev_last_month_range = prev_month_ranges[-1] if prev_month_ranges else None
@@ -264,14 +264,7 @@ def build_quarterly_metrics(
     study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
-    total_interrupts, total_overruns, study_day_count = aggregate_interrupt_overrun(
-        dates, daily_data
-    )
-    avg_interrupts = total_interrupts / max(1, study_day_count)
-    avg_overruns = total_overruns / max(1, study_day_count)
-
-    study_lines.extend(render_interrupts_table(avg_interrupts, avg_overruns))
-    study_lines.append("")
+    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING
@@ -349,9 +342,7 @@ def build_quarterly_metrics(
     )
     training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")
-    training_stats = aggregate_training_type_session_stats(dates, daily_data)
-    training_lines.extend(render_training_type_sessions_table(training_stats))
-    training_lines.append("")
+    append_training_type_table(training_lines, dates, daily_data)
 
     sections.append(trim_blank_lines(training_lines))
 
@@ -359,20 +350,16 @@ def build_quarterly_metrics(
     screen_time_totals = aggregate_screen_time(dates, daily_data)
     screen_time_totals = group_screen_time_by_percent(screen_time_totals)
     if screen_time_totals:
-        procrastination_lines = ["### **PROCRASTINATION**"]
-        waterfall_lines = render_waterfall_chart(screen_time_totals)
-        chart_body = [line for line in waterfall_lines if not line.startswith("### ")]
-        procrastination_lines.extend(wrap_code_block(chart_body))
-        procrastination_lines.append("")
         # Monthly trend table with wikilinks to monthly notes
         month_labels = [MONTH_ABBR[m[0].month - 1] for m in month_ranges]
         month_wikilinks = []
         for (start, _), label in zip(month_ranges, month_labels):
             month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
-        procrastination_lines.extend(
+        procrastination_lines = build_procrastination_section(
+            screen_time_totals,
             render_screen_time_period_table(
                 month_ranges, daily_data, "MONTH", month_labels, month_wikilinks
-            )
+            ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
 
@@ -498,8 +485,7 @@ def build_quarterly_metrics(
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
-    media_lines = build_media_section(quarter_start, quarter_end, "quarter")
-    sections.append(trim_blank_lines(media_lines))
+    append_media_section(sections, quarter_start, quarter_end, "quarter")
 
     return join_sections(sections)
 
