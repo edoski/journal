@@ -35,7 +35,7 @@ journal/
     monthly.py                # Monthly metrics aggregation
     quarterly.py              # Quarterly metrics aggregation
     yearly.py                 # Yearly metrics aggregation
-    base.py                   # Cross-period goal helpers (carry-forward, piercing, mirror/source reconcile)
+    base.py                   # Cross-period goal helpers (piercing + mirror/source reconcile)
     period_sections.py        # Shared periodic section assembly helpers (summary/interrupts/training/procrastination/media)
     period_cleanup.py         # Shared cleanup re-sync helper for prior periods
     constants.py              # Shared constants (paths, thresholds, dimensions)
@@ -211,7 +211,7 @@ sync/
     ├── reminders.py    # Review reminder generation
     ├── logging.py      # Logging utilities
     ├── goal_sync_state.py # Cache-backed source/mirror done-state reconciliation
-    └── base.py         # Cross-period goal carry-forward, piercing, and mirror/source reconciliation
+    └── base.py         # Cross-period goal piercing and mirror/source reconciliation
 ```
 
 **Data flow**: `markdown → readers → models → writers → markdown`
@@ -257,7 +257,7 @@ sync/
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals_engine.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)
-- `base.py`: `carry_forward_goals`, `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
+- `base.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `carried_goals.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - `goal_sync_state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `period_cleanup.py`: `resync_if_marker`

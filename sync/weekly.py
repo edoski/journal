@@ -52,10 +52,10 @@ from sync.period_sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.goals_engine import carry_forward_with_tombstones
 from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
-    carry_forward_goals,
     load_quarterly_goals,
     reconcile_goal_lists,
     merge_mirror_goals,
@@ -417,7 +417,7 @@ def main() -> None:
                     prev_week_tasks, "weekly", prev_week_start.isoformat()
                 )
 
-        weekly_tasks, _ = carry_forward_goals(
+        weekly_tasks, _ = carry_forward_with_tombstones(
             prev_week_tasks, weekly_tasks, week_key, "weekly"
         )
 

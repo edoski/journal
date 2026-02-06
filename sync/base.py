@@ -2,7 +2,6 @@
 Shared base patterns for periodic sync modules.
 
 Provides common functionality used across weekly, monthly, quarterly, and yearly sync:
-- Goal carry-forward with cache guard
 - Bidirectional goal status reconciliation between source/mirror notes
 """
 
@@ -12,36 +11,12 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
-from sync.goals_engine import carry_forward_with_tombstones
 from sync.io import safe_read_file
 from sync.goal_sync_state import (
     locked_goal_sync_state,
     record_note_state,
     reconcile_pair_with_state,
 )
-
-
-def carry_forward_goals(
-    prev_tasks: list,
-    current_tasks: list,
-    period_key: str,
-    horizon: str,
-) -> tuple[list, int]:
-    """
-    Carry forward open goals from previous period with cache guard.
-
-    Uses ID-based tracking to prevent re-adding goals the user deleted.
-
-    Args:
-        prev_tasks: Tasks from previous period (must have IDs assigned)
-        current_tasks: Tasks from current period (modified in place)
-        period_key: Cache key for this period (e.g., "2025-W52")
-        horizon: Goal horizon (e.g., "weekly", "monthly")
-
-    Returns:
-        Tuple of (updated current_tasks, count of tasks added)
-    """
-    return carry_forward_with_tombstones(prev_tasks, current_tasks, period_key, horizon)
 
 
 def propagate_goal_status(

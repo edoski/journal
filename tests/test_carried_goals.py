@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 import pytest
 
-from sync.base import carry_forward_goals
 from sync.carried_goals import (
     cleanup_old_entries,
     get_carried_ids,
@@ -20,6 +19,7 @@ from sync.carried_goals import (
     record_deleted_ids,
 )
 from sync.daily.goals import carry_forward_daily_tasks
+from sync.goals_engine import carry_forward_with_tombstones
 from sync.models.goals import Goal
 
 
@@ -136,14 +136,14 @@ class TestCacheIntegration:
             prev_tasks = [_goal("gid-abc", "Goal A", done=False)]
 
             # First February run: goal is offered into current month.
-            current_tasks, added = carry_forward_goals(
+            current_tasks, added = carry_forward_with_tombstones(
                 prev_tasks, [], "2026-02", "monthly"
             )
             assert added == 1
             assert {g.id for g in current_tasks} == {"gid-abc"}
 
             # User deletes it from February note; second run records tombstone.
-            deleted_view, added = carry_forward_goals(
+            deleted_view, added = carry_forward_with_tombstones(
                 prev_tasks, [], "2026-02", "monthly"
             )
             assert added == 0
@@ -151,7 +151,7 @@ class TestCacheIntegration:
             assert get_deleted_ids("monthly") == {"gid-abc"}
 
             # March run should not re-add tombstoned goal.
-            march_tasks, added = carry_forward_goals(
+            march_tasks, added = carry_forward_with_tombstones(
                 prev_tasks, [], "2026-03", "monthly"
             )
             assert added == 0
@@ -163,7 +163,7 @@ class TestCacheIntegration:
             record_deleted_ids("monthly", "2026-02", ["gid-abc"])
 
             current_tasks = [_goal("gid-abc", "Goal A", done=False)]
-            carry_forward_goals(
+            carry_forward_with_tombstones(
                 [_goal("gid-abc", "Goal A")], current_tasks, "2026-03", "monthly"
             )
 

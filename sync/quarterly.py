@@ -67,9 +67,10 @@ from sync.period_sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.goals_engine import carry_forward_with_tombstones
 from sync.readers.goals import ensure_goal_ids
 
-from sync.base import carry_forward_goals, reconcile_goal_lists, merge_mirror_goals
+from sync.base import reconcile_goal_lists, merge_mirror_goals
 
 logger = get_logger()
 
@@ -544,7 +545,7 @@ def main() -> None:
             )
             prev_tasks = p_body
 
-        quarterly_tasks, _ = carry_forward_goals(
+        quarterly_tasks, _ = carry_forward_with_tombstones(
             prev_tasks, quarterly_tasks, qtr_key, "quarterly"
         )
 
