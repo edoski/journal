@@ -4,7 +4,7 @@ import sync.daily.icloud as icloud
 
 
 def _session(start_hm: str, end_hm: str) -> dict:
-    """Create a minimal SessionDict for tests."""
+    """Create a minimal study-session payload for tests."""
     today = datetime.date(2025, 1, 1)  # fixed date to keep datetimes comparable
     start_h, start_m = map(int, start_hm.split(":"))
     end_h, end_m = map(int, end_hm.split(":"))

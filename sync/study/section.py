@@ -9,15 +9,12 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Callable
+from typing import Callable
 
+from sync.contracts.study import StudySessionRecord
 from sync.formatting import format_minutes, ceil_minutes, round_half_up
 
 from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
-
-
-# Type alias for session dictionaries
-SessionDict = dict[str, Any]
 
 
 def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
@@ -90,9 +87,9 @@ def _format_interrupt(minutes: int) -> str:
 
 
 def build_study_section(
-    sessions: list[SessionDict],
+    sessions: list[StudySessionRecord],
     existing_notes: dict[str, str],
-    context_for_session: Callable[[Any, Any], str] | None = None,
+    context_for_session: Callable[[datetime, datetime], str] | None = None,
     existing_context: dict[str, str] | None = None,
     current_time: datetime | None = None,
 ) -> tuple[list[str], int]:

@@ -20,6 +20,7 @@ class StudySessionRecord(TypedDict, total=False):
     planned_duration: float
     duration: float
     actual_elapsed: float
+    actual_duration: float
     interruptions_count: int
     interruptions_duration: float
     break_duration: float

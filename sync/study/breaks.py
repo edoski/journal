@@ -8,8 +8,8 @@ calculate time overlaps, and determine break overruns.
 from __future__ import annotations
 
 import datetime
-from typing import Any
 
+from sync.contracts.study import StudySessionRecord
 from sync.study.constants import (
     FLOW_BREAK_DEFAULT_KEYS,
     FLOW_PHASE_LONG_BREAK,
@@ -17,14 +17,12 @@ from sync.study.constants import (
 )
 
 
-# Type alias for session dictionaries
-SessionDict = dict[str, Any]
 BreakDefaults = dict[str, int | None]
 TimeWindow = tuple[datetime.time, datetime.time]
 
 
 def get_expected_break_minutes(
-    break_session: SessionDict | None,
+    break_session: StudySessionRecord | None,
     break_defaults: BreakDefaults,
 ) -> int:
     """
@@ -79,8 +77,8 @@ def get_expected_break_minutes(
     return 30
 
 
-def _compute_dynamic_lunch_window(
-    study_sessions: list[SessionDict],
+def compute_dynamic_lunch_window(
+    study_sessions: list[StudySessionRecord],
     base_window: TimeWindow | None,
     reference_date: datetime.date | None = None,
 ) -> TimeWindow | None:

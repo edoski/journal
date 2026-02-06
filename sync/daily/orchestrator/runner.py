@@ -6,9 +6,9 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
+from sync.contracts.study import StudySessionRecord
 from sync.logging import get_logger
 from sync.notes.locking import locked_note
-from sync.study.db import SessionDict
 
 from ..context import (
     files_for_session,
@@ -23,7 +23,7 @@ from .note_io import ensure_daily_sections, find_yaml_end, read_daily_note
 logger = get_logger()
 
 
-def update_markdown(sessions: list[SessionDict]) -> bool | None:
+def update_markdown(sessions: list[StudySessionRecord]) -> bool | None:
     """
     Update the daily markdown note with session data, goals, and metrics.
 

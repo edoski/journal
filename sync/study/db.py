@@ -4,12 +4,12 @@ Study-session database access and enrichment for daily sync.
 
 from __future__ import annotations
 
-import datetime
 import os
 import subprocess
 import sqlite3
-from typing import Any
+import datetime
 
+from sync.contracts.study import StudySessionRecord
 from sync.logging import get_logger
 
 from sync.study.constants import (
@@ -27,17 +27,13 @@ from sync.study.constants import (
 )
 from sync.study.breaks import (
     get_expected_break_minutes,
-    _compute_dynamic_lunch_window,
+    compute_dynamic_lunch_window,
     overlap_minutes_with_window,
     clamp_next_study_within_day,
     anchor_lunch_window,
 )
 
 logger = get_logger()
-
-
-# Type aliases for clarity
-SessionDict = dict[str, Any]
 
 
 def _read_break_defaults() -> dict[str, int | None]:
@@ -93,9 +89,9 @@ def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:
 
 
 def dedupe_sessions(
-    sessions: list[SessionDict],
+    sessions: list[StudySessionRecord],
     start_tolerance_seconds: int = 60,
-) -> list[SessionDict]:
+) -> list[StudySessionRecord]:
     """
     Deduplicate sessions that represent the same work block.
 
@@ -111,14 +107,14 @@ def dedupe_sessions(
         Deduplicated list of sessions with merged metadata
     """
 
-    def same_group(a: SessionDict, b: SessionDict) -> bool:
+    def same_group(a: StudySessionRecord, b: StudySessionRecord) -> bool:
         if a["phase"] != b["phase"]:
             return False
         if (a["title"] or "").strip() != (b["title"] or "").strip():
             return False
         return abs((a["start"] - b["start"]).total_seconds()) <= start_tolerance_seconds
 
-    groups: list[list[SessionDict]] = []
+    groups: list[list[StudySessionRecord]] = []
     for s in sorted(sessions, key=lambda x: x["start"]):
         placed = False
         for grp in groups:
@@ -129,10 +125,10 @@ def dedupe_sessions(
         if not placed:
             groups.append([s])
 
-    merged: list[SessionDict] = []
+    merged: list[StudySessionRecord] = []
     for grp in groups:
 
-        def score(entry: SessionDict) -> tuple:
+        def score(entry: StudySessionRecord) -> tuple:
             completed = 1 if entry.get("completed_at") else 0
             actual = entry.get("actual_elapsed", 0) or 0
             end_ts = entry["end"].timestamp() if entry.get("end") else 0
@@ -154,29 +150,34 @@ def dedupe_sessions(
         if completed_entries:
             completed_starts = [g["start"] for g in completed_entries if g.get("start")]
             merged_start = (
-                min(completed_starts) if completed_starts else canonical.get("start")
+                min(completed_starts) if completed_starts else canonical["start"]
             )
         else:
-            merged_start = min(starts) if starts else canonical.get("start")
+            merged_start = min(starts) if starts else canonical["start"]
 
-        merged_end = max(end_candidates) if end_candidates else canonical.get("end")
+        merged_end = max(end_candidates) if end_candidates else canonical["end"]
 
         merged_entry = canonical.copy()
         merged_entry["start"] = merged_start
         merged_entry["end"] = merged_end
-        merged_entry["pks"] = sorted(
-            set(sum([g.get("pks", [g.get("pk")]) for g in grp], []))
-        )
+        merged_pks = [
+            pk for g in grp for pk in g.get("pks", [g.get("pk")]) if isinstance(pk, int)
+        ]
+        merged_entry["pks"] = sorted(set(merged_pks))
         # Interruptions should come from the anchored (completed) twin when present
         if completed_entries:
-            merged_entry["interrupt_pks"] = sorted(
-                set(sum([g.get("pks", [g.get("pk")]) for g in completed_entries], []))
-            )
+            interrupt_pks = [
+                pk
+                for g in completed_entries
+                for pk in g.get("pks", [g.get("pk")])
+                if isinstance(pk, int)
+            ]
+            merged_entry["interrupt_pks"] = sorted(set(interrupt_pks))
         else:
             merged_entry["interrupt_pks"] = merged_entry["pks"]
 
         merged_entry["pk"] = (
-            merged_entry["pks"][0] if merged_entry["pks"] else canonical.get("pk")
+            merged_entry["pks"][0] if merged_entry["pks"] else canonical["pk"]
         )
         merged_entry["planned_duration"] = max(
             g.get("planned_duration", 0) or 0 for g in grp
@@ -192,9 +193,9 @@ def dedupe_sessions(
     return merged
 
 
-def get_todays_sessions() -> list[SessionDict]:
+def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
     """
-    Fetch and process today's study sessions from the database.
+    Fetch and process study sessions from the database for a specific day.
 
     Returns a list of enriched session dictionaries with:
     - Deduplicated study sessions
@@ -205,10 +206,10 @@ def get_todays_sessions() -> list[SessionDict]:
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Calculate start and end of today (local time) for filtering
+    # Calculate start and end of requested day (local time) for filtering
     now = datetime.datetime.now()
-    start_of_day = datetime.datetime(now.year, now.month, now.day, 0, 0, 0)
-    end_of_day = datetime.datetime(now.year, now.month, now.day, 23, 59, 59)
+    start_of_day = datetime.datetime(day.year, day.month, day.day, 0, 0, 0)
+    end_of_day = datetime.datetime(day.year, day.month, day.day, 23, 59, 59)
 
     # Convert to CoreData timestamps
     cd_start = start_of_day.timestamp() - CORE_DATA_EPOCH_OFFSET
@@ -224,7 +225,7 @@ def get_todays_sessions() -> list[SessionDict]:
     cursor.execute(query, (cd_start, cd_end))
     rows = cursor.fetchall()
 
-    all_sessions: list[SessionDict] = []
+    all_sessions: list[StudySessionRecord] = []
     for row in rows:
         pk, started_at, duration_planned, phase, title, completed_at = row
         start_dt = core_data_to_datetime(started_at)
@@ -270,7 +271,7 @@ def get_todays_sessions() -> list[SessionDict]:
     study_sessions = dedupe_sessions(study_sessions)
     study_sessions.sort(key=lambda x: x["start"])
 
-    def enrich_break(b: SessionDict) -> SessionDict:
+    def enrich_break(b: StudySessionRecord) -> StudySessionRecord:
         completed_dt = b["completed_at"] if b.get("completed_at") else None
         if completed_dt:
             end_dt = completed_dt
@@ -279,21 +280,21 @@ def get_todays_sessions() -> list[SessionDict]:
             if end_dt < b["start"]:
                 end_dt = b["start"]
         b["actual_duration"] = max(0, (end_dt - b["start"]).total_seconds() / 60)
-        b["planned_duration"] = b.get("planned_duration") or b.get("duration")
+        b["planned_duration"] = b.get("planned_duration") or b.get("duration") or 0
         return b
 
     break_sessions = [enrich_break(b) for b in dedupe_sessions(break_sessions)]
     break_sessions.sort(key=lambda x: x["start"])
 
-    lunch_window = _compute_dynamic_lunch_window(
-        study_sessions, LUNCH_WINDOW_BASE, reference_date=now.date()
+    lunch_window = compute_dynamic_lunch_window(
+        study_sessions, LUNCH_WINDOW_BASE, reference_date=day
     )
     lunch_duration_minutes = 0
     if lunch_window:
         try:
             lunch_start_t, lunch_end_t = lunch_window
-            lunch_start_dt = datetime.datetime.combine(now.date(), lunch_start_t)
-            lunch_end_dt = datetime.datetime.combine(now.date(), lunch_end_t)
+            lunch_start_dt = datetime.datetime.combine(day, lunch_start_t)
+            lunch_end_dt = datetime.datetime.combine(day, lunch_end_t)
             if lunch_end_dt <= lunch_start_dt:
                 lunch_end_dt += datetime.timedelta(days=1)
             lunch_duration_minutes = int(
@@ -325,7 +326,7 @@ def get_todays_sessions() -> list[SessionDict]:
         session["interruptions_duration"] = total_duration
 
         # Find nearest subsequent break (first one after session end within gap cap)
-        best_break: SessionDict | None = None
+        best_break: StudySessionRecord | None = None
         for b in break_sessions:
             gap_seconds = (b["start"] - session["end"]).total_seconds()
             if gap_seconds < 0:
@@ -406,7 +407,7 @@ def get_todays_sessions() -> list[SessionDict]:
     # and session N-1 didn't get lunch but gap overlaps lunch significantly,
     # retroactively assign lunch to session N-1.
     if lunch_window:
-        lunch_end_dt = datetime.datetime.combine(now.date(), lunch_window[1])
+        lunch_end_dt = datetime.datetime.combine(day, lunch_window[1])
         for idx in range(1, len(study_sessions)):
             current = study_sessions[idx]
             prev = study_sessions[idx - 1]
@@ -443,3 +444,8 @@ def get_todays_sessions() -> list[SessionDict]:
 
     conn.close()
     return study_sessions
+
+
+def get_todays_sessions() -> list[StudySessionRecord]:
+    """Fetch and process study sessions for today."""
+    return get_sessions_for_day(datetime.date.today())

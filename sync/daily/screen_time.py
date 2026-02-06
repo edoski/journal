@@ -26,7 +26,7 @@ logger = get_logger()
 SCREEN_TIME_CACHE_PATH = os.path.expanduser("~/.cache/journal/screen_time_entries.json")
 
 
-def _parse_duration_string(duration_str: str) -> float:
+def parse_duration_string(duration_str: str) -> float:
     """
     Parse iOS duration strings like "3h 41m", "41m", "59s", "1m30s" to minutes.
 
@@ -57,7 +57,7 @@ def _parse_duration_string(duration_str: str) -> float:
     return total_minutes
 
 
-def _parse_activity_line(line: str) -> tuple[str, float] | None:
+def parse_activity_line(line: str) -> tuple[str, float] | None:
     """
     Parse a single activity line like "Netflix (3h 41m)" into app name and duration.
 
@@ -78,12 +78,12 @@ def _parse_activity_line(line: str) -> tuple[str, float] | None:
 
     app_name = match.group(1).strip()
     duration_str = match.group(2).strip()
-    minutes = _parse_duration_string(duration_str)
+    minutes = parse_duration_string(duration_str)
 
     return (app_name, minutes)
 
 
-def _parse_activity_field(activity_str: str | None) -> dict[str, float]:
+def parse_activity_field(activity_str: str | None) -> dict[str, float]:
     """
     Parse the full activity field (newline-separated entries) into app -> minutes dict.
 
@@ -102,7 +102,7 @@ def _parse_activity_field(activity_str: str | None) -> dict[str, float]:
 
     result: dict[str, float] = {}
     for line in activity_str.split("\n"):
-        parsed = _parse_activity_line(line)
+        parsed = parse_activity_line(line)
         if parsed:
             app_name, minutes = parsed
             result[app_name] = result.get(app_name, 0) + minutes
@@ -198,8 +198,8 @@ def load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
         json_date = data.get("date", "")
         if not json_date or json_date == today_str:
             # Parse both device activity fields
-            ipad_apps = _parse_activity_field(data.get("activity_ipad"))
-            iphone_apps = _parse_activity_field(data.get("activity_iphone"))
+            ipad_apps = parse_activity_field(data.get("activity_ipad"))
+            iphone_apps = parse_activity_field(data.get("activity_iphone"))
 
             # Merge by summing durations for same app
             for app, minutes in ipad_apps.items():

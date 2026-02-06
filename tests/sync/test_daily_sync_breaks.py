@@ -10,7 +10,7 @@ import datetime
 
 from sync.study.breaks import (
     get_expected_break_minutes,
-    _compute_dynamic_lunch_window,
+    compute_dynamic_lunch_window,
     overlap_minutes_with_window,
     clamp_next_study_within_day,
     anchor_lunch_window,
@@ -55,12 +55,12 @@ class TestGetExpectedBreakMinutes:
 
 
 class TestComputeDynamicLunchWindow:
-    """Tests for _compute_dynamic_lunch_window function."""
+    """Tests for compute_dynamic_lunch_window function."""
 
     def test_no_shift_when_no_sessions(self):
         """Returns base window when no sessions."""
         base = (datetime.time(13, 30), datetime.time(14, 30))
-        result = _compute_dynamic_lunch_window([], base)
+        result = compute_dynamic_lunch_window([], base)
         assert result == base
 
     def test_no_shift_when_session_before_window(self):
@@ -73,7 +73,7 @@ class TestComputeDynamicLunchWindow:
                 "end": datetime.datetime(2025, 12, 27, 12, 0),
             }
         ]
-        result = _compute_dynamic_lunch_window(sessions, base, ref_date)
+        result = compute_dynamic_lunch_window(sessions, base, ref_date)
         assert result == base
 
     def test_shift_when_session_straddles_window(self):
@@ -86,7 +86,7 @@ class TestComputeDynamicLunchWindow:
                 "end": datetime.datetime(2025, 12, 27, 14, 0),
             }
         ]
-        result = _compute_dynamic_lunch_window(sessions, base, ref_date)
+        result = compute_dynamic_lunch_window(sessions, base, ref_date)
         assert result is not None
         assert result[0] == datetime.time(14, 0)  # Shifted to session end
         # Duration should be preserved (1 hour)
@@ -94,7 +94,7 @@ class TestComputeDynamicLunchWindow:
 
     def test_none_base_window_returns_none(self):
         """Returns None when base window is None."""
-        result = _compute_dynamic_lunch_window([], None)
+        result = compute_dynamic_lunch_window([], None)
         assert result is None
 
 

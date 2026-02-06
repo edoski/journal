@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from sync.constants import IDEAL
+from sync.contracts.study import StudySessionRecord
 from sync.formatting import format_minutes
 from sync.models.deviation import DailyDeviationData
 from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block
-from sync.study.db import SessionDict
 from sync.study.section import build_study_section, extract_existing_data
 
 from ..icloud import load_status_file, write_study_times_to_icloud
@@ -30,7 +30,7 @@ class MetricsSectionResult:
 
 def build_study_data(
     lines: list[str],
-    sessions: list[SessionDict],
+    sessions: list[StudySessionRecord],
     context_for_session,
 ) -> tuple[list[str], str]:
     """Build STUDY table lines and formatted study frontmatter value."""
@@ -46,7 +46,7 @@ def build_study_data(
 
 
 def _build_deviation_data(
-    sessions: list[SessionDict],
+    sessions: list[StudySessionRecord],
     workout_data,
 ) -> DailyDeviationData:
     """Compute daily deviation signals from study sessions and workout starts."""
@@ -103,7 +103,7 @@ def _build_deviation_data(
 
 def apply_metrics_block(
     lines: list[str],
-    sessions: list[SessionDict],
+    sessions: list[StudySessionRecord],
     today_str: str,
     new_table_lines: list[str],
 ) -> MetricsSectionResult:

@@ -292,6 +292,13 @@ Dependency rules:
 - `sync/writers` must not import `sync/ports` or `sync/adapters`
 - Non-composition modules must not import `sync/application` or `sync/adapters`
 
+Canonical interface contracts (phase 2):
+- `sync.ports.sessions.StudySessionSource.load_sessions(day)` returns `list[sync.contracts.study.StudySessionRecord]`
+- `sync.ports.status.DailyStatusSource` is the only interface for daily training/sleep/screen-time status + study-times writeback
+- `sync.adapters.flow_sessions.FlowStudySessionSource` is the Flow DB adapter implementation
+- `sync.adapters.icloud_status.ICloudDailyStatusSource` is the iCloud status adapter implementation
+- `sync.study.db.get_sessions_for_day(day)` is the canonical day-scoped Flow fetch API (with `get_todays_sessions()` as a today convenience wrapper)
+
 ### Module Responsibilities
 
 **Models (`sync/models/`):**
@@ -329,7 +336,7 @@ Dependency rules:
 - `metrics/aggregation.py`: `compute_period_metrics`, `aggregate_activity_totals`, `aggregate_interrupt_overrun`, `aggregate_screen_time`, `aggregate_training_type_session_stats`
 - `metrics/comparison.py`: `group_screen_time_by_percent`, `compute_period_deltas`, `compute_moving_average`
 - `study/constants.py`: Flow app integration constants + study break boundaries
-- `study/db.py`: `get_todays_sessions`, `dedupe_sessions`, `core_data_to_datetime`
+- `study/db.py`: `get_sessions_for_day`, `get_todays_sessions`, `dedupe_sessions`, `core_data_to_datetime`
 - `study/breaks.py`: expected-break calculation, lunch window shifting, overrun clamping
 - `study/section.py`: STUDY table extraction/building with default activity label normalization (`Study`)
 - `notes/locking.py`: lockfile lifecycle + `locked_note`

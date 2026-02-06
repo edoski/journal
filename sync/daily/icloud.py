@@ -17,7 +17,7 @@ import time
 from sync.logging import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
-from sync.study.db import SessionDict
+from sync.contracts.study import StudySessionRecord
 
 logger = get_logger()
 
@@ -139,7 +139,9 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
     return False, None
 
 
-def write_study_times_to_icloud(sessions: list[SessionDict], today_str: str) -> None:
+def write_study_times_to_icloud(
+    sessions: list[StudySessionRecord], today_str: str
+) -> None:
     """
     Write study session times to iCloud for iPad shortcut to read.
 
