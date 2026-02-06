@@ -459,6 +459,7 @@ Validate:
 - Edge cases: open sessions, missing JSON, dynamic lunch windows
 - Historical aggregation with `--date`/`--month`/`--quarter`/`--year` flags
 - Architecture: `tests/test_architecture_guards.py` enforces domain package layout and bans removed legacy module paths/imports
+- Render diff gates: `tests/test_render_baseline_snapshots.py` enforces line-for-line period metrics + goals block snapshots, including newline/spacing invariance
 
 ## Commit & Pull Request Guidelines
 

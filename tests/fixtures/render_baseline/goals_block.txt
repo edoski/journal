@@ -1,0 +1,8 @@
+## Goals
+---
+### **WEEKLY**
+- [ ] Quarterly planning — `14d` ^gid-aaa1111111
+
+### **DAILY**
+- [ ] Deep work block — `TODAY` ^gid-ccc3333333
+

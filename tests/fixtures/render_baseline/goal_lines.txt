@@ -1,0 +1,2 @@
+- [ ] Quarterly planning — `14d` ^gid-aaa1111111
+- [x] Retrospective ^gid-bbb2222222
