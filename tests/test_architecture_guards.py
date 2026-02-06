@@ -81,11 +81,11 @@ def test_deprecated_import_paths_are_not_used():
                                 f"{path}: from sync.readers import parse_daily_note"
                             )
 
-                if mod == "sync.base":
+                if mod == "sync.goals.reconcile":
                     for alias in node.names:
                         if alias.name == "atomic_write_note":
                             violations.append(
-                                f"{path}: from sync.base import atomic_write_note"
+                                f"{path}: from sync.goals.reconcile import atomic_write_note"
                             )
 
     assert not violations, "Deprecated import paths found:\n" + "\n".join(violations)

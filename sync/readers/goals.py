@@ -8,7 +8,7 @@ import calendar
 import datetime
 import re
 
-from sync.goal_identity import generate_goal_id, generate_goal_id_for
+from sync.goals.identity import generate_goal_id, generate_goal_id_for
 from sync.models import Goal
 
 

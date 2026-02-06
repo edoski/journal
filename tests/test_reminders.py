@@ -5,7 +5,7 @@ Tests for periodic review reminder generation.
 import datetime
 
 
-from sync.reminders import (
+from sync.goals.reminders import (
     get_review_reminders_for_date,
     get_periodic_reminders_for_date,
 )

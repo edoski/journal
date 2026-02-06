@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sync.carried_goals import (
+from sync.goals.tombstones import (
     cleanup_old_entries,
     get_carried_ids,
     get_deleted_ids,
@@ -19,7 +19,7 @@ from sync.carried_goals import (
     record_deleted_ids,
 )
 from sync.daily.goals import carry_forward_daily_tasks
-from sync.goals_engine import carry_forward_with_tombstones
+from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.models.goals import Goal
 
 
@@ -107,12 +107,12 @@ class TestCacheIntegration:
     def temp_cache(self, tmp_path):
         """Create a temporary cache file."""
         cache_path = tmp_path / "carried_goals.json"
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(cache_path)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(cache_path)):
             yield cache_path
 
     def test_monthly_transition_preserves_prior_month(self, temp_cache):
         """Transitioning months should keep previous month carried IDs."""
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             record_carried_ids("monthly", "2026-01", ["gid-jan-1", "gid-jan-2"])
             prior_key = get_prior_period_key("monthly", "2026-02")
             assert prior_key == "2026-01"
@@ -121,7 +121,7 @@ class TestCacheIntegration:
 
     def test_cleanup_does_not_remove_deleted_tombstones(self, temp_cache):
         """Offered-ID cleanup should not touch tombstones."""
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             record_carried_ids("monthly", "2026-01", ["gid-old"])
             record_deleted_ids("monthly", "2026-01", ["gid-old"])
 
@@ -132,7 +132,7 @@ class TestCacheIntegration:
 
     def test_deleted_goal_not_re_added_across_month_boundary(self, temp_cache):
         """Deleted goal should stay suppressed in later months."""
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             prev_tasks = [_goal("gid-abc", "Goal A", done=False)]
 
             # First February run: goal is offered into current month.
@@ -159,7 +159,7 @@ class TestCacheIntegration:
 
     def test_explicit_readd_clears_tombstone(self, temp_cache):
         """If user re-adds a tombstoned goal, suppression should clear."""
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             record_deleted_ids("monthly", "2026-02", ["gid-abc"])
 
             current_tasks = [_goal("gid-abc", "Goal A", done=False)]
@@ -171,7 +171,7 @@ class TestCacheIntegration:
 
     def test_prune_deleted_ids_respects_monthly_window(self, temp_cache):
         """Monthly tombstones should be bounded to retention window."""
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             keys: list[str] = []
             key: str | None = "2026-12"
             for _ in range(40):
@@ -202,7 +202,7 @@ class TestCacheIntegration:
             ),
             encoding="utf-8",
         )
-        with patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)):
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
             prune_deleted_ids("monthly", "2026-02")
             assert get_deleted_ids("monthly") == set()
 
@@ -221,7 +221,7 @@ class TestCacheIntegration:
         )
 
         with (
-            patch("sync.carried_goals.CARRIED_GOALS_PATH", str(temp_cache)),
+            patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)),
             patch("sync.daily.goals.JOURNAL_DIR", str(journal_dir)),
         ):
             # First run offers goal to 2026-02-06.

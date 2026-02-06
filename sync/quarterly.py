@@ -67,10 +67,10 @@ from sync.period_sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.goals_engine import carry_forward_with_tombstones
+from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.readers.goals import ensure_goal_ids
 
-from sync.base import reconcile_goal_lists, merge_mirror_goals
+from sync.goals.reconcile import reconcile_goal_lists, merge_mirror_goals
 
 logger = get_logger()
 

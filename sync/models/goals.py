@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass, field
 
-from sync.goal_identity import canonical_goal_text
+from sync.goals.identity import canonical_goal_text
 
 
 @dataclass

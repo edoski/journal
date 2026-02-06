@@ -35,23 +35,25 @@ journal/
     monthly.py                # Monthly metrics aggregation
     quarterly.py              # Quarterly metrics aggregation
     yearly.py                 # Yearly metrics aggregation
-    base.py                   # Cross-period goal helpers (piercing + mirror/source reconcile)
+    goals/                    # Goal domain logic (identity, carry-forward, reconcile, reminders)
+      __init__.py             # Goal domain public exports
+      identity.py             # Goal canonicalization + deterministic/random IDs
+      tombstones.py           # Carry-forward offered-ID cache + deleted-goal tombstones
+      carry_forward.py        # Shared carry-forward/tombstone suppression engine
+      state.py                # Bidirectional source/mirror goal state reconciliation cache
+      reconcile.py            # Goal piercing + mirror/source reconciliation helpers
+      reminders.py            # Periodic review and maintenance reminder generation
     period_sections.py        # Shared periodic section assembly helpers (summary/interrupts/training/procrastination/media)
     period_cleanup.py         # Shared cleanup re-sync helper for prior periods
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
     formatting.py             # Value parsing and formatting
     metrics.py                # Period aggregation, moving averages, shared data loaders
-    goal_identity.py          # Shared goal canonicalization + ID helpers
     media_section.py          # MEDIA section orchestration (reader scan + writer render)
     notes_locking.py          # File-locking primitives
     markdown_common.py        # Shared header normalization + section block extraction
     notes_sections.py         # Markdown section extraction/manipulation
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
-    reminders.py              # Periodic review reminder generation
-    carried_goals.py          # Goal carry-forward cache + deleted-goal tombstones
-    goal_sync_state.py        # Bidirectional source/mirror goal state reconciliation cache
-    goals_engine.py           # Shared carry-forward/tombstone suppression engine
     logging.py                # Logging utilities
   utils/                      # Flow database & automation CLI utilities
     flow_db.py                # Shared DB helpers (connection, queries, formatting)
@@ -75,7 +77,7 @@ journal/
   - **`readers/`**: Parsing functions and shared parsing helpers (`common.py`, `daily.py`)
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
-  - **`goal_identity.py`**: Shared goal canonicalization and ID generation helpers
+  - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, reminders)
   - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
   - **`period_sections.py`**: Shared weekly/monthly/quarterly/yearly section assembly helpers
   - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
@@ -194,13 +196,19 @@ sync/
 │   ├── icloud.py       # iCloud status file loading and study times export
 │   └── screen_time.py  # Screen time data loading and procrastination section
 │
+├── goals/            # Goal domain logic
+│   ├── identity.py     # canonical_goal_text + goal ID helpers
+│   ├── tombstones.py   # carried-goal cache + deleted-goal tombstones
+│   ├── carry_forward.py # shared carry-forward/tombstone engine
+│   ├── state.py        # cache-backed source/mirror done-state reconciliation
+│   ├── reconcile.py    # goal piercing + mirror/source reconciliation
+│   └── reminders.py    # periodic review/maintenance reminder generation
+│
 └── [shared modules]
     ├── constants.py    # Configuration values
     ├── dates.py        # Date ranges + period shifting
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation + shared period data loaders
-    ├── goal_identity.py # Shared goal canonicalization + deterministic/random IDs
-    ├── goals_engine.py  # Shared carry-forward/tombstone suppression logic
     ├── media_section.py # MEDIA section orchestration (scan + render composition)
     ├── notes_locking.py # Advisory file locking
     ├── markdown_common.py # Shared markdown header normalization + extract_block
@@ -208,10 +216,7 @@ sync/
     ├── period_sections.py # Shared periodic section assembly helpers
     ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
-    ├── reminders.py    # Review reminder generation
-    ├── logging.py      # Logging utilities
-    ├── goal_sync_state.py # Cache-backed source/mirror done-state reconciliation
-    └── base.py         # Cross-period goal piercing and mirror/source reconciliation
+    └── logging.py      # Logging utilities
 ```
 
 **Data flow**: `markdown → readers → models → writers → markdown`
@@ -254,15 +259,15 @@ sync/
 - `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
 - `period_sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
-- `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
-- `goals_engine.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
+- `goals/identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
+- `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)
-- `base.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
-- `carried_goals.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
-- `goal_sync_state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
+- `goals/reconcile.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
+- `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
+- `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `period_cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
-- `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
+- `goals/reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
 
 ### Dated Goals
 
@@ -276,7 +281,7 @@ Goals support inline deadlines with countdown rendering:
 Periodic maintenance reminders are generated automatically and injected into daily notes:
 - **Restart MacBook**: Every 2 weeks on odd ISO weeks (Sunday). Uses ISO week parity (`week_num % 2 == 1`).
 - Reminders show `— TODAY` on due date, `— LATE +Nd` if uncompleted on subsequent days.
-- Implemented in `sync/reminders.py` via `get_periodic_reminders_for_date()`.
+- Implemented in `sync/goals/reminders.py` via `get_periodic_reminders_for_date()`.
 - Carry-forward logic in `sync/daily/orchestrator.py` ensures persistence.
 
 ### Training Table

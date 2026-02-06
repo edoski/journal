@@ -10,7 +10,7 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR, WEEKLY_TEMPLATE_PATH
-from sync.goals_engine import carry_forward_with_tombstones
+from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.io import safe_read_file, atomic_write_note
 from sync.logging import get_logger
 from sync.models import Goal

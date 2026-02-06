@@ -26,13 +26,13 @@ from sync.notes_sections import (
 )
 
 from sync.formatting import format_minutes
-from sync.reminders import (
+from sync.goals.reminders import (
     get_review_reminders_for_date,
     get_periodic_reminders_for_date,
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.readers.goals import filter_by_proximity
-from sync.base import reconcile_goal_lists, process_pierced_goals
+from sync.goals.reconcile import reconcile_goal_lists, process_pierced_goals
 
 from .constants import TEMPLATE_PATH
 from .flow_db import SessionDict

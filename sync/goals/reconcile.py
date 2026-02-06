@@ -12,7 +12,7 @@ import os
 
 from sync.constants import JOURNAL_DIR
 from sync.io import safe_read_file
-from sync.goal_sync_state import (
+from sync.goals.state import (
     locked_goal_sync_state,
     record_note_state,
     reconcile_pair_with_state,

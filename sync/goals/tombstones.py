@@ -25,7 +25,7 @@ import json
 import os
 from typing import Any
 
-from .constants import CARRIED_GOALS_PATH
+from sync.constants import CARRIED_GOALS_PATH
 
 DELETED_CACHE_KEY = "_deleted"
 # Bounded retention windows for deleted-goal tombstones.

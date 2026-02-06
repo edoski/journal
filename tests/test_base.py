@@ -7,8 +7,8 @@ from __future__ import annotations
 import datetime
 import os
 
-from sync.base import merge_mirror_goals
-from sync.goal_sync_state import (
+from sync.goals.reconcile import merge_mirror_goals
+from sync.goals.state import (
     load_goal_sync_state,
     record_note_state,
     save_goal_sync_state,
@@ -102,7 +102,7 @@ def test_merge_mirror_goals_source_reopen_clears_mirror_when_source_changes(
 
     cache_path = tmp_path / "goal_sync_state.json"
     lock_dir = tmp_path / "locks"
-    monkeypatch.setattr("sync.goal_sync_state.GOAL_SYNC_STATE_PATH", str(cache_path))
+    monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
     monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
 
     # Snapshot says both were previously completed.

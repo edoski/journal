@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import datetime
 
-from sync.goal_identity import generate_goal_id
+from sync.goals.identity import generate_goal_id
 from sync.models import Goal
 
 

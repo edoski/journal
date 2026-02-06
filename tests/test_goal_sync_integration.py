@@ -5,8 +5,8 @@ from __future__ import annotations
 import datetime
 import os
 
-from sync.base import process_pierced_goals, reconcile_goal_lists
-from sync.goal_sync_state import (
+from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
+from sync.goals.state import (
     load_goal_sync_state,
     record_note_state,
     save_goal_sync_state,
@@ -43,7 +43,7 @@ def _seed_pair_state(
 def _patch_sync_state(monkeypatch, tmp_path):
     cache_path = tmp_path / "goal_sync_state.json"
     lock_dir = tmp_path / "locks"
-    monkeypatch.setattr("sync.goal_sync_state.GOAL_SYNC_STATE_PATH", str(cache_path))
+    monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
     monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
 
 

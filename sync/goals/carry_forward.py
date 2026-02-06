@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from sync.carried_goals import (
+from sync.goals.tombstones import (
     cleanup_old_entries,
     get_carried_ids,
     get_deleted_ids,
