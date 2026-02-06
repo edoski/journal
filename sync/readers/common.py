@@ -5,7 +5,7 @@ Shared parsing helpers for markdown reader modules.
 from __future__ import annotations
 
 import re
-from sync.markdown_common import extract_block, normalize_header
+from sync.notes.markdown import extract_block, normalize_header
 
 __all__ = [
     "normalize_header",

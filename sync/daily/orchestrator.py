@@ -15,8 +15,8 @@ from sync.constants import (
     JOURNAL_DIR,
 )
 from sync.logging import get_logger
-from sync.notes_locking import locked_note
-from sync.notes_sections import (
+from sync.notes.locking import locked_note
+from sync.notes.sections import (
     extract_block,
     goals_section_bounds,
     find_header_idx,

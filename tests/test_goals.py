@@ -19,7 +19,7 @@ from sync.writers.goals import (
     render_goal_lines,
     build_goals_block,
 )
-from sync.notes_sections import _find_subheader_idx as find_subheader_idx
+from sync.notes.sections import _find_subheader_idx as find_subheader_idx
 from sync.readers.common import normalize_header as _normalize_header
 
 

@@ -103,7 +103,7 @@ def test_merge_mirror_goals_source_reopen_clears_mirror_when_source_changes(
     cache_path = tmp_path / "goal_sync_state.json"
     lock_dir = tmp_path / "locks"
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     # Snapshot says both were previously completed.
     state = load_goal_sync_state()

@@ -139,7 +139,7 @@ def load_quarterly_goals(
         - lines: Raw lines of quarterly note
     """
     from sync.dates import quarter_of_date, quarter_id
-    from sync.notes_sections import (
+    from sync.notes.sections import (
         ensure_note,
         goals_section_bounds,
         extract_subsection_tasks,

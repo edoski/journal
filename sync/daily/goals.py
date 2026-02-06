@@ -14,8 +14,8 @@ from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.io import safe_read_file, atomic_write_note
 from sync.logging import get_logger
 from sync.models import Goal
-from sync.notes_locking import locked_note
-from sync.notes_sections import (
+from sync.notes.locking import locked_note
+from sync.notes.sections import (
     ensure_note,
     goals_section_bounds,
     extract_subsection_tasks,

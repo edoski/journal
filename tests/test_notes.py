@@ -10,7 +10,7 @@ from sync.readers.daily import (
     parse_study_table,
     parse_sleep_table,
 )
-from sync.notes_sections import (
+from sync.notes.sections import (
     find_header_idx,
     section_bounds,
     subsection_bounds,

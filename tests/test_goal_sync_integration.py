@@ -44,7 +44,7 @@ def _patch_sync_state(monkeypatch, tmp_path):
     cache_path = tmp_path / "goal_sync_state.json"
     lock_dir = tmp_path / "locks"
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
 
 def test_monthly_source_unchecked_clears_weekly_mirror(monkeypatch, tmp_path):

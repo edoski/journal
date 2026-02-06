@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sync.markdown_common import extract_block as _extract_block
-from sync.markdown_common import normalize_header as _normalize_header
+from sync.notes.markdown import extract_block as _extract_block
+from sync.notes.markdown import normalize_header as _normalize_header
 
 if TYPE_CHECKING:
     from sync.models.goals import Goal

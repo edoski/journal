@@ -12,7 +12,7 @@ from sync.metrics import (
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
 )
-from sync.notes_sections import trim_blank_lines
+from sync.notes.sections import trim_blank_lines
 from sync.writers.charts import render_waterfall_chart, wrap_code_block
 from sync.writers.tables import (
     render_interrupts_table,

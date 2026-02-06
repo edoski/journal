@@ -39,7 +39,7 @@ def test_reconcile_pair_source_only_change_wins(monkeypatch, tmp_path):
     mirror.write_text("mirror", encoding="utf-8")
 
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     _seed_pair_state("gid-a", str(source), False, str(mirror), False)
 
@@ -64,7 +64,7 @@ def test_reconcile_pair_mirror_only_change_wins(monkeypatch, tmp_path):
     mirror.write_text("mirror", encoding="utf-8")
 
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     _seed_pair_state("gid-b", str(source), False, str(mirror), False)
 
@@ -89,7 +89,7 @@ def test_reconcile_pair_dual_edit_conflict_uses_newer_mtime(monkeypatch, tmp_pat
     mirror.write_text("mirror", encoding="utf-8")
 
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     _seed_pair_state("gid-c", str(source), False, str(mirror), False)
 
@@ -110,7 +110,7 @@ def test_reconcile_pair_mtime_tie_resolves_to_source(monkeypatch, tmp_path):
     mirror.write_text("mirror", encoding="utf-8")
 
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     _seed_pair_state("gid-d", str(source), False, str(mirror), False)
 
@@ -131,7 +131,7 @@ def test_reconcile_pair_bootstrap_conflict_uses_mtime(monkeypatch, tmp_path):
     mirror.write_text("mirror", encoding="utf-8")
 
     monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
 
     now = datetime.datetime.now().timestamp()
     _set_mtime(str(source), now)

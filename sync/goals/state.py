@@ -12,7 +12,7 @@ from typing import Any
 
 from sync.constants import GOAL_SYNC_STATE_PATH
 from sync.logging import get_logger
-from sync.notes_locking import locked_note
+from sync.notes.locking import locked_note
 
 logger = get_logger()
 

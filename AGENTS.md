@@ -54,9 +54,11 @@ journal/
     formatting.py             # Value parsing and formatting
     metrics.py                # Period aggregation, moving averages, shared data loaders
     media_section.py          # MEDIA section orchestration (reader scan + writer render)
-    notes_locking.py          # File-locking primitives
-    markdown_common.py        # Shared header normalization + section block extraction
-    notes_sections.py         # Markdown section extraction/manipulation
+    notes/                    # Note infrastructure (locking + markdown/section helpers)
+      __init__.py             # Notes package exports
+      locking.py              # File-locking primitives
+      markdown.py             # Shared header normalization + section block extraction
+      sections.py             # Markdown section extraction/manipulation
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     logging.py                # Logging utilities
   utils/                      # Flow database & automation CLI utilities
@@ -219,9 +221,10 @@ sync/
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation + shared period data loaders
     ├── media_section.py # MEDIA section orchestration (scan + render composition)
-    ├── notes_locking.py # Advisory file locking
-    ├── markdown_common.py # Shared markdown header normalization + extract_block
-    ├── notes_sections.py # Markdown section extraction/manipulation
+    ├── notes/
+    │   ├── locking.py    # Advisory file locking
+    │   ├── markdown.py   # Shared markdown header normalization + extract_block
+    │   └── sections.py   # Markdown section extraction/manipulation
     ├── period_sections.py # Shared periodic section assembly helpers
     ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
@@ -268,9 +271,9 @@ sync/
 - `study/db.py`: `get_todays_sessions`, `dedupe_sessions`, `core_data_to_datetime`
 - `study/breaks.py`: expected-break calculation, lunch window shifting, overrun clamping
 - `study/section.py`: STUDY table extraction/building with default activity label normalization (`Study`)
-- `notes_locking.py`: lockfile lifecycle + `locked_note`
-- `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
-- `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
+- `notes/locking.py`: lockfile lifecycle + `locked_note`
+- `notes/markdown.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
+- `notes/sections.py`: header lookup, section bounds, goal splicing, section joining
 - `period_sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
 - `goals/identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)

@@ -14,8 +14,8 @@ from sync.constants import (
     RENDER,
 )
 from sync.io import safe_read_file, atomic_write_note
-from sync.notes_locking import locked_note
-from sync.notes_sections import (
+from sync.notes.locking import locked_note
+from sync.notes.sections import (
     ensure_note,
     replace_metrics_block,
     goals_section_bounds,
