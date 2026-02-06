@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import datetime
 
+from sync.config import PATHS
+
 # External integration identifiers for the Flow app.
 FLOW_APP_DEFAULTS_DOMAIN = "design.yugen.Flow"
 FLOW_PHASE_STUDY = "flow"
@@ -15,7 +17,7 @@ FLOW_BREAK_PHASES = (FLOW_PHASE_SHORT_BREAK, FLOW_PHASE_LONG_BREAK)
 FLOW_BREAK_DEFAULT_KEYS = (FLOW_PHASE_LONG_BREAK, FLOW_PHASE_SHORT_BREAK)
 
 # Flow database path.
-DB_PATH = "/Users/edo/Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite"
+DB_PATH = PATHS.flow_db_path
 
 # CoreData uses an epoch starting at 2001-01-01 instead of 1970-01-01.
 CORE_DATA_EPOCH_OFFSET = 978307200

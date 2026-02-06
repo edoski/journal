@@ -6,20 +6,18 @@ Contains daily-note orchestration paths and context-tracking configuration.
 
 from __future__ import annotations
 
-import os
+from sync.config import PATHS
 
 # iCloud paths for Shortcuts status files
-ICLOUD_SHORTCUTS_DIR = (
-    "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents"
-)
-ICLOUD_JOURNALSYNC_DIR = os.path.join(ICLOUD_SHORTCUTS_DIR, "JournalSync")
+ICLOUD_SHORTCUTS_DIR = PATHS.icloud_shortcuts_dir
+ICLOUD_JOURNALSYNC_DIR = PATHS.icloud_journalsync_dir
 
 # Daily note template path
-TEMPLATE_PATH = "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.md"
+TEMPLATE_PATH = PATHS.daily_template_path
 
 # Cache for training entries so workout/stretch files can arrive in separate
 # runs without losing earlier entries for the same day.
-TRAINING_CACHE_PATH = os.path.expanduser("~/.cache/journal/training_entries.json")
+TRAINING_CACHE_PATH = PATHS.training_cache_path
 
 # Context tracking: directories to exclude from file modification tracking
 # (relative to vault root, with trailing slash for directories)

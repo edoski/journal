@@ -8,9 +8,9 @@ for daily notes. Follows the same caching pattern as training.py.
 from __future__ import annotations
 
 
-import os
 import re
 
+from sync.config import PATHS
 from sync.constants import SCREEN_TIME
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
@@ -23,7 +23,7 @@ from sync.logging import get_logger
 logger = get_logger()
 
 # Cache path for screen time entries (same pattern as training)
-SCREEN_TIME_CACHE_PATH = os.path.expanduser("~/.cache/journal/screen_time_entries.json")
+SCREEN_TIME_CACHE_PATH = PATHS.screen_time_cache_path
 
 
 def parse_duration_string(duration_str: str) -> float:

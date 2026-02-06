@@ -135,26 +135,6 @@ def _find_most_recent_focus(sessions: list[dict]) -> dict | None:
     return None
 
 
-def _find_last_focus_and_break(sessions: list[dict]) -> tuple[dict | None, dict | None]:
-    focus = _find_most_recent_focus(sessions)
-    if not focus:
-        return None, None
-
-    associated_break = None
-    for session in sessions:
-        if session["phase"] not in ("shortBreak", "longBreak"):
-            continue
-        if not session["start"] or not focus["start"]:
-            continue
-        if session["start"] >= focus["start"]:
-            gap = (session["start"] - focus["start"]).total_seconds()
-            if gap <= 120:
-                associated_break = session
-                break
-
-    return focus, associated_break
-
-
 def _delete_session(conn: sqlite3.Connection, pk: int) -> int:
     cur = conn.cursor()
     cur.execute("DELETE FROM ZINTERRUPTION WHERE ZSESSION = ?", (pk,))

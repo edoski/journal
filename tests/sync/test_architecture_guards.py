@@ -221,6 +221,37 @@ def test_period_entrypoints_import_service_and_windows():
     )
 
 
+def test_period_entrypoints_stay_thin():
+    entrypoints = [
+        ROOT / "sync" / "periods" / "weekly.py",
+        ROOT / "sync" / "periods" / "monthly.py",
+        ROOT / "sync" / "periods" / "quarterly.py",
+        ROOT / "sync" / "periods" / "yearly.py",
+    ]
+    violations: list[str] = []
+
+    for path in entrypoints:
+        source = path.read_text(encoding="utf-8")
+        module = _parse_module(path)
+        import_count = sum(
+            1
+            for line in source.splitlines()
+            if line.startswith("import ") or line.startswith("from ")
+        )
+        if import_count > 12:
+            violations.append(f"{path}: import count {import_count} exceeds 12")
+
+        for node in module.body:
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("build_"):
+                violations.append(
+                    f"{path}: entrypoint should not define builder {node.name}"
+                )
+
+    assert not violations, (
+        "Period entrypoints regressed from thin wrappers:\n" + "\n".join(violations)
+    )
+
+
 def test_period_goal_orchestration_lives_in_goal_service():
     period_modules = _iter_python_files("sync/periods")
     service_path = ROOT / "sync" / "application" / "goal_sync_service.py"
@@ -336,6 +367,44 @@ def test_removed_reminder_functions_are_not_referenced():
                 )
     assert not violations, "Removed reminder API references found:\n" + "\n".join(
         violations
+    )
+
+
+def test_no_sessiondict_alias_exists():
+    matches: list[str] = []
+    for path in _iter_python_files("sync", "tui"):
+        module = _parse_module(path)
+        for node in module.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "SessionDict":
+                        matches.append(str(path))
+            elif isinstance(node, ast.AnnAssign):
+                target = node.target
+                if isinstance(target, ast.Name) and target.id == "SessionDict":
+                    matches.append(str(path))
+    assert not matches, "SessionDict aliases are not allowed:\n" + "\n".join(matches)
+
+
+def test_sync_modules_do_not_import_private_symbols_across_modules():
+    violations: list[str] = []
+    for path in _iter_python_files("sync"):
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            mod = node.module or ""
+            if not mod.startswith("sync."):
+                continue
+            for alias in node.names:
+                if alias.name.startswith("_"):
+                    violations.append(
+                        f"{path}: from {mod} import private symbol {alias.name}"
+                    )
+
+    assert not violations, (
+        "Cross-module private imports are not allowed in sync package:\n"
+        + "\n".join(violations)
     )
 
 

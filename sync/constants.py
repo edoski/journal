@@ -7,44 +7,37 @@ symbols for rendering, and chart dimension constants.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
+from sync.config import PATHS
+
 # Directory paths
-JOURNAL_DIR = "/Users/edo/Documents/Obsidian/the-vault/journal"
-VAULT_DIR = "/Users/edo/Documents/Obsidian/the-vault"
-BOOKS_DIR = "/Users/edo/Documents/Obsidian/the-vault/notes/books"
-PODCASTS_DIR = "/Users/edo/Documents/Obsidian/the-vault/notes/podcasts"
+JOURNAL_DIR = PATHS.journal_dir
+VAULT_DIR = PATHS.vault_dir
+BOOKS_DIR = PATHS.books_dir
+PODCASTS_DIR = PATHS.podcasts_dir
 
 # Template paths
-WEEKLY_TEMPLATE_PATH = (
-    "/Users/edo/Documents/Obsidian/the-vault/notes/templates/weekly.md"
-)
-MONTHLY_TEMPLATE_PATH = (
-    "/Users/edo/Documents/Obsidian/the-vault/notes/templates/monthly.md"
-)
-QUARTERLY_TEMPLATE_PATH = (
-    "/Users/edo/Documents/Obsidian/the-vault/notes/templates/quarterly.md"
-)
-YEARLY_TEMPLATE_PATH = (
-    "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md"
-)
+WEEKLY_TEMPLATE_PATH = PATHS.weekly_template_path
+MONTHLY_TEMPLATE_PATH = PATHS.monthly_template_path
+QUARTERLY_TEMPLATE_PATH = PATHS.quarterly_template_path
+YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 
 # Reminder rules markdown path (required, user-managed)
-REMINDERS_PATH = os.path.join(JOURNAL_DIR, "REMINDERS.md")
+REMINDERS_PATH = PATHS.reminders_path
 
 # Lock directory for note writes
-LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
+LOCK_DIR = PATHS.lock_dir
 
 # Cache file for tracking carried-forward goal IDs
-CARRIED_GOALS_PATH = os.path.expanduser("~/.cache/journal/carried_goals.json")
+CARRIED_GOALS_PATH = PATHS.carried_goals_path
 
 # Cache file for bidirectional goal sync state conflict resolution
-GOAL_SYNC_STATE_PATH = os.path.expanduser("~/.cache/journal/goal_sync_state.json")
+GOAL_SYNC_STATE_PATH = PATHS.goal_sync_state_path
 
 # Cache for media dates (podcasts/books) to detect and self-heal corrupted
 # frontmatter dates caused by Obsidian Sync re-triggering Templater.
-MEDIA_CACHE_PATH = os.path.expanduser("~/.cache/journal/media_dates.json")
+MEDIA_CACHE_PATH = PATHS.media_cache_path
 
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
