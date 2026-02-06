@@ -37,6 +37,7 @@ from sync.metrics import (
     compute_period_deltas,
     compute_moving_average,
     load_prior_period_metrics,
+    aggregate_training_type_session_stats,
     aggregate_screen_time,
     group_screen_time_by_percent,
 )
@@ -45,6 +46,7 @@ from sync.writers.tables import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
+    render_training_type_sessions_table,
 )
 from sync.writers.charts import (
     render_bar_chart,
@@ -391,6 +393,9 @@ def build_yearly_metrics(
     training_lines.extend(
         wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block)
     )
+    training_lines.append("")
+    training_stats = aggregate_training_type_session_stats(dates, daily_data)
+    training_lines.extend(render_training_type_sessions_table(training_stats))
     training_lines.append("")
     sections.append(trim_blank_lines(training_lines))
 

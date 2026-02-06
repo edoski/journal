@@ -72,6 +72,8 @@ def test_parse_daily_note_characterization(tmp_path):
         "interrupt_minutes": 10,  # +1h30m is intentionally not parsed here
         "overrun_minutes": 65,
         "planned_break_minutes": 25,
+        "training_type_minutes": {},
+        "training_type_sessions": {},
         "screen_time_totals": {"YouTube": 90.0, "X": 30.0},
     }
 
@@ -99,3 +101,44 @@ def test_parse_study_table_interrupt_hour_format_characterization():
 def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
     missing = tmp_path / "missing.md"
     assert parse_daily_note(str(missing)) is None
+
+
+def test_parse_daily_note_training_type_aggregates(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h",
+            "mood: 7.0",
+            "workout: true",
+            "stretch: true",
+            "meditate: true",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **TRAINING**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+00m` |",
+            "| `18:00 - 18:30` | Stretching | `30m` | `+00m` |",
+            "| `21:00 - 21:15` | Meditation | `15m` | `+00m` |",
+            "| `22:00 - 22:00` | Traditional Strength Training | `` | `+00m` |",
+            "",
+        ],
+    )
+
+    parsed = parse_daily_note(note_path)
+
+    assert parsed is not None
+    assert parsed["training_type_minutes"] == {
+        "Traditional Strength Training": 60.0,
+        "Stretching": 30.0,
+        "Meditation": 15.0,
+    }
+    assert parsed["training_type_sessions"] == {
+        "Traditional Strength Training": 1,
+        "Stretching": 1,
+        "Meditation": 1,
+    }

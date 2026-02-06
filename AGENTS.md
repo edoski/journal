@@ -47,7 +47,7 @@ journal/
     notes_sections.py         # Markdown section extraction/manipulation
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     reminders.py              # Periodic review reminder generation
-    carried_goals.py          # Goal carry-forward cache management
+    carried_goals.py          # Goal carry-forward cache + deleted-goal tombstones
     logging.py                # Logging utilities
   utils/                      # Flow database & automation CLI utilities
     flow_db.py                # Shared DB helpers (connection, queries, formatting)
@@ -59,7 +59,7 @@ journal/
     skip_schedule.json        # Flow skip schedule config
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (454 tests on current branch)
+  tests/                  # Pytest test suite (467 tests on current branch)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -75,7 +75,7 @@ journal/
   - **`media_section.py`**: MEDIA section assembly (scanning + rendering composition)
   - **`period_cleanup.py`**: Shared helper for one-time prior-period cleanup re-sync
 
-- **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids, and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
+- **`sync/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
 
 - **`sync/monthly.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns. Includes **Summary Table** with 3-month moving averages.
 
@@ -223,6 +223,7 @@ sync/
 - `parse_study_table(lines)` → `list[StudySession]`
 - `parse_procrastination_table(lines)` → `DailyScreenTimeData`
 - `parse_daily_note(path)` → `dict | None` (canonical daily aggregate parser)
+  - includes `training_type_minutes` and `training_type_sessions` from daily TRAINING rows
 - Shared helpers: `normalize_header`, `extract_block`, `parse_duration_to_minutes`
 - Dated goals: `resolve_deadline`, `parse_goal_date`, `filter_by_proximity`
 - Piercing: `filter_by_proximity` excludes completed goals from piercing into child periods
@@ -231,6 +232,7 @@ sync/
 - `render_goal_lines(goals, today)` → `list[str]`
 - `render_bar_chart(...)` → `list[str]`
 - `render_summary_table(...)` → `list[str]` (includes TARGET and PROGRESS columns)
+- `render_training_type_sessions_table(...)` → `list[str]`
 - `render_waterfall_chart(...)` → `list[str]` (screen time by app)
 - `render_screen_time_trend_table(...)` → `list[str]`
 - `format_countdown(deadline, today, is_done)` → `str`
@@ -238,12 +240,13 @@ sync/
 **Shared Modules:**
 - `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`, `shift_month`, `shift_quarter`, `previous_month`, `previous_quarter`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
-- `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`
+- `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`, `aggregate_training_type_session_stats`
 - `notes_locking.py`: lockfile lifecycle + `locked_note`
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)
 - `base.py`: `carry_forward_goals`, `propagate_goal_status`, `process_pierced_goals`, `merge_mirror_goals`
+- `carried_goals.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - `period_cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
 - `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
@@ -269,6 +272,11 @@ The training table tracks workout and stretch sessions:
 - **Columns**: START, END, ACTIVITY, DURATION, INTERRUPT
 - **INTERRUPT**: Time elapsed beyond actual workout duration
 - **Visualizations**: Weekly grid (`███`/`░░░`), monthly grid (`■`/`·`), frequency counts
+- **Periodic breakdown table**: Weekly/monthly/quarterly/yearly TRAINING sections append:
+  - **Columns**: `TYPE | SESSIONS | AVERAGE`
+  - **SESSIONS**: Backticked `x/y` where `x` is raw session count and `y` is target count scaled from weekly `IDEAL` targets for the period
+  - **Target mapping**: `meditat*` → mindful target, `stretch*` → stretch target, otherwise workout target
+  - **AVERAGE**: Backticked per-session duration (e.g., `` `58m/session` ``), sorted by highest average first
 
 ### Procrastination Tracking
 
@@ -290,8 +298,9 @@ The summary table includes target tracking and progress visualization:
 - **Ideal targets**:
   - Study: 6h/day (scales by period)
   - Sleep: 8h/night (constant)
-  - Workout: 7/7 days (scales by period)
+  - Workout: 6/7 days (scales by period)
   - Stretch: 7/7 days (scales by period)
+  - Mindful: 7/7 days (scales by period)
   - Mood: 7.0/10.0 (constant)
 - **Pace-based training comparison**: For workout/stretch, CHANGE column compares *completion rates* (count/elapsed days for current period, count/total days for previous period). This answers "What is my current pace vs last period's pace?" and provides meaningful mid-period comparisons. Example: on day 4 of a week, `3/4` (75%) vs `5/7` (71%) → +6%.
 
@@ -306,6 +315,9 @@ The summary table includes target tracking and progress visualization:
   - `python sync/quarterly.py [--quarter YYYY-Q#]`
   - `python sync/yearly.py [--year YYYY]`
 - Goal carry-forward cache: `~/.cache/journal/carried_goals.json`
+  - Stores offered goal IDs per period key (for same-period delete suppression)
+  - Stores deleted-goal tombstones in `_deleted` for cross-period suppression
+  - Tombstones are pruned by period window (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - Training cache: `~/.cache/journal/training_entries.json`
 - Screen time cache: `~/.cache/journal/screen_time_entries.json`
 - **Frontmatter**: Only daily notes may have YAML frontmatter properties.
@@ -366,7 +378,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 454 tests (current branch)
+pytest tests/ -v              # All 459 tests (current branch)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```

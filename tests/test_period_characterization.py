@@ -118,7 +118,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
 
     assert (
         _hash_lines(lines)
-        == "82a2a38e6a0f687c3b2ac7c876f238435ff60904a3a1136fad976e8ec8e4cf25"
+        == "e2323f6d5af610397b43948901a462436ff4a260bcf9f73591852628594ae914"
     )
 
 
@@ -151,7 +151,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
 
     assert (
         _hash_lines(lines)
-        == "33bf6a5935eac76cc545772a4554adbb915db23421c4ff740b9cc8b8294da739"
+        == "e8b34ab4923961b624ce39f1aa2a511a4b5fb00d06a0da5847604a1c27ef9149"
     )
 
 
@@ -184,7 +184,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
 
     assert (
         _hash_lines(lines)
-        == "161a230dad6b0894f5ee9dfce99e2b8f1a17035e364fc0bee0fe03e7e2b44a93"
+        == "683bb9731e815b9d6747bc8b34c5c2e266481c37c05675be6e5f4060d5a8963d"
     )
 
 
@@ -220,5 +220,5 @@ def test_yearly_metrics_block_characterization(monkeypatch):
 
     assert (
         _hash_lines(lines)
-        == "a287ac89142a9373ff92c717ee563e5f17aec2c5fb2f1d45279c02d7b86b1ca5"
+        == "74aa5f6e8e5f8bfad1c337ce5814f4f21bdae5ba9a762706498fff131d22c5fe"
     )

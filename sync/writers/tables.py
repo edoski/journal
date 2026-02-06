@@ -111,6 +111,35 @@ def render_interrupts_table(avg_interrupts: float, avg_overruns: float) -> list[
     return lines
 
 
+def render_training_type_sessions_table(rows: list[dict[str, Any]]) -> list[str]:
+    """
+    Render training type sessions and average duration table.
+
+    Args:
+        rows: List of row dicts with keys type, sessions, target, average_minutes
+
+    Returns:
+        List of markdown table lines.
+    """
+    lines: list[str] = []
+    lines.append("| TYPE | SESSIONS | AVERAGE |")
+    lines.append("| ---- | -------- | ------- |")
+
+    if not rows:
+        lines.append("|  |  |  |")
+        return lines
+
+    for row in rows:
+        label = str(row.get("type") or "").strip()
+        sessions = int(row.get("sessions", 0) or 0)
+        target = int(row.get("target", 0) or 0)
+        avg_minutes = float(row.get("average_minutes", 0.0) or 0.0)
+        avg_label = f"{format_minutes(avg_minutes)}/session"
+        lines.append(f"| **{label}** | `{sessions}/{target}` | `{avg_label}` |")
+
+    return lines
+
+
 def render_summary_table(
     current_metrics: dict[str, Any],
     previous_metrics: dict[str, Any],

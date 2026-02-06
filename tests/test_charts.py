@@ -13,6 +13,7 @@ from sync.writers.tables import (
     render_sleep_stats_table,
     render_activity_table,
     render_interrupts_table,
+    render_training_type_sessions_table,
     render_summary_table,
 )
 from sync.writers.charts import (
@@ -106,6 +107,43 @@ class TestRenderInterruptsTable:
         result = render_interrupts_table(0, 0)
         assert "`0h00m/day`" in result[2]
         assert "`0h00m/day`" in result[3]
+
+
+class TestRenderTrainingTypeSessionsTable:
+    """Tests for render_training_type_sessions_table function."""
+
+    def test_renders_rows(self):
+        rows = [
+            {
+                "type": "Traditional Strength Training",
+                "sessions": 2,
+                "target": 6,
+                "average_minutes": 58.0,
+            },
+            {
+                "type": "Stretching",
+                "sessions": 4,
+                "target": 7,
+                "average_minutes": 17.0,
+            },
+        ]
+
+        result = render_training_type_sessions_table(rows)
+
+        assert result[0] == "| TYPE | SESSIONS | AVERAGE |"
+        assert result[1] == "| ---- | -------- | ------- |"
+        assert (
+            result[2] == "| **Traditional Strength Training** | `2/6` | `58m/session` |"
+        )
+        assert result[3] == "| **Stretching** | `4/7` | `17m/session` |"
+
+    def test_empty_rows(self):
+        result = render_training_type_sessions_table([])
+        assert result == [
+            "| TYPE | SESSIONS | AVERAGE |",
+            "| ---- | -------- | ------- |",
+            "|  |  |  |",
+        ]
 
 
 class TestWrapCodeBlock:

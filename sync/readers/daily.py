@@ -131,6 +131,43 @@ def parse_sleep_table(lines: list[str]) -> list[tuple]:
     return _parse_sleep_table_rows(lines)
 
 
+def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
+    """Parse the TRAINING table into (activity, duration_minutes) rows."""
+    block = extract_block(lines, "### **TRAINING**")
+    if not block:
+        return []
+
+    header_idx = -1
+    for i, line in enumerate(block):
+        if re.search(
+            r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|",
+            line,
+            re.IGNORECASE,
+        ):
+            header_idx = i
+            break
+    if header_idx == -1:
+        return []
+
+    rows: list[tuple[str, float]] = []
+    for line in block[header_idx + 2 :]:
+        if not line.strip().startswith("|"):
+            break
+        if re.search(r"no training sessions", line, re.IGNORECASE):
+            continue
+
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 5:
+            continue
+
+        activity = parts[2].strip("`").strip()
+        duration_min = parse_duration_to_minutes(parts[3], default=0.0) or 0.0
+        if activity and duration_min > 0:
+            rows.append((activity, duration_min))
+
+    return rows
+
+
 def parse_daily_note(path: str) -> dict | None:
     """Parse a daily note file and return extracted aggregate metrics."""
     lines = safe_read_file(path)
@@ -140,6 +177,7 @@ def parse_daily_note(path: str) -> dict | None:
     fm = parse_frontmatter(lines)
     study_rows = parse_study_table(lines)
     sleep_rows = parse_sleep_table(lines)
+    training_rows = _parse_training_table_rows(lines)
 
     sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
     sleep_total = (
@@ -183,6 +221,14 @@ def parse_daily_note(path: str) -> dict | None:
 
     study_total = sum(activity_totals.values())
 
+    training_type_minutes: dict[str, float] = {}
+    training_type_sessions: dict[str, int] = {}
+    for activity, minutes in training_rows:
+        training_type_minutes[activity] = (
+            training_type_minutes.get(activity, 0) + minutes
+        )
+        training_type_sessions[activity] = training_type_sessions.get(activity, 0) + 1
+
     screen_time_data = parse_procrastination_table(lines)
     screen_time_totals: dict[str, float] = {}
     if screen_time_data and screen_time_data.entries:
@@ -204,5 +250,7 @@ def parse_daily_note(path: str) -> dict | None:
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
         "planned_break_minutes": planned_break_total,
+        "training_type_minutes": training_type_minutes,
+        "training_type_sessions": training_type_sessions,
         "screen_time_totals": screen_time_totals,
     }

@@ -13,6 +13,7 @@ from sync.metrics import (
     compute_period_metrics,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
+    aggregate_training_type_session_stats,
     compute_period_deltas,
     load_daily_data_for_dates,
     load_prior_period_metrics,
@@ -240,6 +241,119 @@ class TestComputePeriodDeltas:
     def test_empty_counts(self):
         result = compute_period_deltas([], 10, today=datetime.date(2025, 12, 31))
         assert result == []
+
+
+class TestAggregateTrainingTypeSessionStats:
+    """Tests for aggregate_training_type_session_stats function."""
+
+    def test_aggregates_raw_sessions(self):
+        dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {"Traditional Strength Training": 60.0},
+                "training_type_sessions": {"Traditional Strength Training": 1},
+            },
+            dates[1]: {
+                "training_type_minutes": {"Traditional Strength Training": 90.0},
+                "training_type_sessions": {"Traditional Strength Training": 2},
+            },
+        }
+
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+
+        assert len(rows) == 1
+        assert rows[0]["type"] == "Traditional Strength Training"
+        assert rows[0]["sessions"] == 3
+        assert rows[0]["average_minutes"] == 50.0
+
+    def test_applies_bucket_mapping_for_target_denominator(self):
+        dates = [
+            datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
+        ]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {
+                    "Meditation": 10.0,
+                    "Stretching": 20.0,
+                    "Traditional Strength Training": 60.0,
+                },
+                "training_type_sessions": {
+                    "Meditation": 1,
+                    "Stretching": 1,
+                    "Traditional Strength Training": 1,
+                },
+            }
+        }
+
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+        by_type = {row["type"]: row for row in rows}
+
+        assert by_type["Meditation"]["target"] == 7
+        assert by_type["Stretching"]["target"] == 7
+        assert by_type["Traditional Strength Training"]["target"] == 6
+
+    def test_scales_targets_with_period_days(self):
+        dates = [
+            datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(31)
+        ]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {"Traditional Strength Training": 60.0},
+                "training_type_sessions": {"Traditional Strength Training": 1},
+            }
+        }
+
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+
+        assert len(rows) == 1
+        # round(6 * 31 / 7) = 27
+        assert rows[0]["target"] == 27
+
+    def test_sorts_by_average_desc_then_sessions(self):
+        dates = [
+            datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
+        ]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {
+                    "Zone 2 Run": 40.0,
+                    "Traditional Strength Training": 120.0,
+                    "Yoga": 120.0,
+                },
+                "training_type_sessions": {
+                    "Zone 2 Run": 1,
+                    "Traditional Strength Training": 2,
+                    "Yoga": 3,
+                },
+            }
+        }
+
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+        labels = [row["type"] for row in rows]
+
+        # Averages: Run=40, Strength=60, Yoga=40 => Strength first.
+        # Tie on 40s resolved by sessions desc => Yoga before Run.
+        assert labels == ["Traditional Strength Training", "Yoga", "Zone 2 Run"]
+
+    def test_merges_case_and_whitespace_variants(self):
+        dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {"  Stretching ": 20.0},
+                "training_type_sessions": {"  Stretching ": 1},
+            },
+            dates[1]: {
+                "training_type_minutes": {"stretching": 25.0},
+                "training_type_sessions": {"stretching": 1},
+            },
+        }
+
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+
+        assert len(rows) == 1
+        assert rows[0]["type"] == "Stretching"
+        assert rows[0]["sessions"] == 2
+        assert rows[0]["average_minutes"] == 22.5
 
 
 class TestLoadDailyData:

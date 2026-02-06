@@ -12,7 +12,7 @@ import os
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from .constants import JOURNAL_DIR
+from .constants import IDEAL, JOURNAL_DIR
 from .formatting import compute_percent_change, format_percent_change
 
 
@@ -188,6 +188,98 @@ def aggregate_screen_time(
         for app, minutes in screen_time.items():
             app_totals[app] = app_totals.get(app, 0) + minutes
     return app_totals
+
+
+def _normalize_training_type_label(label: str) -> str:
+    """Normalize a training type label for stable aggregation."""
+    return " ".join(label.split()).strip().casefold()
+
+
+def _target_bucket_for_training_type(normalized_label: str) -> str:
+    """Map a normalized training type label to target bucket."""
+    if "meditat" in normalized_label:
+        return "mindful"
+    if "stretch" in normalized_label:
+        return "stretch"
+    return "workout"
+
+
+def aggregate_training_type_session_stats(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Aggregate periodic training stats by activity type.
+
+    Returns row dicts with:
+      - type: display label (first seen)
+      - sessions: raw session count
+      - target: scaled target denominator for period
+      - average_minutes: average duration per session
+    """
+    per_type: dict[str, dict[str, Any]] = {}
+
+    for d in dates:
+        daily = daily_data.get(d, {})
+        minutes_map = daily.get("training_type_minutes", {})
+        sessions_map = daily.get("training_type_sessions", {})
+        if not minutes_map and not sessions_map:
+            continue
+
+        keys = set(minutes_map.keys()) | set(sessions_map.keys())
+        for raw_label in keys:
+            label = (raw_label or "").strip()
+            norm = _normalize_training_type_label(label)
+            if not norm:
+                continue
+            entry = per_type.setdefault(
+                norm,
+                {"type": label, "sessions": 0, "total_minutes": 0.0},
+            )
+            # Preserve source-case display label from first observed non-empty entry.
+            if not entry.get("type") and label:
+                entry["type"] = label
+            entry["sessions"] += int(sessions_map.get(raw_label, 0) or 0)
+            entry["total_minutes"] += float(minutes_map.get(raw_label, 0.0) or 0.0)
+
+    total_days = len(dates)
+    weeks_in_period = total_days / 7
+    mindful_target = int(round(IDEAL.mindful_days_weekly * weeks_in_period))
+    workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
+    stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
+
+    stats: list[dict[str, Any]] = []
+    for norm, data in per_type.items():
+        sessions = int(data.get("sessions", 0) or 0)
+        total_minutes = float(data.get("total_minutes", 0.0) or 0.0)
+        if sessions <= 0 or total_minutes <= 0:
+            continue
+
+        bucket = _target_bucket_for_training_type(norm)
+        if bucket == "mindful":
+            target = mindful_target
+        elif bucket == "stretch":
+            target = stretch_target
+        else:
+            target = workout_target
+
+        stats.append(
+            {
+                "type": data.get("type") or norm,
+                "sessions": sessions,
+                "target": target,
+                "average_minutes": total_minutes / sessions,
+            }
+        )
+
+    stats.sort(
+        key=lambda row: (
+            -float(row.get("average_minutes") or 0.0),
+            -int(row.get("sessions") or 0),
+            str(row.get("type") or "").casefold(),
+        )
+    )
+    return stats
 
 
 def group_screen_time_by_percent(
