@@ -7,7 +7,10 @@ from __future__ import annotations
 import datetime
 import hashlib
 
-import sync.daily.orchestrator as orchestrator
+import sync.daily.orchestrator.goal_pipeline as goal_pipeline
+import sync.daily.orchestrator.metrics_pipeline as metrics_pipeline
+import sync.daily.orchestrator.note_io as note_io
+import sync.daily.orchestrator.runner as orchestrator
 import sync.daily.goals as daily_goals
 
 
@@ -38,7 +41,7 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
     template_path.write_text("---\nmood: 6.0\n---\n")
 
     monkeypatch.setattr(orchestrator, "JOURNAL_DIR", str(journal_dir))
-    monkeypatch.setattr(orchestrator, "TEMPLATE_PATH", str(template_path))
+    monkeypatch.setattr(note_io, "TEMPLATE_PATH", str(template_path))
 
     monkeypatch.setattr(
         orchestrator,
@@ -46,7 +49,7 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
         lambda _target_date: [],
     )
     monkeypatch.setattr(
-        orchestrator,
+        goal_pipeline,
         "load_weekly_goals",
         lambda _date_obj: (
             [],
@@ -58,13 +61,15 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
             str(journal_dir / "dummy-quarterly.md"),
         ),
     )
-    monkeypatch.setattr(orchestrator, "write_weekly_goals", lambda *_a, **_kw: None)
-    monkeypatch.setattr(orchestrator, "get_review_reminders_for_date", lambda _d: [])
-    monkeypatch.setattr(orchestrator, "get_periodic_reminders_for_date", lambda _d: [])
-    monkeypatch.setattr(orchestrator, "_load_status_file", lambda _name: (False, None))
-    monkeypatch.setattr(orchestrator, "_load_screen_time_data", lambda _today: None)
+    monkeypatch.setattr(goal_pipeline, "write_weekly_goals", lambda *_a, **_kw: None)
+    monkeypatch.setattr(goal_pipeline, "get_review_reminders_for_date", lambda _d: [])
+    monkeypatch.setattr(goal_pipeline, "get_periodic_reminders_for_date", lambda _d: [])
     monkeypatch.setattr(
-        orchestrator, "write_study_times_to_icloud", lambda *_a, **_kw: None
+        metrics_pipeline, "_load_status_file", lambda _name: (False, None)
+    )
+    monkeypatch.setattr(metrics_pipeline, "_load_screen_time_data", lambda _today: None)
+    monkeypatch.setattr(
+        metrics_pipeline, "write_study_times_to_icloud", lambda *_a, **_kw: None
     )
 
     return journal_dir

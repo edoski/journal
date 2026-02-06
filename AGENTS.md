@@ -20,7 +20,13 @@ journal/
       screen_time.py          # Procrastination-table parser
     writers/                  # Rendering functions (render_goal_lines, charts, tables)
     daily/                    # Daily note orchestration (run with: python -m sync.daily)
-      orchestrator.py         # Main update_markdown logic and goal management
+      orchestrator/           # Orchestrator package (runner + focused pipelines)
+        __init__.py           # Re-exports update_markdown
+        runner.py             # Main update_markdown orchestration
+        frontmatter.py        # YAML frontmatter update logic
+        note_io.py            # Daily note read/create + core section guards
+        goal_pipeline.py      # Daily goals synchronization/reconciliation pipeline
+        metrics_pipeline.py   # Metrics section build/splice pipeline
       training.py             # Training/workout/stretch handling
       sleep.py                # Sleep section building
       context.py              # Context tracking for CONTEXT column
@@ -199,7 +205,13 @@ sync/
 │   └── media.py        # render_media_table
 │
 ├── daily/            # Daily note orchestration
-│   ├── orchestrator.py # Main update_markdown logic
+│   ├── orchestrator/
+│   │   ├── __init__.py    # update_markdown re-export
+│   │   ├── runner.py      # main orchestration entrypoint
+│   │   ├── frontmatter.py # YAML frontmatter updates
+│   │   ├── note_io.py     # note read/create + section guards
+│   │   ├── goal_pipeline.py # goals synchronization pipeline
+│   │   └── metrics_pipeline.py # metrics section pipeline
 │   ├── training.py     # Training/workout/stretch handling
 │   ├── sleep.py        # Sleep section building
 │   ├── context.py      # Context tracking
@@ -311,7 +323,7 @@ Periodic maintenance reminders are generated automatically and injected into dai
 - **Restart MacBook**: Every 2 weeks on odd ISO weeks (Sunday). Uses ISO week parity (`week_num % 2 == 1`).
 - Reminders show `— TODAY` on due date, `— LATE +Nd` if uncompleted on subsequent days.
 - Implemented in `sync/goals/reminders.py` via `get_periodic_reminders_for_date()`.
-- Carry-forward logic in `sync/daily/orchestrator.py` ensures persistence.
+- Carry-forward logic in `sync/daily/orchestrator/goal_pipeline.py` ensures persistence.
 
 ### Training Table
 
