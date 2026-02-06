@@ -144,6 +144,7 @@ vulture sync/ --min-confidence 80
 # Testing
 python3 -m pytest tests/ -v          # Run all tests
 python3 -m pytest tests/test_reminders.py -v  # Run specific test file
+python3 -m pytest tests/test_architecture_guards.py -v  # Enforce package/layering guardrails
 ```
 
 ### Configuration Constants

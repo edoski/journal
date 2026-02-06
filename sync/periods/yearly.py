@@ -12,11 +12,8 @@ from sync.constants import (
 )
 from sync.io import safe_read_file
 from sync.notes.sections import (
-    goals_section_bounds,
-    extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
-    splice_goals_section,
 )
 from sync.dates import daterange, year_range
 from sync.formatting import (
@@ -49,7 +46,7 @@ from sync.writers.charts import (
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
 )
-from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.goals import render_goal_lines
 from sync.periods.sections import (
     append_interrupts_table,
     append_media_section,
@@ -58,7 +55,7 @@ from sync.periods.sections import (
     build_procrastination_section,
 )
 from sync.goals.carry_forward import carry_forward_with_tombstones
-from sync.readers.goals import ensure_goal_ids
+from sync.goals.note_store import apply_goals_sections, extract_goals
 from sync.periods.runtime import (
     journal_path,
     open_period_note,
@@ -570,18 +567,22 @@ def main() -> None:
     note_path = resolve_note_path(window.filename, args.file)
 
     with open_period_note(note_path, YEARLY_TEMPLATE_PATH) as lines:
-        g_start, g_end = goals_section_bounds(lines)
-        yearly_tasks = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(window.year))
+        yearly_tasks = extract_goals(
+            lines,
+            "YEARLY",
+            horizon="yearly",
+            period_key=str(window.year),
+        )
 
         prev_tasks = []
         prev_note_path = journal_path(window.previous_filename)
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
-            g_start, g_end = goals_section_bounds(prev_lines)
-            prev_tasks = extract_subsection_tasks(prev_lines, g_start, g_end, "YEARLY")
-            prev_tasks = ensure_goal_ids(
-                prev_tasks, "yearly", str(window.previous_year)
+            prev_tasks = extract_goals(
+                prev_lines,
+                "YEARLY",
+                horizon="yearly",
+                period_key=str(window.previous_year),
             )
 
         yearly_tasks, _ = carry_forward_with_tombstones(
@@ -591,12 +592,11 @@ def main() -> None:
             "yearly",
         )
 
-        new_goals_block = build_goals_block(
-            [
-                ("YEARLY", render_goal_lines(yearly_tasks)),
-            ]
+        lines = apply_goals_sections(
+            lines,
+            [("YEARLY", render_goal_lines(yearly_tasks))],
+            insert_if_missing=True,
         )
-        splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         daily_data = load_daily_data(window.start, window.end)
         prev_daily_data = load_daily_data(window.previous_start, window.previous_end)
