@@ -7,9 +7,11 @@ import json
 import sqlite3
 import subprocess
 import sys
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from sync.adapters.flow_sessions import FlowStudySessionSource
+from sync.contracts.study import StudySessionRecord
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
 SKIP_CONFIG_PATH = Path.home() / ".config" / "journal" / "skip_schedule.json"
@@ -21,6 +23,13 @@ def core_data_to_datetime(timestamp: float | None) -> datetime | None:
     if timestamp is None:
         return None
     return datetime.fromtimestamp(timestamp + CORE_DATA_EPOCH_OFFSET)
+
+
+def datetime_to_core_data(value: datetime | None) -> float | None:
+    """Convert datetime to CoreData timestamp."""
+    if value is None:
+        return None
+    return value.timestamp() - CORE_DATA_EPOCH_OFFSET
 
 
 def get_connection(readonly: bool = True) -> sqlite3.Connection:
@@ -154,21 +163,108 @@ def _delete_session(conn: sqlite3.Connection, pk: int) -> int:
     return deleted_interruptions
 
 
+def _record_to_cli_session(record: StudySessionRecord) -> dict:
+    planned = record.get("planned_duration") or record.get("duration") or 0.0
+    return {
+        "pk": int(record.get("pk", 0) or 0),
+        "phase": "flow",
+        "duration": float(planned),
+        "start": record.get("start"),
+        "completed": record.get("completed_at"),
+        "title": record.get("title") or "",
+        "interruptions_count": int(record.get("interruptions_count", 0) or 0),
+        "interruptions_duration": float(record.get("interruptions_duration", 0) or 0),
+    }
+
+
+def _load_recent_focus_sessions(
+    source: FlowStudySessionSource,
+    *,
+    limit: int,
+    lookback_days: int = 14,
+) -> list[dict]:
+    sessions: list[dict] = []
+    today = date.today()
+
+    for delta_days in range(lookback_days + 1):
+        day = today - timedelta(days=delta_days)
+        try:
+            day_sessions = source.load_sessions(day)
+        except Exception:
+            continue
+        sessions.extend(_record_to_cli_session(item) for item in day_sessions)
+        if len(sessions) >= limit:
+            break
+
+    sessions.sort(
+        key=lambda item: item.get("start") or datetime.min,
+        reverse=True,
+    )
+    return sessions[:limit]
+
+
+def _find_associated_break_session(
+    conn: sqlite3.Connection,
+    focus_session: dict,
+) -> dict | None:
+    focus_start = focus_session.get("start")
+    if not isinstance(focus_start, datetime):
+        return None
+
+    focus_core = datetime_to_core_data(focus_start)
+    if focus_core is None:
+        return None
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE
+        FROM ZSESSION
+        WHERE ZPHASE IN ('shortBreak', 'longBreak')
+          AND ZSTARTEDAT >= ?
+          AND ZSTARTEDAT <= ?
+        ORDER BY ZSTARTEDAT ASC
+        LIMIT 1
+        """,
+        (focus_core, focus_core + 120),
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+
+    pk, phase, duration, started_at, completed_at, title = row
+    return {
+        "pk": pk,
+        "phase": phase,
+        "duration": duration,
+        "start": core_data_to_datetime(started_at),
+        "completed": core_data_to_datetime(completed_at),
+        "title": title,
+    }
+
+
 def cmd_session_preview(args: argparse.Namespace) -> int:
     """Show detailed preview of recent sessions."""
-    try:
-        conn = get_connection(readonly=True)
-    except Exception as exc:
-        print(f"Error: could not open database: {exc}")
-        return 1
+    sessions: list[dict]
+    conn: sqlite3.Connection | None = None
+    session_source = FlowStudySessionSource()
 
-    sessions = get_recent_sessions(conn, limit=50)
-    if not args.all_phases:
-        sessions = [s for s in sessions if s["phase"] == "flow"]
+    if args.all_phases:
+        try:
+            conn = get_connection(readonly=True)
+        except Exception as exc:
+            print(f"Error: could not open database: {exc}")
+            return 1
+        sessions = get_recent_sessions(conn, limit=50)
+    else:
+        sessions = _load_recent_focus_sessions(
+            session_source, limit=max(50, args.count)
+        )
 
     if not sessions:
         print("No sessions found.")
-        conn.close()
+        if conn is not None:
+            conn.close()
         return 0
 
     sessions = sessions[: args.count]
@@ -193,29 +289,36 @@ def cmd_session_preview(args: argparse.Namespace) -> int:
                 diff = actual - session["duration"]
                 print(f"  Δ:        {diff:+.1f} min")
 
-        interruptions = get_interruptions_for_session(conn, session["pk"])
-        if interruptions:
-            total = sum(i["duration"] or 0 for i in interruptions)
-            print(f"  Interruptions: {len(interruptions)} ({total:.1f} min)")
+        if args.all_phases and conn is not None:
+            interruptions = get_interruptions_for_session(conn, session["pk"])
+            if interruptions:
+                total = sum(i["duration"] or 0 for i in interruptions)
+                print(f"  Interruptions: {len(interruptions)} ({total:.1f} min)")
+        else:
+            count = session.get("interruptions_count", 0) or 0
+            duration = (session.get("interruptions_duration", 0) or 0) / 60
+            if count:
+                print(f"  Interruptions: {count} ({duration:.1f} min)")
 
-    conn.close()
+    if conn is not None:
+        conn.close()
     return 0
 
 
 def cmd_rename_session(args: argparse.Namespace) -> int:
     """Rename most recent focus session."""
+    session_source = FlowStudySessionSource()
+    sessions = _load_recent_focus_sessions(session_source, limit=10)
+    focus = _find_most_recent_focus(sessions)
+    if not focus:
+        print("No focus session found to rename.")
+        return 0
+
     try:
         conn = get_connection(readonly=not args.confirm)
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
-
-    sessions = get_recent_sessions(conn, limit=10)
-    focus = _find_most_recent_focus(sessions)
-    if not focus:
-        print("No focus session found to rename.")
-        conn.close()
-        return 0
 
     print("=" * 60)
     print("SESSION TO BE RENAMED")
@@ -241,18 +344,20 @@ def cmd_rename_session(args: argparse.Namespace) -> int:
 
 def cmd_undo_last_session(args: argparse.Namespace) -> int:
     """Delete most recent focus session and adjacent break."""
+    session_source = FlowStudySessionSource()
+    sessions = _load_recent_focus_sessions(session_source, limit=10)
+    focus = _find_most_recent_focus(sessions)
+    if not focus:
+        print("No focus session found to delete.")
+        return 0
+
     try:
         conn = get_connection(readonly=not args.confirm)
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
 
-    sessions = get_recent_sessions(conn, limit=10)
-    focus, brk = _find_last_focus_and_break(sessions)
-    if not focus:
-        print("No focus session found to delete.")
-        conn.close()
-        return 0
+    brk = _find_associated_break_session(conn, focus)
 
     print("=" * 60)
     print("SESSIONS TO DELETE")

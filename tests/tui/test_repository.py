@@ -5,42 +5,42 @@ import datetime
 import tui.data.repository as repository
 
 
-def test_query_by_metric_matches_period_snapshot(monkeypatch):
-    repo = repository.QueryRepository()
+class _StubQueryService:
+    def __init__(self) -> None:
+        self.shift_calls = []
 
-    monkeypatch.setattr(
-        repository,
-        "load_daily_data_for_dates",
-        lambda _dates: {
-            datetime.date(2026, 2, 1): {
-                "training_type_sessions": {"Workout": 2},
-            }
-        },
-    )
-    monkeypatch.setattr(
-        repository,
-        "compute_period_metrics",
-        lambda _dates, _data: {
-            "study_total_minutes": 300,
-            "sleep_avg_minutes": 480,
-            "mood_avg": 7.2,
-            "workout_count": 4,
-            "stretch_count": 5,
-            "mindful_count": 6,
-            "total_days": 7,
-            "days_up_to_today": 7,
-        },
-    )
-    monkeypatch.setattr(
-        repository,
-        "aggregate_interrupt_overrun",
-        lambda _dates, _data: (12.0, 8.0, 1),
-    )
-    monkeypatch.setattr(
-        repository,
-        "aggregate_screen_time",
-        lambda _dates, _data: {"YouTube": 30.0, "X": 15.0},
-    )
+    def list_daily_dates(self):
+        return [datetime.date(2026, 2, 1)]
+
+    def period_bounds(self, period, anchor_date):
+        _ = period, anchor_date
+        return (
+            datetime.date(2026, 2, 1),
+            datetime.date(2026, 2, 7),
+            "2026-W05",
+        )
+
+    def shift_anchor(self, period, anchor_date, delta):
+        self.shift_calls.append((period, anchor_date, delta))
+        return anchor_date + datetime.timedelta(days=delta)
+
+    def query_by_period(self, period, anchor_date):
+        _ = period, anchor_date
+        return repository.PeriodSnapshot(
+            period="week",
+            start=datetime.date(2026, 2, 1),
+            end=datetime.date(2026, 2, 7),
+            label="2026-W05",
+            metrics={"study_minutes": 300, "training_sessions_total": 2},
+        )
+
+    def query_by_metric(self, metric, period, anchor_date):
+        snapshot = self.query_by_period(period, anchor_date)
+        return snapshot, snapshot.metrics.get(metric)
+
+
+def test_query_by_metric_matches_period_snapshot():
+    repo = repository.QueryRepository(_StubQueryService())
 
     anchor = datetime.date(2026, 2, 1)
     snapshot = repo.query_by_period("week", anchor)
@@ -53,12 +53,12 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
     assert snapshot.metrics["training_sessions_total"] == 2
 
 
-def test_shift_anchor_supports_all_periods():
-    repo = repository.QueryRepository()
+def test_shift_anchor_delegates_to_query_service():
+    service = _StubQueryService()
+    repo = repository.QueryRepository(service)
     anchor = datetime.date(2026, 2, 6)
 
-    assert repo.shift_anchor("day", anchor, 1) == datetime.date(2026, 2, 7)
-    assert repo.shift_anchor("week", anchor, -1) == datetime.date(2026, 1, 30)
-    assert repo.shift_anchor("month", anchor, 1) == datetime.date(2026, 3, 1)
-    assert repo.shift_anchor("quarter", anchor, 1) == datetime.date(2026, 4, 1)
-    assert repo.shift_anchor("year", anchor, 1) == datetime.date(2027, 1, 1)
+    shifted = repo.shift_anchor("day", anchor, 1)
+
+    assert shifted == datetime.date(2026, 2, 7)
+    assert service.shift_calls == [("day", anchor, 1)]

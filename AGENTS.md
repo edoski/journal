@@ -35,6 +35,7 @@ journal/
       daily_sync_service.py   # Daily note sync service (replaces pipeline orchestration)
       goal_sync_service.py    # Canonical goal synchronization (daily + period flows)
       period_sync_service.py  # Weekly/monthly/quarterly/yearly sync service over ports/contracts
+      query_service.py        # Read-only period/metric query service for TUI/CLI consumers
     study/                    # Study ingestion domain (Flow DB + breaks + STUDY section)
       __init__.py             # Study domain exports
       constants.py            # Flow integration constants + break window config
@@ -124,6 +125,8 @@ journal/
   - `python3 -m tui.cli undo-last-session [--confirm]`: Delete most recent focus session (+ break)
   - `python3 -m tui.cli skip-now`: Execute skip automation immediately (uses config)
   - `python3 -m tui.cli skip-toggle [on|off]`: Toggle skip automation state
+  - TUI query surfaces are powered by `sync.application.query_service.QueryService` (wired in `tui/app.py`)
+  - CLI Flow-session reads use `sync.adapters.flow_sessions.FlowStudySessionSource` (wired in `tui/cli.py`)
 
 ### Linting & Testing
 
@@ -541,3 +544,7 @@ Validate:
 Goal service boundary:
 - `sync.application.goal_sync_service.GoalSyncService` owns all daily/weekly/monthly/quarterly/yearly goal orchestration (carry-forward, mirror sync, pierced-goal reconciliation, and source propagation)
 - `DailySyncService` and `PeriodSyncService` delegate goal flows to `GoalSyncService` rather than performing goal orchestration directly
+
+Query service boundary:
+- `sync.application.query_service.QueryService` owns period bounds, anchor shifts, and aggregate metric snapshots for period/metric exploration
+- `tui/data/repository.py` is a thin delegation layer over an injected query service instance
