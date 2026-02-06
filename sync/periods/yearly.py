@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import datetime
-from dataclasses import replace
 
 from sync.logging import get_logger
 
@@ -58,6 +57,7 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.readers.goals import ensure_goal_ids
 from sync.periods.runtime import (
     journal_path,
@@ -584,13 +584,12 @@ def main() -> None:
                 prev_tasks, "yearly", str(window.previous_year)
             )
 
-        open_prev = [t for t in prev_tasks if not t.done]
-        existing_ids = {t.id for t in yearly_tasks if t.id}
-        for t in open_prev:
-            if t.id in existing_ids:
-                continue
-            yearly_tasks.append(replace(t, done=False))
-            existing_ids.add(t.id)
+        yearly_tasks, _ = carry_forward_with_tombstones(
+            prev_tasks,
+            yearly_tasks,
+            str(window.year),
+            "yearly",
+        )
 
         new_goals_block = build_goals_block(
             [

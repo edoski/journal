@@ -325,7 +325,7 @@ sync/
 - `goals/reconcile.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `goals/note_store.py`: `extract_goals`, `render_goals_or_empty`, `apply_goals_sections`, `write_goals_sections`
 - `goals/period_pipeline.py`: typed configs for carry-forward/mirror/piercing/source-write flows used by period sync entrypoints
-- `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
+- `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`, `yearly=12`)
 - `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `periods/cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
@@ -397,7 +397,7 @@ The summary table includes target tracking and progress visualization:
 - Goal carry-forward cache: `~/.cache/journal/carried_goals.json`
   - Stores offered goal IDs per period key (for same-period delete suppression)
   - Stores deleted-goal tombstones in `_deleted` for cross-period suppression
-  - Tombstones are pruned by period window (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
+  - Tombstones are pruned by period window (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`, `yearly=12`)
 - Goal sync reconciliation cache: `~/.cache/journal/goal_sync_state.json`
   - Stores per-goal per-note done snapshots for bidirectional reopen/completion sync across mirrors
   - Conflict rule: source-only change wins, mirror-only change wins, dual-edit uses newer note mtime (source on ties)

@@ -89,9 +89,12 @@ class TestGetPriorPeriodKey:
         """Test quarterly across year boundary."""
         assert get_prior_period_key("quarterly", "2026-Q1") == "2025-Q4"
 
+    def test_yearly_simple(self):
+        """Test yearly period subtraction."""
+        assert get_prior_period_key("yearly", "2026") == "2025"
+
     def test_unknown_period_type(self):
         """Test unknown period type returns None."""
-        assert get_prior_period_key("yearly", "2026") is None
         assert get_prior_period_key("unknown", "something") is None
 
     def test_invalid_period_key_returns_none(self):
@@ -157,6 +160,30 @@ class TestCacheIntegration:
             assert added == 0
             assert march_tasks == []
 
+    def test_deleted_goal_not_re_added_across_year_boundary(self, temp_cache):
+        """Deleted yearly goal should stay suppressed in later years."""
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
+            prev_tasks = [_goal("gid-yearly", "Year Goal", done=False)]
+
+            current_tasks, added = carry_forward_with_tombstones(
+                prev_tasks, [], "2026", "yearly"
+            )
+            assert added == 1
+            assert {g.id for g in current_tasks} == {"gid-yearly"}
+
+            deleted_view, added = carry_forward_with_tombstones(
+                prev_tasks, [], "2026", "yearly"
+            )
+            assert added == 0
+            assert deleted_view == []
+            assert get_deleted_ids("yearly") == {"gid-yearly"}
+
+            next_year_tasks, added = carry_forward_with_tombstones(
+                prev_tasks, [], "2027", "yearly"
+            )
+            assert added == 0
+            assert next_year_tasks == []
+
     def test_explicit_readd_clears_tombstone(self, temp_cache):
         """If user re-adds a tombstoned goal, suppression should clear."""
         with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
@@ -168,6 +195,18 @@ class TestCacheIntegration:
             )
 
             assert get_deleted_ids("monthly") == set()
+
+    def test_yearly_explicit_readd_clears_tombstone(self, temp_cache):
+        """If user re-adds a yearly tombstoned goal, suppression should clear."""
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
+            record_deleted_ids("yearly", "2026", ["gid-yearly"])
+
+            current_tasks = [_goal("gid-yearly", "Year Goal", done=False)]
+            carry_forward_with_tombstones(
+                [_goal("gid-yearly", "Year Goal")], current_tasks, "2027", "yearly"
+            )
+
+            assert get_deleted_ids("yearly") == set()
 
     def test_prune_deleted_ids_respects_monthly_window(self, temp_cache):
         """Monthly tombstones should be bounded to retention window."""
@@ -190,6 +229,21 @@ class TestCacheIntegration:
             assert isinstance(deleted, dict)
             assert len(deleted) == 36
             assert set(deleted.values()) == set(keys[:36])
+
+    def test_prune_deleted_ids_respects_yearly_window(self, temp_cache):
+        """Yearly tombstones should be bounded to retention window."""
+        with patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)):
+            keys = [str(year) for year in range(2026, 2010, -1)]
+            for idx, period_key in enumerate(keys):
+                record_deleted_ids("yearly", period_key, [f"gid-y{idx:04d}"])
+
+            prune_deleted_ids("yearly", "2026")
+
+            payload = json.loads(temp_cache.read_text(encoding="utf-8"))
+            deleted = payload.get("_deleted", {}).get("yearly", {})
+            assert isinstance(deleted, dict)
+            assert len(deleted) == 12
+            assert set(deleted.values()) == set(keys[:12])
 
     def test_prune_deleted_ids_handles_legacy_shape(self, temp_cache):
         """Malformed legacy tombstone cache should fail safe."""

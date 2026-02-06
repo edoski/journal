@@ -10,11 +10,13 @@ Cache structure:
     "weekly": {"2025-W52": ["gid-def456", ...]},
     "monthly": {"2025-12": ["gid-ghi789", ...]},
     "quarterly": {"2025-Q4": ["gid-jkl012", ...]},
+    "yearly": {"2025": ["gid-mno345", ...]},
     "_deleted": {
         "daily": {"gid-aaa111": "2026-02-06", ...},
         "weekly": {"gid-bbb222": "2026-W06", ...},
         "monthly": {"gid-ccc333": "2026-02", ...},
-        "quarterly": {"gid-ddd444": "2026-Q1", ...}
+        "quarterly": {"gid-ddd444": "2026-Q1", ...},
+        "yearly": {"gid-eee555": "2026", ...}
     }
 }
 """
@@ -34,6 +36,7 @@ DELETED_RETENTION_PERIODS = {
     "weekly": 52,
     "monthly": 36,
     "quarterly": 20,
+    "yearly": 12,
 }
 
 
@@ -45,7 +48,7 @@ def get_prior_period_key(period_type: str, current_key: str) -> str | None:
     so that carry-forward can check if goals were already offered.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         current_key: Current period identifier (e.g., "2026-02", "2026-W06")
 
     Returns:
@@ -81,6 +84,11 @@ def get_prior_period_key(period_type: str, current_key: str) -> str | None:
             if quarter == 1:
                 return f"{year - 1}-Q4"
             return f"{year}-Q{quarter - 1}"
+
+        elif period_type == "yearly":
+            # Parse YYYY, subtract 1 year
+            year = int(current_key)
+            return str(year - 1)
     except (IndexError, ValueError):
         return None
 
@@ -174,7 +182,7 @@ def get_carried_ids(period_type: str, period_key: str) -> set[str]:
     Get goal IDs that have been offered for carry forward to this period.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         period_key: Period identifier (e.g., "2025-12-29", "2025-W52")
 
     Returns:
@@ -190,7 +198,7 @@ def record_carried_ids(period_type: str, period_key: str, goal_ids: list[str]) -
     Record goal IDs that have been offered for carry forward.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         period_key: Period identifier (e.g., "2025-12-29", "2025-W52")
         goal_ids: List of goal IDs that were offered
     """
@@ -214,7 +222,7 @@ def get_deleted_ids(period_type: str) -> set[str]:
     Get goal IDs tombstoned as intentionally deleted for the given horizon.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
 
     Returns:
         Set of goal IDs currently suppressed from re-adding
@@ -229,7 +237,7 @@ def record_deleted_ids(period_type: str, period_key: str, goal_ids: list[str]) -
     Record intentionally deleted goal IDs as tombstones for this horizon.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         period_key: Current period key when deletion was observed
         goal_ids: Goal IDs intentionally removed by the user
     """
@@ -256,7 +264,7 @@ def remove_deleted_ids(period_type: str, goal_ids: list[str]) -> None:
     Remove goal IDs from tombstones (e.g., explicit user re-add).
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         goal_ids: Goal IDs to un-suppress
     """
     if not goal_ids:
@@ -286,7 +294,7 @@ def prune_deleted_ids(period_type: str, current_key: str) -> None:
     Prune deleted-goal tombstones for a horizon to a bounded retention window.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         current_key: Current period key used as retention anchor
     """
     retention = DELETED_RETENTION_PERIODS.get(period_type)
@@ -321,7 +329,7 @@ def cleanup_old_entries(period_type: str, keep_keys: list[str]) -> None:
     Remove old entries from the cache to prevent unbounded growth.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
         keep_keys: Period keys to keep (remove all others)
     """
     cache = _load_cache()
