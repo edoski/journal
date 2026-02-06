@@ -35,7 +35,7 @@ journal/
     monthly.py                # Monthly metrics aggregation
     quarterly.py              # Quarterly metrics aggregation
     yearly.py                 # Yearly metrics aggregation
-    base.py                   # Cross-period goal helpers (carry-forward, piercing, mirror merge)
+    base.py                   # Cross-period goal helpers (carry-forward, piercing, mirror/source reconcile)
     period_cleanup.py         # Shared cleanup re-sync helper for prior periods
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
@@ -48,6 +48,7 @@ journal/
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     reminders.py              # Periodic review reminder generation
     carried_goals.py          # Goal carry-forward cache + deleted-goal tombstones
+    goal_sync_state.py        # Bidirectional source/mirror goal state reconciliation cache
     logging.py                # Logging utilities
   utils/                      # Flow database & automation CLI utilities
     flow_db.py                # Shared DB helpers (connection, queries, formatting)
@@ -59,7 +60,7 @@ journal/
     skip_schedule.json        # Flow skip schedule config
   sync_all.sh             # Wrapper script that runs all syncs
   AGENTS.md               # This file
-  tests/                  # Pytest test suite (467 tests on current branch)
+  tests/                  # Pytest test suite (478 tests on current branch)
     test_*.py             # Tests for all sync modules
   __pycache__/            # Generated Python bytecode; safe to ignore
 ```
@@ -202,7 +203,8 @@ sync/
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
     ├── reminders.py    # Review reminder generation
     ├── logging.py      # Logging utilities
-    └── base.py         # Cross-period goal/piercing/mirror helpers
+    ├── goal_sync_state.py # Cache-backed source/mirror done-state reconciliation
+    └── base.py         # Cross-period goal carry-forward, piercing, and mirror/source reconciliation
 ```
 
 **Data flow**: `markdown → readers → models → writers → markdown`
@@ -245,8 +247,9 @@ sync/
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)
-- `base.py`: `carry_forward_goals`, `propagate_goal_status`, `process_pierced_goals`, `merge_mirror_goals`
+- `base.py`: `carry_forward_goals`, `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `carried_goals.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
+- `goal_sync_state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `period_cleanup.py`: `resync_if_marker`
 - `io.py`: `safe_read_file`, `atomic_write_note`, `safe_load_json`, `safe_save_json`, `safe_load_dated_cache`
 - `reminders.py`: `get_review_reminders_for_date` (weekly/monthly/yearly reviews), `get_periodic_reminders_for_date` (bi-weekly maintenance reminders)
@@ -318,6 +321,9 @@ The summary table includes target tracking and progress visualization:
   - Stores offered goal IDs per period key (for same-period delete suppression)
   - Stores deleted-goal tombstones in `_deleted` for cross-period suppression
   - Tombstones are pruned by period window (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
+- Goal sync reconciliation cache: `~/.cache/journal/goal_sync_state.json`
+  - Stores per-goal per-note done snapshots for bidirectional reopen/completion sync across mirrors
+  - Conflict rule: source-only change wins, mirror-only change wins, dual-edit uses newer note mtime (source on ties)
 - Training cache: `~/.cache/journal/training_entries.json`
 - Screen time cache: `~/.cache/journal/screen_time_entries.json`
 - **Frontmatter**: Only daily notes may have YAML frontmatter properties.
@@ -378,7 +384,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 467 tests (current branch)
+pytest tests/ -v              # All 478 tests (current branch)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```

@@ -67,9 +67,9 @@ from sync.writers.charts import (
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.media_section import build_media_section
-from sync.readers.goals import filter_by_proximity, ensure_goal_ids
+from sync.readers.goals import ensure_goal_ids
 
-from sync.base import carry_forward_goals, propagate_goal_status
+from sync.base import carry_forward_goals, reconcile_goal_lists, merge_mirror_goals
 
 logger = get_logger()
 
@@ -574,8 +574,13 @@ def main() -> None:
             yearly_lines = []
         yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(year))
 
-        # Propagate completed YEARLY goals from quarterly mirror back to the yearly source.
-        yearly_changed = propagate_goal_status(yearly_tasks, yearly_mirror)
+        # Reconcile YEARLY source <-> QUARTERLY YEARLY-mirror state.
+        yearly_tasks, yearly_mirror, yearly_changed, _ = reconcile_goal_lists(
+            yearly_tasks,
+            yearly_mirror,
+            yearly_path,
+            note_path,
+        )
 
         if yearly_changed:
             with locked_note(yearly_path):
@@ -591,9 +596,15 @@ def main() -> None:
                 atomic_write_note(yearly_path, yearly_lines)
 
         # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
-        # Filter yearly tasks to only show those with deadlines within 365 days (or no deadline).
         today = datetime.date.today()
-        filtered_yearly = filter_by_proximity(yearly_tasks, 365, today)
+        filtered_yearly = merge_mirror_goals(
+            yearly_mirror,
+            yearly_tasks,
+            proximity_days=365,
+            today=today,
+            source_path=yearly_path,
+            mirror_path=note_path,
+        )
         yearly_lines_block = (
             render_goal_lines(filtered_yearly, today=today)
             if filtered_yearly

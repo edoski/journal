@@ -10,7 +10,6 @@ from __future__ import annotations
 import datetime
 import os
 from collections import OrderedDict
-from dataclasses import replace
 
 from sync.constants import (
     JOURNAL_DIR,
@@ -33,8 +32,7 @@ from sync.reminders import (
 )
 from sync.writers.goals import render_goal_lines, build_goals_block
 from sync.readers.goals import filter_by_proximity
-from sync.models.goals import Goal
-from sync.base import propagate_goal_status, process_pierced_goals
+from sync.base import reconcile_goal_lists, process_pierced_goals
 
 from .constants import TEMPLATE_PATH
 from .flow_db import SessionDict
@@ -339,34 +337,24 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
             existing_daily_tasks.append(reminder)
             existing_ids.add(reminder.id)
 
-    # Load weekly goals (and monthly/quarterly/yearly for piercing) and propagate status changes.
-    weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, weekly_path = (
-        load_weekly_goals(today)
+    # Load weekly goals (and monthly/quarterly/yearly sources used for piercing).
+    (
+        weekly_tasks,
+        monthly_tasks,
+        quarterly_tasks,
+        yearly_tasks,
+        weekly_path,
+        monthly_path,
+        quarterly_path,
+    ) = load_weekly_goals(today)
+
+    # Reconcile WEEKLY source <-> DAILY WEEKLY-mirror state.
+    updated_weekly_tasks, _, weekly_changed, _ = reconcile_goal_lists(
+        weekly_tasks,
+        existing_weekly_tasks,
+        weekly_path,
+        file_path,
     )
-    updated_weekly_tasks: list[Goal] = []
-    daily_weekly_lookup = {t.canonical: t for t in existing_weekly_tasks}
-    for task in weekly_tasks:
-        canon = task.canonical
-        mirror = daily_weekly_lookup.get(canon)
-        done = task.done
-        if mirror:
-            if mirror.done and not done:
-                done = True  # done wins
-        updated = replace(task, done=done)
-        updated_weekly_tasks.append(updated)
-
-    # Propagate status changes from pierced goals in DAILY back to their sources
-    # (handled by propagate_goal_status in weekly.py on next sync)
-    monthly_changed = propagate_goal_status(monthly_tasks, existing_daily_tasks)
-    quarterly_changed = propagate_goal_status(quarterly_tasks, existing_daily_tasks)
-    yearly_changed = propagate_goal_status(yearly_tasks, existing_daily_tasks)
-
-    # Write back weekly note if statuses changed.
-    weekly_changed = updated_weekly_tasks != weekly_tasks
-    if weekly_changed or monthly_changed or quarterly_changed or yearly_changed:
-        write_weekly_goals(
-            today, updated_weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks
-        )
 
     # Rebuild Goals block with WEEKLY mirror then DAILY goals.
     # Filter weekly tasks to only show those with deadlines within 7 days (or no deadline).
@@ -390,7 +378,22 @@ def update_markdown(sessions: list[SessionDict]) -> bool | None:
         source_goal_lists=[monthly_tasks, quarterly_tasks, yearly_tasks],
         proximity_days=7,
         today=today,
+        note_path=file_path,
+        source_paths=[monthly_path, quarterly_path, quarterly_path],
     )
+    monthly_changed = updated_monthly != monthly_tasks
+    quarterly_changed = updated_quarterly != quarterly_tasks
+    yearly_changed = updated_yearly != yearly_tasks
+
+    # Write back weekly/monthly/quarterly files if status reconciliation changed them.
+    if weekly_changed or monthly_changed or quarterly_changed or yearly_changed:
+        write_weekly_goals(
+            today,
+            updated_weekly_tasks,
+            updated_monthly if monthly_changed else None,
+            updated_quarterly if quarterly_changed else None,
+            updated_yearly if yearly_changed else None,
+        )
 
     # Render: original daily goals + final pierced goals (with countdown)
     daily_source_lines = render_goal_lines(original_daily, today=today)

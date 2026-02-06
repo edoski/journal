@@ -48,7 +48,15 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
     monkeypatch.setattr(
         orchestrator,
         "load_weekly_goals",
-        lambda _date_obj: ([], [], [], [], str(journal_dir / "dummy-weekly.md")),
+        lambda _date_obj: (
+            [],
+            [],
+            [],
+            [],
+            str(journal_dir / "dummy-weekly.md"),
+            str(journal_dir / "dummy-monthly.md"),
+            str(journal_dir / "dummy-quarterly.md"),
+        ),
     )
     monkeypatch.setattr(orchestrator, "write_weekly_goals", lambda *_a, **_kw: None)
     monkeypatch.setattr(orchestrator, "get_review_reminders_for_date", lambda _d: [])

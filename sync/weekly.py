@@ -56,8 +56,8 @@ from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
     carry_forward_goals,
-    propagate_goal_status,
     load_quarterly_goals,
+    reconcile_goal_lists,
     merge_mirror_goals,
     process_pierced_goals,
 )
@@ -360,8 +360,8 @@ def main() -> None:
 
     # Determine month note for the target week (use week_start's month).
     month_start = datetime.date(week_start.year, week_start.month, 1)
-    monthly_tasks, quarterly_mirror, monthly_path, monthly_lines = _load_monthly_goals(
-        month_start
+    monthly_tasks, _quarterly_mirror, monthly_path, _monthly_lines = (
+        _load_monthly_goals(month_start)
     )
 
     # Load quarterly note to get yearly goals for piercing
@@ -434,41 +434,29 @@ def main() -> None:
             prev_week_tasks, weekly_tasks, week_key, "weekly"
         )
 
-        # Propagate status changes from weekly mirrors to sources
-        monthly_changed = propagate_goal_status(monthly_tasks, monthly_mirror)
-        # Propagate quarterly/yearly status from pierced goals in WEEKLY to their sources
-        quarterly_changed = propagate_goal_status(quarterly_tasks, weekly_tasks)
-        yearly_changed = propagate_goal_status(yearly_mirror, weekly_tasks)
+        # Reconcile MONTHLY source <-> WEEKLY MONTHLY-mirror state.
+        monthly_tasks, monthly_mirror, monthly_changed, _ = reconcile_goal_lists(
+            monthly_tasks,
+            monthly_mirror,
+            monthly_path,
+            note_path,
+        )
 
         if monthly_changed:
             with locked_note(monthly_path):
                 monthly_lines = safe_read_file(monthly_path) or []
                 _write_monthly_goals(monthly_path, monthly_tasks, monthly_lines)
 
-        # Write back quarterly note if quarterly or yearly status changed
-        if quarterly_changed or yearly_changed:
-            from sync.writers.goals import build_goals_block as bg
-
-            with locked_note(quarterly_path):
-                quarterly_lines = safe_read_file(quarterly_path) or []
-                new_q_block = bg(
-                    [
-                        ("YEARLY", render_goal_lines(yearly_mirror)),
-                        ("QUARTERLY", render_goal_lines(quarterly_tasks)),
-                    ]
-                )
-                splice_goals_section(
-                    quarterly_lines, new_q_block, insert_if_missing=True
-                )
-                atomic_write_note(quarterly_path, quarterly_lines)
-
         # Rebuild Goals block for weekly note (MONTHLY mirror + WEEKLY source)
         # MONTHLY mirror: preserve existing + add new from filter_by_proximity
         today = datetime.date.today()
-        g_start, g_end = goals_section_bounds(lines)
-        existing_monthly = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
         final_monthly = merge_mirror_goals(
-            existing_monthly, monthly_tasks, proximity_days=30, today=today
+            monthly_mirror,
+            monthly_tasks,
+            proximity_days=30,
+            today=today,
+            source_path=monthly_path,
+            mirror_path=note_path,
         )
         monthly_rendered = (
             render_goal_lines(final_monthly, today=today)
@@ -486,8 +474,31 @@ def main() -> None:
                 source_goal_lists=[quarterly_tasks, yearly_mirror],
                 proximity_days=30,
                 today=today,
+                note_path=note_path,
+                source_paths=[quarterly_path, quarterly_path],
             )
         )
+        quarterly_changed = updated_quarterly != quarterly_tasks
+        yearly_changed = updated_yearly != yearly_mirror
+        quarterly_tasks = updated_quarterly
+        yearly_mirror = updated_yearly
+
+        # Write back quarterly note if quarterly or yearly status changed.
+        if quarterly_changed or yearly_changed:
+            from sync.writers.goals import build_goals_block as bg
+
+            with locked_note(quarterly_path):
+                quarterly_lines = safe_read_file(quarterly_path) or []
+                new_q_block = bg(
+                    [
+                        ("YEARLY", render_goal_lines(yearly_mirror)),
+                        ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+                    ]
+                )
+                splice_goals_section(
+                    quarterly_lines, new_q_block, insert_if_missing=True
+                )
+                atomic_write_note(quarterly_path, quarterly_lines)
 
         # Render: original weekly goals (preserve dates) + final pierced goals (countdown)
         weekly_source_lines = render_goal_lines(original_weekly)

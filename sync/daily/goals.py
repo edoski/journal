@@ -45,7 +45,7 @@ def weekly_note_path(date_obj: datetime.date) -> str:
 
 def load_weekly_goals(
     date_obj: datetime.date,
-) -> tuple[list[Goal], list[Goal], list[Goal], list[Goal], str]:
+) -> tuple[list[Goal], list[Goal], list[Goal], list[Goal], str, str, str]:
     """
     Load all goals from the weekly note for daily sync.
 
@@ -53,7 +53,15 @@ def load_weekly_goals(
         date_obj: Date to load goals for
 
     Returns:
-        Tuple of (weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, path)
+        Tuple of (
+            weekly_tasks,
+            monthly_tasks,
+            quarterly_tasks,
+            yearly_tasks,
+            weekly_path,
+            monthly_path,
+            quarterly_path,
+        )
         - weekly_tasks: Goals from WEEKLY section (source, may contain pierced Q/Y)
         - monthly_tasks: Goals from MONTHLY source note (preserves deadline info)
         - quarterly_tasks: Goals from QUARTERLY source note (preserves deadline info)
@@ -61,9 +69,18 @@ def load_weekly_goals(
         - path: Path to weekly note
     """
     path = weekly_note_path(date_obj)
+    month_start = datetime.date(date_obj.year, date_obj.month, 1)
+    month_key = f"{month_start.year}-{month_start.month:02d}"
+    monthly_path = os.path.join(JOURNAL_DIR, f"{month_key}.md")
+    from sync.dates import quarter_of_date, quarter_id
+
+    q_year, q_num = quarter_of_date(date_obj)
+    qtr_key = quarter_id(q_year, q_num)
+    quarterly_path = os.path.join(JOURNAL_DIR, f"{qtr_key}.md")
+
     lines = safe_read_file(path)
     if lines is None:
-        return [], [], [], [], path
+        return [], [], [], [], path, monthly_path, quarterly_path
 
     g_start, g_end = goals_section_bounds(lines)
     weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
@@ -72,11 +89,6 @@ def load_weekly_goals(
     # Load goals from SOURCE notes (not mirrors) to preserve deadline/reminder_offset.
     # Mirror sections (e.g., weekly's MONTHLY) only have countdown text, not original dates.
     from sync.constants import MONTHLY_TEMPLATE_PATH, QUARTERLY_TEMPLATE_PATH
-    from sync.dates import quarter_of_date, quarter_id
-
-    month_start = datetime.date(date_obj.year, date_obj.month, 1)
-    month_key = f"{month_start.year}-{month_start.month:02d}"
-    monthly_path = os.path.join(JOURNAL_DIR, f"{month_key}.md")
 
     monthly_tasks: list[Goal] = []
     quarterly_tasks: list[Goal] = []
@@ -93,9 +105,6 @@ def load_weekly_goals(
         monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_key)
 
     # Load QUARTERLY and YEARLY goals from quarterly note (source for both)
-    q_year, q_num = quarter_of_date(date_obj)
-    qtr_key = quarter_id(q_year, q_num)
-    quarterly_path = os.path.join(JOURNAL_DIR, f"{qtr_key}.md")
     ensure_note(quarterly_path, QUARTERLY_TEMPLATE_PATH)
     quarterly_lines = safe_read_file(quarterly_path)
     if quarterly_lines is not None:
@@ -109,7 +118,15 @@ def load_weekly_goals(
         quarterly_tasks = ensure_goal_ids(quarterly_tasks, "quarterly", qtr_key)
         yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(q_year))
 
-    return weekly_tasks, monthly_tasks, quarterly_tasks, yearly_tasks, path
+    return (
+        weekly_tasks,
+        monthly_tasks,
+        quarterly_tasks,
+        yearly_tasks,
+        path,
+        monthly_path,
+        quarterly_path,
+    )
 
 
 def write_weekly_goals(

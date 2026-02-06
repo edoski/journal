@@ -5,8 +5,14 @@ Tests for shared base helpers used by period sync modules.
 from __future__ import annotations
 
 import datetime
+import os
 
 from sync.base import merge_mirror_goals
+from sync.goal_sync_state import (
+    load_goal_sync_state,
+    record_note_state,
+    save_goal_sync_state,
+)
 from sync.models.goals import Goal
 
 
@@ -32,13 +38,13 @@ def _goal(
 def test_merge_mirror_goals_restores_source_deadline_and_appends_new():
     today = datetime.date(2025, 1, 1)
     existing_mirror = [
-        _goal("gid-1", "Task A", done=True),
+        _goal("gid-1", "Task A", done=False),
     ]
     source_tasks = [
         _goal(
             "gid-1",
             "Task A",
-            done=False,
+            done=True,
             date_str="2025-01-05",
             deadline=datetime.date(2025, 1, 5),
             reminder_offset=2,
@@ -83,3 +89,53 @@ def test_merge_mirror_goals_skips_far_future_source_goals():
     )
 
     assert [g.id for g in merged] == ["gid-1"]
+
+
+def test_merge_mirror_goals_source_reopen_clears_mirror_when_source_changes(
+    monkeypatch, tmp_path
+):
+    today = datetime.date(2025, 1, 1)
+    source_path = tmp_path / "2025-01.md"
+    mirror_path = tmp_path / "2025-W01.md"
+    source_path.write_text("source", encoding="utf-8")
+    mirror_path.write_text("mirror", encoding="utf-8")
+
+    cache_path = tmp_path / "goal_sync_state.json"
+    lock_dir = tmp_path / "locks"
+    monkeypatch.setattr("sync.goal_sync_state.GOAL_SYNC_STATE_PATH", str(cache_path))
+    monkeypatch.setattr("sync.notes_locking.LOCK_DIR", str(lock_dir))
+
+    # Snapshot says both were previously completed.
+    state = load_goal_sync_state()
+    record_note_state(state, "gid-1", str(source_path), True)
+    record_note_state(state, "gid-1", str(mirror_path), True)
+    save_goal_sync_state(state)
+
+    # User reopens in source only.
+    existing_mirror = [
+        _goal("gid-1", "Task A", done=True, date_str="2025-01-05"),
+    ]
+    source_tasks = [
+        _goal(
+            "gid-1",
+            "Task A",
+            done=False,
+            date_str="2025-01-05",
+            deadline=datetime.date(2025, 1, 5),
+        ),
+    ]
+
+    now = datetime.datetime.now().timestamp()
+    os.utime(source_path, (now + 10, now + 10))
+    os.utime(mirror_path, (now, now))
+
+    merged = merge_mirror_goals(
+        existing_mirror,
+        source_tasks,
+        proximity_days=30,
+        today=today,
+        source_path=str(source_path),
+        mirror_path=str(mirror_path),
+    )
+
+    assert merged[0].done is False

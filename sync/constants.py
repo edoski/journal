@@ -36,6 +36,9 @@ LOCK_DIR = os.path.expanduser("~/.cache/journal/locks")
 # Cache file for tracking carried-forward goal IDs
 CARRIED_GOALS_PATH = os.path.expanduser("~/.cache/journal/carried_goals.json")
 
+# Cache file for bidirectional goal sync state conflict resolution
+GOAL_SYNC_STATE_PATH = os.path.expanduser("~/.cache/journal/goal_sync_state.json")
+
 # Cache for media dates (podcasts/books) to detect and self-heal corrupted
 # frontmatter dates caused by Obsidian Sync re-triggering Templater.
 MEDIA_CACHE_PATH = os.path.expanduser("~/.cache/journal/media_dates.json")

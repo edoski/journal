@@ -68,8 +68,8 @@ from sync.readers.goals import ensure_goal_ids
 
 from sync.base import (
     carry_forward_goals,
-    propagate_goal_status,
     load_quarterly_goals,
+    reconcile_goal_lists,
     merge_mirror_goals,
     process_pierced_goals,
 )
@@ -573,29 +573,27 @@ def main() -> None:
             prev_tasks, monthly_tasks, month_key, "monthly"
         )
 
-        # Load quarterly goals (source of truth) and propagate any completed statuses from mirrors.
+        # Load quarterly goals and reconcile QUARTERLY source <-> MONTHLY mirror state.
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
             load_quarterly_goals(month_start)
         )
-        quarterly_changed = propagate_goal_status(quarterly_tasks, quarterly_mirror)
-
-        # Propagate yearly goal status from monthly_tasks (pierced goals) to quarterly's yearly mirror.
-        # This will then propagate to yearly note on next quarterly.py run.
-        yearly_changed = propagate_goal_status(yearly_mirror, monthly_tasks)
-
-        if quarterly_changed or yearly_changed:
-            _write_quarterly_goals(
-                quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines
-            )
+        quarterly_tasks, quarterly_mirror, quarterly_changed, _ = reconcile_goal_lists(
+            quarterly_tasks,
+            quarterly_mirror,
+            quarterly_path,
+            note_path,
+        )
 
         # Rewrite Goals block with QUARTERLY mirror + MONTHLY source.
         # QUARTERLY mirror: preserve existing + add new from filter_by_proximity
         today = datetime.date.today()
-        existing_quarterly = extract_subsection_tasks(
-            lines, g_start, g_end, "QUARTERLY"
-        )
         final_quarterly = merge_mirror_goals(
-            existing_quarterly, quarterly_tasks, proximity_days=90, today=today
+            quarterly_mirror,
+            quarterly_tasks,
+            proximity_days=90,
+            today=today,
+            source_path=quarterly_path,
+            mirror_path=note_path,
         )
         quarterly_lines_rendered = (
             render_goal_lines(final_quarterly, today=today)
@@ -612,7 +610,17 @@ def main() -> None:
             source_goal_lists=[yearly_mirror],
             proximity_days=90,
             today=today,
+            note_path=note_path,
+            source_paths=[quarterly_path],
         )
+        yearly_changed = updated_yearly != yearly_mirror
+        yearly_mirror = updated_yearly
+
+        # Persist source updates in quarterly note when any source list changed.
+        if quarterly_changed or yearly_changed:
+            _write_quarterly_goals(
+                quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines
+            )
 
         # Render: original monthly goals (preserve dates) + final pierced yearly (countdown)
         monthly_source_lines = render_goal_lines(original_monthly)
