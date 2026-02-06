@@ -10,7 +10,7 @@ journal/
     __init__.py               # Package entry point
     models/                   # Dataclass models (Goal, Book, Podcast, StudySession, etc.)
     readers/                  # Parsing functions and shared reader helpers
-      common.py               # Header normalization, section extraction, duration parsing
+      common.py               # Reader parsing helpers (duration parsing + shared markdown wrappers)
       daily.py                # Daily note aggregate parser (canonical metrics parser)
       frontmatter.py          # YAML frontmatter parsing
       goals.py                # Goal parsing, deadline handling, proximity filtering
@@ -44,6 +44,7 @@ journal/
     goal_identity.py          # Shared goal canonicalization + ID helpers
     media_section.py          # MEDIA section orchestration (reader scan + writer render)
     notes_locking.py          # File-locking primitives
+    markdown_common.py        # Shared header normalization + section block extraction
     notes_sections.py         # Markdown section extraction/manipulation
     io.py                     # Low-level file I/O utilities (safe_read_file, atomic_write_note, JSON cache helpers)
     reminders.py              # Periodic review reminder generation
@@ -198,6 +199,7 @@ sync/
     ├── goal_identity.py # Shared goal canonicalization + deterministic/random IDs
     ├── media_section.py # MEDIA section orchestration (scan + render composition)
     ├── notes_locking.py # Advisory file locking
+    ├── markdown_common.py # Shared markdown header normalization + extract_block
     ├── notes_sections.py # Markdown section extraction/manipulation
     ├── period_cleanup.py # Prior-period cleanup re-sync helper
     ├── io.py            # Low-level file I/O (safe_read_file, atomic_write_note, JSON cache)
@@ -244,6 +246,7 @@ sync/
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
 - `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`, `aggregate_training_type_session_stats`
 - `notes_locking.py`: lockfile lifecycle + `locked_note`
+- `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)

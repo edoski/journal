@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sync.readers.common import normalize_header as _normalize_header
+from sync.markdown_common import extract_block as _extract_block
+from sync.markdown_common import normalize_header as _normalize_header
 
 if TYPE_CHECKING:
     from sync.models.goals import Goal
@@ -81,25 +82,7 @@ def subsection_bounds(
 
 def extract_block(lines: list[str], header: str) -> list[str] | None:
     """Extract lines belonging to a markdown header section."""
-    header_norm = _normalize_header(header)
-    start = -1
-    for idx, line in enumerate(lines):
-        if _normalize_header(line) == header_norm:
-            start = idx
-            break
-    if start == -1:
-        return None
-    level = len(header.split()[0]) if header.startswith("#") else 3
-    end = len(lines)
-    for idx in range(start + 1, len(lines)):
-        stripped = lines[idx].strip()
-        if (
-            stripped.startswith("#" * level + " ")
-            and _normalize_header(stripped) != header_norm
-        ):
-            end = idx
-            break
-    return lines[start:end]
+    return _extract_block(lines, header)
 
 
 def ensure_section_with_divider(
