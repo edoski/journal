@@ -1,7 +1,5 @@
-"""Daily note orchestrator package."""
+"""Daily orchestration helpers shared by application services."""
 
 from __future__ import annotations
 
-from .runner import update_markdown
-
-__all__ = ["update_markdown"]
+__all__: list[str] = []

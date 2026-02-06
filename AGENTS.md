@@ -20,13 +20,10 @@ journal/
       screen_time.py          # Procrastination-table parser
     writers/                  # Rendering functions (render_goal_lines, charts, tables)
     daily/                    # Daily note orchestration (run with: python -m sync.daily)
-      orchestrator/           # Orchestrator package (runner + focused pipelines)
-        __init__.py           # Re-exports update_markdown
-        runner.py             # Main update_markdown orchestration
+      orchestrator/           # Daily orchestration helper package
+        __init__.py           # Package marker
         frontmatter.py        # YAML frontmatter update logic
-        note_io.py            # Daily note read/create + core section guards
-        goal_pipeline.py      # Daily goals synchronization/reconciliation pipeline
-        metrics_pipeline.py   # Metrics section build/splice pipeline
+        note_io.py            # Daily section-shape + NoteStore-backed read helper
       training.py             # Training/workout/stretch handling
       sleep.py                # Sleep section building
       context.py              # Context tracking for CONTEXT column
@@ -34,6 +31,8 @@ journal/
       icloud.py               # Resilient iCloud status file loading
       screen_time.py          # Screen time data loading and PROCRASTINATION section
       constants.py            # Daily-specific constants
+    application/              # Service orchestration over ports/contracts
+      daily_sync_service.py   # Daily note sync service (replaces pipeline orchestration)
     study/                    # Study ingestion domain (Flow DB + breaks + STUDY section)
       __init__.py             # Study domain exports
       constants.py            # Flow integration constants + break window config
@@ -218,18 +217,18 @@ sync/
 │
 ├── daily/            # Daily note orchestration
 │   ├── orchestrator/
-│   │   ├── __init__.py    # update_markdown re-export
-│   │   ├── runner.py      # main orchestration entrypoint
+│   │   ├── __init__.py    # package marker
 │   │   ├── frontmatter.py # YAML frontmatter updates
 │   │   ├── note_io.py     # note read/create + section guards
-│   │   ├── goal_pipeline.py # goals synchronization pipeline
-│   │   └── metrics_pipeline.py # metrics section pipeline
 │   ├── training.py     # Training/workout/stretch handling
 │   ├── sleep.py        # Sleep section building
 │   ├── context.py      # Context tracking
 │   ├── goals.py        # Goal management (carry-forward, weekly/daily parsing)
 │   ├── icloud.py       # iCloud status file loading and study times export
 │   └── screen_time.py  # Screen time data loading and procrastination section
+│
+├── application/      # Service orchestration layer
+│   └── daily_sync_service.py # Daily sync service over ports/contracts
 │
 ├── study/            # Study ingestion domain
 │   ├── constants.py    # Flow integration constants + break window config
@@ -305,6 +304,11 @@ Canonical interface contracts (phase 3):
 - `sync.ports.reminders.ReminderRuleStore` is the canonical reminder rule persistence interface
 - `sync.adapters.markdown_notes.MarkdownNoteStore`, `sync.adapters.markdown_goals.MarkdownGoalStore`, and `sync.adapters.markdown_reminders.MarkdownReminderRuleStore` are the markdown-backed implementations
 - `sync/daily/orchestrator/note_io.py`, `sync/periods/runtime.py`, and `tui/data/daily_store.py` must consume `NoteStore` instead of direct filesystem helpers
+
+Daily service boundary (phase 4):
+- `sync.application.daily_sync_service.DailySyncService` is the only daily orchestrator; it owns goals + metrics assembly and frontmatter writes
+- Daily composition root (`sync/daily/__main__.py`) wires `FlowStudySessionSource`, `ICloudDailyStatusSource`, `VaultContextSource`, `MarkdownNoteStore`, and `MarkdownReminderRuleStore` into `DailySyncService`
+- Removed modules: `sync/daily/orchestrator/goal_pipeline.py` and `sync/daily/orchestrator/metrics_pipeline.py`
 
 ### Module Responsibilities
 
