@@ -3,15 +3,29 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
+from dataclasses import dataclass
 
 from sync.constants import IDEAL
+from sync.contracts.metrics import (
+    DailyAggregate,
+    PeriodAggregate,
+    TrainingTypeSessionStat,
+)
+
+
+@dataclass
+class _TrainingAccumulator:
+    """Mutable accumulator for per-type training aggregation."""
+
+    display_type: str
+    sessions: int = 0
+    total_minutes: float = 0.0
 
 
 def compute_period_metrics(
     dates: list[datetime.date],
-    daily_data: dict[datetime.date, dict[str, Any]],
-) -> dict[str, Any]:
+    daily_data: dict[datetime.date, DailyAggregate],
+) -> PeriodAggregate:
     """
     Compute aggregated metrics for a list of dates.
 
@@ -27,9 +41,19 @@ def compute_period_metrics(
     dates_up_to_today = [d for d in dates if d <= today]
     days_up_to_today = len(dates_up_to_today)
 
-    study_minutes = [daily_data.get(d, {}).get("study_minutes") for d in dates]
-    sleep_minutes = [daily_data.get(d, {}).get("sleep_minutes") for d in dates]
-    mood_vals = [daily_data.get(d, {}).get("mood") for d in dates]
+    study_minutes: list[float | None] = []
+    sleep_minutes: list[float | None] = []
+    mood_vals: list[float | None] = []
+    for day in dates:
+        payload = daily_data.get(day)
+        if payload is None:
+            study_minutes.append(None)
+            sleep_minutes.append(None)
+            mood_vals.append(None)
+            continue
+        study_minutes.append(payload.get("study_minutes"))
+        sleep_minutes.append(payload.get("sleep_minutes"))
+        mood_vals.append(payload.get("mood"))
 
     study_total = sum((m for m in study_minutes if m is not None), 0)
     sleep_vals = [m for m in sleep_minutes if m is not None]
@@ -37,25 +61,37 @@ def compute_period_metrics(
     mood_vals_clean = [m for m in mood_vals if m is not None]
     mood_avg = sum(mood_vals_clean) / len(mood_vals_clean) if mood_vals_clean else None
 
-    workout_count = sum(1 for d in dates if daily_data.get(d, {}).get("workout"))
-    stretch_count = sum(1 for d in dates if daily_data.get(d, {}).get("stretch"))
-    mindful_count = sum(1 for d in dates if daily_data.get(d, {}).get("meditate"))
+    def day_has_workout(day: datetime.date) -> bool:
+        payload = daily_data.get(day)
+        return bool(payload.get("workout")) if payload is not None else False
 
-    return {
-        "study_total_minutes": study_total,
-        "sleep_avg_minutes": sleep_avg,
-        "mood_avg": mood_avg,
-        "workout_count": workout_count,
-        "stretch_count": stretch_count,
-        "mindful_count": mindful_count,
-        "total_days": len(dates),
-        "days_up_to_today": days_up_to_today,
-    }
+    def day_has_stretch(day: datetime.date) -> bool:
+        payload = daily_data.get(day)
+        return bool(payload.get("stretch")) if payload is not None else False
+
+    def day_has_mindful(day: datetime.date) -> bool:
+        payload = daily_data.get(day)
+        return bool(payload.get("meditate")) if payload is not None else False
+
+    workout_count = sum(1 for day in dates if day_has_workout(day))
+    stretch_count = sum(1 for day in dates if day_has_stretch(day))
+    mindful_count = sum(1 for day in dates if day_has_mindful(day))
+
+    return PeriodAggregate(
+        study_total_minutes=study_total,
+        sleep_avg_minutes=sleep_avg,
+        mood_avg=mood_avg,
+        workout_count=workout_count,
+        stretch_count=stretch_count,
+        mindful_count=mindful_count,
+        total_days=len(dates),
+        days_up_to_today=days_up_to_today,
+    )
 
 
 def aggregate_activity_totals(
     dates: list[datetime.date],
-    daily_data: dict[datetime.date, dict[str, Any]],
+    daily_data: dict[datetime.date, DailyAggregate],
 ) -> dict[str, float]:
     """
     Aggregate study activity totals across a date range.
@@ -79,7 +115,7 @@ def aggregate_activity_totals(
 
 def aggregate_interrupt_overrun(
     dates: list[datetime.date],
-    daily_data: dict[datetime.date, dict[str, Any]],
+    daily_data: dict[datetime.date, DailyAggregate],
 ) -> tuple[float, float, int]:
     """
     Aggregate interrupt and overrun minutes across a date range.
@@ -96,7 +132,9 @@ def aggregate_interrupt_overrun(
     total_overruns = 0.0
     study_day_count = 0
     for d in dates:
-        daily = daily_data.get(d, {})
+        daily = daily_data.get(d)
+        if daily is None:
+            continue
         total_interrupts += daily.get("interrupt_minutes", 0) or 0
         total_overruns += daily.get("overrun_minutes", 0) or 0
         study_minutes = daily.get("study_minutes") or 0
@@ -107,7 +145,7 @@ def aggregate_interrupt_overrun(
 
 def aggregate_screen_time(
     dates: list[datetime.date],
-    daily_data: dict[datetime.date, dict[str, Any]],
+    daily_data: dict[datetime.date, DailyAggregate],
 ) -> dict[str, float]:
     """
     Aggregate screen time totals across a date range.
@@ -121,7 +159,9 @@ def aggregate_screen_time(
     """
     app_totals: dict[str, float] = {}
     for d in dates:
-        daily = daily_data.get(d, {})
+        daily = daily_data.get(d)
+        if daily is None:
+            continue
         screen_time = daily.get("screen_time_totals", {})
         for app, minutes in screen_time.items():
             app_totals[app] = app_totals.get(app, 0) + minutes
@@ -144,8 +184,8 @@ def _target_bucket_for_training_type(normalized_label: str) -> str:
 
 def aggregate_training_type_session_stats(
     dates: list[datetime.date],
-    daily_data: dict[datetime.date, dict[str, Any]],
-) -> list[dict[str, Any]]:
+    daily_data: dict[datetime.date, DailyAggregate],
+) -> list[TrainingTypeSessionStat]:
     """
     Aggregate periodic training stats by activity type.
 
@@ -155,10 +195,12 @@ def aggregate_training_type_session_stats(
       - target: scaled target denominator for period
       - average_minutes: average duration per session
     """
-    per_type: dict[str, dict[str, Any]] = {}
+    per_type: dict[str, _TrainingAccumulator] = {}
 
     for d in dates:
-        daily = daily_data.get(d, {})
+        daily = daily_data.get(d)
+        if daily is None:
+            continue
         minutes_map = daily.get("training_type_minutes", {})
         sessions_map = daily.get("training_type_sessions", {})
         if not minutes_map and not sessions_map:
@@ -170,15 +212,12 @@ def aggregate_training_type_session_stats(
             norm = _normalize_training_type_label(label)
             if not norm:
                 continue
-            entry = per_type.setdefault(
-                norm,
-                {"type": label, "sessions": 0, "total_minutes": 0.0},
-            )
+            entry = per_type.setdefault(norm, _TrainingAccumulator(display_type=label))
             # Preserve source-case display label from first observed non-empty entry.
-            if not entry.get("type") and label:
-                entry["type"] = label
-            entry["sessions"] += int(sessions_map.get(raw_label, 0) or 0)
-            entry["total_minutes"] += float(minutes_map.get(raw_label, 0.0) or 0.0)
+            if not entry.display_type and label:
+                entry.display_type = label
+            entry.sessions += int(sessions_map.get(raw_label, 0) or 0)
+            entry.total_minutes += float(minutes_map.get(raw_label, 0.0) or 0.0)
 
     total_days = len(dates)
     weeks_in_period = total_days / 7
@@ -186,10 +225,10 @@ def aggregate_training_type_session_stats(
     workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
     stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
 
-    stats: list[dict[str, Any]] = []
+    stats: list[TrainingTypeSessionStat] = []
     for norm, data in per_type.items():
-        sessions = int(data.get("sessions", 0) or 0)
-        total_minutes = float(data.get("total_minutes", 0.0) or 0.0)
+        sessions = data.sessions
+        total_minutes = data.total_minutes
         if sessions <= 0 or total_minutes <= 0:
             continue
 
@@ -202,19 +241,19 @@ def aggregate_training_type_session_stats(
             target = workout_target
 
         stats.append(
-            {
-                "type": data.get("type") or norm,
-                "sessions": sessions,
-                "target": target,
-                "average_minutes": total_minutes / sessions,
-            }
+            TrainingTypeSessionStat(
+                type=data.display_type or norm,
+                sessions=sessions,
+                target=target,
+                average_minutes=total_minutes / sessions,
+            )
         )
 
     stats.sort(
         key=lambda row: (
-            -float(row.get("average_minutes") or 0.0),
-            -int(row.get("sessions") or 0),
-            str(row.get("type") or "").casefold(),
+            -row["average_minutes"],
+            -row["sessions"],
+            row["type"].casefold(),
         )
     )
     return stats

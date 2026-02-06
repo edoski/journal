@@ -183,6 +183,8 @@ journal/
 - `ContextSource`:
   - `files_modified_on_date(day) -> list[VaultFileRecord]`
   - `links_for_window(files, start, end) -> list[str]`
+- Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
+  - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
 
 ## Canonical Markdown Schemas
 

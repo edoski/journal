@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
 
+from sync.contracts.metrics import MovingAverageAggregate, PeriodAggregate
 from sync.formatting import compute_percent_change, format_percent_change
 
 
@@ -85,9 +85,9 @@ def compute_period_deltas(
 
 
 def compute_moving_average(
-    period_metrics: list[dict[str, Any]],
+    period_metrics: list[PeriodAggregate],
     n_periods: int,
-) -> dict[str, Any]:
+) -> MovingAverageAggregate:
     """
     Compute moving average metrics across N prior periods.
 
@@ -105,14 +105,14 @@ def compute_moving_average(
         Dict with MA values for each metric. Returns None values if
         insufficient periods (< n_periods) are provided.
     """
-    empty_result = {
-        "study_avg_minutes": None,
-        "sleep_avg_minutes": None,
-        "mood_avg": None,
-        "workout_avg": None,
-        "stretch_avg": None,
-        "mindful_avg": None,
-    }
+    empty_result = MovingAverageAggregate(
+        study_avg_minutes=None,
+        sleep_avg_minutes=None,
+        mood_avg=None,
+        workout_avg=None,
+        stretch_avg=None,
+        mindful_avg=None,
+    )
 
     if len(period_metrics) < n_periods:
         return empty_result
@@ -160,11 +160,11 @@ def compute_moving_average(
     mindful_counts = [pm.get("mindful_count", 0) for pm in recent]
     mindful_ma = sum(mindful_counts) / len(mindful_counts) if mindful_counts else None
 
-    return {
-        "study_avg_minutes": study_ma,
-        "sleep_avg_minutes": sleep_ma,
-        "mood_avg": mood_ma,
-        "workout_avg": workout_ma,
-        "stretch_avg": stretch_ma,
-        "mindful_avg": mindful_ma,
-    }
+    return MovingAverageAggregate(
+        study_avg_minutes=study_ma,
+        sleep_avg_minutes=sleep_ma,
+        mood_avg=mood_ma,
+        workout_avg=workout_ma,
+        stretch_avg=stretch_ma,
+        mindful_avg=mindful_ma,
+    )

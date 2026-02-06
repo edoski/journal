@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
-from typing import Any, cast
+from collections.abc import Callable
 
 from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
@@ -12,6 +12,7 @@ from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     YEARLY_TEMPLATE_PATH,
 )
+from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import daterange
 from sync.metrics import compute_period_metrics
 from sync.periods.engine import (
@@ -47,24 +48,22 @@ class PeriodSyncService:
         self,
         start_date: datetime.date,
         end_date: datetime.date,
-    ) -> dict[datetime.date, dict[str, Any]]:
+    ) -> dict[datetime.date, DailyAggregate]:
         dates = list(daterange(start_date, end_date))
-        data = self.aggregate_source.load_for_dates(dates)
-        return cast(dict[datetime.date, dict[str, Any]], data)
+        return self.aggregate_source.load_for_dates(dates)
 
     def _load_dates(
         self,
         dates: list[datetime.date],
-    ) -> dict[datetime.date, dict[str, Any]]:
-        data = self.aggregate_source.load_for_dates(dates)
-        return cast(dict[datetime.date, dict[str, Any]], data)
+    ) -> dict[datetime.date, DailyAggregate]:
+        return self.aggregate_source.load_for_dates(dates)
 
     def _load_prior_metrics(
         self,
         offsets: range,
-        bounds_for_offset,
-    ) -> list[dict[str, Any]]:
-        metrics_list: list[dict[str, Any]] = []
+        bounds_for_offset: Callable[[int], tuple[datetime.date, datetime.date]],
+    ) -> list[PeriodAggregate]:
+        metrics_list: list[PeriodAggregate] = []
         for offset in offsets:
             start_date, end_date = bounds_for_offset(offset)
             dates = list(daterange(start_date, end_date))

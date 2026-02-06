@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypeAlias, TypedDict
 
 
 class DailyAggregate(TypedDict):
@@ -36,3 +36,26 @@ class PeriodAggregate(TypedDict):
     mindful_count: int
     total_days: int
     days_up_to_today: int
+
+
+class TrainingTypeSessionStat(TypedDict):
+    """Per-type training summary row for periodic rendering."""
+
+    type: str
+    sessions: int
+    target: int
+    average_minutes: float
+
+
+class MovingAverageAggregate(TypedDict):
+    """Moving-average view over prior period aggregates."""
+
+    study_avg_minutes: float | None
+    sleep_avg_minutes: float | None
+    mood_avg: float | None
+    workout_avg: float | None
+    stretch_avg: float | None
+    mindful_avg: float | None
+
+
+MetricValue: TypeAlias = float | int | None

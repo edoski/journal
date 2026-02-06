@@ -6,9 +6,9 @@ import datetime
 import os
 import re
 from dataclasses import dataclass
-from typing import Any, cast
 
 from sync.constants import JOURNAL_DIR
+from sync.contracts.metrics import MetricValue
 from sync.dates import (
     daterange,
     quarter_of_date,
@@ -37,7 +37,7 @@ class PeriodSnapshot:
     start: datetime.date
     end: datetime.date
     label: str
-    metrics: dict[str, float | int | None]
+    metrics: dict[str, MetricValue]
 
 
 class QueryService:
@@ -137,10 +137,7 @@ class QueryService:
         """Return aggregated metrics keyed by metric ID for selected period."""
         start, end, label = self.period_bounds(period, anchor_date)
         dates = list(daterange(start, end))
-        daily_data = cast(
-            dict[datetime.date, dict[str, Any]],
-            self.aggregate_source.load_for_dates(dates),
-        )
+        daily_data = self.aggregate_source.load_for_dates(dates)
 
         period_metrics = compute_period_metrics(dates, daily_data)
         interrupt_total, overrun_total, _ = aggregate_interrupt_overrun(
@@ -156,19 +153,19 @@ class QueryService:
                     int(v or 0) for v in sessions_map.values()
                 )
 
-        metrics: dict[str, float | int | None] = {
-            "study_minutes": period_metrics.get("study_total_minutes"),
-            "sleep_minutes": period_metrics.get("sleep_avg_minutes"),
-            "mood": period_metrics.get("mood_avg"),
-            "workout_count": period_metrics.get("workout_count"),
-            "stretch_count": period_metrics.get("stretch_count"),
-            "mindful_count": period_metrics.get("mindful_count"),
+        metrics: dict[str, MetricValue] = {
+            "study_minutes": period_metrics["study_total_minutes"],
+            "sleep_minutes": period_metrics["sleep_avg_minutes"],
+            "mood": period_metrics["mood_avg"],
+            "workout_count": period_metrics["workout_count"],
+            "stretch_count": period_metrics["stretch_count"],
+            "mindful_count": period_metrics["mindful_count"],
             "interrupt_minutes": interrupt_total,
             "overrun_minutes": overrun_total,
             "screen_time_total": screen_time_total,
             "training_sessions_total": training_sessions_total,
-            "days_total": period_metrics.get("total_days"),
-            "days_elapsed": period_metrics.get("days_up_to_today"),
+            "days_total": period_metrics["total_days"],
+            "days_elapsed": period_metrics["days_up_to_today"],
         }
 
         return PeriodSnapshot(
@@ -184,7 +181,7 @@ class QueryService:
         metric: str,
         period: str,
         anchor_date: datetime.date,
-    ) -> tuple[PeriodSnapshot, Any]:
+    ) -> tuple[PeriodSnapshot, MetricValue]:
         """Return selected period snapshot and metric value."""
         snapshot = self.query_by_period(period, anchor_date)
         return snapshot, snapshot.metrics.get(metric)

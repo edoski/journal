@@ -2,7 +2,13 @@
 
 from .study import StudySessionRecord
 from .daily import TrainingStatusBundle, TrainingStatusEntry, SleepStatusPayload
-from .metrics import DailyAggregate, PeriodAggregate
+from .metrics import (
+    DailyAggregate,
+    MetricValue,
+    MovingAverageAggregate,
+    PeriodAggregate,
+    TrainingTypeSessionStat,
+)
 from .goals import GoalSection
 from .media import MediaBundle
 from .notes import VaultFileRecord
@@ -14,6 +20,9 @@ __all__ = [
     "SleepStatusPayload",
     "DailyAggregate",
     "PeriodAggregate",
+    "MovingAverageAggregate",
+    "TrainingTypeSessionStat",
+    "MetricValue",
     "GoalSection",
     "MediaBundle",
     "VaultFileRecord",

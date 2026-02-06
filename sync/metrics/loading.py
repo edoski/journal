@@ -5,10 +5,9 @@ from __future__ import annotations
 import datetime
 import os
 from collections.abc import Callable, Iterable
-from typing import Any, cast
 
 from sync.constants import JOURNAL_DIR
-from sync.contracts.metrics import DailyAggregate
+from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 
 from .aggregation import compute_period_metrics
 
@@ -43,7 +42,7 @@ def load_daily_data(
 def load_prior_period_metrics(
     offsets: Iterable[int],
     period_bounds_for_offset: Callable[[int], tuple[datetime.date, datetime.date]],
-) -> list[dict[str, Any]]:
+) -> list[PeriodAggregate]:
     """
     Load metrics for prior periods using caller-provided period boundaries.
 
@@ -58,7 +57,7 @@ def load_prior_period_metrics(
     """
     from sync.dates import daterange
 
-    metrics_list: list[dict[str, Any]] = []
+    metrics_list: list[PeriodAggregate] = []
     for offset in offsets:
         start_date, end_date = period_bounds_for_offset(offset)
         dates = list(daterange(start_date, end_date))
@@ -66,7 +65,7 @@ def load_prior_period_metrics(
         metrics_list.append(
             compute_period_metrics(
                 dates,
-                cast(dict[datetime.date, dict[str, Any]], daily_data),
+                daily_data,
             )
         )
     return metrics_list

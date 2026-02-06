@@ -5,6 +5,7 @@ Architecture guardrails to prevent layering regressions.
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 
@@ -524,4 +525,25 @@ def test_only_composition_roots_import_adapters_or_application():
     assert not violations, (
         "Only composition roots may wire adapters/application services:\n"
         + "\n".join(violations)
+    )
+
+
+def test_application_metrics_services_avoid_generic_dict_any_signatures():
+    metric_service_files = [
+        ROOT / "sync" / "application" / "period_sync_service.py",
+        ROOT / "sync" / "application" / "query_service.py",
+    ]
+    generic_dict_any = re.compile(r"dict\[\s*str\s*,\s*Any\s*\]")
+    violations: list[str] = []
+
+    for path in metric_service_files:
+        source = path.read_text(encoding="utf-8")
+        if generic_dict_any.search(source):
+            violations.append(f"{path}: found dict[str, Any] metric signature")
+        if "from typing import Any" in source or " import Any" in source:
+            violations.append(f"{path}: found typing.Any import")
+
+    assert not violations, (
+        "Application metric services must use contracts/typed metric values, "
+        "not dict[str, Any]:\n" + "\n".join(violations)
     )
