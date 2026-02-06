@@ -9,12 +9,12 @@ from sync.formatting import format_minutes
 from sync.models.deviation import DailyDeviationData
 from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block
 from sync.study.db import SessionDict
-from sync.study.section import _build_study_section, _extract_existing_data
+from sync.study.section import build_study_section, extract_existing_data
 
-from ..icloud import _load_status_file, write_study_times_to_icloud
-from ..screen_time import _build_procrastination_section, _load_screen_time_data
-from ..sleep import _build_sleep_section
-from ..training import _build_training_section
+from ..icloud import load_status_file, write_study_times_to_icloud
+from ..screen_time import build_procrastination_section, load_screen_time_data
+from ..sleep import build_sleep_section
+from ..training import build_training_section
 
 
 @dataclass(frozen=True)
@@ -34,8 +34,8 @@ def build_study_data(
     context_for_session,
 ) -> tuple[list[str], str]:
     """Build STUDY table lines and formatted study frontmatter value."""
-    existing_notes, existing_context = _extract_existing_data(lines)
-    new_table_lines, total_focus_minutes = _build_study_section(
+    existing_notes, existing_context = extract_existing_data(lines)
+    new_table_lines, total_focus_minutes = build_study_section(
         sessions,
         existing_notes,
         context_for_session=context_for_session,
@@ -127,10 +127,10 @@ def apply_metrics_block(
     )
 
     # Load activity status files
-    workout_done, workout_data = _load_status_file("workout_status.json")
-    stretch_done, stretch_data = _load_status_file("stretching_status.json")
-    meditate_done, meditation_data = _load_status_file("meditation_status.json")
-    _, sleep_data = _load_status_file("sleep_status.json")
+    workout_done, workout_data = load_status_file("workout_status.json")
+    stretch_done, stretch_data = load_status_file("stretching_status.json")
+    meditate_done, meditation_data = load_status_file("meditation_status.json")
+    _, sleep_data = load_status_file("sleep_status.json")
 
     # Extract existing blocks for fallback (using shared extract_block)
     existing_training_block = extract_block(metrics_body, "### **training**")
@@ -145,20 +145,20 @@ def apply_metrics_block(
         study_lines.append("")
         study_lines.append("_No study sessions completed today._")
 
-    training_lines, _ = _build_training_section(
+    training_lines, _ = build_training_section(
         workout_data, stretch_data, meditation_data, existing_training_block, today_str
     )
 
-    sleep_lines = _build_sleep_section(sleep_data, existing_sleep_block)
+    sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
 
     # Load screen time data and build procrastination section
-    screen_time_data = _load_screen_time_data(today_str)
+    screen_time_data = load_screen_time_data(today_str)
     deviation_data = _build_deviation_data(sessions, workout_data)
 
     # Write study times to iCloud for iPad shortcut
     write_study_times_to_icloud(sessions, today_str)
 
-    procrastination_lines = _build_procrastination_section(
+    procrastination_lines = build_procrastination_section(
         screen_time_data, deviation_data
     )
 

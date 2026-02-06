@@ -1,0 +1,1 @@
+"""Markdown note storage adapter."""

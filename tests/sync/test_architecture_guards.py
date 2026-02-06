@@ -90,6 +90,10 @@ def test_required_domain_packages_exist():
         "sync/notes",
         "sync/periods",
         "sync/metrics",
+        "sync/contracts",
+        "sync/ports",
+        "sync/adapters",
+        "sync/application",
         "sync/daily/orchestrator",
         "sync/writers/charts",
         "tui",
@@ -367,4 +371,96 @@ def test_removed_reminder_functions_are_not_referenced():
                 )
     assert not violations, "Removed reminder API references found:\n" + "\n".join(
         violations
+    )
+
+
+def test_application_layer_does_not_import_adapters():
+    application_files = sorted((ROOT / "sync" / "application").rglob("*.py"))
+    violations: list[str] = []
+
+    for path in application_files:
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("sync.adapters"):
+                        violations.append(f"{path}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod.startswith("sync.adapters"):
+                    imported = ", ".join(alias.name for alias in node.names)
+                    violations.append(f"{path}: from {mod} import {imported}")
+
+    assert not violations, (
+        "sync.application must depend on ports/contracts, not adapters:\n"
+        + "\n".join(violations)
+    )
+
+
+def test_writers_do_not_import_ports_or_adapters():
+    writer_files = sorted((ROOT / "sync" / "writers").rglob("*.py"))
+    violations: list[str] = []
+
+    for path in writer_files:
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("sync.ports") or alias.name.startswith(
+                        "sync.adapters"
+                    ):
+                        violations.append(f"{path}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod.startswith("sync.ports") or mod.startswith("sync.adapters"):
+                    imported = ", ".join(alias.name for alias in node.names)
+                    violations.append(f"{path}: from {mod} import {imported}")
+
+    assert not violations, (
+        "sync.writers must remain pure render layer (no ports/adapters):\n"
+        + "\n".join(violations)
+    )
+
+
+def test_only_composition_roots_import_adapters_or_application():
+    composition_roots = {
+        ROOT / "sync" / "daily" / "__main__.py",
+        ROOT / "sync" / "periods" / "weekly.py",
+        ROOT / "sync" / "periods" / "monthly.py",
+        ROOT / "sync" / "periods" / "quarterly.py",
+        ROOT / "sync" / "periods" / "yearly.py",
+        ROOT / "tui" / "app.py",
+        ROOT / "tui" / "cli.py",
+    }
+    violations: list[str] = []
+
+    for path in _iter_python_files("sync", "tui"):
+        if path in composition_roots:
+            continue
+        # Application internals may import sibling application modules.
+        if path.is_relative_to(ROOT / "sync" / "application"):
+            continue
+        # Adapter internals may import sibling adapter modules.
+        if path.is_relative_to(ROOT / "sync" / "adapters"):
+            continue
+
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name.startswith("sync.adapters") or alias.name.startswith(
+                        "sync.application"
+                    ):
+                        violations.append(f"{path}: import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod.startswith("sync.adapters") or mod.startswith(
+                    "sync.application"
+                ):
+                    imported = ", ".join(alias.name for alias in node.names)
+                    violations.append(f"{path}: from {mod} import {imported}")
+
+    assert not violations, (
+        "Only composition roots may wire adapters/application services:\n"
+        + "\n".join(violations)
     )

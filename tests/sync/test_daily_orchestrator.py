@@ -67,9 +67,9 @@ def _prepare_isolated_orchestrator(monkeypatch, tmp_path):
     monkeypatch.setattr(goal_pipeline, "load_reminder_rules", lambda _path: [])
     monkeypatch.setattr(goal_pipeline, "get_reminders_for_date", lambda _d, _r: [])
     monkeypatch.setattr(
-        metrics_pipeline, "_load_status_file", lambda _name: (False, None)
+        metrics_pipeline, "load_status_file", lambda _name: (False, None)
     )
-    monkeypatch.setattr(metrics_pipeline, "_load_screen_time_data", lambda _today: None)
+    monkeypatch.setattr(metrics_pipeline, "load_screen_time_data", lambda _today: None)
     monkeypatch.setattr(
         metrics_pipeline, "write_study_times_to_icloud", lambda *_a, **_kw: None
     )

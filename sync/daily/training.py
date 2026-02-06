@@ -298,7 +298,7 @@ def _extract_data_date(data: dict | list | None) -> str | None:
         return None
 
 
-def _build_training_section(
+def build_training_section(
     workout_data: dict | list | None,
     stretch_data: dict | list | None,
     meditation_data: dict | list | None,

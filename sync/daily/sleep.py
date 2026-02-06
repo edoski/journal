@@ -82,7 +82,7 @@ def _build_sleep_table(data: SleepData | None) -> list[str]:
         return []
 
 
-def _build_sleep_section(
+def build_sleep_section(
     sleep_data: SleepData | None,
     existing_block: list[str] | None,
 ) -> list[str]:

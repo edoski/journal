@@ -1,0 +1,1 @@
+"""Markdown goals store adapter."""

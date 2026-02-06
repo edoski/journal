@@ -17,7 +17,7 @@ from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
 from sync.io import safe_save_json, safe_load_dated_cache
 
-from .icloud import _load_status_file
+from .icloud import load_status_file
 from sync.logging import get_logger
 
 logger = get_logger()
@@ -172,7 +172,7 @@ def _group_by_threshold(
     return result
 
 
-def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
+def load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
     """
     Load and parse screen time data from iCloud JSON file.
 
@@ -186,7 +186,7 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
         DailyScreenTimeData with merged entries, or None if no data at all
     """
     # Try to load new data from status file
-    success, data = _load_status_file("activity_status.json")
+    success, data = load_status_file("activity_status.json")
 
     new_entries: dict[str, float] = {}
     shortcut_ran = False
@@ -237,7 +237,7 @@ def _load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
     return DailyScreenTimeData(entries=entries, shortcut_ran=shortcut_ran)
 
 
-def _build_procrastination_section(
+def build_procrastination_section(
     screen_time_data: DailyScreenTimeData | None,
     deviation_data: DailyDeviationData | None = None,
 ) -> list[str]:

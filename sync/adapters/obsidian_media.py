@@ -1,0 +1,1 @@
+"""Obsidian media source adapter."""

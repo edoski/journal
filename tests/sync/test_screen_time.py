@@ -13,7 +13,7 @@ from sync.daily.screen_time import (
     _parse_duration_string,
     _parse_activity_line,
     _parse_activity_field,
-    _build_procrastination_section,
+    build_procrastination_section,
 )
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 
@@ -109,7 +109,7 @@ class TestParseActivityField:
 
 
 class TestBuildProcrastinationSection:
-    """Tests for _build_procrastination_section function."""
+    """Tests for build_procrastination_section function."""
 
     def test_with_data(self):
         data = DailyScreenTimeData(
@@ -119,7 +119,7 @@ class TestBuildProcrastinationSection:
                 ScreenTimeEntry(app="X", minutes=5),
             ]
         )
-        lines = _build_procrastination_section(data)
+        lines = build_procrastination_section(data)
 
         assert "### **PROCRASTINATION**" in lines
         assert any("YouTube" in line and "`+1h15m`" in line for line in lines)
@@ -135,7 +135,7 @@ class TestBuildProcrastinationSection:
                 ScreenTimeEntry(app="Medium", minutes=30),
             ]
         )
-        lines = _build_procrastination_section(data)
+        lines = build_procrastination_section(data)
         table_lines = [
             line
             for line in lines
@@ -149,14 +149,14 @@ class TestBuildProcrastinationSection:
         assert "TOTAL" in table_lines[3]
 
     def test_no_data(self):
-        lines = _build_procrastination_section(None)
+        lines = build_procrastination_section(None)
         assert "### **PROCRASTINATION**" in lines
         assert any("No screen time data" in line for line in lines)
 
     def test_empty_entries(self):
         """Empty entries with shortcut_ran=True renders TOTAL +0m."""
         data = DailyScreenTimeData(entries=[], shortcut_ran=True)
-        lines = _build_procrastination_section(data)
+        lines = build_procrastination_section(data)
         assert any("**TOTAL**" in line and "+0m" in line for line in lines)
 
     def test_with_deviations(self):
@@ -173,7 +173,7 @@ class TestBuildProcrastinationSection:
             late_study_start_minutes=40,
             late_workout_start_minutes=20,
         )
-        lines = _build_procrastination_section(screen_data, deviation_data)
+        lines = build_procrastination_section(screen_data, deviation_data)
 
         assert any("DEVIATIONS" in line and "`+30m`" in line for line in lines)
         assert any("YouTube" in line and "`+30m`" in line for line in lines)
@@ -193,7 +193,7 @@ class TestBuildProcrastinationSection:
         deviation_data = DailyDeviationData(
             late_study_start_minutes=30,
         )
-        lines = _build_procrastination_section(screen_data, deviation_data)
+        lines = build_procrastination_section(screen_data, deviation_data)
 
         assert not any("DEVIATIONS" in line for line in lines)
         # Total is just screen time since no non-phone deviation

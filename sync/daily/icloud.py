@@ -25,7 +25,7 @@ logger = get_logger()
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
 
 
-def _load_status_file(filename: str) -> tuple[bool, dict | None]:
+def load_status_file(filename: str) -> tuple[bool, dict | None]:
     """
     Read and JSON-parse a status file dropped in iCloud by Shortcuts.
 

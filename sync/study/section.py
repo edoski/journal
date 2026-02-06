@@ -20,7 +20,7 @@ from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
 SessionDict = dict[str, Any]
 
 
-def _extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
+def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
     """
     Extract notes and context from existing study table keyed by start time (HH:MM).
 
@@ -89,7 +89,7 @@ def _format_interrupt(minutes: int) -> str:
     return f"`+{minutes:02d}m`"
 
 
-def _build_study_section(
+def build_study_section(
     sessions: list[SessionDict],
     existing_notes: dict[str, str],
     context_for_session: Callable[[Any, Any], str] | None = None,

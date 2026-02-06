@@ -277,6 +277,21 @@ sync/
 
 **Data flow**: `markdown → readers → models → writers → markdown`
 
+### Interface-First Layer Rules
+
+The architecture is now interface-first and enforces strict layering:
+
+- **`sync/contracts/`**: typed DTO/contracts only (no I/O, no adapter logic)
+- **`sync/ports/`**: stable `Protocol` interfaces consumed by application services
+- **`sync/adapters/`**: concrete integrations for Flow DB, iCloud, markdown/file system
+- **`sync/application/`**: orchestration services that depend on ports/contracts, never adapters directly
+- **Composition roots only**: `sync/daily/__main__.py`, `sync/periods/{weekly,monthly,quarterly,yearly}.py`, `tui/app.py`, and `tui/cli.py` may wire adapters into application services
+
+Dependency rules:
+- `sync/application` must not import `sync/adapters`
+- `sync/writers` must not import `sync/ports` or `sync/adapters`
+- Non-composition modules must not import `sync/application` or `sync/adapters`
+
 ### Module Responsibilities
 
 **Models (`sync/models/`):**
