@@ -201,7 +201,7 @@ class GoalSyncService:
             ),
         )
 
-        today = datetime.date.today()
+        today = window.target_date
         monthly_sync = sync_mirror_section(
             monthly_tasks,
             monthly_mirror,
@@ -307,7 +307,7 @@ class GoalSyncService:
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
             load_quarterly_goals(month_start)
         )
-        today = datetime.date.today()
+        today = window.target_date
         quarterly_sync = sync_mirror_section(
             quarterly_tasks,
             quarterly_mirror,
@@ -390,7 +390,7 @@ class GoalSyncService:
             period_key=str(window.year),
         )
 
-        today = datetime.date.today()
+        today = window.end
         yearly_sync = sync_mirror_section(
             yearly_tasks,
             yearly_mirror,

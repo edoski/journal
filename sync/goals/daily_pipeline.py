@@ -39,6 +39,7 @@ def load_weekly_goals(
 ) -> tuple[list[Goal], list[Goal], list[Goal], list[Goal], str, str, str]:
     """Load weekly/monthly/quarterly/yearly source goals used by daily sync."""
     path = weekly_note_path(date_obj, journal_dir=journal_dir)
+    week_start, _ = iso_week_range(date_obj)
     month_start = datetime.date(date_obj.year, date_obj.month, 1)
     month_key = f"{month_start.year}-{month_start.month:02d}"
     monthly_path = os.path.join(journal_dir, f"{month_key}.md")
@@ -55,7 +56,7 @@ def load_weekly_goals(
         lines,
         "WEEKLY",
         horizon="weekly",
-        period_key=date_obj.isoformat(),
+        period_key=week_start.isoformat(),
     )
 
     monthly_lines = note_store.read_or_create(monthly_path, MONTHLY_TEMPLATE_PATH)

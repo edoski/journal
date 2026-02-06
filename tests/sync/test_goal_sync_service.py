@@ -73,13 +73,24 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
         "sync.application.goal_sync_service.load_source_tasks_with_carry_forward",
         lambda *_a, **_kw: [],
     )
+    mirror_today_calls: list[datetime.date] = []
+    pierce_today_calls: list[datetime.date] = []
+
+    def _mirror_stub(*_args, **kwargs):
+        mirror_today_calls.append(kwargs["today"])
+        return MirrorSyncResult([], [], False, ["mirror"])
+
+    def _pierce_stub(*_args, **kwargs):
+        pierce_today_calls.append(kwargs["today"])
+        return PiercingSyncResult(["source"], [[], []], [False, False])
+
     monkeypatch.setattr(
         "sync.application.goal_sync_service.sync_mirror_section",
-        lambda *_a, **_kw: MirrorSyncResult([], [], False, ["mirror"]),
+        _mirror_stub,
     )
     monkeypatch.setattr(
         "sync.application.goal_sync_service.sync_pierced_source_section",
-        lambda *_a, **_kw: PiercingSyncResult(["source"], [[], []], [False, False]),
+        _pierce_stub,
     )
 
     lines = note_store.read_or_create(note_path, "unused")
@@ -91,6 +102,8 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
     assert goal_store.last_sections[0].lines == ["mirror"]
     assert goal_store.last_sections[1].section == "WEEKLY"
     assert goal_store.last_sections[1].lines == ["source"]
+    assert mirror_today_calls == [window.target_date]
+    assert pierce_today_calls == [window.target_date]
 
 
 def test_sync_yearly_note_uses_carry_forward(monkeypatch):
