@@ -36,7 +36,7 @@ from sync.periods.runtime import journal_path
 from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWindow
 from sync.readers.goals import filter_by_proximity
 from sync.writers.goals import build_goals_block, render_goal_lines
-from sync.daily.goals import (
+from sync.goals.daily_pipeline import (
     carry_forward_daily_tasks,
     load_weekly_goals,
     parse_daily_goal_subsections,
@@ -61,7 +61,9 @@ class GoalSyncService:
         reminder_rules: list[ReminderRule],
     ) -> list[str]:
         existing_weekly_tasks, existing_daily_tasks = parse_daily_goal_subsections(
-            lines
+            lines,
+            day=day,
+            goal_store=self.goal_store,
         )
 
         yesterday = day - datetime.timedelta(days=1)
@@ -69,6 +71,8 @@ class GoalSyncService:
             day,
             yesterday,
             existing_daily_tasks,
+            note_store=self.note_store,
+            goal_store=self.goal_store,
         )
 
         reminders = get_reminders_for_date(day, reminder_rules)
@@ -86,7 +90,11 @@ class GoalSyncService:
             weekly_path,
             monthly_path,
             quarterly_path,
-        ) = load_weekly_goals(day)
+        ) = load_weekly_goals(
+            day,
+            note_store=self.note_store,
+            goal_store=self.goal_store,
+        )
 
         updated_weekly_tasks, _, weekly_changed, _ = reconcile_goal_lists(
             weekly_tasks,
@@ -125,6 +133,8 @@ class GoalSyncService:
                 updated_monthly if monthly_changed else None,
                 updated_quarterly if quarterly_changed else None,
                 updated_yearly if yearly_changed else None,
+                note_store=self.note_store,
+                goal_store=self.goal_store,
             )
 
         daily_source_lines = render_goal_lines(original_daily, today=day)

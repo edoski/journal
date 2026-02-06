@@ -58,7 +58,6 @@ journal/
       __main__.py              # Daily composition root
       constants.py
       context.py
-      goals.py
       icloud.py
       screen_time.py
       sleep.py
@@ -75,6 +74,7 @@ journal/
       section.py
 
     goals/
+      daily_pipeline.py        # Daily goal orchestration helpers (domain-owned)
       identity.py
       tombstones.py
       carry_forward.py

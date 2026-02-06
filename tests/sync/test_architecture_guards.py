@@ -75,6 +75,7 @@ def test_removed_legacy_module_files_do_not_exist():
         "sync/daily/flow_db.py",
         "sync/daily/breaks.py",
         "sync/daily/study.py",
+        "sync/daily/goals.py",
         "utils",
     ]
     existing = [path for path in legacy_paths if (ROOT / path).exists()]
@@ -300,12 +301,36 @@ def test_period_goal_orchestration_lives_in_goal_service():
     )
 
 
-def test_daily_goal_writes_use_period_pipeline_helper():
-    daily_goals_path = ROOT / "sync" / "daily" / "goals.py"
-    imported = _imported_from(daily_goals_path, "sync.goals.period_pipeline")
+def test_goal_daily_pipeline_writes_use_period_pipeline_helper():
+    daily_pipeline_path = ROOT / "sync" / "goals" / "daily_pipeline.py"
+    imported = _imported_from(daily_pipeline_path, "sync.goals.period_pipeline")
     assert "propagate_source_sections" in imported, (
-        "sync/daily/goals.py must route goal source writes through "
+        "sync/goals/daily_pipeline.py must route goal source writes through "
         "sync.goals.period_pipeline.propagate_source_sections"
+    )
+
+
+def test_goal_sync_service_does_not_import_daily_goals_module():
+    service_path = ROOT / "sync" / "application" / "goal_sync_service.py"
+    module = _parse_module(service_path)
+    violations: list[str] = []
+
+    for node in ast.walk(module):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "sync.daily.goals" or alias.name.startswith(
+                    "sync.daily.goals."
+                ):
+                    violations.append(f"import {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ""
+            if mod == "sync.daily.goals" or mod.startswith("sync.daily.goals."):
+                imported = ", ".join(alias.name for alias in node.names)
+                violations.append(f"from {mod} import {imported}")
+
+    assert not violations, (
+        "sync.application.goal_sync_service must not import sync.daily.goals:\n"
+        + "\n".join(violations)
     )
 
 

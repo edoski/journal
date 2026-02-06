@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
+from sync.adapters.markdown_goals import MarkdownGoalStore
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.goals.tombstones import (
     cleanup_old_entries,
     get_carried_ids,
@@ -18,7 +20,7 @@ from sync.goals.tombstones import (
     record_carried_ids,
     record_deleted_ids,
 )
-from sync.daily.goals import carry_forward_daily_tasks
+from sync.goals.daily_pipeline import carry_forward_daily_tasks
 from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.models.goals import Goal
 
@@ -274,15 +276,19 @@ class TestCacheIntegration:
             ["- [ ] Ask Prof. Bacchiega ^gid-d1b9dadad0"],
         )
 
+        note_store = MarkdownNoteStore()
+        goal_store = MarkdownGoalStore()
         with (
             patch("sync.goals.tombstones.CARRIED_GOALS_PATH", str(temp_cache)),
-            patch("sync.daily.goals.JOURNAL_DIR", str(journal_dir)),
         ):
             # First run offers goal to 2026-02-06.
             _, added = carry_forward_daily_tasks(
                 today_date=datetime.date(2026, 2, 6),
                 yesterday_date=datetime.date(2026, 2, 5),
                 existing_daily_tasks=[],
+                note_store=note_store,
+                goal_store=goal_store,
+                journal_dir=str(journal_dir),
             )
             assert added == 1
 
@@ -291,6 +297,9 @@ class TestCacheIntegration:
                 today_date=datetime.date(2026, 2, 6),
                 yesterday_date=datetime.date(2026, 2, 5),
                 existing_daily_tasks=[],
+                note_store=note_store,
+                goal_store=goal_store,
+                journal_dir=str(journal_dir),
             )
             assert added == 0
             assert tasks_after_delete == []
@@ -301,6 +310,9 @@ class TestCacheIntegration:
                 today_date=datetime.date(2026, 2, 7),
                 yesterday_date=datetime.date(2026, 2, 6),
                 existing_daily_tasks=[],
+                note_store=note_store,
+                goal_store=goal_store,
+                journal_dir=str(journal_dir),
             )
             assert added == 0
             assert tasks_next_day == []

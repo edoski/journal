@@ -137,13 +137,6 @@ def test_sync_day_is_idempotent(monkeypatch, tmp_path):
 
 def test_sync_day_output_characterization(monkeypatch, tmp_path):
     fixed_today = datetime.date(2025, 1, 15)
-
-    class _FixedDate(datetime.date):
-        @classmethod
-        def today(cls):
-            return cls(2025, 1, 15)
-
-    monkeypatch.setattr("sync.daily.goals.datetime.date", _FixedDate)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
 
     changed = service.sync_day(fixed_today, [_session_for_day(fixed_today)])
