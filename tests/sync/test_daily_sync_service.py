@@ -34,6 +34,17 @@ class _StubStatusSource:
         return None
 
 
+class _LegacySleepStatusSource(_StubStatusSource):
+    def load_sleep(self, _day: datetime.date):
+        return {
+            "SleepBegin": "14 Jan 2025 at 23:30",
+            "SleepEnd": "15 Jan 2025 at 06:30",
+            "SleepMinutes": 420,
+            "AwakeMinutes": 15,
+            "AwakeCount": 2,
+        }
+
+
 class _StubContextSource:
     def files_modified_on_date(self, _day: datetime.date):
         return []
@@ -83,7 +94,7 @@ def _session_for_day(day: datetime.date) -> dict:
 
 
 def _build_service(
-    monkeypatch, tmp_path, reminder_store=None
+    monkeypatch, tmp_path, reminder_store=None, status_source=None
 ) -> tuple[DailySyncService, str]:
     journal_dir = tmp_path / "journal"
     journal_dir.mkdir()
@@ -93,7 +104,7 @@ def _build_service(
 
     service = DailySyncService(
         note_store=MarkdownNoteStore(),
-        status_source=_StubStatusSource(),
+        status_source=status_source or _StubStatusSource(),
         context_source=_StubContextSource(),
         reminder_store=reminder_store or _StubReminderStore(),
         goal_sync_service=_StubGoalSyncService(),
@@ -163,4 +174,16 @@ def test_sync_day_fails_without_reminders_config(monkeypatch, tmp_path):
     )
 
     with pytest.raises(FileNotFoundError, match="Required reminder config not found"):
+        service.sync_day(day, [_session_for_day(day)])
+
+
+def test_sync_day_fails_for_legacy_sleep_payload(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, _ = _build_service(
+        monkeypatch,
+        tmp_path,
+        status_source=_LegacySleepStatusSource(),
+    )
+
+    with pytest.raises(ValueError, match="Legacy sleep payload keys are not supported"):
         service.sync_day(day, [_session_for_day(day)])

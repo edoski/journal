@@ -3,10 +3,42 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from typing import Any
 
+from sync.contracts.daily import SleepStatusPayload
 from sync.logging import get_logger
 
 logger = get_logger()
+
+_LEGACY_SLEEP_KEYS = {
+    "SleepBegin",
+    "SleepStart",
+    "SleepEnd",
+    "SleepMinutes",
+    "AwakeMinutes",
+    "AwakeCount",
+}
+
+
+def _sleep_minutes_from_payload(sleep_data: SleepStatusPayload) -> float:
+    payload: dict[str, Any] = dict(sleep_data)
+    legacy = sorted(key for key in _LEGACY_SLEEP_KEYS if key in payload)
+    if legacy:
+        msg = "Legacy sleep payload keys are not supported: " + ", ".join(legacy)
+        logger.error(msg)
+        raise ValueError(msg)
+
+    if "sleep_min" not in payload:
+        msg = "Invalid sleep payload: missing key sleep_min"
+        logger.error(msg)
+        raise ValueError(msg)
+
+    try:
+        return float(payload["sleep_min"])
+    except (TypeError, ValueError) as exc:
+        msg = "Invalid sleep payload: sleep_min must be numeric"
+        logger.error(msg)
+        raise ValueError(msg) from exc
 
 
 def update_frontmatter(
@@ -15,7 +47,7 @@ def update_frontmatter(
     workout_done: bool,
     stretch_done: bool,
     meditate_done: bool,
-    sleep_data: dict | None,
+    sleep_data: SleepStatusPayload | None,
 ) -> tuple[list[str], dict[str, str]]:
     """
     Update YAML frontmatter in final_lines with study time and status flags.
@@ -96,17 +128,12 @@ def update_frontmatter(
         current = fm_data.get("stretch", "")
         set_value("stretch", current if current else "false")
 
-    if sleep_data and (sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")):
-        try:
-            sleep_value = sleep_data.get("sleep_min") or sleep_data.get("SleepMinutes")
-            if sleep_value is not None:
-                total_min = float(sleep_value)
-                hours = int(total_min) // 60
-                mins = int(total_min) % 60
-                sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
-                set_value("sleep", sleep_str)
-        except (ValueError, TypeError, KeyError) as e:
-            logger.debug("Failed to parse sleep data for frontmatter: %s", e)
+    if sleep_data is not None:
+        total_min = _sleep_minutes_from_payload(sleep_data)
+        hours = int(total_min) // 60
+        mins = int(total_min) % 60
+        sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
+        set_value("sleep", sleep_str)
 
     # Enforce canonical order: sleep, study, mood, meditate, workout, stretch, then rest
     canonical_order = ["sleep", "study", "mood", "meditate", "workout", "stretch"]

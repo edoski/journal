@@ -166,7 +166,7 @@ journal/
 - `StudySessionSource.load_sessions(day) -> list[StudySessionRecord]`
 - `DailyStatusSource`:
   - `load_training(day) -> TrainingStatusBundle`
-  - `load_sleep(day) -> SleepStatusPayload | None`
+  - `load_sleep(day) -> SleepStatusPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
   - `load_screen_time(day) -> DailyScreenTimeData | None`
   - `write_study_times(day, sessions) -> None`
 - `NoteStore`:

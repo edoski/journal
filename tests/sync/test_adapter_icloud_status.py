@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
+
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
 
@@ -37,7 +39,14 @@ def test_load_training_reads_three_shortcut_files(monkeypatch):
 
 def test_load_sleep_returns_dict_payload(monkeypatch):
     day = datetime.date(2026, 2, 6)
-    expected = {"sleep_min": 420}
+    expected = {
+        "date": "2026-02-06",
+        "start": "2026-02-05T23:30:00+0000",
+        "end": "2026-02-06T06:30:00+0000",
+        "sleep_min": 420,
+        "awake_min": 15,
+        "awake_count": 2,
+    }
     monkeypatch.setattr(
         "sync.adapters.icloud_status.load_status_file",
         lambda _name: (True, expected),
@@ -45,6 +54,25 @@ def test_load_sleep_returns_dict_payload(monkeypatch):
 
     adapter = ICloudDailyStatusSource()
     assert adapter.load_sleep(day) == expected
+
+
+def test_load_sleep_rejects_legacy_payload_keys(monkeypatch):
+    day = datetime.date(2026, 2, 6)
+    legacy_payload = {
+        "SleepBegin": "05 Feb 2026 at 23:30",
+        "SleepEnd": "06 Feb 2026 at 06:30",
+        "SleepMinutes": 420,
+        "AwakeMinutes": 15,
+        "AwakeCount": 2,
+    }
+    monkeypatch.setattr(
+        "sync.adapters.icloud_status.load_status_file",
+        lambda _name: (True, legacy_payload),
+    )
+
+    adapter = ICloudDailyStatusSource()
+    with pytest.raises(ValueError, match="Legacy sleep payload keys are not supported"):
+        adapter.load_sleep(day)
 
 
 def test_load_screen_time_uses_iso_day(monkeypatch):

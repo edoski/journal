@@ -16,7 +16,7 @@ class TrainingStatusEntry(TypedDict, total=False):
     type: str
 
 
-class SleepStatusPayload(TypedDict, total=False):
+class SleepStatusPayload(TypedDict):
     """Sleep status payload produced by iCloud shortcuts."""
 
     date: str
@@ -25,12 +25,6 @@ class SleepStatusPayload(TypedDict, total=False):
     sleep_min: float
     awake_min: float
     awake_count: int
-    SleepBegin: str
-    SleepStart: str
-    SleepEnd: str
-    SleepMinutes: float
-    AwakeMinutes: float
-    AwakeCount: int
 
 
 @dataclass(frozen=True)

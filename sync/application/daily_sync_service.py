@@ -5,9 +5,9 @@ from __future__ import annotations
 import datetime
 import os
 from dataclasses import dataclass
-from typing import cast
 
 from sync.constants import IDEAL, JOURNAL_DIR
+from sync.contracts.daily import SleepStatusPayload
 from sync.contracts.study import StudySessionRecord
 from sync.daily.constants import TEMPLATE_PATH
 from sync.daily.context import format_context_cell
@@ -38,7 +38,7 @@ class _MetricsSectionResult:
     workout_done: bool
     stretch_done: bool
     meditate_done: bool
-    sleep_data: dict | None
+    sleep_data: SleepStatusPayload | None
 
 
 class DailySyncService:
@@ -194,7 +194,6 @@ class DailySyncService:
 
         training_bundle = self.status_source.load_training(day)
         sleep_data = self.status_source.load_sleep(day)
-        sleep_data_dict = cast(dict | None, sleep_data)
         existing_training_block = extract_block(metrics_body, "### **training**")
         existing_sleep_block = extract_block(metrics_body, "### **sleep**")
 
@@ -213,7 +212,7 @@ class DailySyncService:
             existing_training_block,
             day.isoformat(),
         )
-        sleep_lines = build_sleep_section(sleep_data_dict, existing_sleep_block)
+        sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
         screen_time_data = self.status_source.load_screen_time(day)
         deviation_data = self._build_deviation_data(
             sessions, training_bundle.workout_payload
@@ -239,7 +238,7 @@ class DailySyncService:
             workout_done=training_bundle.workout_done,
             stretch_done=training_bundle.stretch_done,
             meditate_done=training_bundle.meditate_done,
-            sleep_data=sleep_data_dict,
+            sleep_data=sleep_data,
         )
 
     @staticmethod
