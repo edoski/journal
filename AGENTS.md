@@ -61,7 +61,11 @@ journal/
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
     formatting.py             # Value parsing and formatting
-    metrics.py                # Period aggregation, moving averages, shared data loaders
+    metrics/                  # Period metrics package (loading, aggregation, comparison)
+      __init__.py             # Public metrics API exports
+      loading.py              # Daily-note loading and prior-period metrics helpers
+      aggregation.py          # Period aggregation + grouped totals helpers
+      comparison.py           # Moving averages, deltas, percentage regrouping
     notes/                    # Note infrastructure (locking + markdown/section helpers)
       __init__.py             # Notes package exports
       locking.py              # File-locking primitives
@@ -247,7 +251,10 @@ sync/
     ├── constants.py    # Configuration values
     ├── dates.py        # Date ranges + period shifting
     ├── formatting.py   # Value parsing and formatting
-    ├── metrics.py      # Period aggregation + shared period data loaders
+    ├── metrics/
+    │   ├── loading.py      # Daily-note loading + prior-period metrics helper
+    │   ├── aggregation.py  # Period aggregation + grouped totals
+    │   └── comparison.py   # Moving averages + delta/threshold helpers
     ├── notes/
     │   ├── locking.py    # Advisory file locking
     │   ├── markdown.py   # Shared markdown header normalization + extract_block
@@ -291,7 +298,9 @@ sync/
 **Shared Modules:**
 - `dates.py`: `daterange`, `iso_week_range`, `month_range`, `quarter_range`, `shift_month`, `shift_quarter`, `previous_month`, `previous_quarter`
 - `formatting.py`: `format_minutes`, `compute_percent_change`, `format_percent_change`
-- `metrics.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`, `compute_period_metrics`, `compute_moving_average`, `aggregate_training_type_session_stats`
+- `metrics/loading.py`: `load_daily_data`, `load_daily_data_for_dates`, `load_prior_period_metrics`
+- `metrics/aggregation.py`: `compute_period_metrics`, `aggregate_activity_totals`, `aggregate_interrupt_overrun`, `aggregate_screen_time`, `aggregate_training_type_session_stats`
+- `metrics/comparison.py`: `group_screen_time_by_percent`, `compute_period_deltas`, `compute_moving_average`
 - `study/constants.py`: Flow app integration constants + study break boundaries
 - `study/db.py`: `get_todays_sessions`, `dedupe_sessions`, `core_data_to_datetime`
 - `study/breaks.py`: expected-break calculation, lunch window shifting, overrun clamping

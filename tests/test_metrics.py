@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import datetime
 
-import sync.metrics as metrics
+import sync.metrics.loading as metrics_loading
 from sync.metrics import (
     compute_period_metrics,
     aggregate_activity_totals,
@@ -369,7 +369,7 @@ class TestLoadDailyData:
         (tmp_path / f"{day_1:%Y-%m-%d}.md").write_text("note")
         (tmp_path / f"{day_3:%Y-%m-%d}.md").write_text("note")
 
-        monkeypatch.setattr(metrics, "JOURNAL_DIR", str(tmp_path))
+        monkeypatch.setattr(metrics_loading, "JOURNAL_DIR", str(tmp_path))
 
         def _fake_parse_daily_note(path: str):
             if path.endswith(f"{day_1:%Y-%m-%d}.md"):
@@ -409,7 +409,7 @@ class TestLoadPriorPeriodMetrics:
                 for d in date_list
             }
 
-        monkeypatch.setattr(metrics, "load_daily_data_for_dates", _fake_load)
+        monkeypatch.setattr(metrics_loading, "load_daily_data_for_dates", _fake_load)
 
         def _bounds(offset: int) -> tuple[datetime.date, datetime.date]:
             start = base + datetime.timedelta(days=offset * 10)
