@@ -7,8 +7,8 @@ including timing, interruptions, and status. Useful for debugging and
 for agents to inspect session state.
 
 Usage:
-    python session_preview.py          # Show most recent session
-    python session_preview.py -n 5     # Show last 5 sessions
+    python -m utils.session_preview       # Show most recent session
+    python -m utils.session_preview -n 5  # Show last 5 sessions
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import argparse
 import sys
 from datetime import datetime
 
-from flow_db import (
+from utils.flow_db import (
     get_connection,
     get_interruptions_for_session,
     get_recent_sessions,

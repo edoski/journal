@@ -8,8 +8,8 @@ IMPORTANT: Make sure Flow is NOT running when you execute this, or the
 changes may not persist (Flow might have the DB locked or cached).
 
 Usage:
-    python rename_session.py "My new title"           # Preview the rename
-    python rename_session.py "My new title" --confirm # Actually rename
+    python -m utils.rename_session "My new title"           # Preview the rename
+    python -m utils.rename_session "My new title" --confirm # Actually rename
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from flow_db import (
+from utils.flow_db import (
     format_session,
     get_connection,
     get_recent_sessions,
@@ -82,7 +82,7 @@ def main():
 
     if not args.confirm:
         print("\nThis is a PREVIEW. To actually rename, run:")
-        print(f'  python rename_session.py "{args.title}" --confirm')
+        print(f'  python -m utils.rename_session "{args.title}" --confirm')
         print("\n⚠️  Make sure Flow is CLOSED before confirming!")
         conn.close()
         sys.exit(0)

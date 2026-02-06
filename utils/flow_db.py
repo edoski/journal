@@ -9,16 +9,7 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
-from pathlib import Path
-
-# Flow database path
-DB_PATH = (
-    Path.home()
-    / "Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite"
-)
-
-# CoreData uses an epoch starting at 2001-01-01 instead of 1970-01-01
-CORE_DATA_EPOCH_OFFSET = 978307200
+from sync.daily.constants import DB_PATH, CORE_DATA_EPOCH_OFFSET
 
 
 def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:

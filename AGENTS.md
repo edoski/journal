@@ -91,9 +91,9 @@ journal/
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence.
 
 - **`utils/`**: CLI utilities for the Flow database:
-  - `session_preview.py`: View current/recent session stats with `python3 session_preview.py [-n COUNT]`
-  - `rename_session.py`: Rename most recent session with `python3 rename_session.py "Title" [--confirm]`
-  - `undo_last_session.py`: Delete most recent session with `python3 undo_last_session.py [--confirm]`
+  - `session_preview.py`: View current/recent session stats with `python3 -m utils.session_preview [-n COUNT]`
+  - `rename_session.py`: Rename most recent session with `python3 -m utils.rename_session "Title" [--confirm]`
+  - `undo_last_session.py`: Delete most recent session with `python3 -m utils.undo_last_session [--confirm]`
   - `flow_skip.py`: Skip current Flow session and start break (called by launchd)
   - `toggle_flow_skip.py`: Enable/disable skip automation with `python3 -m utils.toggle_flow_skip [on|off]`
   - All write operations default to dry-run mode; use `--confirm` to execute.

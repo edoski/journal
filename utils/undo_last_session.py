@@ -9,8 +9,8 @@ IMPORTANT: Make sure Flow is NOT running when you execute this, or the
 changes may not persist (Flow might have the DB locked or cached).
 
 Usage:
-    python undo_last_session.py          # Preview what will be deleted
-    python undo_last_session.py --confirm  # Actually delete
+    python -m utils.undo_last_session          # Preview what will be deleted
+    python -m utils.undo_last_session --confirm  # Actually delete
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from flow_db import (
+from utils.flow_db import (
     format_session,
     get_connection,
     get_recent_sessions,
@@ -112,7 +112,7 @@ def main():
 
     if not args.confirm:
         print("\nThis is a PREVIEW. To actually delete, run:")
-        print("  python undo_last_session.py --confirm")
+        print("  python -m utils.undo_last_session --confirm")
         print("\n⚠️  Make sure Flow is CLOSED before confirming!")
         conn.close()
         sys.exit(0)
