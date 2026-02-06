@@ -11,18 +11,19 @@ import os
 
 from sync.constants import JOURNAL_DIR, WEEKLY_TEMPLATE_PATH
 from sync.goals.carry_forward import carry_forward_with_tombstones
-from sync.io import safe_read_file, atomic_write_note
+from sync.io import safe_read_file
 from sync.logging import get_logger
 from sync.models import Goal
 from sync.notes.locking import locked_note
-from sync.notes.sections import (
-    ensure_note,
-    goals_section_bounds,
-    extract_subsection_tasks,
-)
 from sync.dates import iso_week_range
 from sync.readers.goals import ensure_goal_ids
-from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.goals import render_goal_lines
+from sync.goals.note_store import (
+    ensure_note_lines,
+    extract_goals,
+    render_goals_or_empty,
+    write_goals_sections,
+)
 
 logger = get_logger()
 
@@ -73,9 +74,12 @@ def load_weekly_goals(
     if lines is None:
         return [], [], [], [], path, monthly_path, quarterly_path
 
-    g_start, g_end = goals_section_bounds(lines)
-    weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
-    weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", date_obj.isoformat())
+    weekly_tasks = extract_goals(
+        lines,
+        "WEEKLY",
+        horizon="weekly",
+        period_key=date_obj.isoformat(),
+    )
 
     # Load goals from SOURCE notes (not mirrors) to preserve deadline/reminder_offset.
     # Mirror sections (e.g., weekly's MONTHLY) only have countdown text, not original dates.
@@ -86,28 +90,30 @@ def load_weekly_goals(
     yearly_tasks: list[Goal] = []
 
     # Load MONTHLY goals from monthly note's MONTHLY section (source)
-    ensure_note(monthly_path, MONTHLY_TEMPLATE_PATH)
-    monthly_lines = safe_read_file(monthly_path)
+    monthly_lines = ensure_note_lines(monthly_path, MONTHLY_TEMPLATE_PATH)
     if monthly_lines is not None:
-        m_start, m_end = goals_section_bounds(monthly_lines)
-        monthly_tasks = extract_subsection_tasks(
-            monthly_lines, m_start, m_end, "MONTHLY"
+        monthly_tasks = extract_goals(
+            monthly_lines,
+            "MONTHLY",
+            horizon="monthly",
+            period_key=month_key,
         )
-        monthly_tasks = ensure_goal_ids(monthly_tasks, "monthly", month_key)
 
     # Load QUARTERLY and YEARLY goals from quarterly note (source for both)
-    ensure_note(quarterly_path, QUARTERLY_TEMPLATE_PATH)
-    quarterly_lines = safe_read_file(quarterly_path)
+    quarterly_lines = ensure_note_lines(quarterly_path, QUARTERLY_TEMPLATE_PATH)
     if quarterly_lines is not None:
-        q_start, q_end = goals_section_bounds(quarterly_lines)
-        quarterly_tasks = extract_subsection_tasks(
-            quarterly_lines, q_start, q_end, "QUARTERLY"
+        quarterly_tasks = extract_goals(
+            quarterly_lines,
+            "QUARTERLY",
+            horizon="quarterly",
+            period_key=qtr_key,
         )
-        yearly_tasks = extract_subsection_tasks(
-            quarterly_lines, q_start, q_end, "YEARLY"
+        yearly_tasks = extract_goals(
+            quarterly_lines,
+            "YEARLY",
+            horizon="yearly",
+            period_key=str(q_year),
         )
-        quarterly_tasks = ensure_goal_ids(quarterly_tasks, "quarterly", qtr_key)
-        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(q_year))
 
     return (
         weekly_tasks,
@@ -142,57 +148,17 @@ def write_weekly_goals(
     """
     path = weekly_note_path(date_obj)
     with locked_note(path):
-        ensure_note(path, WEEKLY_TEMPLATE_PATH)
-        lines = safe_read_file(path) or []
-
-        g_start, g_end = goals_section_bounds(lines)
-        if g_start == -1:
-            # No Goals section: prepend it.
-            new_block = build_goals_block(
-                [
-                    (
-                        "MONTHLY",
-                        [
-                            "",
-                            "_No monthly goals have been defined yet._",
-                        ],
-                    ),
-                    ("WEEKLY", render_goal_lines(weekly_tasks)),
-                ]
-            )
-            lines = new_block + ([""] if lines and lines[0].strip() else []) + lines
-        else:
-            existing_monthly = extract_subsection_tasks(
-                lines, g_start, g_end, "MONTHLY"
-            )
-            monthly_lines = (
-                render_goal_lines(existing_monthly)
-                if existing_monthly
-                else [
-                    "",
-                    "_No monthly goals have been defined yet._",
-                ]
-            )
-            new_block = build_goals_block(
-                [
-                    ("MONTHLY", monthly_lines),
-                    ("WEEKLY", render_goal_lines(weekly_tasks)),
-                ]
-            )
-            lines[g_start:g_end] = new_block
-            # Ensure a blank line separation if next line is not blank or header
-            insert_pos = g_start + len(new_block)
-            if (
-                insert_pos < len(lines)
-                and lines[insert_pos].strip()
-                and not lines[insert_pos].startswith("## ")
-            ):
-                lines.insert(insert_pos, "")
-
-        tmp_path = path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write("\n".join(lines).rstrip() + "\n")
-        os.replace(tmp_path, path)
+        lines = ensure_note_lines(path, WEEKLY_TEMPLATE_PATH)
+        existing_monthly = extract_goals(lines, "MONTHLY")
+        write_goals_sections(
+            path,
+            lines,
+            [
+                ("MONTHLY", render_goals_or_empty("MONTHLY", existing_monthly)),
+                ("WEEKLY", render_goal_lines(weekly_tasks)),
+            ],
+            insert_if_missing=True,
+        )
 
     # Propagate status changes to monthly note if monthly goals were updated
     if monthly_tasks:
@@ -203,33 +169,20 @@ def write_weekly_goals(
             JOURNAL_DIR, f"{month_start.year}-{month_start.month:02d}.md"
         )
         with locked_note(monthly_path):
-            ensure_note(monthly_path, MONTHLY_TEMPLATE_PATH)
-            monthly_lines = safe_read_file(monthly_path) or []
-            m_start, m_end = goals_section_bounds(monthly_lines)
-            # Read existing QUARTERLY mirror and update MONTHLY source
-            existing_quarterly = extract_subsection_tasks(
-                monthly_lines, m_start, m_end, "QUARTERLY"
-            )
-            quarterly_rendered = (
-                render_goal_lines(existing_quarterly)
-                if existing_quarterly
-                else ["", "_No quarterly goals have been defined yet._"]
-            )
-            new_m_block = build_goals_block(
+            monthly_lines = ensure_note_lines(monthly_path, MONTHLY_TEMPLATE_PATH)
+            existing_quarterly = extract_goals(monthly_lines, "QUARTERLY")
+            write_goals_sections(
+                monthly_path,
+                monthly_lines,
                 [
-                    ("QUARTERLY", quarterly_rendered),
+                    (
+                        "QUARTERLY",
+                        render_goals_or_empty("QUARTERLY", existing_quarterly),
+                    ),
                     ("MONTHLY", render_goal_lines(monthly_tasks)),
-                ]
+                ],
+                insert_if_missing=True,
             )
-            if m_start == -1:
-                monthly_lines = (
-                    new_m_block
-                    + ([""] if monthly_lines and monthly_lines[0].strip() else [])
-                    + monthly_lines
-                )
-            else:
-                monthly_lines[m_start:m_end] = new_m_block
-            atomic_write_note(monthly_path, monthly_lines)
 
     # Propagate status changes to quarterly note if quarterly/yearly goals were updated
     if quarterly_tasks or yearly_tasks:
@@ -240,35 +193,23 @@ def write_weekly_goals(
         qtr_key = quarter_id(q_year, q_num)
         quarterly_path = os.path.join(JOURNAL_DIR, f"{qtr_key}.md")
         with locked_note(quarterly_path):
-            ensure_note(quarterly_path, QUARTERLY_TEMPLATE_PATH)
-            quarterly_lines = safe_read_file(quarterly_path) or []
-            q_start, q_end = goals_section_bounds(quarterly_lines)
-            existing_yearly = extract_subsection_tasks(
-                quarterly_lines, q_start, q_end, "YEARLY"
-            )
-            existing_quarterly_src = extract_subsection_tasks(
-                quarterly_lines, q_start, q_end, "QUARTERLY"
-            )
+            quarterly_lines = ensure_note_lines(quarterly_path, QUARTERLY_TEMPLATE_PATH)
+            existing_yearly = extract_goals(quarterly_lines, "YEARLY")
+            existing_quarterly_src = extract_goals(quarterly_lines, "QUARTERLY")
             # Use updated tasks if provided, otherwise use existing
             yearly_to_write = yearly_tasks if yearly_tasks else existing_yearly
             quarterly_to_write = (
                 quarterly_tasks if quarterly_tasks else existing_quarterly_src
             )
-            new_q_block = build_goals_block(
+            write_goals_sections(
+                quarterly_path,
+                quarterly_lines,
                 [
                     ("YEARLY", render_goal_lines(yearly_to_write)),
                     ("QUARTERLY", render_goal_lines(quarterly_to_write)),
-                ]
+                ],
+                insert_if_missing=True,
             )
-            if q_start == -1:
-                quarterly_lines = (
-                    new_q_block
-                    + ([""] if quarterly_lines and quarterly_lines[0].strip() else [])
-                    + quarterly_lines
-                )
-            else:
-                quarterly_lines[q_start:q_end] = new_q_block
-            atomic_write_note(quarterly_path, quarterly_lines)
 
     return path
 
@@ -283,15 +224,14 @@ def parse_daily_goal_subsections(lines: list[str]) -> tuple[list[Goal], list[Goa
     Returns:
         Tuple of (weekly_tasks, daily_tasks)
     """
-    g_start, g_end = goals_section_bounds(lines)
-    if g_start == -1:
-        return [], []
-    weekly_tasks = extract_subsection_tasks(lines, g_start, g_end, "WEEKLY")
-    daily_tasks = extract_subsection_tasks(lines, g_start, g_end, "DAILY")
     today = datetime.date.today()
     week_start, _ = iso_week_range(today)
-    weekly_tasks = ensure_goal_ids(weekly_tasks, "weekly", week_start.isoformat())
-    daily_tasks = ensure_goal_ids(daily_tasks, "daily", today.isoformat())
+    weekly_tasks = extract_goals(
+        lines, "WEEKLY", horizon="weekly", period_key=week_start.isoformat()
+    )
+    daily_tasks = extract_goals(
+        lines, "DAILY", horizon="daily", period_key=today.isoformat()
+    )
     return weekly_tasks, daily_tasks
 
 
@@ -320,11 +260,14 @@ def carry_forward_daily_tasks(
     if y_lines is None:
         return existing_daily_tasks, 0
 
-    y_start, y_end = goals_section_bounds(y_lines)
-    y_daily = extract_subsection_tasks(y_lines, y_start, y_end, "DAILY")
+    y_daily = extract_goals(
+        y_lines,
+        "DAILY",
+        horizon="daily",
+        period_key=yesterday_date.isoformat(),
+    )
 
     today_key = today_date.isoformat()
-    y_daily = ensure_goal_ids(y_daily, "daily", yesterday_date.isoformat())
     existing_daily_tasks = ensure_goal_ids(existing_daily_tasks, "daily", today_key)
 
     open_y = [t for t in y_daily if not t.done]

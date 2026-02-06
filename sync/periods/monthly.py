@@ -6,13 +6,10 @@ from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
 )
-from sync.io import safe_read_file, atomic_write_note
+from sync.io import safe_read_file
 from sync.notes.sections import (
-    goals_section_bounds,
-    extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
-    splice_goals_section,
 )
 from sync.dates import (
     daterange,
@@ -48,7 +45,7 @@ from sync.writers.charts import (
     MONTHLY_WEEK_METRIC,
     MONTHLY_WEEK_MOOD,
 )
-from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.goals import render_goal_lines
 from sync.periods.sections import (
     append_interrupts_table,
     append_media_section,
@@ -57,7 +54,6 @@ from sync.periods.sections import (
     build_procrastination_section,
 )
 from sync.goals.carry_forward import carry_forward_with_tombstones
-from sync.readers.goals import ensure_goal_ids
 
 from sync.goals.reconcile import (
     load_quarterly_goals,
@@ -73,18 +69,12 @@ from sync.periods.runtime import (
     write_note_metrics,
 )
 from sync.periods.windows import build_month_window
-
-
-def _write_quarterly_goals(path, yearly_tasks, quarterly_tasks, existing_lines):
-    new_block = build_goals_block(
-        [
-            ("YEARLY", render_goal_lines(yearly_tasks)),
-            ("QUARTERLY", render_goal_lines(quarterly_tasks)),
-        ]
-    )
-    lines = existing_lines[:]
-    splice_goals_section(lines, new_block, insert_if_missing=True)
-    atomic_write_note(path, lines)
+from sync.goals.note_store import (
+    apply_goals_sections,
+    extract_goals,
+    render_goals_or_empty,
+    write_goals_sections,
+)
 
 
 def build_monthly_metrics(
@@ -524,15 +514,19 @@ def main() -> None:
         month_start, month_end = window.start, window.end
 
         # Parse goals (existing mirrors + monthly source) and carry forward open monthly goals.
-        g_start, g_end = goals_section_bounds(lines)
-        quarterly_mirror = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-        monthly_tasks = extract_subsection_tasks(lines, g_start, g_end, "MONTHLY")
-        monthly_tasks = ensure_goal_ids(
-            monthly_tasks, "monthly", month_start.isoformat()
+        quarterly_mirror = extract_goals(
+            lines,
+            "QUARTERLY",
+            horizon="quarterly",
+            period_key=quarter_id(*quarter_of_date(month_start)),
+        )
+        monthly_tasks = extract_goals(
+            lines,
+            "MONTHLY",
+            horizon="monthly",
+            period_key=month_start.isoformat(),
         )
         q_year, q_num = quarter_of_date(month_start)
-        quarter_key = quarter_id(q_year, q_num)
-        quarterly_mirror = ensure_goal_ids(quarterly_mirror, "quarterly", quarter_key)
 
         # Determine previous month path
         month_key = f"{window.year}-{window.month:02d}"
@@ -541,10 +535,11 @@ def main() -> None:
         prev_path = journal_path(window.previous_filename)
         prev_lines = safe_read_file(prev_path)
         if prev_lines is not None:
-            p_start, p_end = goals_section_bounds(prev_lines)
-            prev_tasks = extract_subsection_tasks(prev_lines, p_start, p_end, "MONTHLY")
-            prev_tasks = ensure_goal_ids(
-                prev_tasks, "monthly", prev_month_start.isoformat()
+            prev_tasks = extract_goals(
+                prev_lines,
+                "MONTHLY",
+                horizon="monthly",
+                period_key=prev_month_start.isoformat(),
             )
         else:
             prev_tasks = []
@@ -575,13 +570,8 @@ def main() -> None:
             source_path=quarterly_path,
             mirror_path=note_path,
         )
-        quarterly_lines_rendered = (
-            render_goal_lines(final_quarterly, today=today)
-            if final_quarterly
-            else [
-                "",
-                "_No quarterly goals have been defined yet._",
-            ]
+        quarterly_lines_rendered = render_goals_or_empty(
+            "QUARTERLY", final_quarterly, today=today
         )
 
         # MONTHLY source section: monthly goals + pierced yearly goals (≤90d deadline)
@@ -598,8 +588,14 @@ def main() -> None:
 
         # Persist source updates in quarterly note when any source list changed.
         if quarterly_changed or yearly_changed:
-            _write_quarterly_goals(
-                quarterly_path, yearly_mirror, quarterly_tasks, quarterly_lines
+            write_goals_sections(
+                quarterly_path,
+                quarterly_lines,
+                [
+                    ("YEARLY", render_goal_lines(yearly_mirror)),
+                    ("QUARTERLY", render_goal_lines(quarterly_tasks)),
+                ],
+                insert_if_missing=True,
             )
 
         # Render: original monthly goals (preserve dates) + final pierced yearly (countdown)
@@ -608,13 +604,14 @@ def main() -> None:
             pierced_lines = render_goal_lines(final_pierced, today=today)
             monthly_source_lines = monthly_source_lines + pierced_lines
 
-        new_goals_block = build_goals_block(
+        lines = apply_goals_sections(
+            lines,
             [
                 ("QUARTERLY", quarterly_lines_rendered),
                 ("MONTHLY", monthly_source_lines),
-            ]
+            ],
+            insert_if_missing=True,
         )
-        splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         # Load current month's daily data
         month_dates = list(daterange(month_start, month_end))

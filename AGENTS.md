@@ -52,13 +52,14 @@ journal/
       sections.py             # Shared periodic section assembly helpers
       cleanup.py              # Shared cleanup re-sync helper for prior periods
       media.py                # MEDIA section orchestration (reader scan + writer render)
-    goals/                    # Goal domain logic (identity, carry-forward, reconcile, reminders)
+    goals/                    # Goal domain logic (identity, carry-forward, reconcile, note I/O, reminders)
       __init__.py             # Goal domain public exports
       identity.py             # Goal canonicalization + deterministic/random IDs
       tombstones.py           # Carry-forward offered-ID cache + deleted-goal tombstones
       carry_forward.py        # Shared carry-forward/tombstone suppression engine
       state.py                # Bidirectional source/mirror goal state reconciliation cache
       reconcile.py            # Goal piercing + mirror/source reconciliation helpers
+      note_store.py           # Canonical Goals-section read/write helpers for notes
       reminders.py            # Periodic review and maintenance reminder generation
     constants.py              # Shared constants (paths, thresholds, dimensions)
     dates.py                  # Date range + period-shift calculations
@@ -98,7 +99,7 @@ journal/
   - **`writers/`**: Rendering functions that convert models to markdown
   - **`daily/`**: Daily note orchestration (run with `python -m sync.daily`)
   - **`study/`**: Study ingestion package (Flow DB access, break logic, STUDY section rendering)
-  - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, reminders)
+  - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, canonical goal note I/O, reminders)
   - **`periods/`**: Weekly/monthly/quarterly/yearly sync modules + shared period helpers
 
 - **`sync/periods/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
@@ -238,6 +239,7 @@ sync/
 │   ├── carry_forward.py # shared carry-forward/tombstone engine
 │   ├── state.py        # cache-backed source/mirror done-state reconciliation
 │   ├── reconcile.py    # goal piercing + mirror/source reconciliation
+│   ├── note_store.py   # canonical goal subsection read/write helpers
 │   └── reminders.py    # periodic review/maintenance reminder generation
 │
 ├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
@@ -319,6 +321,7 @@ sync/
 - `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
 - `periods/media.py`: `build_media_section` (scans via readers, renders via writers)
 - `goals/reconcile.py`: `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
+- `goals/note_store.py`: `extract_goals`, `render_goals_or_empty`, `apply_goals_sections`, `write_goals_sections`
 - `goals/tombstones.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)
 - `goals/state.py`: `load_goal_sync_state`, `save_goal_sync_state`, `reconcile_pair`, `record_note_state` (mtime tie-break: source wins)
 - `periods/cleanup.py`: `resync_if_marker`

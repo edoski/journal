@@ -10,14 +10,11 @@ from sync.constants import (
     MONTH_ABBR,
     STUDY_TARGET_MIN,
 )
-from sync.io import safe_read_file, atomic_write_note
+from sync.io import safe_read_file
 from sync.notes.locking import locked_note
 from sync.notes.sections import (
-    goals_section_bounds,
-    extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
-    splice_goals_section,
 )
 from sync.dates import (
     daterange,
@@ -52,7 +49,7 @@ from sync.writers.charts import (
     QUARTERLY_3MONTH_METRIC,
     QUARTERLY_3MONTH_MOOD,
 )
-from sync.writers.goals import render_goal_lines, build_goals_block
+from sync.writers.goals import render_goal_lines
 from sync.periods.sections import (
     append_interrupts_table,
     append_media_section,
@@ -61,7 +58,6 @@ from sync.periods.sections import (
     build_procrastination_section,
 )
 from sync.goals.carry_forward import carry_forward_with_tombstones
-from sync.readers.goals import ensure_goal_ids
 
 from sync.goals.reconcile import reconcile_goal_lists, merge_mirror_goals
 from sync.periods.runtime import (
@@ -71,6 +67,12 @@ from sync.periods.runtime import (
     write_note_metrics,
 )
 from sync.periods.windows import build_quarter_window
+from sync.goals.note_store import (
+    apply_goals_sections,
+    extract_goals,
+    render_goals_or_empty,
+    write_goals_sections,
+)
 
 logger = get_logger()
 
@@ -513,12 +515,17 @@ def main() -> None:
     note_path = resolve_note_path(window.filename, args.file)
 
     with open_period_note(note_path, QUARTERLY_TEMPLATE_PATH) as lines:
-        g_start, g_end = goals_section_bounds(lines)
-        yearly_mirror = extract_subsection_tasks(lines, g_start, g_end, "YEARLY")
-        yearly_mirror = ensure_goal_ids(yearly_mirror, "yearly", str(window.year))
-        quarterly_tasks = extract_subsection_tasks(lines, g_start, g_end, "QUARTERLY")
-        quarterly_tasks = ensure_goal_ids(
-            quarterly_tasks, "quarterly", quarter_id(window.year, window.quarter)
+        yearly_mirror = extract_goals(
+            lines,
+            "YEARLY",
+            horizon="yearly",
+            period_key=str(window.year),
+        )
+        quarterly_tasks = extract_goals(
+            lines,
+            "QUARTERLY",
+            horizon="quarterly",
+            period_key=quarter_id(window.year, window.quarter),
         )
 
         qtr_key = quarter_id(window.year, window.quarter)
@@ -527,14 +534,12 @@ def main() -> None:
         prev_tasks = []
         prev_lines = safe_read_file(prev_note_path)
         if prev_lines is not None:
-            g_start, g_end = goals_section_bounds(prev_lines)
-            p_body = extract_subsection_tasks(prev_lines, g_start, g_end, "QUARTERLY")
-            p_body = ensure_goal_ids(
-                p_body,
-                "quarterly",
-                quarter_id(window.previous_year, window.previous_quarter),
+            prev_tasks = extract_goals(
+                prev_lines,
+                "QUARTERLY",
+                horizon="quarterly",
+                period_key=quarter_id(window.previous_year, window.previous_quarter),
             )
-            prev_tasks = p_body
 
         quarterly_tasks, _ = carry_forward_with_tombstones(
             prev_tasks, quarterly_tasks, qtr_key, "quarterly"
@@ -544,13 +549,14 @@ def main() -> None:
         yearly_path = journal_path(f"{window.year}.md")
         yearly_lines = safe_read_file(yearly_path)
         if yearly_lines is not None:
-            y_start, y_end = goals_section_bounds(yearly_lines)
-            yearly_tasks = extract_subsection_tasks(
-                yearly_lines, y_start, y_end, "YEARLY"
+            yearly_tasks = extract_goals(
+                yearly_lines,
+                "YEARLY",
+                horizon="yearly",
+                period_key=str(window.year),
             )
         else:
             yearly_lines = []
-        yearly_tasks = ensure_goal_ids(yearly_tasks, "yearly", str(window.year))
 
         # Reconcile YEARLY source <-> QUARTERLY YEARLY-mirror state.
         yearly_tasks, yearly_mirror, yearly_changed, _ = reconcile_goal_lists(
@@ -563,15 +569,12 @@ def main() -> None:
         if yearly_changed:
             with locked_note(yearly_path):
                 yearly_lines = safe_read_file(yearly_path) or yearly_lines
-                new_yearly_block = build_goals_block(
-                    [
-                        ("YEARLY", render_goal_lines(yearly_tasks)),
-                    ]
+                write_goals_sections(
+                    yearly_path,
+                    yearly_lines,
+                    [("YEARLY", render_goal_lines(yearly_tasks))],
+                    insert_if_missing=True,
                 )
-                splice_goals_section(
-                    yearly_lines, new_yearly_block, insert_if_missing=True
-                )
-                atomic_write_note(yearly_path, yearly_lines)
 
         # Rebuild Goals block for quarterly note (YEARLY mirror + QUARTERLY source).
         today = datetime.date.today()
@@ -583,22 +586,18 @@ def main() -> None:
             source_path=yearly_path,
             mirror_path=note_path,
         )
-        yearly_lines_block = (
-            render_goal_lines(filtered_yearly, today=today)
-            if filtered_yearly
-            else [
-                "",
-                "_No yearly goals have been defined yet._",
-            ]
+        yearly_lines_block = render_goals_or_empty(
+            "YEARLY", filtered_yearly, today=today
         )
-        new_goals_block = build_goals_block(
+        lines = apply_goals_sections(
+            lines,
             [
                 ("YEARLY", yearly_lines_block),
                 # QUARTERLY is the source (not a mirror), so omit today to preserve deadline dates
                 ("QUARTERLY", render_goal_lines(quarterly_tasks)),
-            ]
+            ],
+            insert_if_missing=True,
         )
-        splice_goals_section(lines, new_goals_block, insert_if_missing=True)
 
         daily_data = load_daily_data(window.start, window.end)
         prev_daily_data = load_daily_data(window.previous_start, window.previous_end)
