@@ -5,10 +5,10 @@ from __future__ import annotations
 import datetime
 import os
 import re
-from dataclasses import dataclass
 
 from sync.constants import JOURNAL_DIR
 from sync.contracts.metrics import MetricValue
+from sync.contracts.query import PeriodSnapshot
 from sync.dates import (
     daterange,
     quarter_of_date,
@@ -27,17 +27,6 @@ from sync.periods.windows import (
     build_year_window,
 )
 from sync.ports.daily_aggregates import DailyAggregateSource
-
-
-@dataclass(frozen=True)
-class PeriodSnapshot:
-    """Aggregated metrics view for a date period."""
-
-    period: str
-    start: datetime.date
-    end: datetime.date
-    label: str
-    metrics: dict[str, MetricValue]
 
 
 class QueryService:

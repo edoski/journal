@@ -20,6 +20,7 @@ journal/
       study.py
       daily.py
       metrics.py
+      query.py
       goals.py
       media.py
       notes.py
@@ -160,6 +161,7 @@ journal/
 - `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by TUI.
+  - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
 
 ### Ports
 
@@ -185,6 +187,8 @@ journal/
   - `links_for_window(files, start, end) -> list[str]`
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
+- Query snapshot contract is canonical across `sync/application` and `tui`:
+  - `PeriodSnapshot` in `sync/contracts/query.py`
 
 ## Canonical Markdown Schemas
 

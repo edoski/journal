@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 
+from sync.contracts.query import PeriodSnapshot
 import tui.data.repository as repository
 
 
@@ -26,7 +27,7 @@ class _StubQueryService:
 
     def query_by_period(self, period, anchor_date):
         _ = period, anchor_date
-        return repository.PeriodSnapshot(
+        return PeriodSnapshot(
             period="week",
             start=datetime.date(2026, 2, 1),
             end=datetime.date(2026, 2, 7),

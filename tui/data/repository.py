@@ -3,19 +3,10 @@
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
-
-@dataclass(frozen=True)
-class PeriodSnapshot:
-    """Aggregated metrics view for a date period."""
-
-    period: str
-    start: datetime.date
-    end: datetime.date
-    label: str
-    metrics: dict[str, float | int | None]
+from sync.contracts.metrics import MetricValue
+from sync.contracts.query import PeriodSnapshot
 
 
 class QueryServiceLike(Protocol):
@@ -47,7 +38,7 @@ class QueryServiceLike(Protocol):
         metric: str,
         period: str,
         anchor_date: datetime.date,
-    ) -> tuple[PeriodSnapshot, Any]: ...
+    ) -> tuple[PeriodSnapshot, MetricValue]: ...
 
 
 class QueryRepository:
@@ -86,5 +77,5 @@ class QueryRepository:
         metric: str,
         period: str,
         anchor_date: datetime.date,
-    ) -> tuple[PeriodSnapshot, Any]:
+    ) -> tuple[PeriodSnapshot, MetricValue]:
         return self.query_service.query_by_metric(metric, period, anchor_date)

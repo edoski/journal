@@ -9,6 +9,7 @@ from .metrics import (
     PeriodAggregate,
     TrainingTypeSessionStat,
 )
+from .query import PeriodSnapshot
 from .goals import GoalSection
 from .media import MediaBundle
 from .notes import VaultFileRecord
@@ -23,6 +24,7 @@ __all__ = [
     "MovingAverageAggregate",
     "TrainingTypeSessionStat",
     "MetricValue",
+    "PeriodSnapshot",
     "GoalSection",
     "MediaBundle",
     "VaultFileRecord",

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import curses
 
-from tui.data.repository import PeriodSnapshot
+from sync.contracts.metrics import MetricValue
+from sync.contracts.query import PeriodSnapshot
 from tui.state import AppState
 
 
@@ -12,7 +13,7 @@ def render(
     stdscr: curses.window,
     state: AppState,
     snapshot: PeriodSnapshot,
-    metric_value,
+    metric_value: MetricValue,
 ) -> None:
     """Render metric-centric explorer for selected period and anchor."""
     stdscr.addstr(1, 2, "By Metric", curses.A_BOLD)

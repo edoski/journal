@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import curses
 
-from tui.data.repository import PeriodSnapshot
+from sync.contracts.query import PeriodSnapshot
 from tui.state import AppState
 
 

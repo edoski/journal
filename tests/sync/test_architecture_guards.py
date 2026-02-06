@@ -547,3 +547,19 @@ def test_application_metrics_services_avoid_generic_dict_any_signatures():
         "Application metric services must use contracts/typed metric values, "
         "not dict[str, Any]:\n" + "\n".join(violations)
     )
+
+
+def test_period_snapshot_contract_is_defined_once():
+    files = _iter_python_files("sync", "tui")
+    definitions: list[str] = []
+
+    for path in files:
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if isinstance(node, ast.ClassDef) and node.name == "PeriodSnapshot":
+                definitions.append(str(path.relative_to(ROOT)))
+
+    assert definitions == ["sync/contracts/query.py"], (
+        "PeriodSnapshot must be defined exactly once in sync/contracts/query.py, "
+        "but found:\n" + "\n".join(definitions)
+    )
