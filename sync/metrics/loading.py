@@ -5,21 +5,22 @@ from __future__ import annotations
 import datetime
 import os
 from collections.abc import Callable, Iterable
-from typing import Any
+from typing import Any, cast
 
 from sync.constants import JOURNAL_DIR
+from sync.contracts.metrics import DailyAggregate
 
 from .aggregation import compute_period_metrics
 
 
 def load_daily_data_for_dates(
     dates: Iterable[datetime.date],
-) -> dict[datetime.date, dict[str, Any]]:
+) -> dict[datetime.date, DailyAggregate]:
     """Load parsed daily notes for an explicit sequence of dates."""
     # Import here to avoid circular dependency
     from sync.readers.daily import parse_daily_note
 
-    data: dict[datetime.date, dict[str, Any]] = {}
+    data: dict[datetime.date, DailyAggregate] = {}
     for day in dates:
         path = os.path.join(JOURNAL_DIR, f"{day:%Y-%m-%d}.md")
         if not os.path.exists(path):
@@ -32,7 +33,7 @@ def load_daily_data_for_dates(
 
 def load_daily_data(
     start_date: datetime.date, end_date: datetime.date
-) -> dict[datetime.date, dict[str, Any]]:
+) -> dict[datetime.date, DailyAggregate]:
     """Load parsed daily notes for a date range."""
     from sync.dates import daterange
 
@@ -62,5 +63,10 @@ def load_prior_period_metrics(
         start_date, end_date = period_bounds_for_offset(offset)
         dates = list(daterange(start_date, end_date))
         daily_data = load_daily_data_for_dates(dates)
-        metrics_list.append(compute_period_metrics(dates, daily_data))
+        metrics_list.append(
+            compute_period_metrics(
+                dates,
+                cast(dict[datetime.date, dict[str, Any]], daily_data),
+            )
+        )
     return metrics_list

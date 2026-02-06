@@ -6,10 +6,8 @@ Covers note parsing, section manipulation, and metrics extraction.
 
 from __future__ import annotations
 
-from sync.readers.daily import (
-    parse_study_table,
-    parse_sleep_table,
-)
+from sync.readers.sleep import parse_sleep_table
+from sync.readers.study import parse_study_table
 from sync.notes.sections import (
     find_header_idx,
     section_bounds,
@@ -325,55 +323,54 @@ class TestParseStudyTable:
     """Tests for parse_study_table function."""
 
     def test_parses_table(self, sample_study_table_lines):
-        rows = parse_study_table(sample_study_table_lines)
-        assert len(rows) == 2
+        sessions = parse_study_table(sample_study_table_lines)
+        assert len(sessions) == 2
 
         # First row: coding, 2h00m, +10m interrupt, 15m (+5m) break
-        assert rows[0][0] == "coding"  # activity
-        assert rows[0][1] == 120.0  # duration minutes
-        assert rows[0][2] == 10  # interrupt minutes
-        assert rows[0][3] == 5  # overrun minutes
+        assert sessions[0].activity == "coding"
+        assert sessions[0].duration_minutes == 120.0
+        assert sessions[0].interrupt_minutes == 10
+        assert sessions[0].overrun_minutes == 5
 
     def test_parses_reading_row(self, sample_study_table_lines):
-        rows = parse_study_table(sample_study_table_lines)
+        sessions = parse_study_table(sample_study_table_lines)
 
         # Second row: reading, 1h30m, no interrupt, 10m break
-        assert rows[1][0] == "reading"
-        assert rows[1][1] == 90.0
-        assert rows[1][2] == 0  # no interrupt
+        assert sessions[1].activity == "reading"
+        assert sessions[1].duration_minutes == 90.0
+        assert sessions[1].interrupt_minutes == 0
 
     def test_empty_when_no_table(self):
         lines = ["### **STUDY**", "", "No table here"]
-        rows = parse_study_table(lines)
-        assert rows == []
+        sessions = parse_study_table(lines)
+        assert sessions == []
 
     def test_empty_when_section_missing(self):
         lines = ["### **OTHER**", "Content"]
-        rows = parse_study_table(lines)
-        assert rows == []
+        sessions = parse_study_table(lines)
+        assert sessions == []
 
 
 class TestParseSleepTable:
     """Tests for parse_sleep_table function."""
 
     def test_parses_table(self, sample_sleep_table_lines):
-        rows = parse_sleep_table(sample_sleep_table_lines)
-        assert len(rows) == 1
+        entries = parse_sleep_table(sample_sleep_table_lines)
+        assert len(entries) == 1
 
-        duration, awake, awakenings = rows[0]
-        assert duration == 480.0  # 8h00m = 480 minutes
-        assert awake == 20.0  # 20m
-        assert awakenings == 2
+        assert entries[0].duration_minutes == 480.0  # 8h00m = 480 minutes
+        assert entries[0].awake_minutes == 20.0  # 20m
+        assert entries[0].awakenings == 2
 
     def test_empty_when_no_table(self):
         lines = ["### **SLEEP**", "", "No table"]
-        rows = parse_sleep_table(lines)
-        assert rows == []
+        entries = parse_sleep_table(lines)
+        assert entries == []
 
     def test_empty_when_section_missing(self):
         lines = ["### **OTHER**"]
-        rows = parse_sleep_table(lines)
-        assert rows == []
+        entries = parse_sleep_table(lines)
+        assert entries == []
 
 
 class TestReplaceMetricsBlock:

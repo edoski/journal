@@ -6,10 +6,8 @@ These tests lock down current parser semantics before compatibility removals.
 
 from __future__ import annotations
 
-from sync.readers.daily import (
-    parse_daily_note,
-    parse_study_table,
-)
+from sync.readers.daily import parse_daily_note
+from sync.readers.study import parse_study_table
 
 
 def _write_note(tmp_path, lines: list[str], name: str = "2025-01-15.md") -> str:
@@ -69,7 +67,7 @@ def test_parse_daily_note_characterization(tmp_path):
         "awake_minutes": 25.0,
         "awakenings": 3,
         "activity_totals": {"coding": 120.0, "reading": 90.0},
-        "interrupt_minutes": 10,  # +1h30m is intentionally not parsed here
+        "interrupt_minutes": 100.0,
         "overrun_minutes": 65,
         "planned_break_minutes": 25,
         "training_type_minutes": {},
@@ -79,7 +77,7 @@ def test_parse_daily_note_characterization(tmp_path):
 
 
 def test_parse_study_table_interrupt_hour_format_characterization():
-    rows = parse_study_table(
+    sessions = parse_study_table(
         [
             "### **STUDY**",
             "",
@@ -90,12 +88,12 @@ def test_parse_study_table_interrupt_hour_format_characterization():
         ]
     )
 
-    assert len(rows) == 1
-    assert rows[0][0] == "coding"
-    assert rows[0][1] == 60.0
-    assert rows[0][2] == 0  # current parser behavior
-    assert rows[0][3] == 0
-    assert rows[0][4] == 5
+    assert len(sessions) == 1
+    assert sessions[0].activity == "coding"
+    assert sessions[0].duration_minutes == 60.0
+    assert sessions[0].interrupt_minutes == 90.0
+    assert sessions[0].overrun_minutes == 0
+    assert sessions[0].break_minutes == 5
 
 
 def test_parse_daily_note_returns_none_for_missing_file(tmp_path):

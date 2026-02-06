@@ -5,10 +5,14 @@ Daily note reader for aggregate metric dictionaries.
 from __future__ import annotations
 
 import re
+
+from sync.contracts.metrics import DailyAggregate
 from sync.io import safe_read_file
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.screen_time import parse_procrastination_table
+from sync.readers.sleep import parse_sleep_table
+from sync.readers.study import parse_study_table
 
 
 def _parse_bool(val) -> bool:
@@ -18,117 +22,6 @@ def _parse_bool(val) -> bool:
     if val is None:
         return False
     return str(val).strip().lower() == "true"
-
-
-def _parse_study_table_rows(lines: list[str]) -> list[tuple]:
-    """Parse the STUDY table into tuple rows for aggregate metrics."""
-    block = extract_block(lines, "### **STUDY**")
-    if not block:
-        return []
-
-    header_idx = -1
-    for i, line in enumerate(block):
-        if re.search(
-            r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(DURATION|FOCUS)\s*\|",
-            line,
-            re.IGNORECASE,
-        ):
-            header_idx = i
-            break
-    if header_idx == -1:
-        return []
-
-    rows = []
-    for line in block[header_idx + 2 :]:
-        if not line.strip().startswith("|"):
-            break
-        if re.search(r"no study sessions", line, re.IGNORECASE):
-            continue
-
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 6:
-            continue
-
-        activity = parts[2].strip("`")
-        duration_min = parse_duration_to_minutes(parts[3])
-
-        interrupt_min = 0
-        if len(parts) > 4:
-            interrupt_str = parts[4].strip("`").strip()
-            interrupt_match = re.search(r"\+(\d+)m", interrupt_str)
-            if interrupt_match:
-                interrupt_min = int(interrupt_match.group(1))
-
-        overrun_min = 0
-        planned_break_min = 0
-        if len(parts) > 5:
-            break_str = parts[5].strip("`").strip()
-            if break_str:
-                planned_str = break_str.split("(", 1)[0].strip()
-                planned_break_min = int(parse_duration_to_minutes(planned_str) or 0)
-            overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
-            if overrun_match:
-                overrun_str = overrun_match.group(1)
-                overrun_min = int(parse_duration_to_minutes(overrun_str) or 0)
-
-        if activity and duration_min:
-            rows.append(
-                (activity, duration_min, interrupt_min, overrun_min, planned_break_min)
-            )
-
-    return rows
-
-
-def parse_study_table(lines: list[str]) -> list[tuple]:
-    """Parse the STUDY table into tuple rows for aggregate metrics."""
-    return _parse_study_table_rows(lines)
-
-
-def _parse_sleep_table_rows(lines: list[str]) -> list[tuple]:
-    """Parse the SLEEP table into tuple rows for aggregate metrics."""
-    block = extract_block(lines, "### **SLEEP**")
-    if not block:
-        return []
-
-    header_idx = -1
-    for i, line in enumerate(block):
-        if re.search(
-            r"\|\s*TIME\s*\|\s*DURATION\s*\|\s*AWAKE\s*\|\s*AWAKENINGS\s*\|",
-            line,
-            re.IGNORECASE,
-        ):
-            header_idx = i
-            break
-    if header_idx == -1:
-        return []
-
-    rows = []
-    for line in block[header_idx + 2 :]:
-        if not line.strip().startswith("|"):
-            break
-
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 5:
-            continue
-
-        duration_min = parse_duration_to_minutes(parts[2])
-        awake_min = parse_duration_to_minutes(parts[3])
-
-        awakenings = None
-        if parts[4]:
-            try:
-                awakenings = int(re.sub(r"[^0-9]", "", parts[4]))
-            except (TypeError, ValueError):
-                awakenings = None
-
-        rows.append((duration_min, awake_min, awakenings))
-
-    return rows
-
-
-def parse_sleep_table(lines: list[str]) -> list[tuple]:
-    """Parse the SLEEP table into tuple rows for aggregate metrics."""
-    return _parse_sleep_table_rows(lines)
 
 
 def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
@@ -168,7 +61,7 @@ def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
     return rows
 
 
-def parse_daily_note(path: str) -> dict | None:
+def parse_daily_note(path: str) -> DailyAggregate | None:
     """Parse a daily note file and return extracted aggregate metrics."""
     lines = safe_read_file(path)
     if lines is None:
@@ -183,7 +76,7 @@ def parse_daily_note(path: str) -> dict | None:
     sleep_total = (
         sleep_from_fm
         if sleep_from_fm is not None
-        else sum((r[0] or 0 for r in sleep_rows), 0)
+        else sum((entry.duration_minutes or 0 for entry in sleep_rows), 0)
     )
 
     mood_val = None
@@ -198,26 +91,30 @@ def parse_daily_note(path: str) -> dict | None:
     stretch = _parse_bool(fm.get("stretch"))
     meditate = _parse_bool(fm.get("meditate"))
 
-    awake_total = sum((r[1] or 0 for r in sleep_rows), 0) if sleep_rows else None
+    awake_total = (
+        sum((entry.awake_minutes or 0 for entry in sleep_rows), 0)
+        if sleep_rows
+        else None
+    )
     awakenings_total = None
     if sleep_rows:
-        awak_counts = [r[2] for r in sleep_rows if r[2] is not None]
+        awak_counts = [
+            entry.awakenings for entry in sleep_rows if entry.awakenings is not None
+        ]
         if awak_counts:
             awakenings_total = sum(awak_counts)
 
     activity_totals: dict[str, float] = {}
-    interrupt_total = 0
-    overrun_total = 0
-    planned_break_total = 0
-    for row in study_rows:
-        activity, minutes = row[0], row[1]
-        activity_totals[activity] = activity_totals.get(activity, 0) + minutes
-        if len(row) > 2:
-            interrupt_total += row[2]
-        if len(row) > 3:
-            overrun_total += row[3]
-        if len(row) > 4:
-            planned_break_total += row[4]
+    interrupt_total = 0.0
+    overrun_total = 0.0
+    planned_break_total = 0.0
+    for session in study_rows:
+        activity_totals[session.activity] = (
+            activity_totals.get(session.activity, 0) + session.duration_minutes
+        )
+        interrupt_total += session.interrupt_minutes
+        overrun_total += session.overrun_minutes
+        planned_break_total += session.break_minutes
 
     study_total = sum(activity_totals.values())
 

@@ -310,6 +310,11 @@ Daily service boundary (phase 4):
 - Daily composition root (`sync/daily/__main__.py`) wires `FlowStudySessionSource`, `ICloudDailyStatusSource`, `VaultContextSource`, `MarkdownNoteStore`, and `MarkdownReminderRuleStore` into `DailySyncService`
 - Removed modules: `sync/daily/orchestrator/goal_pipeline.py` and `sync/daily/orchestrator/metrics_pipeline.py`
 
+Canonical aggregate parser ownership (phase 5):
+- `sync.readers.daily.parse_daily_note` is the only daily aggregate parser API
+- `sync.readers.daily` must consume canonical section readers (`sync.readers.study.parse_study_table`, `sync.readers.sleep.parse_sleep_table`, `sync.readers.screen_time.parse_procrastination_table`) instead of duplicating table parsing logic
+- `sync.adapters.markdown_daily_aggregates.MarkdownDailyAggregateSource` is the markdown-backed `DailyAggregateSource` implementation
+
 ### Module Responsibilities
 
 **Models (`sync/models/`):**
