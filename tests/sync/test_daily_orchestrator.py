@@ -9,6 +9,7 @@ import hashlib
 
 import pytest
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 import sync.daily.orchestrator.goal_pipeline as goal_pipeline
 import sync.daily.orchestrator.metrics_pipeline as metrics_pipeline
 import sync.daily.orchestrator.note_io as note_io
@@ -81,8 +82,9 @@ def test_update_markdown_creates_and_populates_daily_note(monkeypatch, tmp_path)
     """First run should create today's note and populate frontmatter + sections."""
     journal_dir = _prepare_isolated_orchestrator(monkeypatch, tmp_path)
     session = _session_for_today()
+    note_store = MarkdownNoteStore()
 
-    changed = orchestrator.update_markdown([session])
+    changed = orchestrator.update_markdown([session], note_store)
     assert changed is True
 
     note_path = journal_dir / f"{datetime.date.today():%Y-%m-%d}.md"
@@ -112,9 +114,10 @@ def test_update_markdown_is_idempotent_on_second_run(monkeypatch, tmp_path):
     """Second run with same inputs should report no changes."""
     _prepare_isolated_orchestrator(monkeypatch, tmp_path)
     session = _session_for_today()
+    note_store = MarkdownNoteStore()
 
-    first = orchestrator.update_markdown([session])
-    second = orchestrator.update_markdown([session])
+    first = orchestrator.update_markdown([session], note_store)
+    second = orchestrator.update_markdown([session], note_store)
 
     assert first is True
     assert second is False
@@ -147,7 +150,8 @@ def test_update_markdown_output_characterization(monkeypatch, tmp_path):
 
     journal_dir = _prepare_isolated_orchestrator(monkeypatch, tmp_path)
     session = _session_for_today(fixed_today)
-    changed = orchestrator.update_markdown([session])
+    note_store = MarkdownNoteStore()
+    changed = orchestrator.update_markdown([session], note_store)
     assert changed is True
 
     note_path = journal_dir / f"{fixed_today:%Y-%m-%d}.md"
@@ -173,6 +177,7 @@ def test_update_markdown_output_characterization(monkeypatch, tmp_path):
 def test_update_markdown_fails_without_reminders_config(monkeypatch, tmp_path):
     _prepare_isolated_orchestrator(monkeypatch, tmp_path)
     session = _session_for_today()
+    note_store = MarkdownNoteStore()
 
     def _raise_missing(_path):
         raise FileNotFoundError("Required reminder config not found")
@@ -180,4 +185,4 @@ def test_update_markdown_fails_without_reminders_config(monkeypatch, tmp_path):
     monkeypatch.setattr(goal_pipeline, "load_reminder_rules", _raise_missing)
 
     with pytest.raises(FileNotFoundError, match="Required reminder config not found"):
-        orchestrator.update_markdown([session])
+        orchestrator.update_markdown([session], note_store)

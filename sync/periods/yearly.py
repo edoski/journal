@@ -2,6 +2,7 @@
 import argparse
 import datetime
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.logging import get_logger
 
 
@@ -565,8 +566,9 @@ def main() -> None:
 
     window = build_year_window(year)
     note_path = resolve_note_path(window.filename, args.file)
+    note_store = MarkdownNoteStore()
 
-    with open_period_note(note_path, YEARLY_TEMPLATE_PATH) as lines:
+    with open_period_note(note_path, YEARLY_TEMPLATE_PATH, note_store) as lines:
         yearly_tasks = extract_goals(
             lines,
             "YEARLY",
@@ -615,7 +617,7 @@ def main() -> None:
             prior_year_metrics=prior_year_metrics,
         )
 
-        write_note_metrics(note_path, lines, metrics_block)
+        write_note_metrics(note_path, lines, metrics_block, note_store)
 
 
 if __name__ == "__main__":

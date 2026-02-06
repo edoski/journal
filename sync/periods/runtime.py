@@ -7,9 +7,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from sync.constants import JOURNAL_DIR
-from sync.io import atomic_write_note, safe_read_file
 from sync.notes.locking import locked_note
-from sync.notes.sections import ensure_note, replace_metrics_block
+from sync.notes.sections import replace_metrics_block
+from sync.ports.notes import NoteStore
 from sync.periods.cleanup import resync_if_marker
 
 
@@ -24,20 +24,26 @@ def journal_path(filename: str) -> str:
 
 
 @contextmanager
-def open_period_note(note_path: str, template_path: str) -> Iterator[list[str]]:
+def open_period_note(
+    note_path: str,
+    template_path: str,
+    note_store: NoteStore,
+) -> Iterator[list[str]]:
     """Open a period note under lock and yield mutable line content."""
     with locked_note(note_path):
-        ensure_note(note_path, template_path)
-        lines = safe_read_file(note_path) or []
+        lines = note_store.read_or_create(note_path, template_path)
         yield lines
 
 
 def write_note_metrics(
-    note_path: str, lines: list[str], metrics_block: list[str]
+    note_path: str,
+    lines: list[str],
+    metrics_block: list[str],
+    note_store: NoteStore,
 ) -> None:
     """Replace metrics block and atomically persist note content."""
     updated_lines = replace_metrics_block(lines, metrics_block)
-    atomic_write_note(note_path, updated_lines)
+    note_store.write(note_path, updated_lines)
 
 
 def maybe_cleanup_previous(

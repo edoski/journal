@@ -2,6 +2,7 @@
 import argparse
 import datetime
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.logging import get_logger
 
 
@@ -517,8 +518,9 @@ def main() -> None:
 
     window = build_quarter_window(year, quarter_num)
     note_path = resolve_note_path(window.filename, args.file)
+    note_store = MarkdownNoteStore()
 
-    with open_period_note(note_path, QUARTERLY_TEMPLATE_PATH) as lines:
+    with open_period_note(note_path, QUARTERLY_TEMPLATE_PATH, note_store) as lines:
         yearly_mirror = extract_goals(
             lines,
             "YEARLY",
@@ -607,7 +609,7 @@ def main() -> None:
             prior_quarter_metrics=prior_quarter_metrics,
         )
 
-        write_note_metrics(note_path, lines, metrics_block)
+        write_note_metrics(note_path, lines, metrics_block, note_store)
 
 
 if __name__ == "__main__":

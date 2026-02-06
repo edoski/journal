@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
-
 from sync.logging import get_logger
 from sync.notes.locking import locked_note
 from sync.notes.sections import ensure_section_with_divider, section_bounds
+from sync.ports.notes import NoteStore
 
 from ..constants import TEMPLATE_PATH
 
@@ -58,32 +57,29 @@ def ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
     )
 
 
-def read_daily_note(file_path: str) -> list[str]:
+def read_daily_note(
+    file_path: str,
+    note_store: NoteStore,
+    template_path: str | None = None,
+) -> list[str]:
     """
-    Read the daily note, creating from template if it doesn't exist.
+    Read the daily note via NoteStore, creating from template when missing.
 
     Args:
         file_path: Path to the daily note
+        note_store: NoteStore implementation
+        template_path: Optional template override (defaults to TEMPLATE_PATH)
 
     Returns:
         Lines of the note, or empty list on error
     """
+    selected_template = template_path or TEMPLATE_PATH
     with locked_note(file_path):
-        if not os.path.exists(file_path):
-            if os.path.exists(TEMPLATE_PATH):
-                try:
-                    with open(TEMPLATE_PATH, "r") as tf:
-                        template_content = tf.read()
-                    with open(file_path, "w") as f:
-                        f.write(template_content)
-                except (PermissionError, OSError) as e:
-                    logger.error("Error creating file from template: %s", e)
-                    return []
-            else:
-                return []
-
-        with open(file_path, "r") as f:
-            return f.read().splitlines()
+        try:
+            return note_store.read_or_create(file_path, selected_template)
+        except (PermissionError, OSError) as e:
+            logger.error("Error reading daily note %s: %s", file_path, e)
+            return []
 
 
 def find_yaml_end(lines: list[str]) -> int:

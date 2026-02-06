@@ -2,6 +2,7 @@
 import argparse
 import datetime
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     MONTHLY_TEMPLATE_PATH,
@@ -284,6 +285,7 @@ def main() -> None:
 
     window = build_week_window(target_date)
     note_path = resolve_note_path(window.filename, args.file)
+    note_store = MarkdownNoteStore()
 
     # Determine month note for the target week (use week_start's month).
     month_start = datetime.date(window.start.year, window.start.month, 1)
@@ -301,7 +303,7 @@ def main() -> None:
         load_quarterly_goals(month_start)
     )
 
-    with open_period_note(note_path, WEEKLY_TEMPLATE_PATH) as lines:
+    with open_period_note(note_path, WEEKLY_TEMPLATE_PATH, note_store) as lines:
         # Load current week's daily data
         week_dates = list(daterange(window.start, window.end))
         daily_data = load_daily_data_for_dates(week_dates)
@@ -417,7 +419,7 @@ def main() -> None:
             insert_if_missing=True,
         )
 
-        write_note_metrics(note_path, lines, metrics_block)
+        write_note_metrics(note_path, lines, metrics_block, note_store)
 
     # One-time cleanup: re-sync previous week if it still has an arrow indicator
     maybe_cleanup_previous(

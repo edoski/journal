@@ -6,6 +6,8 @@ import curses
 import datetime
 from typing import cast
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
+from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
 from sync.models import ReminderRule, ScheduleKind
 from tui.data.daily_store import DailyStore
 from tui.data.reminders_store import RemindersStore
@@ -78,8 +80,8 @@ def _main(stdscr: curses.window) -> None:
 
     state = AppState()
     repo = QueryRepository()
-    daily_store = DailyStore()
-    reminders_store = RemindersStore()
+    daily_store = DailyStore(note_store=MarkdownNoteStore())
+    reminders_store = RemindersStore(rule_store=MarkdownReminderRuleStore())
 
     while True:
         stdscr.erase()

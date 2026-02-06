@@ -2,6 +2,7 @@
 import argparse
 import datetime
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
     STUDY_TARGET_MIN,
@@ -512,8 +513,9 @@ def main() -> None:
 
     window = build_month_window(target_date)
     note_path = resolve_note_path(window.filename, args.file)
+    note_store = MarkdownNoteStore()
 
-    with open_period_note(note_path, MONTHLY_TEMPLATE_PATH) as lines:
+    with open_period_note(note_path, MONTHLY_TEMPLATE_PATH, note_store) as lines:
         month_start, month_end = window.start, window.end
 
         # Parse goals (existing mirrors + monthly source) and carry forward open monthly goals.
@@ -621,7 +623,7 @@ def main() -> None:
             prior_month_metrics=prior_month_metrics,
         )
 
-        write_note_metrics(note_path, lines, metrics_block)
+        write_note_metrics(note_path, lines, metrics_block, note_store)
 
     # One-time cleanup: re-sync previous month if it still has an arrow indicator
     maybe_cleanup_previous(

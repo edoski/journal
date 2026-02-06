@@ -14,9 +14,8 @@ from sync.goals.note_store import (
     extract_goals,
     render_goals_or_empty,
 )
-from sync.io import atomic_write_note, safe_read_file
 from sync.notes.markdown import normalize_header
-from sync.notes.sections import ensure_note
+from sync.ports.notes import NoteStore
 
 GOAL_SECTION_ORDER = ["YEARLY", "QUARTERLY", "MONTHLY", "WEEKLY", "DAILY"]
 
@@ -26,9 +25,11 @@ class DailyStore:
 
     def __init__(
         self,
+        note_store: NoteStore,
         journal_dir: str = JOURNAL_DIR,
         template_path: str = TEMPLATE_PATH,
     ) -> None:
+        self.note_store = note_store
         self.journal_dir = journal_dir
         self.template_path = template_path
 
@@ -38,12 +39,11 @@ class DailyStore:
     def load_lines(self, note_date: datetime.date) -> list[str]:
         """Load note lines, ensuring the note file exists first."""
         path = self.note_path(note_date)
-        ensure_note(path, self.template_path)
-        return safe_read_file(path) or []
+        return self.note_store.read_or_create(path, self.template_path)
 
     def save_lines(self, note_date: datetime.date, lines: list[str]) -> None:
         """Persist note lines atomically."""
-        atomic_write_note(self.note_path(note_date), lines)
+        self.note_store.write(self.note_path(note_date), lines)
 
     def update_frontmatter(
         self, note_date: datetime.date, key: str, value: str

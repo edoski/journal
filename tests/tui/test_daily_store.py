@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from tui.data.daily_store import DailyStore
 
 
@@ -43,7 +44,11 @@ def test_daily_store_updates_frontmatter_and_section(tmp_path):
     template = tmp_path / "daily.md"
     template.write_text("---\nmood: 5.0\n---\n", encoding="utf-8")
 
-    store = DailyStore(journal_dir=str(journal_dir), template_path=str(template))
+    store = DailyStore(
+        note_store=MarkdownNoteStore(),
+        journal_dir=str(journal_dir),
+        template_path=str(template),
+    )
     note_date = datetime.date(2026, 2, 6)
     note_path = _make_note(store, note_date)
 
@@ -65,7 +70,11 @@ def test_daily_store_replaces_daily_goals_subsection(tmp_path):
     template = tmp_path / "daily.md"
     template.write_text("---\nmood: 5.0\n---\n", encoding="utf-8")
 
-    store = DailyStore(journal_dir=str(journal_dir), template_path=str(template))
+    store = DailyStore(
+        note_store=MarkdownNoteStore(),
+        journal_dir=str(journal_dir),
+        template_path=str(template),
+    )
     note_date = datetime.date(2026, 2, 6)
     note_path = _make_note(store, note_date)
 

@@ -9,6 +9,7 @@ from sync.constants import JOURNAL_DIR
 from sync.contracts.study import StudySessionRecord
 from sync.logging import get_logger
 from sync.notes.locking import locked_note
+from sync.ports.notes import NoteStore
 
 from ..context import (
     files_for_session,
@@ -23,7 +24,10 @@ from .note_io import ensure_daily_sections, find_yaml_end, read_daily_note
 logger = get_logger()
 
 
-def update_markdown(sessions: list[StudySessionRecord]) -> bool | None:
+def update_markdown(
+    sessions: list[StudySessionRecord],
+    note_store: NoteStore,
+) -> bool | None:
     """
     Update the daily markdown note with session data, goals, and metrics.
 
@@ -45,7 +49,7 @@ def update_markdown(sessions: list[StudySessionRecord]) -> bool | None:
     today_str = today.strftime("%Y-%m-%d")
     file_path = os.path.join(JOURNAL_DIR, f"{today_str}.md")
 
-    lines = read_daily_note(file_path)
+    lines = read_daily_note(file_path, note_store)
     if not lines:
         return None
 
@@ -79,22 +83,14 @@ def update_markdown(sessions: list[StudySessionRecord]) -> bool | None:
         metrics_result.sleep_data,
     )
 
-    new_content = "\n".join(updated_lines)
-
     with locked_note(file_path):
-        try:
-            with open(file_path, "r") as f:
-                current_content = f.read()
-        except FileNotFoundError:
-            current_content = ""
-
+        current_lines = note_store.read(file_path) or []
+        current_content = "\n".join(current_lines)
+        new_content = "\n".join(updated_lines)
         if new_content.strip() == current_content.strip():
             return False
 
-        tmp_path = file_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            f.write(new_content)
-        os.replace(tmp_path, file_path)
+        note_store.write(file_path, updated_lines)
 
     # Log only the metrics that changed
     if fm_changes:

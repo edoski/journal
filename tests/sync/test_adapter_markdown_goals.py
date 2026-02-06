@@ -1,0 +1,71 @@
+"""Contract tests for MarkdownGoalStore adapter."""
+
+from __future__ import annotations
+
+from sync.adapters.markdown_goals import MarkdownGoalStore
+from sync.contracts.goals import GoalSection
+
+
+def _base_note_lines() -> list[str]:
+    return [
+        "## Goals",
+        "---",
+        "### **WEEKLY**",
+        "",
+        "- [ ] Weekly task ^gid-abc123",
+        "",
+        "### **DAILY**",
+        "",
+        "- [ ] Daily task ^gid-def456",
+        "",
+        "## Metrics",
+        "---",
+    ]
+
+
+def test_extract_reads_target_subsection():
+    store = MarkdownGoalStore()
+    goals = store.extract(_base_note_lines(), "DAILY")
+
+    assert len(goals) == 1
+    assert goals[0].body == "Daily task"
+    assert goals[0].id == "gid-def456"
+
+
+def test_apply_rebuilds_goals_block():
+    store = MarkdownGoalStore()
+    lines = _base_note_lines()
+    updated = store.apply(
+        lines,
+        sections=[
+            GoalSection(
+                section="WEEKLY", lines=["", "- [ ] Weekly updated ^gid-aaa111"]
+            ),
+            GoalSection(section="DAILY", lines=["", "- [ ] Daily updated ^gid-bbb222"]),
+        ],
+    )
+
+    assert any("Weekly updated" in line for line in updated)
+    assert any("Daily updated" in line for line in updated)
+    assert any(line.strip() == "## Metrics" for line in updated)
+
+
+def test_write_persists_rebuilt_sections(tmp_path):
+    store = MarkdownGoalStore()
+    note_path = tmp_path / "goals.md"
+    lines = _base_note_lines()
+    note_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    written = store.write(
+        str(note_path),
+        lines,
+        sections=[
+            GoalSection(section="WEEKLY", lines=["", "- [ ] Weekly v2 ^gid-111aaa"]),
+            GoalSection(section="DAILY", lines=["", "- [ ] Daily v2 ^gid-222bbb"]),
+        ],
+    )
+
+    content = note_path.read_text(encoding="utf-8")
+    assert "Weekly v2" in content
+    assert "Daily v2" in content
+    assert any("Weekly v2" in line for line in written)

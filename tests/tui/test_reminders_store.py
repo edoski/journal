@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
 from sync.models import ReminderRule
 from tui.data.reminders_store import RemindersStore
 
@@ -22,7 +23,7 @@ def test_reminders_store_add_toggle_delete(tmp_path):
     reminders_path = tmp_path / "REMINDERS.md"
     _write_rules(reminders_path)
 
-    store = RemindersStore(str(reminders_path))
+    store = RemindersStore(rule_store=MarkdownReminderRuleStore(str(reminders_path)))
 
     added = store.add(
         ReminderRule(

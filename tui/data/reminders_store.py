@@ -4,22 +4,21 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from sync.constants import REMINDERS_PATH
-from sync.goals.reminders import load_reminder_rules, save_reminder_rules
 from sync.models import ReminderRule
+from sync.ports.reminders import ReminderRuleStore
 
 
 class RemindersStore:
     """CRUD-like wrapper around REMINDERS.md rule parsing/persistence."""
 
-    def __init__(self, reminders_path: str = REMINDERS_PATH) -> None:
-        self.reminders_path = reminders_path
+    def __init__(self, rule_store: ReminderRuleStore) -> None:
+        self.rule_store = rule_store
 
     def load(self) -> list[ReminderRule]:
-        return load_reminder_rules(self.reminders_path)
+        return self.rule_store.load()
 
     def save(self, rules: list[ReminderRule]) -> None:
-        save_reminder_rules(self.reminders_path, rules)
+        self.rule_store.save(rules)
 
     def add(self, rule: ReminderRule) -> list[ReminderRule]:
         rules = self.load()

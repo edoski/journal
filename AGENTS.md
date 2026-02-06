@@ -299,6 +299,13 @@ Canonical interface contracts (phase 2):
 - `sync.adapters.icloud_status.ICloudDailyStatusSource` is the iCloud status adapter implementation
 - `sync.study.db.get_sessions_for_day(day)` is the canonical day-scoped Flow fetch API (with `get_todays_sessions()` as a today convenience wrapper)
 
+Canonical interface contracts (phase 3):
+- `sync.ports.notes.NoteStore` is the only interface for note read/create/write operations
+- `sync.ports.goals.GoalStore` is the canonical goals extraction/apply/write interface
+- `sync.ports.reminders.ReminderRuleStore` is the canonical reminder rule persistence interface
+- `sync.adapters.markdown_notes.MarkdownNoteStore`, `sync.adapters.markdown_goals.MarkdownGoalStore`, and `sync.adapters.markdown_reminders.MarkdownReminderRuleStore` are the markdown-backed implementations
+- `sync/daily/orchestrator/note_io.py`, `sync/periods/runtime.py`, and `tui/data/daily_store.py` must consume `NoteStore` instead of direct filesystem helpers
+
 ### Module Responsibilities
 
 **Models (`sync/models/`):**
@@ -343,7 +350,7 @@ Canonical interface contracts (phase 2):
 - `notes/markdown.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes/sections.py`: header lookup, section bounds, goal splicing, section joining
 - `periods/windows.py`: typed current/previous period windows + moving-average prior-bound callbacks
-- `periods/runtime.py`: period note path resolution, lock/read lifecycle, metrics write helper, optional prior-period cleanup wrapper
+- `periods/runtime.py`: period note path resolution, lock lifecycle, NoteStore-backed read/write helpers, optional prior-period cleanup wrapper
 - `periods/sections.py`: `append_summary_section`, `append_interrupts_table`, `append_training_type_table`, `build_procrastination_section`, `append_media_section`
 - `goals/identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
 - `goals/carry_forward.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
