@@ -12,16 +12,8 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
+from sync.goals_engine import carry_forward_with_tombstones
 from sync.io import safe_read_file
-from sync.carried_goals import (
-    cleanup_old_entries,
-    get_carried_ids,
-    get_deleted_ids,
-    prune_deleted_ids,
-    record_carried_ids,
-    record_deleted_ids,
-    remove_deleted_ids,
-)
 from sync.goal_sync_state import (
     locked_goal_sync_state,
     record_note_state,
@@ -49,60 +41,7 @@ def carry_forward_goals(
     Returns:
         Tuple of (updated current_tasks, count of tasks added)
     """
-    from dataclasses import replace
-
-    # Clean up old cache entries - keep current + prior period
-    # (prior needed to check if goals from previous period were already offered)
-    from sync.carried_goals import get_prior_period_key
-
-    prior_key = get_prior_period_key(horizon, period_key)
-    keep_keys = [period_key] if prior_key is None else [prior_key, period_key]
-    cleanup_old_entries(horizon, keep_keys)
-    prune_deleted_ids(horizon, period_key)
-
-    open_prev = [t for t in prev_tasks if not t.done]
-    if not open_prev:
-        return current_tasks, 0
-
-    previously_offered = get_carried_ids(horizon, period_key)
-    existing_ids = {t.id for t in current_tasks if t.id}
-    deleted_ids = get_deleted_ids(horizon)
-
-    # Goals previously offered but missing now were intentionally deleted.
-    deleted_now = previously_offered - existing_ids
-    if deleted_now:
-        record_deleted_ids(horizon, period_key, list(deleted_now))
-        deleted_ids.update(deleted_now)
-
-    # If user explicitly re-added a tombstoned goal, restore carry-forward behavior.
-    restored_ids = existing_ids & deleted_ids
-    if restored_ids:
-        remove_deleted_ids(horizon, list(restored_ids))
-        deleted_ids -= restored_ids
-
-    newly_offered: list[str] = []
-    added = 0
-
-    for task in open_prev:
-        tid = task.id
-        if not tid:
-            continue
-        if tid in existing_ids:
-            continue
-        if tid in previously_offered:
-            continue
-        if tid in deleted_ids:
-            continue
-        current_tasks.append(replace(task, done=False))
-        existing_ids.add(tid)
-        newly_offered.append(tid)
-        added += 1
-
-    # Record all offered goals (already offered + newly offered)
-    all_offered = list(previously_offered) + newly_offered
-    record_carried_ids(horizon, period_key, all_offered)
-
-    return current_tasks, added
+    return carry_forward_with_tombstones(prev_tasks, current_tasks, period_key, horizon)
 
 
 def propagate_goal_status(

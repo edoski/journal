@@ -50,6 +50,7 @@ journal/
     reminders.py              # Periodic review reminder generation
     carried_goals.py          # Goal carry-forward cache + deleted-goal tombstones
     goal_sync_state.py        # Bidirectional source/mirror goal state reconciliation cache
+    goals_engine.py           # Shared carry-forward/tombstone suppression engine
     logging.py                # Logging utilities
   utils/                      # Flow database & automation CLI utilities
     flow_db.py                # Shared DB helpers (connection, queries, formatting)
@@ -197,6 +198,7 @@ sync/
     ├── formatting.py   # Value parsing and formatting
     ├── metrics.py      # Period aggregation + shared period data loaders
     ├── goal_identity.py # Shared goal canonicalization + deterministic/random IDs
+    ├── goals_engine.py  # Shared carry-forward/tombstone suppression logic
     ├── media_section.py # MEDIA section orchestration (scan + render composition)
     ├── notes_locking.py # Advisory file locking
     ├── markdown_common.py # Shared markdown header normalization + extract_block
@@ -249,6 +251,7 @@ sync/
 - `markdown_common.py`: `normalize_header`, `extract_block` (single-source markdown matching helpers)
 - `notes_sections.py`: header lookup, section bounds, goal splicing, section joining
 - `goal_identity.py`: `canonical_goal_text`, `generate_goal_id`, `generate_goal_id_for`
+- `goals_engine.py`: `carry_forward_with_tombstones` (shared carry-forward + tombstone suppression)
 - `media_section.py`: `build_media_section` (scans via readers, renders via writers)
 - `base.py`: `carry_forward_goals`, `reconcile_goal_lists`, `process_pierced_goals`, `merge_mirror_goals`
 - `carried_goals.py`: offered-ID cache + deleted-goal tombstones (`_deleted`) with bounded retention pruning (`daily=120`, `weekly=52`, `monthly=36`, `quarterly=20`)

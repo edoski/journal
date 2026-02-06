@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import datetime
 import os
-from dataclasses import replace
 
 from sync.constants import JOURNAL_DIR, WEEKLY_TEMPLATE_PATH
+from sync.goals_engine import carry_forward_with_tombstones
 from sync.io import safe_read_file, atomic_write_note
 from sync.logging import get_logger
 from sync.models import Goal
@@ -23,15 +23,6 @@ from sync.notes_sections import (
 from sync.dates import iso_week_range
 from sync.readers.goals import ensure_goal_ids
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.carried_goals import (
-    cleanup_old_entries,
-    get_carried_ids,
-    get_deleted_ids,
-    prune_deleted_ids,
-    record_carried_ids,
-    record_deleted_ids,
-    remove_deleted_ids,
-)
 
 logger = get_logger()
 
@@ -324,17 +315,6 @@ def carry_forward_daily_tasks(
     Returns:
         Tuple of (updated_tasks_list, count_of_tasks_added)
     """
-    today_key = today_date.isoformat()
-
-    # Clean up old cache entries - keep today + yesterday
-    # (yesterday needed to check if goals were already offered)
-    from sync.carried_goals import get_prior_period_key
-
-    yesterday_key = get_prior_period_key("daily", today_key)
-    keep_keys = [today_key] if yesterday_key is None else [yesterday_key, today_key]
-    cleanup_old_entries("daily", keep_keys)
-    prune_deleted_ids("daily", today_key)
-
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     y_lines = safe_read_file(yesterday_path)
     if y_lines is None:
@@ -343,6 +323,7 @@ def carry_forward_daily_tasks(
     y_start, y_end = goals_section_bounds(y_lines)
     y_daily = extract_subsection_tasks(y_lines, y_start, y_end, "DAILY")
 
+    today_key = today_date.isoformat()
     y_daily = ensure_goal_ids(y_daily, "daily", yesterday_date.isoformat())
     existing_daily_tasks = ensure_goal_ids(existing_daily_tasks, "daily", today_key)
 
@@ -350,52 +331,9 @@ def carry_forward_daily_tasks(
     if not open_y:
         return existing_daily_tasks, 0
 
-    # Get goals that were already offered for carry forward to today
-    previously_offered = get_carried_ids("daily", today_key)
-    existing_ids = {t.id for t in existing_daily_tasks if t.id}
-    deleted_ids = get_deleted_ids("daily")
-
-    # Goals previously offered but missing now were intentionally deleted.
-    deleted_now = previously_offered - existing_ids
-    if deleted_now:
-        record_deleted_ids("daily", today_key, list(deleted_now))
-        deleted_ids.update(deleted_now)
-
-    # If user explicitly re-added a tombstoned goal, restore carry-forward behavior.
-    restored_ids = existing_ids & deleted_ids
-    if restored_ids:
-        remove_deleted_ids("daily", list(restored_ids))
-        deleted_ids -= restored_ids
-
-    added = 0
-    newly_offered: list[str] = []
-
-    for task in open_y:
-        tid = task.id
-        if not tid:
-            continue
-
-        # Skip if already in current note
-        if tid in existing_ids:
-            continue
-
-        # Skip if previously offered but user deleted it
-        if tid in previously_offered:
-            continue
-
-        # Skip if deleted in a prior period (tombstoned)
-        if tid in deleted_ids:
-            continue
-
-        # First time offering this goal - add it with done=False
-        new_task = replace(task, done=False)
-        existing_daily_tasks.append(new_task)
-        existing_ids.add(tid)
-        newly_offered.append(tid)
-        added += 1
-
-    # Record all offered goals (already offered + newly offered)
-    all_offered = list(previously_offered) + newly_offered
-    record_carried_ids("daily", today_key, all_offered)
-
-    return existing_daily_tasks, added
+    return carry_forward_with_tombstones(
+        prev_tasks=open_y,
+        current_tasks=existing_daily_tasks,
+        period_key=today_key,
+        horizon="daily",
+    )
