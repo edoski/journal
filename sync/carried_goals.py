@@ -9,7 +9,13 @@ Cache structure:
     "daily": {"2025-12-29": ["gid-abc123", ...]},
     "weekly": {"2025-W52": ["gid-def456", ...]},
     "monthly": {"2025-12": ["gid-ghi789", ...]},
-    "quarterly": {"2025-Q4": ["gid-jkl012", ...]}
+    "quarterly": {"2025-Q4": ["gid-jkl012", ...]},
+    "_deleted": {
+        "daily": {"gid-aaa111": "2026-02-06", ...},
+        "weekly": {"gid-bbb222": "2026-W06", ...},
+        "monthly": {"gid-ccc333": "2026-02", ...},
+        "quarterly": {"gid-ddd444": "2026-Q1", ...}
+    }
 }
 """
 
@@ -20,6 +26,15 @@ import os
 from typing import Any
 
 from .constants import CARRIED_GOALS_PATH
+
+DELETED_CACHE_KEY = "_deleted"
+# Bounded retention windows for deleted-goal tombstones.
+DELETED_RETENTION_PERIODS = {
+    "daily": 120,
+    "weekly": 52,
+    "monthly": 36,
+    "quarterly": 20,
+}
 
 
 def get_prior_period_key(period_type: str, current_key: str) -> str | None:
@@ -38,33 +53,36 @@ def get_prior_period_key(period_type: str, current_key: str) -> str | None:
     """
     import datetime
 
-    if period_type == "daily":
-        # Parse YYYY-MM-DD, subtract 1 day
-        d = datetime.datetime.strptime(current_key, "%Y-%m-%d").date()
-        prior = d - datetime.timedelta(days=1)
-        return prior.isoformat()
+    try:
+        if period_type == "daily":
+            # Parse YYYY-MM-DD, subtract 1 day
+            d = datetime.datetime.strptime(current_key, "%Y-%m-%d").date()
+            prior = d - datetime.timedelta(days=1)
+            return prior.isoformat()
 
-    elif period_type == "weekly":
-        # Parse YYYY-Www, subtract 7 days
-        year, week = int(current_key[:4]), int(current_key[6:])
-        d = datetime.datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
-        prior = d - datetime.timedelta(days=7)
-        prior_year, prior_week, _ = prior.isocalendar()
-        return f"{prior_year}-W{prior_week:02d}"
+        elif period_type == "weekly":
+            # Parse YYYY-Www, subtract 7 days
+            year, week = int(current_key[:4]), int(current_key[6:])
+            d = datetime.datetime.strptime(f"{year}-W{week}-1", "%G-W%V-%u").date()
+            prior = d - datetime.timedelta(days=7)
+            prior_year, prior_week, _ = prior.isocalendar()
+            return f"{prior_year}-W{prior_week:02d}"
 
-    elif period_type == "monthly":
-        # Parse YYYY-MM, subtract 1 month
-        year, month = int(current_key[:4]), int(current_key[5:])
-        if month == 1:
-            return f"{year - 1}-12"
-        return f"{year}-{month - 1:02d}"
+        elif period_type == "monthly":
+            # Parse YYYY-MM, subtract 1 month
+            year, month = int(current_key[:4]), int(current_key[5:])
+            if month == 1:
+                return f"{year - 1}-12"
+            return f"{year}-{month - 1:02d}"
 
-    elif period_type == "quarterly":
-        # Parse YYYY-Qn, subtract 1 quarter
-        year, quarter = int(current_key[:4]), int(current_key[-1])
-        if quarter == 1:
-            return f"{year - 1}-Q4"
-        return f"{year}-Q{quarter - 1}"
+        elif period_type == "quarterly":
+            # Parse YYYY-Qn, subtract 1 quarter
+            year, quarter = int(current_key[:4]), int(current_key[-1])
+            if quarter == 1:
+                return f"{year - 1}-Q4"
+            return f"{year}-Q{quarter - 1}"
+    except (IndexError, ValueError):
+        return None
 
     return None
 
@@ -75,7 +93,8 @@ def _load_cache() -> dict[str, Any]:
         return {}
     try:
         with open(CARRIED_GOALS_PATH, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError):
         return {}
 
@@ -87,6 +106,67 @@ def _save_cache(cache: dict[str, Any]) -> None:
     with open(tmp_path, "w") as f:
         json.dump(cache, f, indent=2)
     os.replace(tmp_path, CARRIED_GOALS_PATH)
+
+
+def _compute_retention_window(
+    period_type: str,
+    current_key: str,
+    count: int,
+) -> set[str]:
+    """
+    Compute the set of period keys to keep for tombstone retention.
+
+    Walks backward from current_key using get_prior_period_key() for `count`
+    periods (inclusive of current_key). If key parsing fails, returns the keys
+    collected so far.
+    """
+    if count <= 0:
+        return set()
+
+    keys: set[str] = set()
+    key: str | None = current_key
+    for _ in range(count):
+        if not key:
+            break
+        keys.add(key)
+        key = get_prior_period_key(period_type, key)
+    return keys
+
+
+def _get_deleted_bucket(cache: dict[str, Any], period_type: str) -> dict[str, str]:
+    """
+    Return a normalized deleted-tombstone bucket for a horizon.
+
+    Missing or malformed structures are treated as empty.
+    """
+    deleted = cache.get(DELETED_CACHE_KEY)
+    if not isinstance(deleted, dict):
+        return {}
+
+    bucket = deleted.get(period_type)
+    if not isinstance(bucket, dict):
+        return {}
+
+    normalized: dict[str, str] = {}
+    for goal_id, deleted_period in bucket.items():
+        if isinstance(goal_id, str) and goal_id and isinstance(deleted_period, str):
+            normalized[goal_id] = deleted_period
+    return normalized
+
+
+def _ensure_deleted_bucket(cache: dict[str, Any], period_type: str) -> dict[str, str]:
+    """Ensure cache has a mutable deleted-tombstone bucket for the horizon."""
+    deleted = cache.get(DELETED_CACHE_KEY)
+    if not isinstance(deleted, dict):
+        deleted = {}
+        cache[DELETED_CACHE_KEY] = deleted
+
+    bucket = deleted.get(period_type)
+    if not isinstance(bucket, dict):
+        bucket = {}
+        deleted[period_type] = bucket
+
+    return bucket
 
 
 def get_carried_ids(period_type: str, period_key: str) -> set[str]:
@@ -126,6 +206,113 @@ def record_carried_ids(period_type: str, period_key: str, goal_ids: list[str]) -
     existing.update(goal_ids)
     cache[period_type][period_key] = sorted(existing)
 
+    _save_cache(cache)
+
+
+def get_deleted_ids(period_type: str) -> set[str]:
+    """
+    Get goal IDs tombstoned as intentionally deleted for the given horizon.
+
+    Args:
+        period_type: One of "daily", "weekly", "monthly", "quarterly"
+
+    Returns:
+        Set of goal IDs currently suppressed from re-adding
+    """
+    cache = _load_cache()
+    bucket = _get_deleted_bucket(cache, period_type)
+    return set(bucket.keys())
+
+
+def record_deleted_ids(period_type: str, period_key: str, goal_ids: list[str]) -> None:
+    """
+    Record intentionally deleted goal IDs as tombstones for this horizon.
+
+    Args:
+        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        period_key: Current period key when deletion was observed
+        goal_ids: Goal IDs intentionally removed by the user
+    """
+    if not goal_ids:
+        return
+
+    cache = _load_cache()
+    bucket = _ensure_deleted_bucket(cache, period_type)
+
+    changed = False
+    for goal_id in goal_ids:
+        if not isinstance(goal_id, str) or not goal_id:
+            continue
+        if bucket.get(goal_id) != period_key:
+            bucket[goal_id] = period_key
+            changed = True
+
+    if changed:
+        _save_cache(cache)
+
+
+def remove_deleted_ids(period_type: str, goal_ids: list[str]) -> None:
+    """
+    Remove goal IDs from tombstones (e.g., explicit user re-add).
+
+    Args:
+        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        goal_ids: Goal IDs to un-suppress
+    """
+    if not goal_ids:
+        return
+
+    cache = _load_cache()
+    deleted = cache.get(DELETED_CACHE_KEY)
+    if not isinstance(deleted, dict):
+        return
+
+    bucket = deleted.get(period_type)
+    if not isinstance(bucket, dict):
+        return
+
+    changed = False
+    for goal_id in goal_ids:
+        if goal_id in bucket:
+            del bucket[goal_id]
+            changed = True
+
+    if changed:
+        _save_cache(cache)
+
+
+def prune_deleted_ids(period_type: str, current_key: str) -> None:
+    """
+    Prune deleted-goal tombstones for a horizon to a bounded retention window.
+
+    Args:
+        period_type: One of "daily", "weekly", "monthly", "quarterly"
+        current_key: Current period key used as retention anchor
+    """
+    retention = DELETED_RETENTION_PERIODS.get(period_type)
+    if retention is None:
+        return
+
+    keep_keys = _compute_retention_window(period_type, current_key, retention)
+    if not keep_keys:
+        return
+
+    cache = _load_cache()
+    bucket = _get_deleted_bucket(cache, period_type)
+    if not bucket:
+        return
+
+    pruned = {
+        goal_id: deleted_period
+        for goal_id, deleted_period in bucket.items()
+        if deleted_period in keep_keys
+    }
+
+    if pruned == bucket:
+        return
+
+    _ensure_deleted_bucket(cache, period_type).clear()
+    _ensure_deleted_bucket(cache, period_type).update(pruned)
     _save_cache(cache)
 
 

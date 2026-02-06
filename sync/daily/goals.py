@@ -23,7 +23,15 @@ from sync.notes_sections import (
 from sync.dates import iso_week_range
 from sync.readers.goals import ensure_goal_ids
 from sync.writers.goals import render_goal_lines, build_goals_block
-from sync.carried_goals import get_carried_ids, record_carried_ids, cleanup_old_entries
+from sync.carried_goals import (
+    cleanup_old_entries,
+    get_carried_ids,
+    get_deleted_ids,
+    prune_deleted_ids,
+    record_carried_ids,
+    record_deleted_ids,
+    remove_deleted_ids,
+)
 
 logger = get_logger()
 
@@ -308,6 +316,7 @@ def carry_forward_daily_tasks(
     yesterday_key = get_prior_period_key("daily", today_key)
     keep_keys = [today_key] if yesterday_key is None else [yesterday_key, today_key]
     cleanup_old_entries("daily", keep_keys)
+    prune_deleted_ids("daily", today_key)
 
     yesterday_path = os.path.join(JOURNAL_DIR, f"{yesterday_date:%Y-%m-%d}.md")
     y_lines = safe_read_file(yesterday_path)
@@ -327,6 +336,19 @@ def carry_forward_daily_tasks(
     # Get goals that were already offered for carry forward to today
     previously_offered = get_carried_ids("daily", today_key)
     existing_ids = {t.id for t in existing_daily_tasks if t.id}
+    deleted_ids = get_deleted_ids("daily")
+
+    # Goals previously offered but missing now were intentionally deleted.
+    deleted_now = previously_offered - existing_ids
+    if deleted_now:
+        record_deleted_ids("daily", today_key, list(deleted_now))
+        deleted_ids.update(deleted_now)
+
+    # If user explicitly re-added a tombstoned goal, restore carry-forward behavior.
+    restored_ids = existing_ids & deleted_ids
+    if restored_ids:
+        remove_deleted_ids("daily", list(restored_ids))
+        deleted_ids -= restored_ids
 
     added = 0
     newly_offered: list[str] = []
@@ -342,6 +364,10 @@ def carry_forward_daily_tasks(
 
         # Skip if previously offered but user deleted it
         if tid in previously_offered:
+            continue
+
+        # Skip if deleted in a prior period (tombstoned)
+        if tid in deleted_ids:
             continue
 
         # First time offering this goal - add it with done=False

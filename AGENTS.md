@@ -378,7 +378,7 @@ launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
 
 Run the test suite before committing:
 ```bash
-pytest tests/ -v              # All 459 tests (current branch)
+pytest tests/ -v              # All 467 tests (current branch)
 ruff check . && ruff format --check .  # Linting
 vulture sync/ --min-confidence 80      # Dead code
 ```
