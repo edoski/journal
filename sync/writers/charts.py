@@ -865,7 +865,7 @@ def _compress_symbols(symbols, target_width):
     return "".join(compressed)
 
 
-def _compress_days_time_order(
+def compress_days_time_order(
     days,
     met_fn,
     target_width,
@@ -924,7 +924,7 @@ def compress_activity_time_order(
     """
     Time-ordered compression for binary activity (workout/stretch).
     """
-    return _compress_days_time_order(
+    return compress_days_time_order(
         days,
         has_activity_fn,
         target_width,

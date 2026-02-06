@@ -49,7 +49,7 @@ from sync.writers.charts import (
     render_yearly_study_coverage,
     wrap_code_block,
     compress_activity_time_order,
-    _compress_days_time_order,
+    compress_days_time_order,
     render_screen_time_period_table,
     YEARLY_4QTR_STUDY,
     YEARLY_4QTR_METRIC,
@@ -195,7 +195,7 @@ def build_yearly_metrics(
             and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
         )
         study_counts.append((done, elapsed_days, start))
-        bar = _compress_days_time_order(
+        bar = compress_days_time_order(
             days,
             lambda d: (daily_data.get(d, {}).get("study_minutes") or 0)
             >= STUDY_TARGET_MIN,

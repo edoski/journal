@@ -26,7 +26,7 @@ from sync.writers.charts import (
     render_weekly_study_grid,
     render_monthly_study_grid,
     _compress_symbols,
-    _compress_days_time_order,
+    compress_days_time_order,
     compress_activity_time_order,
     render_quarterly_study_coverage,
     render_yearly_study_coverage,
@@ -606,13 +606,13 @@ class TestCompressSymbols:
 
 
 class TestCompressDaysTimeOrder:
-    """Tests for _compress_days_time_order function."""
+    """Tests for compress_days_time_order function."""
 
     def test_basic_compression(self):
         days = [datetime.date(2025, 1, 1) + datetime.timedelta(i) for i in range(10)]
         today = datetime.date(2025, 1, 15)
 
-        result = _compress_days_time_order(
+        result = compress_days_time_order(
             days,
             lambda d: True,  # All days meet criterion
             5,
@@ -626,7 +626,7 @@ class TestCompressDaysTimeOrder:
         days = [datetime.date(2025, 12, 25), datetime.date(2025, 12, 26)]
         today = datetime.date(2025, 12, 25)
 
-        result = _compress_days_time_order(
+        result = compress_days_time_order(
             days,
             lambda d: True,
             2,

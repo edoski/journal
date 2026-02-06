@@ -10,8 +10,8 @@ from __future__ import annotations
 import calendar
 import datetime
 
+from sync.goal_identity import generate_goal_id_for
 from sync.models import Goal
-from sync.readers.goals import generate_goal_id_for
 
 
 def get_periodic_reminders_for_date(date: datetime.date) -> list[Goal]:
