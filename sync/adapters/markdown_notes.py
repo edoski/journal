@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from sync.io import safe_read_file
+from sync.io import atomic_write_note, safe_read_file
 from sync.notes.sections import ensure_note
 from sync.ports.notes import NoteStore
 
@@ -23,8 +23,7 @@ class MarkdownNoteStore(NoteStore):
 
     def write(self, path: str, lines: list[str]) -> None:
         """Persist note lines atomically."""
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp_path = path + ".tmp"
-        with open(tmp_path, "w") as handle:
-            handle.write("\n".join(lines))
-        os.replace(tmp_path, path)
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        atomic_write_note(path, lines)

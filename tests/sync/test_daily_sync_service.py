@@ -159,7 +159,7 @@ def test_sync_day_output_characterization(monkeypatch, tmp_path):
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     assert (
         content_hash
-        == "2dc949bd8ef5dc305f717f44cafb171cbb76942acd851732750daececc2ba221"
+        == "b70f5034dbdc19ca38aa3f0d8c3764e98534093873c1404f95eee5d1ab59d19b"
     )
 
 

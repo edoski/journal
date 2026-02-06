@@ -30,4 +30,4 @@ def test_write_persists_lines_atomically(tmp_path):
 
     store.write(str(note_path), lines)
 
-    assert note_path.read_text(encoding="utf-8") == "## Header\n\nBody"
+    assert note_path.read_text(encoding="utf-8") == "## Header\n\nBody\n"

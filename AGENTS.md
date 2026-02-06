@@ -174,7 +174,7 @@ journal/
 - `NoteStore`:
   - `read(path) -> list[str] | None`
   - `read_or_create(path, template_path) -> list[str]`
-  - `write(path, lines) -> None`
+  - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `GoalStore`:
   - `extract(lines, section, horizon=None, period_key=None) -> list[Goal]`
