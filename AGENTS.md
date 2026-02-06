@@ -142,7 +142,7 @@ Shared constants are in `sync/constants.py`, organized into frozen dataclasses:
 - **`RenderConfig`** (`RENDER`): Progress bars & symbols — `progress_bar_width`, `progress_filled`, `progress_empty`, `study_symbol_*`, `study_legend`
 - **`ScreenTimeConfig`** (`SCREEN_TIME`): Thresholds — `min_minutes`, `percent_threshold`, `misc_label`
 
-**Bar Chart Presets** (in `sync/writers/charts.py`):
+**Bar Chart Presets** (in `sync/writers/charts/presets.py`):
 - **`BarChartPreset`** dataclass: Encapsulates all bar chart parameters (`height`, `y_max`, `bar_width`, `col_spacing`, `label_prefix`, `axis_trim`, `left_pad`, `center_labels_on_bars`)
 - **Named presets**: `WEEKLY_7DAY_CHART`, `WEEKLY_7DAY_MOOD`, `MONTHLY_WEEK_STUDY`, `MONTHLY_WEEK_METRIC`, `MONTHLY_WEEK_MOOD`, `QUARTERLY_3MONTH_STUDY`, `QUARTERLY_3MONTH_METRIC`, `QUARTERLY_3MONTH_MOOD`, `YEARLY_4QTR_STUDY`, `YEARLY_4QTR_METRIC`, `YEARLY_4QTR_MOOD`
 
@@ -186,7 +186,14 @@ sync/
 │   └── screen_time.py  # parse_procrastination_table
 │
 ├── writers/          # Rendering: models → markdown
-│   ├── charts.py       # render_bar_chart, BarChartPreset, training grids, study coverage, waterfall charts
+│   ├── charts/         # Chart package (presets, bars, study/training grids, screen-time charts)
+│   │   ├── __init__.py
+│   │   ├── presets.py
+│   │   ├── bar.py
+│   │   ├── grid.py
+│   │   ├── training.py
+│   │   ├── study.py
+│   │   └── screen_time.py
 │   ├── tables.py       # render_summary_table, render_sleep_stats_table
 │   ├── goals.py        # render_goal_lines, build_goals_block, format_countdown
 │   └── media.py        # render_media_table
