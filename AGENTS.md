@@ -33,6 +33,7 @@ journal/
       constants.py            # Daily-specific constants
     application/              # Service orchestration over ports/contracts
       daily_sync_service.py   # Daily note sync service (replaces pipeline orchestration)
+      period_sync_service.py  # Weekly/monthly/quarterly/yearly sync service over ports/contracts
     study/                    # Study ingestion domain (Flow DB + breaks + STUDY section)
       __init__.py             # Study domain exports
       constants.py            # Flow integration constants + break window config
@@ -42,12 +43,13 @@ journal/
       section.py              # STUDY table extraction/building
     periods/                  # Weekly/monthly/quarterly/yearly sync entrypoints + helpers
       __init__.py             # Period package marker
+      engine.py               # Shared metrics rendering engine for all period types
       windows.py              # Typed period-window builders (current/previous/prior bounds)
       runtime.py              # Shared period runtime helpers (path/lock/write/cleanup)
-      weekly.py               # Weekly metrics aggregation
-      monthly.py              # Monthly metrics aggregation
-      quarterly.py            # Quarterly metrics aggregation
-      yearly.py               # Yearly metrics aggregation
+      weekly.py               # Weekly composition root (args + wiring + service call)
+      monthly.py              # Monthly composition root (args + wiring + service call)
+      quarterly.py            # Quarterly composition root (args + wiring + service call)
+      yearly.py               # Yearly composition root (args + wiring + service call)
       sections.py             # Shared periodic section assembly helpers
       cleanup.py              # Shared cleanup re-sync helper for prior periods
       media.py                # MEDIA section orchestration (reader scan + writer render)
@@ -104,13 +106,13 @@ journal/
   - **`goals/`**: Goal domain package (identity, carry-forward, reconciliation, canonical note I/O, period-goal pipeline, reminders)
   - **`periods/`**: Weekly/monthly/quarterly/yearly sync modules + shared period helpers
 
-- **`sync/periods/weekly.py`**: Aggregates daily notes into weekly metrics with bar charts, training grids + training type table (`TYPE | SESSIONS | AVERAGE`), and procrastination trend tables. Includes **Summary Table** with 4-week moving averages and **IDEALS Progress** tracking.
+- **`sync/periods/weekly.py`**: Weekly composition root that resolves args/window and delegates to `sync.application.period_sync_service.PeriodSyncService`.
 
-- **`sync/periods/monthly.py`**: Aggregates daily notes into monthly metrics with weekly breakdowns. Includes **Summary Table** with 3-month moving averages.
+- **`sync/periods/monthly.py`**: Monthly composition root that resolves args/window and delegates to `PeriodSyncService`.
 
-- **`sync/periods/quarterly.py`**: Aggregates daily notes into quarterly metrics with month-level breakdowns. Includes **Summary Table** with 4-quarter moving averages.
+- **`sync/periods/quarterly.py`**: Quarterly composition root that resolves args/window and delegates to `PeriodSyncService`.
 
-- **`sync/periods/yearly.py`**: Aggregates daily notes into yearly metrics with quarter-level breakdowns. Includes **Summary Table** with 3-year moving averages.
+- **`sync/periods/yearly.py`**: Yearly composition root that resolves args/window and delegates to `PeriodSyncService`.
 
 - **`sync_all.sh`**: Wrapper script that runs daily, weekly, monthly, quarterly, and yearly syncs in sequence.
 
@@ -228,7 +230,8 @@ sync/
 │   └── screen_time.py  # Screen time data loading and procrastination section
 │
 ├── application/      # Service orchestration layer
-│   └── daily_sync_service.py # Daily sync service over ports/contracts
+│   ├── daily_sync_service.py # Daily sync service over ports/contracts
+│   └── period_sync_service.py # Period sync service over ports/contracts
 │
 ├── study/            # Study ingestion domain
 │   ├── constants.py    # Flow integration constants + break window config
@@ -247,13 +250,14 @@ sync/
 │   ├── period_pipeline.py # shared period-goal orchestration configs + helpers
 │   └── reminders.py    # markdown-configured reminder parsing/evaluation
 │
-├── periods/          # Weekly/monthly/quarterly/yearly sync + shared helpers
+├── periods/          # Period rendering engine + thin composition roots
+│   ├── engine.py       # Shared metrics rendering for week/month/quarter/year
 │   ├── windows.py      # Typed period windows + prior-period bound callbacks
 │   ├── runtime.py      # Common path resolution, note lock/read/write, cleanup wrapper
-│   ├── weekly.py       # Weekly note sync entrypoint
-│   ├── monthly.py      # Monthly note sync entrypoint
-│   ├── quarterly.py    # Quarterly note sync entrypoint
-│   ├── yearly.py       # Yearly note sync entrypoint
+│   ├── weekly.py       # Weekly composition root
+│   ├── monthly.py      # Monthly composition root
+│   ├── quarterly.py    # Quarterly composition root
+│   ├── yearly.py       # Yearly composition root
 │   ├── sections.py     # Shared periodic section assembly helpers
 │   ├── cleanup.py      # Prior-period cleanup re-sync helper
 │   └── media.py        # MEDIA section orchestration (scan + render composition)
@@ -528,3 +532,7 @@ Validate:
 
 - Paths point to personal data; avoid committing real journal files
 - Keep `DB_PATH` read-only; test on copies to avoid accidental edits
+- Period service boundary (phase 6):
+- `sync.application.period_sync_service.PeriodSyncService` owns weekly/monthly/quarterly/yearly orchestration and goal pipeline wiring
+- `sync.periods.engine` owns period metrics rendering (`build_weekly_metrics`, `build_monthly_metrics`, `build_quarterly_metrics`, `build_yearly_metrics`)
+- Period entrypoints (`sync/periods/{weekly,monthly,quarterly,yearly}.py`) are composition roots only (argument parsing + window resolution + service wiring)

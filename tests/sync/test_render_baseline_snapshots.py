@@ -5,11 +5,8 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
-import sync.periods.monthly as monthly
-import sync.periods.quarterly as quarterly
+import sync.periods.engine as period_engine
 import sync.periods.sections as period_sections
-import sync.periods.weekly as weekly
-import sync.periods.yearly as yearly
 from sync.dates import (
     daterange,
     iso_week_range,
@@ -110,7 +107,7 @@ def test_weekly_metrics_snapshot(monkeypatch):
         p_dates = [p_start + datetime.timedelta(days=i) for i in range(7)]
         prior_week_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = weekly.build_weekly_metrics(
+    lines = period_engine.build_weekly_metrics(
         start,
         end,
         daily_data,
@@ -138,7 +135,7 @@ def test_monthly_metrics_snapshot(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_month_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = monthly.build_monthly_metrics(
+    lines = period_engine.build_monthly_metrics(
         start,
         end,
         week_ranges,
@@ -168,7 +165,7 @@ def test_quarterly_metrics_snapshot(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = quarterly.build_quarterly_metrics(
+    lines = period_engine.build_quarterly_metrics(
         start,
         end,
         month_ranges,
@@ -201,7 +198,7 @@ def test_yearly_metrics_snapshot(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_year_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = yearly.build_yearly_metrics(
+    lines = period_engine.build_yearly_metrics(
         year,
         start,
         end,

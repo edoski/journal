@@ -181,38 +181,26 @@ def test_deprecated_import_paths_are_not_used():
     assert not violations, "Deprecated import paths found:\n" + "\n".join(violations)
 
 
-def test_period_entrypoints_import_shared_runtime_and_windows():
+def test_period_entrypoints_import_service_and_windows():
     required: dict[str, dict[str, set[str]]] = {
         "sync/periods/weekly.py": {
-            "sync.periods.runtime": {
-                "open_period_note",
-                "resolve_note_path",
-                "write_note_metrics",
-            },
+            "sync.application.period_sync_service": {"PeriodSyncService"},
+            "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_week_window"},
         },
         "sync/periods/monthly.py": {
-            "sync.periods.runtime": {
-                "open_period_note",
-                "resolve_note_path",
-                "write_note_metrics",
-            },
+            "sync.application.period_sync_service": {"PeriodSyncService"},
+            "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_month_window"},
         },
         "sync/periods/quarterly.py": {
-            "sync.periods.runtime": {
-                "open_period_note",
-                "resolve_note_path",
-                "write_note_metrics",
-            },
+            "sync.application.period_sync_service": {"PeriodSyncService"},
+            "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_quarter_window"},
         },
         "sync/periods/yearly.py": {
-            "sync.periods.runtime": {
-                "open_period_note",
-                "resolve_note_path",
-                "write_note_metrics",
-            },
+            "sync.application.period_sync_service": {"PeriodSyncService"},
+            "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_year_window"},
         },
     }
@@ -228,78 +216,55 @@ def test_period_entrypoints_import_shared_runtime_and_windows():
                     f"{rel_path}: missing {module_name} imports: {', '.join(missing)}"
                 )
 
-    assert not violations, "Period runtime/window imports regressed:\n" + "\n".join(
-        violations
+    assert not violations, (
+        "Period entrypoint service/window imports regressed:\n" + "\n".join(violations)
     )
 
 
-def test_period_goal_orchestration_uses_pipeline_or_note_store():
-    period_modules = [
-        ROOT / "sync" / "periods" / "weekly.py",
-        ROOT / "sync" / "periods" / "monthly.py",
-        ROOT / "sync" / "periods" / "quarterly.py",
-        ROOT / "sync" / "periods" / "yearly.py",
-    ]
+def test_period_goal_orchestration_lives_in_period_service():
+    period_modules = _iter_python_files("sync/periods")
+    service_path = ROOT / "sync" / "application" / "period_sync_service.py"
+    pipeline_imports = _imported_from(service_path, "sync.goals.period_pipeline")
+    expected_pipeline_imports = {
+        "CarryForwardConfig",
+        "MirrorSyncConfig",
+        "PiercingSyncConfig",
+        "SourceWriteConfig",
+        "load_source_tasks_with_carry_forward",
+        "propagate_source_sections",
+        "sync_mirror_section",
+        "sync_pierced_source_section",
+    }
+    missing_pipeline = sorted(expected_pipeline_imports - pipeline_imports)
+    assert not missing_pipeline, (
+        "sync/application/period_sync_service.py must own goal pipeline orchestration:\n"
+        + ", ".join(missing_pipeline)
+    )
+
+    carry_forward_imports = _imported_from(
+        service_path,
+        "sync.goals.carry_forward",
+    )
+    assert "carry_forward_with_tombstones" in carry_forward_imports, (
+        "sync/application/period_sync_service.py must own yearly carry-forward flow"
+    )
+
     violations: list[str] = []
 
     for path in period_modules:
+        if path.name in {"engine.py", "__init__.py"}:
+            continue
         module = _parse_module(path)
-        imported_pipeline = _imported_from(path, "sync.goals.period_pipeline")
-        imported_note_store = _imported_from(path, "sync.goals.note_store")
-
-        if path.name in {"weekly.py", "monthly.py", "quarterly.py"}:
-            required_pipeline = {
-                "CarryForwardConfig",
-                "load_source_tasks_with_carry_forward",
-                "SourceWriteConfig",
-                "propagate_source_sections",
-            }
-            missing = sorted(required_pipeline - imported_pipeline)
-            if missing:
-                violations.append(
-                    f"{path}: missing pipeline imports: {', '.join(missing)}"
-                )
-
-        if path.name == "yearly.py":
-            required_note_store = {"extract_goals", "apply_goals_sections"}
-            missing = sorted(required_note_store - imported_note_store)
-            if missing:
-                violations.append(
-                    f"{path}: missing note_store imports: {', '.join(missing)}"
-                )
 
         for node in ast.walk(module):
             if not isinstance(node, ast.ImportFrom):
                 continue
             mod = node.module or ""
-            names = {alias.name for alias in node.names}
-            if mod == "sync.goals.reconcile":
-                banned = {
-                    "reconcile_goal_lists",
-                    "merge_mirror_goals",
-                    "process_pierced_goals",
-                }
-                used = sorted(names & banned)
-                if used:
-                    violations.append(
-                        f"{path}: direct reconcile imports not allowed: {', '.join(used)}"
-                    )
-            if mod == "sync.writers.goals" and "build_goals_block" in names:
-                violations.append(f"{path}: build_goals_block import is not allowed")
-            if mod == "sync.notes.sections":
-                banned_sections = {
-                    "splice_goals_section",
-                    "goals_section_bounds",
-                    "extract_subsection_tasks",
-                }
-                used_sections = sorted(names & banned_sections)
-                if used_sections:
-                    violations.append(
-                        f"{path}: direct goals section helpers not allowed: {', '.join(used_sections)}"
-                    )
+            if mod.startswith("sync.goals"):
+                violations.append(f"{path}: period entrypoints must not import {mod}")
 
     assert not violations, (
-        "Period goal orchestration must use goals pipeline/note_store:\n"
+        "Period goal orchestration must live in sync.application.period_sync_service:\n"
         + "\n".join(violations)
     )
 
