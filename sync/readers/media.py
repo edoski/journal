@@ -8,40 +8,12 @@ import datetime
 import os
 import re
 
-from sync.constants import MEDIA_CACHE_PATH
 from sync.logging import get_logger
 from sync.models import Book, Podcast
 from sync.readers.frontmatter import parse_frontmatter
-from sync.io import safe_read_file, safe_load_json, safe_save_json
+from sync.io import safe_read_file
 
 logger = get_logger()
-
-
-# ---------------------------------------------------------------------------
-# Media date cache functions
-# ---------------------------------------------------------------------------
-
-
-def _load_media_cache() -> dict[str, dict[str, str]]:
-    """
-    Load cached media dates from disk.
-
-    Returns:
-        Dict with 'podcasts' and 'books' keys, each mapping title -> date string
-    """
-    default: dict[str, dict[str, str]] = {"podcasts": {}, "books": {}}
-    data = safe_load_json(MEDIA_CACHE_PATH, default)
-    if not isinstance(data, dict):
-        return default
-    return {
-        "podcasts": data.get("podcasts", {}),
-        "books": data.get("books", {}),
-    }
-
-
-def _save_media_cache(cache: dict[str, dict[str, str]]) -> None:
-    """Save media dates cache to disk."""
-    safe_save_json(MEDIA_CACHE_PATH, cache)
 
 
 def _heal_frontmatter_date(
@@ -131,7 +103,9 @@ def scan_books(
     start_date: datetime.date,
     end_date: datetime.date,
     books_dir: str,
-) -> list[Book]:
+    *,
+    cached_dates: dict[str, str] | None = None,
+) -> tuple[list[Book], dict[str, str], bool]:
     """
     Scan notes/books/ for books completed within the date range.
 
@@ -147,12 +121,11 @@ def scan_books(
         List of Book dataclasses for books completed in range
     """
     books: list[Book] = []
+    cache = dict(cached_dates or {})
+    cache_modified = False
 
     if not os.path.isdir(books_dir):
-        return books
-
-    cache = _load_media_cache()
-    cache_modified = False
+        return books, cache, cache_modified
 
     for filename in os.listdir(books_dir):
         if not filename.endswith(".md"):
@@ -179,7 +152,7 @@ def scan_books(
         title = filename[:-3]
 
         # Cache check and healing for completed date
-        cached_date_str = cache["books"].get(title)
+        cached_date_str = cache.get(title)
         if cached_date_str:
             cached_date = _parse_date_link(cached_date_str)
             if cached_date and cached_date != completed_date:
@@ -194,7 +167,7 @@ def scan_books(
                 completed_date = cached_date
         else:
             # New entry - add to cache
-            cache["books"][title] = completed_date.strftime("%Y-%m-%d")
+            cache[title] = completed_date.strftime("%Y-%m-%d")
             cache_modified = True
 
         # Check if completed within date range
@@ -216,20 +189,19 @@ def scan_books(
             )
         )
 
-    if cache_modified:
-        _save_media_cache(cache)
-
     # Sort by completed date
     books.sort(key=lambda b: b.completed)
 
-    return books
+    return books, cache, cache_modified
 
 
 def scan_podcasts(
     start_date: datetime.date,
     end_date: datetime.date,
     podcasts_dir: str,
-) -> list[Podcast]:
+    *,
+    cached_dates: dict[str, str] | None = None,
+) -> tuple[list[Podcast], dict[str, str], bool]:
     """
     Scan notes/podcasts/ for podcasts within the date range.
 
@@ -245,12 +217,11 @@ def scan_podcasts(
         List of Podcast dataclasses for podcasts in range
     """
     podcasts: list[Podcast] = []
+    cache = dict(cached_dates or {})
+    cache_modified = False
 
     if not os.path.isdir(podcasts_dir):
-        return podcasts
-
-    cache = _load_media_cache()
-    cache_modified = False
+        return podcasts, cache, cache_modified
 
     for filename in os.listdir(podcasts_dir):
         if not filename.endswith(".md"):
@@ -277,7 +248,7 @@ def scan_podcasts(
         title = filename[:-3]
 
         # Cache check and healing
-        cached_date_str = cache["podcasts"].get(title)
+        cached_date_str = cache.get(title)
         if cached_date_str:
             cached_date = _parse_date_link(cached_date_str)
             if cached_date and cached_date != podcast_date:
@@ -292,7 +263,7 @@ def scan_podcasts(
                 podcast_date = cached_date
         else:
             # New entry - add to cache
-            cache["podcasts"][title] = podcast_date.strftime("%Y-%m-%d")
+            cache[title] = podcast_date.strftime("%Y-%m-%d")
             cache_modified = True
 
         # Check if within date range
@@ -313,10 +284,7 @@ def scan_podcasts(
             )
         )
 
-    if cache_modified:
-        _save_media_cache(cache)
-
     # Sort by date
     podcasts.sort(key=lambda p: p.date)
 
-    return podcasts
+    return podcasts, cache, cache_modified

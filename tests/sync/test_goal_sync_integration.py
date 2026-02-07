@@ -5,13 +5,17 @@ from __future__ import annotations
 import datetime
 import os
 
+from sync.adapters.json_goal_cache import JsonGoalReconcileCacheStore
 from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
-from sync.goals.state import (
-    load_goal_sync_state,
-    record_note_state,
-    save_goal_sync_state,
-)
+from sync.goals.state import record_note_state
 from sync.models.goals import Goal
+
+
+def _store(tmp_path) -> JsonGoalReconcileCacheStore:
+    return JsonGoalReconcileCacheStore(
+        cache_dir=str(tmp_path / "cache" / "goals"),
+        lock_root=str(tmp_path / "cache" / "locks" / "state"),
+    )
 
 
 def _goal(
@@ -32,29 +36,27 @@ def _goal(
 
 
 def _seed_pair_state(
-    gid: str, source_path: str, source_done: bool, mirror_path: str, mirror_done: bool
+    store: JsonGoalReconcileCacheStore,
+    gid: str,
+    source_path: str,
+    source_done: bool,
+    mirror_path: str,
+    mirror_done: bool,
 ) -> None:
-    state = load_goal_sync_state()
+    state = store.load()
     record_note_state(state, gid, source_path, source_done)
     record_note_state(state, gid, mirror_path, mirror_done)
-    save_goal_sync_state(state)
+    store.save(state)
 
 
-def _patch_sync_state(monkeypatch, tmp_path):
-    cache_path = tmp_path / "goal_sync_state.json"
-    lock_dir = tmp_path / "locks"
-    monkeypatch.setattr("sync.goals.state.GOAL_SYNC_STATE_PATH", str(cache_path))
-    monkeypatch.setattr("sync.notes.locking.LOCK_DIR", str(lock_dir))
-
-
-def test_monthly_source_unchecked_clears_weekly_mirror(monkeypatch, tmp_path):
-    _patch_sync_state(monkeypatch, tmp_path)
+def test_monthly_source_unchecked_clears_weekly_mirror(tmp_path):
+    store = _store(tmp_path)
     source_path = tmp_path / "2026-02.md"
     mirror_path = tmp_path / "2026-W06.md"
     source_path.write_text("source", encoding="utf-8")
     mirror_path.write_text("mirror", encoding="utf-8")
 
-    _seed_pair_state("gid-1", str(source_path), True, str(mirror_path), True)
+    _seed_pair_state(store, "gid-1", str(source_path), True, str(mirror_path), True)
 
     source_tasks = [_goal("gid-1", False)]
     mirror_tasks = [_goal("gid-1", True)]
@@ -64,6 +66,7 @@ def test_monthly_source_unchecked_clears_weekly_mirror(monkeypatch, tmp_path):
         mirror_tasks,
         str(source_path),
         str(mirror_path),
+        reconcile_cache_store=store,
     )
 
     assert updated_source[0].done is False
@@ -71,14 +74,14 @@ def test_monthly_source_unchecked_clears_weekly_mirror(monkeypatch, tmp_path):
     assert mirror_changed is True
 
 
-def test_weekly_mirror_checked_sets_monthly_source_checked(monkeypatch, tmp_path):
-    _patch_sync_state(monkeypatch, tmp_path)
+def test_weekly_mirror_checked_sets_monthly_source_checked(tmp_path):
+    store = _store(tmp_path)
     source_path = tmp_path / "2026-02.md"
     mirror_path = tmp_path / "2026-W06.md"
     source_path.write_text("source", encoding="utf-8")
     mirror_path.write_text("mirror", encoding="utf-8")
 
-    _seed_pair_state("gid-2", str(source_path), False, str(mirror_path), False)
+    _seed_pair_state(store, "gid-2", str(source_path), False, str(mirror_path), False)
 
     source_tasks = [_goal("gid-2", False)]
     mirror_tasks = [_goal("gid-2", True)]
@@ -88,6 +91,7 @@ def test_weekly_mirror_checked_sets_monthly_source_checked(monkeypatch, tmp_path
         mirror_tasks,
         str(source_path),
         str(mirror_path),
+        reconcile_cache_store=store,
     )
 
     assert updated_source[0].done is True
@@ -95,14 +99,14 @@ def test_weekly_mirror_checked_sets_monthly_source_checked(monkeypatch, tmp_path
     assert source_changed is True
 
 
-def test_quarterly_yearly_bidirectional_reconcile(monkeypatch, tmp_path):
-    _patch_sync_state(monkeypatch, tmp_path)
+def test_quarterly_yearly_bidirectional_reconcile(tmp_path):
+    store = _store(tmp_path)
     source_path = tmp_path / "2026.md"
     mirror_path = tmp_path / "2026-Q1.md"
     source_path.write_text("source", encoding="utf-8")
     mirror_path.write_text("mirror", encoding="utf-8")
 
-    _seed_pair_state("gid-3", str(source_path), False, str(mirror_path), False)
+    _seed_pair_state(store, "gid-3", str(source_path), False, str(mirror_path), False)
 
     # Child checks goal -> should propagate up.
     source_tasks = [_goal("gid-3", False)]
@@ -112,6 +116,7 @@ def test_quarterly_yearly_bidirectional_reconcile(monkeypatch, tmp_path):
         mirror_tasks,
         str(source_path),
         str(mirror_path),
+        reconcile_cache_store=store,
     )
     assert updated_source[0].done is True
     assert updated_mirror[0].done is True
@@ -124,13 +129,14 @@ def test_quarterly_yearly_bidirectional_reconcile(monkeypatch, tmp_path):
         mirror_tasks,
         str(source_path),
         str(mirror_path),
+        reconcile_cache_store=store,
     )
     assert updated_source[0].done is False
     assert updated_mirror[0].done is False
 
 
-def test_daily_pierced_checked_updates_source(monkeypatch, tmp_path):
-    _patch_sync_state(monkeypatch, tmp_path)
+def test_daily_pierced_checked_updates_source(tmp_path):
+    store = _store(tmp_path)
     source_path = tmp_path / "2026-02.md"
     note_path = tmp_path / "2026-02-06.md"
     source_path.write_text("source", encoding="utf-8")
@@ -150,19 +156,20 @@ def test_daily_pierced_checked_updates_source(monkeypatch, tmp_path):
         today=datetime.date(2026, 2, 6),
         note_path=str(note_path),
         source_paths=[str(source_path)],
+        reconcile_cache_store=store,
     )
 
     assert updated_sources[0][0].done is True
 
 
-def test_daily_pierced_source_reopen_clears_child(monkeypatch, tmp_path):
-    _patch_sync_state(monkeypatch, tmp_path)
+def test_daily_pierced_source_reopen_clears_child(tmp_path):
+    store = _store(tmp_path)
     source_path = tmp_path / "2026-02.md"
     note_path = tmp_path / "2026-02-06.md"
     source_path.write_text("source", encoding="utf-8")
     note_path.write_text("daily", encoding="utf-8")
 
-    _seed_pair_state("gid-5", str(source_path), True, str(note_path), True)
+    _seed_pair_state(store, "gid-5", str(source_path), True, str(note_path), True)
 
     source_goal = _goal("gid-5", False)
     existing_daily = [_goal("gid-5", True)]
@@ -174,6 +181,7 @@ def test_daily_pierced_source_reopen_clears_child(monkeypatch, tmp_path):
         today=datetime.date(2026, 2, 6),
         note_path=str(note_path),
         source_paths=[str(source_path)],
+        reconcile_cache_store=store,
     )
 
     assert updated_sources[0][0].done is False

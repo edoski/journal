@@ -7,53 +7,65 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import os
-import random
 import time
 from contextlib import contextmanager
 
-from sync.constants import LOCK_DIR
+from sync.constants import NOTE_LOCK_DIR
+
+LOCK_RETENTION_DAYS = 14
+_PRUNED_LOCK_ROOTS: set[str] = set()
 
 
-def _lockfile_for(path: str) -> str:
-    """Return path to advisory lockfile for a given note."""
-    os.makedirs(LOCK_DIR, exist_ok=True)
+def _lockfile_for(path: str, lock_root: str) -> str:
+    """Return path to advisory lockfile for a given lock root and target path."""
     digest = hashlib.sha1(os.path.abspath(path).encode()).hexdigest()
-    return os.path.join(LOCK_DIR, f"{digest}.lock")
+    shard = digest[:2]
+    lock_dir = os.path.join(lock_root, shard)
+    os.makedirs(lock_dir, exist_ok=True)
+    return os.path.join(lock_dir, f"{digest}.lock")
 
 
-def _cleanup_old_locks(max_age_days: int = 30) -> None:
-    """Remove lock files older than max_age_days."""
-    if not os.path.isdir(LOCK_DIR):
+def _cleanup_old_locks(lock_root: str, max_age_days: int = LOCK_RETENTION_DAYS) -> None:
+    """Remove lock files older than max_age_days under the provided lock root."""
+    if not os.path.isdir(lock_root):
         return
     cutoff = time.time() - (max_age_days * 86400)
     try:
-        for fname in os.listdir(LOCK_DIR):
-            if not fname.endswith(".lock"):
-                continue
-            fpath = os.path.join(LOCK_DIR, fname)
-            try:
-                if os.path.getmtime(fpath) < cutoff:
-                    os.remove(fpath)
-            except OSError:
-                pass
+        for root, _, files in os.walk(lock_root):
+            for fname in files:
+                if not fname.endswith(".lock"):
+                    continue
+                fpath = os.path.join(root, fname)
+                try:
+                    if os.path.getmtime(fpath) < cutoff:
+                        os.remove(fpath)
+                except OSError:
+                    pass
     except OSError:
         pass
 
 
 @contextmanager
-def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
+def locked_path(
+    path: str,
+    *,
+    lock_root: str,
+    timeout: float = 2.0,
+    poll: float = 0.1,
+):
     """
-    Serialize writes to a note by taking an advisory lock stored in ~/.cache.
+    Serialize access to a target path using a sharded advisory lock file.
 
     - Uses fcntl.flock (works on macOS) with non-blocking attempts.
     - Waits up to `timeout` seconds, polling every `poll` seconds.
     - Raises TimeoutError if the lock cannot be acquired in time.
-    - Automatically cleans up old lock files (~1% of calls).
+    - Performs deterministic stale-lock cleanup once per process + lock root.
     """
-    if random.random() < 0.01:
-        _cleanup_old_locks(30)
+    if lock_root not in _PRUNED_LOCK_ROOTS:
+        _cleanup_old_locks(lock_root)
+        _PRUNED_LOCK_ROOTS.add(lock_root)
 
-    lock_path = _lockfile_for(path)
+    lock_path = _lockfile_for(path, lock_root)
     fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
     deadline = time.time() + timeout
     try:
@@ -69,3 +81,10 @@ def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
+
+
+@contextmanager
+def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
+    """Serialize writes to a note using the configured notes lock root."""
+    with locked_path(path, lock_root=NOTE_LOCK_DIR, timeout=timeout, poll=poll):
+        yield

@@ -7,22 +7,49 @@ from __future__ import annotations
 import datetime
 import pytest
 from typing import Any
-from unittest.mock import patch
-import sync.readers.media as readers_media
 
 
 @pytest.fixture(autouse=True)
-def isolate_media_cache(tmp_path):
+def isolate_cache_dirs(tmp_path, monkeypatch):
     """
-    Automatically isolate all tests from the production media cache.
+    Automatically isolate all tests from production cache/lock directories.
 
-    Uses a temp file for each test to prevent test data from polluting
-    the real ~/.cache/journal/media_dates.json cache.
+    New cache adapters resolve defaults at runtime, so monkeypatching these
+    module-level constants keeps every test sandboxed under tmp_path.
     """
-    temp_cache = tmp_path / "media_dates.json"
-    # Patch where the constant is used, not where it's defined
-    with patch.object(readers_media, "MEDIA_CACHE_PATH", str(temp_cache)):
-        yield
+    cache_root = tmp_path / "cache"
+    goal_cache_dir = cache_root / "goals"
+    media_cache_dir = cache_root / "media"
+    training_cache_dir = cache_root / "daily" / "training"
+    screen_cache_dir = cache_root / "daily" / "screen_time"
+    note_lock_dir = cache_root / "locks" / "notes"
+    state_lock_dir = cache_root / "locks" / "state"
+
+    monkeypatch.setattr(
+        "sync.adapters.json_goal_cache.GOAL_CACHE_DIR", str(goal_cache_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_goal_cache.STATE_LOCK_DIR", str(state_lock_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_media_cache.MEDIA_CACHE_DIR", str(media_cache_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_media_cache.STATE_LOCK_DIR", str(state_lock_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_daily_cache.TRAINING_CACHE_DIR", str(training_cache_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_daily_cache.SCREEN_TIME_CACHE_DIR", str(screen_cache_dir)
+    )
+    monkeypatch.setattr(
+        "sync.adapters.json_daily_cache.STATE_LOCK_DIR", str(state_lock_dir)
+    )
+    monkeypatch.setattr("sync.notes.locking.NOTE_LOCK_DIR", str(note_lock_dir))
+    monkeypatch.setattr("sync.notes.locking._PRUNED_LOCK_ROOTS", set())
+
+    yield
 
 
 @pytest.fixture

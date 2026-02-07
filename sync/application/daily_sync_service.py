@@ -21,6 +21,7 @@ from sync.logging import get_logger
 from sync.models.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
 from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block
+from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.context import ContextSource
 from sync.ports.notes import NoteStore
 from sync.ports.reminders import ReminderRuleStore
@@ -52,6 +53,7 @@ class DailySyncService:
         context_source: ContextSource,
         reminder_store: ReminderRuleStore,
         goal_sync_service: GoalSyncService,
+        training_cache_store: DailyTrainingCacheStore,
         journal_dir: str = JOURNAL_DIR,
         template_path: str = TEMPLATE_PATH,
     ) -> None:
@@ -60,6 +62,7 @@ class DailySyncService:
         self.context_source = context_source
         self.reminder_store = reminder_store
         self.goal_sync_service = goal_sync_service
+        self.training_cache_store = training_cache_store
         self.journal_dir = journal_dir
         self.template_path = template_path
 
@@ -71,6 +74,7 @@ class DailySyncService:
         """Synchronize the daily note for a specific date."""
         today_str = day.isoformat()
         file_path = os.path.join(self.journal_dir, f"{today_str}.md")
+        self.training_cache_store.prune(keep_days=14)
 
         with locked_note(file_path):
             lines = self.note_store.read_or_create(file_path, self.template_path)
@@ -211,6 +215,7 @@ class DailySyncService:
             training_bundle.meditate_payload,
             existing_training_block,
             day.isoformat(),
+            training_cache_store=self.training_cache_store,
         )
         sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
         screen_time_data = self.status_source.load_screen_time(day)

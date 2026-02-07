@@ -30,6 +30,7 @@ from sync.goals.reminders import get_reminders_for_date
 from sync.models.reminders import ReminderRule
 from sync.notes.locking import locked_note
 from sync.notes.sections import goals_section_bounds
+from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
 from sync.periods.runtime import journal_path
@@ -47,9 +48,18 @@ from sync.goals.daily_pipeline import (
 class GoalSyncService:
     """Owns all source/mirror/piercing goal orchestration flows."""
 
-    def __init__(self, *, note_store: NoteStore, goal_store: GoalStore) -> None:
+    def __init__(
+        self,
+        *,
+        note_store: NoteStore,
+        goal_store: GoalStore,
+        carry_cache_store: GoalCarryForwardCacheStore,
+        reconcile_cache_store: GoalReconcileCacheStore,
+    ) -> None:
         self.note_store = note_store
         self.goal_store = goal_store
+        self.carry_cache_store = carry_cache_store
+        self.reconcile_cache_store = reconcile_cache_store
 
     def sync_daily_note(
         self,
@@ -71,6 +81,7 @@ class GoalSyncService:
             day,
             yesterday,
             existing_daily_tasks,
+            carry_cache_store=self.carry_cache_store,
             note_store=self.note_store,
             goal_store=self.goal_store,
         )
@@ -101,6 +112,7 @@ class GoalSyncService:
             existing_weekly_tasks,
             weekly_path,
             note_path,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
 
         filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, day)
@@ -121,6 +133,7 @@ class GoalSyncService:
             today=day,
             note_path=note_path,
             source_paths=[monthly_path, quarterly_path, quarterly_path],
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         monthly_changed = updated_monthly != monthly_tasks
         quarterly_changed = updated_quarterly != quarterly_tasks
@@ -199,6 +212,7 @@ class GoalSyncService:
                 previous_note_path=journal_path(window.previous_filename),
                 previous_id_key=window.previous_start.isoformat(),
             ),
+            carry_cache_store=self.carry_cache_store,
         )
 
         today = window.target_date
@@ -212,6 +226,7 @@ class GoalSyncService:
                 proximity_days=30,
             ),
             today=today,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         monthly_tasks = monthly_sync.source_tasks
         monthly_changed = monthly_sync.source_changed
@@ -246,6 +261,7 @@ class GoalSyncService:
                 proximity_days=30,
             ),
             today=today,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         weekly_source_lines = source_sync.source_lines
         quarterly_tasks, yearly_mirror = source_sync.updated_source_lists
@@ -302,6 +318,7 @@ class GoalSyncService:
                 previous_note_path=prev_path,
                 previous_id_key=prev_month_start.isoformat(),
             ),
+            carry_cache_store=self.carry_cache_store,
         )
 
         yearly_mirror, quarterly_tasks, quarterly_path, quarterly_lines = (
@@ -318,6 +335,7 @@ class GoalSyncService:
                 proximity_days=90,
             ),
             today=today,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         quarterly_tasks = quarterly_sync.source_tasks
         quarterly_changed = quarterly_sync.source_changed
@@ -331,6 +349,7 @@ class GoalSyncService:
                 proximity_days=90,
             ),
             today=today,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         monthly_source_lines = source_sync.source_lines
         [yearly_mirror] = source_sync.updated_source_lists
@@ -379,6 +398,7 @@ class GoalSyncService:
                     window.previous_year, window.previous_quarter
                 ),
             ),
+            carry_cache_store=self.carry_cache_store,
         )
 
         yearly_path = journal_path(f"{window.year}.md")
@@ -401,6 +421,7 @@ class GoalSyncService:
                 proximity_days=365,
             ),
             today=today,
+            reconcile_cache_store=self.reconcile_cache_store,
         )
         yearly_tasks = yearly_sync.source_tasks
         yearly_changed = yearly_sync.source_changed
@@ -449,6 +470,7 @@ class GoalSyncService:
             yearly_tasks,
             str(window.year),
             "yearly",
+            cache_store=self.carry_cache_store,
         )
 
         return self.goal_store.apply(

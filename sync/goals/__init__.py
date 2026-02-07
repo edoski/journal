@@ -18,12 +18,11 @@ from .reminders import (
     save_reminder_rules,
 )
 from .state import (
-    load_goal_sync_state,
-    locked_goal_sync_state,
+    empty_goal_sync_state,
+    normalize_goal_sync_state,
     record_note_state,
     reconcile_pair,
     reconcile_pair_with_state,
-    save_goal_sync_state,
 )
 from .tombstones import (
     cleanup_old_entries,
@@ -50,12 +49,11 @@ __all__ = [
     "get_reminders_for_date",
     "render_reminder_rules_markdown",
     "save_reminder_rules",
-    "load_goal_sync_state",
-    "save_goal_sync_state",
+    "empty_goal_sync_state",
+    "normalize_goal_sync_state",
     "record_note_state",
     "reconcile_pair",
     "reconcile_pair_with_state",
-    "locked_goal_sync_state",
     "get_carried_ids",
     "record_carried_ids",
     "cleanup_old_entries",

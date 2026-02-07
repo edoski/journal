@@ -1,35 +1,28 @@
-"""
-Cache-backed reconciliation state for bidirectional goal sync.
-"""
+"""Pure reconciliation cache operations for bidirectional goal sync."""
 
 from __future__ import annotations
 
 import datetime
-import json
 import os
-from contextlib import contextmanager
 from typing import Any
 
-from sync.constants import GOAL_SYNC_STATE_PATH
-from sync.logging import get_logger
-from sync.notes.locking import locked_note
-
-logger = get_logger()
+from sync.contracts.cache import GoalReconcileCacheState
+from sync.ports.cache import GoalReconcileCacheStore
 
 
-def _empty_state() -> dict[str, Any]:
-    """Return an empty v1 state payload."""
+def empty_goal_sync_state() -> GoalReconcileCacheState:
+    """Return an empty goal-reconcile state payload."""
     return {"version": 1, "goals": {}}
 
 
-def _normalize_state(raw: Any) -> dict[str, Any]:
-    """Normalize arbitrary JSON payload into the expected v1 schema."""
+def normalize_goal_sync_state(raw: Any) -> GoalReconcileCacheState:
+    """Normalize arbitrary JSON payload into the expected reconcile schema."""
     if not isinstance(raw, dict):
-        return _empty_state()
+        return empty_goal_sync_state()
 
     goals = raw.get("goals")
     if not isinstance(goals, dict):
-        return _empty_state()
+        return empty_goal_sync_state()
 
     normalized_goals: dict[str, dict[str, Any]] = {}
     for gid, entry in goals.items():
@@ -81,30 +74,7 @@ def _normalize_state(raw: Any) -> dict[str, Any]:
     return {"version": 1, "goals": normalized_goals}
 
 
-def load_goal_sync_state() -> dict[str, Any]:
-    """Load goal sync state from disk, returning an empty state on failure."""
-    if not os.path.exists(GOAL_SYNC_STATE_PATH):
-        return _empty_state()
-
-    try:
-        with open(GOAL_SYNC_STATE_PATH, "r") as f:
-            return _normalize_state(json.load(f))
-    except (OSError, json.JSONDecodeError) as e:
-        logger.debug("Failed to load goal sync state: %s", e)
-        return _empty_state()
-
-
-def save_goal_sync_state(state: dict[str, Any]) -> None:
-    """Persist goal sync state atomically."""
-    normalized = _normalize_state(state)
-    os.makedirs(os.path.dirname(GOAL_SYNC_STATE_PATH), exist_ok=True)
-    tmp_path = GOAL_SYNC_STATE_PATH + ".tmp"
-    with open(tmp_path, "w") as f:
-        json.dump(normalized, f, indent=2, sort_keys=True)
-    os.replace(tmp_path, GOAL_SYNC_STATE_PATH)
-
-
-def _ensure_goal_entry(state: dict[str, Any], gid: str) -> dict[str, Any]:
+def _ensure_goal_entry(state: GoalReconcileCacheState, gid: str) -> dict[str, Any]:
     goals = state.setdefault("goals", {})
     if not isinstance(goals, dict):
         goals = {}
@@ -168,7 +138,7 @@ def _pick_by_mtime(
 
 
 def record_note_state(
-    state: dict[str, Any],
+    state: GoalReconcileCacheState,
     gid: str,
     note_path: str,
     done: bool,
@@ -190,7 +160,7 @@ def record_note_state(
 
 
 def reconcile_pair_with_state(
-    state: dict[str, Any],
+    state: GoalReconcileCacheState,
     gid: str,
     source_done: bool,
     mirror_done: bool,
@@ -258,18 +228,8 @@ def reconcile_pair_with_state(
     return winner
 
 
-@contextmanager
-def locked_goal_sync_state():
-    """Open goal sync state under advisory lock and persist on exit."""
-    with locked_note(GOAL_SYNC_STATE_PATH):
-        state = load_goal_sync_state()
-        try:
-            yield state
-        finally:
-            save_goal_sync_state(state)
-
-
 def reconcile_pair(
+    store: GoalReconcileCacheStore,
     gid: str,
     source_done: bool,
     mirror_done: bool,
@@ -277,7 +237,7 @@ def reconcile_pair(
     mirror_path: str,
 ) -> bool:
     """Resolve one source/mirror pair and persist updated reconciliation cache."""
-    with locked_goal_sync_state() as state:
+    with store.locked_state() as state:
         return reconcile_pair_with_state(
             state,
             gid,
@@ -286,13 +246,3 @@ def reconcile_pair(
             source_path,
             mirror_path,
         )
-
-
-__all__ = [
-    "load_goal_sync_state",
-    "save_goal_sync_state",
-    "record_note_state",
-    "reconcile_pair",
-    "reconcile_pair_with_state",
-    "locked_goal_sync_state",
-]

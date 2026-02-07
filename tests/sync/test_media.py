@@ -66,7 +66,7 @@ rating: 8.5
 # Notes
 """)
 
-        books = scan_books(
+        books, _cache, _modified = scan_books(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(book_dir),
@@ -91,7 +91,7 @@ completed: "[[2024-01-15]]"
 ---
 """)
 
-        books = scan_books(
+        books, _cache, _modified = scan_books(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(book_dir),
@@ -112,7 +112,7 @@ completed:
 ---
 """)
 
-        books = scan_books(
+        books, _cache, _modified = scan_books(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(book_dir),
@@ -125,7 +125,7 @@ completed:
         book_dir = tmp_path / "books"
         book_dir.mkdir()
 
-        books = scan_books(
+        books, _cache, _modified = scan_books(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(book_dir),
@@ -135,7 +135,7 @@ completed:
 
     def test_nonexistent_directory(self, tmp_path):
         """Returns empty list for nonexistent directory."""
-        books = scan_books(
+        books, _cache, _modified = scan_books(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(tmp_path / "nonexistent"),
@@ -162,7 +162,7 @@ link: https://example.com
 # Notes
 """)
 
-        podcasts = scan_podcasts(
+        podcasts, _cache, _modified = scan_podcasts(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(podcast_dir),
@@ -185,7 +185,7 @@ date: "[[2024-06-15]]"
 ---
 """)
 
-        podcasts = scan_podcasts(
+        podcasts, _cache, _modified = scan_podcasts(
             datetime.date(2025, 1, 1),
             datetime.date(2025, 1, 31),
             str(podcast_dir),

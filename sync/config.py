@@ -20,12 +20,15 @@ class PathConfig:
     quarterly_template_path: str
     yearly_template_path: str
     reminders_path: str
+    journal_cache_dir: str
+    goal_cache_dir: str
+    media_cache_dir: str
+    daily_cache_dir: str
+    daily_training_cache_dir: str
+    daily_screen_time_cache_dir: str
     lock_dir: str
-    carried_goals_path: str
-    goal_sync_state_path: str
-    media_cache_path: str
-    training_cache_path: str
-    screen_time_cache_path: str
+    note_lock_dir: str
+    state_lock_dir: str
     flow_db_path: str
     icloud_shortcuts_dir: str
     icloud_journalsync_dir: str
@@ -48,6 +51,8 @@ def _build_paths() -> PathConfig:
         "VAULT_DIR",
         "/Users/edo/Documents/Obsidian/the-vault",
     )
+    journal_cache_dir = _env_path("JOURNAL_CACHE_DIR", "~/.cache/journal")
+    lock_dir = _env_path("LOCK_DIR", os.path.join(journal_cache_dir, "locks"))
 
     return PathConfig(
         journal_dir=journal_dir,
@@ -84,26 +89,35 @@ def _build_paths() -> PathConfig:
             "REMINDERS_PATH",
             os.path.join(journal_dir, "REMINDERS.md"),
         ),
-        lock_dir=_env_path("LOCK_DIR", "~/.cache/journal/locks"),
-        carried_goals_path=_env_path(
-            "CARRIED_GOALS_PATH",
-            "~/.cache/journal/carried_goals.json",
+        journal_cache_dir=journal_cache_dir,
+        goal_cache_dir=_env_path(
+            "GOAL_CACHE_DIR",
+            os.path.join(journal_cache_dir, "goals"),
         ),
-        goal_sync_state_path=_env_path(
-            "GOAL_SYNC_STATE_PATH",
-            "~/.cache/journal/goal_sync_state.json",
+        media_cache_dir=_env_path(
+            "MEDIA_CACHE_DIR",
+            os.path.join(journal_cache_dir, "media"),
         ),
-        media_cache_path=_env_path(
-            "MEDIA_CACHE_PATH",
-            "~/.cache/journal/media_dates.json",
+        daily_cache_dir=_env_path(
+            "DAILY_CACHE_DIR",
+            os.path.join(journal_cache_dir, "daily"),
         ),
-        training_cache_path=_env_path(
-            "TRAINING_CACHE_PATH",
-            "~/.cache/journal/training_entries.json",
+        daily_training_cache_dir=_env_path(
+            "TRAINING_CACHE_DIR",
+            os.path.join(journal_cache_dir, "daily", "training"),
         ),
-        screen_time_cache_path=_env_path(
-            "SCREEN_TIME_CACHE_PATH",
-            "~/.cache/journal/screen_time_entries.json",
+        daily_screen_time_cache_dir=_env_path(
+            "SCREEN_TIME_CACHE_DIR",
+            os.path.join(journal_cache_dir, "daily", "screen_time"),
+        ),
+        lock_dir=lock_dir,
+        note_lock_dir=_env_path(
+            "NOTE_LOCK_DIR",
+            os.path.join(lock_dir, "notes"),
+        ),
+        state_lock_dir=_env_path(
+            "STATE_LOCK_DIR",
+            os.path.join(lock_dir, "state"),
         ),
         flow_db_path=_env_path(
             "FLOW_DB_PATH",

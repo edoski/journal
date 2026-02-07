@@ -19,6 +19,7 @@ from sync.goals.reconcile import (
 )
 from sync.io import safe_read_file
 from sync.models.goals import Goal
+from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.writers.goals import render_goal_lines
 
 
@@ -85,6 +86,7 @@ def load_source_tasks_with_carry_forward(
     lines: list[str],
     *,
     config: CarryForwardConfig,
+    carry_cache_store: GoalCarryForwardCacheStore,
 ) -> list[Goal]:
     """
     Load source-section goals from current lines, then carry forward from previous note.
@@ -112,6 +114,7 @@ def load_source_tasks_with_carry_forward(
         current_tasks,
         config.period_key,
         config.horizon,
+        cache_store=carry_cache_store,
     )
     return current_tasks
 
@@ -122,6 +125,7 @@ def sync_mirror_section(
     *,
     config: MirrorSyncConfig,
     today: datetime.date,
+    reconcile_cache_store: GoalReconcileCacheStore,
 ) -> MirrorSyncResult:
     """Reconcile source<->mirror state and produce mirror render lines."""
     updated_source, updated_mirror, source_changed, _ = reconcile_goal_lists(
@@ -129,6 +133,7 @@ def sync_mirror_section(
         mirror_tasks,
         config.source_path,
         config.mirror_path,
+        reconcile_cache_store=reconcile_cache_store,
     )
     final_mirror = merge_mirror_goals(
         updated_mirror,
@@ -137,6 +142,7 @@ def sync_mirror_section(
         today=today,
         source_path=config.source_path,
         mirror_path=config.mirror_path,
+        reconcile_cache_store=reconcile_cache_store,
     )
     mirror_lines = render_goals_or_empty(
         config.mirror_section,
@@ -157,6 +163,7 @@ def sync_pierced_source_section(
     *,
     config: PiercingSyncConfig,
     today: datetime.date,
+    reconcile_cache_store: GoalReconcileCacheStore,
 ) -> PiercingSyncResult:
     """Reconcile pierced goals and render source lines with countdown metadata."""
     original_tasks, final_pierced, updated_source_lists = process_pierced_goals(
@@ -166,6 +173,7 @@ def sync_pierced_source_section(
         today=today,
         note_path=config.note_path,
         source_paths=list(config.source_paths),
+        reconcile_cache_store=reconcile_cache_store,
     )
 
     source_lines = render_goal_lines(original_tasks)

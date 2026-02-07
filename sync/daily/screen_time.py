@@ -10,20 +10,16 @@ from __future__ import annotations
 
 import re
 
-from sync.config import PATHS
 from sync.constants import SCREEN_TIME
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
-from sync.io import safe_save_json, safe_load_dated_cache
+from sync.ports.cache import DailyScreenTimeCacheStore
 
 from .icloud import load_status_file
 from sync.logging import get_logger
 
 logger = get_logger()
-
-# Cache path for screen time entries (same pattern as training)
-SCREEN_TIME_CACHE_PATH = PATHS.screen_time_cache_path
 
 
 def parse_duration_string(duration_str: str) -> float:
@@ -110,7 +106,10 @@ def parse_activity_field(activity_str: str | None) -> dict[str, float]:
     return result
 
 
-def _load_screen_time_cache(date_str: str) -> dict[str, float]:
+def _load_screen_time_cache(
+    date_str: str,
+    cache_store: DailyScreenTimeCacheStore,
+) -> dict[str, float]:
     """
     Load cached screen time entries for a given date.
 
@@ -120,11 +119,15 @@ def _load_screen_time_cache(date_str: str) -> dict[str, float]:
     Returns:
         Dict mapping app names to minutes, or empty dict if none
     """
-    entries = safe_load_dated_cache(SCREEN_TIME_CACHE_PATH, date_str, entries_type=dict)
-    return entries or {}
+    entries = cache_store.load_for_date(date_str)
+    return entries if isinstance(entries, dict) else {}
 
 
-def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
+def _save_screen_time_cache(
+    date_str: str,
+    entries: dict[str, float],
+    cache_store: DailyScreenTimeCacheStore,
+) -> None:
     """
     Save screen time entries to cache for a given date.
 
@@ -132,7 +135,7 @@ def _save_screen_time_cache(date_str: str, entries: dict[str, float]) -> None:
         date_str: Date string in YYYY-MM-DD format
         entries: Dict mapping app names to minutes
     """
-    safe_save_json(SCREEN_TIME_CACHE_PATH, {"date": date_str, "entries": entries})
+    cache_store.save_for_date(date_str, entries)
 
 
 def _group_by_threshold(
@@ -172,7 +175,11 @@ def _group_by_threshold(
     return result
 
 
-def load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
+def load_screen_time_data(
+    today_str: str,
+    *,
+    screen_time_cache_store: DailyScreenTimeCacheStore,
+) -> DailyScreenTimeData | None:
     """
     Load and parse screen time data from iCloud JSON file.
 
@@ -208,14 +215,14 @@ def load_screen_time_data(today_str: str) -> DailyScreenTimeData | None:
                 new_entries[app] = new_entries.get(app, 0) + minutes
 
     # Load cached entries
-    cache_entries = _load_screen_time_cache(today_str)
+    cache_entries = _load_screen_time_cache(today_str, screen_time_cache_store)
 
     # Merge: new entries override cached (same app = replace, not add)
     merged: dict[str, float] = {}
     if new_entries:
         # New data available: merge with cache, cache the result
         merged = {**cache_entries, **new_entries}
-        _save_screen_time_cache(today_str, merged)
+        _save_screen_time_cache(today_str, merged, screen_time_cache_store)
     elif cache_entries:
         # No new data, use cache (shortcut may have run previously)
         merged = cache_entries

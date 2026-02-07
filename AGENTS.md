@@ -263,18 +263,20 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `REMINDERS_PATH`, `LOCK_DIR`
-- `CARRIED_GOALS_PATH`, `GOAL_SYNC_STATE_PATH`, `MEDIA_CACHE_PATH`
-- `TRAINING_CACHE_PATH`, `SCREEN_TIME_CACHE_PATH`
+- `REMINDERS_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
+- `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
+- `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
 
 ## Data and Cache Files
 
-- carried-goals cache: `~/.cache/journal/carried_goals.json`
-- goal-sync state cache: `~/.cache/journal/goal_sync_state.json`
-- media cache: `~/.cache/journal/media_dates.json`
-- training cache: `~/.cache/journal/training_entries.json`
-- screen-time cache: `~/.cache/journal/screen_time_entries.json`
+- carried-goals cache: `~/.cache/journal/goals/carry_forward.json`
+- goal-sync state cache: `~/.cache/journal/goals/reconcile_state.json`
+- media cache: `~/.cache/journal/media/dates.json`
+- training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
+- screen-time cache: `~/.cache/journal/daily/screen_time/YYYY-MM-DD.json`
+- note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`
+- state locks: `~/.cache/journal/locks/state/<shard>/<sha1>.lock`
 
 ## LaunchAgents
 

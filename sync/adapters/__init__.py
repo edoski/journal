@@ -8,6 +8,16 @@ from .markdown_notes import MarkdownNoteStore
 from .markdown_reminders import MarkdownReminderRuleStore
 from .obsidian_media import ObsidianMediaSource
 from .vault_context import VaultContextSource
+from .cache_bootstrap import bootstrap_cache_layout
+from .json_goal_cache import (
+    JsonGoalCarryForwardCacheStore,
+    JsonGoalReconcileCacheStore,
+)
+from .json_media_cache import JsonMediaDateCacheStore
+from .json_daily_cache import (
+    JsonDailyScreenTimeCacheStore,
+    JsonDailyTrainingCacheStore,
+)
 
 __all__ = [
     "FlowStudySessionSource",
@@ -18,4 +28,10 @@ __all__ = [
     "MarkdownReminderRuleStore",
     "ObsidianMediaSource",
     "VaultContextSource",
+    "JsonGoalCarryForwardCacheStore",
+    "JsonGoalReconcileCacheStore",
+    "JsonMediaDateCacheStore",
+    "JsonDailyTrainingCacheStore",
+    "JsonDailyScreenTimeCacheStore",
+    "bootstrap_cache_layout",
 ]

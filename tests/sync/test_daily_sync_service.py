@@ -7,6 +7,7 @@ import hashlib
 
 import pytest
 
+from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.daily import TrainingStatusBundle
@@ -101,6 +102,10 @@ def _build_service(
     template_path = tmp_path / "daily_template.md"
     template_path.write_text("---\nmood: 6.0\n---\n", encoding="utf-8")
     _ = monkeypatch
+    training_cache_store = JsonDailyTrainingCacheStore(
+        cache_dir=str(tmp_path / "cache" / "daily" / "training"),
+        lock_root=str(tmp_path / "cache" / "locks" / "state"),
+    )
 
     service = DailySyncService(
         note_store=MarkdownNoteStore(),
@@ -108,6 +113,7 @@ def _build_service(
         context_source=_StubContextSource(),
         reminder_store=reminder_store or _StubReminderStore(),
         goal_sync_service=_StubGoalSyncService(),
+        training_cache_store=training_cache_store,
         journal_dir=str(journal_dir),
         template_path=str(template_path),
     )

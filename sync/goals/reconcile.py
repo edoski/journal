@@ -13,10 +13,10 @@ import os
 from sync.constants import JOURNAL_DIR
 from sync.io import safe_read_file
 from sync.goals.state import (
-    locked_goal_sync_state,
     record_note_state,
     reconcile_pair_with_state,
 )
+from sync.ports.cache import GoalReconcileCacheStore
 
 
 def propagate_goal_status(
@@ -58,6 +58,8 @@ def reconcile_goal_lists(
     mirror_tasks: list,
     source_path: str,
     mirror_path: str,
+    *,
+    reconcile_cache_store: GoalReconcileCacheStore,
 ) -> tuple[list, list, bool, bool]:
     """
     Reconcile done state for shared goal IDs between a source and mirror note.
@@ -87,7 +89,7 @@ def reconcile_goal_lists(
     source_changed = False
     mirror_changed = False
 
-    with locked_goal_sync_state() as state:
+    with reconcile_cache_store.locked_state() as state:
         for gid in shared_ids:
             s_idx = source_index[gid]
             m_idx = mirror_index[gid]
@@ -172,6 +174,8 @@ def process_pierced_goals(
     today: datetime.date,
     note_path: str,
     source_paths: list[str],
+    *,
+    reconcile_cache_store: GoalReconcileCacheStore,
 ) -> tuple[list, list, list[list]]:
     """
     Process pierced goals with bidirectional source<->child done-state reconciliation.
@@ -216,7 +220,7 @@ def process_pierced_goals(
     updated_source_lists: list[list] = []
     all_updated_sources: list = []  # Flat list for source_goal_info lookup/restoration
 
-    with locked_goal_sync_state() as state:
+    with reconcile_cache_store.locked_state() as state:
         for source_list, source_path in zip(source_goal_lists, source_paths):
             updated_list: list = []
             for g in source_list:
@@ -285,6 +289,7 @@ def merge_mirror_goals(
     today: datetime.date,
     source_path: str | None = None,
     mirror_path: str | None = None,
+    reconcile_cache_store: GoalReconcileCacheStore | None = None,
 ) -> list:
     """
     Merge mirror goals with source goals while preserving countdown metadata.
@@ -296,9 +301,13 @@ def merge_mirror_goals(
     from dataclasses import replace
     from sync.readers.goals import filter_by_proximity
 
-    if source_path and mirror_path:
+    if source_path and mirror_path and reconcile_cache_store is not None:
         source_tasks, existing_mirror, _, _ = reconcile_goal_lists(
-            source_tasks, existing_mirror, source_path, mirror_path
+            source_tasks,
+            existing_mirror,
+            source_path,
+            mirror_path,
+            reconcile_cache_store=reconcile_cache_store,
         )
 
     existing_ids = {g.id for g in existing_mirror if g.id}

@@ -11,6 +11,7 @@ from sync.daily.icloud import load_status_file, write_study_times_to_icloud
 from sync.logging import get_logger
 from sync.daily.screen_time import load_screen_time_data
 from sync.models.screen_time import DailyScreenTimeData
+from sync.ports.cache import DailyScreenTimeCacheStore
 from sync.ports.status import DailyStatusSource
 
 logger = get_logger()
@@ -98,6 +99,9 @@ def _validate_sleep_payload(payload: dict[str, Any]) -> SleepStatusPayload:
 class ICloudDailyStatusSource(DailyStatusSource):
     """Load daily shortcut payloads from iCloud drop files."""
 
+    def __init__(self, *, screen_time_cache_store: DailyScreenTimeCacheStore) -> None:
+        self.screen_time_cache_store = screen_time_cache_store
+
     def load_training(self, day: datetime.date) -> TrainingStatusBundle:
         """Load workout/stretch/meditation payloads for the day."""
         workout_done, workout_payload = load_status_file("workout_status.json")
@@ -127,7 +131,11 @@ class ICloudDailyStatusSource(DailyStatusSource):
 
     def load_screen_time(self, day: datetime.date) -> DailyScreenTimeData | None:
         """Load grouped screen-time payload for the day."""
-        return load_screen_time_data(day.isoformat())
+        self.screen_time_cache_store.prune(keep_days=14)
+        return load_screen_time_data(
+            day.isoformat(),
+            screen_time_cache_store=self.screen_time_cache_store,
+        )
 
     def write_study_times(
         self,

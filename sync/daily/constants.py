@@ -15,10 +15,6 @@ ICLOUD_JOURNALSYNC_DIR = PATHS.icloud_journalsync_dir
 # Daily note template path
 TEMPLATE_PATH = PATHS.daily_template_path
 
-# Cache for training entries so workout/stretch files can arrive in separate
-# runs without losing earlier entries for the same day.
-TRAINING_CACHE_PATH = PATHS.training_cache_path
-
 # Context tracking: directories to exclude from file modification tracking
 # (relative to vault root, with trailing slash for directories)
 CONTEXT_EXCLUDED_DIRS = (

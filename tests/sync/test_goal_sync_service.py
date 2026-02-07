@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import datetime
+from contextlib import contextmanager
 
+from sync.adapters.json_goal_cache import (
+    JsonGoalCarryForwardCacheStore,
+    JsonGoalReconcileCacheStore,
+)
 from sync.application.goal_sync_service import GoalSyncService
 from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
 from sync.models.goals import Goal
@@ -54,7 +59,18 @@ class _StubGoalStore:
 def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
     goal_store = _StubGoalStore()
-    service = GoalSyncService(note_store=note_store, goal_store=goal_store)
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=JsonGoalCarryForwardCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+        reconcile_cache_store=JsonGoalReconcileCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+    )
 
     window = build_week_window(datetime.date(2026, 2, 6))
     note_path = str(tmp_path / window.filename)
@@ -109,15 +125,22 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
 def test_sync_yearly_note_uses_carry_forward(monkeypatch):
     note_store = _StubNoteStore()
     goal_store = _StubGoalStore()
-    service = GoalSyncService(note_store=note_store, goal_store=goal_store)
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=_StubCarryCacheStore(),
+        reconcile_cache_store=_StubReconcileCacheStore(),
+    )
 
     window = build_year_window(2026)
     lines = ["## Goals", "", "## Metrics"]
 
     carry_calls = []
 
-    def _carry(prev_tasks, current_tasks, period_key, horizon):
-        carry_calls.append((prev_tasks, current_tasks, period_key, horizon))
+    def _carry(prev_tasks, current_tasks, period_key, horizon, *, cache_store):
+        carry_calls.append(
+            (prev_tasks, current_tasks, period_key, horizon, cache_store)
+        )
         return (
             [
                 Goal(
@@ -138,6 +161,21 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
 
     assert updated == lines
     assert len(carry_calls) == 1
-    assert carry_calls[0][2:] == ("2026", "yearly")
+    assert carry_calls[0][2:4] == ("2026", "yearly")
+    assert isinstance(carry_calls[0][4], _StubCarryCacheStore)
     assert len(goal_store.last_sections) == 1
     assert goal_store.last_sections[0].section == "YEARLY"
+
+
+class _StubCarryCacheStore:
+    @contextmanager
+    def locked_state(self):
+        payload = {}
+        yield payload
+
+
+class _StubReconcileCacheStore:
+    @contextmanager
+    def locked_state(self):
+        payload = {"version": 1, "goals": {}}
+        yield payload

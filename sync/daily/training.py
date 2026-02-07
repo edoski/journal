@@ -14,9 +14,7 @@ from typing import Any
 
 from sync.formatting import format_minutes_seconds
 from sync.logging import get_logger
-from sync.io import safe_save_json, safe_load_dated_cache
-
-from .constants import TRAINING_CACHE_PATH
+from sync.ports.cache import DailyTrainingCacheStore
 
 logger = get_logger()
 
@@ -91,7 +89,10 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
     return entries
 
 
-def _load_training_cache(date_str: str) -> list[TrainingEntry]:
+def _load_training_cache(
+    date_str: str,
+    cache_store: DailyTrainingCacheStore,
+) -> list[TrainingEntry]:
     """
     Load cached training entries for a given date.
 
@@ -101,11 +102,15 @@ def _load_training_cache(date_str: str) -> list[TrainingEntry]:
     Returns:
         List of cached training entries, or empty list if none
     """
-    entries = safe_load_dated_cache(TRAINING_CACHE_PATH, date_str, entries_type=list)
-    return entries or []
+    entries = cache_store.load_for_date(date_str)
+    return entries if isinstance(entries, list) else []
 
 
-def _save_training_cache(date_str: str, entries: list[TrainingEntry]) -> None:
+def _save_training_cache(
+    date_str: str,
+    entries: list[TrainingEntry],
+    cache_store: DailyTrainingCacheStore,
+) -> None:
     """
     Save training entries to cache for a given date.
 
@@ -113,7 +118,7 @@ def _save_training_cache(date_str: str, entries: list[TrainingEntry]) -> None:
         date_str: Date string in YYYY-MM-DD format
         entries: List of training entries to cache
     """
-    safe_save_json(TRAINING_CACHE_PATH, {"date": date_str, "entries": entries})
+    cache_store.save_for_date(date_str, entries)
 
 
 def _activity_entries_from_data(
@@ -304,6 +309,8 @@ def build_training_section(
     meditation_data: dict | list | None,
     existing_block: list[str] | None,
     today_str: str,
+    *,
+    training_cache_store: DailyTrainingCacheStore,
 ) -> tuple[list[str], list[TrainingEntry]]:
     """
     Build training section lines from workout/stretch/meditation data.
@@ -337,12 +344,12 @@ def build_training_section(
 
     new_entries = workout_entries + stretch_entries + meditation_entries
 
-    cache_entries = _load_training_cache(today_str)
+    cache_entries = _load_training_cache(today_str, training_cache_store)
 
     merged: list[TrainingEntry] = []
     if new_entries:
         merged = _merge_training_entries(cache_entries, new_entries)
-        _save_training_cache(today_str, merged)
+        _save_training_cache(today_str, merged, training_cache_store)
     elif cache_entries:
         merged = cache_entries
 

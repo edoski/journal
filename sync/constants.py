@@ -26,18 +26,18 @@ YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 # Reminder rules markdown path (required, user-managed)
 REMINDERS_PATH = PATHS.reminders_path
 
-# Lock directory for note writes
+# Cache directories
+JOURNAL_CACHE_DIR = PATHS.journal_cache_dir
+GOAL_CACHE_DIR = PATHS.goal_cache_dir
+MEDIA_CACHE_DIR = PATHS.media_cache_dir
+DAILY_CACHE_DIR = PATHS.daily_cache_dir
+TRAINING_CACHE_DIR = PATHS.daily_training_cache_dir
+SCREEN_TIME_CACHE_DIR = PATHS.daily_screen_time_cache_dir
+
+# Lock directories
 LOCK_DIR = PATHS.lock_dir
-
-# Cache file for tracking carried-forward goal IDs
-CARRIED_GOALS_PATH = PATHS.carried_goals_path
-
-# Cache file for bidirectional goal sync state conflict resolution
-GOAL_SYNC_STATE_PATH = PATHS.goal_sync_state_path
-
-# Cache for media dates (podcasts/books) to detect and self-heal corrupted
-# frontmatter dates caused by Obsidian Sync re-triggering Templater.
-MEDIA_CACHE_PATH = PATHS.media_cache_path
+NOTE_LOCK_DIR = PATHS.note_lock_dir
+STATE_LOCK_DIR = PATHS.state_lock_dir
 
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]

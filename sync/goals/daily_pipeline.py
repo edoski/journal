@@ -17,6 +17,7 @@ from sync.goals.note_store import render_goals_or_empty
 from sync.goals.period_pipeline import SourceWriteConfig, propagate_source_sections
 from sync.models.goals import Goal
 from sync.notes.locking import locked_note
+from sync.ports.cache import GoalCarryForwardCacheStore
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
 from sync.readers.goals import ensure_goal_ids
@@ -195,6 +196,7 @@ def carry_forward_daily_tasks(
     yesterday_date: datetime.date,
     existing_daily_tasks: list[Goal],
     *,
+    carry_cache_store: GoalCarryForwardCacheStore,
     note_store: NoteStore,
     goal_store: GoalStore,
     journal_dir: str = JOURNAL_DIR,
@@ -224,4 +226,5 @@ def carry_forward_daily_tasks(
         current_tasks=existing_daily_tasks,
         period_key=today_key,
         horizon="daily",
+        cache_store=carry_cache_store,
     )
