@@ -1,51 +1,37 @@
 """
 Training section building for daily sync.
 
-Provides functions to parse, cache, merge, and render training (workout/stretch)
-data for daily notes.
+Consumes canonical training entries and renders/caches the TRAINING table.
 """
 
 from __future__ import annotations
-
 
 import re
 from collections import OrderedDict
 from typing import Any
 
 from sync.formatting import format_minutes_seconds
-from sync.logging import get_logger
+from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
 from sync.ports.cache import DailyTrainingCacheStore
 
-logger = get_logger()
+# Internal table row shape persisted in cache and used for rendering.
+TrainingTableRow = dict[str, Any]
 
 
-# Type alias for training entries
-TrainingEntry = dict[str, Any]
-
-
-def _parse_time_to_minutes(time_str: str) -> float | None:
+def _parse_time_to_minutes(time_str: str) -> int | None:
     """Parse HH:MM time string to minutes since midnight."""
     try:
         h, m = map(int, time_str.split(":"))
         return h * 60 + m
     except (ValueError, AttributeError):
-        # Expected: malformed time string
         return None
 
 
-def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
-    """
-    Convert an existing TRAINING table into structured entries.
-
-    Args:
-        block_lines: Lines from an existing training block, or None
-
-    Returns:
-        List of training entry dicts with keys: start, end, time_raw, activity, duration, interrupt
-    """
+def _parse_training_table(block_lines: list[str] | None) -> list[TrainingTableRow]:
+    """Convert an existing TRAINING table into structured rows."""
     if block_lines is None:
         return []
-    entries: list[TrainingEntry] = []
+    entries: list[TrainingTableRow] = []
     header_re = re.compile(r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|", re.IGNORECASE)
     header_idx = -1
     for idx, line in enumerate(block_lines):
@@ -70,7 +56,8 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
         start_val: str | None = None
         end_val: str | None = None
         time_match = re.match(
-            r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$", raw_time
+            r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$",
+            raw_time,
         )
         if time_match:
             start_val = time_match.group(1)
@@ -92,116 +79,66 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingEntry]:
 def _load_training_cache(
     date_str: str,
     cache_store: DailyTrainingCacheStore,
-) -> list[TrainingEntry]:
-    """
-    Load cached training entries for a given date.
-
-    Args:
-        date_str: Date string in YYYY-MM-DD format
-
-    Returns:
-        List of cached training entries, or empty list if none
-    """
+) -> list[TrainingTableRow]:
     entries = cache_store.load_for_date(date_str)
     return entries if isinstance(entries, list) else []
 
 
 def _save_training_cache(
     date_str: str,
-    entries: list[TrainingEntry],
+    entries: list[TrainingTableRow],
     cache_store: DailyTrainingCacheStore,
 ) -> None:
-    """
-    Save training entries to cache for a given date.
-
-    Args:
-        date_str: Date string in YYYY-MM-DD format
-        entries: List of training entries to cache
-    """
     cache_store.save_for_date(date_str, entries)
 
 
-def _activity_entries_from_data(
-    data: dict | list | None,
-    default_activity_label: str,
-) -> list[TrainingEntry]:
-    """
-    Normalize workout/stretch JSON payloads into training table entries.
+def _rows_from_canonical_entries(
+    entries: tuple[CanonicalTrainingEntry, ...],
+) -> list[TrainingTableRow]:
+    rows: list[TrainingTableRow] = []
+    for entry in entries:
+        start_raw = (entry.start or "").strip()
+        end_raw = (entry.end or "").strip()
+        duration_minutes = float(entry.duration or 0.0)
+        duration_fmt = (
+            format_minutes_seconds(duration_minutes) if duration_minutes > 0 else ""
+        )
 
-    Args:
-        data: Raw JSON data from status file (dict or list of dicts)
-        default_activity_label: Default activity name (e.g., "Workout", "Stretching")
+        interrupt_minutes = 0.0
+        if start_raw and end_raw and duration_minutes > 0:
+            start_minutes = _parse_time_to_minutes(start_raw)
+            end_minutes = _parse_time_to_minutes(end_raw)
+            if start_minutes is not None and end_minutes is not None:
+                if end_minutes < start_minutes:
+                    end_minutes += 24 * 60
+                elapsed_minutes = end_minutes - start_minutes
+                interrupt_minutes = max(0.0, elapsed_minutes - duration_minutes)
 
-    Returns:
-        List of normalized training entries
-    """
-    entries_out: list[TrainingEntry] = []
-    if not data:
-        return entries_out
-    try:
-        source_entries = data if isinstance(data, list) else [data]
-        for entry in source_entries:
-            start_raw = (entry.get("start") or "").strip()
-            end_raw = (entry.get("end") or "").strip()
-            dur_val = entry.get("duration")
-            activity_val = entry.get("type") or default_activity_label
+        if start_raw and end_raw:
+            time_raw = f"{start_raw} - {end_raw}"
+        else:
+            time_raw = start_raw or ""
 
-            duration_fmt = ""
-            duration_minutes = 0.0
-            if dur_val is not None:
-                duration_minutes = float(dur_val)
-                duration_fmt = format_minutes_seconds(duration_minutes)
-
-            # Calculate interrupt time (elapsed - duration) if we have start/end times
-            interrupt_minutes = 0.0
-            if start_raw and end_raw and duration_minutes > 0:
-                start_minutes = _parse_time_to_minutes(start_raw)
-                end_minutes = _parse_time_to_minutes(end_raw)
-                if start_minutes is not None and end_minutes is not None:
-                    # Handle midnight crossing
-                    if end_minutes < start_minutes:
-                        end_minutes += 24 * 60
-                    elapsed_minutes = end_minutes - start_minutes
-                    interrupt_minutes = max(0, elapsed_minutes - duration_minutes)
-
-            if start_raw and end_raw:
-                time_raw = f"{start_raw} - {end_raw}"
-            else:
-                time_raw = start_raw or ""
-
-            entries_out.append(
-                {
-                    "start": start_raw or None,
-                    "end": end_raw or None,
-                    "time_raw": time_raw,
-                    "activity": activity_val,
-                    "duration": duration_fmt,
-                    "interrupt": interrupt_minutes,
-                }
-            )
-    except (ValueError, TypeError, KeyError) as e:
-        logger.debug("Failed to parse training entry: %s", e)
-        entries_out = []
-    return entries_out
+        rows.append(
+            {
+                "start": start_raw or None,
+                "end": end_raw or None,
+                "time_raw": time_raw,
+                "activity": entry.type,
+                "duration": duration_fmt,
+                "interrupt": interrupt_minutes,
+            }
+        )
+    return rows
 
 
-def _merge_training_entries(
-    existing: list[TrainingEntry],
-    new: list[TrainingEntry],
-) -> list[TrainingEntry]:
-    """
-    Deduplicate training rows, letting new entries override prior ones.
+def _merge_training_rows(
+    existing: list[TrainingTableRow],
+    new: list[TrainingTableRow],
+) -> list[TrainingTableRow]:
+    merged: OrderedDict[tuple, TrainingTableRow] = OrderedDict()
 
-    Args:
-        existing: Previously cached/parsed entries
-        new: New entries to merge in
-
-    Returns:
-        Merged list with duplicates removed (new wins over existing)
-    """
-    merged: OrderedDict[tuple, TrainingEntry] = OrderedDict()
-
-    def key(entry: TrainingEntry) -> tuple:
+    def key(entry: TrainingTableRow) -> tuple:
         return (
             entry.get("start") or "",
             entry.get("end") or "",
@@ -209,39 +146,25 @@ def _merge_training_entries(
             entry.get("duration") or "",
         )
 
-    for e in existing:
-        merged[key(e)] = e
-    for e in new:
-        merged[key(e)] = e
+    for entry in existing:
+        merged[key(entry)] = entry
+    for entry in new:
+        merged[key(entry)] = entry
     return list(merged.values())
 
 
-def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
-    """
-    Render training entries as markdown table lines.
-
-    Args:
-        entries: List of training entries to render
-
-    Returns:
-        List of markdown lines (header, separator, rows)
-    """
+def _render_training_rows(entries: list[TrainingTableRow]) -> list[str]:
     if not entries:
         return []
 
-    def to_minutes(val: str) -> int | None:
-        try:
-            h, m = map(int, val.split(":"))
-            return h * 60 + m
-        except (ValueError, AttributeError):
-            return None
-
-    def sort_key(e: TrainingEntry) -> tuple:
-        mins = to_minutes(e.get("start") or "")
-        return (mins if mins is not None else 24 * 60 + 1, e.get("activity") or "")
+    def sort_key(entry: TrainingTableRow) -> tuple[int, str]:
+        mins = _parse_time_to_minutes(entry.get("start") or "")
+        return (
+            mins if mins is not None else (24 * 60 + 1),
+            entry.get("activity") or "",
+        )
 
     def format_interrupt(minutes: float) -> str:
-        """Format interrupt duration for display (same as study table)."""
         mins = int(round(minutes))
         if mins >= 60:
             hours = mins // 60
@@ -250,9 +173,10 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
         return f"`+{mins:02d}m`"
 
     ordered = sorted(entries, key=sort_key)
-    header = "| TIME | ACTIVITY | DURATION | INTERRUPT |"
-    separator = "| ---- | -------- | -------- | --------- |"
-    lines_out = [header, separator]
+    lines_out = [
+        "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+        "| ---- | -------- | -------- | --------- |",
+    ]
     for entry in ordered:
         if entry.get("start") and entry.get("end"):
             time_cell = f"`{entry['start']} - {entry['end']}`"
@@ -266,9 +190,8 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
         duration_cell = f"`{entry['duration']}`" if entry.get("duration") else ""
         interrupt_val = entry.get("interrupt")
         if isinstance(interrupt_val, (int, float)) and interrupt_val > 0:
-            interrupt_cell = format_interrupt(interrupt_val)
+            interrupt_cell = format_interrupt(float(interrupt_val))
         elif isinstance(interrupt_val, str) and interrupt_val:
-            # Already formatted from parsing existing table
             interrupt_cell = (
                 f"`{interrupt_val}`"
                 if not interrupt_val.startswith("`")
@@ -277,87 +200,41 @@ def _render_training_entries(entries: list[TrainingEntry]) -> list[str]:
         else:
             interrupt_cell = "`+00m`"
 
-        row = f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {interrupt_cell} |"
-        lines_out.append(row)
+        lines_out.append(
+            f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {interrupt_cell} |"
+        )
     return lines_out
 
 
-def _extract_data_date(data: dict | list | None) -> str | None:
-    """
-    Extract the date field from training data if present.
-
-    Args:
-        data: Raw JSON data from status file
-
-    Returns:
-        Date string (YYYY-MM-DD) or None if not present
-    """
-    if not data:
-        return None
-    try:
-        if isinstance(data, list):
-            # Use first entry's date
-            return data[0].get("date") if data else None
-        return data.get("date")
-    except (ValueError, TypeError, KeyError, IndexError):
-        return None
-
-
 def build_training_section(
-    workout_data: dict | list | None,
-    stretch_data: dict | list | None,
-    meditation_data: dict | list | None,
+    training_status: CanonicalTrainingStatus,
     existing_block: list[str] | None,
     today_str: str,
     *,
     training_cache_store: DailyTrainingCacheStore,
-) -> tuple[list[str], list[TrainingEntry]]:
+) -> tuple[list[str], list[TrainingTableRow]]:
     """
-    Build training section lines from workout/stretch/meditation data.
-
-    Args:
-        workout_data: Raw workout JSON data
-        stretch_data: Raw stretch JSON data
-        meditation_data: Raw meditation JSON data
-        existing_block: Lines from existing training block in note
-        today_str: Today's date as YYYY-MM-DD string
-
-    Returns:
-        Tuple of (section_lines, merged_entries)
+    Build TRAINING section lines from canonical training status data.
     """
-    # Only use data if its date matches today
-    workout_entries = []
-    stretch_entries = []
-    meditation_entries = []
+    _ = existing_block
+    new_rows = (
+        _rows_from_canonical_entries(training_status.workout_entries)
+        + _rows_from_canonical_entries(training_status.stretch_entries)
+        + _rows_from_canonical_entries(training_status.meditation_entries)
+    )
 
-    workout_date = _extract_data_date(workout_data)
-    if workout_date == today_str:
-        workout_entries = _activity_entries_from_data(workout_data, "Workout")
+    cache_rows = _load_training_cache(today_str, training_cache_store)
+    merged_rows: list[TrainingTableRow] = []
+    if new_rows:
+        merged_rows = _merge_training_rows(cache_rows, new_rows)
+        _save_training_cache(today_str, merged_rows, training_cache_store)
+    elif cache_rows:
+        merged_rows = cache_rows
 
-    stretch_date = _extract_data_date(stretch_data)
-    if stretch_date == today_str:
-        stretch_entries = _activity_entries_from_data(stretch_data, "Stretching")
-
-    meditation_date = _extract_data_date(meditation_data)
-    if meditation_date == today_str:
-        meditation_entries = _activity_entries_from_data(meditation_data, "Meditation")
-
-    new_entries = workout_entries + stretch_entries + meditation_entries
-
-    cache_entries = _load_training_cache(today_str, training_cache_store)
-
-    merged: list[TrainingEntry] = []
-    if new_entries:
-        merged = _merge_training_entries(cache_entries, new_entries)
-        _save_training_cache(today_str, merged, training_cache_store)
-    elif cache_entries:
-        merged = cache_entries
-
-    lines_out = ["### **TRAINING**"]
-    lines_out.append("")  # spacer between header and body
-    if merged:
-        lines_out.extend(_render_training_entries(merged))
+    lines_out = ["### **TRAINING**", ""]
+    if merged_rows:
+        lines_out.extend(_render_training_rows(merged_rows))
     else:
         lines_out.append("_No training sessions completed today._")
 
-    return lines_out, merged
+    return lines_out, merged_rows

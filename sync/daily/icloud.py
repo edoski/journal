@@ -13,6 +13,7 @@ import glob
 import json
 import os
 import time
+from typing import Any
 
 from sync.logging import get_logger
 
@@ -25,7 +26,7 @@ logger = get_logger()
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
 
 
-def load_status_file(filename: str) -> tuple[bool, dict | None]:
+def read_status_file(filename: str) -> tuple[bool, Any | None, str | None]:
     """
     Read and JSON-parse a status file dropped in iCloud by Shortcuts.
 
@@ -40,13 +41,12 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
         filename: Name of the status file (e.g., "workout_status.json")
 
     Returns:
-        Tuple of (success, data) where success is True if data was loaded
+        Tuple of (success, data, parsed_path) where parsed_path is the file that
+        was successfully parsed and can later be finalized or quarantined.
     """
     path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
 
-    def try_parse(
-        target_path: str, delete_after: bool
-    ) -> tuple[bool, dict | None, Exception | None]:
+    def try_parse(target_path: str) -> tuple[bool, Any | None, Exception | None]:
         last_size: int | None = None
         stable_count = 0
         max_attempts = 60
@@ -81,11 +81,6 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
                 with open(target_path, "r") as f:
                     raw = f.read()
                 data = json.loads(raw)
-                if delete_after:
-                    try:
-                        os.remove(target_path)
-                    except (PermissionError, OSError):
-                        pass
                 return True, data, None
             except (json.JSONDecodeError, PermissionError, OSError) as e:
                 last_err = e
@@ -93,23 +88,12 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
 
         return False, None, last_err
 
-    def cleanup_invalids(primary_path: str) -> None:
-        invalids = glob.glob(primary_path + ".invalid") + glob.glob(
-            primary_path + ".*.invalid"
-        )
-        for inv in invalids:
-            try:
-                os.remove(inv)
-            except (PermissionError, OSError):
-                pass
-
     # First try the primary path
     last_err: Exception | None = None
     if os.path.exists(path):
-        success, data, last_err = try_parse(path, delete_after=True)
+        success, data, last_err = try_parse(path)
         if success:
-            cleanup_invalids(path)
-            return True, data
+            return True, data, path
         # Promote the failed file to an .invalid copy for inspection/retry.
         backup_path = path + ".invalid"
         try:
@@ -121,7 +105,7 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
             pass
     else:
         # Missing is expected most of the time; treat as no new data.
-        return False, None
+        return False, None, None
 
     # Fallback: reprocess any existing .invalid copies (most recent first)
     candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
@@ -129,14 +113,61 @@ def load_status_file(filename: str) -> tuple[bool, dict | None]:
         set(candidates), key=lambda p: os.path.getmtime(p), reverse=True
     )
     for cand in candidates:
-        success, data, _ = try_parse(cand, delete_after=False)
+        success, data, _ = try_parse(cand)
         if success:
-            cleanup_invalids(path)
-            return True, data
+            return True, data, cand
 
     if last_err:
         logger.error("Failed to parse %s: %s", os.path.basename(path), last_err)
-    return False, None
+    return False, None, None
+
+
+def finalize_status_file(filename: str, parsed_path: str | None) -> None:
+    """Delete consumed status file and cleanup stale invalid copies."""
+    primary_path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
+    if parsed_path and os.path.exists(parsed_path):
+        try:
+            os.remove(parsed_path)
+        except (PermissionError, OSError):
+            pass
+
+    invalids = glob.glob(primary_path + ".invalid") + glob.glob(
+        primary_path + ".*.invalid"
+    )
+    for inv in invalids:
+        try:
+            os.remove(inv)
+        except (PermissionError, OSError):
+            pass
+
+
+def quarantine_status_file(filename: str, parsed_path: str | None) -> None:
+    """Move parsed payload file to .invalid for later inspection."""
+    if not parsed_path or not os.path.exists(parsed_path):
+        return
+    if parsed_path.endswith(".invalid"):
+        return
+    primary_path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
+    backup_path = primary_path + ".invalid"
+    try:
+        if os.path.exists(backup_path):
+            ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            backup_path = f"{primary_path}.{ts}.invalid"
+        os.replace(parsed_path, backup_path)
+    except (PermissionError, OSError):
+        pass
+
+
+def load_status_file(filename: str) -> tuple[bool, Any | None]:
+    """
+    Backward-compatible reader that consumes parsed status data immediately.
+
+    New code should use read_status_file/finalize_status_file/quarantine_status_file.
+    """
+    success, data, parsed_path = read_status_file(filename)
+    if success:
+        finalize_status_file(filename, parsed_path)
+    return success, data
 
 
 def write_study_times_to_icloud(

@@ -14,12 +14,8 @@ from sync.constants import SCREEN_TIME
 from sync.formatting import format_minutes
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
+from sync.models.status import CanonicalActivityPayload
 from sync.ports.cache import DailyScreenTimeCacheStore
-
-from .icloud import load_status_file
-from sync.logging import get_logger
-
-logger = get_logger()
 
 
 def parse_duration_string(duration_str: str) -> float:
@@ -178,6 +174,7 @@ def _group_by_threshold(
 def load_screen_time_data(
     today_str: str,
     *,
+    activity_payload: CanonicalActivityPayload | None,
     screen_time_cache_store: DailyScreenTimeCacheStore,
 ) -> DailyScreenTimeData | None:
     """
@@ -192,23 +189,16 @@ def load_screen_time_data(
     Returns:
         DailyScreenTimeData with merged entries, or None if no data at all
     """
-    # Try to load new data from status file
-    success, data = load_status_file("activity_status.json")
-
     new_entries: dict[str, float] = {}
     shortcut_ran = False
 
-    if success and data:
+    if activity_payload is not None:
         # Shortcut ran and provided data (even if empty)
         shortcut_ran = True
-        # Validate date matches (data is already in memory, file consumed)
-        json_date = data.get("date", "")
+        json_date = activity_payload.date
         if not json_date or json_date == today_str:
-            # Parse both device activity fields
-            ipad_apps = parse_activity_field(data.get("activity_ipad"))
-            iphone_apps = parse_activity_field(data.get("activity_iphone"))
-
-            # Merge by summing durations for same app
+            ipad_apps = parse_activity_field(activity_payload.activity_ipad)
+            iphone_apps = parse_activity_field(activity_payload.activity_iphone)
             for app, minutes in ipad_apps.items():
                 new_entries[app] = new_entries.get(app, 0) + minutes
             for app, minutes in iphone_apps.items():

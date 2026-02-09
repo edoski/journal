@@ -5,18 +5,18 @@ from __future__ import annotations
 import datetime
 from typing import Protocol
 
-from sync.contracts.daily import SleepStatusPayload, TrainingStatusBundle
 from sync.contracts.study import StudySessionRecord
 from sync.models.screen_time import DailyScreenTimeData
+from sync.models.status import CanonicalSleepPayload, CanonicalTrainingStatus
 
 
 class DailyStatusSource(Protocol):
     """Loads daily training/sleep/screen-time status payloads."""
 
-    def load_training(self, day: datetime.date) -> TrainingStatusBundle:
+    def load_training(self, day: datetime.date) -> CanonicalTrainingStatus:
         """Load training payloads and completion state for a day."""
 
-    def load_sleep(self, day: datetime.date) -> SleepStatusPayload | None:
+    def load_sleep(self, day: datetime.date) -> CanonicalSleepPayload | None:
         """Load sleep payload for a day if available."""
 
     def load_screen_time(self, day: datetime.date) -> DailyScreenTimeData | None:

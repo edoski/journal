@@ -1,13 +1,12 @@
-"""Typed contracts for daily external status payloads."""
+"""Typed wire contracts for daily external status payloads."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TypedDict
 
 
-class TrainingStatusEntry(TypedDict, total=False):
-    """Training status payload produced by iCloud shortcuts."""
+class RawTrainingEntry(TypedDict, total=False):
+    """Training entry payload produced by iCloud shortcuts."""
 
     date: str
     start: str
@@ -16,8 +15,8 @@ class TrainingStatusEntry(TypedDict, total=False):
     type: str
 
 
-class SleepStatusPayload(TypedDict):
-    """Sleep status payload produced by iCloud shortcuts."""
+class RawSleepPayload(TypedDict):
+    """Sleep payload produced by iCloud shortcuts."""
 
     date: str
     start: str
@@ -27,13 +26,9 @@ class SleepStatusPayload(TypedDict):
     awake_count: int
 
 
-@dataclass(frozen=True)
-class TrainingStatusBundle:
-    """Raw training payloads consumed by the daily metrics builder."""
+class RawActivityPayload(TypedDict, total=False):
+    """Screen-time payload produced by iCloud shortcuts."""
 
-    workout_done: bool
-    stretch_done: bool
-    meditate_done: bool
-    workout_payload: dict | list | None
-    stretch_payload: dict | list | None
-    meditate_payload: dict | list | None
+    date: str
+    activity_ipad: str
+    activity_iphone: str

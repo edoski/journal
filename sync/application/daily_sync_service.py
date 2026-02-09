@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass
 
 from sync.constants import IDEAL, JOURNAL_DIR
-from sync.contracts.daily import SleepStatusPayload
 from sync.contracts.study import StudySessionRecord
 from sync.daily.constants import TEMPLATE_PATH
 from sync.daily.context import format_context_cell
@@ -21,6 +20,11 @@ from sync.logging import get_logger
 from sync.models.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
 from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block
+from sync.models.status import (
+    CanonicalSleepPayload,
+    CanonicalTrainingEntry,
+    CanonicalTrainingStatus,
+)
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.context import ContextSource
 from sync.ports.notes import NoteStore
@@ -39,7 +43,7 @@ class _MetricsSectionResult:
     workout_done: bool
     stretch_done: bool
     meditate_done: bool
-    sleep_data: SleepStatusPayload | None
+    sleep_data: CanonicalSleepPayload | None
 
 
 class DailySyncService:
@@ -196,7 +200,7 @@ class DailySyncService:
             else lines[metrics_body_start:]
         )
 
-        training_bundle = self.status_source.load_training(day)
+        training_status = self.status_source.load_training(day)
         sleep_data = self.status_source.load_sleep(day)
         existing_training_block = extract_block(metrics_body, "### **training**")
         existing_sleep_block = extract_block(metrics_body, "### **sleep**")
@@ -210,9 +214,7 @@ class DailySyncService:
             study_lines.append("_No study sessions completed today._")
 
         training_lines, _ = build_training_section(
-            training_bundle.workout_payload,
-            training_bundle.stretch_payload,
-            training_bundle.meditate_payload,
+            training_status,
             existing_training_block,
             day.isoformat(),
             training_cache_store=self.training_cache_store,
@@ -220,7 +222,8 @@ class DailySyncService:
         sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
         screen_time_data = self.status_source.load_screen_time(day)
         deviation_data = self._build_deviation_data(
-            sessions, training_bundle.workout_payload
+            sessions,
+            training_status,
         )
         self.status_source.write_study_times(day, sessions)
         procrastination_lines = build_procrastination_section(
@@ -240,16 +243,16 @@ class DailySyncService:
         updated_lines = replace_metrics_block(lines, metrics_lines)
         return _MetricsSectionResult(
             updated_lines=updated_lines,
-            workout_done=training_bundle.workout_done,
-            stretch_done=training_bundle.stretch_done,
-            meditate_done=training_bundle.meditate_done,
+            workout_done=training_status.workout_done,
+            stretch_done=training_status.stretch_done,
+            meditate_done=training_status.meditate_done,
             sleep_data=sleep_data,
         )
 
     @staticmethod
     def _build_deviation_data(
         sessions: list[StudySessionRecord],
-        workout_data,
+        training_status: CanonicalTrainingStatus,
     ) -> DailyDeviationData:
         deviation_data = DailyDeviationData()
 
@@ -271,14 +274,14 @@ class DailySyncService:
                 session.get("break_overrun", 0) or 0 for session in sessions
             )
 
-        if workout_data:
-            workout_entries = (
-                workout_data if isinstance(workout_data, list) else [workout_data]
+        if training_status.workout_entries:
+            workout_entries: tuple[CanonicalTrainingEntry, ...] = (
+                training_status.workout_entries
             )
             earliest_workout_start = None
             for entry in workout_entries:
-                start_str = (entry.get("start") or "").strip()
-                if start_str and (entry.get("type") or "").lower() != "stretching":
+                start_str = (entry.start or "").strip()
+                if start_str and entry.type.lower() != "stretching":
                     try:
                         h, m = map(int, start_str.split(":"))
                     except (ValueError, AttributeError):

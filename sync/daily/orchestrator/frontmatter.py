@@ -3,42 +3,12 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Any
 
-from sync.contracts.daily import SleepStatusPayload
-from sync.logging import get_logger
-
-logger = get_logger()
-
-_LEGACY_SLEEP_KEYS = {
-    "SleepBegin",
-    "SleepStart",
-    "SleepEnd",
-    "SleepMinutes",
-    "AwakeMinutes",
-    "AwakeCount",
-}
+from sync.models.status import CanonicalSleepPayload
 
 
-def _sleep_minutes_from_payload(sleep_data: SleepStatusPayload) -> float:
-    payload: dict[str, Any] = dict(sleep_data)
-    legacy = sorted(key for key in _LEGACY_SLEEP_KEYS if key in payload)
-    if legacy:
-        msg = "Legacy sleep payload keys are not supported: " + ", ".join(legacy)
-        logger.error(msg)
-        raise ValueError(msg)
-
-    if "sleep_min" not in payload:
-        msg = "Invalid sleep payload: missing key sleep_min"
-        logger.error(msg)
-        raise ValueError(msg)
-
-    try:
-        return float(payload["sleep_min"])
-    except (TypeError, ValueError) as exc:
-        msg = "Invalid sleep payload: sleep_min must be numeric"
-        logger.error(msg)
-        raise ValueError(msg) from exc
+def _sleep_minutes_from_payload(sleep_data: CanonicalSleepPayload) -> float:
+    return float(sleep_data.sleep_min)
 
 
 def update_frontmatter(
@@ -47,7 +17,7 @@ def update_frontmatter(
     workout_done: bool,
     stretch_done: bool,
     meditate_done: bool,
-    sleep_data: SleepStatusPayload | None,
+    sleep_data: CanonicalSleepPayload | None,
 ) -> tuple[list[str], dict[str, str]]:
     """
     Update YAML frontmatter in final_lines with study time and status flags.

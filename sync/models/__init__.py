@@ -11,6 +11,13 @@ from .study import StudySession, DailyStudyData
 from .sleep import SleepEntry, DailySleepData
 from .training import TrainingEntry, DailyTrainingData
 from .screen_time import ScreenTimeEntry, DailyScreenTimeData
+from .status import (
+    CanonicalActivityPayload,
+    CanonicalSleepPayload,
+    CanonicalTrainingEntry,
+    CanonicalTrainingStatus,
+    StatusIngestionIssue,
+)
 from .deviation import DailyDeviationData
 from .daily import DailyData
 from .period import PeriodMetrics
@@ -31,6 +38,11 @@ __all__ = [
     # Screen time
     "ScreenTimeEntry",
     "DailyScreenTimeData",
+    "CanonicalSleepPayload",
+    "CanonicalTrainingEntry",
+    "CanonicalTrainingStatus",
+    "CanonicalActivityPayload",
+    "StatusIngestionIssue",
     # Deviation
     "DailyDeviationData",
     # Daily aggregate

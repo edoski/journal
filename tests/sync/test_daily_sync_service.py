@@ -10,20 +10,13 @@ import pytest
 from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
-from sync.contracts.daily import TrainingStatusBundle
 from sync.models.screen_time import DailyScreenTimeData
+from sync.models.status import CanonicalTrainingStatus
 
 
 class _StubStatusSource:
-    def load_training(self, _day: datetime.date) -> TrainingStatusBundle:
-        return TrainingStatusBundle(
-            workout_done=False,
-            stretch_done=False,
-            meditate_done=False,
-            workout_payload=None,
-            stretch_payload=None,
-            meditate_payload=None,
-        )
+    def load_training(self, _day: datetime.date) -> CanonicalTrainingStatus:
+        return CanonicalTrainingStatus()
 
     def load_sleep(self, _day: datetime.date):
         return None
@@ -33,17 +26,6 @@ class _StubStatusSource:
 
     def write_study_times(self, _day: datetime.date, _sessions) -> None:
         return None
-
-
-class _LegacySleepStatusSource(_StubStatusSource):
-    def load_sleep(self, _day: datetime.date):
-        return {
-            "SleepBegin": "14 Jan 2025 at 23:30",
-            "SleepEnd": "15 Jan 2025 at 06:30",
-            "SleepMinutes": 420,
-            "AwakeMinutes": 15,
-            "AwakeCount": 2,
-        }
 
 
 class _StubContextSource:
@@ -183,13 +165,11 @@ def test_sync_day_fails_without_reminders_config(monkeypatch, tmp_path):
         service.sync_day(day, [_session_for_day(day)])
 
 
-def test_sync_day_fails_for_legacy_sleep_payload(monkeypatch, tmp_path):
+def test_sync_day_tolerates_missing_sleep_payload(monkeypatch, tmp_path):
     day = datetime.date(2025, 1, 15)
-    service, _ = _build_service(
-        monkeypatch,
-        tmp_path,
-        status_source=_LegacySleepStatusSource(),
-    )
-
-    with pytest.raises(ValueError, match="Legacy sleep payload keys are not supported"):
-        service.sync_day(day, [_session_for_day(day)])
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    changed = service.sync_day(day, [_session_for_day(day)])
+    assert changed is True
+    note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
+    content = open(note_path, "r", encoding="utf-8").read()
+    assert "### **SLEEP**" in content
