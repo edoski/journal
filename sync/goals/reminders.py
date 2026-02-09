@@ -14,7 +14,7 @@ from sync.models.reminders import ReminderRule, ScheduleKind
 if TYPE_CHECKING:
     from sync.models.goals import Goal
 
-TABLE_HEADERS = ("ID", "ENABLED", "SCHEDULE", "BODY")
+TABLE_HEADERS = ("SCHEDULE", "BODY")
 WEEKDAY_INDEX = {
     "MON": 0,
     "TUE": 1,
@@ -33,17 +33,6 @@ def _split_table_cells(line: str) -> list[str]:
     return [cell.strip() for cell in stripped[1:-1].split("|")]
 
 
-def _parse_bool(value: str, *, line_no: int) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"true", "1", "yes", "y"}:
-        return True
-    if normalized in {"false", "0", "no", "n"}:
-        return False
-    raise ValueError(
-        f"REMINDERS.md line {line_no}: ENABLED must be true/false, got {value!r}"
-    )
-
-
 def _parse_schedule(schedule: str, *, line_no: int) -> tuple[str, str]:
     kind, sep, value = schedule.partition(":")
     if not sep:
@@ -54,7 +43,7 @@ def _parse_schedule(schedule: str, *, line_no: int) -> tuple[str, str]:
     kind = kind.strip().upper()
     value = value.strip().upper()
 
-    if kind in {"WEEKLY", "BIWEEKLY_ODD_ISO", "BIWEEKLY_EVEN_ISO"}:
+    if kind in {"WEEKLY", "WEEKLY_ODD", "WEEKLY_EVEN"}:
         if value not in WEEKDAY_INDEX:
             raise ValueError(
                 f"REMINDERS.md line {line_no}: invalid weekday {value!r} for {kind}"
@@ -103,7 +92,7 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
     if header_idx == -1:
         raise ValueError(
             f"{path} must contain a markdown table header: "
-            "| ID | ENABLED | SCHEDULE | BODY |"
+            "| SCHEDULE | BODY |"
         )
 
     divider_idx = header_idx + 1
@@ -111,7 +100,7 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
         raise ValueError(f"{path} is missing markdown table divider row")
 
     rules: list[ReminderRule] = []
-    ids: set[str] = set()
+    seen_keys: set[str] = set()
 
     for idx in range(divider_idx + 1, len(lines)):
         raw = lines[idx].strip()
@@ -127,32 +116,31 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
                 f"REMINDERS.md line {line_no}: expected {len(TABLE_HEADERS)} cells, got {len(row)}"
             )
 
-        rule_id, enabled_raw, schedule_raw, body = row
-        rule_id = rule_id.strip()
+        schedule_raw, body = row
         body = body.strip()
 
-        if not rule_id:
-            raise ValueError(f"REMINDERS.md line {line_no}: ID is required")
-        if rule_id in ids:
-            raise ValueError(f"REMINDERS.md line {line_no}: duplicate ID {rule_id!r}")
         if "|" in body:
             raise ValueError(
                 f"REMINDERS.md line {line_no}: BODY cannot contain '|' in strict table mode"
             )
 
-        enabled = _parse_bool(enabled_raw, line_no=line_no)
         schedule_kind, schedule_value = _parse_schedule(schedule_raw, line_no=line_no)
+
+        # Ensure uniqueness based on schedule+body
+        unique_key = f"{schedule_kind}:{schedule_value}|{body}"
+        if unique_key in seen_keys:
+            raise ValueError(
+                f"REMINDERS.md line {line_no}: duplicate rule (same schedule and body)"
+            )
+        seen_keys.add(unique_key)
 
         rules.append(
             ReminderRule(
-                id=rule_id,
-                enabled=enabled,
                 schedule_kind=cast(ScheduleKind, schedule_kind),
                 schedule_value=schedule_value,
                 body=body,
             )
         )
-        ids.add(rule_id)
 
     return rules
 
@@ -161,14 +149,14 @@ def _is_due_on(rule: ReminderRule, due_date: datetime.date) -> bool:
     if rule.schedule_kind == "WEEKLY":
         return due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
 
-    if rule.schedule_kind == "BIWEEKLY_ODD_ISO":
+    if rule.schedule_kind == "WEEKLY_ODD":
         _, week_num, _ = due_date.isocalendar()
         return (
             due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
             and week_num % 2 == 1
         )
 
-    if rule.schedule_kind == "BIWEEKLY_EVEN_ISO":
+    if rule.schedule_kind == "WEEKLY_EVEN":
         _, week_num, _ = due_date.isocalendar()
         return (
             due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
@@ -204,6 +192,12 @@ def _render_body_template(body: str, due_date: datetime.date) -> str:
     return rendered
 
 
+def _generate_rule_id(rule: ReminderRule) -> str:
+    """Generate a deterministic ID for a reminder rule based on its schedule and body."""
+    schedule = f"{rule.schedule_kind}:{rule.schedule_value}"
+    return generate_goal_id_for("reminder", schedule, rule.body, 0)
+
+
 def get_reminders_for_date(
     date: datetime.date,
     rules: list[ReminderRule],
@@ -214,17 +208,15 @@ def get_reminders_for_date(
     reminders: list[Goal] = []
 
     for rule in rules:
-        if not rule.enabled:
-            continue
-
         due_date = date
         if not _is_due_on(rule, due_date):
             continue
 
         rendered_body = _render_body_template(rule.body, due_date)
+        rule_id = _generate_rule_id(rule)
         goal_id = generate_goal_id_for(
             "reminder",
-            f"{rule.id}:{due_date.isoformat()}",
+            f"{rule_id}:{due_date.isoformat()}",
             rendered_body,
             0,
         )
@@ -246,13 +238,12 @@ def get_reminders_for_date(
 def render_reminder_rules_markdown(rules: list[ReminderRule]) -> list[str]:
     """Render reminder rules into canonical REMINDERS.md markdown lines."""
     lines = [
-        "| ID | ENABLED | SCHEDULE | BODY |",
-        "| -- | ------- | -------- | ---- |",
+        "| SCHEDULE | BODY |",
+        "| -------- | ---- |",
     ]
     for rule in rules:
         schedule = f"{rule.schedule_kind}:{rule.schedule_value}"
-        enabled = "true" if rule.enabled else "false"
-        lines.append(f"| {rule.id} | {enabled} | {schedule} | {rule.body} |")
+        lines.append(f"| {schedule} | {rule.body} |")
     lines.append("")
     return lines
 

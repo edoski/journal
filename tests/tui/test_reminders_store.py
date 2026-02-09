@@ -9,9 +9,9 @@ def _write_rules(path):
     path.write_text(
         "\n".join(
             [
-                "| ID | ENABLED | SCHEDULE | BODY |",
-                "| -- | ------- | -------- | ---- |",
-                "| weekly_review | true | WEEKLY:SUN | Review Week |",
+                "| SCHEDULE | BODY |",
+                "| -------- | ---- |",
+                "| WEEKLY:SUN | Review Week |",
                 "",
             ]
         ),
@@ -19,7 +19,7 @@ def _write_rules(path):
     )
 
 
-def test_reminders_store_add_toggle_delete(tmp_path):
+def test_reminders_store_add_and_delete(tmp_path):
     reminders_path = tmp_path / "REMINDERS.md"
     _write_rules(reminders_path)
 
@@ -27,18 +27,18 @@ def test_reminders_store_add_toggle_delete(tmp_path):
 
     added = store.add(
         ReminderRule(
-            id="restart_mac",
-            enabled=True,
-            schedule_kind="BIWEEKLY_ODD_ISO",
+            schedule_kind="WEEKLY_ODD",
             schedule_value="SUN",
             body="Restart MacBook",
         )
     )
-    assert any(rule.id == "restart_mac" for rule in added)
+    assert any(
+        rule.schedule_kind == "WEEKLY_ODD" and rule.body == "Restart MacBook"
+        for rule in added
+    )
 
-    toggled = store.toggle("restart_mac")
-    restart = next(rule for rule in toggled if rule.id == "restart_mac")
-    assert restart.enabled is False
-
-    deleted = store.delete("restart_mac")
-    assert all(rule.id != "restart_mac" for rule in deleted)
+    deleted = store.delete("WEEKLY_ODD", "SUN", "Restart MacBook")
+    assert all(
+        not (rule.schedule_kind == "WEEKLY_ODD" and rule.body == "Restart MacBook")
+        for rule in deleted
+    )

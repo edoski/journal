@@ -10,8 +10,8 @@ from sync.goals.reminders import get_reminders_for_date, load_reminder_rules
 
 
 HEADER = [
-    "| ID | ENABLED | SCHEDULE | BODY |",
-    "| -- | ------- | -------- | ---- |",
+    "| SCHEDULE | BODY |",
+    "| -------- | ---- |",
 ]
 
 
@@ -26,21 +26,20 @@ def test_load_reminder_rules_parses_valid_table(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| weekly_review | true | WEEKLY:SUN | Review [[2026-W05]] + Goals |",
-            "| monthly_review | true | MONTHLY:LAST_DAY | Review [[2026-02]] + Goals |",
-            "| yearly_review | true | YEARLY:12-31 | Review [[2026]] + Goals |",
-            "| restart_mac | true | BIWEEKLY_ODD_ISO:SUN | Restart MacBook |",
-            "| vacuum_room | true | BIWEEKLY_EVEN_ISO:SUN | Vacuum room |",
+            "| WEEKLY:SUN | Review [[2026-W05]] + Goals |",
+            "| MONTHLY:LAST_DAY | Review [[2026-02]] + Goals |",
+            "| YEARLY:12-31 | Review [[2026]] + Goals |",
+            "| WEEKLY_ODD:SUN | Restart MacBook |",
+            "| WEEKLY_EVEN:SUN | Vacuum room |",
         ],
     )
 
     rules = load_reminder_rules(path)
 
     assert len(rules) == 5
-    assert rules[0].id == "weekly_review"
-    assert rules[0].enabled is True
     assert rules[0].schedule_kind == "WEEKLY"
     assert rules[0].schedule_value == "SUN"
+    assert rules[0].body == "Review [[2026-W05]] + Goals"
 
 
 def test_load_reminder_rules_requires_existing_file(tmp_path):
@@ -61,7 +60,7 @@ def test_load_reminder_rules_invalid_schedule_fails(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| bad | true | WEEKLY:FUNDAY | Invalid |",
+            "| WEEKLY:FUNDAY | Invalid |",
         ],
     )
 
@@ -69,15 +68,28 @@ def test_load_reminder_rules_invalid_schedule_fails(tmp_path):
         load_reminder_rules(path)
 
 
-def test_load_reminder_rules_legacy_extra_column_fails(tmp_path):
+def test_load_reminder_rules_extra_column_fails(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| legacy | true | WEEKLY:SUN | Invalid | 0 |",
+            "| WEEKLY:SUN | Invalid | extra |",
         ],
     )
 
-    with pytest.raises(ValueError, match="expected 4 cells, got 5"):
+    with pytest.raises(ValueError, match="expected 2 cells, got 3"):
+        load_reminder_rules(path)
+
+
+def test_load_reminder_rules_duplicate_fails(tmp_path):
+    path = _write_rules(
+        tmp_path,
+        [
+            "| WEEKLY:SUN | Same task |",
+            "| WEEKLY:SUN | Same task |",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="duplicate rule"):
         load_reminder_rules(path)
 
 
@@ -85,12 +97,11 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| weekly_sun | true | WEEKLY:SUN | Weekly Checkpoint |",
-            "| monthly_last | true | MONTHLY:LAST_DAY | Monthly Review |",
-            "| yearly_dec31 | true | YEARLY:12-31 | Yearly Review |",
-            "| biweekly_sun | true | BIWEEKLY_ODD_ISO:SUN | Restart MacBook |",
-            "| biweekly_even | true | BIWEEKLY_EVEN_ISO:SUN | Vacuum room |",
-            "| disabled_rule | false | WEEKLY:SUN | Should Not Appear |",
+            "| WEEKLY:SUN | Weekly Checkpoint |",
+            "| MONTHLY:LAST_DAY | Monthly Review |",
+            "| YEARLY:12-31 | Yearly Review |",
+            "| WEEKLY_ODD:SUN | Restart MacBook |",
+            "| WEEKLY_EVEN:SUN | Vacuum room |",
         ],
     )
     rules = load_reminder_rules(path)
@@ -102,7 +113,6 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     assert "Weekly Checkpoint" in bodies
     assert "Restart MacBook" in bodies
     assert "Vacuum room" not in bodies
-    assert "Should Not Appear" not in bodies
 
     sunday_even = datetime.date(2026, 2, 8)  # Sunday, ISO week 6 (even)
     reminders_even = get_reminders_for_date(sunday_even, rules)
@@ -123,7 +133,7 @@ def test_get_reminders_for_date_is_deterministic(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| weekly_sun | true | WEEKLY:SUN | Weekly Checkpoint |",
+            "| WEEKLY:SUN | Weekly Checkpoint |",
         ],
     )
     rules = load_reminder_rules(path)
@@ -141,9 +151,9 @@ def test_get_reminders_for_date_renders_body_tokens(tmp_path):
     path = _write_rules(
         tmp_path,
         [
-            "| weekly_review | true | WEEKLY:SUN | Review [[{{iso_week}}]] + Goals |",
-            "| monthly_review | true | MONTHLY:LAST_DAY | Review [[{{month}}]] + Goals |",
-            "| yearly_review | true | YEARLY:12-31 | Review [[{{year}}]] + Goals |",
+            "| WEEKLY:SUN | Review [[{{iso_week}}]] + Goals |",
+            "| MONTHLY:LAST_DAY | Review [[{{month}}]] + Goals |",
+            "| YEARLY:12-31 | Review [[{{year}}]] + Goals |",
         ],
     )
     rules = load_reminder_rules(path)

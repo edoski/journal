@@ -19,15 +19,11 @@ def test_save_then_load_round_trip(tmp_path):
     store = MarkdownReminderRuleStore(str(path))
     rules = [
         ReminderRule(
-            id="weekly_review",
-            enabled=True,
             schedule_kind="WEEKLY",
             schedule_value="SUN",
             body="Review week",
         ),
         ReminderRule(
-            id="month_close",
-            enabled=False,
             schedule_kind="MONTHLY",
             schedule_value="LAST_DAY",
             body="Close month",
