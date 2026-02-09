@@ -8,7 +8,7 @@ import datetime
 import os
 import re
 
-from sync.logging import get_logger
+from sync.log import get_logger
 from sync.models import Book, Podcast
 from sync.readers.frontmatter import parse_frontmatter
 from sync.io import safe_read_file

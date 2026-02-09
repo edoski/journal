@@ -12,7 +12,7 @@ from sync.daily.icloud import (
     write_study_times_to_icloud,
 )
 from sync.daily.screen_time import load_screen_time_data
-from sync.logging import get_logger
+from sync.log import get_logger
 from sync.models.screen_time import DailyScreenTimeData
 from sync.models.status import (
     CanonicalSleepPayload,

@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 
-from sync.logging import get_logger
+from sync.log import get_logger
 
 logger = get_logger()
 

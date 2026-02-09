@@ -16,7 +16,7 @@ from sync.daily.screen_time import build_procrastination_section
 from sync.daily.sleep import build_sleep_section
 from sync.daily.training import build_training_section
 from sync.formatting import format_minutes
-from sync.logging import get_logger
+from sync.log import get_logger
 from sync.models.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
 from sync.notes.sections import extract_block, find_header_idx, replace_metrics_block

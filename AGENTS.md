@@ -14,7 +14,7 @@ journal/
     dates.py                   # Date/period math
     formatting.py              # Formatting + percent helpers
     io.py                      # Safe file/json I/O
-    logging.py                 # Logger helper
+    log.py                     # Logger helper
 
     contracts/                 # Pure typed contracts (no I/O)
       study.py
@@ -102,10 +102,10 @@ journal/
       runtime.py
       sections.py
       cleanup.py
-      weekly.py                # Composition root
-      monthly.py               # Composition root
-      quarterly.py             # Composition root
-      yearly.py                # Composition root
+      weekly/                  # Package (composition root in __main__.py)
+      monthly/                 # Package (composition root in __main__.py)
+      quarterly/               # Package (composition root in __main__.py)
+      yearly/                  # Package (composition root in __main__.py)
 
   tui/
     __main__.py
@@ -138,10 +138,10 @@ journal/
 - `application`: orchestration only; depends on `ports` + `contracts`, never on adapter internals.
 - composition roots wire implementations:
   - `sync/daily/__main__.py`
-  - `sync/periods/weekly.py`
-  - `sync/periods/monthly.py`
-  - `sync/periods/quarterly.py`
-  - `sync/periods/yearly.py`
+  - `sync/periods/weekly/__main__.py`
+  - `sync/periods/monthly/__main__.py`
+  - `sync/periods/quarterly/__main__.py`
+  - `sync/periods/yearly/__main__.py`
   - `tui/app.py`
   - `tui/cli.py`
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sync.logging import get_logger
+from sync.log import get_logger
 from sync.notes.locking import locked_note
 from sync.notes.sections import ensure_section_with_divider, section_bounds
 from sync.ports.notes import NoteStore

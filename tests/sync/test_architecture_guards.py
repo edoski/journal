@@ -187,22 +187,22 @@ def test_deprecated_import_paths_are_not_used():
 
 def test_period_entrypoints_import_service_and_windows():
     required: dict[str, dict[str, set[str]]] = {
-        "sync/periods/weekly.py": {
+        "sync/periods/weekly/__main__.py": {
             "sync.application.period_sync_service": {"PeriodSyncService"},
             "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_week_window"},
         },
-        "sync/periods/monthly.py": {
+        "sync/periods/monthly/__main__.py": {
             "sync.application.period_sync_service": {"PeriodSyncService"},
             "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_month_window"},
         },
-        "sync/periods/quarterly.py": {
+        "sync/periods/quarterly/__main__.py": {
             "sync.application.period_sync_service": {"PeriodSyncService"},
             "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_quarter_window"},
         },
-        "sync/periods/yearly.py": {
+        "sync/periods/yearly/__main__.py": {
             "sync.application.period_sync_service": {"PeriodSyncService"},
             "sync.periods.runtime": {"resolve_note_path"},
             "sync.periods.windows": {"build_year_window"},
@@ -227,10 +227,10 @@ def test_period_entrypoints_import_service_and_windows():
 
 def test_period_entrypoints_stay_thin():
     entrypoints = [
-        ROOT / "sync" / "periods" / "weekly.py",
-        ROOT / "sync" / "periods" / "monthly.py",
-        ROOT / "sync" / "periods" / "quarterly.py",
-        ROOT / "sync" / "periods" / "yearly.py",
+        ROOT / "sync" / "periods" / "weekly" / "__main__.py",
+        ROOT / "sync" / "periods" / "monthly" / "__main__.py",
+        ROOT / "sync" / "periods" / "quarterly" / "__main__.py",
+        ROOT / "sync" / "periods" / "yearly" / "__main__.py",
     ]
     violations: list[str] = []
 
@@ -487,10 +487,10 @@ def test_writers_do_not_import_ports_or_adapters():
 def test_only_composition_roots_import_adapters_or_application():
     composition_roots = {
         ROOT / "sync" / "daily" / "__main__.py",
-        ROOT / "sync" / "periods" / "weekly.py",
-        ROOT / "sync" / "periods" / "monthly.py",
-        ROOT / "sync" / "periods" / "quarterly.py",
-        ROOT / "sync" / "periods" / "yearly.py",
+        ROOT / "sync" / "periods" / "weekly" / "__main__.py",
+        ROOT / "sync" / "periods" / "monthly" / "__main__.py",
+        ROOT / "sync" / "periods" / "quarterly" / "__main__.py",
+        ROOT / "sync" / "periods" / "yearly" / "__main__.py",
         ROOT / "tui" / "app.py",
         ROOT / "tui" / "cli.py",
     }

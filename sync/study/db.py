@@ -10,7 +10,7 @@ import sqlite3
 import datetime
 
 from sync.contracts.study import StudySessionRecord
-from sync.logging import get_logger
+from sync.log import get_logger
 
 from sync.study.constants import (
     DB_PATH,

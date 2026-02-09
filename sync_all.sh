@@ -7,6 +7,7 @@
 export PATH="/opt/homebrew/bin:$PATH"
 
 cd /Users/edo/scripts/journal
+export PYTHONPATH=/Users/edo/scripts/journal
 
 python3 -m sync.daily
 python3 -m sync.periods.weekly

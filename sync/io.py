@@ -19,7 +19,7 @@ import json
 import os
 from typing import Any
 
-from sync.logging import get_logger
+from sync.log import get_logger
 
 _logger = get_logger()
 

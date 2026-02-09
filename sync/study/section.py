@@ -13,7 +13,7 @@ from typing import Callable
 
 from sync.contracts.study import StudySessionRecord
 from sync.formatting import format_minutes, ceil_minutes, round_half_up
-from sync.logging import get_logger
+from sync.log import get_logger
 
 from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
 

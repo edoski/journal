@@ -15,7 +15,7 @@ import os
 import time
 from typing import Any
 
-from sync.logging import get_logger
+from sync.log import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
 from sync.contracts.study import StudySessionRecord
