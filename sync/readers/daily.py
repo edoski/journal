@@ -68,7 +68,10 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         return None
 
     fm = parse_frontmatter(lines)
-    study_rows = parse_study_table(lines)
+    try:
+        study_rows = parse_study_table(lines)
+    except ValueError as exc:
+        raise ValueError(f"Invalid daily note schema in {path}: {exc}") from exc
     sleep_rows = parse_sleep_table(lines)
     training_rows = _parse_training_table_rows(lines)
 

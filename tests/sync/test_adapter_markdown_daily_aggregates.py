@@ -79,5 +79,89 @@ def test_load_for_dates_raises_for_non_canonical_study_header(tmp_path):
     )
 
     source = MarkdownDailyAggregateSource(str(tmp_path))
+    with pytest.raises(
+        ValueError, match="Invalid daily note schema in requested window"
+    ):
+        source.load_for_dates([day])
+
+
+def test_load_for_dates_aggregates_non_canonical_study_header_errors(tmp_path):
+    day_one = datetime.date(2025, 12, 21)
+    day_two = datetime.date(2025, 12, 23)
+    shared_lines = [
+        "---",
+        "sleep: 7h00m",
+        "mood: 7.0",
+        "workout: true",
+        "stretch: false",
+        "meditate: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **STUDY**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+        "| ---- | -------- | -------- | --------- | ----- | ----- |",
+        "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+        "",
+    ]
+    (tmp_path / f"{day_one:%Y-%m-%d}.md").write_text(
+        "\n".join(shared_lines),
+        encoding="utf-8",
+    )
+    (tmp_path / f"{day_two:%Y-%m-%d}.md").write_text(
+        "\n".join(shared_lines),
+        encoding="utf-8",
+    )
+
+    source = MarkdownDailyAggregateSource(str(tmp_path))
+    with pytest.raises(ValueError) as excinfo:
+        source.load_for_dates([day_two, day_one])
+
+    message = str(excinfo.value)
+    assert "Invalid daily note schema in requested window (2 file(s))" in message
+    assert (
+        f"- {day_one.isoformat()} | {tmp_path / f'{day_one:%Y-%m-%d}.md'} |" in message
+    )
+    assert (
+        f"- {day_two.isoformat()} | {tmp_path / f'{day_two:%Y-%m-%d}.md'} |" in message
+    )
+    assert "Required canonical STUDY header:" in message
+    assert (
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
+        in message
+    )
+    assert "Non-canonical STUDY table header" in message
+
+
+def test_load_for_dates_raises_for_non_canonical_study_header_reason(tmp_path):
+    day = datetime.date(2025, 12, 23)
+    note_path = tmp_path / f"{day:%Y-%m-%d}.md"
+    note_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "sleep: 7h00m",
+                "mood: 7.0",
+                "workout: true",
+                "stretch: false",
+                "meditate: false",
+                "---",
+                "",
+                "## Metrics",
+                "---",
+                "### **STUDY**",
+                "",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| ---- | -------- | -------- | --------- | ----- | ----- |",
+                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    source = MarkdownDailyAggregateSource(str(tmp_path))
     with pytest.raises(ValueError, match="Non-canonical STUDY table header"):
         source.load_for_dates([day])

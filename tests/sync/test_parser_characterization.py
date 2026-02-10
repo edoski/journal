@@ -110,6 +110,38 @@ def test_parse_study_table_rejects_non_canonical_header():
         )
 
 
+def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h",
+            "mood: 7",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ----- |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `5m` | note |",
+            "",
+        ],
+        name="2025-12-23.md",
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        parse_daily_note(note_path)
+
+    message = str(excinfo.value)
+    assert f"Invalid daily note schema in {note_path}:" in message
+    assert "Non-canonical STUDY table header" in message
+
+
 def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
     missing = tmp_path / "missing.md"
     assert parse_daily_note(str(missing)) is None
