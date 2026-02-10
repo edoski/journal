@@ -17,14 +17,10 @@ from sync.log import get_logger
 
 from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 _CANONICAL_STUDY_HEADER_RE = re.compile(
-    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*CONTEXT\s*\|\s*NOTES\s*\|$",
-    re.IGNORECASE,
-)
-_LEGACY_STUDY_HEADER_RE = re.compile(
-    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*(FOCUS|DURATION)\s*\|\s*(PAUSE|INTERRUPT)\s*\|\s*BREAK\s*\|\s*NOTES\s*\|$",
+    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|\s*INTERRUPT\s*\|\s*BREAK\s*\|\s*CONTEXT\s*\|\s*NOTES\s*\|$",
     re.IGNORECASE,
 )
 
@@ -47,8 +43,15 @@ def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, s
         if _CANONICAL_STUDY_HEADER_RE.match(stripped):
             header_idx = i
             break
-        if _LEGACY_STUDY_HEADER_RE.match(stripped):
-            msg = "Legacy STUDY table header without CONTEXT is no longer supported"
+        if re.match(
+            r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|\s*INTERRUPT\s*\|\s*BREAK\s*\|",
+            stripped,
+            re.IGNORECASE,
+        ):
+            msg = (
+                "Non-canonical STUDY table header. Expected "
+                "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |'"
+            )
             logger.error(msg)
             raise ValueError(msg)
     if header_idx == -1:

@@ -12,56 +12,59 @@ from sync.notes.locking import locked_path
 from sync.ports.cache import MediaDateCacheStore
 
 
-def _safe_load_json(path: str, default: Any) -> Any:
+def _schema_error(path: str, detail: str) -> ValueError:
+    return ValueError(
+        f"Invalid cache schema in {path}: {detail}. Fix command: rm '{path}'"
+    )
+
+
+def _load_json_or_none(path: str) -> Any | None:
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return default
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError as exc:
+        raise _schema_error(path, f"invalid JSON ({exc})") from exc
 
 
 def _atomic_write_json(path: str, payload: Any) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
     os.replace(tmp_path, path)
 
 
-def _normalize_media_cache(raw: Any) -> MediaDateCacheState:
+def _validate_title_to_date_map(raw: Any, *, path: str, bucket: str) -> dict[str, str]:
     if not isinstance(raw, dict):
-        return {"podcasts": {}, "books": {}}
+        raise _schema_error(path, f"{bucket} must be an object")
 
-    podcasts_raw = raw.get("podcasts")
-    books_raw = raw.get("books")
+    validated: dict[str, str] = {}
+    for title, date_value in raw.items():
+        if not isinstance(title, str) or not title:
+            raise _schema_error(path, f"{bucket} has invalid title key")
+        if not isinstance(date_value, str) or not date_value:
+            raise _schema_error(path, f"{bucket}.{title} must be a non-empty string")
+        validated[title] = date_value
 
-    podcasts = (
-        {
-            title: date_str
-            for title, date_str in podcasts_raw.items()
-            if isinstance(title, str)
-            and title
-            and isinstance(date_str, str)
-            and date_str
-        }
-        if isinstance(podcasts_raw, dict)
-        else {}
+    return validated
+
+
+def _validate_media_cache(raw: Any, *, path: str) -> MediaDateCacheState:
+    if not isinstance(raw, dict):
+        raise _schema_error(path, "root payload must be an object")
+
+    required = {"books", "podcasts"}
+    if set(raw) != required:
+        raise _schema_error(path, f"root must contain exactly {sorted(required)}")
+
+    books = _validate_title_to_date_map(raw.get("books"), path=path, bucket="books")
+    podcasts = _validate_title_to_date_map(
+        raw.get("podcasts"), path=path, bucket="podcasts"
     )
 
-    books = (
-        {
-            title: date_str
-            for title, date_str in books_raw.items()
-            if isinstance(title, str)
-            and title
-            and isinstance(date_str, str)
-            and date_str
-        }
-        if isinstance(books_raw, dict)
-        else {}
-    )
-
-    return {"podcasts": podcasts, "books": books}
+    return {"books": books, "podcasts": podcasts}
 
 
 class JsonMediaDateCacheStore(MediaDateCacheStore):
@@ -78,10 +81,12 @@ class JsonMediaDateCacheStore(MediaDateCacheStore):
         self.path = os.path.join(self.cache_dir, "dates.json")
 
     def load(self) -> MediaDateCacheState:
-        raw = _safe_load_json(self.path, None)
-        return _normalize_media_cache(raw)
+        raw = _load_json_or_none(self.path)
+        if raw is None:
+            return {"books": {}, "podcasts": {}}
+        return _validate_media_cache(raw, path=self.path)
 
     def save(self, state: MediaDateCacheState) -> None:
-        normalized = _normalize_media_cache(state)
+        validated = _validate_media_cache(state, path=self.path)
         with locked_path(self.path, lock_root=self.lock_root):
-            _atomic_write_json(self.path, normalized)
+            _atomic_write_json(self.path, validated)

@@ -32,6 +32,6 @@ def test_extract_existing_data_rejects_legacy_header_without_context():
 
     with pytest.raises(
         ValueError,
-        match="Legacy STUDY table header without CONTEXT is no longer supported",
+        match="Non-canonical STUDY table header",
     ):
         extract_existing_data(lines)

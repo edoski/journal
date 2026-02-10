@@ -12,19 +12,27 @@ from sync.notes.locking import locked_path
 from sync.ports.cache import DailyScreenTimeCacheStore, DailyTrainingCacheStore
 
 
-def _safe_load_json(path: str, default: Any) -> Any:
+def _schema_error(path: str, detail: str) -> ValueError:
+    return ValueError(
+        f"Invalid cache schema in {path}: {detail}. Fix command: rm '{path}'"
+    )
+
+
+def _load_json_or_none(path: str) -> Any | None:
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return default
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError as exc:
+        raise _schema_error(path, f"invalid JSON ({exc})") from exc
 
 
 def _atomic_write_json(path: str, payload: Any) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2, sort_keys=True)
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True)
     os.replace(tmp_path, path)
 
 
@@ -58,6 +66,59 @@ def _prune_old_files(cache_dir: str, keep_days: int) -> None:
                 pass
 
 
+def _validate_training_payload(
+    raw: Any, *, path: str, date_str: str
+) -> list[dict[str, Any]]:
+    if not isinstance(raw, dict):
+        raise _schema_error(path, "root payload must be an object")
+    if set(raw) != {"date", "entries"}:
+        raise _schema_error(path, "root must contain exactly ['date', 'entries']")
+
+    if raw.get("date") != date_str:
+        raise _schema_error(path, f"date must equal '{date_str}'")
+
+    entries = raw.get("entries")
+    if not isinstance(entries, list):
+        raise _schema_error(path, "entries must be a list")
+
+    typed_entries: list[dict[str, Any]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise _schema_error(path, f"entries[{index}] must be an object")
+        typed_entries.append(entry)
+
+    return typed_entries
+
+
+def _validate_screen_time_payload(
+    raw: Any,
+    *,
+    path: str,
+    date_str: str,
+) -> dict[str, float]:
+    if not isinstance(raw, dict):
+        raise _schema_error(path, "root payload must be an object")
+    if set(raw) != {"date", "entries"}:
+        raise _schema_error(path, "root must contain exactly ['date', 'entries']")
+
+    if raw.get("date") != date_str:
+        raise _schema_error(path, f"date must equal '{date_str}'")
+
+    entries = raw.get("entries")
+    if not isinstance(entries, dict):
+        raise _schema_error(path, "entries must be an object")
+
+    normalized: dict[str, float] = {}
+    for app, minutes in entries.items():
+        if not isinstance(app, str) or not app:
+            raise _schema_error(path, "entries contains invalid app key")
+        if not isinstance(minutes, (int, float)):
+            raise _schema_error(path, f"entries.{app} must be numeric")
+        normalized[app] = float(minutes)
+
+    return normalized
+
+
 class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
     """Filesystem-backed per-day training cache store."""
 
@@ -73,20 +134,15 @@ class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
     def load_for_date(self, date_str: str) -> list[dict[str, Any]]:
         path = _path_for_date(self.cache_dir, date_str)
         with locked_path(path, lock_root=self.lock_root):
-            data = _safe_load_json(path, None)
-        if not isinstance(data, dict) or data.get("date") != date_str:
+            raw = _load_json_or_none(path)
+        if raw is None:
             return []
-        entries = data.get("entries")
-        if not isinstance(entries, list):
-            return []
-        return [entry for entry in entries if isinstance(entry, dict)]
+        return _validate_training_payload(raw, path=path, date_str=date_str)
 
     def save_for_date(self, date_str: str, entries: list[dict[str, Any]]) -> None:
         path = _path_for_date(self.cache_dir, date_str)
-        payload = {
-            "date": date_str,
-            "entries": [entry for entry in entries if isinstance(entry, dict)],
-        }
+        payload = {"date": date_str, "entries": entries}
+        _validate_training_payload(payload, path=path, date_str=date_str)
         with locked_path(path, lock_root=self.lock_root):
             _atomic_write_json(path, payload)
 
@@ -109,37 +165,21 @@ class JsonDailyScreenTimeCacheStore(DailyScreenTimeCacheStore):
     def load_for_date(self, date_str: str) -> dict[str, float]:
         path = _path_for_date(self.cache_dir, date_str)
         with locked_path(path, lock_root=self.lock_root):
-            data = _safe_load_json(path, None)
-        if not isinstance(data, dict) or data.get("date") != date_str:
+            raw = _load_json_or_none(path)
+        if raw is None:
             return {}
-        entries = data.get("entries")
-        if not isinstance(entries, dict):
-            return {}
-
-        normalized: dict[str, float] = {}
-        for app, minutes in entries.items():
-            if not isinstance(app, str) or not app:
-                continue
-            try:
-                normalized[app] = float(minutes)
-            except (TypeError, ValueError):
-                continue
-        return normalized
+        return _validate_screen_time_payload(raw, path=path, date_str=date_str)
 
     def save_for_date(self, date_str: str, entries: dict[str, float]) -> None:
         path = _path_for_date(self.cache_dir, date_str)
-        normalized: dict[str, float] = {}
-        for app, minutes in entries.items():
-            if not isinstance(app, str) or not app:
-                continue
-            try:
-                normalized[app] = float(minutes)
-            except (TypeError, ValueError):
-                continue
-
-        payload = {"date": date_str, "entries": normalized}
+        payload = {"date": date_str, "entries": entries}
+        validated_entries = _validate_screen_time_payload(
+            payload,
+            path=path,
+            date_str=date_str,
+        )
         with locked_path(path, lock_root=self.lock_root):
-            _atomic_write_json(path, payload)
+            _atomic_write_json(path, {"date": date_str, "entries": validated_entries})
 
     def prune(self, *, keep_days: int) -> None:
         _prune_old_files(self.cache_dir, keep_days)

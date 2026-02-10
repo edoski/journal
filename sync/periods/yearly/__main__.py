@@ -18,18 +18,28 @@ from sync.adapters import (
 from sync.adapters.cache_bootstrap import bootstrap_cache_layout
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
+from sync.log import (
+    add_logging_cli_args,
+    configure_logging,
+    get_logger,
+    resolve_logging_settings,
+)
 from sync.periods.runtime import resolve_note_path
 from sync.periods.windows import build_year_window
 
 
 def main() -> None:
-    bootstrap_cache_layout()
     parser = argparse.ArgumentParser(
         description="Generate yearly metrics from daily notes."
     )
+    add_logging_cli_args(parser)
     parser.add_argument("--file", help="Path to yearly note")
     parser.add_argument("--year", help="Year (YYYY)")
     args = parser.parse_args()
+    level, log_format = resolve_logging_settings(args)
+    configure_logging(level=level, log_format=log_format)
+    logger = get_logger(__name__)
+    bootstrap_cache_layout()
 
     if args.year:
         year = int(args.year)
@@ -55,7 +65,11 @@ def main() -> None:
             reconcile_cache_store=reconcile_cache_store,
         ),
     )
-    service.sync_year(window, note_path)
+    try:
+        service.sync_year(window, note_path)
+    except Exception:
+        logger.exception("Yearly sync failed for %s", window.filename)
+        raise
 
 
 if __name__ == "__main__":

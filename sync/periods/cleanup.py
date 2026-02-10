@@ -10,7 +10,7 @@ import sys
 
 from sync.log import get_logger
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def _repo_root() -> str:
@@ -37,13 +37,24 @@ def resync_if_marker(
         True if a re-sync command was launched, otherwise False.
     """
     if not os.path.exists(previous_note_path):
+        logger.debug("Previous note missing; cleanup skipped: %s", previous_note_path)
         return False
 
     try:
         with open(previous_note_path, "r") as f:
             if marker not in f.read():
+                logger.debug(
+                    "Cleanup marker not present; cleanup skipped: %s",
+                    previous_note_path,
+                )
                 return False
 
+        logger.info(
+            "Cleanup marker found in %s; running %s %s",
+            previous_note_path,
+            module_name,
+            " ".join(module_args),
+        )
         subprocess.run(
             [sys.executable, "-m", module_name, *module_args],
             cwd=_repo_root(),

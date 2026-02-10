@@ -20,7 +20,7 @@ from sync.log import get_logger
 from .constants import ICLOUD_JOURNALSYNC_DIR
 from sync.contracts.study import StudySessionRecord
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 # iCloud path for study times JSON (read by iPad shortcut)
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
@@ -156,18 +156,6 @@ def quarantine_status_file(filename: str, parsed_path: str | None) -> None:
         os.replace(parsed_path, backup_path)
     except (PermissionError, OSError):
         pass
-
-
-def load_status_file(filename: str) -> tuple[bool, Any | None]:
-    """
-    Backward-compatible reader that consumes parsed status data immediately.
-
-    New code should use read_status_file/finalize_status_file/quarantine_status_file.
-    """
-    success, data, parsed_path = read_status_file(filename)
-    if success:
-        finalize_status_file(filename, parsed_path)
-    return success, data
 
 
 def write_study_times_to_icloud(

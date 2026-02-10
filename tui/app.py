@@ -10,6 +10,7 @@ from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
 from sync.application.query_service import QueryService
+from sync.log import configure_logging, get_logger
 from sync.models import ReminderRule, ScheduleKind
 from tui.data.daily_store import DailyStore
 from tui.data.reminders_store import RemindersStore
@@ -249,4 +250,10 @@ def _main(stdscr: curses.window) -> None:
 
 def run() -> None:
     """Run curses TUI application."""
-    curses.wrapper(_main)
+    configure_logging()
+    logger = get_logger(__name__)
+    try:
+        curses.wrapper(_main)
+    except Exception:
+        logger.exception("TUI app crashed")
+        raise

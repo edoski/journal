@@ -33,7 +33,7 @@ from sync.study.breaks import (
     anchor_lunch_window,
 )
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def _read_break_defaults() -> dict[str, int | None]:

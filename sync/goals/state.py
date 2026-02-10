@@ -4,84 +4,21 @@ from __future__ import annotations
 
 import datetime
 import os
-from typing import Any
 
-from sync.contracts.cache import GoalReconcileCacheState
+from sync.contracts.cache import (
+    GoalReconcileCacheState,
+    GoalReconcileGoalState,
+)
 from sync.ports.cache import GoalReconcileCacheStore
 
 
-def empty_goal_sync_state() -> GoalReconcileCacheState:
-    """Return an empty goal-reconcile state payload."""
-    return {"version": 1, "goals": {}}
-
-
-def normalize_goal_sync_state(raw: Any) -> GoalReconcileCacheState:
-    """Normalize arbitrary JSON payload into the expected reconcile schema."""
-    if not isinstance(raw, dict):
-        return empty_goal_sync_state()
-
-    goals = raw.get("goals")
-    if not isinstance(goals, dict):
-        return empty_goal_sync_state()
-
-    normalized_goals: dict[str, dict[str, Any]] = {}
-    for gid, entry in goals.items():
-        if not isinstance(gid, str) or not gid:
-            continue
-        if not isinstance(entry, dict):
-            continue
-
-        notes_raw = entry.get("notes")
-        notes: dict[str, dict[str, bool]] = {}
-        if isinstance(notes_raw, dict):
-            for note_path, note_entry in notes_raw.items():
-                if not isinstance(note_path, str) or not note_path:
-                    continue
-
-                done_value: bool | None = None
-                if isinstance(note_entry, dict):
-                    done = note_entry.get("done")
-                    if isinstance(done, bool):
-                        done_value = done
-                elif isinstance(note_entry, bool):
-                    done_value = note_entry
-
-                if done_value is not None:
-                    notes[note_path] = {"done": done_value}
-
-        last_value = entry.get("last_value")
-        if not isinstance(last_value, bool):
-            if notes:
-                last_value = next(iter(notes.values()))["done"]
-            else:
-                last_value = False
-
-        last_updated_at = entry.get("last_updated_at")
-        if not isinstance(last_updated_at, str):
-            last_updated_at = ""
-
-        last_updated_by = entry.get("last_updated_by")
-        if not isinstance(last_updated_by, str):
-            last_updated_by = ""
-
-        normalized_goals[gid] = {
-            "last_value": last_value,
-            "last_updated_at": last_updated_at,
-            "last_updated_by": last_updated_by,
-            "notes": notes,
-        }
-
-    return {"version": 1, "goals": normalized_goals}
-
-
-def _ensure_goal_entry(state: GoalReconcileCacheState, gid: str) -> dict[str, Any]:
-    goals = state.setdefault("goals", {})
-    if not isinstance(goals, dict):
-        goals = {}
-        state["goals"] = goals
-
+def _ensure_goal_entry(
+    state: GoalReconcileCacheState,
+    gid: str,
+) -> GoalReconcileGoalState:
+    goals = state["goals"]
     entry = goals.get(gid)
-    if not isinstance(entry, dict):
+    if entry is None:
         entry = {
             "last_value": False,
             "last_updated_at": "",
@@ -89,12 +26,6 @@ def _ensure_goal_entry(state: GoalReconcileCacheState, gid: str) -> dict[str, An
             "notes": {},
         }
         goals[gid] = entry
-
-    notes = entry.get("notes")
-    if not isinstance(notes, dict):
-        notes = {}
-        entry["notes"] = notes
-
     return entry
 
 
@@ -102,17 +33,11 @@ def _now_iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def _note_snapshot_done(entry: dict[str, Any], note_path: str) -> bool | None:
-    notes = entry.get("notes")
-    if not isinstance(notes, dict):
+def _note_snapshot_done(entry: GoalReconcileGoalState, note_path: str) -> bool | None:
+    note_entry = entry["notes"].get(note_path)
+    if note_entry is None:
         return None
-
-    note_entry = notes.get(note_path)
-    if not isinstance(note_entry, dict):
-        return None
-
-    done = note_entry.get("done")
-    return done if isinstance(done, bool) else None
+    return note_entry["done"]
 
 
 def _path_mtime(path: str) -> float:

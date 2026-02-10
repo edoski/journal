@@ -18,15 +18,21 @@ from sync.adapters import (
 from sync.adapters.cache_bootstrap import bootstrap_cache_layout
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
+from sync.log import (
+    add_logging_cli_args,
+    configure_logging,
+    get_logger,
+    resolve_logging_settings,
+)
 from sync.periods.runtime import resolve_note_path
 from sync.periods.windows import build_week_window
 
 
 def main() -> None:
-    bootstrap_cache_layout()
     parser = argparse.ArgumentParser(
         description="Generate weekly metrics from daily notes."
     )
+    add_logging_cli_args(parser)
     parser.add_argument("--file", help="Path to weekly note")
     parser.add_argument("--date", help="Date within week (YYYY-MM-DD)")
     parser.add_argument(
@@ -35,6 +41,10 @@ def main() -> None:
         help="Skip cleanup of previous period (used internally to avoid recursion)",
     )
     args = parser.parse_args()
+    level, log_format = resolve_logging_settings(args)
+    configure_logging(level=level, log_format=log_format)
+    logger = get_logger(__name__)
+    bootstrap_cache_layout()
 
     if args.date:
         target_date = datetime.datetime.strptime(args.date, "%Y-%m-%d").date()
@@ -60,7 +70,11 @@ def main() -> None:
             reconcile_cache_store=reconcile_cache_store,
         ),
     )
-    service.sync_week(window, note_path, cleanup_previous=not args.no_cleanup)
+    try:
+        service.sync_week(window, note_path, cleanup_previous=not args.no_cleanup)
+    except Exception:
+        logger.exception("Weekly sync failed for %s", window.filename)
+        raise
 
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ from typing import Any
 
 from sync.log import get_logger
 
-_logger = get_logger()
+_logger = get_logger(__name__)
 
 
 def safe_read_file(path: str) -> list[str] | None:

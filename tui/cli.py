@@ -1,9 +1,10 @@
-"""Non-interactive CLI utilities for journal operations (replacement for old utils/)."""
+"""Non-interactive CLI utilities for journal operations."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -11,11 +12,57 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sync.adapters.flow_sessions import FlowStudySessionSource
+from sync.config import LOGGING
 from sync.contracts.study import StudySessionRecord
+from sync.log import (
+    add_logging_cli_args,
+    configure_logging,
+    get_logger,
+    resolve_logging_settings,
+)
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
 SKIP_CONFIG_PATH = Path.home() / ".config" / "journal" / "skip_schedule.json"
 FLOW_SKIP_LOG_PATH = Path("/tmp/flow-skip.log")
+
+logger = get_logger(__name__)
+
+
+def _log_cap_bytes() -> int:
+    raw = os.environ.get("JOURNAL_LOG_CAP_BYTES")
+    if raw is None:
+        return LOGGING.cap_bytes
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return LOGGING.cap_bytes
+    return parsed if parsed > 0 else LOGGING.cap_bytes
+
+
+def _cap_log_file(path: Path, max_bytes: int) -> None:
+    """Trim a log file in-place to the newest max_bytes bytes."""
+    if max_bytes <= 0:
+        return
+
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return
+
+    if size <= max_bytes:
+        return
+
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(-max_bytes, os.SEEK_END)
+            tail = handle.read(max_bytes)
+        newline = tail.find(b"\n")
+        if newline != -1 and newline + 1 < len(tail):
+            tail = tail[newline + 1 :]
+        with open(path, "wb") as handle:
+            handle.write(tail)
+    except OSError:
+        return
 
 
 def core_data_to_datetime(timestamp: float | None) -> datetime | None:
@@ -170,7 +217,8 @@ def _load_recent_focus_sessions(
         day = today - timedelta(days=delta_days)
         try:
             day_sessions = source.load_sessions(day)
-        except Exception:
+        except Exception as exc:
+            logger.debug("Failed to load sessions for %s: %s", day, exc)
             continue
         sessions.extend(_record_to_cli_session(item) for item in day_sessions)
         if len(sessions) >= limit:
@@ -378,14 +426,6 @@ def _save_skip_config(config: dict) -> None:
         handle.write("\n")
 
 
-def _log_skip(message: str) -> None:
-    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{stamp}] {message}"
-    with open(FLOW_SKIP_LOG_PATH, "a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
-    print(line)
-
-
 def _run_applescript(script: str) -> str | None:
     try:
         result = subprocess.run(
@@ -396,7 +436,8 @@ def _run_applescript(script: str) -> str | None:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as exc:
-        _log_skip(f"AppleScript error: {exc.stderr.strip()}")
+        detail = exc.stderr.strip() if exc.stderr else str(exc)
+        logger.error("AppleScript error: %s", detail)
         return None
 
 
@@ -404,19 +445,19 @@ def cmd_skip_now(_args: argparse.Namespace) -> int:
     """Skip active focus session and start break, honoring skip config."""
     config = _load_skip_config()
     if not config.get("enabled", False):
-        _log_skip("Skip automation disabled; exiting")
+        logger.info("Skip automation disabled; exiting")
         return 0
 
     phase = _run_applescript('tell application "Flow" to getPhase')
-    _log_skip(f"Current phase: {phase}")
+    logger.info("Current phase: %s", phase)
     if phase != "Flow":
-        _log_skip("Not in Flow phase; no skip performed")
+        logger.info("Not in Flow phase; no skip performed")
         return 0
 
     _run_applescript('tell application "Flow" to skip')
     _run_applescript('tell application "Flow" to start')
     _run_applescript('tell application "Flow" to show')
-    _log_skip("Skip executed")
+    logger.info("Skip executed")
     return 0
 
 
@@ -444,6 +485,7 @@ def cmd_skip_toggle(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI parser and subcommands."""
     parser = argparse.ArgumentParser(description="Journal TUI CLI utilities")
+    add_logging_cli_args(parser)
     sub = parser.add_subparsers(dest="command", required=True)
 
     preview = sub.add_parser("session-preview", help="Preview recent sessions")
@@ -474,7 +516,16 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    return int(args.func(args))
+
+    _cap_log_file(FLOW_SKIP_LOG_PATH, _log_cap_bytes())
+    level, log_format = resolve_logging_settings(args)
+    configure_logging(level=level, log_format=log_format)
+
+    try:
+        return int(args.func(args))
+    except Exception:
+        logger.exception("CLI command failed: %s", args.command)
+        return 1
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import cast
 
 from sync.contracts.cache import CarryForwardCacheState
 
@@ -16,62 +16,6 @@ DELETED_RETENTION_PERIODS = {
     "yearly": 12,
 }
 _HORIZONS = ("daily", "weekly", "monthly", "quarterly", "yearly")
-
-
-def normalize_carry_forward_cache(raw: Any) -> CarryForwardCacheState:
-    """Normalize arbitrary payload into carried-goals cache schema."""
-    if not isinstance(raw, dict):
-        return {}
-
-    normalized: CarryForwardCacheState = {}
-
-    for horizon in _HORIZONS:
-        bucket = raw.get(horizon)
-        if not isinstance(bucket, dict):
-            continue
-
-        normalized_bucket: dict[str, list[str]] = {}
-        for period_key, goal_ids in bucket.items():
-            if not isinstance(period_key, str) or not period_key:
-                continue
-            if not isinstance(goal_ids, list):
-                continue
-
-            filtered = sorted(
-                {
-                    goal_id
-                    for goal_id in goal_ids
-                    if isinstance(goal_id, str) and goal_id
-                }
-            )
-            if filtered:
-                normalized_bucket[period_key] = filtered
-
-        if normalized_bucket:
-            normalized[horizon] = normalized_bucket
-
-    deleted = raw.get(DELETED_CACHE_KEY)
-    if isinstance(deleted, dict):
-        normalized_deleted: dict[str, dict[str, str]] = {}
-        for horizon in _HORIZONS:
-            bucket = deleted.get(horizon)
-            if not isinstance(bucket, dict):
-                continue
-            normalized_deleted_bucket: dict[str, str] = {
-                goal_id: deleted_period
-                for goal_id, deleted_period in bucket.items()
-                if isinstance(goal_id, str)
-                and goal_id
-                and isinstance(deleted_period, str)
-                and deleted_period
-            }
-            if normalized_deleted_bucket:
-                normalized_deleted[horizon] = normalized_deleted_bucket
-
-        if normalized_deleted:
-            normalized[DELETED_CACHE_KEY] = normalized_deleted
-
-    return normalized
 
 
 def get_prior_period_key(period_type: str, current_key: str) -> str | None:
@@ -173,10 +117,11 @@ def _ensure_deleted_bucket(
     period_type: str,
 ) -> dict[str, str]:
     """Ensure cache has a mutable deleted-tombstone bucket for the horizon."""
-    deleted = cache.get(DELETED_CACHE_KEY)
+    state = cast(dict[str, object], cache)
+    deleted = state.get(DELETED_CACHE_KEY)
     if not isinstance(deleted, dict):
         deleted = {}
-        cache[DELETED_CACHE_KEY] = deleted
+        state[DELETED_CACHE_KEY] = deleted
 
     bucket = deleted.get(period_type)
     if not isinstance(bucket, dict):
@@ -192,7 +137,8 @@ def get_carried_ids(
     period_key: str,
 ) -> set[str]:
     """Get goal IDs that have already been offered for carry forward."""
-    period_cache = cache.get(period_type, {})
+    state = cast(dict[str, object], cache)
+    period_cache = state.get(period_type, {})
     if not isinstance(period_cache, dict):
         return set()
     goal_ids = period_cache.get(period_key, [])
@@ -211,10 +157,11 @@ def record_carried_ids(
     if not goal_ids:
         return False
 
-    period_cache = cache.get(period_type)
+    state = cast(dict[str, object], cache)
+    period_cache = state.get(period_type)
     if not isinstance(period_cache, dict):
         period_cache = {}
-        cache[period_type] = period_cache
+        state[period_type] = period_cache
 
     existing = set(period_cache.get(period_key, []))
     clean_ids = {
@@ -268,7 +215,8 @@ def remove_deleted_ids(
     if not goal_ids:
         return False
 
-    deleted = cache.get(DELETED_CACHE_KEY)
+    state = cast(dict[str, object], cache)
+    deleted = state.get(DELETED_CACHE_KEY)
     if not isinstance(deleted, dict):
         return False
 
@@ -324,7 +272,8 @@ def cleanup_old_entries(
     keep_keys: list[str],
 ) -> bool:
     """Drop old period offer entries outside keep_keys."""
-    period_cache = cache.get(period_type)
+    state = cast(dict[str, object], cache)
+    period_cache = state.get(period_type)
     if not isinstance(period_cache, dict):
         return False
 
@@ -333,5 +282,5 @@ def cleanup_old_entries(
     if filtered == period_cache:
         return False
 
-    cache[period_type] = filtered
+    state[period_type] = filtered
     return True

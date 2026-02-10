@@ -34,7 +34,7 @@ from sync.study.section import build_study_section, extract_existing_data
 
 from .goal_sync_service import GoalSyncService
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)

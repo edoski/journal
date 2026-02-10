@@ -1,10 +1,10 @@
 """
 Characterization tests for daily parser behavior.
-
-These tests lock down current parser semantics before compatibility removals.
 """
 
 from __future__ import annotations
+
+import pytest
 
 from sync.readers.daily import parse_daily_note
 from sync.readers.study import parse_study_table
@@ -32,10 +32,10 @@ def test_parse_daily_note_characterization(tmp_path):
             "---",
             "### **STUDY**",
             "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
-            "| ---- | -------- | -------- | --------- | ----- |",
-            "| 09:00 - 11:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` |",
-            "| 14:00 - 15:30 | `reading` | `1h30m` | `+1h30m` | `10m (+1h)` |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 - 11:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` | [[code.md]] | – |",
+            "| 14:00 - 15:30 | `reading` | `1h30m` | `+1h30m` | `10m (+1h)` | [[read.md]] | – |",
             "",
             "### **SLEEP**",
             "",
@@ -81,9 +81,9 @@ def test_parse_study_table_interrupt_hour_format_characterization():
         [
             "### **STUDY**",
             "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
-            "| ---- | -------- | -------- | --------- | ----- |",
-            "| 09:00 | `coding` | `1h00m` | `+1h30m` | `5m` |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 | `coding` | `1h00m` | `+1h30m` | `5m` | – | – |",
             "",
         ]
     )
@@ -94,6 +94,20 @@ def test_parse_study_table_interrupt_hour_format_characterization():
     assert sessions[0].interrupt_minutes == 90.0
     assert sessions[0].overrun_minutes == 0
     assert sessions[0].break_minutes == 5
+
+
+def test_parse_study_table_rejects_non_canonical_header():
+    with pytest.raises(ValueError, match="Non-canonical STUDY table header"):
+        parse_study_table(
+            [
+                "### **STUDY**",
+                "",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| ---- | -------- | -------- | --------- | ----- | ----- |",
+                "| 09:00 | `coding` | `1h00m` | `+00m` | `5m` | note |",
+                "",
+            ]
+        )
 
 
 def test_parse_daily_note_returns_none_for_missing_file(tmp_path):

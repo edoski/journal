@@ -13,7 +13,7 @@ from sync.models import Book, Podcast
 from sync.readers.frontmatter import parse_frontmatter
 from sync.io import safe_read_file
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def _heal_frontmatter_date(

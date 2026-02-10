@@ -264,23 +264,6 @@ class TestCacheIntegration:
         assert len(deleted) == 12
         assert set(deleted.values()) == set(keys[:12])
 
-    def test_prune_deleted_ids_handles_legacy_shape(self, tmp_path):
-        store = _carry_store(tmp_path)
-        Path(store.path).parent.mkdir(parents=True, exist_ok=True)
-        Path(store.path).write_text(
-            json.dumps(
-                {
-                    "monthly": {"2026-02": ["gid-abc"]},
-                    "_deleted": ["unexpected"],
-                }
-            ),
-            encoding="utf-8",
-        )
-
-        with store.locked_state() as cache:
-            prune_deleted_ids(cache, "monthly", "2026-02")
-            assert get_deleted_ids(cache, "monthly") == set()
-
     def test_daily_tombstone_blocks_future_day(self, tmp_path):
         journal_dir = tmp_path / "journal"
         journal_dir.mkdir()

@@ -9,7 +9,7 @@ from sync.ports.notes import NoteStore
 
 from ..constants import TEMPLATE_PATH
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 def ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:

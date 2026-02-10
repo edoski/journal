@@ -185,6 +185,38 @@ def test_deprecated_import_paths_are_not_used():
     assert not violations, "Deprecated import paths found:\n" + "\n".join(violations)
 
 
+def test_removed_compat_helpers_are_not_reintroduced():
+    banned_functions: dict[str, set[str]] = {
+        "sync/daily/icloud.py": {"load_status_file"},
+        "sync/adapters/cache_bootstrap.py": {"_LEGACY_CACHE_FILES"},
+        "sync/goals/state.py": {"empty_goal_sync_state", "normalize_goal_sync_state"},
+        "sync/goals/tombstones.py": {"normalize_carry_forward_cache"},
+    }
+    violations: list[str] = []
+
+    for rel_path, names in banned_functions.items():
+        path = ROOT / rel_path
+        module = _parse_module(path)
+        defined = {
+            node.name for node in module.body if isinstance(node, ast.FunctionDef)
+        }
+        assigned = {
+            target.id
+            for node in module.body
+            if isinstance(node, ast.Assign)
+            for target in node.targets
+            if isinstance(target, ast.Name)
+        }
+
+        for name in names:
+            if name in defined or name in assigned:
+                violations.append(f"{rel_path}: found banned symbol {name}")
+
+    assert not violations, "Removed compat helpers reappeared:\n" + "\n".join(
+        violations
+    )
+
+
 def test_period_entrypoints_import_service_and_windows():
     required: dict[str, dict[str, set[str]]] = {
         "sync/periods/weekly/__main__.py": {

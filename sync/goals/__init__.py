@@ -18,8 +18,6 @@ from .reminders import (
     save_reminder_rules,
 )
 from .state import (
-    empty_goal_sync_state,
-    normalize_goal_sync_state,
     record_note_state,
     reconcile_pair,
     reconcile_pair_with_state,
@@ -49,8 +47,6 @@ __all__ = [
     "get_reminders_for_date",
     "render_reminder_rules_markdown",
     "save_reminder_rules",
-    "empty_goal_sync_state",
-    "normalize_goal_sync_state",
     "record_note_state",
     "reconcile_pair",
     "reconcile_pair_with_state",

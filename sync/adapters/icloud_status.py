@@ -28,7 +28,7 @@ from .status_parsers import (
     parse_training_payload,
 )
 
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 class ICloudDailyStatusSource(DailyStatusSource):

@@ -34,12 +34,32 @@ class PathConfig:
     icloud_journalsync_dir: str
 
 
+@dataclass(frozen=True)
+class LoggingConfig:
+    """Resolved logging configuration used by sync and TUI entrypoints."""
+
+    level: str
+    format: str
+    cap_bytes: int
+
+
 def _resolve_path(value: str) -> str:
     return os.path.expanduser(value)
 
 
 def _env_path(name: str, default: str) -> str:
     return _resolve_path(os.environ.get(name, default))
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
 def _build_paths() -> PathConfig:
@@ -151,3 +171,14 @@ def _build_paths() -> PathConfig:
 
 
 PATHS = _build_paths()
+
+
+def _build_logging() -> LoggingConfig:
+    return LoggingConfig(
+        level=os.environ.get("JOURNAL_LOG_LEVEL", "INFO"),
+        format=os.environ.get("JOURNAL_LOG_FORMAT", "text"),
+        cap_bytes=_env_int("JOURNAL_LOG_CAP_BYTES", 262144),
+    )
+
+
+LOGGING = _build_logging()

@@ -267,6 +267,7 @@ Primary env overrides:
 - `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
+- `JOURNAL_LOG_LEVEL`, `JOURNAL_LOG_FORMAT`, `JOURNAL_LOG_CAP_BYTES`
 
 ## Runtime Configuration
 
@@ -281,6 +282,8 @@ Operational guidance:
 - Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.flow-skip.plist`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
+- Logging is stderr-only; no app-level log file sink is used.
+- Keep `/tmp` launchd logs bounded with `JOURNAL_LOG_CAP_BYTES` (default `262144` bytes).
 
 Move checklist (repo relocation):
 
