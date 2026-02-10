@@ -21,7 +21,7 @@ DATE_QUARTER_RE = re.compile(r"^(\d{4})-Q([1-4])$")  # YYYY-Qn
 # Regex to find backtick-wrapped date (with optional reminder offset) in goal body
 GOAL_DATE_RE = re.compile(
     r"`(\d{4}(?:-(?:W\d{2}|\d{2}(?:-\d{2})?|Q[1-4])))"
-    r"(?:\s*!\s*(\d+)\s*([dwmq]))?`"
+    r"(?:\s*!\s*(\d+)\s*([dwmqDWMQ]))?`"
 )
 
 # Reminder offset units in days
@@ -101,6 +101,8 @@ def parse_goal_date(body: str) -> tuple[str, str | None, datetime.date | None, i
 
     date_str = match.group(1)
     deadline = resolve_deadline(date_str)
+    if deadline is None:
+        return body, None, None, 0
 
     # Parse reminder offset if present (e.g., !14d, !2w, !1m)
     reminder_offset = 0

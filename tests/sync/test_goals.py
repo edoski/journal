@@ -59,12 +59,21 @@ class TestCanonicalGoal:
     def test_strips_goal_id(self):
         assert canonical_goal("- [x] Task ^gid-abc1234567") == "task"
         assert canonical_goal("- [ ] Task ^gid-1234567890") == "task"
+        assert canonical_goal("- [x] Task ^gid-ABCDEF") == "task"
+
+    def test_preserves_invalid_goal_id_shapes(self):
+        assert canonical_goal("- [x] Task ^gid-abc12") == "task ^gid-abc12"
+        assert canonical_goal("- [x] Task ^gid-xyzxyz") == "task ^gid-xyzxyz"
 
     def test_strips_wiki_links(self):
         assert canonical_goal("- [x] Read [[Book Name]]") == "read book name"
         assert (
             canonical_goal("Review [[Note]] and [[Other]]") == "review note and other"
         )
+
+    def test_strips_checkbox_variants(self):
+        assert canonical_goal("- [✓] Done task") == "done task"
+        assert canonical_goal("- [-] Skipped task") == "skipped task"
 
     def test_collapses_whitespace(self):
         assert canonical_goal("- [x] Task   with   spaces") == "task with spaces"

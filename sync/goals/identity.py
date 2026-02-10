@@ -21,11 +21,16 @@ def canonical_goal_text(text: str) -> str:
     - Lowercases and removes trailing punctuation
     """
     # Strip checkbox markers
-    text = re.sub(r"^[-*]\s*\[[x ]\]\s*", "", text.strip(), flags=re.IGNORECASE)
+    text = re.sub(
+        r"^[-*]\s*\[[x \-✓✔]\]\s*",
+        "",
+        text.strip(),
+        flags=re.IGNORECASE,
+    )
     # Strip wikilinks but keep inner text
     text = re.sub(r"\[\[([^\]]+)\]\]", r"\1", text)
     # Strip goal IDs
-    text = re.sub(r"\^gid-[a-f0-9]+", "", text)
+    text = re.sub(r"(\s+\^gid-[a-f0-9]{6,32})+\s*$", "", text, flags=re.IGNORECASE)
     # Collapse whitespace
     text = re.sub(r"\s+", " ", text)
     # Strip backticks

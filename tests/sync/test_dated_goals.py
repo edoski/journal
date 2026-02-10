@@ -124,6 +124,13 @@ class TestParseGoalDate:
         assert deadline is None
         assert offset == 0
 
+    def test_invalid_calendar_date_treated_as_plain_text(self):
+        body, date_str, deadline, offset = parse_goal_date("`2025-13-40` Pass MIC exam")
+        assert body == "`2025-13-40` Pass MIC exam"
+        assert date_str is None
+        assert deadline is None
+        assert offset == 0
+
     def test_preserves_other_backticks(self):
         body, date_str, deadline, offset = parse_goal_date(
             "`2025-02-12` Study `chapter 8`"
@@ -151,8 +158,23 @@ class TestParseGoalDate:
         assert deadline == datetime.date(2025, 2, 12)
         assert offset == 14  # 2 weeks = 14 days
 
+    def test_reminder_offset_uppercase_weeks(self):
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-02-12 !2W` Pass MIC exam"
+        )
+        assert body == "Pass MIC exam"
+        assert date_str == "2025-02-12"
+        assert deadline == datetime.date(2025, 2, 12)
+        assert offset == 14  # 2 weeks = 14 days
+
     def test_reminder_offset_months(self):
         body, date_str, deadline, offset = parse_goal_date("`2025-05-01 !1m` Graduate")
+        assert body == "Graduate"
+        assert date_str == "2025-05-01"
+        assert offset == 30  # 1 month = 30 days
+
+    def test_reminder_offset_uppercase_months(self):
+        body, date_str, deadline, offset = parse_goal_date("`2025-05-01 !1M` Graduate")
         assert body == "Graduate"
         assert date_str == "2025-05-01"
         assert offset == 30  # 1 month = 30 days
@@ -160,6 +182,14 @@ class TestParseGoalDate:
     def test_reminder_offset_quarters(self):
         body, date_str, deadline, offset = parse_goal_date(
             "`2025-12-31 !1q` Year end review"
+        )
+        assert body == "Year end review"
+        assert date_str == "2025-12-31"
+        assert offset == 90  # 1 quarter = 90 days
+
+    def test_reminder_offset_uppercase_quarters(self):
+        body, date_str, deadline, offset = parse_goal_date(
+            "`2025-12-31 !1Q` Year end review"
         )
         assert body == "Year end review"
         assert date_str == "2025-12-31"
@@ -385,6 +415,17 @@ class TestParseGoalTasksWithDates:
         assert tasks[0].body == "Pass MIC exam"
         assert tasks[0].deadline == datetime.date(2025, 2, 12)
         assert tasks[0].reminder_offset == 14
+
+    def test_invalid_date_token_preserved_as_plain_text(self):
+        lines = [
+            "- [ ] `2025-13-40` Pass MIC exam ^gid-abc123",
+        ]
+        tasks = parse_goal_tasks(lines)
+        assert len(tasks) == 1
+        assert tasks[0].body == "`2025-13-40` Pass MIC exam"
+        assert tasks[0].date_str is None
+        assert tasks[0].deadline is None
+        assert tasks[0].reminder_offset == 0
 
     def test_strips_existing_countdown(self):
         """Ensure existing countdown suffixes are removed during re-parsing."""
