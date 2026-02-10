@@ -27,16 +27,21 @@ class RemindersStore:
                 and existing.schedule_value == rule.schedule_value
                 and existing.body == rule.body
             ):
-                raise ValueError("Reminder rule with same schedule and body already exists")
+                raise ValueError(
+                    "Reminder rule with same schedule and body already exists"
+                )
         updated = rules + [rule]
         self.save(updated)
         return updated
 
-    def delete(self, schedule_kind: str, schedule_value: str, body: str) -> list[ReminderRule]:
+    def delete(
+        self, schedule_kind: str, schedule_value: str, body: str
+    ) -> list[ReminderRule]:
         """Delete a rule by matching its schedule and body."""
         rules = self.load()
         updated = [
-            rule for rule in rules
+            rule
+            for rule in rules
             if not (
                 rule.schedule_kind == schedule_kind
                 and rule.schedule_value == schedule_value

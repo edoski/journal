@@ -43,14 +43,30 @@ def _env_path(name: str, default: str) -> str:
 
 
 def _build_paths() -> PathConfig:
-    journal_dir = _env_path(
-        "JOURNAL_DIR",
-        "/Users/edo/Documents/Obsidian/the-vault/journal",
+    home_dir = _resolve_path("~")
+    default_vault_dir = os.path.join(home_dir, "Documents", "Obsidian", "the-vault")
+    vault_dir = _env_path("VAULT_DIR", default_vault_dir)
+    journal_dir = _env_path("JOURNAL_DIR", os.path.join(vault_dir, "journal"))
+    notes_dir = os.path.join(vault_dir, "notes")
+    templates_dir = os.path.join(notes_dir, "templates")
+    flow_container_root = os.path.join(
+        home_dir,
+        "Library",
+        "Containers",
+        "design.yugen.Flow",
+        "Data",
+        "Library",
+        "Application Support",
+        "Flow",
     )
-    vault_dir = _env_path(
-        "VAULT_DIR",
-        "/Users/edo/Documents/Obsidian/the-vault",
+    shortcuts_documents_dir = os.path.join(
+        home_dir,
+        "Library",
+        "Mobile Documents",
+        "iCloud~is~workflow~my~workflows",
+        "Documents",
     )
+
     journal_cache_dir = _env_path("JOURNAL_CACHE_DIR", "~/.cache/journal")
     lock_dir = _env_path("LOCK_DIR", os.path.join(journal_cache_dir, "locks"))
 
@@ -59,31 +75,31 @@ def _build_paths() -> PathConfig:
         vault_dir=vault_dir,
         books_dir=_env_path(
             "BOOKS_DIR",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/books",
+            os.path.join(notes_dir, "books"),
         ),
         podcasts_dir=_env_path(
             "PODCASTS_DIR",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/podcasts",
+            os.path.join(notes_dir, "podcasts"),
         ),
         daily_template_path=_env_path(
             "DAILY_TEMPLATE_PATH",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/templates/daily.md",
+            os.path.join(templates_dir, "daily.md"),
         ),
         weekly_template_path=_env_path(
             "WEEKLY_TEMPLATE_PATH",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/templates/weekly.md",
+            os.path.join(templates_dir, "weekly.md"),
         ),
         monthly_template_path=_env_path(
             "MONTHLY_TEMPLATE_PATH",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/templates/monthly.md",
+            os.path.join(templates_dir, "monthly.md"),
         ),
         quarterly_template_path=_env_path(
             "QUARTERLY_TEMPLATE_PATH",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/templates/quarterly.md",
+            os.path.join(templates_dir, "quarterly.md"),
         ),
         yearly_template_path=_env_path(
             "YEARLY_TEMPLATE_PATH",
-            "/Users/edo/Documents/Obsidian/the-vault/notes/templates/yearly.md",
+            os.path.join(templates_dir, "yearly.md"),
         ),
         reminders_path=_env_path(
             "REMINDERS_PATH",
@@ -121,15 +137,15 @@ def _build_paths() -> PathConfig:
         ),
         flow_db_path=_env_path(
             "FLOW_DB_PATH",
-            "/Users/edo/Library/Containers/design.yugen.Flow/Data/Library/Application Support/Flow/CoreData.sqlite",
+            os.path.join(flow_container_root, "CoreData.sqlite"),
         ),
         icloud_shortcuts_dir=_env_path(
             "ICLOUD_SHORTCUTS_DIR",
-            "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents",
+            shortcuts_documents_dir,
         ),
         icloud_journalsync_dir=_env_path(
             "ICLOUD_JOURNALSYNC_DIR",
-            "/Users/edo/Library/Mobile Documents/iCloud~is~workflow~my~workflows/Documents/JournalSync",
+            os.path.join(shortcuts_documents_dir, "JournalSync"),
         ),
     )
 

@@ -91,8 +91,7 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
 
     if header_idx == -1:
         raise ValueError(
-            f"{path} must contain a markdown table header: "
-            "| SCHEDULE | BODY |"
+            f"{path} must contain a markdown table header: | SCHEDULE | BODY |"
         )
 
     divider_idx = header_idx + 1

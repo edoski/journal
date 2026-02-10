@@ -1218,8 +1218,9 @@ def build_yearly_metrics(
         study_counts.append((done, elapsed_days, start))
         bar = compress_days_time_order(
             days,
-            lambda d: (daily_data.get(d, {}).get("study_minutes") or 0)
-            >= STUDY_TARGET_MIN,
+            lambda d: (
+                (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
+            ),
             YEARLY_STUDY_BAR_WIDTH,
             allow_partial=True,
             fill_char=RENDER.study_symbol_deep,

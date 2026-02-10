@@ -268,6 +268,27 @@ Primary env overrides:
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
 
+## Runtime Configuration
+
+Path resolution precedence:
+
+1. `EnvironmentVariables` in LaunchAgent plists (canonical for scheduled runs).
+2. Process env vars from the invoking shell (interactive terminal runs).
+3. Defaults in `sync/config.py` (home/vault-derived fallbacks).
+
+Operational guidance:
+
+- Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.flow-skip.plist`.
+- Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
+- Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
+
+Move checklist (repo relocation):
+
+- Move repo to new location and recreate `.venv` in the new root.
+- Update both LaunchAgent `ProgramArguments`/`WorkingDirectory` paths.
+- Confirm `EnvironmentVariables` in both LaunchAgents still point to valid external resources.
+- Reload both LaunchAgents with `launchctl unload/load`.
+
 ## Data and Cache Files
 
 - carried-goals cache: `~/.cache/journal/goals/carry_forward.json`
