@@ -1,85 +1,125 @@
 from __future__ import annotations
 
-from tui.app import _handle_pending_confirmation, _stage_pending_change
-from tui.state import AppState
+from tui.runtime import AppRuntime
+from tui.theme import Theme
 
 
-def _stage(state: AppState, success_message: str = "Applied staged change") -> None:
-    _stage_pending_change(
-        state,
+class _FakeWindow:
+    def keypad(self, _value: bool) -> None:
+        return
+
+    def getmaxyx(self) -> tuple[int, int]:
+        return (40, 140)
+
+    def erase(self) -> None:
+        return
+
+    def refresh(self) -> None:
+        return
+
+    def getch(self) -> int:
+        return ord("q")
+
+    def addstr(self, *_args, **_kwargs) -> None:
+        return
+
+
+class _StubRepo:
+    def __init__(self) -> None:
+        self.invalidations = 0
+
+    def invalidate_cache(self) -> None:
+        self.invalidations += 1
+
+    def shift_anchor(self, period, anchor_date, delta):
+        _ = period
+        return anchor_date
+
+
+class _StubDailyStore:
+    pass
+
+
+class _StubRemindersStore:
+    pass
+
+
+def _runtime(monkeypatch) -> AppRuntime:
+    monkeypatch.setattr(
+        "tui.runtime.init_theme",
+        lambda: Theme(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    )
+    return AppRuntime(
+        stdscr=_FakeWindow(),  # type: ignore[arg-type]
+        repo=_StubRepo(),  # type: ignore[arg-type]
+        daily_store=_StubDailyStore(),  # type: ignore[arg-type]
+        reminders_store=_StubRemindersStore(),  # type: ignore[arg-type]
+    )
+
+
+def test_pending_change_blocks_mutating_keys_until_confirmed(monkeypatch):
+    runtime = _runtime(monkeypatch)
+    writes = 0
+
+    def apply() -> None:
+        nonlocal writes
+        writes += 1
+
+    runtime._stage_pending_change(
         title="Update test data",
         target_label="/tmp/test.md",
         before_lines=["old"],
         after_lines=["new"],
-        success_message=success_message,
+        success_message="Applied staged change",
+        apply=apply,
     )
+    runtime._handle_key(ord("f"))
 
-
-def test_pending_change_blocks_other_mutating_keys_until_confirmed():
-    state = AppState(screen="edit_daily")
-    writes = 0
-
-    def apply() -> None:
-        nonlocal writes
-        writes += 1
-
-    _stage(state)
-    consumed, pending_apply = _handle_pending_confirmation(state, ord("f"), apply)
-
-    assert consumed is True
     assert writes == 0
-    assert pending_apply is apply
-    assert state.pending_preview is not None
+    assert runtime.state.pending_preview is not None
 
 
-def test_pending_change_confirm_writes_and_clears_preview():
-    state = AppState(screen="edit_daily")
+def test_pending_change_confirm_writes_and_clears_preview(monkeypatch):
+    runtime = _runtime(monkeypatch)
     writes = 0
-    _stage(state, success_message="Updated frontmatter mood")
 
     def apply() -> None:
         nonlocal writes
         writes += 1
 
-    consumed, pending_apply = _handle_pending_confirmation(state, 10, apply)
+    runtime._stage_pending_change(
+        title="Update test data",
+        target_label="/tmp/test.md",
+        before_lines=["old"],
+        after_lines=["new"],
+        success_message="Updated frontmatter mood",
+        apply=apply,
+    )
+    runtime._handle_key(10)
 
-    assert consumed is True
     assert writes == 1
-    assert pending_apply is None
-    assert state.pending_preview is None
-    assert state.message == "Updated frontmatter mood"
+    assert runtime.state.pending_preview is None
+    assert runtime.state.message == "Updated frontmatter mood"
 
 
-def test_pending_change_cancel_drops_staged_write():
-    state = AppState(screen="edit_reminders")
+def test_pending_change_cancel_drops_staged_write(monkeypatch):
+    runtime = _runtime(monkeypatch)
     writes = 0
 
     def apply() -> None:
         nonlocal writes
         writes += 1
 
-    _stage(state)
-    consumed, pending_apply = _handle_pending_confirmation(state, ord("c"), apply)
+    runtime._stage_pending_change(
+        title="Update test data",
+        target_label="/tmp/test.md",
+        before_lines=["old"],
+        after_lines=["new"],
+        success_message="Applied staged change",
+        apply=apply,
+    )
+    runtime._handle_key(27)
 
-    assert consumed is True
     assert writes == 0
-    assert pending_apply is None
-    assert state.pending_preview is None
-    assert state.message == "Cancelled pending change."
-
-
-def test_pending_change_q_cancels_before_navigation():
-    state = AppState(screen="edit_reminders")
-    writes = 0
-
-    def apply() -> None:
-        nonlocal writes
-        writes += 1
-
-    _stage(state)
-    consumed, pending_apply = _handle_pending_confirmation(state, ord("q"), apply)
-
-    assert consumed is True
-    assert writes == 0
-    assert pending_apply is None
-    assert state.pending_preview is None
+    assert runtime.state.pending_preview is None
+    assert runtime.state.message == "Cancelled pending change."

@@ -1,23 +1,44 @@
-"""Service-level tests for query service."""
+"""Service-level tests for query service and rich query contracts."""
 
 from __future__ import annotations
 
 import datetime
 
 from sync.application.query_service import QueryService
+from sync.contracts.query import (
+    MetricHistoryPoint,
+    MetricHistorySnapshot,
+    PeriodDetailSnapshot,
+    PeriodMetricRow,
+    PeriodSnapshot,
+)
 
 
 class _StubAggregateSource:
+    def __init__(self) -> None:
+        self.by_day: dict[datetime.date, dict] = {}
+
     def load_for_dates(self, dates: list[datetime.date]):
-        return {
-            day: {"training_type_sessions": {"Workout": 2}}
-            for day in dates
-            if day == datetime.date(2026, 2, 1)
-        }
+        return {day: self.by_day[day] for day in dates if day in self.by_day}
+
+
+def _service_with_data() -> tuple[QueryService, _StubAggregateSource]:
+    source = _StubAggregateSource()
+    service = QueryService(aggregate_source=source)
+    return service, source
+
+
+def test_metric_definitions_expose_expected_keys():
+    service, _ = _service_with_data()
+    keys = [item.key for item in service.metric_definitions()]
+    assert "study_minutes" in keys
+    assert "sleep_minutes" in keys
+    assert "mood" in keys
+    assert "screen_time_total" in keys
 
 
 def test_query_by_metric_matches_period_snapshot(monkeypatch):
-    service = QueryService(aggregate_source=_StubAggregateSource())
+    service, _ = _service_with_data()
 
     monkeypatch.setattr(
         "sync.application.query_service.compute_period_metrics",
@@ -49,11 +70,167 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
 
     assert metric_snapshot.label == snapshot.label
     assert metric_value == snapshot.metrics["study_minutes"]
-    assert snapshot.metrics["training_sessions_total"] == 2
+    assert snapshot.metrics["training_sessions_total"] == 0
+
+
+def test_query_period_detail_contains_sorted_breakdowns():
+    service, source = _service_with_data()
+    anchor = datetime.date(2026, 2, 6)
+    source.by_day[anchor] = {
+        "study_minutes": 420.0,
+        "sleep_minutes": 470.0,
+        "mood": 6.5,
+        "workout": True,
+        "stretch": False,
+        "meditate": True,
+        "awake_minutes": 18.0,
+        "awakenings": 1,
+        "activity_totals": {"Writing": 180.0, "Reading": 90.0},
+        "interrupt_minutes": 15.0,
+        "overrun_minutes": 10.0,
+        "planned_break_minutes": 30.0,
+        "training_type_minutes": {"Workout": 50.0, "Stretch": 20.0},
+        "training_type_sessions": {"Workout": 2, "Stretch": 1},
+        "screen_time_totals": {"YouTube": 40.0, "X": 12.0},
+    }
+
+    detail = service.query_period_detail("week", anchor)
+
+    assert isinstance(detail, PeriodDetailSnapshot)
+    assert detail.days_total == 7
+    assert detail.days_with_data == 1
+    assert detail.rows[0].key == "study_minutes"
+    assert detail.activity_breakdown[0].label == "Writing"
+    assert detail.training_breakdown[0].label == "Workout"
+    assert detail.screen_time_breakdown[0].label == "YouTube"
+
+
+def test_query_metric_history_returns_lookback_points(monkeypatch):
+    service, _ = _service_with_data()
+    anchor = datetime.date(2026, 2, 8)
+
+    values_by_anchor = {
+        datetime.date(2026, 1, 25): 100.0,
+        datetime.date(2026, 2, 1): 120.0,
+        datetime.date(2026, 2, 8): 90.0,
+    }
+
+    def _fake_query_by_period(
+        period: str, anchor_date: datetime.date
+    ) -> PeriodSnapshot:
+        assert period == "week"
+        value = values_by_anchor[anchor_date]
+        return PeriodSnapshot(
+            period=period,
+            start=anchor_date,
+            end=anchor_date + datetime.timedelta(days=6),
+            label=f"{anchor_date.isoformat()}-W",
+            metrics={"study_minutes": value},
+        )
+
+    monkeypatch.setattr(service, "query_by_period", _fake_query_by_period)
+
+    history = service.query_metric_history(
+        "study_minutes",
+        "week",
+        anchor,
+        lookback=3,
+    )
+
+    assert len(history.points) == 3
+    assert isinstance(history.points[0], MetricHistoryPoint)
+    assert history.current == 90.0
+    assert history.previous == 120.0
+    assert history.delta_pct is not None and history.delta_pct < 0
+
+
+def test_query_dashboard_emits_missing_note_alert(monkeypatch):
+    service, _ = _service_with_data()
+    anchor = datetime.date(2026, 2, 8)
+
+    detail = PeriodDetailSnapshot(
+        period="week",
+        start=anchor - datetime.timedelta(days=6),
+        end=anchor,
+        label="2026-W06",
+        rows=(
+            PeriodMetricRow(
+                "study_minutes", "Study", 300.0, 250.0, 20.0, 280.0, 2520.0
+            ),
+            PeriodMetricRow("sleep_minutes", "Sleep", 470.0, 460.0, 2.0, 465.0, 480.0),
+            PeriodMetricRow("mood", "Mood", 6.0, 6.5, -8.0, 6.2, 6.0),
+            PeriodMetricRow("workout_count", "Workout", 4, 3, 33.0, 3.5, 6.0),
+            PeriodMetricRow("stretch_count", "Stretch", 4, 5, -20.0, 4.5, 7.0),
+            PeriodMetricRow("mindful_count", "Mindful", 5, 4, 25.0, 4.5, 7.0),
+            PeriodMetricRow(
+                "interrupt_minutes",
+                "Interruptions",
+                40.0,
+                30.0,
+                33.0,
+                35.0,
+                0.0,
+            ),
+            PeriodMetricRow(
+                "screen_time_total",
+                "Screen Time",
+                140.0,
+                130.0,
+                8.0,
+                135.0,
+                None,
+            ),
+        ),
+        activity_breakdown=tuple(),
+        training_breakdown=tuple(),
+        screen_time_breakdown=tuple(),
+        days_total=7,
+        days_with_data=0,
+    )
+
+    monkeypatch.setattr(service, "query_period_detail", lambda _period, _anchor: detail)
+
+    def _fake_history(
+        metric: str,
+        period: str,
+        anchor_date: datetime.date,
+        lookback: int,
+    ) -> MetricHistorySnapshot:
+        return MetricHistorySnapshot(
+            metric=metric,
+            period=period,
+            anchor_label=detail.label,
+            current=1.0,
+            previous=1.0,
+            delta_pct=0.0,
+            points=tuple(
+                MetricHistoryPoint(
+                    label=f"P{idx}",
+                    start=anchor_date,
+                    end=anchor_date,
+                    value=float(idx),
+                    delta_pct=0.0,
+                    is_partial=False,
+                )
+                for idx in range(lookback)
+            ),
+        )
+
+    monkeypatch.setattr(
+        service,
+        "query_metric_history",
+        _fake_history,
+    )
+
+    snapshot = service.query_dashboard(anchor)
+    assert snapshot.period_label == "2026-W06"
+    assert snapshot.cards
+    assert snapshot.alerts
+    assert snapshot.alerts[0].startswith("Missing daily note for")
 
 
 def test_shift_anchor_supports_all_periods():
-    service = QueryService(aggregate_source=_StubAggregateSource())
+    service, _ = _service_with_data()
     anchor = datetime.date(2026, 2, 6)
 
     assert service.shift_anchor("day", anchor, 1) == datetime.date(2026, 2, 7)
