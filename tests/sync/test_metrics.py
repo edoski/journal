@@ -290,7 +290,7 @@ class TestAggregateTrainingTypeSessionStats:
 
         assert by_type["Meditation"]["target"] == 7
         assert by_type["Stretching"]["target"] == 7
-        assert by_type["Traditional Strength Training"]["target"] == 6
+        assert by_type["Traditional Strength Training"]["target"] == 7
 
     def test_scales_targets_with_period_days(self):
         dates = [
@@ -306,8 +306,8 @@ class TestAggregateTrainingTypeSessionStats:
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
         assert len(rows) == 1
-        # round(6 * 31 / 7) = 27
-        assert rows[0]["target"] == 27
+        # round(7 * 31 / 7) = 31
+        assert rows[0]["target"] == 31
 
     def test_sorts_by_average_desc_then_sessions(self):
         dates = [

@@ -117,7 +117,7 @@ class TestRenderTrainingTypeSessionsTable:
             {
                 "type": "Traditional Strength Training",
                 "sessions": 2,
-                "target": 6,
+                "target": 7,
                 "average_minutes": 58.0,
             },
             {
@@ -133,7 +133,7 @@ class TestRenderTrainingTypeSessionsTable:
         assert result[0] == "| TYPE | SESSIONS | AVERAGE |"
         assert result[1] == "| ---- | -------- | ------- |"
         assert (
-            result[2] == "| **Traditional Strength Training** | `2/6` | `58m/session` |"
+            result[2] == "| **Traditional Strength Training** | `2/7` | `58m/session` |"
         )
         assert result[3] == "| **Stretching** | `4/7` | `17m/session` |"
 
