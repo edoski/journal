@@ -54,11 +54,12 @@ def main(argv: list[str] | None = None) -> None:
     reconcile_cache_store = JsonGoalReconcileCacheStore()
     training_cache_store = JsonDailyTrainingCacheStore()
     screen_time_cache_store = JsonDailyScreenTimeCacheStore()
+    status_source = ICloudDailyStatusSource(
+        screen_time_cache_store=screen_time_cache_store
+    )
     service = DailySyncService(
         note_store=note_store,
-        status_source=ICloudDailyStatusSource(
-            screen_time_cache_store=screen_time_cache_store
-        ),
+        status_source=status_source,
         context_source=VaultContextSource(),
         reminder_store=MarkdownReminderRuleStore(),
         goal_sync_service=GoalSyncService(
@@ -69,12 +70,16 @@ def main(argv: list[str] | None = None) -> None:
         ),
         training_cache_store=training_cache_store,
     )
-    sessions = session_source.load_sessions(day)
+    target_days = status_source.target_days(day)
+    run_days = sorted(d for d in target_days if d != day)
+    run_days.append(day)
     try:
-        changed = service.sync_day(day, sessions)
-        if changed is False:
-            # Suppress noisy success logs on no-op runs.
-            pass
+        for run_day in run_days:
+            sessions = session_source.load_sessions(run_day)
+            changed = service.sync_day(run_day, sessions)
+            if changed is False:
+                # Suppress noisy success logs on no-op runs.
+                continue
     except Exception:
         logger.exception("Daily sync failed")
         raise

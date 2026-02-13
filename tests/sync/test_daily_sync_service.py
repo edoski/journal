@@ -15,6 +15,9 @@ from sync.models.status import CanonicalTrainingStatus
 
 
 class _StubStatusSource:
+    def target_days(self, anchor_day: datetime.date) -> tuple[datetime.date, ...]:
+        return (anchor_day,)
+
     def load_training(self, _day: datetime.date) -> CanonicalTrainingStatus:
         return CanonicalTrainingStatus()
 

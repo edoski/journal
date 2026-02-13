@@ -184,7 +184,7 @@ def load_screen_time_data(
     and caches the result for persistence across sync runs.
 
     Args:
-        today_str: Date string (YYYY-MM-DD) to validate against JSON date
+        today_str: Date string (YYYY-MM-DD) to load/update cache for
 
     Returns:
         DailyScreenTimeData with merged entries, or None if no data at all
@@ -195,14 +195,12 @@ def load_screen_time_data(
     if activity_payload is not None:
         # Shortcut ran and provided data (even if empty)
         shortcut_ran = True
-        json_date = activity_payload.date
-        if not json_date or json_date == today_str:
-            ipad_apps = parse_activity_field(activity_payload.activity_ipad)
-            iphone_apps = parse_activity_field(activity_payload.activity_iphone)
-            for app, minutes in ipad_apps.items():
-                new_entries[app] = new_entries.get(app, 0) + minutes
-            for app, minutes in iphone_apps.items():
-                new_entries[app] = new_entries.get(app, 0) + minutes
+        ipad_apps = parse_activity_field(activity_payload.activity_ipad)
+        iphone_apps = parse_activity_field(activity_payload.activity_iphone)
+        for app, minutes in ipad_apps.items():
+            new_entries[app] = new_entries.get(app, 0) + minutes
+        for app, minutes in iphone_apps.items():
+            new_entries[app] = new_entries.get(app, 0) + minutes
 
     # Load cached entries
     cache_entries = _load_screen_time_cache(today_str, screen_time_cache_store)
