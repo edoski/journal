@@ -42,3 +42,35 @@ def test_reminders_store_add_and_delete(tmp_path):
         not (rule.schedule_kind == "WEEKLY_ODD" and rule.body == "Restart MacBook")
         for rule in deleted
     )
+
+
+def test_reminders_store_preview_add_and_delete(tmp_path):
+    reminders_path = tmp_path / "REMINDERS.md"
+    _write_rules(reminders_path)
+    store = RemindersStore(rule_store=MarkdownReminderRuleStore(str(reminders_path)))
+
+    candidate = ReminderRule(
+        schedule_kind="WEEKLY_EVEN",
+        schedule_value="SUN",
+        body="Rotate workspace setup",
+    )
+
+    before_text = reminders_path.read_text(encoding="utf-8")
+    before_add, after_add, updated_rules = store.preview_add(candidate)
+    assert reminders_path.read_text(encoding="utf-8") == before_text
+    assert "| WEEKLY_EVEN:SUN | Rotate workspace setup |" not in "\n".join(before_add)
+    assert "| WEEKLY_EVEN:SUN | Rotate workspace setup |" in "\n".join(after_add)
+
+    store.save(updated_rules)
+    assert "| WEEKLY_EVEN:SUN | Rotate workspace setup |" in reminders_path.read_text(
+        encoding="utf-8"
+    )
+
+    before_delete, after_delete, deleted_rules = store.preview_delete(candidate)
+    assert "| WEEKLY_EVEN:SUN | Rotate workspace setup |" in "\n".join(before_delete)
+    assert "| WEEKLY_EVEN:SUN | Rotate workspace setup |" not in "\n".join(after_delete)
+    store.save(deleted_rules)
+    assert (
+        "| WEEKLY_EVEN:SUN | Rotate workspace setup |"
+        not in reminders_path.read_text(encoding="utf-8")
+    )

@@ -31,6 +31,16 @@ PERIOD_KEYS: list[PeriodKey] = ["day", "week", "month", "quarter", "year"]
 
 
 @dataclass
+class PendingPreview:
+    """Pending change preview shown before interactive writes are confirmed."""
+
+    title: str
+    target_label: str
+    diff_lines: list[str]
+    success_message: str
+
+
+@dataclass
 class AppState:
     """Runtime state for TUI screens and query controls."""
 
@@ -40,6 +50,7 @@ class AppState:
     metric: str = "study_minutes"
     selected_index: int = 0
     message: str = ""
+    pending_preview: PendingPreview | None = None
 
     def pivot(self) -> None:
         """Switch between period and metric explorers."""

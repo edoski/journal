@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import curses
 import datetime
-from typing import cast
+from typing import Callable, cast
 
 from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
 from sync.adapters.markdown_notes import MarkdownNoteStore
@@ -16,7 +16,7 @@ from tui.data.daily_store import DailyStore
 from tui.data.reminders_store import RemindersStore
 from tui.data.repository import QueryRepository
 from tui.keymap import is_back, is_enter, is_pivot
-from tui.state import AppState
+from tui.state import AppState, PendingPreview
 from tui.views import (
     editor_daily,
     editor_reminders,
@@ -24,6 +24,10 @@ from tui.views import (
     explorer_period,
     main_menu,
 )
+from tui.views.preview import build_unified_diff
+
+PendingApply = Callable[[], None]
+_WEEKDAYS = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
 
 
 def _prompt(stdscr: curses.window, prompt: str) -> str:
@@ -45,21 +49,100 @@ def _prompt(stdscr: curses.window, prompt: str) -> str:
 
 
 def _parse_schedule_input(schedule: str) -> tuple[str, str]:
+    """Parse and validate reminder schedule input from interactive prompts."""
     kind, sep, value = schedule.partition(":")
     if not sep:
         raise ValueError("SCHEDULE must be KIND:VALUE")
+
     kind = kind.strip().upper()
     value = value.strip().upper()
-    allowed = {
-        "WEEKLY",
-        "MONTHLY",
-        "YEARLY",
-        "BIWEEKLY_ODD_ISO",
-        "BIWEEKLY_EVEN_ISO",
-    }
-    if kind not in allowed:
-        raise ValueError(f"Unsupported schedule kind: {kind}")
-    return kind, value
+
+    if kind in {"WEEKLY", "WEEKLY_ODD", "WEEKLY_EVEN"}:
+        if value not in _WEEKDAYS:
+            raise ValueError(f"Unsupported weekday for {kind}: {value}")
+        return kind, value
+
+    if kind == "MONTHLY":
+        if value != "LAST_DAY":
+            raise ValueError("MONTHLY schedule must be MONTHLY:LAST_DAY")
+        return kind, value
+
+    if kind == "YEARLY":
+        parts = value.split("-", maxsplit=1)
+        if len(parts) != 2 or len(parts[0]) != 2 or len(parts[1]) != 2:
+            raise ValueError("YEARLY schedule must be YEARLY:MM-DD")
+        if not parts[0].isdigit() or not parts[1].isdigit():
+            raise ValueError("YEARLY schedule must be YEARLY:MM-DD")
+        month, day = int(parts[0]), int(parts[1])
+        try:
+            datetime.date(2000, month, day)
+        except ValueError as exc:
+            raise ValueError(f"Invalid YEARLY schedule date: {value}") from exc
+        return kind, value
+
+    raise ValueError(f"Unsupported schedule kind: {kind}")
+
+
+def _stage_pending_change(
+    state: AppState,
+    *,
+    title: str,
+    target_label: str,
+    before_lines: list[str],
+    after_lines: list[str],
+    success_message: str,
+) -> None:
+    """Store a pending change preview that requires user confirmation."""
+    diff_lines = build_unified_diff(
+        before_lines,
+        after_lines,
+        from_label=f"{target_label} (before)",
+        to_label=f"{target_label} (after)",
+    )
+    state.pending_preview = PendingPreview(
+        title=title,
+        target_label=target_label,
+        diff_lines=diff_lines,
+        success_message=success_message,
+    )
+    state.message = "Review expected changes. Press Enter/y to confirm or c to cancel."
+
+
+def _handle_pending_confirmation(
+    state: AppState,
+    ch: int,
+    pending_apply: PendingApply | None,
+) -> tuple[bool, PendingApply | None]:
+    """
+    Handle confirm/cancel keys while a preview is staged.
+
+    Returns (consumed, pending_apply).
+    """
+    if state.pending_preview is None:
+        return False, pending_apply
+
+    if is_enter(ch) or ch in {ord("y"), ord("Y")}:
+        if pending_apply is None:
+            state.pending_preview = None
+            state.message = "No pending action to apply."
+            return True, None
+        try:
+            pending_apply()
+        except Exception as exc:
+            state.message = f"Error: {exc}"
+            return True, pending_apply
+        success_message = state.pending_preview.success_message
+        state.pending_preview = None
+        state.message = success_message
+        return True, None
+
+    if ch in {ord("c"), ord("C")} or is_back(ch):
+        state.pending_preview = None
+        state.message = "Cancelled pending change."
+        return True, None
+
+    # Freeze edit controls while waiting for explicit confirm/cancel.
+    return True, pending_apply
 
 
 def _handle_main_menu(state: AppState, ch: int) -> bool:
@@ -73,6 +156,7 @@ def _handle_main_menu(state: AppState, ch: int) -> bool:
             return True
         state.screen = target  # type: ignore[assignment]
         state.selected_index = 0
+        state.pending_preview = None
         state.message = ""
     return False
 
@@ -82,6 +166,7 @@ def _main(stdscr: curses.window) -> None:
     stdscr.keypad(True)
 
     state = AppState()
+    pending_apply: PendingApply | None = None
     query_service = QueryService(aggregate_source=MarkdownDailyAggregateSource())
     repo = QueryRepository(query_service)
     daily_store = DailyStore(note_store=MarkdownNoteStore())
@@ -108,7 +193,12 @@ def _main(stdscr: curses.window) -> None:
                 stdscr.addstr(10, 2, state.message, curses.A_BOLD)
 
         elif state.screen == "edit_daily":
-            editor_daily.render(stdscr, state.anchor_date, state.message)
+            editor_daily.render(
+                stdscr,
+                state.anchor_date,
+                state.message,
+                state.pending_preview,
+            )
 
         elif state.screen == "edit_reminders":
             try:
@@ -120,7 +210,11 @@ def _main(stdscr: curses.window) -> None:
                 else:
                     state.selected_index = 0
                 editor_reminders.render(
-                    stdscr, rules, state.selected_index, state.message
+                    stdscr,
+                    rules,
+                    state.selected_index,
+                    state.message,
+                    state.pending_preview,
                 )
             except Exception as exc:
                 stdscr.addstr(1, 2, "Edit REMINDERS.md", curses.A_BOLD)
@@ -135,8 +229,19 @@ def _main(stdscr: curses.window) -> None:
                 break
             continue
 
+        if state.screen in {"edit_daily", "edit_reminders"}:
+            consumed, pending_apply = _handle_pending_confirmation(
+                state,
+                ch,
+                pending_apply,
+            )
+            if consumed:
+                continue
+
         if is_back(ch):
             state.screen = "menu"
+            state.pending_preview = None
+            pending_apply = None
             state.message = ""
             continue
 
@@ -152,11 +257,15 @@ def _main(stdscr: curses.window) -> None:
                 state.cycle_period(1)
             elif ch == ord("n"):
                 state.anchor_date = repo.shift_anchor(
-                    state.period, state.anchor_date, 1
+                    state.period,
+                    state.anchor_date,
+                    1,
                 )
             elif ch == ord("p"):
                 state.anchor_date = repo.shift_anchor(
-                    state.period, state.anchor_date, -1
+                    state.period,
+                    state.anchor_date,
+                    -1,
                 )
             continue
 
@@ -171,11 +280,15 @@ def _main(stdscr: curses.window) -> None:
                 state.cycle_period(1)
             elif ch == ord("n"):
                 state.anchor_date = repo.shift_anchor(
-                    state.period, state.anchor_date, 1
+                    state.period,
+                    state.anchor_date,
+                    1,
                 )
             elif ch == ord("p"):
                 state.anchor_date = repo.shift_anchor(
-                    state.period, state.anchor_date, -1
+                    state.period,
+                    state.anchor_date,
+                    -1,
                 )
             continue
 
@@ -183,28 +296,88 @@ def _main(stdscr: curses.window) -> None:
             try:
                 if ch == ord("n"):
                     state.anchor_date = state.anchor_date + datetime.timedelta(days=1)
+                    state.message = ""
                 elif ch == ord("p"):
                     state.anchor_date = state.anchor_date - datetime.timedelta(days=1)
+                    state.message = ""
                 elif ch == ord("f"):
                     key = _prompt(stdscr, "frontmatter key: ")
                     value = _prompt(stdscr, "value: ")
-                    daily_store.update_frontmatter(state.anchor_date, key, value)
-                    state.message = f"Updated frontmatter {key}"
+                    note_date = state.anchor_date
+                    path, before, after = daily_store.preview_frontmatter_update(
+                        note_date,
+                        key,
+                        value,
+                    )
+                    _stage_pending_change(
+                        state,
+                        title=f"Update frontmatter key '{key}'",
+                        target_label=path,
+                        before_lines=before,
+                        after_lines=after,
+                        success_message=f"Updated frontmatter {key}",
+                    )
+
+                    def _apply_frontmatter(
+                        note_date: datetime.date = note_date,
+                        staged_lines: list[str] = list(after),
+                    ) -> None:
+                        daily_store.save_lines(note_date, list(staged_lines))
+
+                    pending_apply = _apply_frontmatter
                 elif ch == ord("g"):
                     raw = _prompt(stdscr, "DAILY goals (use ';;' to separate lines): ")
                     goals = [part.strip() for part in raw.split(";;") if part.strip()]
-                    daily_store.replace_goals_subsection(
-                        state.anchor_date, "DAILY", goals
+                    note_date = state.anchor_date
+                    path, before, after = daily_store.preview_goals_subsection_replace(
+                        note_date,
+                        "DAILY",
+                        goals,
                     )
-                    state.message = "Updated DAILY goals"
+                    _stage_pending_change(
+                        state,
+                        title="Replace DAILY goals subsection",
+                        target_label=path,
+                        before_lines=before,
+                        after_lines=after,
+                        success_message="Updated DAILY goals",
+                    )
+
+                    def _apply_goals(
+                        note_date: datetime.date = note_date,
+                        staged_lines: list[str] = list(after),
+                    ) -> None:
+                        daily_store.save_lines(note_date, list(staged_lines))
+
+                    pending_apply = _apply_goals
                 elif ch == ord("s"):
                     header = _prompt(stdscr, "Section header (e.g. ### **STUDY**): ")
                     raw = _prompt(stdscr, "Section body lines separated by ';;': ")
                     body_lines = [
                         part.strip() for part in raw.split(";;") if part.strip()
                     ]
-                    daily_store.replace_section(state.anchor_date, header, body_lines)
-                    state.message = f"Updated section {header}"
+                    note_date = state.anchor_date
+                    path, before, after = daily_store.preview_section_replace(
+                        note_date,
+                        header,
+                        body_lines,
+                    )
+                    _stage_pending_change(
+                        state,
+                        title=f"Replace section {header}",
+                        target_label=path,
+                        before_lines=before,
+                        after_lines=after,
+                        success_message=f"Updated section {header}",
+                    )
+
+                    def _apply_section(
+                        note_date: datetime.date = note_date,
+                        staged_lines: list[str] = list(after),
+                    ) -> None:
+                        daily_store.save_lines(note_date, list(staged_lines))
+
+                    pending_apply = _apply_section
             except Exception as exc:
                 state.message = f"Error: {exc}"
             continue
@@ -216,34 +389,57 @@ def _main(stdscr: curses.window) -> None:
                     state.selected_index = (state.selected_index + 1) % len(rules)
                 elif ch in {ord("k"), curses.KEY_UP} and rules:
                     state.selected_index = (state.selected_index - 1) % len(rules)
-                elif ch == ord("t") and rules:
-                    rule = rules[state.selected_index]
-                    reminders_store.toggle(rule.id)
-                    state.message = f"Toggled {rule.id}"
                 elif ch == ord("d") and rules:
                     rule = rules[state.selected_index]
-                    reminders_store.delete(rule.id)
-                    state.selected_index = max(0, state.selected_index - 1)
-                    state.message = f"Deleted {rule.id}"
+                    before, after, updated_rules = reminders_store.preview_delete(rule)
+                    next_index = max(
+                        0, min(state.selected_index, len(updated_rules) - 1)
+                    )
+                    schedule = f"{rule.schedule_kind}:{rule.schedule_value}"
+                    _stage_pending_change(
+                        state,
+                        title=f"Delete reminder '{schedule}'",
+                        target_label="REMINDERS.md",
+                        before_lines=before,
+                        after_lines=after,
+                        success_message=f"Deleted reminder {schedule}",
+                    )
+
+                    def _apply_deleted(
+                        staged_rules: list[ReminderRule] = list(updated_rules),
+                        staged_index: int = next_index,
+                    ) -> None:
+                        reminders_store.save(list(staged_rules))
+                        state.selected_index = staged_index
+
+                    pending_apply = _apply_deleted
                 elif ch == ord("a"):
-                    rule_id = _prompt(stdscr, "ID: ")
-                    enabled_raw = _prompt(stdscr, "enabled (true/false): ")
                     schedule = _prompt(stdscr, "SCHEDULE (KIND:VALUE): ")
                     body = _prompt(stdscr, "BODY: ")
-
-                    enabled = enabled_raw.strip().lower() in {"true", "1", "yes", "y"}
                     kind, value = _parse_schedule_input(schedule)
-
-                    reminders_store.add(
-                        ReminderRule(
-                            id=rule_id,
-                            enabled=enabled,
-                            schedule_kind=cast(ScheduleKind, kind),
-                            schedule_value=value,
-                            body=body,
-                        )
+                    rule = ReminderRule(
+                        schedule_kind=cast(ScheduleKind, kind),
+                        schedule_value=value,
+                        body=body,
                     )
-                    state.message = f"Added {rule_id}"
+                    before, after, updated_rules = reminders_store.preview_add(rule)
+                    schedule_label = f"{kind}:{value}"
+                    _stage_pending_change(
+                        state,
+                        title=f"Add reminder '{schedule_label}'",
+                        target_label="REMINDERS.md",
+                        before_lines=before,
+                        after_lines=after,
+                        success_message=f"Added reminder {schedule_label}",
+                    )
+
+                    def _apply_added(
+                        staged_rules: list[ReminderRule] = list(updated_rules),
+                    ) -> None:
+                        reminders_store.save(list(staged_rules))
+                        state.selected_index = max(0, len(staged_rules) - 1)
+
+                    pending_apply = _apply_added
             except Exception as exc:
                 state.message = f"Error: {exc}"
 
