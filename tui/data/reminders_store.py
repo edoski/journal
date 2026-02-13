@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from sync.goals.reminders import render_reminder_rules_markdown
-from sync.models import ReminderRule, ScheduleKind
+from sync.models import ReminderRule
 from sync.ports.reminders import ReminderRuleStore
 
 
@@ -23,11 +21,7 @@ class RemindersStore:
 
     @staticmethod
     def _is_same_rule(left: ReminderRule, right: ReminderRule) -> bool:
-        return (
-            left.schedule_kind == right.schedule_kind
-            and left.schedule_value == right.schedule_value
-            and left.body == right.body
-        )
+        return left.schedule == right.schedule and left.body == right.body
 
     def preview_add(
         self,
@@ -65,16 +59,8 @@ class RemindersStore:
         self.save(updated)
         return updated
 
-    def delete(
-        self, schedule_kind: str, schedule_value: str, body: str
-    ) -> list[ReminderRule]:
+    def delete(self, rule: ReminderRule) -> list[ReminderRule]:
         """Delete a rule by matching its schedule and body."""
-        _, _, updated = self.preview_delete(
-            ReminderRule(
-                schedule_kind=cast(ScheduleKind, schedule_kind),
-                schedule_value=schedule_value,
-                body=body,
-            )
-        )
+        _, _, updated = self.preview_delete(rule)
         self.save(updated)
         return updated

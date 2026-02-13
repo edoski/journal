@@ -7,6 +7,7 @@ import datetime
 import pytest
 
 from sync.goals.reminders import get_reminders_for_date, load_reminder_rules
+from sync.models.reminders import DailySchedule
 
 
 HEADER = [
@@ -26,6 +27,7 @@ def test_load_reminder_rules_parses_valid_table(tmp_path):
     path = _write_rules(
         tmp_path,
         [
+            "| DAILY | Daily planning |",
             "| WEEKLY:SUN | Review [[2026-W05]] + Goals |",
             "| MONTHLY:LAST_DAY | Review [[2026-02]] + Goals |",
             "| YEARLY:12-31 | Review [[2026]] + Goals |",
@@ -36,10 +38,9 @@ def test_load_reminder_rules_parses_valid_table(tmp_path):
 
     rules = load_reminder_rules(path)
 
-    assert len(rules) == 5
-    assert rules[0].schedule_kind == "WEEKLY"
-    assert rules[0].schedule_value == "SUN"
-    assert rules[0].body == "Review [[2026-W05]] + Goals"
+    assert len(rules) == 6
+    assert rules[0].schedule == DailySchedule()
+    assert rules[0].body == "Daily planning"
 
 
 def test_load_reminder_rules_requires_existing_file(tmp_path):
@@ -65,6 +66,42 @@ def test_load_reminder_rules_invalid_schedule_fails(tmp_path):
     )
 
     with pytest.raises(ValueError, match="invalid weekday"):
+        load_reminder_rules(path)
+
+
+def test_load_reminder_rules_invalid_daily_schedule_fails(tmp_path):
+    path = _write_rules(
+        tmp_path,
+        [
+            "| DAILY:MON | Invalid |",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="DAILY schedule must be DAILY"):
+        load_reminder_rules(path)
+
+
+def test_load_reminder_rules_malformed_yearly_schedule_fails(tmp_path):
+    path = _write_rules(
+        tmp_path,
+        [
+            "| YEARLY:1231 | Invalid |",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="YEARLY schedule must be YEARLY:MM-DD"):
+        load_reminder_rules(path)
+
+
+def test_load_reminder_rules_impossible_yearly_schedule_fails(tmp_path):
+    path = _write_rules(
+        tmp_path,
+        [
+            "| YEARLY:02-30 | Invalid |",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="invalid YEARLY date"):
         load_reminder_rules(path)
 
 
@@ -97,6 +134,7 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     path = _write_rules(
         tmp_path,
         [
+            "| DAILY | Daily planning |",
             "| WEEKLY:SUN | Weekly Checkpoint |",
             "| MONTHLY:LAST_DAY | Monthly Review |",
             "| YEARLY:12-31 | Yearly Review |",
@@ -110,6 +148,7 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     reminders = get_reminders_for_date(sunday_odd, rules)
     bodies = {r.body for r in reminders}
 
+    assert "Daily planning" in bodies
     assert "Weekly Checkpoint" in bodies
     assert "Restart MacBook" in bodies
     assert "Vacuum room" not in bodies
@@ -151,12 +190,16 @@ def test_get_reminders_for_date_renders_body_tokens(tmp_path):
     path = _write_rules(
         tmp_path,
         [
+            "| DAILY | Plan {{date}} |",
             "| WEEKLY:SUN | Review [[{{iso_week}}]] + Goals |",
             "| MONTHLY:LAST_DAY | Review [[{{month}}]] + Goals |",
             "| YEARLY:12-31 | Review [[{{year}}]] + Goals |",
         ],
     )
     rules = load_reminder_rules(path)
+
+    daily = get_reminders_for_date(datetime.date(2026, 2, 1), rules)
+    assert any(r.body == "Plan 2026-02-01" for r in daily)
 
     weekly = get_reminders_for_date(datetime.date(2026, 2, 1), rules)
     assert any(r.body == "Review [[2026-W05]] + Goals" for r in weekly)

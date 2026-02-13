@@ -6,7 +6,7 @@ import curses
 import datetime
 from typing import cast
 
-from sync.models import ReminderRule, ScheduleKind
+from sync.models import ReminderRule, ReminderSchedule, format_schedule, parse_schedule
 from tui.commands import Command, default_commands, filter_commands
 from tui.data.daily_store import DailyStore
 from tui.data.reminders_store import RemindersStore
@@ -47,7 +47,6 @@ _ROUTE_LABELS = {
     "reminders": "Reminders",
     "help": "Help",
 }
-_WEEKDAYS = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"}
 
 
 class AppRuntime:
@@ -519,7 +518,7 @@ class AppRuntime:
             self.state.modal = FormModal(
                 mode="reminders_add",
                 title="Add Reminder",
-                fields=[FormField("Schedule (KIND:VALUE)"), FormField("Body")],
+                fields=[FormField("Schedule (DAILY or KIND:VALUE)"), FormField("Body")],
             )
             return
         if action == "reminders_delete":
@@ -648,14 +647,13 @@ class AppRuntime:
             if modal.mode == "reminders_add":
                 schedule = modal.fields[0].value.strip()
                 body = modal.fields[1].value.strip()
-                kind, value = self._parse_schedule_input(schedule)
+                parsed_schedule = self._parse_schedule_input(schedule)
                 rule = ReminderRule(
-                    schedule_kind=cast(ScheduleKind, kind),
-                    schedule_value=value,
+                    schedule=parsed_schedule,
                     body=body,
                 )
                 before, after, updated_rules = self.reminders_store.preview_add(rule)
-                label = f"{kind}:{value}"
+                label = format_schedule(parsed_schedule)
                 self._stage_pending_change(
                     title=f"Add reminder '{label}'",
                     target_label="REMINDERS.md",
@@ -758,34 +756,8 @@ class AppRuntime:
             self.state.pending_apply = None
             self.state.message = "Cancelled pending change."
 
-    def _parse_schedule_input(self, schedule: str) -> tuple[str, str]:
-        kind, sep, value = schedule.partition(":")
-        if not sep:
-            raise ValueError("SCHEDULE must be KIND:VALUE")
-        kind = kind.strip().upper()
-        value = value.strip().upper()
-        if kind in {"WEEKLY", "WEEKLY_ODD", "WEEKLY_EVEN"}:
-            if value not in _WEEKDAYS:
-                raise ValueError(f"Unsupported weekday for {kind}: {value}")
-            return kind, value
-        if kind == "MONTHLY":
-            if value != "LAST_DAY":
-                raise ValueError("MONTHLY schedule must be MONTHLY:LAST_DAY")
-            return kind, value
-        if kind == "YEARLY":
-            parts = value.split("-", maxsplit=1)
-            if len(parts) != 2 or len(parts[0]) != 2 or len(parts[1]) != 2:
-                raise ValueError("YEARLY schedule must be YEARLY:MM-DD")
-            if not parts[0].isdigit() or not parts[1].isdigit():
-                raise ValueError("YEARLY schedule must be YEARLY:MM-DD")
-            month = int(parts[0])
-            day = int(parts[1])
-            try:
-                datetime.date(2000, month, day)
-            except ValueError as exc:
-                raise ValueError(f"Invalid YEARLY schedule date: {value}") from exc
-            return kind, value
-        raise ValueError(f"Unsupported schedule kind: {kind}")
+    def _parse_schedule_input(self, schedule: str) -> ReminderSchedule:
+        return parse_schedule(schedule)
 
     def _load_reminders(self) -> list[ReminderRule]:
         try:
@@ -805,7 +777,7 @@ class AppRuntime:
         idx = max(0, min(self.state.reminders_selected_index, len(filtered) - 1))
         rule = filtered[idx]
         before, after, updated_rules = self.reminders_store.preview_delete(rule)
-        label = f"{rule.schedule_kind}:{rule.schedule_value}"
+        label = format_schedule(rule.schedule)
         self._stage_pending_change(
             title=f"Delete reminder '{label}'",
             target_label="REMINDERS.md",

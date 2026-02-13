@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 import datetime
-import re
 from calendar import monthrange
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from sync.goals.identity import generate_goal_id_for
 from sync.io import atomic_write_note, safe_read_file
-from sync.models.reminders import ReminderRule, ScheduleKind
+from sync.models.reminders import (
+    DailySchedule,
+    MonthlyLastDaySchedule,
+    ReminderRule,
+    WeeklyEvenSchedule,
+    WeeklyOddSchedule,
+    WeeklySchedule,
+    YearlySchedule,
+    format_schedule,
+    parse_schedule,
+)
 
 if TYPE_CHECKING:
     from sync.models.goals import Goal
@@ -31,47 +40,6 @@ def _split_table_cells(line: str) -> list[str]:
     if not stripped.startswith("|") or not stripped.endswith("|"):
         raise ValueError(f"Invalid markdown table row: {line!r}")
     return [cell.strip() for cell in stripped[1:-1].split("|")]
-
-
-def _parse_schedule(schedule: str, *, line_no: int) -> tuple[str, str]:
-    kind, sep, value = schedule.partition(":")
-    if not sep:
-        raise ValueError(
-            f"REMINDERS.md line {line_no}: SCHEDULE must be KIND:VALUE, got {schedule!r}"
-        )
-
-    kind = kind.strip().upper()
-    value = value.strip().upper()
-
-    if kind in {"WEEKLY", "WEEKLY_ODD", "WEEKLY_EVEN"}:
-        if value not in WEEKDAY_INDEX:
-            raise ValueError(
-                f"REMINDERS.md line {line_no}: invalid weekday {value!r} for {kind}"
-            )
-        return kind, value
-
-    if kind == "MONTHLY":
-        if value != "LAST_DAY":
-            raise ValueError(
-                f"REMINDERS.md line {line_no}: MONTHLY schedule must be MONTHLY:LAST_DAY"
-            )
-        return kind, value
-
-    if kind == "YEARLY":
-        if not re.fullmatch(r"\d{2}-\d{2}", value):
-            raise ValueError(
-                f"REMINDERS.md line {line_no}: YEARLY schedule must be YEARLY:MM-DD"
-            )
-        mm, dd = map(int, value.split("-"))
-        try:
-            datetime.date(2000, mm, dd)
-        except ValueError as exc:
-            raise ValueError(
-                f"REMINDERS.md line {line_no}: invalid YEARLY date {value!r}"
-            ) from exc
-        return kind, value
-
-    raise ValueError(f"REMINDERS.md line {line_no}: unsupported schedule kind {kind!r}")
 
 
 def load_reminder_rules(path: str) -> list[ReminderRule]:
@@ -123,10 +91,13 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
                 f"REMINDERS.md line {line_no}: BODY cannot contain '|' in strict table mode"
             )
 
-        schedule_kind, schedule_value = _parse_schedule(schedule_raw, line_no=line_no)
+        try:
+            schedule = parse_schedule(schedule_raw)
+        except ValueError as exc:
+            raise ValueError(f"REMINDERS.md line {line_no}: {exc}") from exc
 
         # Ensure uniqueness based on schedule+body
-        unique_key = f"{schedule_kind}:{schedule_value}|{body}"
+        unique_key = f"{format_schedule(schedule)}|{body}"
         if unique_key in seen_keys:
             raise ValueError(
                 f"REMINDERS.md line {line_no}: duplicate rule (same schedule and body)"
@@ -135,8 +106,7 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
 
         rules.append(
             ReminderRule(
-                schedule_kind=cast(ScheduleKind, schedule_kind),
-                schedule_value=schedule_value,
+                schedule=schedule,
                 body=body,
             )
         )
@@ -145,30 +115,32 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
 
 
 def _is_due_on(rule: ReminderRule, due_date: datetime.date) -> bool:
-    if rule.schedule_kind == "WEEKLY":
-        return due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
+    schedule = rule.schedule
 
-    if rule.schedule_kind == "WEEKLY_ODD":
+    if isinstance(schedule, DailySchedule):
+        return True
+
+    if isinstance(schedule, WeeklySchedule):
+        return due_date.weekday() == WEEKDAY_INDEX[schedule.weekday]
+
+    if isinstance(schedule, WeeklyOddSchedule):
         _, week_num, _ = due_date.isocalendar()
         return (
-            due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
-            and week_num % 2 == 1
+            due_date.weekday() == WEEKDAY_INDEX[schedule.weekday] and week_num % 2 == 1
         )
 
-    if rule.schedule_kind == "WEEKLY_EVEN":
+    if isinstance(schedule, WeeklyEvenSchedule):
         _, week_num, _ = due_date.isocalendar()
         return (
-            due_date.weekday() == WEEKDAY_INDEX[rule.schedule_value]
-            and week_num % 2 == 0
+            due_date.weekday() == WEEKDAY_INDEX[schedule.weekday] and week_num % 2 == 0
         )
 
-    if rule.schedule_kind == "MONTHLY":
+    if isinstance(schedule, MonthlyLastDaySchedule):
         _, last_day = monthrange(due_date.year, due_date.month)
         return due_date.day == last_day
 
-    if rule.schedule_kind == "YEARLY":
-        mm, dd = map(int, rule.schedule_value.split("-"))
-        return due_date.month == mm and due_date.day == dd
+    if isinstance(schedule, YearlySchedule):
+        return due_date.month == schedule.month and due_date.day == schedule.day
 
     return False
 
@@ -193,7 +165,7 @@ def _render_body_template(body: str, due_date: datetime.date) -> str:
 
 def _generate_rule_id(rule: ReminderRule) -> str:
     """Generate a deterministic ID for a reminder rule based on its schedule and body."""
-    schedule = f"{rule.schedule_kind}:{rule.schedule_value}"
+    schedule = format_schedule(rule.schedule)
     return generate_goal_id_for("reminder", schedule, rule.body, 0)
 
 
@@ -241,8 +213,7 @@ def render_reminder_rules_markdown(rules: list[ReminderRule]) -> list[str]:
         "| -------- | ---- |",
     ]
     for rule in rules:
-        schedule = f"{rule.schedule_kind}:{rule.schedule_value}"
-        lines.append(f"| {schedule} | {rule.body} |")
+        lines.append(f"| {format_schedule(rule.schedule)} | {rule.body} |")
     lines.append("")
     return lines
 

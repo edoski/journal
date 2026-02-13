@@ -23,7 +23,19 @@ from .daily import DailyData
 from .period import PeriodMetrics
 from .goals import Goal
 from .media import Book, Podcast
-from .reminders import ReminderRule, ScheduleKind
+from .reminders import (
+    DailySchedule,
+    MonthlyLastDaySchedule,
+    ReminderRule,
+    ReminderSchedule,
+    WeeklyEvenSchedule,
+    WeeklyOddSchedule,
+    WeeklySchedule,
+    Weekday,
+    YearlySchedule,
+    format_schedule,
+    parse_schedule,
+)
 
 __all__ = [
     # Study
@@ -52,8 +64,17 @@ __all__ = [
     # Goals
     "Goal",
     # Reminder rules
+    "DailySchedule",
+    "MonthlyLastDaySchedule",
     "ReminderRule",
-    "ScheduleKind",
+    "ReminderSchedule",
+    "WeeklyEvenSchedule",
+    "WeeklyOddSchedule",
+    "WeeklySchedule",
+    "Weekday",
+    "YearlySchedule",
+    "format_schedule",
+    "parse_schedule",
     # Media
     "Book",
     "Podcast",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import curses
 
-from sync.models import ReminderRule
+from sync.models import ReminderRule, format_schedule
 from tui.layout import Rect
 from tui.state import FormModal, PendingPreview
 from tui.theme import Theme
@@ -19,7 +19,7 @@ def filtered_rules(rules: list[ReminderRule], query: str) -> list[ReminderRule]:
     return [
         rule
         for rule in rules
-        if token in f"{rule.schedule_kind}:{rule.schedule_value}".casefold()
+        if token in format_schedule(rule.schedule).casefold()
         or token in rule.body.casefold()
     ]
 
@@ -70,7 +70,7 @@ def render(
     rows = filtered_rules(rules, filter_query)
     visible = max(0, left_rect.h - 6)
     for idx, rule in enumerate(rows[:visible]):
-        label = f"{rule.schedule_kind}:{rule.schedule_value}"
+        label = format_schedule(rule.schedule)
         attr = theme.nav_active if idx == selected_index else theme.normal
         safe_addstr(
             stdscr,

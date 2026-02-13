@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
-from sync.models.reminders import ReminderRule
+from sync.models.reminders import (
+    DailySchedule,
+    MonthlyLastDaySchedule,
+    ReminderRule,
+    WeeklySchedule,
+)
 
 
 def test_load_raises_when_file_missing(tmp_path):
@@ -19,13 +24,15 @@ def test_save_then_load_round_trip(tmp_path):
     store = MarkdownReminderRuleStore(str(path))
     rules = [
         ReminderRule(
-            schedule_kind="WEEKLY",
-            schedule_value="SUN",
+            schedule=DailySchedule(),
+            body="Plan day",
+        ),
+        ReminderRule(
+            schedule=WeeklySchedule(weekday="SUN"),
             body="Review week",
         ),
         ReminderRule(
-            schedule_kind="MONTHLY",
-            schedule_value="LAST_DAY",
+            schedule=MonthlyLastDaySchedule(),
             body="Close month",
         ),
     ]

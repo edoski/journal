@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
-from sync.models import ReminderRule
+from sync.models import ReminderRule, WeeklyEvenSchedule, WeeklyOddSchedule
 from tui.data.reminders_store import RemindersStore
 
 
@@ -27,19 +27,27 @@ def test_reminders_store_add_and_delete(tmp_path):
 
     added = store.add(
         ReminderRule(
-            schedule_kind="WEEKLY_ODD",
-            schedule_value="SUN",
+            schedule=WeeklyOddSchedule(weekday="SUN"),
             body="Restart MacBook",
         )
     )
     assert any(
-        rule.schedule_kind == "WEEKLY_ODD" and rule.body == "Restart MacBook"
+        rule.schedule == WeeklyOddSchedule(weekday="SUN")
+        and rule.body == "Restart MacBook"
         for rule in added
     )
 
-    deleted = store.delete("WEEKLY_ODD", "SUN", "Restart MacBook")
+    deleted = store.delete(
+        ReminderRule(
+            schedule=WeeklyOddSchedule(weekday="SUN"),
+            body="Restart MacBook",
+        )
+    )
     assert all(
-        not (rule.schedule_kind == "WEEKLY_ODD" and rule.body == "Restart MacBook")
+        not (
+            rule.schedule == WeeklyOddSchedule(weekday="SUN")
+            and rule.body == "Restart MacBook"
+        )
         for rule in deleted
     )
 
@@ -50,8 +58,7 @@ def test_reminders_store_preview_add_and_delete(tmp_path):
     store = RemindersStore(rule_store=MarkdownReminderRuleStore(str(reminders_path)))
 
     candidate = ReminderRule(
-        schedule_kind="WEEKLY_EVEN",
-        schedule_value="SUN",
+        schedule=WeeklyEvenSchedule(weekday="SUN"),
         body="Rotate workspace setup",
     )
 
