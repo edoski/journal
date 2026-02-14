@@ -39,6 +39,8 @@ from sync.periods.windows import (
     build_year_window,
 )
 from sync.ports.daily_aggregates import DailyAggregateSource
+from sync.target_policy import target_for_metric as resolve_target_for_metric
+from sync.target_policy import training_type_target
 
 _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
     MetricDefinition(
@@ -71,7 +73,7 @@ _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         unit="count",
         precision=0,
         higher_is_better=True,
-        target=float(IDEAL.workout_days_weekly),
+        target=float(training_type_target(7, "workout")),
     ),
     MetricDefinition(
         key="stretch_count",
@@ -79,7 +81,7 @@ _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         unit="count",
         precision=0,
         higher_is_better=True,
-        target=float(IDEAL.stretch_days_weekly),
+        target=float(training_type_target(7, "stretch")),
     ),
     MetricDefinition(
         key="mindful_count",
@@ -87,7 +89,7 @@ _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         unit="count",
         precision=0,
         higher_is_better=True,
-        target=float(IDEAL.mindful_days_weekly),
+        target=float(training_type_target(7, "mindful")),
     ),
     MetricDefinition(
         key="interrupt_minutes",
@@ -290,27 +292,6 @@ class QueryService:
                 totals[label] = totals.get(label, 0.0) + amount
         return totals
 
-    @staticmethod
-    def _scaled_count_target(days_total: int, weekly_target: float) -> float:
-        return weekly_target * (float(days_total) / 7.0)
-
-    def _target_for_metric(self, metric: str, days_total: int) -> float | None:
-        if metric == "study_minutes":
-            return float(STUDY_TARGET_MIN * max(1, days_total))
-        if metric == "sleep_minutes":
-            return float(IDEAL.sleep_minutes_nightly)
-        if metric == "mood":
-            return float(IDEAL.mood_target)
-        if metric == "workout_count":
-            return self._scaled_count_target(days_total, IDEAL.workout_days_weekly)
-        if metric == "stretch_count":
-            return self._scaled_count_target(days_total, IDEAL.stretch_days_weekly)
-        if metric == "mindful_count":
-            return self._scaled_count_target(days_total, IDEAL.mindful_days_weekly)
-        if metric in {"interrupt_minutes", "overrun_minutes"}:
-            return 0.0
-        return None
-
     def _build_metrics_map(
         self,
         dates: list[datetime.date],
@@ -424,7 +405,7 @@ class QueryService:
                         period,
                         anchor_date,
                     ),
-                    target=self._target_for_metric(definition.key, days_total),
+                    target=resolve_target_for_metric(definition.key, days_total),
                 )
             )
 

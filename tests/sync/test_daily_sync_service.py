@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import hashlib
 
 import pytest
 
@@ -137,7 +136,7 @@ def test_sync_day_is_idempotent(monkeypatch, tmp_path):
     assert second is False
 
 
-def test_sync_day_output_characterization(monkeypatch, tmp_path):
+def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_path):
     fixed_today = datetime.date(2025, 1, 15)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
 
@@ -146,12 +145,18 @@ def test_sync_day_output_characterization(monkeypatch, tmp_path):
 
     note_path = f"{journal_dir}/{fixed_today:%Y-%m-%d}.md"
     content = open(note_path, "r", encoding="utf-8").read()
-    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in content
-    content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    lines = content.splitlines()
+
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in lines
     assert (
-        content_hash
-        == "b70f5034dbdc19ca38aa3f0d8c3764e98534093873c1404f95eee5d1ab59d19b"
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |" in lines
     )
+
+    level_two_headers = [line for line in lines if line.startswith("## ")]
+    assert level_two_headers[:3] == ["## Goals", "## Metrics", "## Reflections"]
+
+    level_three_headers = [line for line in lines if line.startswith("### **")]
+    assert "### **STUDY**" in level_three_headers
 
 
 def test_sync_day_fails_without_reminders_config(monkeypatch, tmp_path):

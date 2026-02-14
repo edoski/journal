@@ -12,6 +12,7 @@ from sync.contracts.query import (
     PeriodMetricRow,
     PeriodSnapshot,
 )
+from sync.target_policy import training_type_target
 
 
 class _StubAggregateSource:
@@ -148,6 +149,10 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
     service, _ = _service_with_data()
     anchor = datetime.date(2026, 2, 8)
 
+    workout_target = float(training_type_target(7, "workout"))
+    stretch_target = float(training_type_target(7, "stretch"))
+    mindful_target = float(training_type_target(7, "mindful"))
+
     detail = PeriodDetailSnapshot(
         period="week",
         start=anchor - datetime.timedelta(days=6),
@@ -159,9 +164,33 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
             ),
             PeriodMetricRow("sleep_minutes", "Sleep", 470.0, 460.0, 2.0, 465.0, 480.0),
             PeriodMetricRow("mood", "Mood", 6.0, 6.5, -8.0, 6.2, 6.0),
-            PeriodMetricRow("workout_count", "Workout", 4, 3, 33.0, 3.5, 6.0),
-            PeriodMetricRow("stretch_count", "Stretch", 4, 5, -20.0, 4.5, 7.0),
-            PeriodMetricRow("mindful_count", "Mindful", 5, 4, 25.0, 4.5, 7.0),
+            PeriodMetricRow(
+                "workout_count",
+                "Workout",
+                4,
+                3,
+                33.0,
+                3.5,
+                workout_target,
+            ),
+            PeriodMetricRow(
+                "stretch_count",
+                "Stretch",
+                4,
+                5,
+                -20.0,
+                4.5,
+                stretch_target,
+            ),
+            PeriodMetricRow(
+                "mindful_count",
+                "Mindful",
+                5,
+                4,
+                25.0,
+                4.5,
+                mindful_target,
+            ),
             PeriodMetricRow(
                 "interrupt_minutes",
                 "Interruptions",

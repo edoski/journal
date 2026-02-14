@@ -5,12 +5,12 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 
-from sync.constants import IDEAL
 from sync.contracts.metrics import (
     DailyAggregate,
     PeriodAggregate,
     TrainingTypeSessionStat,
 )
+from sync.target_policy import training_type_target
 
 
 @dataclass
@@ -220,10 +220,9 @@ def aggregate_training_type_session_stats(
             entry.total_minutes += float(minutes_map.get(raw_label, 0.0) or 0.0)
 
     total_days = len(dates)
-    weeks_in_period = total_days / 7
-    mindful_target = int(round(IDEAL.mindful_days_weekly * weeks_in_period))
-    workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
-    stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
+    mindful_target = training_type_target(total_days, "mindful")
+    workout_target = training_type_target(total_days, "workout")
+    stretch_target = training_type_target(total_days, "stretch")
 
     stats: list[TrainingTypeSessionStat] = []
     for norm, data in per_type.items():

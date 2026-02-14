@@ -12,6 +12,7 @@ from sync.contracts.metrics import (
     MovingAverageAggregate,
     PeriodAggregate,
 )
+from sync.contracts.targets import PeriodType
 from sync.metrics import (
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
@@ -36,7 +37,7 @@ def append_summary_section(
     ma_metrics: MovingAverageAggregate | None,
     ma_label: str | None,
     ma_training_unit: str,
-    period_type: str,
+    period_type: PeriodType,
     total_days: int,
 ) -> None:
     """Render and append the SUMMARY section."""

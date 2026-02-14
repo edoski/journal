@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from sync.contracts.targets import PeriodType
 from sync.formatting import (
     format_minutes,
     format_training_ratio,
@@ -15,7 +16,8 @@ from sync.formatting import (
     format_percent_change,
     format_progress_bar,
 )
-from sync.constants import IDEAL, RENDER
+from sync.constants import RENDER
+from sync.target_policy import summary_targets
 
 
 def render_sleep_stats_table(
@@ -148,7 +150,7 @@ def render_summary_table(
     ma_metrics: dict[str, Any] | None = None,
     ma_label: str | None = None,
     ma_training_unit: str = "7",
-    period_type: str = "week",
+    period_type: PeriodType = "week",
     total_days: int = 7,
 ) -> list[str]:
     """
@@ -174,37 +176,20 @@ def render_summary_table(
 
     show_ma = ma_metrics is not None and ma_label is not None
 
-    # Period suffix for target labels
-    period_suffix = {
-        "week": "wk",
-        "month": "mo",
-        "quarter": "qtr",
-        "year": "yr",
-    }.get(period_type, "wk")
+    targets = summary_targets(period_type, total_days)
+    study_target_minutes = targets.study_minutes
+    sleep_target_minutes = targets.sleep_minutes
+    mindful_target = targets.training.mindful
+    workout_target = targets.training.workout
+    stretch_target = targets.training.stretch
+    mood_target = targets.mood
 
-    # Calculate scaled targets
-    study_target_minutes = IDEAL.study_minutes_daily * total_days
-    sleep_target_minutes = IDEAL.sleep_minutes_nightly  # Always nightly avg
-    weeks_in_period = total_days / 7
-    mindful_target = int(round(IDEAL.mindful_days_weekly * weeks_in_period))
-    workout_target = int(round(IDEAL.workout_days_weekly * weeks_in_period))
-    stretch_target = int(round(IDEAL.stretch_days_weekly * weeks_in_period))
-    mood_target = IDEAL.mood_target
-
-    # Format target labels
-    study_hours = int(study_target_minutes // 60)
-    study_target_label = f"{study_hours}h/{period_suffix}"
-    sleep_target_label = "8h/night"
-    mood_target_label = f"{mood_target:.1f}/10"
-
-    if period_type == "week":
-        mindful_target_label = f"{mindful_target}/7"
-        workout_target_label = f"{workout_target}/7"
-        stretch_target_label = f"{stretch_target}/7"
-    else:
-        mindful_target_label = f"{mindful_target}/{period_suffix}"
-        workout_target_label = f"{workout_target}/{period_suffix}"
-        stretch_target_label = f"{stretch_target}/{period_suffix}"
+    study_target_label = targets.study_label
+    sleep_target_label = targets.sleep_label
+    mood_target_label = targets.mood_label
+    mindful_target_label = targets.training.mindful_label
+    workout_target_label = targets.training.workout_label
+    stretch_target_label = targets.training.stretch_label
 
     # Table header
     if show_ma:

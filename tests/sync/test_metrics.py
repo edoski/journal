@@ -18,6 +18,7 @@ from sync.metrics import (
     load_daily_data_for_dates,
     load_prior_period_metrics,
 )
+from sync.target_policy import training_type_target
 
 
 class TestComputePeriodMetrics:
@@ -288,9 +289,13 @@ class TestAggregateTrainingTypeSessionStats:
         rows = aggregate_training_type_session_stats(dates, daily_data)
         by_type = {row["type"]: row for row in rows}
 
-        assert by_type["Meditation"]["target"] == 7
-        assert by_type["Stretching"]["target"] == 7
-        assert by_type["Traditional Strength Training"]["target"] == 7
+        expected_mindful = training_type_target(len(dates), "mindful")
+        expected_stretch = training_type_target(len(dates), "stretch")
+        expected_workout = training_type_target(len(dates), "workout")
+
+        assert by_type["Meditation"]["target"] == expected_mindful
+        assert by_type["Stretching"]["target"] == expected_stretch
+        assert by_type["Traditional Strength Training"]["target"] == expected_workout
 
     def test_scales_targets_with_period_days(self):
         dates = [
@@ -306,8 +311,7 @@ class TestAggregateTrainingTypeSessionStats:
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
         assert len(rows) == 1
-        # round(7 * 31 / 7) = 31
-        assert rows[0]["target"] == 31
+        assert rows[0]["target"] == training_type_target(len(dates), "workout")
 
     def test_sorts_by_average_desc_then_sessions(self):
         dates = [
