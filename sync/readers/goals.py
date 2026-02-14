@@ -31,6 +31,8 @@ REMINDER_UNIT_DAYS = {
     "m": 30,  # months (approximate)
     "q": 90,  # quarters (approximate)
 }
+_TYPED_GID_RE = re.compile(r"\^gid-([mr][0-9a-fA-F]{9})\s*$", flags=re.IGNORECASE)
+_TRAILING_GID_MARKER_RE = re.compile(r"(\s+\^gid-[A-Za-z0-9]{6,32})+\s*$")
 
 
 def resolve_deadline(date_str: str) -> datetime.date | None:
@@ -122,7 +124,7 @@ def _extract_goal_id(line: str) -> str | None:
     """Extract a gid-... block ID from a line, if present."""
     if not line:
         return None
-    m = re.search(r"\^gid-([0-9a-fA-F]{6,32})\s*$", line)
+    m = _TYPED_GID_RE.search(line)
     if m:
         return f"gid-{m.group(1).lower()}"
     return None
@@ -149,10 +151,10 @@ def parse_goal_tasks(lines: list[str]) -> list[Goal]:
         state = (match.group("state") or "").strip()
         body = match.group("body").strip()
         done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
-        goal_id = _extract_goal_id(line) or generate_goal_id()
+        goal_id = _extract_goal_id(line) or generate_goal_id(kind="manual")
 
         # Strip trailing gid marker from body if present
-        body = re.sub(r"(\s+\^gid-[0-9a-fA-F]{6,32})+\s*$", "", body).rstrip()
+        body = _TRAILING_GID_MARKER_RE.sub("", body).rstrip()
         # Strip any existing countdown suffix
         body = re.sub(r"\s*—\s*`(?:TODAY|LATE \+\d+d|\d+d)`\s*$", "", body).rstrip()
         # Extract date and reminder offset if present
@@ -220,7 +222,7 @@ def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> lis
         canon = t.canonical or ""
         if not t.id:
             idx = counts.get(canon, 0)
-            new_id = generate_goal_id_for(horizon_key, period_key, canon, idx)
+            new_id = generate_goal_id_for("manual", horizon_key, period_key, canon, idx)
             result.append(replace(t, id=new_id))
         else:
             result.append(t)

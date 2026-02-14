@@ -9,9 +9,12 @@ from sync.adapters.json_goal_cache import (
     JsonGoalCarryForwardCacheStore,
     JsonGoalReconcileCacheStore,
 )
+from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.application.goal_sync_service import GoalSyncService
+from sync.goals.reminders import get_reminders_for_date
 from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
 from sync.models.goals import Goal
+from sync.models.reminders import DailySchedule, ReminderRule
 from sync.periods.windows import build_week_window, build_year_window
 
 
@@ -146,7 +149,7 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
                 Goal(
                     body="Ship refactor",
                     done=False,
-                    id="gid-1234567890",
+                    id="gid-m123456789",
                 )
             ],
             1,
@@ -167,6 +170,89 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
     assert goal_store.last_sections[0].section == "YEARLY"
 
 
+def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
+    note_store = _StubNoteStore()
+    goal_store = MarkdownGoalStore()
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=JsonGoalCarryForwardCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+        reconcile_cache_store=JsonGoalReconcileCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+    )
+
+    day = datetime.date(2026, 2, 14)
+    rules = [ReminderRule(schedule=DailySchedule(), body="Do touch-toes stretch")]
+    today_reminder = get_reminders_for_date(day, rules)[0]
+    stale_reminder = get_reminders_for_date(day - datetime.timedelta(days=1), rules)[0]
+
+    lines = [
+        "## Goals",
+        "---",
+        "### **WEEKLY**",
+        "",
+        "_No weekly goals have been defined yet._",
+        "",
+        "### **DAILY**",
+        f"- [ ] Do touch-toes stretch ^{stale_reminder.id}",
+        f"- [ ] Do touch-toes stretch ^{today_reminder.id}",
+        "- [ ] Manual carry task ^gid-m222222222",
+        "",
+        "## Metrics",
+        "---",
+    ]
+
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.carry_forward_daily_tasks",
+        lambda _today, _yesterday, existing_daily_tasks, **_kwargs: (
+            existing_daily_tasks,
+            0,
+        ),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.load_weekly_goals",
+        lambda *_a, **_kw: ([], [], [], [], "weekly.md", "monthly.md", "quarterly.md"),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.reconcile_goal_lists",
+        lambda *_a, **_kw: ([], [], False, False),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.process_pierced_goals",
+        lambda *_a, **kwargs: (
+            kwargs["existing_tasks"],
+            [],
+            kwargs["source_goal_lists"],
+        ),
+    )
+
+    updated = service.sync_daily_note(
+        lines,
+        day=day,
+        note_path=str(tmp_path / "2026-02-14.md"),
+        yaml_end_idx=-1,
+        reminder_rules=rules,
+    )
+    updated_text = "\n".join(updated)
+    assert stale_reminder.id not in updated_text
+    assert updated_text.count(today_reminder.id) == 1
+    assert "Manual carry task" in updated_text
+
+    updated_again = service.sync_daily_note(
+        updated,
+        day=day,
+        note_path=str(tmp_path / "2026-02-14.md"),
+        yaml_end_idx=-1,
+        reminder_rules=rules,
+    )
+    assert updated_again == updated
+
+
 class _StubCarryCacheStore:
     @contextmanager
     def locked_state(self):
@@ -177,5 +263,5 @@ class _StubCarryCacheStore:
 class _StubReconcileCacheStore:
     @contextmanager
     def locked_state(self):
-        payload = {"version": 1, "goals": {}}
+        payload = {"goals": {}}
         yield payload

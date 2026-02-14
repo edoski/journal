@@ -12,11 +12,11 @@ def _base_note_lines() -> list[str]:
         "---",
         "### **WEEKLY**",
         "",
-        "- [ ] Weekly task ^gid-abc123",
+        "- [ ] Weekly task ^gid-mabc123456",
         "",
         "### **DAILY**",
         "",
-        "- [ ] Daily task ^gid-def456",
+        "- [ ] Daily task ^gid-mdef456789",
         "",
         "## Metrics",
         "---",
@@ -29,7 +29,7 @@ def test_extract_reads_target_subsection():
 
     assert len(goals) == 1
     assert goals[0].body == "Daily task"
-    assert goals[0].id == "gid-def456"
+    assert goals[0].id == "gid-mdef456789"
 
 
 def test_apply_rebuilds_goals_block():
@@ -39,9 +39,11 @@ def test_apply_rebuilds_goals_block():
         lines,
         sections=[
             GoalSection(
-                section="WEEKLY", lines=["", "- [ ] Weekly updated ^gid-aaa111"]
+                section="WEEKLY", lines=["", "- [ ] Weekly updated ^gid-maaa111111"]
             ),
-            GoalSection(section="DAILY", lines=["", "- [ ] Daily updated ^gid-bbb222"]),
+            GoalSection(
+                section="DAILY", lines=["", "- [ ] Daily updated ^gid-mbbb222222"]
+            ),
         ],
     )
 
@@ -60,8 +62,10 @@ def test_write_persists_rebuilt_sections(tmp_path):
         str(note_path),
         lines,
         sections=[
-            GoalSection(section="WEEKLY", lines=["", "- [ ] Weekly v2 ^gid-111aaa"]),
-            GoalSection(section="DAILY", lines=["", "- [ ] Daily v2 ^gid-222bbb"]),
+            GoalSection(
+                section="WEEKLY", lines=["", "- [ ] Weekly v2 ^gid-m111aaa111"]
+            ),
+            GoalSection(section="DAILY", lines=["", "- [ ] Daily v2 ^gid-m222bbb222"]),
         ],
     )
 

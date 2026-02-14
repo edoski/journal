@@ -11,6 +11,7 @@ from sync.constants import (
 from sync.contracts.goals import GoalSection
 from sync.dates import quarter_id, quarter_of_date
 from sync.goals.carry_forward import carry_forward_with_tombstones
+from sync.goals.identity import goal_id_kind
 from sync.goals.period_pipeline import (
     CarryForwardConfig,
     MirrorSyncConfig,
@@ -87,6 +88,16 @@ class GoalSyncService:
         )
 
         reminders = get_reminders_for_date(day, reminder_rules)
+        today_reminder_ids = {goal.id for goal in reminders if goal.id}
+        existing_daily_tasks = [
+            goal
+            for goal in existing_daily_tasks
+            if not (
+                goal.id
+                and goal_id_kind(goal.id) == "reminder"
+                and goal.id not in today_reminder_ids
+            )
+        ]
         existing_ids = {task.id for task in existing_daily_tasks if task.id}
         for reminder in reminders:
             if reminder.id not in existing_ids:

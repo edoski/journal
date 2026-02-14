@@ -166,7 +166,7 @@ def _render_body_template(body: str, due_date: datetime.date) -> str:
 def _generate_rule_id(rule: ReminderRule) -> str:
     """Generate a deterministic ID for a reminder rule based on its schedule and body."""
     schedule = format_schedule(rule.schedule)
-    return generate_goal_id_for("reminder", schedule, rule.body, 0)
+    return generate_goal_id_for("reminder", "reminder", schedule, rule.body, 0)
 
 
 def get_reminders_for_date(
@@ -186,6 +186,7 @@ def get_reminders_for_date(
         rendered_body = _render_body_template(rule.body, due_date)
         rule_id = _generate_rule_id(rule)
         goal_id = generate_goal_id_for(
+            "reminder",
             "reminder",
             f"{rule_id}:{due_date.isoformat()}",
             rendered_body,

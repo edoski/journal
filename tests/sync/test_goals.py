@@ -57,9 +57,9 @@ class TestCanonicalGoal:
         assert canonical_goal("* [x] Star checkbox") == "star checkbox"
 
     def test_strips_goal_id(self):
-        assert canonical_goal("- [x] Task ^gid-abc1234567") == "task"
-        assert canonical_goal("- [ ] Task ^gid-1234567890") == "task"
-        assert canonical_goal("- [x] Task ^gid-ABCDEF") == "task"
+        assert canonical_goal("- [x] Task ^gid-mabc123456") == "task"
+        assert canonical_goal("- [ ] Task ^gid-r123456789") == "task"
+        assert canonical_goal("- [x] Task ^gid-MABCDEF123") == "task"
 
     def test_preserves_invalid_goal_id_shapes(self):
         assert canonical_goal("- [x] Task ^gid-abc12") == "task ^gid-abc12"
@@ -97,6 +97,12 @@ class TestGenerateGoalId:
         gid = generate_goal_id()
         assert gid.startswith("gid-")
         assert len(gid) == 14  # "gid-" + 10 hex chars
+        assert gid[4] == "m"
+
+    def test_reminder_kind_format(self):
+        gid = generate_goal_id("reminder")
+        assert gid.startswith("gid-r")
+        assert len(gid) == 14
 
     def test_uniqueness(self):
         ids = [generate_goal_id() for _ in range(100)]
@@ -107,23 +113,29 @@ class TestGenerateGoalIdFor:
     """Tests for generate_goal_id_for function."""
 
     def test_deterministic(self):
-        id1 = generate_goal_id_for("weekly", "2025-W52", "complete task", 0)
-        id2 = generate_goal_id_for("weekly", "2025-W52", "complete task", 0)
+        id1 = generate_goal_id_for("manual", "weekly", "2025-W52", "complete task", 0)
+        id2 = generate_goal_id_for("manual", "weekly", "2025-W52", "complete task", 0)
         assert id1 == id2
 
     def test_different_inputs_different_ids(self):
-        id1 = generate_goal_id_for("weekly", "2025-W52", "task a", 0)
-        id2 = generate_goal_id_for("weekly", "2025-W52", "task b", 0)
+        id1 = generate_goal_id_for("manual", "weekly", "2025-W52", "task a", 0)
+        id2 = generate_goal_id_for("manual", "weekly", "2025-W52", "task b", 0)
         assert id1 != id2
 
     def test_index_collision_prevention(self):
-        id1 = generate_goal_id_for("weekly", "2025-W52", "task", 0)
-        id2 = generate_goal_id_for("weekly", "2025-W52", "task", 1)
+        id1 = generate_goal_id_for("manual", "weekly", "2025-W52", "task", 0)
+        id2 = generate_goal_id_for("manual", "weekly", "2025-W52", "task", 1)
         assert id1 != id2
 
     def test_format(self):
-        gid = generate_goal_id_for("weekly", "2025-W52", "task", 0)
+        gid = generate_goal_id_for("manual", "weekly", "2025-W52", "task", 0)
         assert gid.startswith("gid-")
+        assert len(gid) == 14
+        assert gid[4] == "m"
+
+    def test_reminder_kind_uses_r_prefix(self):
+        gid = generate_goal_id_for("reminder", "daily", "2026-02-14", "task", 0)
+        assert gid.startswith("gid-r")
         assert len(gid) == 14
 
 
@@ -131,26 +143,29 @@ class TestExtractGoalId:
     """Tests for extract_goal_id function."""
 
     def test_extracts_id(self):
-        line = "- [x] Complete task ^gid-abc1234567"
-        assert extract_goal_id(line) == "gid-abc1234567"
+        line = "- [x] Complete task ^gid-mabc123456"
+        assert extract_goal_id(line) == "gid-mabc123456"
 
     def test_at_line_end(self):
-        line = "- [x] Task ^gid-1234567890"
+        line = "- [x] Task ^gid-r123456789"
         result = extract_goal_id(line)
-        assert result == "gid-1234567890"
+        assert result == "gid-r123456789"
 
     def test_no_id_returns_none(self):
         assert extract_goal_id("- [x] Task without id") is None
         assert extract_goal_id("- [x] Task with ^other-marker") is None
+
+    def test_legacy_untyped_id_returns_none(self):
+        assert extract_goal_id("- [x] Task ^gid-abc1234567") is None
 
     def test_empty_line(self):
         assert extract_goal_id("") is None
         assert extract_goal_id(None) is None
 
     def test_lowercase_normalized(self):
-        line = "- [x] Task ^gid-ABC1234567"
+        line = "- [x] Task ^gid-MABC123456"
         result = extract_goal_id(line)
-        assert result == "gid-abc1234567"
+        assert result == "gid-mabc123456"
 
 
 class TestParseGoalTasks:
@@ -158,9 +173,9 @@ class TestParseGoalTasks:
 
     def test_parses_multiple_tasks(self):
         lines = [
-            "- [x] Task one ^gid-abc1234567",
-            "- [ ] Task two ^gid-def1234567",
-            "- [-] Task skipped ^gid-ghi1234567",
+            "- [x] Task one ^gid-mabc123456",
+            "- [ ] Task two ^gid-mdef123456",
+            "- [-] Task skipped ^gid-mfedcba987",
         ]
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 3
@@ -179,17 +194,17 @@ class TestParseGoalTasks:
         assert tasks[3].done is True
 
     def test_body_extraction(self):
-        lines = ["- [x] Complete task ^gid-abc1234567"]
+        lines = ["- [x] Complete task ^gid-mabc123456"]
         tasks = parse_goal_tasks(lines)
         assert tasks[0].body == "Complete task"
 
     def test_id_extraction(self):
-        lines = ["- [x] Task ^gid-abc1234567"]
+        lines = ["- [x] Task ^gid-mabc123456"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0].id == "gid-abc1234567"
+        assert tasks[0].id == "gid-mabc123456"
 
     def test_canonical_computed(self):
-        lines = ["- [x] Complete [[Project]] task ^gid-abc1234567"]
+        lines = ["- [x] Complete [[Project]] task ^gid-mabc123456"]
         tasks = parse_goal_tasks(lines)
         assert tasks[0].canonical == "complete project task"
 
@@ -215,14 +230,14 @@ class TestRenderGoalLines:
     """Tests for render_goal_lines function."""
 
     def test_renders_done_task(self):
-        tasks = [Goal(id="gid-abc1234567", body="Complete task", done=True)]
+        tasks = [Goal(id="gid-mabc123456", body="Complete task", done=True)]
         lines = render_goal_lines(tasks)
-        assert lines == ["- [x] Complete task ^gid-abc1234567"]
+        assert lines == ["- [x] Complete task ^gid-mabc123456"]
 
     def test_renders_undone_task(self):
-        tasks = [Goal(id="gid-def1234567", body="Pending task", done=False)]
+        tasks = [Goal(id="gid-mdef123456", body="Pending task", done=False)]
         lines = render_goal_lines(tasks)
-        assert lines == ["- [ ] Pending task ^gid-def1234567"]
+        assert lines == ["- [ ] Pending task ^gid-mdef123456"]
 
     def test_uses_existing_id(self):
         tasks = [Goal(id="gid-existing123", body="Task with id", done=False)]
@@ -240,8 +255,8 @@ class TestRenderGoalLines:
     def test_round_trip(self):
         """Parse and render should preserve content."""
         original = [
-            "- [x] Task one ^gid-abc1234567",
-            "- [ ] Task two ^gid-def1234567",
+            "- [x] Task one ^gid-mabc123456",
+            "- [ ] Task two ^gid-mdef123456",
         ]
         tasks = parse_goal_tasks(original)
         rendered = render_goal_lines(tasks)
@@ -250,10 +265,10 @@ class TestRenderGoalLines:
     def test_round_trip_with_date(self):
         """Parse and render should preserve dated goals in source notes."""
         original = [
-            "- [ ] `2025-02-12` Pass exam ^gid-abc1234567",
+            "- [ ] `2025-02-12` Pass exam ^gid-mabc123456",
         ]
         expected = [
-            "- [ ] Pass exam `2025-02-12` ^gid-abc1234567",
+            "- [ ] Pass exam `2025-02-12` ^gid-mabc123456",
         ]
         tasks = parse_goal_tasks(original)
         # Source note: no today param -> shows date after body
@@ -266,10 +281,10 @@ class TestRenderGoalLines:
         Note: The reminder offset is normalized to shortest unit (14d -> 2w).
         """
         original = [
-            "- [ ] `2025-02-12 !14d` Pass exam ^gid-abc1234567",
+            "- [ ] `2025-02-12 !14d` Pass exam ^gid-mabc123456",
         ]
         expected = [
-            "- [ ] Pass exam `2025-02-12 !2w` ^gid-abc1234567",
+            "- [ ] Pass exam `2025-02-12 !2w` ^gid-mabc123456",
         ]
         tasks = parse_goal_tasks(original)
         # Source note: no today param -> shows date after body
@@ -281,12 +296,12 @@ class TestRenderGoalLines:
         import datetime
 
         original = [
-            "- [ ] `2025-02-12` Pass exam ^gid-abc1234567",
+            "- [ ] `2025-02-12` Pass exam ^gid-mabc123456",
         ]
         tasks = parse_goal_tasks(original)
         # Mirror note: today param -> shows countdown only
         rendered = render_goal_lines(tasks, today=datetime.date(2025, 1, 6))
-        assert rendered == ["- [ ] Pass exam — `37d` ^gid-abc1234567"]
+        assert rendered == ["- [ ] Pass exam — `37d` ^gid-mabc123456"]
 
 
 class TestEnsureGoalIds:
@@ -325,8 +340,8 @@ class TestBuildGoalsBlock:
 
     def test_basic_structure(self):
         subsections = [
-            ("STUDY", ["- [x] Read chapter ^gid-abc1234567"]),
-            ("HEALTH", ["- [ ] Workout ^gid-def1234567"]),
+            ("STUDY", ["- [x] Read chapter ^gid-mabc123456"]),
+            ("HEALTH", ["- [ ] Workout ^gid-mdef123456"]),
         ]
         lines = build_goals_block(subsections)
 
@@ -336,7 +351,7 @@ class TestBuildGoalsBlock:
         assert "### **HEALTH**" in lines
 
     def test_trailing_blank_line(self):
-        subsections = [("STUDY", ["- [x] Task ^gid-abc1234567"])]
+        subsections = [("STUDY", ["- [x] Task ^gid-mabc123456"])]
         lines = build_goals_block(subsections)
         assert lines[-1] == ""
 
@@ -350,14 +365,14 @@ class TestBuildGoalsBlock:
             (
                 "STUDY",
                 [
-                    "- [x] Task 1 ^gid-abc1234567",
-                    "- [ ] Task 2 ^gid-def1234567",
+                    "- [x] Task 1 ^gid-mabc123456",
+                    "- [ ] Task 2 ^gid-mdef123456",
                 ],
             ),
         ]
         lines = build_goals_block(subsections)
-        assert "- [x] Task 1 ^gid-abc1234567" in lines
-        assert "- [ ] Task 2 ^gid-def1234567" in lines
+        assert "- [x] Task 1 ^gid-mabc123456" in lines
+        assert "- [ ] Task 2 ^gid-mdef123456" in lines
 
 
 class TestFindSubheaderIdx:

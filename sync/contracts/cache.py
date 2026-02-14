@@ -48,7 +48,6 @@ class GoalReconcileGoalState(TypedDict):
 class GoalReconcileCacheState(TypedDict):
     """Root reconciliation cache payload."""
 
-    version: int
     goals: dict[str, GoalReconcileGoalState]
 
 

@@ -197,13 +197,9 @@ def _validate_reconcile_state(raw: Any, *, path: str) -> GoalReconcileCacheState
     if not isinstance(raw, dict):
         raise _schema_error(path, "root payload must be an object")
 
-    required = {"version", "goals"}
+    required = {"goals"}
     if set(raw) != required:
         raise _schema_error(path, f"root must contain exactly {sorted(required)}")
-
-    version = raw.get("version")
-    if not isinstance(version, int) or version != 1:
-        raise _schema_error(path, "version must be integer 1")
 
     goals_raw = raw.get("goals")
     if not isinstance(goals_raw, dict):
@@ -219,7 +215,7 @@ def _validate_reconcile_state(raw: Any, *, path: str) -> GoalReconcileCacheState
             goal_id=goal_id,
         )
 
-    return {"version": version, "goals": goals}
+    return {"goals": goals}
 
 
 class JsonGoalCarryForwardCacheStore(GoalCarryForwardCacheStore):
@@ -271,7 +267,7 @@ class JsonGoalReconcileCacheStore(GoalReconcileCacheStore):
     def load(self) -> GoalReconcileCacheState:
         raw = _load_json_or_none(self.path)
         if raw is None:
-            return {"version": 1, "goals": {}}
+            return {"goals": {}}
         return _validate_reconcile_state(raw, path=self.path)
 
     def save(self, state: GoalReconcileCacheState) -> None:

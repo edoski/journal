@@ -38,7 +38,6 @@ def test_goal_reconcile_load_raises_on_invalid_note_shape(tmp_path):
     path.write_text(
         json.dumps(
             {
-                "version": 1,
                 "goals": {
                     "gid-1": {
                         "last_value": False,

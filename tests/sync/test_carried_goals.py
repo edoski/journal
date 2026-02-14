@@ -271,11 +271,11 @@ class TestCacheIntegration:
 
         _write_daily_note(
             journal_dir / "2026-02-05.md",
-            ["- [ ] Ask Prof. Bacchiega ^gid-d1b9dadad0"],
+            ["- [ ] Ask Prof. Bacchiega ^gid-md1b9dadad"],
         )
         _write_daily_note(
             journal_dir / "2026-02-06.md",
-            ["- [ ] Ask Prof. Bacchiega ^gid-d1b9dadad0"],
+            ["- [ ] Ask Prof. Bacchiega ^gid-md1b9dadad"],
         )
 
         note_store = MarkdownNoteStore()
@@ -303,7 +303,7 @@ class TestCacheIntegration:
         )
         assert added == 0
         assert tasks_after_delete == []
-        assert get_deleted_ids(_cache_snapshot(store), "daily") == {"gid-d1b9dadad0"}
+        assert get_deleted_ids(_cache_snapshot(store), "daily") == {"gid-md1b9dadad"}
 
         tasks_next_day, added = carry_forward_daily_tasks(
             today_date=datetime.date(2026, 2, 7),
@@ -316,3 +316,32 @@ class TestCacheIntegration:
         )
         assert added == 0
         assert tasks_next_day == []
+
+    def test_daily_carry_forward_excludes_reminder_ids(self, tmp_path):
+        journal_dir = tmp_path / "journal"
+        journal_dir.mkdir()
+        store = _carry_store(tmp_path)
+
+        _write_daily_note(
+            journal_dir / "2026-02-05.md",
+            [
+                "- [ ] Reminder task ^gid-r111111111",
+                "- [ ] Manual task ^gid-m222222222",
+            ],
+        )
+
+        note_store = MarkdownNoteStore()
+        goal_store = MarkdownGoalStore()
+
+        tasks, added = carry_forward_daily_tasks(
+            today_date=datetime.date(2026, 2, 6),
+            yesterday_date=datetime.date(2026, 2, 5),
+            existing_daily_tasks=[],
+            carry_cache_store=store,
+            note_store=note_store,
+            goal_store=goal_store,
+            journal_dir=str(journal_dir),
+        )
+        assert added == 1
+        assert len(tasks) == 1
+        assert tasks[0].id == "gid-m222222222"

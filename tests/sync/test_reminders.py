@@ -147,6 +147,7 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     sunday_odd = datetime.date(2026, 2, 1)  # Sunday, ISO week 5 (odd)
     reminders = get_reminders_for_date(sunday_odd, rules)
     bodies = {r.body for r in reminders}
+    assert all(r.id.startswith("gid-r") for r in reminders)
 
     assert "Daily planning" in bodies
     assert "Weekly Checkpoint" in bodies
@@ -156,6 +157,7 @@ def test_get_reminders_for_date_evaluates_schedules(tmp_path):
     sunday_even = datetime.date(2026, 2, 8)  # Sunday, ISO week 6 (even)
     reminders_even = get_reminders_for_date(sunday_even, rules)
     bodies_even = {r.body for r in reminders_even}
+    assert all(r.id.startswith("gid-r") for r in reminders_even)
     assert "Restart MacBook" not in bodies_even
     assert "Vacuum room" in bodies_even
 
@@ -183,6 +185,7 @@ def test_get_reminders_for_date_is_deterministic(tmp_path):
 
     assert len(first) == len(second) == 1
     assert first[0].id == second[0].id
+    assert first[0].id.startswith("gid-r")
     assert first[0].body == second[0].body
 
 

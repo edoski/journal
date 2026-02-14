@@ -13,6 +13,7 @@ from sync.constants import (
 )
 from sync.dates import iso_week_range, quarter_id, quarter_of_date
 from sync.goals.carry_forward import carry_forward_with_tombstones
+from sync.goals.identity import goal_id_kind
 from sync.goals.note_store import render_goals_or_empty
 from sync.goals.period_pipeline import SourceWriteConfig, propagate_source_sections
 from sync.models.goals import Goal
@@ -217,7 +218,11 @@ def carry_forward_daily_tasks(
     today_key = today_date.isoformat()
     existing_daily_tasks = ensure_goal_ids(existing_daily_tasks, "daily", today_key)
 
-    open_y = [task for task in y_daily if not task.done]
+    open_y = [
+        task
+        for task in y_daily
+        if not task.done and goal_id_kind(task.id or "") != "reminder"
+    ]
     if not open_y:
         return existing_daily_tasks, 0
 
