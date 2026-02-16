@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from pathlib import Path
 
 import pytest
 
@@ -28,6 +29,14 @@ class _StubStatusSource:
 
     def write_study_times(self, _day: datetime.date, _sessions) -> None:
         return None
+
+
+class _CountingStatusSource(_StubStatusSource):
+    def __init__(self) -> None:
+        self.write_calls = 0
+
+    def write_study_times(self, _day: datetime.date, _sessions) -> None:
+        self.write_calls += 1
 
 
 class _StubContextSource:
@@ -62,6 +71,22 @@ class _StubGoalSyncService:
         return lines
 
 
+class _ConflictNoteStore(MarkdownNoteStore):
+    def __init__(self, *, mutate_on_reads: int) -> None:
+        self.mutate_on_reads = mutate_on_reads
+        self.read_calls = 0
+
+    def read(self, path: str) -> list[str] | None:
+        self.read_calls += 1
+        if self.read_calls <= self.mutate_on_reads:
+            marker = f"<!-- external-change-{self.read_calls} -->"
+            current = super().read(path) or []
+            if marker not in current:
+                current.append(marker)
+                super().write(path, current)
+        return super().read(path)
+
+
 def _session_for_day(day: datetime.date) -> dict:
     start = datetime.datetime.combine(day, datetime.time(9, 0))
     end = datetime.datetime.combine(day, datetime.time(10, 0))
@@ -79,7 +104,11 @@ def _session_for_day(day: datetime.date) -> dict:
 
 
 def _build_service(
-    monkeypatch, tmp_path, reminder_store=None, status_source=None
+    monkeypatch,
+    tmp_path,
+    reminder_store=None,
+    status_source=None,
+    note_store=None,
 ) -> tuple[DailySyncService, str]:
     journal_dir = tmp_path / "journal"
     journal_dir.mkdir()
@@ -92,7 +121,7 @@ def _build_service(
     )
 
     service = DailySyncService(
-        note_store=MarkdownNoteStore(),
+        note_store=note_store or MarkdownNoteStore(),
         status_source=status_source or _StubStatusSource(),
         context_source=_StubContextSource(),
         reminder_store=reminder_store or _StubReminderStore(),
@@ -102,6 +131,33 @@ def _build_service(
         template_path=str(template_path),
     )
     return service, str(journal_dir)
+
+
+def _seed_daily_note(
+    *,
+    journal_dir: str,
+    day: datetime.date,
+    reflections_lines: list[str],
+) -> Path:
+    note_path = Path(journal_dir) / f"{day:%Y-%m-%d}.md"
+    lines = [
+        "---",
+        "mood: 6.0",
+        "---",
+        "## Goals",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "",
+        "## Reflections",
+        "---",
+        "",
+        *reflections_lines,
+        "",
+    ]
+    note_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return note_path
 
 
 def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
@@ -181,3 +237,181 @@ def test_sync_day_tolerates_missing_sleep_payload(monkeypatch, tmp_path):
     note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
     content = open(note_path, "r", encoding="utf-8").read()
     assert "### **SLEEP**" in content
+
+
+def test_sync_day_rebases_when_note_changes_before_write(monkeypatch, tmp_path, caplog):
+    day = datetime.date(2025, 1, 15)
+    status_source = _CountingStatusSource()
+    service, journal_dir = _build_service(
+        monkeypatch,
+        tmp_path,
+        status_source=status_source,
+        note_store=_ConflictNoteStore(mutate_on_reads=1),
+    )
+
+    caplog.set_level("WARNING")
+    changed = service.sync_day(day, [_session_for_day(day)])
+
+    assert changed is True
+    assert status_source.write_calls == 1
+    assert "retrying with rebase" in caplog.text
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "<!-- external-change-1 -->" in content
+
+
+def test_sync_day_skips_write_after_persistent_rebase_conflicts(
+    monkeypatch, tmp_path, caplog
+):
+    day = datetime.date(2025, 1, 15)
+    status_source = _CountingStatusSource()
+    service, journal_dir = _build_service(
+        monkeypatch,
+        tmp_path,
+        status_source=status_source,
+        note_store=_ConflictNoteStore(mutate_on_reads=2),
+    )
+
+    caplog.set_level("WARNING")
+    changed = service.sync_day(day, [_session_for_day(day)])
+
+    assert changed is False
+    assert status_source.write_calls == 1
+    assert "skipped write" in caplog.text
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "<!-- external-change-2 -->" in content
+
+
+def test_sync_day_repairs_reflections_h_mm_time(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| `7:18` | test entry |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| `07:18` | test entry |" in content
+
+
+def test_sync_day_repairs_reflections_partial_hh_m_time(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| `08:4` | partial time entry |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| `08:40` | partial time entry |" in content
+
+
+def test_sync_day_repairs_collapsed_reflections_row(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| `08:3 collapsed reflection content | |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| `08:30` | collapsed reflection content |" in content
+
+
+def test_sync_day_repairs_reflections_overflow_columns(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| `08:43` | part one | part two |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| `08:43` | part one \\| part two |" in content
+
+
+def test_sync_day_preserves_unrecoverable_reflections_entry(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| broken time text | |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "|  | broken time text |" in content
+
+
+def test_sync_day_preserves_escaped_reflections_pipes(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ---- | ----- |",
+            "| `08:43` | [[x\\|y]] |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| `08:43` | [[x\\|y]] |" in content
+
+
+def test_sync_day_repairs_reflections_header_when_first_column_is_corrupt(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME is corrupted text | ENTRY |",
+            "| -------- | ----------- |",
+            "| `08:43` | valid entry |",
+        ],
+    )
+
+    changed = service.sync_day(day, [])
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| TIME | ENTRY |" in content
+    assert "| ---- | ----- |" in content
