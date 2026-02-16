@@ -13,6 +13,7 @@ from sync.daily.icloud import (
 )
 from sync.daily.screen_time import load_screen_time_data
 from sync.log import get_logger
+from sync.contracts.schedule import DayScheduleProfile
 from sync.models.screen_time import DailyScreenTimeData
 from sync.models.status import (
     CanonicalActivityPayload,
@@ -225,6 +226,7 @@ class ICloudDailyStatusSource(DailyStatusSource):
         self,
         day: datetime.date,
         sessions: list[StudySessionRecord],
+        day_schedule: DayScheduleProfile,
     ) -> None:
         """Persist study times for iPad shortcut consumption."""
-        write_study_times_to_icloud(sessions, day.isoformat())
+        write_study_times_to_icloud(sessions, day.isoformat(), day_schedule)

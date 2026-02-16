@@ -17,8 +17,8 @@ class DailyDeviationData:
     Tracks time lost due to:
     - Study session interruptions
     - Break overruns beyond scheduled break time
-    - Late study start (vs ideal 8:00 AM)
-    - Late workout start (vs ideal 6:00 PM)
+    - Late study start (vs resolved day schedule)
+    - Late workout start (vs resolved day schedule)
     """
 
     interrupt_minutes: float = 0.0

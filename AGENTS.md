@@ -19,6 +19,7 @@ journal/
     contracts/                 # Pure typed contracts (no I/O)
       study.py
       daily.py
+      schedule.py
       metrics.py
       query.py
       goals.py
@@ -28,6 +29,7 @@ journal/
     ports/                     # Stable Protocol interfaces
       sessions.py
       status.py
+      schedule.py
       notes.py
       daily_aggregates.py
       goals.py
@@ -42,6 +44,7 @@ journal/
       markdown_daily_aggregates.py
       markdown_goals.py
       markdown_reminders.py
+      markdown_schedule.py
       obsidian_media.py
       vault_context.py
 
@@ -53,6 +56,7 @@ journal/
 
     models/                    # Dataclasses and domain payloads
     readers/                   # Markdown parsing (markdown -> models/contracts)
+      schedule.py
     writers/                   # Rendering (models/contracts -> markdown)
 
     daily/
@@ -165,13 +169,14 @@ journal/
 
 ### Ports
 
-- `StudySessionSource.load_sessions(day) -> list[StudySessionRecord]`
+- `StudySessionSource.load_sessions(day, day_schedule) -> list[StudySessionRecord]`
 - `DailyStatusSource`:
   - `target_days(anchor_day) -> tuple[date, ...]`
   - `load_training(day) -> TrainingStatusBundle`
   - `load_sleep(day) -> SleepStatusPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
   - `load_screen_time(day) -> DailyScreenTimeData | None`
-  - `write_study_times(day, sessions) -> None`
+  - `write_study_times(day, sessions, day_schedule) -> None`
+- `ScheduleSource.resolve_day(day) -> DayScheduleProfile`
 - `NoteStore`:
   - `read(path) -> list[str] | None`
   - `read_or_create(path, template_path) -> list[str]`
@@ -196,6 +201,10 @@ journal/
 - Daily `STUDY` tables are canonical only when they include:
   - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |`
 - Legacy `STUDY` tables without `CONTEXT` are rejected with explicit errors.
+- `PROTOCOL.md` `## SCHEDULE` is canonical only when it includes:
+  - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
+  - required `DEFAULT` row with full values
+  - optional `WEEKDAY:...` and `DATE:YYYY-MM-DD` override rows
 
 ## Data Flow
 
@@ -264,7 +273,7 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `REMINDERS_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
+- `REMINDERS_PATH`, `SCHEDULE_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
 - `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`

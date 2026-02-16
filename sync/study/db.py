@@ -9,6 +9,7 @@ import subprocess
 import sqlite3
 import datetime
 
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 
@@ -22,8 +23,6 @@ from sync.study.constants import (
     FLOW_PHASE_LONG_BREAK,
     FLOW_PHASE_SHORT_BREAK,
     FLOW_PHASE_STUDY,
-    LUNCH_WINDOW_BASE,
-    REGULAR_DAY_END,
 )
 from sync.study.breaks import (
     get_expected_break_minutes,
@@ -193,7 +192,10 @@ def dedupe_sessions(
     return merged
 
 
-def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
+def get_sessions_for_day(
+    day: datetime.date,
+    day_schedule: DayScheduleProfile,
+) -> list[StudySessionRecord]:
     """
     Fetch and process study sessions from the database for a specific day.
 
@@ -287,7 +289,9 @@ def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
     break_sessions.sort(key=lambda x: x["start"])
 
     lunch_window = compute_dynamic_lunch_window(
-        study_sessions, LUNCH_WINDOW_BASE, reference_date=day
+        study_sessions,
+        (day_schedule.lunch_start, day_schedule.lunch_end),
+        reference_date=day,
     )
     lunch_duration_minutes = 0
     if lunch_window:
@@ -376,7 +380,7 @@ def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
                 session["break_expected"] = int(actual_break_minutes + 0.5)
                 session["break_duration"] = session["break_expected"]
             effective_next_start = clamp_next_study_within_day(
-                session["end"], next_study_start, REGULAR_DAY_END
+                session["end"], next_study_start, day_schedule.study_end
             )
             if not effective_next_start or effective_next_start <= session["end"]:
                 session["break_overrun"] = 0
@@ -435,7 +439,7 @@ def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
 
             # Recalculate overrun for prev session
             effective_next_start = clamp_next_study_within_day(
-                prev["end"], current["start"], REGULAR_DAY_END
+                prev["end"], current["start"], day_schedule.study_end
             )
             if effective_next_start and effective_next_start > prev["end"]:
                 gap_minutes = (effective_next_start - prev["end"]).total_seconds() / 60
@@ -446,6 +450,6 @@ def get_sessions_for_day(day: datetime.date) -> list[StudySessionRecord]:
     return study_sessions
 
 
-def get_todays_sessions() -> list[StudySessionRecord]:
+def get_todays_sessions(day_schedule: DayScheduleProfile) -> list[StudySessionRecord]:
     """Fetch and process study sessions for today."""
-    return get_sessions_for_day(datetime.date.today())
+    return get_sessions_for_day(datetime.date.today(), day_schedule)

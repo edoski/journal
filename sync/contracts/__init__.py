@@ -6,10 +6,13 @@ from .targets import (
     TrainingTargetBucket,
     TrainingTargets,
 )
+from .schedule import DayScheduleProfile, Weekday
 
 __all__ = [
     "PeriodType",
     "SummaryTargets",
     "TrainingTargetBucket",
     "TrainingTargets",
+    "DayScheduleProfile",
+    "Weekday",
 ]

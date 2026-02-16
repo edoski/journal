@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Protocol
 
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.models.screen_time import DailyScreenTimeData
 from sync.models.status import CanonicalSleepPayload, CanonicalTrainingStatus
@@ -29,5 +30,6 @@ class DailyStatusSource(Protocol):
         self,
         day: datetime.date,
         sessions: list[StudySessionRecord],
+        day_schedule: DayScheduleProfile,
     ) -> None:
         """Persist study-time boundaries consumed by shortcuts."""

@@ -8,7 +8,8 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from sync.constants import IDEAL, JOURNAL_DIR
+from sync.constants import JOURNAL_DIR
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.daily.constants import TEMPLATE_PATH
 from sync.daily.context import format_context_cell
@@ -105,6 +106,7 @@ class DailySyncService:
         self,
         day: datetime.date,
         sessions: list[StudySessionRecord],
+        day_schedule: DayScheduleProfile,
     ) -> bool | None:
         """Synchronize the daily note for a specific date."""
         today_str = day.isoformat()
@@ -123,7 +125,7 @@ class DailySyncService:
             return format_context_cell(wikilinks)
 
         # External side effect runs once per sync call, outside rebase retries.
-        self.status_source.write_study_times(day, sessions)
+        self.status_source.write_study_times(day, sessions, day_schedule)
 
         for attempt in range(1, MAX_REBASE_ATTEMPTS + 1):
             with locked_note(file_path):
@@ -137,6 +139,7 @@ class DailySyncService:
                 base_lines,
                 day=day,
                 sessions=sessions,
+                day_schedule=day_schedule,
                 file_path=file_path,
                 context_for_session=context_callback,
             )
@@ -182,6 +185,7 @@ class DailySyncService:
         *,
         day: datetime.date,
         sessions: list[StudySessionRecord],
+        day_schedule: DayScheduleProfile,
         file_path: str,
         context_for_session: Callable[[datetime.datetime, datetime.datetime], str],
     ) -> _ComposeResult:
@@ -204,6 +208,7 @@ class DailySyncService:
             lines_with_goals,
             sessions,
             day,
+            day_schedule,
             new_table_lines,
         )
 
@@ -492,6 +497,7 @@ class DailySyncService:
         lines: list[str],
         sessions: list[StudySessionRecord],
         day: datetime.date,
+        day_schedule: DayScheduleProfile,
         new_table_lines: list[str],
     ) -> _MetricsSectionResult:
         metrics_idx = find_header_idx(lines, "Metrics")
@@ -530,6 +536,8 @@ class DailySyncService:
         sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
         screen_time_data = self.status_source.load_screen_time(day)
         deviation_data = self._build_deviation_data(
+            day,
+            day_schedule,
             sessions,
             training_status,
         )
@@ -558,19 +566,27 @@ class DailySyncService:
 
     @staticmethod
     def _build_deviation_data(
+        day: datetime.date,
+        day_schedule: DayScheduleProfile,
         sessions: list[StudySessionRecord],
         training_status: CanonicalTrainingStatus,
     ) -> DailyDeviationData:
         deviation_data = DailyDeviationData()
 
+        day_study_start = datetime.datetime.combine(day, day_schedule.study_start)
+        day_study_end = datetime.datetime.combine(day, day_schedule.study_end)
+        study_window_minutes = 0.0
+        if day_study_end > day_study_start:
+            study_window_minutes = (
+                day_study_end - day_study_start
+            ).total_seconds() / 60
+
         if sessions:
             first_start = sessions[0]["start"]
-            ideal_study_start = first_start.replace(
-                hour=IDEAL.study_start_hour, minute=0, second=0, microsecond=0
-            )
-            if first_start > ideal_study_start:
+            effective_first_start = min(first_start, day_study_end)
+            if effective_first_start > day_study_start:
                 deviation_data.late_study_start_minutes = (
-                    first_start - ideal_study_start
+                    effective_first_start - day_study_start
                 ).total_seconds() / 60
 
             deviation_data.interrupt_minutes = sum(
@@ -580,6 +596,8 @@ class DailySyncService:
             deviation_data.overrun_minutes = sum(
                 session.get("break_overrun", 0) or 0 for session in sessions
             )
+        else:
+            deviation_data.late_study_start_minutes = study_window_minutes
 
         if training_status.workout_entries:
             workout_entries: tuple[CanonicalTrainingEntry, ...] = (
@@ -600,7 +618,10 @@ class DailySyncService:
                     ):
                         earliest_workout_start = start_minutes
             if earliest_workout_start is not None:
-                ideal_workout_minutes = IDEAL.workout_start_hour * 60
+                ideal_workout_minutes = (
+                    day_schedule.workout_start.hour * 60
+                    + day_schedule.workout_start.minute
+                )
                 if earliest_workout_start > ideal_workout_minutes:
                     deviation_data.late_workout_start_minutes = (
                         earliest_workout_start - ideal_workout_minutes

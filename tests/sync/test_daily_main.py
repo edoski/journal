@@ -5,6 +5,17 @@ from __future__ import annotations
 import datetime
 
 import sync.daily.__main__ as daily_main
+from sync.contracts.schedule import DayScheduleProfile
+
+
+def _default_schedule() -> DayScheduleProfile:
+    return DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
+    )
 
 
 def _patch_common_runtime(monkeypatch) -> None:
@@ -35,13 +46,19 @@ def _patch_common_runtime(monkeypatch) -> None:
 def test_main_syncs_non_today_days_first_then_today(monkeypatch):
     anchor_day = datetime.date.today()
     loaded_session_days: list[datetime.date] = []
+    resolved_schedule_days: list[datetime.date] = []
     synced_days: list[tuple[datetime.date, list[dict[str, str]]]] = []
 
     _patch_common_runtime(monkeypatch)
 
     class _FakeSessionSource:
-        def load_sessions(self, day: datetime.date) -> list[dict[str, str]]:
+        def load_sessions(
+            self,
+            day: datetime.date,
+            day_schedule: DayScheduleProfile,
+        ) -> list[dict[str, str]]:
             loaded_session_days.append(day)
+            assert day_schedule == _default_schedule()
             return [{"source_day": day.isoformat()}]
 
     class _FakeStatusSource:
@@ -60,15 +77,27 @@ def test_main_syncs_non_today_days_first_then_today(monkeypatch):
         def __init__(self, **kwargs) -> None:
             _ = kwargs
 
-        def sync_day(self, day: datetime.date, sessions: list[dict[str, str]]):
+        def sync_day(
+            self,
+            day: datetime.date,
+            sessions: list[dict[str, str]],
+            day_schedule: DayScheduleProfile,
+        ):
+            assert day_schedule == _default_schedule()
             synced_days.append((day, sessions))
             return True
+
+    class _FakeScheduleSource:
+        def resolve_day(self, day: datetime.date) -> DayScheduleProfile:
+            resolved_schedule_days.append(day)
+            return _default_schedule()
 
     monkeypatch.setattr(
         daily_main, "FlowStudySessionSource", lambda: _FakeSessionSource()
     )
     monkeypatch.setattr(daily_main, "ICloudDailyStatusSource", _FakeStatusSource)
     monkeypatch.setattr(daily_main, "DailySyncService", _FakeDailySyncService)
+    monkeypatch.setattr(daily_main, "MarkdownScheduleSource", _FakeScheduleSource)
 
     daily_main.main([])
 
@@ -78,6 +107,7 @@ def test_main_syncs_non_today_days_first_then_today(monkeypatch):
         anchor_day,
     ]
     assert loaded_session_days == expected_days
+    assert resolved_schedule_days == expected_days
     assert [day for day, _sessions in synced_days] == expected_days
     assert [sessions for _day, sessions in synced_days] == [
         [{"source_day": day.isoformat()}] for day in expected_days
@@ -87,13 +117,19 @@ def test_main_syncs_non_today_days_first_then_today(monkeypatch):
 def test_main_syncs_today_only_when_no_backfill_targets(monkeypatch):
     anchor_day = datetime.date.today()
     loaded_session_days: list[datetime.date] = []
+    resolved_schedule_days: list[datetime.date] = []
     synced_days: list[datetime.date] = []
 
     _patch_common_runtime(monkeypatch)
 
     class _FakeSessionSource:
-        def load_sessions(self, day: datetime.date) -> list[dict]:
+        def load_sessions(
+            self,
+            day: datetime.date,
+            day_schedule: DayScheduleProfile,
+        ) -> list[dict]:
             loaded_session_days.append(day)
+            assert day_schedule == _default_schedule()
             return []
 
     class _FakeStatusSource:
@@ -108,18 +144,31 @@ def test_main_syncs_today_only_when_no_backfill_targets(monkeypatch):
         def __init__(self, **kwargs) -> None:
             _ = kwargs
 
-        def sync_day(self, day: datetime.date, sessions: list[dict]):
+        def sync_day(
+            self,
+            day: datetime.date,
+            sessions: list[dict],
+            day_schedule: DayScheduleProfile,
+        ):
             _ = sessions
+            assert day_schedule == _default_schedule()
             synced_days.append(day)
             return True
+
+    class _FakeScheduleSource:
+        def resolve_day(self, day: datetime.date) -> DayScheduleProfile:
+            resolved_schedule_days.append(day)
+            return _default_schedule()
 
     monkeypatch.setattr(
         daily_main, "FlowStudySessionSource", lambda: _FakeSessionSource()
     )
     monkeypatch.setattr(daily_main, "ICloudDailyStatusSource", _FakeStatusSource)
     monkeypatch.setattr(daily_main, "DailySyncService", _FakeDailySyncService)
+    monkeypatch.setattr(daily_main, "MarkdownScheduleSource", _FakeScheduleSource)
 
     daily_main.main([])
 
     assert loaded_session_days == [anchor_day]
+    assert resolved_schedule_days == [anchor_day]
     assert synced_days == [anchor_day]

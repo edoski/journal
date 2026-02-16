@@ -18,6 +18,7 @@ from typing import Any
 from sync.log import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 
 logger = get_logger(__name__)
@@ -159,7 +160,9 @@ def quarantine_status_file(filename: str, parsed_path: str | None) -> None:
 
 
 def write_study_times_to_icloud(
-    sessions: list[StudySessionRecord], today_str: str
+    sessions: list[StudySessionRecord],
+    today_str: str,
+    day_schedule: DayScheduleProfile,
 ) -> None:
     """
     Write study session times to iCloud for iPad shortcut to read.
@@ -167,6 +170,7 @@ def write_study_times_to_icloud(
     Args:
         sessions: List of study session dicts
         today_str: Today's date string (YYYY-MM-DD)
+        day_schedule: Resolved daily schedule profile
     """
     if not sessions:
         return
@@ -175,31 +179,42 @@ def write_study_times_to_icloud(
     note_date = datetime.date.fromisoformat(today_str)
 
     # Default schedule used when actual times would create invalid ranges
-    default_morning = datetime.datetime.combine(note_date, datetime.time(8, 0))
-    default_lunch = datetime.datetime.combine(note_date, datetime.time(13, 30))
-    default_afternoon = datetime.datetime.combine(note_date, datetime.time(14, 30))
-    default_afternoon_end = datetime.datetime.combine(note_date, datetime.time(18, 0))
+    default_morning = datetime.datetime.combine(note_date, day_schedule.study_start)
+    default_lunch = datetime.datetime.combine(note_date, day_schedule.lunch_start)
+    default_afternoon = datetime.datetime.combine(note_date, day_schedule.lunch_end)
+    default_afternoon_end = datetime.datetime.combine(note_date, day_schedule.study_end)
 
     first_start = sessions[0]["start"]
     last_end = sessions[-1]["end"]
 
-    # Find last session ending between 12:00-15:00 (pre-lunch)
+    # Find last session ending near lunch to preserve dynamic afternoon anchoring.
+    lunch_duration = default_afternoon - default_lunch
+    if lunch_duration <= datetime.timedelta(0):
+        lunch_duration = datetime.timedelta(hours=1)
+    lunch_window_start = default_lunch - datetime.timedelta(minutes=90)
+    lunch_window_end = default_afternoon + datetime.timedelta(minutes=30)
+
     lunch_start = None
     for session in sessions:
-        end_hour = session["end"].hour
-        if 12 <= end_hour < 15:
+        end_time = session["end"]
+        if lunch_window_start <= end_time < lunch_window_end:
             lunch_start = session["end"]
 
-    # Compute afternoon start (1 hour after lunch)
+    # Compute afternoon start (configured lunch duration after lunch start)
     afternoon_start = None
     if lunch_start:
-        afternoon_start = lunch_start + datetime.timedelta(hours=1)
+        afternoon_start = lunch_start + lunch_duration
 
-    # Compute afternoon start time for comparison (use actual or default 14:30)
+    # Compute afternoon start time for comparison (use actual or schedule default).
     afternoon_start_time = (
         afternoon_start
         if afternoon_start
-        else first_start.replace(hour=14, minute=30, second=0, microsecond=0)
+        else first_start.replace(
+            hour=day_schedule.lunch_end.hour,
+            minute=day_schedule.lunch_end.minute,
+            second=0,
+            microsecond=0,
+        )
     )
 
     afternoon_end = (

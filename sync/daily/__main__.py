@@ -24,6 +24,7 @@ from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
+from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.adapters.vault_context import VaultContextSource
 from sync.adapters.cache_bootstrap import bootstrap_cache_layout
 from sync.application.daily_sync_service import DailySyncService
@@ -47,6 +48,7 @@ def main(argv: list[str] | None = None) -> None:
 
     bootstrap_cache_layout()
     day = datetime.date.today()
+    schedule_source = MarkdownScheduleSource()
     session_source = FlowStudySessionSource()
     note_store = MarkdownNoteStore()
     goal_store = MarkdownGoalStore()
@@ -75,8 +77,9 @@ def main(argv: list[str] | None = None) -> None:
     run_days.append(day)
     try:
         for run_day in run_days:
-            sessions = session_source.load_sessions(run_day)
-            changed = service.sync_day(run_day, sessions)
+            day_schedule = schedule_source.resolve_day(run_day)
+            sessions = session_source.load_sessions(run_day, day_schedule)
+            changed = service.sync_day(run_day, sessions, day_schedule)
             if changed is False:
                 # Suppress noisy success logs on no-op runs.
                 continue

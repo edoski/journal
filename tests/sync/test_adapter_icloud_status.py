@@ -6,6 +6,7 @@ import datetime
 
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.adapters.json_daily_cache import JsonDailyScreenTimeCacheStore
+from sync.contracts.schedule import DayScheduleProfile
 from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
 from sync.models.status import CanonicalActivityPayload, CanonicalTrainingStatus
 
@@ -16,6 +17,16 @@ def _build_adapter(tmp_path):
             cache_dir=str(tmp_path / "cache" / "daily" / "screen_time"),
             lock_root=str(tmp_path / "cache" / "locks" / "state"),
         )
+    )
+
+
+def _default_schedule() -> DayScheduleProfile:
+    return DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
     )
 
 
@@ -314,10 +325,12 @@ def test_target_days_is_idempotent_per_anchor_day(monkeypatch, tmp_path):
 def test_write_study_times_uses_iso_day(monkeypatch, tmp_path):
     day = datetime.date(2026, 2, 6)
     sessions = [{"start": datetime.datetime(2026, 2, 6, 8, 0)}]
-    calls: list[tuple[list[dict], str]] = []
+    calls: list[tuple[list[dict], str, DayScheduleProfile]] = []
 
-    def fake_write_study_times(payload_sessions, today_str: str):
-        calls.append((payload_sessions, today_str))
+    def fake_write_study_times(
+        payload_sessions, today_str: str, day_schedule: DayScheduleProfile
+    ):
+        calls.append((payload_sessions, today_str, day_schedule))
 
     monkeypatch.setattr(
         "sync.adapters.icloud_status.write_study_times_to_icloud",
@@ -325,6 +338,6 @@ def test_write_study_times_uses_iso_day(monkeypatch, tmp_path):
     )
 
     adapter = _build_adapter(tmp_path)
-    adapter.write_study_times(day, sessions)
+    adapter.write_study_times(day, sessions, _default_schedule())
 
-    assert calls == [(sessions, "2026-02-06")]
+    assert calls == [(sessions, "2026-02-06", _default_schedule())]

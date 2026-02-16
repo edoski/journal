@@ -25,6 +25,7 @@ YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 
 # Reminder rules markdown path (required, user-managed)
 REMINDERS_PATH = PATHS.reminders_path
+SCHEDULE_PATH = PATHS.schedule_path
 
 # Cache directories
 JOURNAL_CACHE_DIR = PATHS.journal_cache_dir
@@ -69,8 +70,6 @@ STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
 class IdealSchedule:
     """Ideal daily/weekly targets for tracking schedule adherence."""
 
-    study_start_hour: int = 8  # 8:00 AM
-    workout_start_hour: int = 18  # 6:00 PM
     study_minutes_daily: int = 360  # 6h/day
     sleep_minutes_nightly: int = 480  # 8h/night
     workout_days_weekly: int = 7  # 7/7

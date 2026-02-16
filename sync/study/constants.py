@@ -4,8 +4,6 @@ Constants for study-session ingestion from the Flow app.
 
 from __future__ import annotations
 
-import datetime
-
 from sync.config import PATHS
 
 # External integration identifiers for the Flow app.
@@ -22,9 +20,5 @@ DB_PATH = PATHS.flow_db_path
 # CoreData uses an epoch starting at 2001-01-01 instead of 1970-01-01.
 CORE_DATA_EPOCH_OFFSET = 978307200
 
-# Break-linking and overrun boundaries.
+# Break-linking boundary.
 BREAK_LINK_MAX_GAP_SECONDS = 300
-REGULAR_DAY_END = datetime.time(18, 0)
-
-# Base daily lunch window (dynamically shifted when a study session straddles start).
-LUNCH_WINDOW_BASE = (datetime.time(13, 30), datetime.time(14, 30))

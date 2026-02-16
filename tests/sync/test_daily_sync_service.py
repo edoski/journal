@@ -10,8 +10,9 @@ import pytest
 from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
+from sync.contracts.schedule import DayScheduleProfile
 from sync.models.screen_time import DailyScreenTimeData
-from sync.models.status import CanonicalTrainingStatus
+from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
 
 
 class _StubStatusSource:
@@ -27,7 +28,12 @@ class _StubStatusSource:
     def load_screen_time(self, _day: datetime.date) -> DailyScreenTimeData | None:
         return None
 
-    def write_study_times(self, _day: datetime.date, _sessions) -> None:
+    def write_study_times(
+        self,
+        _day: datetime.date,
+        _sessions,
+        _day_schedule: DayScheduleProfile,
+    ) -> None:
         return None
 
 
@@ -35,7 +41,12 @@ class _CountingStatusSource(_StubStatusSource):
     def __init__(self) -> None:
         self.write_calls = 0
 
-    def write_study_times(self, _day: datetime.date, _sessions) -> None:
+    def write_study_times(
+        self,
+        _day: datetime.date,
+        _sessions,
+        _day_schedule: DayScheduleProfile,
+    ) -> None:
         self.write_calls += 1
 
 
@@ -103,6 +114,16 @@ def _session_for_day(day: datetime.date) -> dict:
     }
 
 
+def _default_schedule() -> DayScheduleProfile:
+    return DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
+    )
+
+
 def _build_service(
     monkeypatch,
     tmp_path,
@@ -163,7 +184,7 @@ def _seed_daily_note(
 def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     day = datetime.date.today()
     service, journal_dir = _build_service(monkeypatch, tmp_path)
-    changed = service.sync_day(day, [_session_for_day(day)])
+    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
     assert changed is True
 
     note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
@@ -186,8 +207,8 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
 def test_sync_day_is_idempotent(monkeypatch, tmp_path):
     day = datetime.date.today()
     service, _ = _build_service(monkeypatch, tmp_path)
-    first = service.sync_day(day, [_session_for_day(day)])
-    second = service.sync_day(day, [_session_for_day(day)])
+    first = service.sync_day(day, [_session_for_day(day)], _default_schedule())
+    second = service.sync_day(day, [_session_for_day(day)], _default_schedule())
     assert first is True
     assert second is False
 
@@ -196,7 +217,11 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
     fixed_today = datetime.date(2025, 1, 15)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
 
-    changed = service.sync_day(fixed_today, [_session_for_day(fixed_today)])
+    changed = service.sync_day(
+        fixed_today,
+        [_session_for_day(fixed_today)],
+        _default_schedule(),
+    )
     assert changed is True
 
     note_path = f"{journal_dir}/{fixed_today:%Y-%m-%d}.md"
@@ -226,13 +251,13 @@ def test_sync_day_fails_without_reminders_config(monkeypatch, tmp_path):
     )
 
     with pytest.raises(FileNotFoundError, match="Required reminder config not found"):
-        service.sync_day(day, [_session_for_day(day)])
+        service.sync_day(day, [_session_for_day(day)], _default_schedule())
 
 
 def test_sync_day_tolerates_missing_sleep_payload(monkeypatch, tmp_path):
     day = datetime.date(2025, 1, 15)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
-    changed = service.sync_day(day, [_session_for_day(day)])
+    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
     assert changed is True
     note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
     content = open(note_path, "r", encoding="utf-8").read()
@@ -250,7 +275,7 @@ def test_sync_day_rebases_when_note_changes_before_write(monkeypatch, tmp_path, 
     )
 
     caplog.set_level("WARNING")
-    changed = service.sync_day(day, [_session_for_day(day)])
+    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
 
     assert changed is True
     assert status_source.write_calls == 1
@@ -272,7 +297,7 @@ def test_sync_day_skips_write_after_persistent_rebase_conflicts(
     )
 
     caplog.set_level("WARNING")
-    changed = service.sync_day(day, [_session_for_day(day)])
+    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
 
     assert changed is False
     assert status_source.write_calls == 1
@@ -294,7 +319,7 @@ def test_sync_day_repairs_reflections_h_mm_time(monkeypatch, tmp_path):
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| `07:18` | test entry |" in content
@@ -313,7 +338,7 @@ def test_sync_day_repairs_reflections_partial_hh_m_time(monkeypatch, tmp_path):
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| `08:40` | partial time entry |" in content
@@ -332,7 +357,7 @@ def test_sync_day_repairs_collapsed_reflections_row(monkeypatch, tmp_path):
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| `08:30` | collapsed reflection content |" in content
@@ -351,7 +376,7 @@ def test_sync_day_repairs_reflections_overflow_columns(monkeypatch, tmp_path):
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| `08:43` | part one \\| part two |" in content
@@ -370,7 +395,7 @@ def test_sync_day_preserves_unrecoverable_reflections_entry(monkeypatch, tmp_pat
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "|  | broken time text |" in content
@@ -389,7 +414,7 @@ def test_sync_day_preserves_escaped_reflections_pipes(monkeypatch, tmp_path):
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| `08:43` | [[x\\|y]] |" in content
@@ -410,8 +435,89 @@ def test_sync_day_repairs_reflections_header_when_first_column_is_corrupt(
         ],
     )
 
-    changed = service.sync_day(day, [])
+    changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "| TIME | ENTRY |" in content
     assert "| ---- | ----- |" in content
+
+
+def test_build_deviation_data_accrues_full_study_window_without_sessions():
+    day = datetime.date(2026, 2, 18)
+    schedule = DayScheduleProfile(
+        study_start=datetime.time(14, 30),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
+    )
+
+    deviation = DailySyncService._build_deviation_data(
+        day,
+        schedule,
+        [],
+        CanonicalTrainingStatus(),
+    )
+
+    assert deviation.late_study_start_minutes == 210.0
+
+
+def test_build_deviation_data_uses_schedule_study_start_for_lateness():
+    day = datetime.date(2026, 2, 19)
+    schedule = DayScheduleProfile(
+        study_start=datetime.time(14, 30),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
+    )
+    session_start = datetime.datetime.combine(day, datetime.time(15, 0))
+    session_end = datetime.datetime.combine(day, datetime.time(16, 0))
+    sessions = [
+        {
+            "start": session_start,
+            "end": session_end,
+            "interruptions_duration": 0,
+            "break_overrun": 0,
+        }
+    ]
+
+    deviation = DailySyncService._build_deviation_data(
+        day,
+        schedule,
+        sessions,
+        CanonicalTrainingStatus(),
+    )
+
+    assert deviation.late_study_start_minutes == 30.0
+
+
+def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
+    day = datetime.date(2026, 2, 20)
+    schedule = DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(19, 0),
+    )
+    training = CanonicalTrainingStatus(
+        workout_entries=(
+            CanonicalTrainingEntry(
+                date=day.isoformat(),
+                start="19:15",
+                end="20:00",
+                duration=45.0,
+                type="Workout",
+            ),
+        )
+    )
+
+    deviation = DailySyncService._build_deviation_data(
+        day,
+        schedule,
+        [],
+        training,
+    )
+
+    assert deviation.late_workout_start_minutes == 15.0

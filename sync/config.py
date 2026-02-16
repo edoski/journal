@@ -20,6 +20,7 @@ class PathConfig:
     quarterly_template_path: str
     yearly_template_path: str
     reminders_path: str
+    schedule_path: str
     journal_cache_dir: str
     goal_cache_dir: str
     media_cache_dir: str
@@ -124,6 +125,10 @@ def _build_paths() -> PathConfig:
         reminders_path=_env_path(
             "REMINDERS_PATH",
             os.path.join(journal_dir, "REMINDERS.md"),
+        ),
+        schedule_path=_env_path(
+            "SCHEDULE_PATH",
+            os.path.join(journal_dir, "PROTOCOL.md"),
         ),
         journal_cache_dir=journal_cache_dir,
         goal_cache_dir=_env_path(

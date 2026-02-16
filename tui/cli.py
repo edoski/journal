@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sync.adapters.flow_sessions import FlowStudySessionSource
+from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.config import LOGGING
 from sync.contracts.study import StudySessionRecord
 from sync.log import (
@@ -20,6 +21,7 @@ from sync.log import (
     get_logger,
     resolve_logging_settings,
 )
+from sync.ports.schedule import ScheduleSource
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
 SKIP_CONFIG_PATH = Path.home() / ".config" / "journal" / "skip_schedule.json"
@@ -206,6 +208,7 @@ def _record_to_cli_session(record: StudySessionRecord) -> dict:
 
 def _load_recent_focus_sessions(
     source: FlowStudySessionSource,
+    schedule_source: ScheduleSource,
     *,
     limit: int,
     lookback_days: int = 14,
@@ -216,7 +219,8 @@ def _load_recent_focus_sessions(
     for delta_days in range(lookback_days + 1):
         day = today - timedelta(days=delta_days)
         try:
-            day_sessions = source.load_sessions(day)
+            day_schedule = schedule_source.resolve_day(day)
+            day_sessions = source.load_sessions(day, day_schedule)
         except Exception as exc:
             logger.debug("Failed to load sessions for %s: %s", day, exc)
             continue
@@ -276,6 +280,7 @@ def cmd_session_preview(args: argparse.Namespace) -> int:
     sessions: list[dict]
     conn: sqlite3.Connection | None = None
     session_source = FlowStudySessionSource()
+    schedule_source = MarkdownScheduleSource()
 
     if args.all_phases:
         try:
@@ -286,7 +291,9 @@ def cmd_session_preview(args: argparse.Namespace) -> int:
         sessions = get_recent_sessions(conn, limit=50)
     else:
         sessions = _load_recent_focus_sessions(
-            session_source, limit=max(50, args.count)
+            session_source,
+            schedule_source,
+            limit=max(50, args.count),
         )
 
     if not sessions:
@@ -336,7 +343,12 @@ def cmd_session_preview(args: argparse.Namespace) -> int:
 def cmd_rename_session(args: argparse.Namespace) -> int:
     """Rename most recent focus session."""
     session_source = FlowStudySessionSource()
-    sessions = _load_recent_focus_sessions(session_source, limit=10)
+    schedule_source = MarkdownScheduleSource()
+    sessions = _load_recent_focus_sessions(
+        session_source,
+        schedule_source,
+        limit=10,
+    )
     focus = _find_most_recent_focus(sessions)
     if not focus:
         print("No focus session found to rename.")
@@ -373,7 +385,12 @@ def cmd_rename_session(args: argparse.Namespace) -> int:
 def cmd_undo_last_session(args: argparse.Namespace) -> int:
     """Delete most recent focus session and adjacent break."""
     session_source = FlowStudySessionSource()
-    sessions = _load_recent_focus_sessions(session_source, limit=10)
+    schedule_source = MarkdownScheduleSource()
+    sessions = _load_recent_focus_sessions(
+        session_source,
+        schedule_source,
+        limit=10,
+    )
     focus = _find_most_recent_focus(sessions)
     if not focus:
         print("No focus session found to delete.")
