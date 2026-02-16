@@ -242,6 +242,7 @@ def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
     assert stale_reminder.id not in updated_text
     assert updated_text.count(today_reminder.id) == 1
     assert "Manual carry task" in updated_text
+    assert "_No daily goals have been defined yet._" not in updated_text
 
     updated_again = service.sync_daily_note(
         updated,
@@ -249,6 +250,81 @@ def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
         note_path=str(tmp_path / "2026-02-14.md"),
         yaml_end_idx=-1,
         reminder_rules=rules,
+    )
+    assert updated_again == updated
+
+
+def test_sync_daily_note_renders_empty_daily_placeholder(monkeypatch, tmp_path):
+    note_store = _StubNoteStore()
+    goal_store = MarkdownGoalStore()
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=JsonGoalCarryForwardCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+        reconcile_cache_store=JsonGoalReconcileCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+    )
+
+    day = datetime.date(2026, 2, 14)
+    lines = [
+        "## Goals",
+        "---",
+        "### **WEEKLY**",
+        "",
+        "_No weekly goals have been defined yet._",
+        "",
+        "### **DAILY**",
+        "",
+        "## Metrics",
+        "---",
+    ]
+
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.carry_forward_daily_tasks",
+        lambda _today, _yesterday, existing_daily_tasks, **_kwargs: (
+            existing_daily_tasks,
+            0,
+        ),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.load_weekly_goals",
+        lambda *_a, **_kw: ([], [], [], [], "weekly.md", "monthly.md", "quarterly.md"),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.reconcile_goal_lists",
+        lambda *_a, **_kw: ([], [], False, False),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_service.process_pierced_goals",
+        lambda *_a, **kwargs: (
+            kwargs["existing_tasks"],
+            [],
+            kwargs["source_goal_lists"],
+        ),
+    )
+
+    updated = service.sync_daily_note(
+        lines,
+        day=day,
+        note_path=str(tmp_path / "2026-02-14.md"),
+        yaml_end_idx=-1,
+        reminder_rules=[],
+    )
+
+    updated_text = "\n".join(updated)
+    assert "_No daily goals have been defined yet._" in updated_text
+
+    updated_again = service.sync_daily_note(
+        updated,
+        day=day,
+        note_path=str(tmp_path / "2026-02-14.md"),
+        yaml_end_idx=-1,
+        reminder_rules=[],
     )
     assert updated_again == updated
 

@@ -127,10 +127,10 @@ class GoalSyncService:
         )
 
         filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, day)
-        weekly_lines = (
-            render_goal_lines(filtered_weekly, today=day)
-            if filtered_weekly
-            else ["", "_No weekly goals have been defined yet._"]
+        weekly_lines = self._render_goals_or_empty(
+            "WEEKLY",
+            filtered_weekly,
+            today=day,
         )
 
         (
@@ -161,12 +161,11 @@ class GoalSyncService:
                 goal_store=self.goal_store,
             )
 
-        daily_source_lines = render_goal_lines(original_daily, today=day)
-        if final_pierced:
-            daily_source_lines = daily_source_lines + render_goal_lines(
-                final_pierced,
-                today=day,
-            )
+        daily_source_lines = self._render_goals_or_empty(
+            "DAILY",
+            [*original_daily, *final_pierced],
+            today=day,
+        )
 
         goals_block = build_goals_block(
             [
