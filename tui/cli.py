@@ -441,22 +441,63 @@ def _run_applescript(script: str) -> str | None:
         return None
 
 
+def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
+    """Return True when latest session row is an open focus session."""
+    cur = conn.cursor()
+    cur.execute(
+        """
+        SELECT ZPHASE, ZCOMPLETEDAT
+        FROM ZSESSION
+        ORDER BY ZSTARTEDAT DESC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    if not row:
+        return False
+    phase, completed_at = row
+    return phase == "flow" and completed_at is None
+
+
 def cmd_skip_now(_args: argparse.Namespace) -> int:
     """Skip active focus session and start break, honoring skip config."""
     config = _load_skip_config()
     if not config.get("enabled", False):
-        logger.info("Skip automation disabled; exiting")
+        logger.info("Skip no-op: automation disabled")
         return 0
 
     phase = _run_applescript('tell application "Flow" to getPhase')
     logger.info("Current phase: %s", phase)
     if phase != "Flow":
-        logger.info("Not in Flow phase; no skip performed")
+        logger.info("Skip no-op: current phase is not Flow")
         return 0
 
-    _run_applescript('tell application "Flow" to skip')
-    _run_applescript('tell application "Flow" to start')
-    _run_applescript('tell application "Flow" to show')
+    try:
+        conn = get_connection(readonly=True)
+    except Exception as exc:
+        logger.warning("Skip no-op: failed to read Flow DB state: %s", exc)
+        return 0
+
+    try:
+        if not _latest_row_is_open_flow(conn):
+            logger.info("Skip no-op: latest session is not an open flow row")
+            return 0
+    except Exception as exc:
+        logger.warning("Skip no-op: failed to evaluate latest session row: %s", exc)
+        return 0
+    finally:
+        conn.close()
+
+    if _run_applescript('tell application "Flow" to skip') is None:
+        logger.warning("Skip no-op: Flow skip command failed")
+        return 0
+    if _run_applescript('tell application "Flow" to start') is None:
+        logger.warning("Skip no-op: Flow start command failed after skip")
+        return 0
+    if _run_applescript('tell application "Flow" to show') is None:
+        logger.warning("Skip no-op: Flow show command failed after skip/start")
+        return 0
+
     logger.info("Skip executed")
     return 0
 
