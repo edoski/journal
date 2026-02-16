@@ -292,7 +292,7 @@ Operational guidance:
 - Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.flow-skip.plist`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
-- `tui.cli skip-now` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window.
+- `tui.cli skip-now` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
 - Logging is stderr-only; no app-level log file sink is used.
 - Keep `/tmp` launchd logs bounded with `JOURNAL_LOG_CAP_BYTES` (default `262144` bytes).
 

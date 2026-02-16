@@ -275,6 +275,13 @@ def test_skip_now_noops_when_now_outside_schedule_window(monkeypatch) -> None:
     assert rc == 0
 
 
+def test_is_within_study_window_includes_end_minute_bucket() -> None:
+    schedule = _default_schedule()
+
+    assert cli._is_within_study_window(datetime(2026, 2, 16, 18, 0, 1), schedule)
+    assert not cli._is_within_study_window(datetime(2026, 2, 16, 18, 1, 0), schedule)
+
+
 def test_cli_skip_toggle_writes_config(tmp_path, monkeypatch):
     state_path = tmp_path / "flow_skip_state.json"
     monkeypatch.setattr(cli, "SKIP_STATE_PATH", state_path)

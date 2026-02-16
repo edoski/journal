@@ -461,8 +461,15 @@ def _resolve_day_schedule(day: date) -> DayScheduleProfile:
 
 
 def _is_within_study_window(now: datetime, day_schedule: DayScheduleProfile) -> bool:
-    current_time = now.time()
-    return day_schedule.study_start <= current_time < day_schedule.study_end
+    """Return True when `now` falls within the schedule window by minute bucket.
+
+    Launchd triggers are minute-based and can fire a few seconds after the minute,
+    so this gate compares only hour+minute and includes the end minute.
+    """
+    current_minutes = now.hour * 60 + now.minute
+    start_minutes = day_schedule.study_start.hour * 60 + day_schedule.study_start.minute
+    end_minutes = day_schedule.study_end.hour * 60 + day_schedule.study_end.minute
+    return start_minutes <= current_minutes <= end_minutes
 
 
 def _run_applescript(script: str) -> str | None:
