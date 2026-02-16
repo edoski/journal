@@ -13,7 +13,8 @@ from pathlib import Path
 
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.markdown_schedule import MarkdownScheduleSource
-from sync.config import LOGGING
+from sync.config import LOGGING, PATHS
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.log import (
     add_logging_cli_args,
@@ -24,7 +25,7 @@ from sync.log import (
 from sync.ports.schedule import ScheduleSource
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
-SKIP_CONFIG_PATH = Path.home() / ".config" / "journal" / "skip_schedule.json"
+SKIP_STATE_PATH = Path(PATHS.journal_cache_dir) / "flow_skip_state.json"
 FLOW_SKIP_LOG_PATH = Path("/tmp/flow-skip.log")
 
 logger = get_logger(__name__)
@@ -173,8 +174,13 @@ def calculate_actual_duration(session: dict) -> float | None:
     """Compute actual session elapsed minutes."""
     if not session["start"]:
         return None
-    end = session["completed"] or datetime.now()
+    end = session["completed"] or _now()
     return (end - session["start"]).total_seconds() / 60
+
+
+def _now() -> datetime:
+    """Current local datetime, wrapped for deterministic tests."""
+    return datetime.now()
 
 
 def _find_most_recent_focus(sessions: list[dict]) -> dict | None:
@@ -429,18 +435,34 @@ def cmd_undo_last_session(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_skip_config() -> dict:
-    if not SKIP_CONFIG_PATH.exists():
-        return {"enabled": False, "skip_times": []}
-    with open(SKIP_CONFIG_PATH, "r", encoding="utf-8") as handle:
-        return json.load(handle)
+def _load_skip_state() -> dict[str, bool]:
+    if not SKIP_STATE_PATH.exists():
+        return {"enabled": False}
+    try:
+        with open(SKIP_STATE_PATH, "r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        logger.warning(
+            "Skip state unreadable at %s; defaulting disabled", SKIP_STATE_PATH
+        )
+        return {"enabled": False}
+    return {"enabled": bool(raw.get("enabled", False))}
 
 
-def _save_skip_config(config: dict) -> None:
-    SKIP_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(SKIP_CONFIG_PATH, "w", encoding="utf-8") as handle:
-        json.dump(config, handle, indent=2)
+def _save_skip_state(state: dict[str, bool]) -> None:
+    SKIP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(SKIP_STATE_PATH, "w", encoding="utf-8") as handle:
+        json.dump(state, handle, indent=2)
         handle.write("\n")
+
+
+def _resolve_day_schedule(day: date) -> DayScheduleProfile:
+    return MarkdownScheduleSource().resolve_day(day)
+
+
+def _is_within_study_window(now: datetime, day_schedule: DayScheduleProfile) -> bool:
+    current_time = now.time()
+    return day_schedule.study_start <= current_time < day_schedule.study_end
 
 
 def _run_applescript(script: str) -> str | None:
@@ -477,10 +499,26 @@ def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
 
 
 def cmd_skip_now(_args: argparse.Namespace) -> int:
-    """Skip active focus session and start break, honoring skip config."""
-    config = _load_skip_config()
-    if not config.get("enabled", False):
+    """Skip active focus session and start break within configured schedule windows."""
+    state = _load_skip_state()
+    if not state.get("enabled", False):
         logger.info("Skip no-op: automation disabled")
+        return 0
+    now = _now()
+    try:
+        day_schedule = _resolve_day_schedule(now.date())
+    except Exception as exc:
+        logger.warning(
+            "Skip no-op: failed to resolve schedule for %s: %s", now.date(), exc
+        )
+        return 0
+
+    if not _is_within_study_window(now, day_schedule):
+        logger.info(
+            "Skip no-op: outside scheduled study window (%s-%s)",
+            day_schedule.study_start.strftime("%H:%M"),
+            day_schedule.study_end.strftime("%H:%M"),
+        )
         return 0
 
     phase = _run_applescript('tell application "Flow" to getPhase')
@@ -521,8 +559,8 @@ def cmd_skip_now(_args: argparse.Namespace) -> int:
 
 def cmd_skip_toggle(args: argparse.Namespace) -> int:
     """Toggle or set skip automation enabled state."""
-    config = _load_skip_config()
-    current = bool(config.get("enabled", False))
+    state = _load_skip_state()
+    current = bool(state.get("enabled", False))
 
     if args.state is None:
         new_state = not current
@@ -531,12 +569,10 @@ def cmd_skip_toggle(args: argparse.Namespace) -> int:
     else:
         new_state = False
 
-    config["enabled"] = new_state
-    _save_skip_config(config)
+    state["enabled"] = new_state
+    _save_skip_state(state)
     status = "ENABLED" if new_state else "DISABLED"
     print(f"Skip automation: {status}")
-    if config.get("skip_times"):
-        print("Skip times:", ", ".join(config.get("skip_times", [])))
     return 0
 
 

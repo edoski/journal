@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+from datetime import date, datetime, time
 
 import tui.cli as cli
+from sync.contracts.schedule import DayScheduleProfile
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
 FLOW_SKIP = 'tell application "Flow" to skip'
@@ -14,6 +16,21 @@ FLOW_SHOW = 'tell application "Flow" to show'
 
 def _skip_args() -> argparse.Namespace:
     return argparse.Namespace()
+
+
+def _default_schedule() -> DayScheduleProfile:
+    return DayScheduleProfile(
+        study_start=time(8, 0),
+        study_end=time(18, 0),
+        lunch_start=time(13, 30),
+        lunch_end=time(14, 30),
+        workout_start=time(18, 0),
+    )
+
+
+def _set_schedule_ready(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
+    monkeypatch.setattr(cli, "_resolve_day_schedule", lambda _day: _default_schedule())
 
 
 def _make_session_conn() -> sqlite3.Connection:
@@ -45,8 +62,8 @@ def _insert_session_row(
     conn.commit()
 
 
-def _enabled_skip_config() -> dict:
-    return {"enabled": True, "skip_times": []}
+def _enabled_skip_state() -> dict[str, bool]:
+    return {"enabled": True}
 
 
 def test_latest_row_is_open_flow_true_for_open_flow() -> None:
@@ -82,9 +99,7 @@ def test_latest_row_is_open_flow_false_when_no_rows() -> None:
 
 
 def test_skip_now_noops_when_disabled(monkeypatch) -> None:
-    monkeypatch.setattr(
-        cli, "_load_skip_config", lambda: {"enabled": False, "skip_times": []}
-    )
+    monkeypatch.setattr(cli, "_load_skip_state", lambda: {"enabled": False})
 
     def _fail_run(_script: str) -> str:
         raise AssertionError(
@@ -103,7 +118,8 @@ def test_skip_now_noops_when_disabled(monkeypatch) -> None:
 
 
 def test_skip_now_noops_when_phase_is_not_flow(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_config", _enabled_skip_config)
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
     def _fake_run(script: str) -> str:
@@ -127,7 +143,8 @@ def test_skip_now_noops_when_phase_is_not_flow(monkeypatch) -> None:
 def test_skip_now_executes_when_phase_flow_and_latest_row_open_flow(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(cli, "_load_skip_config", _enabled_skip_config)
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=None)
     monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
@@ -147,7 +164,8 @@ def test_skip_now_executes_when_phase_flow_and_latest_row_open_flow(
 
 
 def test_skip_now_noops_when_latest_row_is_completed_flow(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_config", _enabled_skip_config)
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=1234.0)
     monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
@@ -167,7 +185,8 @@ def test_skip_now_noops_when_latest_row_is_completed_flow(monkeypatch) -> None:
 
 
 def test_skip_now_noops_when_latest_row_is_open_break(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_config", _enabled_skip_config)
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="shortBreak", completed_at=None)
     monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
@@ -187,7 +206,8 @@ def test_skip_now_noops_when_latest_row_is_open_break(monkeypatch) -> None:
 
 
 def test_skip_now_noops_on_db_error(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_config", _enabled_skip_config)
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
     def _fake_run(script: str) -> str:
@@ -208,13 +228,60 @@ def test_skip_now_noops_on_db_error(monkeypatch) -> None:
     assert calls == [FLOW_GET_PHASE]
 
 
+def test_skip_now_noops_when_schedule_cannot_be_resolved(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
+
+    def _raise_schedule(_day: date):
+        raise ValueError("missing schedule")
+
+    monkeypatch.setattr(cli, "_resolve_day_schedule", _raise_schedule)
+
+    def _fail_run(_script: str) -> str:
+        raise AssertionError("AppleScript should not run when schedule is unresolved")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
+
+    rc = cli.cmd_skip_now(_skip_args())
+    assert rc == 0
+
+
+def test_skip_now_noops_when_now_outside_schedule_window(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 19, 9, 30))
+    monkeypatch.setattr(
+        cli,
+        "_resolve_day_schedule",
+        lambda _day: DayScheduleProfile(
+            study_start=time(14, 30),
+            study_end=time(18, 0),
+            lunch_start=time(13, 30),
+            lunch_end=time(14, 30),
+            workout_start=time(18, 0),
+        ),
+    )
+
+    def _fail_run(_script: str) -> str:
+        raise AssertionError("AppleScript should not run outside schedule window")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
+
+    def _fail_conn(*_args, **_kwargs):
+        raise AssertionError("DB should not be opened outside schedule window")
+
+    monkeypatch.setattr(cli, "get_connection", _fail_conn)
+
+    rc = cli.cmd_skip_now(_skip_args())
+    assert rc == 0
+
+
 def test_cli_skip_toggle_writes_config(tmp_path, monkeypatch):
-    config_path = tmp_path / "skip_schedule.json"
-    monkeypatch.setattr(cli, "SKIP_CONFIG_PATH", config_path)
+    state_path = tmp_path / "flow_skip_state.json"
+    monkeypatch.setattr(cli, "SKIP_STATE_PATH", state_path)
 
     rc = cli.main(["skip-toggle", "on"])
     assert rc == 0
-    data = json.loads(config_path.read_text(encoding="utf-8"))
+    data = json.loads(state_path.read_text(encoding="utf-8"))
     assert data["enabled"] is True
 
 
