@@ -41,11 +41,16 @@ skip_covered = true
 paths_to_mutate = [
     "sync/formatting.py",
 ]
+also_copy = [
+    "sync",
+]
 pytest_add_cli_args = [
+    "-o",
+    "pythonpath=",
     "-o",
     "addopts=-q --tb=native",
 ]
 pytest_add_cli_args_test_selection = [
+    "tests/sync/test_parsing.py",
     "tests/sync/test_formatting_properties.py",
-    "tests/sync/test_charts.py",
 ]

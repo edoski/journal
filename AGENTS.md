@@ -291,25 +291,18 @@ pyright
 mypy sync/ --strict
 vulture sync/ --min-confidence 80
 lint-imports --config .importlinter
-deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox
+deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox,mutmut=mutmut,pip-audit=pip_audit
 python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report= --cov-fail-under=78"
 ```
 
-Optional security audit gate:
+Optional extended gate (security + mutation):
 
 ```bash
 source .venv/bin/activate
-tox -e audit
+tox -e extended
 ```
 
-Optional mutation gate:
-
-```bash
-source .venv/bin/activate
-tox -e mutation
-```
-
-Literal everything gate (check + audit + mutation):
+Literal everything gate (check + extended):
 
 ```bash
 source .venv/bin/activate
