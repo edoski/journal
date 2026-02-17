@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-from typing import cast
 
 from sync.contracts.notes import VaultFileRecord
 from sync.daily.context import files_for_session, get_vault_files_modified_on_date
@@ -15,8 +14,7 @@ class VaultContextSource(ContextSource):
 
     def files_modified_on_date(self, day: datetime.date) -> list[VaultFileRecord]:
         """Return vault file metadata for files touched on the supplied day."""
-        records = get_vault_files_modified_on_date(day)
-        return cast(list[VaultFileRecord], records)
+        return get_vault_files_modified_on_date(day)
 
     def links_for_window(
         self,
@@ -25,4 +23,4 @@ class VaultContextSource(ContextSource):
         end: datetime.datetime,
     ) -> list[str]:
         """Return wikilinks modified during a study session time window."""
-        return files_for_session(cast(list[dict], files), start, end)
+        return files_for_session(files, start, end)

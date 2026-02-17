@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, date, timedelta
-from typing import Any
 
+from sync.contracts.notes import VaultFileRecord
 from sync.constants import VAULT_DIR
 
 from .constants import (
@@ -20,8 +20,7 @@ from .constants import (
 )
 
 
-# Type alias for file info dictionaries
-FileInfo = dict[str, Any]
+FileInfo = VaultFileRecord
 
 
 def get_vault_files_modified_on_date(

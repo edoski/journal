@@ -15,7 +15,7 @@ from sync.readers.sleep import parse_sleep_table
 from sync.readers.study import parse_study_table
 
 
-def _parse_bool(val) -> bool:
+def _parse_bool(val: object) -> bool:
     """Parse a value as boolean."""
     if isinstance(val, bool):
         return val

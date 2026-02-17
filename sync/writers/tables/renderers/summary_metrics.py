@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from sync.constants import RENDER
 from sync.formatting import (
-    compute_percent_change,
+    compute_pace,
     format_ma_training_ratio,
+    format_summary_change_label,
     format_minutes,
     format_mood_with_scale,
-    format_percent_change,
     format_progress_bar,
     format_training_ratio,
 )
@@ -73,9 +73,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     ) or previous_metrics.get("total_days", 7)
     prev_total_days = previous_metrics.get("total_days", 7)
 
-    curr_study_avg_mins = curr_study_total / max(1, curr_days_for_avg)
+    curr_study_avg_mins = compute_pace(curr_study_total, curr_days_for_avg)
     curr_study_avg = format_minutes(curr_study_avg_mins, always_show_both=True) + "/day"
-    prev_study_avg_mins = prev_study_total / max(1, prev_days_for_avg)
+    prev_study_avg_mins = compute_pace(prev_study_total, prev_days_for_avg)
     prev_study_avg = format_minutes(prev_study_avg_mins, always_show_both=True) + "/day"
 
     ma_study_str = "—"
@@ -89,11 +89,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
             + "/day"
         )
 
-    if curr_study_avg_mins > 0 or prev_study_avg_mins > 0:
-        study_pct = compute_percent_change(curr_study_avg_mins, prev_study_avg_mins)
-        study_pct_str = format_percent_change(study_pct)
-    else:
-        study_pct_str = "—"
+    study_pct_str = format_summary_change_label(
+        curr_study_avg_mins, prev_study_avg_mins
+    )
 
     study_bar, study_progress_pct = format_progress_bar(
         curr_study_total,
@@ -128,11 +126,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
             + "/night"
         )
 
-    if curr_sleep_avg > 0 or prev_sleep_avg > 0:
-        sleep_pct = compute_percent_change(curr_sleep_avg, prev_sleep_avg)
-        sleep_pct_str = format_percent_change(sleep_pct)
-    else:
-        sleep_pct_str = "—"
+    sleep_pct_str = format_summary_change_label(curr_sleep_avg, prev_sleep_avg)
 
     sleep_bar, sleep_progress_pct = format_progress_bar(
         curr_sleep_avg,
@@ -162,13 +156,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
             ma_metrics["mindful_avg"], ma_training_unit
         )
 
-    if curr_mindful_count > 0 or prev_mindful_count > 0:
-        curr_mindful_rate = curr_mindful_count / max(1, curr_days_for_avg)
-        prev_mindful_rate = prev_mindful_count / max(1, prev_days_for_avg)
-        mindful_pct = compute_percent_change(curr_mindful_rate, prev_mindful_rate)
-        mindful_pct_str = format_percent_change(mindful_pct)
-    else:
-        mindful_pct_str = "—"
+    curr_mindful_rate = compute_pace(curr_mindful_count, curr_days_for_avg)
+    prev_mindful_rate = compute_pace(prev_mindful_count, prev_days_for_avg)
+    mindful_pct_str = format_summary_change_label(curr_mindful_rate, prev_mindful_rate)
 
     mindful_bar, mindful_progress_pct = format_progress_bar(
         curr_mindful_count,
@@ -198,13 +188,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
             ma_metrics["workout_avg"], ma_training_unit
         )
 
-    if curr_workout_count > 0 or prev_workout_count > 0:
-        curr_workout_rate = curr_workout_count / max(1, curr_days_for_avg)
-        prev_workout_rate = prev_workout_count / max(1, prev_days_for_avg)
-        workout_pct = compute_percent_change(curr_workout_rate, prev_workout_rate)
-        workout_pct_str = format_percent_change(workout_pct)
-    else:
-        workout_pct_str = "—"
+    curr_workout_rate = compute_pace(curr_workout_count, curr_days_for_avg)
+    prev_workout_rate = compute_pace(prev_workout_count, prev_days_for_avg)
+    workout_pct_str = format_summary_change_label(curr_workout_rate, prev_workout_rate)
 
     workout_bar, workout_progress_pct = format_progress_bar(
         curr_workout_count,
@@ -234,13 +220,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
             ma_metrics["stretch_avg"], ma_training_unit
         )
 
-    if curr_stretch_count > 0 or prev_stretch_count > 0:
-        curr_stretch_rate = curr_stretch_count / max(1, curr_days_for_avg)
-        prev_stretch_rate = prev_stretch_count / max(1, prev_days_for_avg)
-        stretch_pct = compute_percent_change(curr_stretch_rate, prev_stretch_rate)
-        stretch_pct_str = format_percent_change(stretch_pct)
-    else:
-        stretch_pct_str = "—"
+    curr_stretch_rate = compute_pace(curr_stretch_count, curr_days_for_avg)
+    prev_stretch_rate = compute_pace(prev_stretch_count, prev_days_for_avg)
+    stretch_pct_str = format_summary_change_label(curr_stretch_rate, prev_stretch_rate)
 
     stretch_bar, stretch_progress_pct = format_progress_bar(
         curr_stretch_count,
@@ -268,11 +250,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     if show_ma and ma_metrics is not None and ma_metrics.get("mood_avg") is not None:
         ma_mood_str = format_mood_with_scale(ma_metrics["mood_avg"])
 
-    if curr_mood_avg > 0 or prev_mood_avg > 0:
-        mood_pct = compute_percent_change(curr_mood_avg, prev_mood_avg)
-        mood_pct_str = format_percent_change(mood_pct)
-    else:
-        mood_pct_str = "—"
+    mood_pct_str = format_summary_change_label(curr_mood_avg, prev_mood_avg)
 
     mood_bar, mood_progress_pct = format_progress_bar(
         curr_mood_avg,

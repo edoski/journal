@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any, cast
 
+from sync.contracts.metrics import DailyAggregate
 from sync.constants import DAYS, RENDER, STUDY_TARGET_MIN
 from sync.dates import daterange, format_week_label
 
@@ -25,6 +27,14 @@ def _study_intensity_symbol(minutes: float | None) -> str:
     )
 
 
+def _row_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> dict[str, Any]:
+    payload = daily_data.get(day)
+    return cast(dict[str, Any], payload) if payload is not None else {}
+
+
 def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
     """Render weekly full-study-days grouped grid body."""
     dates = list(spec.dates)
@@ -39,7 +49,7 @@ def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
 
     study_symbols: list[str] = []
     for day in dates:
-        minutes = daily_data.get(day, {}).get("study_minutes")
+        minutes = _row_for_day(daily_data, day).get("study_minutes")
         if day > today:
             study_symbols.append(none_symbol)
         else:
@@ -98,7 +108,7 @@ def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
                 symbols.append(RENDER.study_symbol_none)
             else:
                 symbol = _study_intensity_symbol(
-                    daily_data.get(day, {}).get("study_minutes")
+                    _row_for_day(daily_data, day).get("study_minutes")
                 )
                 symbols.append(symbol)
                 total_elapsed += 1
@@ -190,7 +200,7 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
         week_labels.append(format_week_label(start, end))
 
         for day in week_days:
-            entry = daily_data.get(day, {})
+            entry = _row_for_day(daily_data, day)
             mindful_symbols.append("■" if entry.get("meditate") else "·")
             workout_symbols.append("■" if entry.get("workout") else "·")
             stretch_symbols.append("■" if entry.get("stretch") else "·")
@@ -276,7 +286,7 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     stretch_symbols: list[str] = []
 
     for day in dates:
-        entry = daily_data.get(day, {})
+        entry = _row_for_day(daily_data, day)
         has_mindful = entry.get("meditate", False)
         has_workout = entry.get("workout", False)
         has_stretch = entry.get("stretch", False)

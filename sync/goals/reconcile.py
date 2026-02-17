@@ -9,19 +9,23 @@ from __future__ import annotations
 
 import datetime
 import os
+from typing import TYPE_CHECKING
 
 from sync.constants import JOURNAL_DIR
-from sync.io import safe_read_file
 from sync.goals.state import (
     record_note_state,
     reconcile_pair_with_state,
 )
+from sync.io import safe_read_file
 from sync.ports.cache import GoalReconcileCacheStore
+
+if TYPE_CHECKING:
+    from sync.models.goals import Goal
 
 
 def propagate_goal_status(
-    source_tasks: list,
-    mirror_tasks: list,
+    source_tasks: list[Goal],
+    mirror_tasks: list[Goal],
 ) -> bool:
     """
     Propagate done=True from mirror to source.
@@ -54,13 +58,13 @@ def propagate_goal_status(
 
 
 def reconcile_goal_lists(
-    source_tasks: list,
-    mirror_tasks: list,
+    source_tasks: list[Goal],
+    mirror_tasks: list[Goal],
     source_path: str,
     mirror_path: str,
     *,
     reconcile_cache_store: GoalReconcileCacheStore,
-) -> tuple[list, list, bool, bool]:
+) -> tuple[list[Goal], list[Goal], bool, bool]:
     """
     Reconcile done state for shared goal IDs between a source and mirror note.
 
@@ -126,7 +130,7 @@ def reconcile_goal_lists(
 
 def load_quarterly_goals(
     month_start: datetime.date,
-) -> tuple[list, list, str, list[str]]:
+) -> tuple[list[Goal], list[Goal], str, list[str]]:
     """
     Load quarterly note goals for the quarter containing month_start.
 
@@ -168,15 +172,15 @@ def load_quarterly_goals(
 
 
 def process_pierced_goals(
-    existing_tasks: list,
-    source_goal_lists: list[list],
+    existing_tasks: list[Goal],
+    source_goal_lists: list[list[Goal]],
     proximity_days: int,
     today: datetime.date,
     note_path: str,
     source_paths: list[str],
     *,
     reconcile_cache_store: GoalReconcileCacheStore,
-) -> tuple[list, list, list[list]]:
+) -> tuple[list[Goal], list[Goal], list[list[Goal]]]:
     """
     Process pierced goals with bidirectional source<->child done-state reconciliation.
 
@@ -217,12 +221,12 @@ def process_pierced_goals(
     existing_lookup = {g.id: g for g in existing_pierced if g.id}
 
     # Reconcile done status between each source and the current note's pierced copy.
-    updated_source_lists: list[list] = []
-    all_updated_sources: list = []  # Flat list for source_goal_info lookup/restoration
+    updated_source_lists: list[list[Goal]] = []
+    all_updated_sources: list[Goal] = []
 
     with reconcile_cache_store.locked_state() as state:
         for source_list, source_path in zip(source_goal_lists, source_paths):
-            updated_list: list = []
+            updated_list: list[Goal] = []
             for g in source_list:
                 if g.id and g.id in existing_lookup:
                     child_goal = existing_lookup[g.id]
@@ -251,7 +255,7 @@ def process_pierced_goals(
                 record_note_state(state, g.id, note_path, g.done)
 
     # Get NEW pierced goals from each source (only those not already in note)
-    new_pierced: list = []
+    new_pierced: list[Goal] = []
     for updated_list in updated_source_lists:
         filtered = filter_by_proximity(updated_list, proximity_days, today)
         for g in filtered:
@@ -260,7 +264,7 @@ def process_pierced_goals(
 
     # Restore deadline info to existing pierced goals from source
     source_goal_info = {g.id: g for g in all_updated_sources if g.id}
-    restored_existing_pierced: list = []
+    restored_existing_pierced: list[Goal] = []
     for g in existing_pierced:
         if g.id in source_goal_info:
             src = source_goal_info[g.id]
@@ -283,14 +287,14 @@ def process_pierced_goals(
 
 
 def merge_mirror_goals(
-    existing_mirror: list,
-    source_tasks: list,
+    existing_mirror: list[Goal],
+    source_tasks: list[Goal],
     proximity_days: int,
     today: datetime.date,
     source_path: str | None = None,
     mirror_path: str | None = None,
     reconcile_cache_store: GoalReconcileCacheStore | None = None,
-) -> list:
+) -> list[Goal]:
     """
     Merge mirror goals with source goals while preserving countdown metadata.
 
@@ -315,7 +319,7 @@ def merge_mirror_goals(
     new_goals = [g for g in new_goals if g.id not in existing_ids]
 
     source_lookup = {g.id: g for g in source_tasks if g.id}
-    restored_existing: list = []
+    restored_existing: list[Goal] = []
     for goal in existing_mirror:
         source = source_lookup.get(goal.id)
         if source:

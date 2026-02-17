@@ -486,7 +486,7 @@ class DailySyncService:
         self,
         lines: list[str],
         sessions: list[StudySessionRecord],
-        context_for_session,
+        context_for_session: Callable[[datetime.datetime, datetime.datetime], str],
     ) -> tuple[list[str], str]:
         existing_notes, existing_context = extract_existing_data(lines)
         new_table_lines, total_focus_minutes = build_study_section(

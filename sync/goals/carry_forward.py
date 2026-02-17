@@ -7,6 +7,7 @@ Keeps carry-forward behavior identical across daily and period sync flows.
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from sync.ports.cache import GoalCarryForwardCacheStore
 from sync.goals.tombstones import (
@@ -20,15 +21,18 @@ from sync.goals.tombstones import (
     remove_deleted_ids,
 )
 
+if TYPE_CHECKING:
+    from sync.models.goals import Goal
+
 
 def carry_forward_with_tombstones(
-    prev_tasks: list,
-    current_tasks: list,
+    prev_tasks: list[Goal],
+    current_tasks: list[Goal],
     period_key: str,
     horizon: str,
     *,
     cache_store: GoalCarryForwardCacheStore,
-) -> tuple[list, int]:
+) -> tuple[list[Goal], int]:
     """
     Carry forward open goals from prev_tasks with offered-ID/tombstone suppression.
 

@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import datetime
 from collections import OrderedDict
+from collections.abc import Iterator
 
 from .constants import MONTH_ABBR
 
 
-def daterange(start_date: datetime.date, end_date: datetime.date):
+def daterange(
+    start_date: datetime.date, end_date: datetime.date
+) -> Iterator[datetime.date]:
     """Yield dates from start_date to end_date (inclusive)."""
     current = start_date
     while current <= end_date:

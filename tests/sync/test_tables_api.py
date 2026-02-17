@@ -70,6 +70,74 @@ class TestSummaryMetricsTable:
         )
         assert any("**STUDY**" in line for line in lines)
 
+    def test_summary_change_shows_emdash_when_both_zero(self):
+        current = {
+            "study_total_minutes": 0,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 0,
+            "stretch_count": 0,
+            "mindful_count": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+        previous = {
+            "study_total_minutes": 0,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 0,
+            "stretch_count": 0,
+            "mindful_count": 0,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+
+        lines = render_table(
+            SummaryMetricsTableSpec(
+                current_metrics=current,
+                previous_metrics=previous,
+                current_label="THIS WEEK",
+                previous_label="LAST WEEK",
+            )
+        )
+
+        study_line = next(line for line in lines if "**STUDY**" in line)
+        assert "| `—` |" in study_line
+
+    def test_training_change_uses_pace_denominators(self):
+        current = {
+            "study_total_minutes": 0,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 1,
+            "stretch_count": 0,
+            "mindful_count": 0,
+            "total_days": 7,
+            "days_up_to_today": 2,
+        }
+        previous = {
+            "study_total_minutes": 0,
+            "sleep_avg_minutes": 0,
+            "mood_avg": 0,
+            "workout_count": 1,
+            "stretch_count": 0,
+            "mindful_count": 0,
+            "total_days": 7,
+            "days_up_to_today": 1,
+        }
+
+        lines = render_table(
+            SummaryMetricsTableSpec(
+                current_metrics=current,
+                previous_metrics=previous,
+                current_label="THIS WEEK",
+                previous_label="LAST WEEK",
+            )
+        )
+
+        workout_line = next(line for line in lines if "**WORKOUT**" in line)
+        assert "| `-50%` |" in workout_line
+
 
 class TestScreenTrendTable:
     def test_daily_trend_table(self):

@@ -127,7 +127,7 @@ def dedupe_sessions(
     merged: list[StudySessionRecord] = []
     for grp in groups:
 
-        def score(entry: StudySessionRecord) -> tuple:
+        def score(entry: StudySessionRecord) -> tuple[int, float, float, float]:
             completed = 1 if entry.get("completed_at") else 0
             actual = entry.get("actual_elapsed", 0) or 0
             end_ts = entry["end"].timestamp() if entry.get("end") else 0

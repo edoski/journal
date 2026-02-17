@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Sequence
+from collections.abc import Callable, Sequence
 
 from .specs import HAnchor
 
@@ -123,7 +123,7 @@ def compress_symbols(
 
 def compress_days_time_order(
     days: Sequence[datetime.date],
-    met_fn,
+    met_fn: Callable[[datetime.date], bool],
     target_width: int,
     *,
     allow_partial: bool = False,
@@ -168,7 +168,7 @@ def compress_days_time_order(
 
 def compress_activity_time_order(
     days: Sequence[datetime.date],
-    has_activity_fn,
+    has_activity_fn: Callable[[datetime.date], bool],
     target_width: int,
     *,
     fill_char: str = "■",

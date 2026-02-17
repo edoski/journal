@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import TYPE_CHECKING
 
 from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
@@ -44,6 +45,9 @@ from sync.goals.daily_pipeline import (
     parse_daily_goal_subsections,
     write_weekly_goals,
 )
+
+if TYPE_CHECKING:
+    from sync.models.goals import Goal
 
 
 class GoalSyncService:
@@ -464,7 +468,7 @@ class GoalSyncService:
             period_key=str(window.year),
         )
 
-        prev_tasks: list = []
+        prev_tasks: list[Goal] = []
         prev_note_path = journal_path(window.previous_filename)
         prev_lines = self.note_store.read(prev_note_path)
         if prev_lines is not None:
@@ -494,11 +498,15 @@ class GoalSyncService:
         )
 
     @staticmethod
-    def _render_goal_lines(goals: list) -> list[str]:
+    def _render_goal_lines(goals: list[Goal]) -> list[str]:
         return render_goal_lines(goals)
 
     @staticmethod
-    def _render_goals_or_empty(subsection: str, goals: list, today=None) -> list[str]:
+    def _render_goals_or_empty(
+        subsection: str,
+        goals: list[Goal],
+        today: datetime.date | None = None,
+    ) -> list[str]:
         from sync.goals.note_store import render_goals_or_empty
 
         return render_goals_or_empty(subsection, goals, today=today)

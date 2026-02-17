@@ -58,6 +58,21 @@ journal/
     readers/                   # Markdown parsing (markdown -> models/contracts)
       schedule.py
     writers/                   # Rendering (models/contracts -> markdown)
+      __init__.py
+      goals.py
+      charts/                  # Unified chart API (typed specs + renderers)
+        api.py                 # render_chart(spec) -> list[str]
+        specs.py
+        profiles.py
+        layout.py
+        formatters.py
+        renderers/
+      tables/                  # Unified markdown table API (typed specs + renderers)
+        api.py                 # render_table(spec) -> list[str]
+        specs.py
+        layout.py
+        formatters.py
+        renderers/
 
     daily/
       __main__.py              # Daily composition root
@@ -92,11 +107,13 @@ journal/
     metrics/
       loading.py
       aggregation.py
-      comparison.py
+      trends.py
+      screen_time.py
 
     notes/
       locking.py
       markdown.py
+      markdown_tables.py       # Shared markdown table parse/render helpers
       sections.py
 
     periods/
@@ -156,6 +173,13 @@ journal/
 - Non-composition modules must not import `sync/application` or `sync/adapters`.
 - No cross-module private (`_name`) imports in `sync/`.
 
+### Rendering architecture
+
+- Charts are rendered only via `sync/writers/charts/api.py::render_chart(spec)`.
+- Markdown tables are rendered only via `sync/writers/tables/api.py::render_table(spec)`.
+- Markdown table parsing/row escaping is centralized in `sync/notes/markdown_tables.py`.
+- Do not reintroduce legacy one-off chart/table helpers or compatibility shims.
+
 ## Canonical Services and Interfaces
 
 ### Application services
@@ -166,6 +190,12 @@ journal/
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by TUI.
   - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
+
+### Canonical rendering entrypoints
+
+- `render_chart(spec) -> list[str]` in `sync/writers/charts/api.py`
+- `render_table(spec) -> list[str]` in `sync/writers/tables/api.py`
+- Chart/table behavior is configured through typed specs; avoid ad-hoc markdown string-concatenation paths.
 
 ### Ports
 
@@ -250,7 +280,7 @@ Run this full gate before every commit:
 source .venv/bin/activate
 ruff check .
 ruff format --check .
-mypy sync/ --ignore-missing-imports
+mypy sync/ --strict
 vulture sync/ --min-confidence 80
 python3 -m pytest tests/ -v
 ```

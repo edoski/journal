@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 import os
+from collections.abc import Iterator
 from typing import Any
 
 from sync.constants import SCREEN_TIME_CACHE_DIR, STATE_LOCK_DIR, TRAINING_CACHE_DIR
@@ -40,7 +41,7 @@ def _path_for_date(cache_dir: str, date_str: str) -> str:
     return os.path.join(cache_dir, f"{date_str}.json")
 
 
-def _iter_cache_files(cache_dir: str):
+def _iter_cache_files(cache_dir: str) -> Iterator[tuple[str, str]]:
     if not os.path.isdir(cache_dir):
         return
     for name in os.listdir(cache_dir):

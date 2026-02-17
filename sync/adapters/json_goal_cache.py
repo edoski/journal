@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from contextlib import contextmanager
 import json
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any, Final, cast
 
 from sync.constants import GOAL_CACHE_DIR, STATE_LOCK_DIR
@@ -242,7 +243,7 @@ class JsonGoalCarryForwardCacheStore(GoalCarryForwardCacheStore):
         _atomic_write_json(self.path, validated)
 
     @contextmanager
-    def locked_state(self):
+    def locked_state(self) -> Iterator[CarryForwardCacheState]:
         with locked_path(self.path, lock_root=self.lock_root):
             state = self.load()
             try:
@@ -275,7 +276,7 @@ class JsonGoalReconcileCacheStore(GoalReconcileCacheStore):
         _atomic_write_json(self.path, validated)
 
     @contextmanager
-    def locked_state(self):
+    def locked_state(self) -> Iterator[GoalReconcileCacheState]:
         with locked_path(self.path, lock_root=self.lock_root):
             state = self.load()
             try:

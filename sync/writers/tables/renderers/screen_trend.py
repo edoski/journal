@@ -26,8 +26,8 @@ def _daily_rows(spec: ScreenTrendTableSpec) -> list[list[str]]:
             day_name = day.strftime("%a").upper()
 
         label = f"**[[{day.isoformat()}\\|{day_name}]]**"
-        data = daily_data.get(day, {})
-        screen_time = data.get("screen_time_totals", {})
+        data = daily_data.get(day)
+        screen_time = data.get("screen_time_totals", {}) if data is not None else {}
         day_total = sum(screen_time.values()) if screen_time else 0
 
         if day > today:
@@ -68,8 +68,8 @@ def _period_rows(spec: ScreenTrendTableSpec) -> list[list[str]]:
 
         period_total = 0.0
         for day in daterange(start, end):
-            data = daily_data.get(day, {})
-            screen_time = data.get("screen_time_totals", {})
+            data = daily_data.get(day)
+            screen_time = data.get("screen_time_totals", {}) if data is not None else {}
             period_total += sum(screen_time.values()) if screen_time else 0
 
         if start > today:

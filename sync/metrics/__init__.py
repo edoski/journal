@@ -14,15 +14,15 @@ from .aggregation import (
     aggregate_training_type_session_stats,
     compute_period_metrics,
 )
-from .comparison import (
-    compute_bucket_deltas,
-    compute_moving_average,
-    group_screen_time_by_percent,
-)
 from .loading import (
     load_daily_data,
     load_daily_data_for_dates,
     load_prior_period_metrics,
+)
+from .screen_time import group_screen_time_by_percent
+from .trends import (
+    compute_bucket_deltas,
+    compute_moving_average,
 )
 
 __all__ = [

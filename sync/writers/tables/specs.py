@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Sequence
 
+from sync.contracts.metrics import DailyAggregate
 from sync.contracts.targets import PeriodType
 
 
@@ -58,7 +59,7 @@ class ScreenTrendTableSpec:
 
     mode: ScreenTrendMode
     period_label: str
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     dates: Sequence[datetime.date] | None = None
     period_ranges: Sequence[tuple[datetime.date, datetime.date]] | None = None
     labels: Sequence[str] | None = None

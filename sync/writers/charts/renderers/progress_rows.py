@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import datetime
+from typing import Any, cast
 
+from sync.contracts.metrics import DailyAggregate
 from sync.constants import MONTH_ABBR, RENDER, STUDY_TARGET_MIN
 from sync.dates import daterange
 from sync.formatting import round_half_up
@@ -23,6 +25,14 @@ def _study_intensity_symbol(minutes: float | None) -> str:
         if mins >= STUDY_TARGET_MIN
         else RENDER.study_symbol_none
     )
+
+
+def _row_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> dict[str, Any]:
+    payload = daily_data.get(day)
+    return cast(dict[str, Any], payload) if payload is not None else {}
 
 
 def _compress_symbols(symbols: list[str], target_width: int) -> str:
@@ -176,7 +186,7 @@ def render_quarterly_study_coverage_rows(
                 bar_chars.append(RENDER.study_symbol_none)
                 continue
             symbol = _study_intensity_symbol(
-                daily_data.get(day, {}).get("study_minutes")
+                _row_for_day(daily_data, day).get("study_minutes")
             )
             bar_chars.append(symbol)
             if symbol != RENDER.study_symbol_none:
@@ -245,7 +255,7 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
                 for day in days
                 if day <= today
                 and _study_intensity_symbol(
-                    daily_data.get(day, {}).get("study_minutes")
+                    _row_for_day(daily_data, day).get("study_minutes")
                 )
                 == RENDER.study_symbol_deep
             )
@@ -259,7 +269,7 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
                     continue
                 elapsed_days += 1
                 symbol = _study_intensity_symbol(
-                    daily_data.get(day, {}).get("study_minutes")
+                    _row_for_day(daily_data, day).get("study_minutes")
                 )
                 bar_chars.append(symbol)
                 if symbol != RENDER.study_symbol_none:

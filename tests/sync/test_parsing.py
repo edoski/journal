@@ -10,14 +10,18 @@ from __future__ import annotations
 from collections import OrderedDict
 
 from sync.formatting import (
+    ceil_minutes,
+    compute_non_none_average,
+    compute_pace,
+    compute_percent_change,
+    format_bucket_delta_change_label,
     format_minutes,
     format_minutes_seconds,
-    ceil_minutes,
-    round_half_up,
-    compute_percent_change,
-    format_percent_change,
-    format_training_ratio,
     format_mood_with_scale,
+    format_percent_change,
+    format_summary_change_label,
+    format_training_ratio,
+    round_half_up,
 )
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.common import parse_duration_to_minutes
@@ -263,6 +267,57 @@ class TestComputePercentChange:
         assert compute_percent_change(None, 100) is None
         assert compute_percent_change(100, None) is None
         assert compute_percent_change(None, None) is None
+
+
+class TestComputePace:
+    """Tests for compute_pace function."""
+
+    def test_returns_per_day_rate(self):
+        assert compute_pace(420, 7) == 60.0
+        assert compute_pace(3, 2) == 1.5
+
+    def test_guards_zero_day_count(self):
+        assert compute_pace(60, 0) == 60.0
+
+    def test_treats_none_total_as_zero(self):
+        assert compute_pace(None, 7) == 0.0
+
+
+class TestComputeNonNoneAverage:
+    """Tests for compute_non_none_average function."""
+
+    def test_averages_only_present_values(self):
+        assert compute_non_none_average([2.0, None, 4.0]) == 3.0
+
+    def test_returns_zero_when_no_present_values(self):
+        assert compute_non_none_average([None, None]) == 0.0
+        assert compute_non_none_average([]) == 0.0
+
+
+class TestFormatSummaryChangeLabel:
+    """Tests for format_summary_change_label function."""
+
+    def test_both_zero_returns_emdash(self):
+        assert format_summary_change_label(0.0, 0.0) == "—"
+
+    def test_formats_non_zero_change(self):
+        assert format_summary_change_label(120.0, 60.0) == "+100%"
+
+    def test_zero_baseline_non_zero_current_returns_emdash(self):
+        assert format_summary_change_label(1.0, 0.0) == "—"
+
+
+class TestFormatBucketDeltaChangeLabel:
+    """Tests for format_bucket_delta_change_label function."""
+
+    def test_both_zero_returns_zero_percent(self):
+        assert format_bucket_delta_change_label(0.0, 0.0) == "+0%"
+
+    def test_formats_non_zero_change(self):
+        assert format_bucket_delta_change_label(30.0, 60.0) == "-50%"
+
+    def test_zero_baseline_non_zero_current_returns_emdash(self):
+        assert format_bucket_delta_change_label(1.0, 0.0) == "—"
 
 
 class TestFormatPercentChange:

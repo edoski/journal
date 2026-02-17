@@ -8,6 +8,7 @@ import fcntl
 import hashlib
 import os
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 from sync.constants import NOTE_LOCK_DIR
@@ -52,7 +53,7 @@ def locked_path(
     lock_root: str,
     timeout: float = 2.0,
     poll: float = 0.1,
-):
+) -> Iterator[None]:
     """
     Serialize access to a target path using a sharded advisory lock file.
 
@@ -84,7 +85,7 @@ def locked_path(
 
 
 @contextmanager
-def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1):
+def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1) -> Iterator[None]:
     """Serialize writes to a note using the configured notes lock root."""
     with locked_path(path, lock_root=NOTE_LOCK_DIR, timeout=timeout, poll=poll):
         yield

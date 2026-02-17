@@ -8,6 +8,7 @@ for display in markdown tables and charts.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 
 
 def round_half_up(val: float | None) -> int:
@@ -87,6 +88,17 @@ def compute_percent_change(
     return ((current - previous) / previous) * 100
 
 
+def compute_pace(total: float | None, day_count: int) -> float:
+    """Compute per-day pace with a guarded denominator."""
+    return float(total or 0.0) / max(1, day_count)
+
+
+def compute_non_none_average(values: Sequence[float | None]) -> float:
+    """Compute average over non-None values, returning 0.0 when empty."""
+    present = [float(value) for value in values if value is not None]
+    return (sum(present) / len(present)) if present else 0.0
+
+
 def format_percent_change(pct: float | None) -> str:
     """
     Format percentage change as +X% or -X%.
@@ -97,6 +109,23 @@ def format_percent_change(pct: float | None) -> str:
         return "—"
     sign = "+" if pct >= 0 else ""
     return f"{sign}{round_half_up(pct)}%"
+
+
+def format_summary_change_label(current: float | None, previous: float | None) -> str:
+    """Format SUMMARY table CHANGE labels."""
+    if current == 0 and previous == 0:
+        return "—"
+    return format_percent_change(compute_percent_change(current, previous))
+
+
+def format_bucket_delta_change_label(
+    current: float | None,
+    previous: float | None,
+) -> str:
+    """Format chart/grid bucket delta labels."""
+    if current == 0 and previous == 0:
+        return format_percent_change(0.0)
+    return format_percent_change(compute_percent_change(current, previous))
 
 
 def format_training_ratio(count: int, total_days: int) -> str:

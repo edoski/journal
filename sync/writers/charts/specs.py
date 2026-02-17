@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Sequence
 
+from sync.contracts.metrics import DailyAggregate
+
 
 class ChartKind(str, Enum):
     """Top-level chart families supported by ``render_chart``."""
@@ -143,7 +145,7 @@ class WeeklyStudyGridSpec:
     """Spec for weekly full-study-days grouped grid chart."""
 
     dates: Sequence[datetime.date]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
     kind: ChartKind = ChartKind.GROUPED_GRID
@@ -154,7 +156,7 @@ class MonthlyStudyGridSpec:
     """Spec for monthly full-study-days grouped grid chart."""
 
     week_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
@@ -166,7 +168,7 @@ class MonthlyTrainingGridSpec:
     """Spec for monthly training grouped grid chart."""
 
     week_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     mindful_count: int
     workout_count: int
     stretch_count: int
@@ -185,7 +187,7 @@ class WeeklyTrainingGridSpec:
     """Spec for weekly training grouped grid chart."""
 
     dates: Sequence[datetime.date]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     mindful_count: int
     workout_count: int
     stretch_count: int
@@ -223,7 +225,7 @@ class QuarterlyStudyCoverageRowsSpec:
     """Spec for quarterly study-coverage progress rows."""
 
     month_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     today: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
@@ -235,7 +237,7 @@ class YearlyStudyCoverageRowsSpec:
     """Spec for yearly study-coverage progress rows."""
 
     quarter_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict
+    daily_data: dict[datetime.date, DailyAggregate]
     today: datetime.date | None = None
     bar_width: int = 30
     delta_labels: Sequence[str] | None = None

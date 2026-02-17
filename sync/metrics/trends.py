@@ -1,4 +1,4 @@
-"""Comparison and trend helpers for period metrics."""
+"""Trend and delta helpers for period metrics."""
 
 from __future__ import annotations
 
@@ -7,50 +7,13 @@ from collections.abc import Callable, Sequence
 from typing import Literal
 
 from sync.contracts.metrics import MovingAverageAggregate, PeriodAggregate
-from sync.formatting import compute_percent_change, format_percent_change
+from sync.formatting import (
+    compute_non_none_average,
+    compute_pace,
+    format_bucket_delta_change_label,
+)
 
 BucketDeltaMode = Literal["pace", "average"]
-
-
-def group_screen_time_by_percent(
-    totals: dict[str, float],
-    percent_threshold: float = 0.05,
-) -> dict[str, float]:
-    """
-    Re-group aggregated screen time totals by percentage threshold.
-
-    Apps ≤ percent_threshold get merged into Miscellaneous.
-    Used for periodic notes to avoid cluttering charts with small apps.
-
-    Args:
-        totals: Dict mapping app names to total minutes.
-        percent_threshold: Apps at or below this percentage get grouped.
-
-    Returns:
-        Dict with small apps merged into Miscellaneous.
-    """
-    if not totals:
-        return {}
-
-    total = sum(totals.values())
-    if total == 0:
-        return totals
-
-    result: dict[str, float] = {}
-    misc_total = 0.0
-    misc_label = "Miscellaneous"
-
-    for app, minutes in totals.items():
-        pct = minutes / total
-        if pct > percent_threshold:
-            result[app] = minutes
-        else:
-            misc_total += minutes
-
-    if misc_total > 0:
-        result[misc_label] = result.get(misc_label, 0) + misc_total
-
-    return result
 
 
 def compute_bucket_deltas(
@@ -97,32 +60,23 @@ def compute_bucket_deltas(
         previous_days = list(previous_bucket)
 
         if mode == "pace":
-            current_sum = sum(float(value_for_day(day) or 0.0) for day in current_days)
-            previous_sum = sum(
+            current_total = sum(
+                float(value_for_day(day) or 0.0) for day in current_days
+            )
+            previous_total = sum(
                 float(value_for_day(day) or 0.0) for day in previous_days
             )
-            current_value = current_sum / max(1, len(current_days))
-            previous_value = previous_sum / max(1, len(previous_days))
+            current_value = compute_pace(current_total, len(current_days))
+            previous_value = compute_pace(previous_total, len(previous_days))
         else:
-            current_vals = [
-                float(val)
-                for day in current_days
-                if (val := value_for_day(day)) is not None
-            ]
-            previous_vals = [
-                float(val)
-                for day in previous_days
-                if (val := value_for_day(day)) is not None
-            ]
-            current_value = (
-                sum(current_vals) / len(current_vals) if current_vals else 0.0
+            current_value = compute_non_none_average(
+                [value_for_day(day) for day in current_days]
             )
-            previous_value = (
-                sum(previous_vals) / len(previous_vals) if previous_vals else 0.0
+            previous_value = compute_non_none_average(
+                [value_for_day(day) for day in previous_days]
             )
 
-        delta = compute_percent_change(current_value, previous_value)
-        deltas.append(format_percent_change(delta))
+        deltas.append(format_bucket_delta_change_label(current_value, previous_value))
 
     return deltas
 
@@ -165,42 +119,38 @@ def compute_moving_average(
 
     # Study: average of daily averages
     study_avgs = []
-    for pm in recent:
-        total = pm.get("study_total_minutes") or 0
-        days = pm.get("days_up_to_today") or pm.get("total_days") or 1
-        study_avgs.append(total / max(1, days))
+    for period in recent:
+        total = period.get("study_total_minutes")
+        days = int(period.get("days_up_to_today") or period.get("total_days") or 1)
+        study_avgs.append(compute_pace(total, days))
     study_ma = sum(study_avgs) / len(study_avgs) if study_avgs else None
 
     # Sleep: average of averages
-    sleep_vals = [
-        pm.get("sleep_avg_minutes")
-        for pm in recent
-        if pm.get("sleep_avg_minutes") is not None
-    ]
+    sleep_vals = [period.get("sleep_avg_minutes") for period in recent]
     sleep_ma = (
-        sum(float(v) for v in sleep_vals if v is not None) / len(sleep_vals)
-        if sleep_vals
+        compute_non_none_average(sleep_vals)
+        if any(v is not None for v in sleep_vals)
         else None
     )
 
     # Mood: average of averages
-    mood_vals = [pm.get("mood_avg") for pm in recent if pm.get("mood_avg") is not None]
+    mood_vals = [period.get("mood_avg") for period in recent]
     mood_ma = (
-        sum(float(v) for v in mood_vals if v is not None) / len(mood_vals)
-        if mood_vals
+        compute_non_none_average(mood_vals)
+        if any(v is not None for v in mood_vals)
         else None
     )
 
     # Workout: average count per period
-    workout_counts = [pm.get("workout_count", 0) for pm in recent]
+    workout_counts = [period.get("workout_count", 0) for period in recent]
     workout_ma = sum(workout_counts) / len(workout_counts) if workout_counts else None
 
     # Stretch: average count per period
-    stretch_counts = [pm.get("stretch_count", 0) for pm in recent]
+    stretch_counts = [period.get("stretch_count", 0) for period in recent]
     stretch_ma = sum(stretch_counts) / len(stretch_counts) if stretch_counts else None
 
     # Mindful: average count per period
-    mindful_counts = [pm.get("mindful_count", 0) for pm in recent]
+    mindful_counts = [period.get("mindful_count", 0) for period in recent]
     mindful_ma = sum(mindful_counts) / len(mindful_counts) if mindful_counts else None
 
     return MovingAverageAggregate(

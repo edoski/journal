@@ -302,6 +302,24 @@ class TestComputeBucketDeltas:
 
         assert result == ["—"]
 
+    def test_both_zero_bucket_returns_zero_percent(self):
+        baseline_bucket = [datetime.date(2024, 12, 31)]
+        buckets = [[datetime.date(2025, 1, 1)]]
+        values = {
+            datetime.date(2024, 12, 31): 0.0,
+            datetime.date(2025, 1, 1): 0.0,
+        }
+
+        result = compute_bucket_deltas(
+            buckets,
+            value_for_day=lambda d: values.get(d),
+            baseline_bucket=baseline_bucket,
+            mode="pace",
+            today=datetime.date(2025, 1, 31),
+        )
+
+        assert result == ["+0%"]
+
 
 class TestAggregateTrainingTypeSessionStats:
     """Tests for aggregate_training_type_session_stats function."""

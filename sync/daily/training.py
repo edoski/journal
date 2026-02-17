@@ -138,9 +138,9 @@ def _merge_training_rows(
     existing: list[TrainingTableRow],
     new: list[TrainingTableRow],
 ) -> list[TrainingTableRow]:
-    merged: OrderedDict[tuple, TrainingTableRow] = OrderedDict()
+    merged: OrderedDict[tuple[str, str, str, str], TrainingTableRow] = OrderedDict()
 
-    def key(entry: TrainingTableRow) -> tuple:
+    def key(entry: TrainingTableRow) -> tuple[str, str, str, str]:
         return (
             entry.get("start") or "",
             entry.get("end") or "",
