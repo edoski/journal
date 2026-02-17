@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Callable, Sequence
+from typing import Literal
 
 from sync.contracts.metrics import MovingAverageAggregate, PeriodAggregate
 from sync.formatting import compute_percent_change, format_percent_change
+
+BucketDeltaMode = Literal["pace", "average"]
 
 
 def group_screen_time_by_percent(
@@ -49,38 +53,77 @@ def group_screen_time_by_percent(
     return result
 
 
-def compute_period_deltas(
-    counts: list[tuple[int, int, datetime.date]],
-    baseline: int | None,
+def compute_bucket_deltas(
+    buckets: Sequence[Sequence[datetime.date]],
+    *,
+    value_for_day: Callable[[datetime.date], float | None],
+    baseline_bucket: Sequence[datetime.date] | None = None,
+    mode: BucketDeltaMode = "pace",
     today: datetime.date | None = None,
 ) -> list[str]:
     """
-    Compute percent change deltas for a sequence of period counts.
+    Compute per-bucket deltas using consistent period semantics.
 
-    This consolidates the repeated delta calculation pattern used in
-    quarterly_sync.py and yearly_sync.py.
-
-    Args:
-        counts: List of (done, elapsed, start_date) tuples for each period.
-        baseline: The count from the previous comparable period (e.g., last
-                  quarter of previous year for Q1 comparison).
-        today: Reference date for skipping future periods. Defaults to today.
-
-    Returns:
-        List of formatted delta strings (e.g., "+25%", "-10%", "—").
+    Semantics:
+    - Current bucket uses observed days up to ``today``.
+    - Previous bucket uses the full previous bucket (or baseline bucket for index 0).
+    - Future buckets return blank strings.
+    - ``mode="pace"`` compares per-day pace (sum / day_count).
+    - ``mode="average"`` compares averages of non-None values.
     """
+    if mode not in ("pace", "average"):
+        raise ValueError(f"Unsupported bucket delta mode: {mode}")
+
     today = today or datetime.date.today()
     deltas: list[str] = []
-    for idx, (done, _, start) in enumerate(counts):
-        if start > today:
+
+    for idx, bucket in enumerate(buckets):
+        if not bucket:
+            deltas.append("—")
+            continue
+        if bucket[0] > today:
             deltas.append("")
             continue
-        if idx == 0:
-            prev_val = baseline
+
+        current_days = [day for day in bucket if day <= today]
+        if not current_days:
+            deltas.append("—")
+            continue
+
+        previous_bucket = buckets[idx - 1] if idx > 0 else baseline_bucket
+        if not previous_bucket:
+            deltas.append("—")
+            continue
+        previous_days = list(previous_bucket)
+
+        if mode == "pace":
+            current_sum = sum(float(value_for_day(day) or 0.0) for day in current_days)
+            previous_sum = sum(
+                float(value_for_day(day) or 0.0) for day in previous_days
+            )
+            current_value = current_sum / max(1, len(current_days))
+            previous_value = previous_sum / max(1, len(previous_days))
         else:
-            prev_val = counts[idx - 1][0]
-        delta = compute_percent_change(done, prev_val)
+            current_vals = [
+                float(val)
+                for day in current_days
+                if (val := value_for_day(day)) is not None
+            ]
+            previous_vals = [
+                float(val)
+                for day in previous_days
+                if (val := value_for_day(day)) is not None
+            ]
+            current_value = (
+                sum(current_vals) / len(current_vals) if current_vals else 0.0
+            )
+            previous_value = (
+                sum(previous_vals) / len(previous_vals) if previous_vals else 0.0
+            )
+
+        delta = compute_percent_change(current_value, previous_value)
         deltas.append(format_percent_change(delta))
+
     return deltas
 
 

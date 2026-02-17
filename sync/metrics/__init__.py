@@ -15,8 +15,8 @@ from .aggregation import (
     compute_period_metrics,
 )
 from .comparison import (
+    compute_bucket_deltas,
     compute_moving_average,
-    compute_period_deltas,
     group_screen_time_by_percent,
 )
 from .loading import (
@@ -35,6 +35,6 @@ __all__ = [
     "aggregate_screen_time",
     "aggregate_training_type_session_stats",
     "group_screen_time_by_percent",
-    "compute_period_deltas",
+    "compute_bucket_deltas",
     "compute_moving_average",
 ]

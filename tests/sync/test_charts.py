@@ -126,6 +126,12 @@ class TestRenderTrainingTypeSessionsTable:
                 "target": 7,
                 "average_minutes": 17.0,
             },
+            {
+                "type": "Mind & Body",
+                "sessions": 1,
+                "target": 7,
+                "average_minutes": 9.0,
+            },
         ]
 
         result = render_training_type_sessions_table(rows)
@@ -136,6 +142,7 @@ class TestRenderTrainingTypeSessionsTable:
             result[2] == "| **Traditional Strength Training** | `2/7` | `58m/session` |"
         )
         assert result[3] == "| **Stretching** | `4/7` | `17m/session` |"
+        assert result[4] == "| **Mind & Body** | `1/7` | `09m/session` |"
 
     def test_empty_rows(self):
         result = render_training_type_sessions_table([])

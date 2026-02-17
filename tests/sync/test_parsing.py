@@ -120,6 +120,10 @@ class TestFormatMinutes:
         assert format_minutes(45) == "45m"
         assert format_minutes(5) == "5m"
 
+    def test_minutes_only_zero_padded_when_requested(self):
+        assert format_minutes(45, pad_minutes=True) == "45m"
+        assert format_minutes(5, pad_minutes=True) == "05m"
+
     def test_zero(self):
         assert format_minutes(0) == "0m"
         assert format_minutes(0, always_show_both=True) == "0h00m"

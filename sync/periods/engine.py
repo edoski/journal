@@ -13,20 +13,18 @@ from sync.constants import (
 from sync.dates import (
     daterange,
     format_week_label,
+    month_week_ranges,
     quarter_id,
     quarter_months,
+    shift_month,
     year_range,
 )
-from sync.formatting import (
-    compute_percent_change,
-    format_minutes,
-    format_percent_change,
-)
+from sync.formatting import format_minutes
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_screen_time,
+    compute_bucket_deltas,
     compute_moving_average,
-    compute_period_deltas,
     compute_period_metrics,
     group_screen_time_by_percent,
 )
@@ -324,7 +322,6 @@ def build_monthly_metrics(
     # Weekly TOTALS for study chart (0-40h scale, 8 visual rows, 6-char bars)
     week_labels = []
     week_day_lists = []
-    study_week_raw = []
     study_chart_vals = []
     study_value_labels = []
     for start, end in week_ranges:
@@ -332,8 +329,6 @@ def build_monthly_metrics(
         week_labels.append(label)
         week_days = list(daterange(start, end))
         week_day_lists.append(week_days)
-        raw_minutes = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
-        study_week_raw.append(raw_minutes)
         mins = [daily_data.get(d, {}).get("study_minutes") for d in week_days]
         mins = [m for m in mins if m is not None]
         total_min = sum(mins) if mins else 0
@@ -348,32 +343,25 @@ def build_monthly_metrics(
                 format_minutes(total_min) if total_min > 0 else "0h00m"
             )
 
+    prev_year, prev_month = shift_month(start_date.year, start_date.month, -1)
+    prev_week_ranges = month_week_ranges(prev_year, prev_month)
+    prev_baseline_week = (
+        list(daterange(prev_week_ranges[-1][0], prev_week_ranges[-1][1]))
+        if prev_week_ranges
+        else None
+    )
+    month_delta_data = {**prev_daily_data, **daily_data}
+
     is_current_month = start_date.year == today.year and start_date.month == today.month
-    study_delta_labels = []
-    for idx, week_days in enumerate(week_day_lists):
-        week_start = week_days[0]
-        # Future weeks: blank
-        if week_start > today and is_current_month:
-            study_delta_labels.append("")
-            continue
-        # First week has no prior comparison
-        if idx == 0:
-            study_delta_labels.append("—")
-            continue
-        # Determine slice length (partial for active week)
-        if is_current_month and week_start <= today <= week_days[-1]:
-            days_elapsed = sum(1 for d in week_days if d <= today)
-        else:
-            days_elapsed = len(week_days)
-        prev_week_days = week_day_lists[idx - 1]
-        slice_len = min(days_elapsed, len(week_days))
-        prev_slice_len = min(days_elapsed, len(prev_week_days))
-        curr_vals = study_week_raw[idx][:slice_len]
-        prev_vals = study_week_raw[idx - 1][:prev_slice_len]
-        curr_sum = sum(v for v in curr_vals if v is not None)
-        prev_sum = sum(v for v in prev_vals if v is not None)
-        delta = compute_percent_change(curr_sum, prev_sum)
-        study_delta_labels.append(format_percent_change(delta))
+    study_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: float(
+            month_delta_data.get(d, {}).get("study_minutes") or 0.0
+        ),
+        baseline_bucket=prev_baseline_week,
+        mode="pace",
+        today=today,
+    )
 
     chart_lines = render_bar_chart(
         week_labels,
@@ -392,27 +380,19 @@ def build_monthly_metrics(
     study_lines.extend(render_activity_table(activity_totals))
     study_lines.append("")
 
-    # Full-study-day deltas per week (mirror training delta behavior)
-    study_week_done = []
-    for week_days in week_day_lists:
-        done = sum(
-            1
-            for d in week_days
-            if (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
-        )
-        study_week_done.append(done)
-
-    study_grid_delta_labels = []
-    for idx, week_days in enumerate(week_day_lists):
-        week_start = week_days[0]
-        if is_current_month and week_start > today:
-            study_grid_delta_labels.append("")
-            continue
-        if idx == 0:
-            study_grid_delta_labels.append("—")
-            continue
-        delta = compute_percent_change(study_week_done[idx], study_week_done[idx - 1])
-        study_grid_delta_labels.append(format_percent_change(delta))
+    # Full-study-day deltas per week (pace-normalized by days per bucket)
+    study_grid_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: (
+            1.0
+            if (month_delta_data.get(d, {}).get("study_minutes") or 0)
+            >= STUDY_TARGET_MIN
+            else 0.0
+        ),
+        baseline_bucket=prev_baseline_week,
+        mode="pace",
+        today=today,
+    )
 
     current_month_date = today if is_current_month else None
     study_grid = render_monthly_study_grid(
@@ -430,51 +410,33 @@ def build_monthly_metrics(
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
-    mindful_delta_labels = []
-    workout_delta_labels = []
-    stretch_delta_labels = []
-    for idx, week_days in enumerate(week_day_lists):
-        week_start = week_days[0]
-        if is_current_month and week_start > today:
-            mindful_delta_labels.append("")
-            workout_delta_labels.append("")
-            stretch_delta_labels.append("")
-            continue
-        if idx == 0:
-            mindful_delta_labels.append("—")
-            workout_delta_labels.append("—")
-            stretch_delta_labels.append("—")
-            continue
-
-        prev_week_days = week_day_lists[idx - 1]
-
-        # Compare full periods (no partial-window truncation)
-        curr_mindful_count = sum(
-            1 for d in week_days if daily_data.get(d, {}).get("meditate")
-        )
-        prev_mindful_count = sum(
-            1 for d in prev_week_days if daily_data.get(d, {}).get("meditate")
-        )
-        mindful_delta = compute_percent_change(curr_mindful_count, prev_mindful_count)
-        mindful_delta_labels.append(format_percent_change(mindful_delta))
-
-        curr_workout_count = sum(
-            1 for d in week_days if daily_data.get(d, {}).get("workout")
-        )
-        prev_workout_count = sum(
-            1 for d in prev_week_days if daily_data.get(d, {}).get("workout")
-        )
-        workout_delta = compute_percent_change(curr_workout_count, prev_workout_count)
-        workout_delta_labels.append(format_percent_change(workout_delta))
-
-        curr_stretch_count = sum(
-            1 for d in week_days if daily_data.get(d, {}).get("stretch")
-        )
-        prev_stretch_count = sum(
-            1 for d in prev_week_days if daily_data.get(d, {}).get("stretch")
-        )
-        stretch_delta = compute_percent_change(curr_stretch_count, prev_stretch_count)
-        stretch_delta_labels.append(format_percent_change(stretch_delta))
+    mindful_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: (
+            1.0 if month_delta_data.get(d, {}).get("meditate") else 0.0
+        ),
+        baseline_bucket=prev_baseline_week,
+        mode="pace",
+        today=today,
+    )
+    workout_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: (
+            1.0 if month_delta_data.get(d, {}).get("workout") else 0.0
+        ),
+        baseline_bucket=prev_baseline_week,
+        mode="pace",
+        today=today,
+    )
+    stretch_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: (
+            1.0 if month_delta_data.get(d, {}).get("stretch") else 0.0
+        ),
+        baseline_bucket=prev_baseline_week,
+        mode="pace",
+        today=today,
+    )
 
     mindful_days = current_metrics["mindful_count"]
     training_grid = render_training_frequency_grid(
@@ -531,12 +493,10 @@ def build_monthly_metrics(
 
     # SLEEP section (5-char bars, weekly averages)
     sleep_lines = ["### **SLEEP**"]
-    sleep_week_raw = []
     sleep_chart_vals = []
     sleep_value_labels = []
     for week_days in week_day_lists:
         mins_raw = [daily_data.get(d, {}).get("sleep_minutes") for d in week_days]
-        sleep_week_raw.append(mins_raw)
         mins = [m for m in mins_raw if m is not None]
         start = week_days[0]
         if mins:
@@ -555,30 +515,13 @@ def build_monthly_metrics(
             else:
                 sleep_value_labels.append("0h00m")
 
-    sleep_delta_labels = []
-    for idx, week_days in enumerate(week_day_lists):
-        week_start = week_days[0]
-        if week_start > today and is_current_month:
-            sleep_delta_labels.append("")
-            continue
-        if idx == 0:
-            sleep_delta_labels.append("—")
-            continue
-        if is_current_month and week_start <= today <= week_days[-1]:
-            days_elapsed = sum(1 for d in week_days if d <= today)
-        else:
-            days_elapsed = len(week_days)
-        prev_week_days = week_day_lists[idx - 1]
-        slice_len = min(days_elapsed, len(week_days))
-        prev_slice_len = min(days_elapsed, len(prev_week_days))
-        curr_vals = [v for v in sleep_week_raw[idx][:slice_len] if v is not None]
-        prev_vals = [
-            v for v in sleep_week_raw[idx - 1][:prev_slice_len] if v is not None
-        ]
-        curr_avg = (sum(curr_vals) / len(curr_vals)) if curr_vals else 0
-        prev_avg = (sum(prev_vals) / len(prev_vals)) if prev_vals else 0
-        delta = compute_percent_change(curr_avg, prev_avg)
-        sleep_delta_labels.append(format_percent_change(delta))
+    sleep_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: month_delta_data.get(d, {}).get("sleep_minutes"),
+        baseline_bucket=prev_baseline_week,
+        mode="average",
+        today=today,
+    )
 
     sleep_chart = render_bar_chart(
         week_labels,
@@ -610,12 +553,10 @@ def build_monthly_metrics(
 
     # MOOD section (5-char bars, weekly averages, always show decimal)
     mood_lines = ["### **MOOD**"]
-    mood_week_raw = []
     mood_chart_vals = []
     mood_value_labels = []
     for week_days in week_day_lists:
         vals_raw = [daily_data.get(d, {}).get("mood") for d in week_days]
-        mood_week_raw.append(vals_raw)
         vals = [v for v in vals_raw if v is not None]
         start = week_days[0]
         if vals:
@@ -633,30 +574,13 @@ def build_monthly_metrics(
             else:
                 mood_value_labels.append("0.0")
 
-    mood_delta_labels = []
-    for idx, week_days in enumerate(week_day_lists):
-        week_start = week_days[0]
-        if week_start > today and is_current_month:
-            mood_delta_labels.append("")
-            continue
-        if idx == 0:
-            mood_delta_labels.append("—")
-            continue
-        if is_current_month and week_start <= today <= week_days[-1]:
-            days_elapsed = sum(1 for d in week_days if d <= today)
-        else:
-            days_elapsed = len(week_days)
-        prev_week_days = week_day_lists[idx - 1]
-        slice_len = min(days_elapsed, len(week_days))
-        prev_slice_len = min(days_elapsed, len(prev_week_days))
-        curr_vals = [v for v in mood_week_raw[idx][:slice_len] if v is not None]
-        prev_vals = [
-            v for v in mood_week_raw[idx - 1][:prev_slice_len] if v is not None
-        ]
-        curr_avg = (sum(curr_vals) / len(curr_vals)) if curr_vals else 0
-        prev_avg = (sum(prev_vals) / len(prev_vals)) if prev_vals else 0
-        delta = compute_percent_change(curr_avg, prev_avg)
-        mood_delta_labels.append(format_percent_change(delta))
+    mood_delta_labels = compute_bucket_deltas(
+        week_day_lists,
+        value_for_day=lambda d: month_delta_data.get(d, {}).get("mood"),
+        baseline_bucket=prev_baseline_week,
+        mode="average",
+        today=today,
+    )
 
     mood_chart = render_bar_chart(
         week_labels,
@@ -773,13 +697,19 @@ def build_quarterly_metrics(
 
     prev_month_ranges = quarter_months(prev_year, prev_quarter)
     prev_last_month_range = prev_month_ranges[-1] if prev_month_ranges else None
+    prev_last_month_days = (
+        list(daterange(prev_last_month_range[0], prev_last_month_range[1]))
+        if prev_last_month_range
+        else None
+    )
+    quarter_delta_data = {**prev_daily_data, **daily_data}
+    month_day_lists = [list(daterange(start, end)) for start, end in month_ranges]
 
     # STUDY
     study_lines = ["### **STUDY**"]
     month_labels = []
     study_chart_vals = []
     study_value_labels = []
-    study_totals_minutes = []
     activity_totals = {}
 
     for start, end in month_ranges:
@@ -794,7 +724,6 @@ def build_quarterly_metrics(
                 total_min += mins
         hours = round((total_min / 60) * 2) / 2  # Round to nearest 0.5h
         study_chart_vals.append(hours)
-        study_totals_minutes.append(total_min)
         if start > today:
             study_value_labels.append("")
         else:
@@ -802,18 +731,15 @@ def build_quarterly_metrics(
                 format_minutes(total_min) if total_min > 0 else "0h00m"
             )
 
-    study_delta_labels = []
-    for idx, start in enumerate([m[0] for m in month_ranges]):
-        if start > today:
-            study_delta_labels.append("")
-            continue
-        if idx == 0:
-            study_delta_labels.append("—")
-            continue
-        curr = study_totals_minutes[idx]
-        prev = study_totals_minutes[idx - 1]
-        delta = compute_percent_change(curr, prev)
-        study_delta_labels.append(format_percent_change(delta))
+    study_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: float(
+            quarter_delta_data.get(d, {}).get("study_minutes") or 0.0
+        ),
+        baseline_bucket=prev_last_month_days,
+        mode="pace",
+        today=today,
+    )
 
     chart_lines = render_bar_chart(
         month_labels,
@@ -831,30 +757,18 @@ def build_quarterly_metrics(
     study_lines.extend(render_activity_table(activity_totals))
     study_lines.append("")
 
-    study_counts = []
-    for start, end in month_ranges:
-        days = list(daterange(start, end))
-        elapsed = sum(1 for d in days if d <= today)
-        done = sum(
-            1
-            for d in days
-            if d <= today
-            and (daily_data.get(d, {}).get("study_minutes") or 0) >= STUDY_TARGET_MIN
-        )
-        study_counts.append((done, elapsed, start))
-
-    prev_study_baseline = None
-    if prev_last_month_range:
-        prev_days = list(daterange(prev_last_month_range[0], prev_last_month_range[1]))
-        prev_study_baseline = sum(
-            1
-            for d in prev_days
-            if d <= today
-            and (prev_daily_data.get(d, {}).get("study_minutes") or 0)
+    study_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: (
+            1.0
+            if (quarter_delta_data.get(d, {}).get("study_minutes") or 0)
             >= STUDY_TARGET_MIN
-        )
-
-    study_delta_labels = compute_period_deltas(study_counts, prev_study_baseline, today)
+            else 0.0
+        ),
+        baseline_bucket=prev_last_month_days,
+        mode="pace",
+        today=today,
+    )
 
     study_grid = render_quarterly_study_coverage(
         month_ranges,
@@ -884,29 +798,32 @@ def build_quarterly_metrics(
     mindful_counts = [_month_count(rng, "meditate", daily_data) for rng in month_ranges]
     workout_counts = [_month_count(rng, "workout", daily_data) for rng in month_ranges]
     stretch_counts = [_month_count(rng, "stretch", daily_data) for rng in month_ranges]
-    if prev_last_month_range:
-        prev_mindful_baseline = _month_count(
-            prev_last_month_range, "meditate", prev_daily_data
-        )[0]
-        prev_workout_baseline = _month_count(
-            prev_last_month_range, "workout", prev_daily_data
-        )[0]
-        prev_stretch_baseline = _month_count(
-            prev_last_month_range, "stretch", prev_daily_data
-        )[0]
-    else:
-        prev_mindful_baseline = None
-        prev_workout_baseline = None
-        prev_stretch_baseline = None
-
-    mindful_delta_labels = compute_period_deltas(
-        mindful_counts, prev_mindful_baseline, today
+    mindful_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: (
+            1.0 if quarter_delta_data.get(d, {}).get("meditate") else 0.0
+        ),
+        baseline_bucket=prev_last_month_days,
+        mode="pace",
+        today=today,
     )
-    workout_delta_labels = compute_period_deltas(
-        workout_counts, prev_workout_baseline, today
+    workout_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: (
+            1.0 if quarter_delta_data.get(d, {}).get("workout") else 0.0
+        ),
+        baseline_bucket=prev_last_month_days,
+        mode="pace",
+        today=today,
     )
-    stretch_delta_labels = compute_period_deltas(
-        stretch_counts, prev_stretch_baseline, today
+    stretch_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: (
+            1.0 if quarter_delta_data.get(d, {}).get("stretch") else 0.0
+        ),
+        baseline_bucket=prev_last_month_days,
+        mode="pace",
+        today=today,
     )
 
     def _build_training_block(title, activity_key, counts, deltas):
@@ -968,7 +885,6 @@ def build_quarterly_metrics(
     sleep_lines = ["### **SLEEP**"]
     sleep_labels = []
     sleep_chart_vals = []
-    sleep_avgs_minutes = []
     sleep_value_labels = []
     awake_vals = []
     awakenings_vals = []
@@ -987,11 +903,9 @@ def build_quarterly_metrics(
             sleep_chart_vals.append(
                 round((avg_min / 60) * 2) / 2
             )  # Round to nearest 0.5h
-            sleep_avgs_minutes.append(avg_min)
             sleep_value_labels.append(format_minutes(avg_min))
         else:
             sleep_chart_vals.append(0)
-            sleep_avgs_minutes.append(0)
             sleep_value_labels.append("0h00m" if start <= today else "")
 
         awake_vals.extend(
@@ -1005,18 +919,13 @@ def build_quarterly_metrics(
             [daily_data.get(d, {}).get("awakenings") for d in days if daily_data.get(d)]
         )
 
-    sleep_delta_labels = []
-    for idx, start in enumerate([m[0] for m in month_ranges]):
-        if start > today:
-            sleep_delta_labels.append("")
-            continue
-        if idx == 0:
-            sleep_delta_labels.append("—")
-            continue
-        curr = sleep_avgs_minutes[idx]
-        prev = sleep_avgs_minutes[idx - 1]
-        delta = compute_percent_change(curr, prev)
-        sleep_delta_labels.append(format_percent_change(delta))
+    sleep_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: quarter_delta_data.get(d, {}).get("sleep_minutes"),
+        baseline_bucket=prev_last_month_days,
+        mode="average",
+        today=today,
+    )
 
     sleep_chart = render_bar_chart(
         sleep_labels,
@@ -1045,7 +954,6 @@ def build_quarterly_metrics(
     mood_labels = []
     mood_chart_vals = []
     mood_value_labels = []
-    mood_avgs = []
     for start, end in month_ranges:
         label = MONTH_ABBR[start.month - 1]
         mood_labels.append(label)
@@ -1055,25 +963,18 @@ def build_quarterly_metrics(
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)
-            mood_avgs.append(avg_val)
             mood_value_labels.append(f"{avg_val:.1f}")
         else:
             mood_chart_vals.append(0)
-            mood_avgs.append(0)
             mood_value_labels.append("0.0" if start <= today else "")
 
-    mood_delta_labels = []
-    for idx, start in enumerate([m[0] for m in month_ranges]):
-        if start > today:
-            mood_delta_labels.append("")
-            continue
-        if idx == 0:
-            mood_delta_labels.append("—")
-            continue
-        curr = mood_avgs[idx]
-        prev = mood_avgs[idx - 1]
-        delta = compute_percent_change(curr, prev)
-        mood_delta_labels.append(format_percent_change(delta))
+    mood_delta_labels = compute_bucket_deltas(
+        month_day_lists,
+        value_for_day=lambda d: quarter_delta_data.get(d, {}).get("mood"),
+        baseline_bucket=prev_last_month_days,
+        mode="average",
+        today=today,
+    )
 
     mood_chart = render_bar_chart(
         mood_labels,
@@ -1089,19 +990,6 @@ def build_quarterly_metrics(
     append_media_section(sections, media_bundle)
 
     return join_sections(sections)
-
-
-def _quarter_totals(daily_data, quarter_ranges):
-    totals = []
-    for start, end in quarter_ranges:
-        total_min = 0
-        for d in daterange(start, end):
-            daily = daily_data.get(d)
-            if not daily:
-                continue
-            total_min += sum(daily.get("activity_totals", {}).values())
-        totals.append(total_min)
-    return totals
 
 
 def build_yearly_metrics(
@@ -1144,16 +1032,21 @@ def build_yearly_metrics(
         total_days=days_in_year,
     )
 
+    quarter_day_lists = [list(daterange(start, end)) for start, end in quarter_ranges]
+    prev_last_quarter_days = (
+        list(daterange(prev_quarter_ranges[-1][0], prev_quarter_ranges[-1][1]))
+        if prev_quarter_ranges
+        else None
+    )
+    year_delta_data = {**prev_daily_data, **daily_data}
+
     # STUDY (quarter bars, y_max=720h)
     study_lines = ["### **STUDY**"]
     q_labels = [f"Q{i + 1}" for i in range(4)]
-    prev_quarter_totals = _quarter_totals(prev_daily_data, prev_quarter_ranges)
 
     activity_totals = {}
-    study_totals_minutes = []
     study_values_hours = []
     study_value_labels = []
-    study_delta_labels = []
 
     for start, end in quarter_ranges:
         total_min = 0
@@ -1165,7 +1058,6 @@ def build_yearly_metrics(
                 activity_totals[activity] = activity_totals.get(activity, 0) + mins
                 total_min += mins
 
-        study_totals_minutes.append(total_min)
         study_values_hours.append(
             round((total_min / 60) * 2) / 2 if total_min else 0
         )  # Round to nearest 0.5h
@@ -1176,16 +1068,15 @@ def build_yearly_metrics(
                 format_minutes(total_min) if total_min > 0 else "0h00m"
             )
 
-    for idx, (start, _) in enumerate(quarter_ranges):
-        if start > today:
-            study_delta_labels.append("")
-            continue
-        if idx == 0:
-            prev_val = prev_quarter_totals[-1] if prev_quarter_totals else None
-        else:
-            prev_val = study_totals_minutes[idx - 1]
-        delta = compute_percent_change(study_totals_minutes[idx], prev_val)
-        study_delta_labels.append(format_percent_change(delta))
+    study_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: float(
+            year_delta_data.get(d, {}).get("study_minutes") or 0.0
+        ),
+        baseline_bucket=prev_last_quarter_days,
+        mode="pace",
+        today=today,
+    )
 
     study_chart = render_bar_chart(
         q_labels,
@@ -1203,7 +1094,7 @@ def build_yearly_metrics(
     study_lines.extend(render_activity_table(activity_totals))
     study_lines.append("")
 
-    # Compute per-quarter full-study day counts (only elapsed days) for deltas
+    # Compute per-quarter full-study day counts for rendering
     study_counts = []
     study_bars = []
     for start, end in quarter_ranges:
@@ -1230,29 +1121,18 @@ def build_yearly_metrics(
         )
         study_bars.append(bar)
 
-    prev_study_baseline = None
-    if prev_quarter_ranges:
-        prev_q_start, prev_q_end = prev_quarter_ranges[-1]
-        prev_days = list(daterange(prev_q_start, prev_q_end))
-        prev_study_baseline = sum(
-            1
-            for d in prev_days
-            if d <= today
-            and (prev_daily_data.get(d, {}).get("study_minutes") or 0)
+    study_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: (
+            1.0
+            if (year_delta_data.get(d, {}).get("study_minutes") or 0)
             >= STUDY_TARGET_MIN
-        )
-
-    study_delta_labels = []
-    for idx, (done, _, start) in enumerate(study_counts):
-        if start > today:
-            study_delta_labels.append("")
-            continue
-        if idx == 0:
-            prev_val = prev_study_baseline
-        else:
-            prev_val = study_counts[idx - 1][0]
-        delta = compute_percent_change(done, prev_val)
-        study_delta_labels.append(format_percent_change(delta))
+            else 0.0
+        ),
+        baseline_bucket=prev_last_quarter_days,
+        mode="pace",
+        today=today,
+    )
 
     study_grid = render_yearly_study_coverage(
         quarter_ranges,
@@ -1300,31 +1180,32 @@ def build_yearly_metrics(
         stretch_done_year += stretch_done
         elapsed_year += elapsed_days
 
-    # Baseline is last quarter of previous year
-    prev_mindful_baseline = None
-    prev_workout_baseline = None
-    prev_stretch_baseline = None
-    if prev_quarter_ranges:
-        last_q_start, last_q_end = prev_quarter_ranges[-1]
-        prev_days = list(daterange(last_q_start, last_q_end))
-        prev_mindful_baseline = sum(
-            1 for d in prev_days if prev_daily_data.get(d, {}).get("meditate")
-        )
-        prev_workout_baseline = sum(
-            1 for d in prev_days if prev_daily_data.get(d, {}).get("workout")
-        )
-        prev_stretch_baseline = sum(
-            1 for d in prev_days if prev_daily_data.get(d, {}).get("stretch")
-        )
-
-    mindful_delta_labels = compute_period_deltas(
-        mindful_counts, prev_mindful_baseline, today
+    mindful_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: (
+            1.0 if year_delta_data.get(d, {}).get("meditate") else 0.0
+        ),
+        baseline_bucket=prev_last_quarter_days,
+        mode="pace",
+        today=today,
     )
-    workout_delta_labels = compute_period_deltas(
-        workout_counts, prev_workout_baseline, today
+    workout_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: (
+            1.0 if year_delta_data.get(d, {}).get("workout") else 0.0
+        ),
+        baseline_bucket=prev_last_quarter_days,
+        mode="pace",
+        today=today,
     )
-    stretch_delta_labels = compute_period_deltas(
-        stretch_counts, prev_stretch_baseline, today
+    stretch_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: (
+            1.0 if year_delta_data.get(d, {}).get("stretch") else 0.0
+        ),
+        baseline_bucket=prev_last_quarter_days,
+        mode="pace",
+        today=today,
     )
 
     mindful_bars = []
@@ -1433,23 +1314,7 @@ def build_yearly_metrics(
     sleep_lines = ["### **SLEEP**"]
     sleep_chart_vals = []
     sleep_value_labels = []
-    sleep_avgs_minutes = []
     sleep_delta_labels = []
-
-    # Previous year's Q4 baseline for Q1 deltas
-    prev_q4_sleep_avg = None
-    if prev_quarter_ranges:
-        prev_q4_start, prev_q4_end = prev_quarter_ranges[-1]
-        prev_q4_days = list(daterange(prev_q4_start, prev_q4_end))
-        prev_q4_vals = [
-            prev_daily_data.get(d, {}).get("sleep_minutes")
-            for d in prev_q4_days
-            if prev_daily_data.get(d)
-        ]
-        prev_q4_vals = [v for v in prev_q4_vals if v is not None]
-        prev_q4_sleep_avg = (
-            (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
-        )
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
@@ -1464,23 +1329,18 @@ def build_yearly_metrics(
             sleep_chart_vals.append(
                 round((avg_min / 60) * 2) / 2
             )  # Round to nearest 0.5h
-            sleep_avgs_minutes.append(avg_min)
             sleep_value_labels.append(format_minutes(avg_min))
         else:
             sleep_chart_vals.append(0)
-            sleep_avgs_minutes.append(0)
             sleep_value_labels.append("" if start > today else "0h00m")
 
-    for idx, (start, _) in enumerate(quarter_ranges):
-        if start > today:
-            sleep_delta_labels.append("")
-            continue
-        if idx == 0:
-            prev_avg = prev_q4_sleep_avg
-        else:
-            prev_avg = sleep_avgs_minutes[idx - 1]
-        delta = compute_percent_change(sleep_avgs_minutes[idx], prev_avg)
-        sleep_delta_labels.append(format_percent_change(delta))
+    sleep_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: year_delta_data.get(d, {}).get("sleep_minutes"),
+        baseline_bucket=prev_last_quarter_days,
+        mode="average",
+        today=today,
+    )
 
     sleep_chart = render_bar_chart(
         q_labels,
@@ -1515,22 +1375,7 @@ def build_yearly_metrics(
     mood_lines = ["### **MOOD**"]
     mood_chart_vals = []
     mood_value_labels = []
-    mood_avgs = []
     mood_delta_labels = []
-
-    prev_q4_mood_avg = None
-    if prev_quarter_ranges:
-        prev_q4_start, prev_q4_end = prev_quarter_ranges[-1]
-        prev_q4_days = list(daterange(prev_q4_start, prev_q4_end))
-        prev_q4_vals = [
-            prev_daily_data.get(d, {}).get("mood")
-            for d in prev_q4_days
-            if prev_daily_data.get(d)
-        ]
-        prev_q4_vals = [v for v in prev_q4_vals if v is not None]
-        prev_q4_mood_avg = (
-            (sum(prev_q4_vals) / len(prev_q4_vals)) if prev_q4_vals else None
-        )
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
@@ -1539,23 +1384,18 @@ def build_yearly_metrics(
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)
-            mood_avgs.append(avg_val)
             mood_value_labels.append(f"{avg_val:.1f}")
         else:
             mood_chart_vals.append(0)
-            mood_avgs.append(0)
             mood_value_labels.append("" if start > today else "0.0")
 
-    for idx, (start, _) in enumerate(quarter_ranges):
-        if start > today:
-            mood_delta_labels.append("")
-            continue
-        if idx == 0:
-            prev_avg = prev_q4_mood_avg
-        else:
-            prev_avg = mood_avgs[idx - 1]
-        delta = compute_percent_change(mood_avgs[idx], prev_avg)
-        mood_delta_labels.append(format_percent_change(delta))
+    mood_delta_labels = compute_bucket_deltas(
+        quarter_day_lists,
+        value_for_day=lambda d: year_delta_data.get(d, {}).get("mood"),
+        baseline_bucket=prev_last_quarter_days,
+        mode="average",
+        today=today,
+    )
 
     mood_chart = render_bar_chart(
         q_labels,

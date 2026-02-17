@@ -14,7 +14,7 @@ from sync.metrics import (
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
-    compute_period_deltas,
+    compute_bucket_deltas,
     load_daily_data_for_dates,
     load_prior_period_metrics,
 )
@@ -178,70 +178,129 @@ class TestAggregateInterruptOverrun:
         assert study_days == 0
 
 
-class TestComputePeriodDeltas:
-    """Tests for compute_period_deltas function."""
+class TestComputeBucketDeltas:
+    """Tests for compute_bucket_deltas function."""
 
-    def test_computes_percent_changes(self):
-        counts = [
-            (10, 91, datetime.date(2025, 1, 1)),  # Q1
-            (15, 91, datetime.date(2025, 4, 1)),  # Q2: +50%
-            (12, 92, datetime.date(2025, 7, 1)),  # Q3: -20%
-            (18, 92, datetime.date(2025, 10, 1)),  # Q4: +50%
-        ]
-        baseline = 8  # Previous Q4
+    def test_pace_mode_uses_baseline_for_first_bucket(self):
+        baseline_bucket = [datetime.date(2024, 12, 30), datetime.date(2024, 12, 31)]
+        buckets = [[datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]]
+        values = {
+            datetime.date(2024, 12, 30): 60.0,
+            datetime.date(2024, 12, 31): 60.0,
+            datetime.date(2025, 1, 1): 120.0,
+            datetime.date(2025, 1, 2): 120.0,
+        }
 
-        result = compute_period_deltas(
-            counts, baseline, today=datetime.date(2025, 12, 31)
+        result = compute_bucket_deltas(
+            buckets,
+            value_for_day=lambda d: values.get(d),
+            baseline_bucket=baseline_bucket,
+            mode="pace",
+            today=datetime.date(2025, 1, 31),
         )
 
-        assert len(result) == 4
-        # Q1 vs baseline (8): (10-8)/8 = 25%
-        assert result[0] == "+25%"
-        # Q2 vs Q1 (10): (15-10)/10 = 50%
-        assert result[1] == "+50%"
+        assert result == ["+100%"]
 
-    def test_skips_future_periods(self):
-        counts = [
-            (10, 91, datetime.date(2025, 1, 1)),
-            (15, 91, datetime.date(2025, 4, 1)),  # Future
+    def test_pace_mode_in_progress_uses_current_to_date(self):
+        prev_bucket = [datetime.date(2026, 2, 1)]
+        curr_bucket = [
+            datetime.date(2026, 2, 2),
+            datetime.date(2026, 2, 3),
+            datetime.date(2026, 2, 4),
+            datetime.date(2026, 2, 5),
+            datetime.date(2026, 2, 6),
+            datetime.date(2026, 2, 7),
+            datetime.date(2026, 2, 8),
         ]
-        baseline = 8
+        values = {
+            datetime.date(2026, 2, 1): 120.0,
+            datetime.date(2026, 2, 2): 60.0,
+            datetime.date(2026, 2, 3): 60.0,
+            datetime.date(2026, 2, 4): 60.0,
+            datetime.date(2026, 2, 5): 60.0,
+        }
 
-        result = compute_period_deltas(
-            counts, baseline, today=datetime.date(2025, 2, 1)
+        result = compute_bucket_deltas(
+            [prev_bucket, curr_bucket],
+            value_for_day=lambda d: values.get(d),
+            mode="pace",
+            today=datetime.date(2026, 2, 5),
         )
 
-        assert result[0] == "+25%"
-        assert result[1] == ""  # Future period
+        assert result == ["—", "-50%"]
 
-    def test_handles_zero_baseline(self):
-        counts = [
-            (10, 91, datetime.date(2025, 1, 1)),
+    def test_average_mode_ignores_none_values(self):
+        baseline_bucket = [
+            datetime.date(2024, 12, 29),
+            datetime.date(2024, 12, 30),
+            datetime.date(2024, 12, 31),
         ]
-        baseline = 0
+        buckets = [
+            [
+                datetime.date(2025, 1, 1),
+                datetime.date(2025, 1, 2),
+                datetime.date(2025, 1, 3),
+            ],
+            [
+                datetime.date(2025, 1, 4),
+                datetime.date(2025, 1, 5),
+                datetime.date(2025, 1, 6),
+            ],
+        ]
+        values = {
+            datetime.date(2024, 12, 29): 5.0,
+            datetime.date(2024, 12, 30): 5.0,
+            datetime.date(2024, 12, 31): 5.0,
+            datetime.date(2025, 1, 1): 6.0,
+            datetime.date(2025, 1, 2): None,
+            datetime.date(2025, 1, 3): 8.0,
+            datetime.date(2025, 1, 4): 9.0,
+            datetime.date(2025, 1, 5): None,
+            datetime.date(2025, 1, 6): None,
+        }
 
-        result = compute_period_deltas(
-            counts, baseline, today=datetime.date(2025, 12, 31)
+        result = compute_bucket_deltas(
+            buckets,
+            value_for_day=lambda d: values.get(d),
+            baseline_bucket=baseline_bucket,
+            mode="average",
+            today=datetime.date(2025, 1, 31),
         )
 
-        # Zero baseline with nonzero current -> em dash
-        assert result[0] == "—"
+        assert result == ["+40%", "+29%"]
 
-    def test_handles_none_baseline(self):
-        counts = [
-            (10, 91, datetime.date(2025, 1, 1)),
+    def test_future_bucket_returns_blank(self):
+        buckets = [
+            [datetime.date(2025, 1, day) for day in range(1, 8)],
+            [datetime.date(2025, 1, day) for day in range(8, 15)],
         ]
-        baseline = None
 
-        result = compute_period_deltas(
-            counts, baseline, today=datetime.date(2025, 12, 31)
+        result = compute_bucket_deltas(
+            buckets,
+            value_for_day=lambda _day: 60.0,
+            mode="pace",
+            today=datetime.date(2025, 1, 5),
         )
 
-        assert result[0] == "—"
+        assert result == ["—", ""]
 
-    def test_empty_counts(self):
-        result = compute_period_deltas([], 10, today=datetime.date(2025, 12, 31))
-        assert result == []
+    def test_zero_baseline_returns_emdash(self):
+        baseline_bucket = [datetime.date(2024, 12, 31)]
+        buckets = [[datetime.date(2025, 1, 1)]]
+        values = {
+            datetime.date(2024, 12, 31): 0.0,
+            datetime.date(2025, 1, 1): 30.0,
+        }
+
+        result = compute_bucket_deltas(
+            buckets,
+            value_for_day=lambda d: values.get(d),
+            baseline_bucket=baseline_bucket,
+            mode="pace",
+            today=datetime.date(2025, 1, 31),
+        )
+
+        assert result == ["—"]
 
 
 class TestAggregateTrainingTypeSessionStats:

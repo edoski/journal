@@ -136,7 +136,7 @@ def render_training_type_sessions_table(rows: list[dict[str, Any]]) -> list[str]
         sessions = int(row.get("sessions", 0) or 0)
         target = int(row.get("target", 0) or 0)
         avg_minutes = float(row.get("average_minutes", 0.0) or 0.0)
-        avg_label = f"{format_minutes(avg_minutes)}/session"
+        avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
         lines.append(f"| **{label}** | `{sessions}/{target}` | `{avg_label}` |")
 
     return lines

@@ -24,12 +24,17 @@ def ceil_minutes(val: float) -> int:
     return int(math.ceil(val - 1e-6))
 
 
-def format_minutes(total_minutes: float | None, always_show_both: bool = False) -> str:
+def format_minutes(
+    total_minutes: float | None,
+    always_show_both: bool = False,
+    pad_minutes: bool = False,
+) -> str:
     """
     Format minutes as XhYm string.
 
     Always uses two-digit minutes when hours > 0 (e.g., 7h00m, 7h05m).
     If always_show_both=True, always shows both h and m (e.g., 0h00m for 0 minutes).
+    If pad_minutes=True, minutes-only values are zero-padded (e.g., 05m).
     """
     if total_minutes is None:
         return ""
@@ -39,6 +44,8 @@ def format_minutes(total_minutes: float | None, always_show_both: bool = False) 
     minutes = total_minutes % 60
     if hours > 0 or always_show_both:
         return f"{hours}h{minutes:02d}m"
+    if pad_minutes:
+        return f"{minutes:02d}m"
     return f"{minutes}m"
 
 
