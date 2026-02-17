@@ -19,10 +19,10 @@ forbidden_modules =
     sync.ports
     sync.adapters
 
-[importlinter:sync_no_tui]
-name = Sync package must not import tui
+[importlinter:writers_no_readers]
+name = Writers must not import readers
 type = forbidden
 source_modules =
-    sync
+    sync.writers
 forbidden_modules =
-    tui
+    sync.readers

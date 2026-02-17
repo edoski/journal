@@ -10,9 +10,9 @@ import pytest
 from sync.log import configure_logging, get_logger
 
 
-def test_get_logger_namespaces_sync_and_tui():
+def test_get_logger_namespaces_sync():
     assert get_logger("sync.study.db").name == "journal.sync.study.db"
-    assert get_logger("tui.cli").name == "journal.tui.cli"
+    assert get_logger("sync.study.__main__").name == "journal.sync.study.__main__"
 
 
 def test_get_logger_requires_non_empty_name():

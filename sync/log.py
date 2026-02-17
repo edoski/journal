@@ -1,4 +1,4 @@
-"""Centralized logging helpers for sync and TUI entrypoints."""
+"""Centralized logging helpers for sync and CLI entrypoints."""
 
 from __future__ import annotations
 
@@ -72,8 +72,6 @@ def _map_logger_name(name: str) -> str:
         raise ValueError("Logger name must be a non-empty string")
     if name.startswith("journal."):
         return name
-    if name in {"sync", "tui"} or name.startswith(("sync.", "tui.")):
-        return f"journal.{name}"
     return f"journal.{name}"
 
 

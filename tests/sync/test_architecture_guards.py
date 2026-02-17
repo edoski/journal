@@ -32,26 +32,6 @@ def _imported_from(path: Path, module_name: str) -> set[str]:
     return imported
 
 
-def test_writers_do_not_import_readers():
-    writer_files = sorted((ROOT / "sync" / "writers").rglob("*.py"))
-    violations: list[str] = []
-
-    for path in writer_files:
-        module = _parse_module(path)
-        for node in ast.walk(module):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("sync.readers"):
-                        violations.append(f"{path}: import {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                if mod.startswith("sync.readers"):
-                    imported = ", ".join(alias.name for alias in node.names)
-                    violations.append(f"{path}: from {mod} import {imported}")
-
-    assert not violations, "Writers must not import readers:\n" + "\n".join(violations)
-
-
 def test_removed_legacy_module_files_do_not_exist():
     legacy_paths = [
         "sync/weekly.py",
@@ -99,7 +79,6 @@ def test_required_domain_packages_exist():
         "sync/application",
         "sync/daily/orchestrator",
         "sync/writers/charts",
-        "tui",
     ]
     missing = [path for path in required_dirs if not (ROOT / path).is_dir()]
     assert not missing, (
@@ -369,26 +348,9 @@ def test_goal_sync_service_does_not_import_daily_goals_module():
     )
 
 
-def test_sync_package_does_not_import_tui():
-    violations: list[str] = []
-    for path in _iter_python_files("sync"):
-        module = _parse_module(path)
-        for node in ast.walk(module):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name == "tui" or alias.name.startswith("tui."):
-                        violations.append(f"{path}: import {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                if mod == "tui" or mod.startswith("tui."):
-                    imported = ", ".join(alias.name for alias in node.names)
-                    violations.append(f"{path}: from {mod} import {imported}")
-    assert not violations, "sync must not import tui:\n" + "\n".join(violations)
-
-
 def test_removed_utils_package_is_not_imported():
     violations: list[str] = []
-    for path in _iter_python_files("sync", "tests", "tui"):
+    for path in _iter_python_files("sync", "tests"):
         module = _parse_module(path)
         for node in ast.walk(module):
             if isinstance(node, ast.Import):
@@ -407,7 +369,7 @@ def test_removed_utils_package_is_not_imported():
 
 def test_removed_reminder_functions_are_not_referenced():
     violations: list[str] = []
-    for path in _iter_python_files("sync", "tests", "tui"):
+    for path in _iter_python_files("sync", "tests"):
         module = _parse_module(path)
         for node in ast.walk(module):
             if not isinstance(node, ast.ImportFrom):
@@ -432,7 +394,7 @@ def test_removed_reminder_functions_are_not_referenced():
 
 def test_no_sessiondict_alias_exists():
     matches: list[str] = []
-    for path in _iter_python_files("sync", "tui"):
+    for path in _iter_python_files("sync"):
         module = _parse_module(path)
         for node in module.body:
             if isinstance(node, ast.Assign):
@@ -468,67 +430,18 @@ def test_sync_modules_do_not_import_private_symbols_across_modules():
     )
 
 
-def test_application_layer_does_not_import_adapters():
-    application_files = sorted((ROOT / "sync" / "application").rglob("*.py"))
-    violations: list[str] = []
-
-    for path in application_files:
-        module = _parse_module(path)
-        for node in ast.walk(module):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("sync.adapters"):
-                        violations.append(f"{path}: import {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                if mod.startswith("sync.adapters"):
-                    imported = ", ".join(alias.name for alias in node.names)
-                    violations.append(f"{path}: from {mod} import {imported}")
-
-    assert not violations, (
-        "sync.application must depend on ports/contracts, not adapters:\n"
-        + "\n".join(violations)
-    )
-
-
-def test_writers_do_not_import_ports_or_adapters():
-    writer_files = sorted((ROOT / "sync" / "writers").rglob("*.py"))
-    violations: list[str] = []
-
-    for path in writer_files:
-        module = _parse_module(path)
-        for node in ast.walk(module):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith("sync.ports") or alias.name.startswith(
-                        "sync.adapters"
-                    ):
-                        violations.append(f"{path}: import {alias.name}")
-            elif isinstance(node, ast.ImportFrom):
-                mod = node.module or ""
-                if mod.startswith("sync.ports") or mod.startswith("sync.adapters"):
-                    imported = ", ".join(alias.name for alias in node.names)
-                    violations.append(f"{path}: from {mod} import {imported}")
-
-    assert not violations, (
-        "sync.writers must remain pure render layer (no ports/adapters):\n"
-        + "\n".join(violations)
-    )
-
-
 def test_only_composition_roots_import_adapters_or_application():
     composition_roots = {
         ROOT / "sync" / "daily" / "__main__.py",
+        ROOT / "sync" / "study" / "__main__.py",
         ROOT / "sync" / "periods" / "weekly" / "__main__.py",
         ROOT / "sync" / "periods" / "monthly" / "__main__.py",
         ROOT / "sync" / "periods" / "quarterly" / "__main__.py",
         ROOT / "sync" / "periods" / "yearly" / "__main__.py",
-        ROOT / "tui" / "app.py",
-        ROOT / "tui" / "cli.py",
     }
     violations: list[str] = []
 
-    for path in _iter_python_files("sync", "tui"):
+    for path in _iter_python_files("sync"):
         if path in composition_roots:
             continue
         # Application internals may import sibling application modules.
@@ -582,7 +495,7 @@ def test_application_metrics_services_avoid_generic_dict_any_signatures():
 
 
 def test_period_snapshot_contract_is_defined_once():
-    files = _iter_python_files("sync", "tui")
+    files = _iter_python_files("sync")
     definitions: list[str] = []
 
     for path in files:

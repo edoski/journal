@@ -403,7 +403,7 @@ def get_sessions_for_day(
                 overrun_minutes = max(
                     0.0, gap_minutes - lunch_overlap - expected_excl_lunch
                 )
-                # Half-up to nearest minute to reflect intuitive lateness
+                # Half-up to nearest minute to reflect clear lateness
                 overrun = int(overrun_minutes + 0.5)
                 session["break_overrun"] = overrun
 

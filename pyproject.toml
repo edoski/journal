@@ -27,7 +27,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["sync*", "tui*"]
+include = ["sync*"]
 
 [tool.coverage.run]
 branch = true

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sqlite3
 from datetime import date, datetime, time
 
-import tui.cli as cli
+import pytest
+
+import sync.study.__main__ as cli
 from sync.contracts.schedule import DayScheduleProfile
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
@@ -14,8 +15,8 @@ FLOW_START = 'tell application "Flow" to start'
 FLOW_SHOW = 'tell application "Flow" to show'
 
 
-def _skip_args() -> argparse.Namespace:
-    return argparse.Namespace()
+def _skip_args(state: str | None = None) -> argparse.Namespace:
+    return argparse.Namespace(state=state)
 
 
 def _default_schedule() -> DayScheduleProfile:
@@ -28,7 +29,7 @@ def _default_schedule() -> DayScheduleProfile:
     )
 
 
-def _set_schedule_ready(monkeypatch) -> None:
+def _set_schedule_ready(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
     monkeypatch.setattr(cli, "_resolve_day_schedule", lambda _day: _default_schedule())
 
@@ -62,8 +63,9 @@ def _insert_session_row(
     conn.commit()
 
 
-def _enabled_skip_state() -> dict[str, bool]:
-    return {"enabled": True}
+def _print_disabled_output(disabled: bool) -> str:
+    value = "true" if disabled else "false"
+    return f'{{\n  "{cli.SKIP_LAUNCHD_LABEL}" => {value}\n}}'
 
 
 def test_latest_row_is_open_flow_true_for_open_flow() -> None:
@@ -98,8 +100,8 @@ def test_latest_row_is_open_flow_false_when_no_rows() -> None:
     conn.close()
 
 
-def test_skip_now_noops_when_disabled(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", lambda: {"enabled": False})
+def test_session_skip_noops_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: False)
 
     def _fail_run(_script: str) -> str:
         raise AssertionError(
@@ -113,12 +115,14 @@ def test_skip_now_noops_when_disabled(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "get_connection", _fail_conn)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
 
 
-def test_skip_now_noops_when_phase_is_not_flow(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+def test_session_skip_noops_when_phase_is_not_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
@@ -135,15 +139,15 @@ def test_skip_now_noops_when_phase_is_not_flow(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "get_connection", _fail_conn)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
     assert calls == [FLOW_GET_PHASE]
 
 
-def test_skip_now_executes_when_phase_flow_and_latest_row_open_flow(
-    monkeypatch,
+def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=None)
@@ -158,13 +162,15 @@ def test_skip_now_executes_when_phase_flow_and_latest_row_open_flow(
 
     monkeypatch.setattr(cli, "_run_applescript", _fake_run)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
     assert calls == [FLOW_GET_PHASE, FLOW_SKIP, FLOW_START, FLOW_SHOW]
 
 
-def test_skip_now_noops_when_latest_row_is_completed_flow(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+def test_session_skip_noops_when_latest_row_is_completed_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=1234.0)
@@ -179,34 +185,13 @@ def test_skip_now_noops_when_latest_row_is_completed_flow(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "_run_applescript", _fake_run)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
     assert calls == [FLOW_GET_PHASE]
 
 
-def test_skip_now_noops_when_latest_row_is_open_break(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
-    _set_schedule_ready(monkeypatch)
-    conn = _make_session_conn()
-    _insert_session_row(conn, phase="shortBreak", completed_at=None)
-    monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
-    calls: list[str] = []
-
-    def _fake_run(script: str) -> str:
-        calls.append(script)
-        if script == FLOW_GET_PHASE:
-            return "Flow"
-        return "ok"
-
-    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
-
-    rc = cli.cmd_skip_now(_skip_args())
-    assert rc == 0
-    assert calls == [FLOW_GET_PHASE]
-
-
-def test_skip_now_noops_on_db_error(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+def test_session_skip_noops_on_db_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
@@ -223,13 +208,15 @@ def test_skip_now_noops_on_db_error(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "get_connection", _raise_db)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
     assert calls == [FLOW_GET_PHASE]
 
 
-def test_skip_now_noops_when_schedule_cannot_be_resolved(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+def test_session_skip_noops_when_schedule_cannot_be_resolved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
 
     def _raise_schedule(_day: date):
@@ -242,12 +229,14 @@ def test_skip_now_noops_when_schedule_cannot_be_resolved(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "_run_applescript", _fail_run)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
 
 
-def test_skip_now_noops_when_now_outside_schedule_window(monkeypatch) -> None:
-    monkeypatch.setattr(cli, "_load_skip_state", _enabled_skip_state)
+def test_session_skip_noops_when_now_outside_schedule_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
     monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 19, 9, 30))
     monkeypatch.setattr(
         cli,
@@ -271,7 +260,7 @@ def test_skip_now_noops_when_now_outside_schedule_window(monkeypatch) -> None:
 
     monkeypatch.setattr(cli, "get_connection", _fail_conn)
 
-    rc = cli.cmd_skip_now(_skip_args())
+    rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
 
 
@@ -282,35 +271,92 @@ def test_is_within_study_window_includes_end_minute_bucket() -> None:
     assert not cli._is_within_study_window(datetime(2026, 2, 16, 18, 1, 0), schedule)
 
 
-def test_cli_skip_toggle_writes_config(tmp_path, monkeypatch):
-    state_path = tmp_path / "flow_skip_state.json"
-    monkeypatch.setattr(cli, "SKIP_STATE_PATH", state_path)
+def test_session_skip_state_status_prints_state(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "_run_launchctl",
+        lambda args: (0, _print_disabled_output(disabled=False), ""),
+    )
 
-    rc = cli.main(["skip-toggle", "on"])
+    rc = cli.cmd_session_skip(_skip_args("status"))
+
     assert rc == 0
-    data = json.loads(state_path.read_text(encoding="utf-8"))
-    assert data["enabled"] is True
+    assert "Skip automation: ENABLED" in capsys.readouterr().out
 
 
-def test_cli_parser_has_expected_commands():
+def test_session_skip_state_toggle_calls_launchctl_disable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[list[str]] = []
+    responses = [
+        (0, _print_disabled_output(disabled=False), ""),
+        (0, "", ""),
+        (0, _print_disabled_output(disabled=True), ""),
+    ]
+
+    def _fake_launchctl(args: list[str]) -> tuple[int, str, str]:
+        calls.append(args)
+        return responses[len(calls) - 1]
+
+    monkeypatch.setattr(cli, "_run_launchctl", _fake_launchctl)
+
+    rc = cli.cmd_session_skip(_skip_args("toggle"))
+
+    assert rc == 0
+    assert calls == [
+        ["print-disabled", cli.SKIP_LAUNCHD_DOMAIN],
+        ["disable", cli.SKIP_LAUNCHD_TARGET],
+        ["print-disabled", cli.SKIP_LAUNCHD_DOMAIN],
+    ]
+    assert "Skip automation: DISABLED" in capsys.readouterr().out
+
+
+def test_cli_parser_has_expected_commands() -> None:
     parser = cli.build_parser()
-    args = parser.parse_args(["session-preview", "-n", "2"])
-    assert args.command == "session-preview"
-    assert args.count == 2
+
+    args = parser.parse_args(["session-rename", "Retitle", "--confirm"])
+    assert args.command == "session-rename"
+    assert args.title == "Retitle"
+    assert args.confirm is True
+
+    args = parser.parse_args(["session-undo", "--confirm"])
+    assert args.command == "session-undo"
+    assert args.confirm is True
+
+    args = parser.parse_args(["session-skip", "--state", "status"])
+    assert args.command == "session-skip"
+    assert args.state == "status"
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["session-preview", "-n", "2"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["session-skip", "--state", "on"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["session-skip", "--state", "off"])
 
 
-def test_cli_parser_accepts_global_logging_flags():
+def test_cli_parser_accepts_global_logging_flags() -> None:
     parser = cli.build_parser()
     args = parser.parse_args(
-        ["--log-level", "DEBUG", "--log-format", "json", "session-preview", "-n", "2"]
+        [
+            "--log-level",
+            "DEBUG",
+            "--log-format",
+            "json",
+            "session-skip",
+            "--state",
+            "status",
+        ]
     )
     assert args.log_level == "DEBUG"
     assert args.log_format == "json"
-    assert args.command == "session-preview"
+    assert args.command == "session-skip"
 
 
-def test_cap_log_file_truncates_large_file(tmp_path):
-    log_path = tmp_path / "flow-skip.log"
+def test_cap_log_file_truncates_large_file(tmp_path) -> None:
+    log_path = tmp_path / "com.edo.skip.log"
     log_path.write_text("a" * 1024, encoding="utf-8")
 
     cli._cap_log_file(log_path, 128)

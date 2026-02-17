@@ -1,4 +1,4 @@
-"""Query-facing contracts shared by application and TUI layers."""
+"""Query-facing contracts shared by application and CLI layers."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class PeriodSnapshot:
 
 @dataclass(frozen=True)
 class MetricDefinition:
-    """Static metadata for a single metric exposed in the TUI."""
+    """Static metadata for a single metric exposed in CLI consumers."""
 
     key: str
     label: str

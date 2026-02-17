@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import TypedDict
 
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.markdown_schedule import MarkdownScheduleSource
-from sync.config import LOGGING, PATHS
+from sync.config import LOGGING
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.log import (
@@ -25,10 +26,23 @@ from sync.log import (
 from sync.ports.schedule import ScheduleSource
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
-SKIP_STATE_PATH = Path(PATHS.journal_cache_dir) / "flow_skip_state.json"
-FLOW_SKIP_LOG_PATH = Path("/tmp/flow-skip.log")
+SKIP_LAUNCHD_LABEL = "com.edo.skip"
+SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
+SKIP_LAUNCHD_TARGET = f"{SKIP_LAUNCHD_DOMAIN}/{SKIP_LAUNCHD_LABEL}"
+SKIP_LOG_PATH = Path("/tmp/com.edo.skip.log")
 
 logger = get_logger(__name__)
+
+
+class CliSession(TypedDict):
+    pk: int
+    phase: str
+    duration: float
+    start: datetime | None
+    completed: datetime | None
+    title: str
+    interruptions_count: int
+    interruptions_duration: float
 
 
 def _log_cap_bytes() -> int:
@@ -90,71 +104,7 @@ def get_connection(readonly: bool = True) -> sqlite3.Connection:
     return sqlite3.connect(str(DB_PATH))
 
 
-def get_recent_sessions(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
-    """Fetch recent sessions sorted by descending start time."""
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE
-        FROM ZSESSION
-        ORDER BY ZSTARTEDAT DESC
-        LIMIT ?
-        """,
-        (limit,),
-    )
-
-    sessions: list[dict] = []
-    for row in cur.fetchall():
-        pk, phase, duration, started_at, completed_at, title = row
-        sessions.append(
-            {
-                "pk": pk,
-                "phase": phase,
-                "duration": duration,
-                "start": core_data_to_datetime(started_at),
-                "completed": core_data_to_datetime(completed_at),
-                "title": title,
-            }
-        )
-    return sessions
-
-
-def get_interruptions_for_session(
-    conn: sqlite3.Connection, session_pk: int
-) -> list[dict]:
-    """Fetch interruption rows for a session."""
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT Z_PK, ZSTARTEDAT, ZFINISHEDAT, ZPHASE
-        FROM ZINTERRUPTION
-        WHERE ZSESSION = ?
-        ORDER BY ZSTARTEDAT
-        """,
-        (session_pk,),
-    )
-
-    items: list[dict] = []
-    for row in cur.fetchall():
-        pk, started_at, finished_at, phase = row
-        start = core_data_to_datetime(started_at)
-        end = core_data_to_datetime(finished_at)
-        duration = None
-        if start and end:
-            duration = (end - start).total_seconds() / 60
-        items.append(
-            {
-                "pk": pk,
-                "start": start,
-                "end": end,
-                "duration": duration,
-                "phase": phase,
-            }
-        )
-    return items
-
-
-def format_session(session: dict, include_pk: bool = False) -> str:
+def format_session(session: CliSession, include_pk: bool = False) -> str:
     """Format session payload for display."""
     lines = []
     if include_pk:
@@ -170,20 +120,12 @@ def format_session(session: dict, include_pk: bool = False) -> str:
     return "\n".join(lines)
 
 
-def calculate_actual_duration(session: dict) -> float | None:
-    """Compute actual session elapsed minutes."""
-    if not session["start"]:
-        return None
-    end = session["completed"] or _now()
-    return (end - session["start"]).total_seconds() / 60
-
-
 def _now() -> datetime:
     """Current local datetime, wrapped for deterministic tests."""
     return datetime.now()
 
 
-def _find_most_recent_focus(sessions: list[dict]) -> dict | None:
+def _find_most_recent_focus(sessions: list[CliSession]) -> CliSession | None:
     for session in sessions:
         if session["phase"] == "flow":
             return session
@@ -198,7 +140,7 @@ def _delete_session(conn: sqlite3.Connection, pk: int) -> int:
     return deleted_interruptions
 
 
-def _record_to_cli_session(record: StudySessionRecord) -> dict:
+def _record_to_cli_session(record: StudySessionRecord) -> CliSession:
     planned = record.get("planned_duration") or record.get("duration") or 0.0
     return {
         "pk": int(record.get("pk", 0) or 0),
@@ -218,8 +160,8 @@ def _load_recent_focus_sessions(
     *,
     limit: int,
     lookback_days: int = 14,
-) -> list[dict]:
-    sessions: list[dict] = []
+) -> list[CliSession]:
+    sessions: list[CliSession] = []
     today = date.today()
 
     for delta_days in range(lookback_days + 1):
@@ -243,8 +185,8 @@ def _load_recent_focus_sessions(
 
 def _find_associated_break_session(
     conn: sqlite3.Connection,
-    focus_session: dict,
-) -> dict | None:
+    focus_session: CliSession,
+) -> CliSession | None:
     focus_start = focus_session.get("start")
     if not isinstance(focus_start, datetime):
         return None
@@ -272,81 +214,18 @@ def _find_associated_break_session(
 
     pk, phase, duration, started_at, completed_at, title = row
     return {
-        "pk": pk,
-        "phase": phase,
-        "duration": duration,
+        "pk": int(pk),
+        "phase": str(phase),
+        "duration": float(duration or 0.0),
         "start": core_data_to_datetime(started_at),
         "completed": core_data_to_datetime(completed_at),
-        "title": title,
+        "title": str(title or ""),
+        "interruptions_count": 0,
+        "interruptions_duration": 0.0,
     }
 
 
-def cmd_session_preview(args: argparse.Namespace) -> int:
-    """Show detailed preview of recent sessions."""
-    sessions: list[dict]
-    conn: sqlite3.Connection | None = None
-    session_source = FlowStudySessionSource()
-    schedule_source = MarkdownScheduleSource()
-
-    if args.all_phases:
-        try:
-            conn = get_connection(readonly=True)
-        except Exception as exc:
-            print(f"Error: could not open database: {exc}")
-            return 1
-        sessions = get_recent_sessions(conn, limit=50)
-    else:
-        sessions = _load_recent_focus_sessions(
-            session_source,
-            schedule_source,
-            limit=max(50, args.count),
-        )
-
-    if not sessions:
-        print("No sessions found.")
-        if conn is not None:
-            conn.close()
-        return 0
-
-    sessions = sessions[: args.count]
-
-    print("=" * 60)
-    print(f"SESSION PREVIEW ({len(sessions)})")
-    print("=" * 60)
-
-    for idx, session in enumerate(sessions):
-        if idx:
-            print("\n" + "=" * 60 + "\n")
-
-        title = session["title"] or "(no title)"
-        print(title)
-        print("-" * 60)
-        print(format_session(session, include_pk=True))
-
-        actual = calculate_actual_duration(session)
-        if actual is not None:
-            print(f"  Actual:   {actual:.1f} min")
-            if session["duration"]:
-                diff = actual - session["duration"]
-                print(f"  Δ:        {diff:+.1f} min")
-
-        if args.all_phases and conn is not None:
-            interruptions = get_interruptions_for_session(conn, session["pk"])
-            if interruptions:
-                total = sum(i["duration"] or 0 for i in interruptions)
-                print(f"  Interruptions: {len(interruptions)} ({total:.1f} min)")
-        else:
-            count = session.get("interruptions_count", 0) or 0
-            duration = (session.get("interruptions_duration", 0) or 0) / 60
-            if count:
-                print(f"  Interruptions: {count} ({duration:.1f} min)")
-
-    if conn is not None:
-        conn.close()
-    return 0
-
-
-def cmd_rename_session(args: argparse.Namespace) -> int:
+def cmd_session_rename(args: argparse.Namespace) -> int:
     """Rename most recent focus session."""
     session_source = FlowStudySessionSource()
     schedule_source = MarkdownScheduleSource()
@@ -388,7 +267,7 @@ def cmd_rename_session(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_undo_last_session(args: argparse.Namespace) -> int:
+def cmd_session_undo(args: argparse.Namespace) -> int:
     """Delete most recent focus session and adjacent break."""
     session_source = FlowStudySessionSource()
     schedule_source = MarkdownScheduleSource()
@@ -435,25 +314,68 @@ def cmd_undo_last_session(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_skip_state() -> dict[str, bool]:
-    if not SKIP_STATE_PATH.exists():
-        return {"enabled": False}
-    try:
-        with open(SKIP_STATE_PATH, "r", encoding="utf-8") as handle:
-            raw = json.load(handle)
-    except (json.JSONDecodeError, OSError):
-        logger.warning(
-            "Skip state unreadable at %s; defaulting disabled", SKIP_STATE_PATH
-        )
-        return {"enabled": False}
-    return {"enabled": bool(raw.get("enabled", False))}
+def _run_launchctl(args: list[str]) -> tuple[int, str, str]:
+    result = subprocess.run(
+        ["launchctl", *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
-def _save_skip_state(state: dict[str, bool]) -> None:
-    SKIP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(SKIP_STATE_PATH, "w", encoding="utf-8") as handle:
-        json.dump(state, handle, indent=2)
-        handle.write("\n")
+def _skip_enabled_state() -> bool | None:
+    code, stdout, stderr = _run_launchctl(["print-disabled", SKIP_LAUNCHD_DOMAIN])
+    if code != 0:
+        detail = stderr or stdout or f"exit {code}"
+        logger.warning("Unable to read launchd skip state: %s", detail)
+        return None
+
+    match = re.search(
+        rf'"{re.escape(SKIP_LAUNCHD_LABEL)}"\s*=>\s*(true|false)',
+        stdout,
+    )
+    if match is None:
+        # Missing entries default to enabled in launchd print-disabled output.
+        return True
+    return match.group(1) == "false"
+
+
+def _set_skip_enabled(enabled: bool) -> bool:
+    command = "enable" if enabled else "disable"
+    code, stdout, stderr = _run_launchctl([command, SKIP_LAUNCHD_TARGET])
+    if code != 0:
+        detail = stderr or stdout or f"exit {code}"
+        logger.error("Failed to %s %s: %s", command, SKIP_LAUNCHD_TARGET, detail)
+        return False
+    return True
+
+
+def _print_skip_status(enabled: bool) -> None:
+    status = "ENABLED" if enabled else "DISABLED"
+    print(f"Skip automation: {status}")
+
+
+def _apply_skip_state(state: str) -> int:
+    current = _skip_enabled_state()
+    if current is None:
+        print("Skip automation: UNKNOWN (launchd state unavailable)")
+        return 1
+
+    if state == "status":
+        _print_skip_status(current)
+        return 0
+
+    if state != "toggle":
+        raise ValueError(f"Unsupported skip state action: {state}")
+    target = not current
+
+    if not _set_skip_enabled(target):
+        return 1
+
+    updated = _skip_enabled_state()
+    _print_skip_status(target if updated is None else updated)
+    return 0
 
 
 def _resolve_day_schedule(day: date) -> DayScheduleProfile:
@@ -505,10 +427,16 @@ def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
     return phase == "flow" and completed_at is None
 
 
-def cmd_skip_now(_args: argparse.Namespace) -> int:
+def cmd_session_skip(args: argparse.Namespace) -> int:
     """Skip active focus session and start break within configured schedule windows."""
-    state = _load_skip_state()
-    if not state.get("enabled", False):
+    if args.state is not None:
+        return _apply_skip_state(args.state)
+
+    enabled = _skip_enabled_state()
+    if enabled is None:
+        logger.warning("Skip no-op: unable to resolve launchd skip state")
+        return 0
+    if not enabled:
         logger.info("Skip no-op: automation disabled")
         return 0
     now = _now()
@@ -564,51 +492,28 @@ def cmd_skip_now(_args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_skip_toggle(args: argparse.Namespace) -> int:
-    """Toggle or set skip automation enabled state."""
-    state = _load_skip_state()
-    current = bool(state.get("enabled", False))
-
-    if args.state is None:
-        new_state = not current
-    elif args.state == "on":
-        new_state = True
-    else:
-        new_state = False
-
-    state["enabled"] = new_state
-    _save_skip_state(state)
-    status = "ENABLED" if new_state else "DISABLED"
-    print(f"Skip automation: {status}")
-    return 0
-
-
 def build_parser() -> argparse.ArgumentParser:
     """Construct CLI parser and subcommands."""
-    parser = argparse.ArgumentParser(description="Journal TUI CLI utilities")
+    parser = argparse.ArgumentParser(description="Study session CLI utilities")
     add_logging_cli_args(parser)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    preview = sub.add_parser("session-preview", help="Preview recent sessions")
-    preview.add_argument("-n", "--count", type=int, default=1)
-    preview.add_argument("--all-phases", action="store_true")
-    preview.set_defaults(func=cmd_session_preview)
-
-    rename = sub.add_parser("rename-session", help="Rename most recent focus session")
+    rename = sub.add_parser("session-rename", help="Rename most recent focus session")
     rename.add_argument("title")
     rename.add_argument("--confirm", action="store_true")
-    rename.set_defaults(func=cmd_rename_session)
+    rename.set_defaults(func=cmd_session_rename)
 
-    undo = sub.add_parser("undo-last-session", help="Delete most recent focus session")
+    undo = sub.add_parser("session-undo", help="Delete most recent focus session")
     undo.add_argument("--confirm", action="store_true")
-    undo.set_defaults(func=cmd_undo_last_session)
+    undo.set_defaults(func=cmd_session_undo)
 
-    skip_now = sub.add_parser("skip-now", help="Execute scheduled skip now")
-    skip_now.set_defaults(func=cmd_skip_now)
-
-    skip_toggle = sub.add_parser("skip-toggle", help="Toggle skip automation")
-    skip_toggle.add_argument("state", nargs="?", choices=["on", "off"])
-    skip_toggle.set_defaults(func=cmd_skip_toggle)
+    skip = sub.add_parser("session-skip", help="Execute or manage skip automation")
+    skip.add_argument(
+        "--state",
+        choices=["toggle", "status"],
+        help="Manage launchd skip automation state",
+    )
+    skip.set_defaults(func=cmd_session_skip)
 
     return parser
 
@@ -618,7 +523,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    _cap_log_file(FLOW_SKIP_LOG_PATH, _log_cap_bytes())
+    _cap_log_file(SKIP_LOG_PATH, _log_cap_bytes())
     level, log_format = resolve_logging_settings(args)
     configure_logging(level=level, log_format=log_format)
 

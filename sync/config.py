@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PathConfig:
-    """Resolved filesystem paths used across sync and TUI layers."""
+    """Resolved filesystem paths used across sync and CLI layers."""
 
     journal_dir: str
     vault_dir: str
@@ -37,7 +37,7 @@ class PathConfig:
 
 @dataclass(frozen=True)
 class LoggingConfig:
-    """Resolved logging configuration used by sync and TUI entrypoints."""
+    """Resolved logging configuration used by sync and CLI entrypoints."""
 
     level: str
     format: str

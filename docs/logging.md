@@ -13,17 +13,17 @@
 - `JOURNAL_LOG_FORMAT` (default: `text`)
 - `JOURNAL_LOG_CAP_BYTES` (default: `262144`)
 
-CLI overrides are available on sync entrypoints and `tui.cli`:
+CLI overrides are available on sync entrypoints and `sync.study`:
 
 - `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`
 - `--log-format {text,json}`
 
 ## Log Growth Control
 
-- `sync_all.sh` caps launchd files:
+- `sync.sh` caps launchd files:
   - `/tmp/com.edo.journal.out`
   - `/tmp/com.edo.journal.err`
-- `tui.cli` caps `/tmp/flow-skip.log` on startup.
+- `sync.study` caps `/tmp/com.edo.skip.log` on startup.
 - Cap size is controlled by `JOURNAL_LOG_CAP_BYTES`.
 
 ## Logger Names

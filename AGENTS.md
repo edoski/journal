@@ -87,6 +87,7 @@ journal/
         note_io.py
 
     study/
+      __main__.py              # Study CLI composition root
       constants.py
       labels.py
       breaks.py
@@ -128,24 +129,11 @@ journal/
       quarterly/               # Package (composition root in __main__.py)
       yearly/                  # Package (composition root in __main__.py)
 
-  tui/
-    __main__.py
-    app.py                     # TUI composition root
-    cli.py                     # CLI composition root
-    state.py
-    keymap.py
-    data/
-      daily_store.py
-      reminders_store.py
-      repository.py            # Thin delegate over QueryService
-    views/
-
   tests/
     sync/
-    tui/
     fixtures/
 
-  sync_all.sh
+  sync.sh
   AGENTS.md
 ```
 
@@ -159,12 +147,11 @@ journal/
 - `application`: orchestration only; depends on `ports` + `contracts`, never on adapter internals.
 - composition roots wire implementations:
   - `sync/daily/__main__.py`
+  - `sync/study/__main__.py`
   - `sync/periods/weekly/__main__.py`
   - `sync/periods/monthly/__main__.py`
   - `sync/periods/quarterly/__main__.py`
   - `sync/periods/yearly/__main__.py`
-  - `tui/app.py`
-  - `tui/cli.py`
 
 ### Dependency constraints
 
@@ -188,7 +175,7 @@ journal/
 - `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation) using explicit target dates from inputs (no wall-clock coupling).
 - `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
-- `QueryService`: period-window query/shift/bounds + metric snapshot service used by TUI.
+- `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
   - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
 
 ### Canonical rendering entrypoints
@@ -223,7 +210,7 @@ journal/
   - `links_for_window(files, start, end) -> list[str]`
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
-- Query snapshot contract is canonical across `sync/application` and `tui`:
+- Query snapshot contract is canonical across `sync/application` and CLI consumers:
   - `PeriodSnapshot` in `sync/contracts/query.py`
 
 ## Canonical Markdown Schemas
@@ -253,7 +240,7 @@ source .venv/bin/activate
 ### Sync entrypoints
 
 ```bash
-./sync_all.sh
+./sync.sh
 python -m sync.daily
 python -m sync.periods.weekly [--date YYYY-MM-DD]
 python -m sync.periods.monthly [--month YYYY-MM]
@@ -261,15 +248,12 @@ python -m sync.periods.quarterly [--quarter YYYY-Q#]
 python -m sync.periods.yearly [--year YYYY]
 ```
 
-### TUI/CLI
+### Study CLI
 
 ```bash
-python3 -m tui
-python3 -m tui.cli session-preview [-n COUNT] [--all-phases]
-python3 -m tui.cli rename-session "Title" [--confirm]
-python3 -m tui.cli undo-last-session [--confirm]
-python3 -m tui.cli skip-now
-python3 -m tui.cli skip-toggle [on|off]
+python3 -m sync.study session-rename "Title" [--confirm]
+python3 -m sync.study session-undo [--confirm]
+python3 -m sync.study session-skip [--state toggle|status]
 ```
 
 ## Quality Gate
@@ -368,10 +352,10 @@ Path resolution precedence:
 
 Operational guidance:
 
-- Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.flow-skip.plist`.
+- Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.skip.plist`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
-- `tui.cli skip-now` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
+- `sync.study session-skip` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
 - Logging is stderr-only; no app-level log file sink is used.
 - Keep `/tmp` launchd logs bounded with `JOURNAL_LOG_CAP_BYTES` (default `262144` bytes).
 
@@ -389,14 +373,13 @@ Move checklist (repo relocation):
 - media cache: `~/.cache/journal/media/dates.json`
 - training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
 - screen-time cache: `~/.cache/journal/daily/screen_time/YYYY-MM-DD.json`
-- flow-skip state: `~/.cache/journal/flow_skip_state.json`
 - note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`
 - state locks: `~/.cache/journal/locks/state/<shard>/<sha1>.lock`
 
 ## LaunchAgents
 
 - Journal sync: `~/Library/LaunchAgents/com.edo.journalsync.plist`
-- Flow skip automation: `~/Library/LaunchAgents/com.edo.flow-skip.plist`
+- Skip automation: `~/Library/LaunchAgents/com.edo.skip.plist`
 
 Reload:
 
@@ -404,8 +387,8 @@ Reload:
 launchctl unload ~/Library/LaunchAgents/com.edo.journalsync.plist
 launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 
-launchctl unload ~/Library/LaunchAgents/com.edo.flow-skip.plist
-launchctl load ~/Library/LaunchAgents/com.edo.flow-skip.plist
+launchctl unload ~/Library/LaunchAgents/com.edo.skip.plist
+launchctl load ~/Library/LaunchAgents/com.edo.skip.plist
 ```
 
 ## Coding Conventions
