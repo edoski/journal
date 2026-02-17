@@ -293,7 +293,7 @@ vulture sync/ --min-confidence 80
 lint-imports --config .importlinter
 deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox
 pip-audit --progress-spinner off
-python3 -m pytest tests/ -v
+python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report= --cov-fail-under=78"
 ```
 
 Optional fast local gate:
@@ -333,6 +333,13 @@ tox -e full
 ```bash
 source .venv/bin/activate
 tox -e all
+```
+
+When debugging a failing test or coverage regression, rerun with verbose reporting:
+
+```bash
+source .venv/bin/activate
+python3 -m pytest tests/ -v --tb=short --cov=sync --cov-branch --cov-report=term-missing:skip-covered
 ```
 
 ## Testing Guidance
