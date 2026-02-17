@@ -13,3 +13,4 @@ class MediaSource(Protocol):
 
     def scan(self, start: datetime.date, end: datetime.date) -> MediaBundle:
         """Return books/podcasts for the supplied range."""
+        ...

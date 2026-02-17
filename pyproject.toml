@@ -10,5 +10,42 @@ requires-python = ">=3.10"
 readme = "AGENTS.md"
 authors = [{ name = "Edo", email = "edo@example.com" }]
 
+[project.optional-dependencies]
+dev = [
+    "deptry",
+    "hypothesis",
+    "import-linter",
+    "mypy",
+    "mutmut",
+    "pip-audit",
+    "pyright",
+    "pytest-cov",
+    "pytest",
+    "ruff",
+    "tox",
+    "vulture",
+]
+
 [tool.setuptools.packages.find]
 include = ["sync*", "tui*"]
+
+[tool.coverage.run]
+branch = true
+source = ["sync"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.mutmut]
+paths_to_mutate = [
+    "sync/formatting.py",
+]
+pytest_add_cli_args = [
+    "-o",
+    "addopts=-q --tb=native",
+]
+pytest_add_cli_args_test_selection = [
+    "tests/sync/test_formatting_properties.py",
+    "tests/sync/test_charts.py",
+]

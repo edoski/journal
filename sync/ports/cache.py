@@ -16,12 +16,15 @@ class GoalCarryForwardCacheStore(Protocol):
 
     def load(self) -> CarryForwardCacheState:
         """Load carried-goal cache state."""
+        ...
 
     def save(self, state: CarryForwardCacheState) -> None:
         """Persist carried-goal cache state."""
+        ...
 
     def locked_state(self) -> ContextManager[CarryForwardCacheState]:
         """Open cache state under an advisory lock and persist on exit."""
+        ...
 
 
 class GoalReconcileCacheStore(Protocol):
@@ -29,12 +32,15 @@ class GoalReconcileCacheStore(Protocol):
 
     def load(self) -> GoalReconcileCacheState:
         """Load reconcile cache state."""
+        ...
 
     def save(self, state: GoalReconcileCacheState) -> None:
         """Persist reconcile cache state."""
+        ...
 
     def locked_state(self) -> ContextManager[GoalReconcileCacheState]:
         """Open cache state under an advisory lock and persist on exit."""
+        ...
 
 
 class MediaDateCacheStore(Protocol):
@@ -42,9 +48,11 @@ class MediaDateCacheStore(Protocol):
 
     def load(self) -> MediaDateCacheState:
         """Load media date cache."""
+        ...
 
     def save(self, state: MediaDateCacheState) -> None:
         """Persist media date cache."""
+        ...
 
 
 class DailyTrainingCacheStore(Protocol):
@@ -52,12 +60,15 @@ class DailyTrainingCacheStore(Protocol):
 
     def load_for_date(self, date_str: str) -> list[dict[str, Any]]:
         """Load training entries for a given day."""
+        ...
 
     def save_for_date(self, date_str: str, entries: list[dict[str, Any]]) -> None:
         """Persist training entries for a given day."""
+        ...
 
     def prune(self, *, keep_days: int) -> None:
         """Prune old per-day cache files."""
+        ...
 
 
 class DailyScreenTimeCacheStore(Protocol):
@@ -65,9 +76,12 @@ class DailyScreenTimeCacheStore(Protocol):
 
     def load_for_date(self, date_str: str) -> dict[str, float]:
         """Load screen-time entries for a given day."""
+        ...
 
     def save_for_date(self, date_str: str, entries: dict[str, float]) -> None:
         """Persist screen-time entries for a given day."""
+        ...
 
     def prune(self, *, keep_days: int) -> None:
         """Prune old per-day cache files."""
+        ...

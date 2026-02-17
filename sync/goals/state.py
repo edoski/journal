@@ -19,13 +19,14 @@ def _ensure_goal_entry(
     goals = state["goals"]
     entry = goals.get(gid)
     if entry is None:
-        entry = {
+        new_entry: GoalReconcileGoalState = {
             "last_value": False,
             "last_updated_at": "",
             "last_updated_by": "",
             "notes": {},
         }
-        goals[gid] = entry
+        goals[gid] = new_entry
+        return new_entry
     return entry
 
 

@@ -13,6 +13,7 @@ class ContextSource(Protocol):
 
     def files_modified_on_date(self, day: datetime.date) -> list[VaultFileRecord]:
         """Return modified files for a date."""
+        ...
 
     def links_for_window(
         self,
@@ -21,3 +22,4 @@ class ContextSource(Protocol):
         end: datetime.datetime,
     ) -> list[str]:
         """Return wiki links modified during a time window."""
+        ...

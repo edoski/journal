@@ -90,9 +90,7 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
     value_labels = [
         str(label).strip("`") if label else "" for label in spec.value_labels
     ]
-    deltas = [
-        str(delta) if delta is not None else "" for delta in (spec.delta_labels or [])
-    ]
+    deltas = [str(delta) for delta in (spec.delta_labels or [])]
 
     height = profile.height
     y_max = profile.y_max

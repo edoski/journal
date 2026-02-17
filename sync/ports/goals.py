@@ -19,9 +19,11 @@ class GoalStore(Protocol):
         period_key: str | None = None,
     ) -> list[Goal]:
         """Extract goals from a section."""
+        ...
 
     def apply(self, lines: list[str], sections: list[GoalSection]) -> list[str]:
         """Return lines with goals sections replaced."""
+        ...
 
     def write(
         self,
@@ -30,3 +32,4 @@ class GoalStore(Protocol):
         sections: list[GoalSection],
     ) -> list[str]:
         """Persist and return updated lines."""
+        ...

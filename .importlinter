@@ -1,0 +1,28 @@
+[importlinter]
+root_package = sync
+include_external_packages = True
+
+[importlinter:application_no_adapters]
+name = Application layer must not import adapters
+type = forbidden
+source_modules =
+    sync.application
+forbidden_modules =
+    sync.adapters
+
+[importlinter:writers_no_ports_or_adapters]
+name = Writers layer must stay pure render logic
+type = forbidden
+source_modules =
+    sync.writers
+forbidden_modules =
+    sync.ports
+    sync.adapters
+
+[importlinter:sync_no_tui]
+name = Sync package must not import tui
+type = forbidden
+source_modules =
+    sync
+forbidden_modules =
+    tui

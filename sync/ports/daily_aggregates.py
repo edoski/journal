@@ -16,3 +16,4 @@ class DailyAggregateSource(Protocol):
         dates: list[datetime.date],
     ) -> dict[datetime.date, DailyAggregate]:
         """Load aggregates keyed by date."""
+        ...

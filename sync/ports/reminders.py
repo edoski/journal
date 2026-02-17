@@ -12,6 +12,8 @@ class ReminderRuleStore(Protocol):
 
     def load(self) -> list[ReminderRule]:
         """Load reminder rules."""
+        ...
 
     def save(self, rules: list[ReminderRule]) -> None:
         """Persist reminder rules."""
+        ...

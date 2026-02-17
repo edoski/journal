@@ -13,3 +13,4 @@ class ScheduleSource(Protocol):
 
     def resolve_day(self, day: datetime.date) -> DayScheduleProfile:
         """Return the resolved schedule profile for a calendar day."""
+        ...

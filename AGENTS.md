@@ -278,11 +278,61 @@ Run this full gate before every commit:
 
 ```bash
 source .venv/bin/activate
+tox -e full
+```
+
+Equivalent expanded commands:
+
+```bash
+source .venv/bin/activate
 ruff check .
 ruff format --check .
+pyright
 mypy sync/ --strict
 vulture sync/ --min-confidence 80
+lint-imports --config .importlinter
+deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox
+pip-audit --progress-spinner off
 python3 -m pytest tests/ -v
+```
+
+Optional fast local gate:
+
+```bash
+source .venv/bin/activate
+tox -e fast
+```
+
+Optional mutation gate:
+
+```bash
+source .venv/bin/activate
+tox -e mutation
+```
+
+Literal everything gate (full + mutation):
+
+```bash
+source .venv/bin/activate
+tox -e all
+```
+
+Recommended run protocol:
+
+1. Inner loop while editing:
+```bash
+source .venv/bin/activate
+tox -e fast
+```
+2. Before every commit:
+```bash
+source .venv/bin/activate
+tox -e full
+```
+3. Before large refactors or release-ready changes:
+```bash
+source .venv/bin/activate
+tox -e all
 ```
 
 ## Testing Guidance

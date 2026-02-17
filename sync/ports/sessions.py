@@ -18,3 +18,4 @@ class StudySessionSource(Protocol):
         day_schedule: DayScheduleProfile,
     ) -> list[StudySessionRecord]:
         """Return sessions for the provided date."""
+        ...

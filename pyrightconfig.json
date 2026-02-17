@@ -1,0 +1,14 @@
+{
+  "include": [
+    "sync/writers"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    ".venv"
+  ],
+  "typeCheckingMode": "strict",
+  "reportMissingTypeStubs": "none",
+  "reportTypedDictNotRequiredAccess": "none",
+  "venvPath": ".",
+  "venv": ".venv"
+}
