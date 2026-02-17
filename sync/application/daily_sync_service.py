@@ -48,6 +48,7 @@ MAX_REBASE_ATTEMPTS = 2
 _REFLECTIONS_HEADER_TITLE = "Reflections"
 _REFLECTIONS_TABLE_HEADER = "| TIME | ENTRY |"
 _REFLECTIONS_TABLE_DIVIDER = "| ---- | ----- |"
+_REFLECTIONS_DIVIDER_CELL_RE = re.compile(r"^:?-{3,}:?$")
 _REFLECTIONS_TIME_FULL_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _REFLECTIONS_TIME_SHORT_HOUR_RE = re.compile(r"^\d:[0-5]\d$")
 _REFLECTIONS_TIME_PARTIAL_MIN_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]$")
@@ -308,6 +309,26 @@ class DailySyncService:
     def _merge_cells(cells: list[str]) -> str:
         return " | ".join(cell for cell in cells if cell)
 
+    @staticmethod
+    def _is_reflections_divider_cell(cell: str) -> bool:
+        return _REFLECTIONS_DIVIDER_CELL_RE.fullmatch(cell.strip()) is not None
+
+    @classmethod
+    def _classify_reflections_divider(
+        cls,
+        cells: list[str] | None,
+    ) -> tuple[str, str | None]:
+        if cells is None:
+            return "missing", None
+        if len(cells) >= 2 and all(
+            cls._is_reflections_divider_cell(cell) for cell in cells[:2]
+        ):
+            if len(cells) == 2:
+                return "divider", None
+            recovered_entry = cls._merge_cells(cells[2:]).strip()
+            return "merged_divider_and_row", recovered_entry or None
+        return "not_divider", None
+
     @classmethod
     def _render_reflections_row(cls, time_cell: str, entry_cell: str) -> str:
         time_part = f"`{time_cell}`" if time_cell else ""
@@ -426,7 +447,10 @@ class DailySyncService:
                 if divider_idx < reflections_end
                 else None
             )
-            if divider_cells is None:
+            divider_kind, recovered_entry = self._classify_reflections_divider(
+                divider_cells
+            )
+            if divider_kind == "missing":
                 updated.insert(divider_idx, _REFLECTIONS_TABLE_DIVIDER)
                 reflections_end += 1
                 logger.warning(
@@ -434,10 +458,36 @@ class DailySyncService:
                     abs_path,
                     divider_idx + 1,
                 )
-            elif updated[divider_idx].strip() != _REFLECTIONS_TABLE_DIVIDER:
+            elif divider_kind == "divider":
+                if updated[divider_idx].strip() != _REFLECTIONS_TABLE_DIVIDER:
+                    updated[divider_idx] = _REFLECTIONS_TABLE_DIVIDER
+                    logger.warning(
+                        "Repaired Reflections table divider in %s:%d",
+                        abs_path,
+                        divider_idx + 1,
+                    )
+            elif divider_kind == "merged_divider_and_row":
                 updated[divider_idx] = _REFLECTIONS_TABLE_DIVIDER
                 logger.warning(
-                    "Repaired Reflections table divider in %s:%d",
+                    "Recovered Reflections table divider in %s:%d",
+                    abs_path,
+                    divider_idx + 1,
+                )
+                if recovered_entry:
+                    recovered_line = self._render_reflections_row("", recovered_entry)
+                    recovered_idx = divider_idx + 1
+                    updated.insert(recovered_idx, recovered_line)
+                    reflections_end += 1
+                    logger.warning(
+                        "Recovered Reflections table row from divider in %s:%d",
+                        abs_path,
+                        recovered_idx + 1,
+                    )
+            else:
+                updated.insert(divider_idx, _REFLECTIONS_TABLE_DIVIDER)
+                reflections_end += 1
+                logger.warning(
+                    "Inserted Reflections table divider before first row in %s:%d",
                     abs_path,
                     divider_idx + 1,
                 )

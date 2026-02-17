@@ -382,6 +382,76 @@ def test_sync_day_repairs_reflections_overflow_columns(monkeypatch, tmp_path):
     assert "| `08:43` | part one \\| part two |" in content
 
 
+def test_sync_day_inserts_missing_reflections_divider_without_dropping_first_row(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "|  | long reflection entry that should be preserved |",
+        ],
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| TIME | ENTRY |" in content
+    assert "| ---- | ----- |" in content
+    assert "|  | long reflection entry that should be preserved |" in content
+
+
+def test_sync_day_salvages_entry_when_reflections_divider_is_merged_with_row(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| ------- | ------------------------------------------------------ | I dreamt this was merged into divider |",
+        ],
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| ---- | ----- |" in content
+    assert "|  | I dreamt this was merged into divider |" in content
+    assert (
+        "| ------- | ------------------------------------------------------ |"
+        " I dreamt this was merged into divider |"
+    ) not in content
+
+
+def test_sync_day_canonicalizes_colon_reflections_divider_and_preserves_rows(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME | ENTRY |",
+            "| :------- | -------: |",
+            "|  | keep this entry |",
+        ],
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
+    assert "| ---- | ----- |" in content
+    assert "| :------- | -------: |" not in content
+    assert "|  | keep this entry |" in content
+
+
 def test_sync_day_preserves_unrecoverable_reflections_entry(monkeypatch, tmp_path):
     day = datetime.date(2025, 1, 15)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
