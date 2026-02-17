@@ -274,11 +274,11 @@ python3 -m tui.cli skip-toggle [on|off]
 
 ## Quality Gate
 
-Run this full gate before every commit:
+Run this standard gate before every commit:
 
 ```bash
 source .venv/bin/activate
-tox -e full
+tox -e check
 ```
 
 Equivalent expanded commands:
@@ -292,15 +292,14 @@ mypy sync/ --strict
 vulture sync/ --min-confidence 80
 lint-imports --config .importlinter
 deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox
-pip-audit --progress-spinner off
 python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report= --cov-fail-under=78"
 ```
 
-Optional fast local gate:
+Optional security audit gate:
 
 ```bash
 source .venv/bin/activate
-tox -e fast
+tox -e audit
 ```
 
 Optional mutation gate:
@@ -310,7 +309,7 @@ source .venv/bin/activate
 tox -e mutation
 ```
 
-Literal everything gate (full + mutation):
+Literal everything gate (check + audit + mutation):
 
 ```bash
 source .venv/bin/activate
@@ -322,12 +321,12 @@ Recommended run protocol:
 1. Inner loop while editing:
 ```bash
 source .venv/bin/activate
-tox -e fast
+tox -e check
 ```
 2. Before every commit:
 ```bash
 source .venv/bin/activate
-tox -e full
+tox -e check
 ```
 3. Before large refactors or release-ready changes:
 ```bash
