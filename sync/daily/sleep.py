@@ -10,6 +10,7 @@ import datetime
 
 from sync.formatting import format_minutes_seconds
 from sync.models.status import CanonicalSleepPayload
+from sync.writers.tables import SimpleGridTableSpec, render_table
 
 
 def _build_sleep_table(data: CanonicalSleepPayload | None) -> list[str]:
@@ -41,10 +42,13 @@ def _build_sleep_table(data: CanonicalSleepPayload | None) -> list[str]:
     awake_cell = f"`{int(round(data.awake_min))}m`"
     wakes_cell = f"`{data.awake_count} times`"
 
-    header = "| TIME | DURATION | AWAKE | AWAKENINGS |"
-    separator = "| ---- | -------- | ----- | ---------- |"
-    row = f"| {time_cell} | {duration_cell} | {awake_cell} | {wakes_cell} |"
-    return [header, separator, row]
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["TIME", "DURATION", "AWAKE", "AWAKENINGS"],
+            divider_cells=["----", "--------", "-----", "----------"],
+            rows=[[time_cell, duration_cell, awake_cell, wakes_cell]],
+        )
+    )
 
 
 def build_sleep_section(

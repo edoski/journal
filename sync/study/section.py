@@ -14,6 +14,8 @@ from typing import Callable
 from sync.contracts.study import StudySessionRecord
 from sync.formatting import format_minutes, ceil_minutes, round_half_up
 from sync.log import get_logger
+from sync.notes.markdown_tables import split_markdown_row
+from sync.writers.tables import SimpleGridTableSpec, render_table
 
 from sync.study.labels import DEFAULT_ACTIVITY_LABEL, FLOW_DEFAULT_TITLE
 
@@ -61,21 +63,21 @@ def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, s
     for i in range(row_start, len(lines)):
         if not lines[i].lstrip().startswith("|"):
             break
-        parts = [p.strip() for p in lines[i].split("|")]
-        if len(parts) < 9:
+        parts = split_markdown_row(lines[i])
+        if parts is None or len(parts) < 7:
             msg = (
                 "Invalid STUDY table row: expected TIME/ACTIVITY/DURATION/"
                 "INTERRUPT/BREAK/CONTEXT/NOTES columns"
             )
             logger.error(msg)
             raise ValueError(msg)
-        time_cell = parts[1].replace("`", "")
+        time_cell = parts[0].replace("`", "")
         time_match = re.search(r"([0-2][0-9]:[0-5][0-9])", time_cell)
         if not time_match:
             continue
         start_key = time_match.group(1)
-        context_content = parts[6]
-        note_content = parts[7]
+        context_content = parts[5]
+        note_content = parts[6]
         # Preserve context if it's not an em-dash (has actual content)
         if context_content and context_content != "–":
             existing_context[start_key] = context_content
@@ -130,9 +132,7 @@ def build_study_section(
     if not sessions:
         return [], 0
 
-    header = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
-    separator = "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |"
-    table_lines = [header, separator]
+    rows: list[list[str]] = []
 
     for session in sessions:
         start_s = session["start"].strftime("%H:%M")
@@ -198,8 +198,40 @@ def build_study_section(
         else:
             context_str = "–"  # em-dash when no callback
 
-        row = f"| {time_str} | {activity_str} | {duration_str} | {interrupt_str} | {break_str} | {context_str} | {notes_str} |"
-        table_lines.append(row)
+        rows.append(
+            [
+                time_str,
+                activity_str,
+                duration_str,
+                interrupt_str,
+                break_str,
+                context_str,
+                notes_str,
+            ]
+        )
 
     total_focus = sum(s.get("focus_minutes_rounded", 0) for s in sessions)
+    table_lines = render_table(
+        SimpleGridTableSpec(
+            headers=[
+                "TIME",
+                "ACTIVITY",
+                "DURATION",
+                "INTERRUPT",
+                "BREAK",
+                "CONTEXT",
+                "NOTES",
+            ],
+            divider_cells=[
+                "----",
+                "--------",
+                "--------",
+                "---------",
+                "-----",
+                "-------",
+                "-----",
+            ],
+            rows=rows,
+        )
+    )
     return table_lines, total_focus

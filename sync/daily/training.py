@@ -11,8 +11,10 @@ from collections import OrderedDict
 from typing import Any
 
 from sync.formatting import format_minutes_seconds
+from sync.notes.markdown_tables import split_markdown_row
 from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
 from sync.ports.cache import DailyTrainingCacheStore
+from sync.writers.tables import SimpleGridTableSpec, render_table
 
 # Internal table row shape persisted in cache and used for rendering.
 TrainingTableRow = dict[str, Any]
@@ -45,13 +47,13 @@ def _parse_training_table(block_lines: list[str] | None) -> list[TrainingTableRo
     for line in block_lines[row_start:]:
         if not line.lstrip().startswith("|"):
             break
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 5:
+        parts = split_markdown_row(line)
+        if parts is None or len(parts) < 4:
             continue
-        raw_time = parts[1].strip("` ").replace("`", "")
-        activity = parts[2]
-        duration = parts[3].strip("` ").replace("`", "")
-        interrupt = parts[4].strip("` ").replace("`", "")
+        raw_time = parts[0].strip("` ").replace("`", "")
+        activity = parts[1]
+        duration = parts[2].strip("` ").replace("`", "")
+        interrupt = parts[3].strip("` ").replace("`", "")
 
         start_val: str | None = None
         end_val: str | None = None
@@ -173,10 +175,7 @@ def _render_training_rows(entries: list[TrainingTableRow]) -> list[str]:
         return f"`+{mins:02d}m`"
 
     ordered = sorted(entries, key=sort_key)
-    lines_out = [
-        "| TIME | ACTIVITY | DURATION | INTERRUPT |",
-        "| ---- | -------- | -------- | --------- |",
-    ]
+    rows: list[list[str]] = []
     for entry in ordered:
         if entry.get("start") and entry.get("end"):
             time_cell = f"`{entry['start']} - {entry['end']}`"
@@ -200,10 +199,17 @@ def _render_training_rows(entries: list[TrainingTableRow]) -> list[str]:
         else:
             interrupt_cell = "`+00m`"
 
-        lines_out.append(
-            f"| {time_cell} | {entry.get('activity', '')} | {duration_cell} | {interrupt_cell} |"
+        rows.append(
+            [time_cell, str(entry.get("activity", "")), duration_cell, interrupt_cell]
         )
-    return lines_out
+
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["TIME", "ACTIVITY", "DURATION", "INTERRUPT"],
+            divider_cells=["----", "--------", "--------", "---------"],
+            rows=rows,
+        )
+    )
 
 
 def build_training_section(

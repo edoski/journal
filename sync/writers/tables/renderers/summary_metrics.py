@@ -1,177 +1,34 @@
-"""
-Table rendering for the journal sync system.
-"""
+"""Renderer for period summary metrics table section."""
 
 from __future__ import annotations
 
-from typing import Any
-
-from sync.contracts.targets import PeriodType
+from sync.constants import RENDER
 from sync.formatting import (
-    format_minutes,
-    format_training_ratio,
-    format_mood_with_scale,
-    format_ma_training_ratio,
     compute_percent_change,
+    format_ma_training_ratio,
+    format_minutes,
+    format_mood_with_scale,
     format_percent_change,
     format_progress_bar,
+    format_training_ratio,
 )
-from sync.constants import RENDER
 from sync.target_policy import summary_targets
 
-
-def render_sleep_stats_table(
-    sleep_avg: float | None,
-    avg_awake: float | None,
-    avg_awakenings: float | None,
-) -> list[str]:
-    """
-    Render the SLEEP statistics table with average metrics.
-
-    Args:
-        sleep_avg: Average sleep duration in minutes.
-        avg_awake: Average awake time during sleep in minutes.
-        avg_awakenings: Average number of awakenings per night.
-
-    Returns:
-        List of markdown table lines.
-    """
-    lines: list[str] = []
-    lines.append("| ACTIVITY | AVERAGE |")
-    lines.append("| -------- | ------- |")
-    lines.append(
-        f"| **SLEEP**      | `{format_minutes(sleep_avg)}` |"
-        if sleep_avg is not None
-        else "| **SLEEP**      | |"
-    )
-    lines.append(
-        f"| **AWAKE**      | `{format_minutes(avg_awake)}` |"
-        if avg_awake is not None
-        else "| **AWAKE**      | |"
-    )
-    if avg_awakenings is not None:
-        awaken_val = (
-            f"{avg_awakenings:.1f}"
-            if abs(avg_awakenings - round(avg_awakenings)) >= 0.05
-            else str(int(round(avg_awakenings)))
-        )
-        lines.append(f"| **AWAKENINGS** | `{awaken_val}` |")
-    else:
-        lines.append("| **AWAKENINGS** | |")
-    return lines
+from ..specs import SummaryMetricsTableSpec
 
 
-def render_activity_table(activity_totals: dict[str, float]) -> list[str]:
-    """
-    Render the ACTIVITY breakdown table with time and share percentages.
+def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
+    """Render markdown summary section and table."""
+    current_metrics = spec.current_metrics
+    previous_metrics = spec.previous_metrics
+    current_label = spec.current_label
+    previous_label = spec.previous_label
+    ma_metrics = spec.ma_metrics
+    ma_label = spec.ma_label
+    ma_training_unit = spec.ma_training_unit
+    period_type = spec.period_type
+    total_days = spec.total_days
 
-    Args:
-        activity_totals: Dict mapping activity names to total minutes.
-
-    Returns:
-        List of markdown table lines sorted by time (descending).
-    """
-    lines: list[str] = []
-    lines.append("| ACTIVITY | TIME | SHARE |")
-    lines.append("| -------- | ---- | ----- |")
-    total_activity = sum(activity_totals.values())
-    if activity_totals:
-        for activity, mins in sorted(
-            activity_totals.items(), key=lambda x: x[1], reverse=True
-        ):
-            share = (
-                f"{int(round((mins / total_activity) * 100))}%"
-                if total_activity
-                else "0%"
-            )
-            lines.append(f"| **{activity}** | `{format_minutes(mins)}` | `{share}` |")
-    else:
-        lines.append("|  |  |  |")
-    return lines
-
-
-def render_interrupts_table(avg_interrupts: float, avg_overruns: float) -> list[str]:
-    """
-    Render the INTERRUPTS/OVERRUNS metrics table.
-
-    Args:
-        avg_interrupts: Average interrupt minutes per study day.
-        avg_overruns: Average overrun minutes per study day.
-
-    Returns:
-        List of markdown table lines.
-    """
-    lines: list[str] = []
-    lines.append("| METRIC | AVERAGE |")
-    lines.append("| ------ | ------- |")
-    lines.append(
-        f"| **INTERRUPTS** | `{format_minutes(avg_interrupts, always_show_both=True)}/day` |"
-    )
-    lines.append(
-        f"| **OVERRUNS**   | `{format_minutes(avg_overruns, always_show_both=True)}/day` |"
-    )
-    return lines
-
-
-def render_training_type_sessions_table(rows: list[dict[str, Any]]) -> list[str]:
-    """
-    Render training type sessions and average duration table.
-
-    Args:
-        rows: List of row dicts with keys type, sessions, target, average_minutes
-
-    Returns:
-        List of markdown table lines.
-    """
-    lines: list[str] = []
-    lines.append("| TYPE | SESSIONS | AVERAGE |")
-    lines.append("| ---- | -------- | ------- |")
-
-    if not rows:
-        lines.append("|  |  |  |")
-        return lines
-
-    for row in rows:
-        label = str(row.get("type") or "").strip()
-        sessions = int(row.get("sessions", 0) or 0)
-        target = int(row.get("target", 0) or 0)
-        avg_minutes = float(row.get("average_minutes", 0.0) or 0.0)
-        avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
-        lines.append(f"| **{label}** | `{sessions}/{target}` | `{avg_label}` |")
-
-    return lines
-
-
-def render_summary_table(
-    current_metrics: dict[str, Any],
-    previous_metrics: dict[str, Any],
-    current_label: str,
-    previous_label: str,
-    ma_metrics: dict[str, Any] | None = None,
-    ma_label: str | None = None,
-    ma_training_unit: str = "7",
-    period_type: PeriodType = "week",
-    total_days: int = 7,
-) -> list[str]:
-    """
-    Generate markdown summary table with averages, previous values, MA, % change, targets, and progress.
-
-    Args:
-        current_metrics: Dict with study_total_minutes, sleep_avg_minutes, mood_avg,
-                         workout_count, stretch_count, total_days, days_up_to_today
-        previous_metrics: Same structure as current_metrics
-        current_label: Column header for current period
-        previous_label: Column header (wiki link) for previous period
-        ma_metrics: Optional dict with MA values (study_avg_minutes, sleep_avg_minutes,
-                    mood_avg, workout_avg, stretch_avg)
-        ma_label: Column header like "4-WK AVG"
-        ma_training_unit: Unit for training MA ("7", "mo", "qtr", "yr")
-        period_type: One of "week", "month", "quarter", "year"
-        total_days: Number of days in the period for target scaling
-
-    Returns:
-        List of markdown lines for the SUMMARY section
-    """
     lines = ["### **SUMMARY**", ""]
 
     show_ma = ma_metrics is not None and ma_label is not None
@@ -191,7 +48,6 @@ def render_summary_table(
     workout_target_label = targets.training.workout_label
     stretch_target_label = targets.training.stretch_label
 
-    # Table header
     if show_ma:
         lines.append(
             f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} | TARGET | PROGRESS |"
@@ -207,7 +63,6 @@ def render_summary_table(
             "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |"
         )
 
-    # STUDY row
     curr_study_total = current_metrics.get("study_total_minutes") or 0
     prev_study_total = previous_metrics.get("study_total_minutes") or 0
     curr_days_for_avg = current_metrics.get("days_up_to_today") or current_metrics.get(
@@ -257,7 +112,6 @@ def render_summary_table(
             f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{study_target_label}` | `{study_bar}` `{study_progress_pct}%` |"
         )
 
-    # SLEEP row
     curr_sleep_avg = current_metrics.get("sleep_avg_minutes") or 0
     prev_sleep_avg = previous_metrics.get("sleep_avg_minutes") or 0
     curr_sleep = format_minutes(curr_sleep_avg, always_show_both=True) + "/night"
@@ -297,12 +151,9 @@ def render_summary_table(
             f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
         )
 
-    # MINDFUL row — use elapsed days for current period (pace-based comparison)
     curr_mindful_count = current_metrics.get("mindful_count", 0)
     prev_mindful_count = previous_metrics.get("mindful_count", 0)
-    # Current period uses elapsed days (for fair mid-period comparison)
     curr_mindful = format_training_ratio(curr_mindful_count, curr_days_for_avg)
-    # Previous period uses total days (it's complete)
     prev_mindful = format_training_ratio(prev_mindful_count, prev_total_days)
 
     ma_mindful_str = "—"
@@ -311,7 +162,6 @@ def render_summary_table(
             ma_metrics["mindful_avg"], ma_training_unit
         )
 
-    # Compare completion rates (pace) instead of raw counts
     if curr_mindful_count > 0 or prev_mindful_count > 0:
         curr_mindful_rate = curr_mindful_count / max(1, curr_days_for_avg)
         prev_mindful_rate = prev_mindful_count / max(1, prev_days_for_avg)
@@ -337,12 +187,9 @@ def render_summary_table(
             f"| **MINDFUL** | `{curr_mindful}` | `{prev_mindful}` | `{mindful_pct_str}` | `{mindful_target_label}` | `{mindful_bar}` `{mindful_progress_pct}%` |"
         )
 
-    # WORKOUT row — use elapsed days for current period (pace-based comparison)
     curr_workout_count = current_metrics.get("workout_count", 0)
     prev_workout_count = previous_metrics.get("workout_count", 0)
-    # Current period uses elapsed days (for fair mid-period comparison)
     curr_workout = format_training_ratio(curr_workout_count, curr_days_for_avg)
-    # Previous period uses total days (it's complete)
     prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
 
     ma_workout_str = "—"
@@ -351,7 +198,6 @@ def render_summary_table(
             ma_metrics["workout_avg"], ma_training_unit
         )
 
-    # Compare completion rates (pace) instead of raw counts
     if curr_workout_count > 0 or prev_workout_count > 0:
         curr_workout_rate = curr_workout_count / max(1, curr_days_for_avg)
         prev_workout_rate = prev_workout_count / max(1, prev_days_for_avg)
@@ -377,12 +223,9 @@ def render_summary_table(
             f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
         )
 
-    # STRETCH row — use elapsed days for current period (pace-based comparison)
     curr_stretch_count = current_metrics.get("stretch_count", 0)
     prev_stretch_count = previous_metrics.get("stretch_count", 0)
-    # Current period uses elapsed days (for fair mid-period comparison)
     curr_stretch = format_training_ratio(curr_stretch_count, curr_days_for_avg)
-    # Previous period uses total days (it's complete)
     prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
 
     ma_stretch_str = "—"
@@ -391,7 +234,6 @@ def render_summary_table(
             ma_metrics["stretch_avg"], ma_training_unit
         )
 
-    # Compare completion rates (pace) instead of raw counts
     if curr_stretch_count > 0 or prev_stretch_count > 0:
         curr_stretch_rate = curr_stretch_count / max(1, curr_days_for_avg)
         prev_stretch_rate = prev_stretch_count / max(1, prev_days_for_avg)
@@ -417,7 +259,6 @@ def render_summary_table(
             f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{stretch_target_label}` | `{stretch_bar}` `{stretch_progress_pct}%` |"
         )
 
-    # MOOD row
     curr_mood_avg = current_metrics.get("mood_avg") or 0
     prev_mood_avg = previous_metrics.get("mood_avg") or 0
     curr_mood = format_mood_with_scale(curr_mood_avg)

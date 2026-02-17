@@ -11,11 +11,11 @@ from __future__ import annotations
 import re
 
 from sync.constants import SCREEN_TIME
-from sync.formatting import format_minutes
-from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.models.deviation import DailyDeviationData
+from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
 from sync.models.status import CanonicalActivityPayload
 from sync.ports.cache import DailyScreenTimeCacheStore
+from sync.writers.tables import DailyProcrastinationTableSpec, render_table
 
 
 def parse_duration_string(duration_str: str) -> float:
@@ -246,53 +246,10 @@ def build_procrastination_section(
     Returns:
         List of markdown lines for the section
     """
-    lines = ["### **PROCRASTINATION**"]
-
-    # No data at all (shortcut never ran)
-    if not screen_time_data:
-        lines.append("")
-        lines.append("_No screen time data available._")
-        return lines
-
-    # Compute non-phone deviation: total deviation - screen time
-    # (time lost that wasn't spent on phone apps)
-    total_deviation = deviation_data.total_minutes if deviation_data else 0.0
-    screen_total = screen_time_data.total_minutes
-    non_phone_deviation = max(0.0, total_deviation - screen_total)
-
-    # Shortcut ran but zero procrastination apps and no deviations
-    if not screen_time_data.entries and non_phone_deviation == 0:
-        lines.append("")
-        lines.append("| SOURCE      | DURATION    |")
-        lines.append("| ----------- | ----------- |")
-        lines.append("| **TOTAL** | **`+0m`** |")
-        return lines
-
-    lines.append("")
-    lines.append("| SOURCE      | DURATION    |")
-    lines.append("| ----------- | ----------- |")
-
-    # Build list of (name, minutes) for sorting
-    rows: list[tuple[str, float]] = []
-
-    for entry in screen_time_data.entries:
-        rows.append((entry.app, entry.minutes))
-
-    # Add DEVIATIONS if > 0 (sorted with entries by value)
-    if non_phone_deviation > 0:
-        rows.append(("DEVIATIONS", non_phone_deviation))
-
-    # Sort rows descending by minutes
-    rows.sort(key=lambda x: x[1], reverse=True)
-
-    # Render sorted rows
-    for name, minutes in rows:
-        duration_str = f"`+{format_minutes(minutes)}`"
-        lines.append(f"| {name} | {duration_str} |")
-
-    # TOTAL row always last (screen time + non-phone deviations)
-    total_minutes = screen_total + non_phone_deviation
-    total_str = f"**`{format_minutes(total_minutes)}`**"
-    lines.append(f"| **TOTAL** | {total_str} |")
-
-    return lines
+    return render_table(
+        DailyProcrastinationTableSpec(
+            screen_time_data=screen_time_data,
+            deviation_data=deviation_data,
+            include_section_title=True,
+        )
+    )

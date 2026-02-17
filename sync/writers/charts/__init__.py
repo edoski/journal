@@ -1,10 +1,21 @@
-"""Chart and grid rendering package."""
+"""Unified chart specifications, profiles, and renderer API."""
 
 from __future__ import annotations
 
-from .bar import render_bar_chart
-from .presets import (
-    BarChartPreset,
+from .api import render_chart
+from .formatters import (
+    DECIMAL_ONE_LABEL,
+    TIME_LABEL_MIN2H,
+    TIME_LABEL_STANDARD,
+    DecimalOneLabel,
+    TimeLabelMin2HourDigits,
+    TimeLabelStandard,
+)
+from .layout import compress_activity_time_order, compress_days_time_order
+from .profiles import (
+    DEFAULT_GROUPED_GRID_PROFILE,
+    DEFAULT_PROGRESS_ROWS_PROFILE,
+    DEFAULT_WATERFALL_PROFILE,
     MONTHLY_WEEK_METRIC,
     MONTHLY_WEEK_MOOD,
     MONTHLY_WEEK_STUDY,
@@ -17,31 +28,56 @@ from .presets import (
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
     YEARLY_4QTR_STUDY,
-    wrap_code_block,
 )
-from .screen_time import (
-    render_screen_time_period_table,
-    render_screen_time_trend_table,
-    render_waterfall_chart,
-)
-from .study import (
-    _compress_symbols,
-    compress_activity_time_order,
-    compress_days_time_order,
-    render_monthly_study_grid,
-    render_quarterly_study_coverage,
-    render_weekly_study_grid,
-    render_yearly_study_coverage,
-    study_intensity_symbol,
-)
-from .training import (
-    render_training_frequency_grid,
-    render_training_quarter_block,
-    render_weekly_training_grid,
+from .specs import (
+    AnchorRef,
+    ChartKind,
+    ChartSpec,
+    ColumnTrack,
+    GlyphSet,
+    GroupedGridProfile,
+    HAnchor,
+    MonthlyStudyGridSpec,
+    MonthlyTrainingGridSpec,
+    ProgressRowsProfile,
+    QuarterlyStudyCoverageRowsSpec,
+    SegmentTrack,
+    TrainingBlockRowsSpec,
+    TrainingSection,
+    TrainingSectionsRowsSpec,
+    VerticalBarProfile,
+    VerticalBarSpec,
+    WaterfallProfile,
+    WaterfallSpec,
+    WeeklyStudyGridSpec,
+    WeeklyTrainingGridSpec,
+    YearlyStudyCoverageRowsSpec,
 )
 
 __all__ = [
-    "BarChartPreset",
+    "render_chart",
+    "ChartSpec",
+    "ChartKind",
+    "HAnchor",
+    "AnchorRef",
+    "GlyphSet",
+    "ColumnTrack",
+    "SegmentTrack",
+    "VerticalBarProfile",
+    "GroupedGridProfile",
+    "ProgressRowsProfile",
+    "WaterfallProfile",
+    "VerticalBarSpec",
+    "WeeklyStudyGridSpec",
+    "MonthlyStudyGridSpec",
+    "MonthlyTrainingGridSpec",
+    "WeeklyTrainingGridSpec",
+    "TrainingBlockRowsSpec",
+    "TrainingSectionsRowsSpec",
+    "QuarterlyStudyCoverageRowsSpec",
+    "YearlyStudyCoverageRowsSpec",
+    "WaterfallSpec",
+    "TrainingSection",
     "WEEKLY_7DAY_CHART",
     "WEEKLY_7DAY_MOOD",
     "MONTHLY_WEEK_STUDY",
@@ -54,20 +90,15 @@ __all__ = [
     "YEARLY_4QTR_METRIC",
     "YEARLY_4QTR_MOOD",
     "TEST_CHART",
-    "wrap_code_block",
-    "render_bar_chart",
-    "render_training_quarter_block",
-    "render_training_frequency_grid",
-    "render_weekly_training_grid",
-    "study_intensity_symbol",
-    "render_weekly_study_grid",
-    "render_monthly_study_grid",
-    "_compress_symbols",
+    "DEFAULT_GROUPED_GRID_PROFILE",
+    "DEFAULT_PROGRESS_ROWS_PROFILE",
+    "DEFAULT_WATERFALL_PROFILE",
+    "TimeLabelStandard",
+    "TimeLabelMin2HourDigits",
+    "DecimalOneLabel",
+    "TIME_LABEL_STANDARD",
+    "TIME_LABEL_MIN2H",
+    "DECIMAL_ONE_LABEL",
     "compress_days_time_order",
     "compress_activity_time_order",
-    "render_quarterly_study_coverage",
-    "render_yearly_study_coverage",
-    "render_waterfall_chart",
-    "render_screen_time_trend_table",
-    "render_screen_time_period_table",
 ]

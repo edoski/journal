@@ -37,38 +37,104 @@ from sync.periods.sections import (
     build_procrastination_section,
 )
 from sync.writers.charts import (
+    DECIMAL_ONE_LABEL,
     MONTHLY_WEEK_METRIC,
     MONTHLY_WEEK_MOOD,
     MONTHLY_WEEK_STUDY,
+    MonthlyStudyGridSpec,
+    MonthlyTrainingGridSpec,
     QUARTERLY_3MONTH_METRIC,
     QUARTERLY_3MONTH_MOOD,
     QUARTERLY_3MONTH_STUDY,
+    QuarterlyStudyCoverageRowsSpec,
+    TIME_LABEL_MIN2H,
+    TIME_LABEL_STANDARD,
+    TrainingSectionsRowsSpec,
+    WeeklyStudyGridSpec,
+    WeeklyTrainingGridSpec,
     WEEKLY_7DAY_CHART,
     WEEKLY_7DAY_MOOD,
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
     YEARLY_4QTR_STUDY,
+    TrainingSection,
+    VerticalBarSpec,
+    YearlyStudyCoverageRowsSpec,
     compress_activity_time_order,
     compress_days_time_order,
-    render_bar_chart,
-    render_monthly_study_grid,
-    render_quarterly_study_coverage,
-    render_screen_time_period_table,
-    render_screen_time_trend_table,
-    render_training_frequency_grid,
-    render_training_quarter_block,
-    render_weekly_study_grid,
-    render_weekly_training_grid,
-    render_yearly_study_coverage,
-    wrap_code_block,
+    render_chart,
 )
 from sync.writers.tables import (
-    render_activity_table,
-    render_sleep_stats_table,
+    ScreenTrendMode,
+    ScreenTrendTableSpec,
+    SimpleGridTableSpec,
+    render_table,
 )
 
 YEARLY_STUDY_BAR_WIDTH = 45
 YEARLY_TRAINING_BAR_WIDTH = 45
+
+
+def _activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
+    total_activity = sum(activity_totals.values())
+    rows: list[list[str]] = []
+    if activity_totals:
+        for activity, mins in sorted(
+            activity_totals.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        ):
+            share = (
+                f"{int(round((mins / total_activity) * 100))}%"
+                if total_activity
+                else "0%"
+            )
+            rows.append([f"**{activity}**", f"`{format_minutes(mins)}`", f"`{share}`"])
+    else:
+        rows.append(["", "", ""])
+
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["ACTIVITY", "TIME", "SHARE"],
+            divider_cells=["--------", "----", "-----"],
+            rows=rows,
+        )
+    )
+
+
+def _sleep_stats_table_lines(
+    sleep_avg: float | None,
+    avg_awake: float | None,
+    avg_awakenings: float | None,
+) -> list[str]:
+    if avg_awakenings is not None:
+        awaken_val = (
+            f"{avg_awakenings:.1f}"
+            if abs(avg_awakenings - round(avg_awakenings)) >= 0.05
+            else str(int(round(avg_awakenings)))
+        )
+    else:
+        awaken_val = ""
+
+    rows = [
+        [
+            "**SLEEP**     ",
+            f"`{format_minutes(sleep_avg)}`" if sleep_avg is not None else "",
+        ],
+        [
+            "**AWAKE**     ",
+            f"`{format_minutes(avg_awake)}`" if avg_awake is not None else "",
+        ],
+        ["**AWAKENINGS**", f"`{awaken_val}`" if awaken_val else ""],
+    ]
+
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["ACTIVITY", "AVERAGE"],
+            divider_cells=["--------", "-------"],
+            rows=rows,
+        )
+    )
 
 
 def build_weekly_metrics(
@@ -140,30 +206,36 @@ def build_weekly_metrics(
         if d > today:
             study_values.append("")
         else:
-            study_values.append(
-                format_minutes(m) if m is not None and m > 0 else "0h00m"
+            study_values.append(TIME_LABEL_STANDARD.format(m or 0))
+    study_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=DAYS,
+                values=study_hours,
+                value_labels=study_values,
+                profile=WEEKLY_7DAY_CHART,
             )
-    chart_lines = render_bar_chart(
-        DAYS,
-        study_hours,
-        study_values,
-        preset=WEEKLY_7DAY_CHART,
+        )
     )
-    study_lines.extend(wrap_code_block(chart_lines))
     study_lines.append(
         f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**"
     )
     study_lines.append("")
 
     # Activity table (activity_totals already computed above)
-    study_lines.extend(render_activity_table(activity_totals))
+    study_lines.extend(_activity_table_lines(activity_totals))
     study_lines.append("")
 
     current_week_date = today if start_date <= today <= end_date else None
-    study_grid = render_weekly_study_grid(
-        dates, daily_data, current_date=current_week_date
+    study_lines.extend(
+        render_chart(
+            WeeklyStudyGridSpec(
+                dates=dates,
+                daily_data=daily_data,
+                current_date=current_week_date,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     # INTERRUPTIONS table
@@ -174,15 +246,18 @@ def build_weekly_metrics(
     training_lines = ["### **TRAINING**"]
     current_week_date = today if start_date <= today <= end_date else None
     mindful_days = current_metrics["mindful_count"]
-    training_grid = render_weekly_training_grid(
-        dates,
-        daily_data,
-        mindful_days,
-        workout_days,
-        stretch_days,
-        current_date=current_week_date,
+    training_lines.extend(
+        render_chart(
+            WeeklyTrainingGridSpec(
+                dates=dates,
+                daily_data=daily_data,
+                mindful_count=mindful_days,
+                workout_count=workout_days,
+                stretch_count=stretch_days,
+                current_date=current_week_date,
+            )
+        )
     )
-    training_lines.extend(wrap_code_block(training_grid))
     training_lines.append("")
     append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
@@ -192,7 +267,14 @@ def build_weekly_metrics(
     screen_time_totals = group_screen_time_by_percent(screen_time_totals)
     procrastination_lines = build_procrastination_section(
         screen_time_totals,
-        render_screen_time_trend_table(dates, daily_data),
+        render_table(
+            ScreenTrendTableSpec(
+                mode=ScreenTrendMode.DAILY,
+                period_label="DAY",
+                dates=dates,
+                daily_data=daily_data,
+            )
+        ),
     )
     if procrastination_lines:
         sections.append(trim_blank_lines(procrastination_lines))
@@ -207,16 +289,17 @@ def build_weekly_metrics(
         if d > today:
             sleep_values.append("")
         else:
-            sleep_values.append(
-                format_minutes(m) if m is not None and m > 0 else "0h00m"
+            sleep_values.append(TIME_LABEL_STANDARD.format(m or 0))
+    sleep_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=DAYS,
+                values=sleep_hours,
+                value_labels=sleep_values,
+                profile=WEEKLY_7DAY_CHART,
             )
-    sleep_chart = render_bar_chart(
-        DAYS,
-        sleep_hours,
-        sleep_values,
-        preset=WEEKLY_7DAY_CHART,
+        )
     )
-    sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
     awake_vals = [
@@ -233,7 +316,7 @@ def build_weekly_metrics(
         sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
     )
 
-    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -245,14 +328,19 @@ def build_weekly_metrics(
         if d > today:
             mood_value_labels.append("")
         else:
-            mood_value_labels.append(f"{m:.1f}" if m is not None else "0.0")
-    mood_chart = render_bar_chart(
-        DAYS,
-        mood_chart_vals,
-        mood_value_labels,
-        preset=WEEKLY_7DAY_MOOD,
+            mood_value_labels.append(
+                DECIMAL_ONE_LABEL.format(m if m is not None else 0.0)
+            )
+    mood_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=DAYS,
+                values=mood_chart_vals,
+                value_labels=mood_value_labels,
+                profile=WEEKLY_7DAY_MOOD,
+            )
+        )
     )
-    mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
@@ -324,6 +412,7 @@ def build_monthly_metrics(
     week_day_lists = []
     study_chart_vals = []
     study_value_labels = []
+
     for start, end in week_ranges:
         label = format_week_label(start, end)
         week_labels.append(label)
@@ -339,9 +428,7 @@ def build_monthly_metrics(
         if start > today:
             study_value_labels.append("")
         else:
-            study_value_labels.append(
-                format_minutes(total_min) if total_min > 0 else "0h00m"
-            )
+            study_value_labels.append(TIME_LABEL_MIN2H.format(total_min))
 
     prev_year, prev_month = shift_month(start_date.year, start_date.month, -1)
     prev_week_ranges = month_week_ranges(prev_year, prev_month)
@@ -363,21 +450,24 @@ def build_monthly_metrics(
         today=today,
     )
 
-    chart_lines = render_bar_chart(
-        week_labels,
-        study_chart_vals,
-        study_value_labels,
-        preset=MONTHLY_WEEK_STUDY,
-        delta_labels=study_delta_labels,
+    study_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=week_labels,
+                values=study_chart_vals,
+                value_labels=study_value_labels,
+                profile=MONTHLY_WEEK_STUDY,
+                delta_labels=study_delta_labels,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(chart_lines))
     study_lines.append(
         f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**"
     )
     study_lines.append("")
 
     # Activity table (activity_totals already computed above)
-    study_lines.extend(render_activity_table(activity_totals))
+    study_lines.extend(_activity_table_lines(activity_totals))
     study_lines.append("")
 
     # Full-study-day deltas per week (pace-normalized by days per bucket)
@@ -395,13 +485,16 @@ def build_monthly_metrics(
     )
 
     current_month_date = today if is_current_month else None
-    study_grid = render_monthly_study_grid(
-        week_ranges,
-        daily_data,
-        current_date=current_month_date,
-        delta_labels=study_grid_delta_labels,
+    study_lines.extend(
+        render_chart(
+            MonthlyStudyGridSpec(
+                week_ranges=week_ranges,
+                daily_data=daily_data,
+                current_date=current_month_date,
+                delta_labels=study_grid_delta_labels,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     # INTERRUPTIONS table
@@ -439,17 +532,19 @@ def build_monthly_metrics(
     )
 
     mindful_days = current_metrics["mindful_count"]
-    training_grid = render_training_frequency_grid(
-        week_ranges,
-        daily_data,
-        mindful_days,
-        workout_days,
-        stretch_days,
-        days_in_period,
-        mindful_delta_labels=mindful_delta_labels,
-        workout_delta_labels=workout_delta_labels,
-        stretch_delta_labels=stretch_delta_labels,
-        current_date=current_month_date,
+    training_grid = render_chart(
+        MonthlyTrainingGridSpec(
+            week_ranges=week_ranges,
+            daily_data=daily_data,
+            mindful_count=mindful_days,
+            workout_count=workout_days,
+            stretch_count=stretch_days,
+            days_in_period=days_in_period,
+            mindful_delta_labels=mindful_delta_labels,
+            workout_delta_labels=workout_delta_labels,
+            stretch_delta_labels=stretch_delta_labels,
+            current_date=current_month_date,
+        )
     )
     # Inject counts into headers of the grid lines
     elapsed_days = current_metrics.get("days_up_to_today", days_in_period)
@@ -468,7 +563,7 @@ def build_monthly_metrics(
                     f"┌ STRETCH ({stretch_days:02d}/{elapsed_days:02d})"
                 )
 
-    training_lines.extend(wrap_code_block(training_grid))
+    training_lines.extend(training_grid)
     training_lines.append("")
     append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
@@ -485,8 +580,15 @@ def build_monthly_metrics(
             week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
         procrastination_lines = build_procrastination_section(
             screen_time_totals,
-            render_screen_time_period_table(
-                week_ranges, daily_data, "WEEK", week_labels, week_wikilinks
+            render_table(
+                ScreenTrendTableSpec(
+                    mode=ScreenTrendMode.PERIOD,
+                    period_label="WEEK",
+                    period_ranges=week_ranges,
+                    daily_data=daily_data,
+                    labels=week_labels,
+                    wikilinks=week_wikilinks,
+                )
             ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
@@ -507,7 +609,7 @@ def build_monthly_metrics(
             if start > today:
                 sleep_value_labels.append("")
             else:
-                sleep_value_labels.append(format_minutes(avg_min))
+                sleep_value_labels.append(TIME_LABEL_STANDARD.format(avg_min))
         else:
             sleep_chart_vals.append(0)
             if start > today:
@@ -523,14 +625,17 @@ def build_monthly_metrics(
         today=today,
     )
 
-    sleep_chart = render_bar_chart(
-        week_labels,
-        sleep_chart_vals,
-        sleep_value_labels,
-        preset=MONTHLY_WEEK_METRIC,
-        delta_labels=sleep_delta_labels,
+    sleep_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=week_labels,
+                values=sleep_chart_vals,
+                value_labels=sleep_value_labels,
+                profile=MONTHLY_WEEK_METRIC,
+                delta_labels=sleep_delta_labels,
+            )
+        )
     )
-    sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
     awake_vals = [
@@ -547,7 +652,7 @@ def build_monthly_metrics(
         sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
     )
 
-    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -566,7 +671,7 @@ def build_monthly_metrics(
             if start > today:
                 mood_value_labels.append("")
             else:
-                mood_value_labels.append(f"{avg_val:.1f}")
+                mood_value_labels.append(DECIMAL_ONE_LABEL.format(avg_val))
         else:
             mood_chart_vals.append(0)
             if start > today:
@@ -582,76 +687,23 @@ def build_monthly_metrics(
         today=today,
     )
 
-    mood_chart = render_bar_chart(
-        week_labels,
-        mood_chart_vals,
-        mood_value_labels,
-        preset=MONTHLY_WEEK_MOOD,
-        delta_labels=mood_delta_labels,
+    mood_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=week_labels,
+                values=mood_chart_vals,
+                value_labels=mood_value_labels,
+                profile=MONTHLY_WEEK_MOOD,
+                delta_labels=mood_delta_labels,
+            )
+        )
     )
-    mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
     append_media_section(sections, media_bundle)
 
     return join_sections(sections)
-
-
-def render_quarterly_training_bars(
-    month_ranges, daily_data, activity_key, delta_labels
-):
-    """
-    Render per-month rows for workout/stretch with dense bars, counts, and deltas.
-    Spacing mirrors the requested layout (no symbol spacing; counts aligned).
-    """
-    lines = []
-    bars = []
-    counts = []
-    max_bar_len = 0
-    max_count_len = 0
-
-    today = datetime.date.today()
-    for start, end in month_ranges:
-        label = MONTH_ABBR[start.month - 1]
-        days = list(daterange(start, end))
-        bar_chars = []
-        done = 0
-        for d in days:
-            if d > today:
-                bar_chars.append("·")
-            elif daily_data.get(d, {}).get(activity_key):
-                bar_chars.append("█")
-                done += 1
-            else:
-                bar_chars.append("·")
-        bar = "".join(bar_chars)
-        bars.append((label, bar, done, len(days)))
-        count_str = f"({done:02d}/{len(days):02d})"
-        counts.append(count_str)
-        max_bar_len = max(max_bar_len, len(bar))
-        max_count_len = max(max_count_len, len(count_str))
-
-    for idx, ((label, bar, done, total_days), count_str) in enumerate(
-        zip(bars, counts)
-    ):
-        pad_between_bar_and_count = (
-            max_bar_len - len(bar)
-        ) + 1  # base 1-space plus padding to align counts
-        delta_str = (
-            delta_labels[idx] if delta_labels and idx < len(delta_labels) else ""
-        )
-        # Right-pad delta to 4 chars for consistent column; prefix single space
-        delta_formatted = delta_str.rjust(4) if delta_str else ""
-        line = (
-            f"│ {label} {bar}"
-            f"{' ' * pad_between_bar_and_count}"
-            f"{count_str.rjust(max_count_len)}"
-        )
-        if delta_formatted:
-            line += f"   {delta_formatted}"
-        lines.append(line)
-    return lines
 
 
 def build_quarterly_metrics(
@@ -727,9 +779,7 @@ def build_quarterly_metrics(
         if start > today:
             study_value_labels.append("")
         else:
-            study_value_labels.append(
-                format_minutes(total_min) if total_min > 0 else "0h00m"
-            )
+            study_value_labels.append(TIME_LABEL_STANDARD.format(total_min))
 
     study_delta_labels = compute_bucket_deltas(
         month_day_lists,
@@ -741,20 +791,23 @@ def build_quarterly_metrics(
         today=today,
     )
 
-    chart_lines = render_bar_chart(
-        month_labels,
-        study_chart_vals,
-        study_value_labels,
-        preset=QUARTERLY_3MONTH_STUDY,
-        delta_labels=study_delta_labels,
+    study_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=month_labels,
+                values=study_chart_vals,
+                value_labels=study_value_labels,
+                profile=QUARTERLY_3MONTH_STUDY,
+                delta_labels=study_delta_labels,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(chart_lines))
     study_lines.append(
         f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
     )
     study_lines.append("")
 
-    study_lines.extend(render_activity_table(activity_totals))
+    study_lines.extend(_activity_table_lines(activity_totals))
     study_lines.append("")
 
     study_delta_labels = compute_bucket_deltas(
@@ -770,13 +823,16 @@ def build_quarterly_metrics(
         today=today,
     )
 
-    study_grid = render_quarterly_study_coverage(
-        month_ranges,
-        daily_data,
-        today=today,
-        delta_labels=study_delta_labels,
+    study_lines.extend(
+        render_chart(
+            QuarterlyStudyCoverageRowsSpec(
+                month_ranges=month_ranges,
+                daily_data=daily_data,
+                today=today,
+                delta_labels=study_delta_labels,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     append_interrupts_table(study_lines, dates, daily_data)
@@ -826,39 +882,65 @@ def build_quarterly_metrics(
         today=today,
     )
 
-    def _build_training_block(title, activity_key, counts, deltas):
-        total_done = sum(d for d, _, _ in counts)
-        total_elapsed = sum(e for _, e, _ in counts)
-        block = [f"┌ {title} ({total_done:02d}/{total_elapsed:02d})", "│"]
-        block.extend(
-            render_quarterly_training_bars(
-                month_ranges, daily_data, activity_key, deltas
+    def _month_activity_bars(activity_key: str) -> list[str]:
+        bars: list[str] = []
+        for start, end in month_ranges:
+            days = list(daterange(start, end))
+            bars.append(
+                compress_activity_time_order(
+                    days,
+                    lambda d: daily_data.get(d, {}).get(activity_key),
+                    len(days),
+                    fill_char="█",
+                    empty_char="·",
+                    today=today,
+                )
+            )
+        return bars
+
+    training_sections = [
+        TrainingSection(
+            title="MINDFUL",
+            total_done=sum(d for d, _, _ in mindful_counts),
+            total_elapsed=sum(e for _, e, _ in mindful_counts),
+            labels=month_labels,
+            counts=[(d, e) for d, e, _ in mindful_counts],
+            delta_labels=mindful_delta_labels,
+            bars_override=_month_activity_bars("meditate"),
+            fill_char="█",
+            empty_char="·",
+        ),
+        TrainingSection(
+            title="WORKOUT",
+            total_done=sum(d for d, _, _ in workout_counts),
+            total_elapsed=sum(e for _, e, _ in workout_counts),
+            labels=month_labels,
+            counts=[(d, e) for d, e, _ in workout_counts],
+            delta_labels=workout_delta_labels,
+            bars_override=_month_activity_bars("workout"),
+            fill_char="█",
+            empty_char="·",
+        ),
+        TrainingSection(
+            title="STRETCH",
+            total_done=sum(d for d, _, _ in stretch_counts),
+            total_elapsed=sum(e for _, e, _ in stretch_counts),
+            labels=month_labels,
+            counts=[(d, e) for d, e, _ in stretch_counts],
+            delta_labels=stretch_delta_labels,
+            bars_override=_month_activity_bars("stretch"),
+            fill_char="█",
+            empty_char="·",
+        ),
+    ]
+    # Render all three titled training blocks as one fenced chart.
+    training_lines.extend(
+        render_chart(
+            TrainingSectionsRowsSpec(
+                sections=training_sections,
             )
         )
-        block.append("└")
-        return block
-
-    training_block = []
-    training_block.extend(
-        _build_training_block(
-            "MINDFUL", "meditate", mindful_counts, mindful_delta_labels
-        )
     )
-    training_block.append("")  # blank line between blocks
-    training_block.extend(
-        _build_training_block(
-            "WORKOUT", "workout", workout_counts, workout_delta_labels
-        )
-    )
-    training_block.append(
-        ""
-    )  # blank line between workout and stretch inside same block
-    training_block.extend(
-        _build_training_block(
-            "STRETCH", "stretch", stretch_counts, stretch_delta_labels
-        )
-    )
-    training_lines.extend(wrap_code_block(training_block))
     training_lines.append("")
     append_training_type_table(training_lines, dates, daily_data)
 
@@ -875,8 +957,15 @@ def build_quarterly_metrics(
             month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
         procrastination_lines = build_procrastination_section(
             screen_time_totals,
-            render_screen_time_period_table(
-                month_ranges, daily_data, "MONTH", month_labels, month_wikilinks
+            render_table(
+                ScreenTrendTableSpec(
+                    mode=ScreenTrendMode.PERIOD,
+                    period_label="MONTH",
+                    period_ranges=month_ranges,
+                    daily_data=daily_data,
+                    labels=month_labels,
+                    wikilinks=month_wikilinks,
+                )
             ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
@@ -903,7 +992,7 @@ def build_quarterly_metrics(
             sleep_chart_vals.append(
                 round((avg_min / 60) * 2) / 2
             )  # Round to nearest 0.5h
-            sleep_value_labels.append(format_minutes(avg_min))
+            sleep_value_labels.append(TIME_LABEL_STANDARD.format(avg_min))
         else:
             sleep_chart_vals.append(0)
             sleep_value_labels.append("0h00m" if start <= today else "")
@@ -927,14 +1016,17 @@ def build_quarterly_metrics(
         today=today,
     )
 
-    sleep_chart = render_bar_chart(
-        sleep_labels,
-        sleep_chart_vals,
-        sleep_value_labels,
-        preset=QUARTERLY_3MONTH_METRIC,
-        delta_labels=sleep_delta_labels,
+    sleep_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=sleep_labels,
+                values=sleep_chart_vals,
+                value_labels=sleep_value_labels,
+                profile=QUARTERLY_3MONTH_METRIC,
+                delta_labels=sleep_delta_labels,
+            )
+        )
     )
-    sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
     awake_vals = [v for v in awake_vals if v is not None]
@@ -945,7 +1037,7 @@ def build_quarterly_metrics(
         sum(awakenings_vals) / len(awakenings_vals) if awakenings_vals else None
     )
 
-    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -963,7 +1055,7 @@ def build_quarterly_metrics(
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)
-            mood_value_labels.append(f"{avg_val:.1f}")
+            mood_value_labels.append(DECIMAL_ONE_LABEL.format(avg_val))
         else:
             mood_chart_vals.append(0)
             mood_value_labels.append("0.0" if start <= today else "")
@@ -976,14 +1068,17 @@ def build_quarterly_metrics(
         today=today,
     )
 
-    mood_chart = render_bar_chart(
-        mood_labels,
-        mood_chart_vals,
-        mood_value_labels,
-        preset=QUARTERLY_3MONTH_MOOD,
-        delta_labels=mood_delta_labels,
+    mood_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=mood_labels,
+                values=mood_chart_vals,
+                value_labels=mood_value_labels,
+                profile=QUARTERLY_3MONTH_MOOD,
+                delta_labels=mood_delta_labels,
+            )
+        )
     )
-    mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
@@ -1064,9 +1159,7 @@ def build_yearly_metrics(
         if start > today:
             study_value_labels.append("")
         else:
-            study_value_labels.append(
-                format_minutes(total_min) if total_min > 0 else "0h00m"
-            )
+            study_value_labels.append(TIME_LABEL_STANDARD.format(total_min))
 
     study_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
@@ -1078,20 +1171,23 @@ def build_yearly_metrics(
         today=today,
     )
 
-    study_chart = render_bar_chart(
-        q_labels,
-        study_values_hours,
-        study_value_labels,
-        preset=YEARLY_4QTR_STUDY,
-        delta_labels=study_delta_labels,
+    study_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=q_labels,
+                values=study_values_hours,
+                value_labels=study_value_labels,
+                profile=YEARLY_4QTR_STUDY,
+                delta_labels=study_delta_labels,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(study_chart))
     study_lines.append(
         f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
     )
     study_lines.append("")
 
-    study_lines.extend(render_activity_table(activity_totals))
+    study_lines.extend(_activity_table_lines(activity_totals))
     study_lines.append("")
 
     # Compute per-quarter full-study day counts for rendering
@@ -1134,16 +1230,19 @@ def build_yearly_metrics(
         today=today,
     )
 
-    study_grid = render_yearly_study_coverage(
-        quarter_ranges,
-        daily_data,
-        today=today,
-        bar_width=YEARLY_STUDY_BAR_WIDTH,
-        delta_labels=study_delta_labels,
-        bars_override=study_bars,
-        legend_line=RENDER.yearly_study_legend,
+    study_lines.extend(
+        render_chart(
+            YearlyStudyCoverageRowsSpec(
+                quarter_ranges=quarter_ranges,
+                daily_data=daily_data,
+                today=today,
+                bar_width=YEARLY_STUDY_BAR_WIDTH,
+                delta_labels=study_delta_labels,
+                bars_override=study_bars,
+                legend_line=RENDER.yearly_study_legend,
+            )
+        )
     )
-    study_lines.extend(wrap_code_block(study_grid))
     study_lines.append("")
 
     append_interrupts_table(study_lines, dates, daily_data)
@@ -1244,50 +1343,51 @@ def build_yearly_metrics(
             )
         )
 
-    mindful_block = [f"┌ MINDFUL ({mindful_done_year:02d}/{elapsed_year:02d})", "│"]
-    mindful_block.extend(
-        render_training_quarter_block(
-            quarter_labels,
-            [(d, t) for d, t, _ in mindful_counts],
-            mindful_delta_labels,
+    training_sections = [
+        TrainingSection(
+            title="MINDFUL",
+            total_done=mindful_done_year,
+            total_elapsed=elapsed_year,
+            labels=quarter_labels,
+            counts=[(d, t) for d, t, _ in mindful_counts],
+            delta_labels=mindful_delta_labels,
             bar_width=YEARLY_TRAINING_BAR_WIDTH,
             bars_override=mindful_bars,
             fill_char="█",
             empty_char="·",
-        )
-    )
-    mindful_block.append("└")
-
-    workout_block = [f"┌ WORKOUT ({workout_done_year:02d}/{elapsed_year:02d})", "│"]
-    workout_block.extend(
-        render_training_quarter_block(
-            quarter_labels,
-            [(d, t) for d, t, _ in workout_counts],
-            workout_delta_labels,
+        ),
+        TrainingSection(
+            title="WORKOUT",
+            total_done=workout_done_year,
+            total_elapsed=elapsed_year,
+            labels=quarter_labels,
+            counts=[(d, t) for d, t, _ in workout_counts],
+            delta_labels=workout_delta_labels,
             bar_width=YEARLY_TRAINING_BAR_WIDTH,
             bars_override=workout_bars,
             fill_char="█",
             empty_char="·",
-        )
-    )
-    workout_block.append("└")
-
-    stretch_block = [f"┌ STRETCH ({stretch_done_year:02d}/{elapsed_year:02d})", "│"]
-    stretch_block.extend(
-        render_training_quarter_block(
-            quarter_labels,
-            [(d, t) for d, t, _ in stretch_counts],
-            stretch_delta_labels,
+        ),
+        TrainingSection(
+            title="STRETCH",
+            total_done=stretch_done_year,
+            total_elapsed=elapsed_year,
+            labels=quarter_labels,
+            counts=[(d, t) for d, t, _ in stretch_counts],
+            delta_labels=stretch_delta_labels,
             bar_width=YEARLY_TRAINING_BAR_WIDTH,
             bars_override=stretch_bars,
             fill_char="█",
             empty_char="·",
-        )
-    )
-    stretch_block.append("└")
-
+        ),
+    ]
+    # Render all three titled training blocks as one fenced chart.
     training_lines.extend(
-        wrap_code_block(mindful_block + [""] + workout_block + [""] + stretch_block)
+        render_chart(
+            TrainingSectionsRowsSpec(
+                sections=training_sections,
+            )
+        )
     )
     training_lines.append("")
     append_training_type_table(training_lines, dates, daily_data)
@@ -1304,8 +1404,15 @@ def build_yearly_metrics(
             quarter_wikilinks.append(f"[[{year}-Q{i + 1}\\|Q{i + 1}]]")
         procrastination_lines = build_procrastination_section(
             screen_time_totals,
-            render_screen_time_period_table(
-                quarter_ranges, daily_data, "QTR", quarter_labels, quarter_wikilinks
+            render_table(
+                ScreenTrendTableSpec(
+                    mode=ScreenTrendMode.PERIOD,
+                    period_label="QTR",
+                    period_ranges=quarter_ranges,
+                    daily_data=daily_data,
+                    labels=quarter_labels,
+                    wikilinks=quarter_wikilinks,
+                )
             ),
         )
         sections.append(trim_blank_lines(procrastination_lines))
@@ -1329,7 +1436,7 @@ def build_yearly_metrics(
             sleep_chart_vals.append(
                 round((avg_min / 60) * 2) / 2
             )  # Round to nearest 0.5h
-            sleep_value_labels.append(format_minutes(avg_min))
+            sleep_value_labels.append(TIME_LABEL_STANDARD.format(avg_min))
         else:
             sleep_chart_vals.append(0)
             sleep_value_labels.append("" if start > today else "0h00m")
@@ -1342,14 +1449,17 @@ def build_yearly_metrics(
         today=today,
     )
 
-    sleep_chart = render_bar_chart(
-        q_labels,
-        sleep_chart_vals,
-        sleep_value_labels,
-        preset=YEARLY_4QTR_METRIC,
-        delta_labels=sleep_delta_labels,
+    sleep_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=q_labels,
+                values=sleep_chart_vals,
+                value_labels=sleep_value_labels,
+                profile=YEARLY_4QTR_METRIC,
+                delta_labels=sleep_delta_labels,
+            )
+        )
     )
-    sleep_lines.extend(wrap_code_block(sleep_chart))
     sleep_lines.append("")
 
     awake_vals = [
@@ -1367,7 +1477,7 @@ def build_yearly_metrics(
     )
     sleep_avg = current_metrics.get("sleep_avg_minutes")
 
-    sleep_lines.extend(render_sleep_stats_table(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -1384,7 +1494,7 @@ def build_yearly_metrics(
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)
-            mood_value_labels.append(f"{avg_val:.1f}")
+            mood_value_labels.append(DECIMAL_ONE_LABEL.format(avg_val))
         else:
             mood_chart_vals.append(0)
             mood_value_labels.append("" if start > today else "0.0")
@@ -1397,14 +1507,17 @@ def build_yearly_metrics(
         today=today,
     )
 
-    mood_chart = render_bar_chart(
-        q_labels,
-        mood_chart_vals,
-        mood_value_labels,
-        preset=YEARLY_4QTR_MOOD,
-        delta_labels=mood_delta_labels,
+    mood_lines.extend(
+        render_chart(
+            VerticalBarSpec(
+                labels=q_labels,
+                values=mood_chart_vals,
+                value_labels=mood_value_labels,
+                profile=YEARLY_4QTR_MOOD,
+                delta_labels=mood_delta_labels,
+            )
+        )
     )
-    mood_lines.extend(wrap_code_block(mood_chart))
     sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section

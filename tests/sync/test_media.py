@@ -14,7 +14,24 @@ from sync.readers.media import (
     scan_books,
     scan_podcasts,
 )
-from sync.writers.media import render_media_table
+from sync.writers.tables import SimpleGridTableSpec, render_table
+
+
+def _render_media_table(books: list[Book], podcasts: list[Podcast]) -> list[str]:
+    rows: list[list[str]] = []
+    for book in books:
+        rows.append(["**BOOK**", f"[[{book.title}]]", f"`{book.completed:%Y-%m-%d}`"])
+    for podcast in podcasts:
+        rows.append(
+            ["**PODCAST**", f"[[{podcast.title}]]", f"`{podcast.date:%Y-%m-%d}`"]
+        )
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["TYPE", "TITLE", "DATE"],
+            divider_cells=["----", "-----", "----"],
+            rows=rows,
+        )
+    )
 
 
 class TestParseDateLink:
@@ -218,7 +235,7 @@ class TestRenderMediaTable:
             )
         ]
 
-        lines = render_media_table(books, podcasts)
+        lines = _render_media_table(books, podcasts)
 
         assert "| TYPE | TITLE | DATE |" in lines[0]
         assert "**BOOK**" in lines[2]
@@ -228,7 +245,7 @@ class TestRenderMediaTable:
 
     def test_empty_returns_header_only(self):
         """Returns header only when no media."""
-        lines = render_media_table([], [])
+        lines = _render_media_table([], [])
         assert len(lines) == 2  # header + separator
         assert "TYPE" in lines[0]
 
@@ -244,7 +261,7 @@ class TestRenderMediaTable:
             )
         ]
 
-        lines = render_media_table(books, [])
+        lines = _render_media_table(books, [])
 
         assert len(lines) == 3  # header, separator, one row
         assert "**BOOK**" in lines[2]

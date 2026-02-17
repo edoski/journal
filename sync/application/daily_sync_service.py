@@ -22,6 +22,11 @@ from sync.formatting import format_minutes
 from sync.log import get_logger
 from sync.models.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
+from sync.notes.markdown_tables import (
+    escape_markdown_cell,
+    render_markdown_row,
+    split_markdown_row,
+)
 from sync.notes.sections import (
     extract_block,
     find_header_idx,
@@ -245,39 +250,6 @@ class DailySyncService:
         logger.info("Updated %s", today_str + ".md")
 
     @staticmethod
-    def _split_markdown_row(line: str) -> list[str] | None:
-        stripped = line.strip()
-        if not stripped.startswith("|") or not stripped.endswith("|"):
-            return None
-        cells: list[str] = []
-        buffer: list[str] = []
-        escaped = False
-        for char in stripped[1:-1]:
-            if char == "|" and not escaped:
-                cells.append("".join(buffer).strip())
-                buffer = []
-                continue
-            buffer.append(char)
-            escaped = char == "\\" and not escaped
-            if char != "\\":
-                escaped = False
-        cells.append("".join(buffer).strip())
-        return cells
-
-    @staticmethod
-    def _escape_unescaped_pipes(text: str) -> str:
-        escaped = False
-        result: list[str] = []
-        for char in text:
-            if char == "|" and not escaped:
-                result.append("\\")
-            result.append(char)
-            escaped = char == "\\" and not escaped
-            if char != "\\":
-                escaped = False
-        return "".join(result)
-
-    @staticmethod
     def _normalize_reflections_time(raw: str) -> str | None:
         cleaned = raw.strip().strip("`").strip()
         if not cleaned:
@@ -332,12 +304,12 @@ class DailySyncService:
     @classmethod
     def _render_reflections_row(cls, time_cell: str, entry_cell: str) -> str:
         time_part = f"`{time_cell}`" if time_cell else ""
-        escaped_entry = cls._escape_unescaped_pipes(entry_cell.strip())
-        return f"| {time_part} | {escaped_entry} |"
+        escaped_entry = escape_markdown_cell(entry_cell.strip())
+        return render_markdown_row([time_part, escaped_entry])
 
     @classmethod
     def _repair_reflections_row(cls, line: str) -> _ReflectionsRowRepair:
-        cells = cls._split_markdown_row(line)
+        cells = split_markdown_row(line)
         if cells is None:
             return _ReflectionsRowRepair(line=line, repaired=False, reason=None)
 
@@ -424,7 +396,7 @@ class DailySyncService:
 
         idx = reflections_idx + 1
         while idx < reflections_end:
-            header_cells = self._split_markdown_row(updated[idx])
+            header_cells = split_markdown_row(updated[idx])
             if header_cells is None:
                 idx += 1
                 continue
@@ -443,7 +415,7 @@ class DailySyncService:
 
             divider_idx = idx + 1
             divider_cells = (
-                self._split_markdown_row(updated[divider_idx])
+                split_markdown_row(updated[divider_idx])
                 if divider_idx < reflections_end
                 else None
             )

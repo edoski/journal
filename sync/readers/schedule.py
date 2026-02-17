@@ -9,6 +9,7 @@ from typing import Literal, cast
 
 from sync.contracts.schedule import DayScheduleProfile, Weekday
 from sync.io import safe_read_file
+from sync.notes.markdown_tables import split_markdown_row
 
 _TABLE_HEADERS = (
     "RULE",
@@ -73,13 +74,6 @@ class ScheduleRules:
             )
 
         return profile
-
-
-def _split_markdown_row(line: str, *, line_no: int) -> list[str]:
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        raise ValueError(f"PROTOCOL.md line {line_no}: invalid markdown table row")
-    return [cell.strip() for cell in stripped[1:-1].split("|")]
 
 
 def _find_schedule_header(lines: list[str]) -> int:
@@ -180,7 +174,11 @@ def load_schedule_rules(path: str) -> ScheduleRules:
     schedule_header_idx = _find_schedule_header(lines)
     table_start = _find_table_start(lines, schedule_header_idx)
 
-    header = _split_markdown_row(lines[table_start], line_no=table_start + 1)
+    header = split_markdown_row(lines[table_start])
+    if header is None:
+        raise ValueError(
+            f"PROTOCOL.md line {table_start + 1}: invalid markdown table row"
+        )
     if tuple(header) != _TABLE_HEADERS:
         raise ValueError(
             "## SCHEDULE table header must be exactly: "
@@ -206,7 +204,9 @@ def load_schedule_rules(path: str) -> ScheduleRules:
             break
 
         row_count += 1
-        cells = _split_markdown_row(lines[idx], line_no=idx + 1)
+        cells = split_markdown_row(lines[idx])
+        if cells is None:
+            raise ValueError(f"PROTOCOL.md line {idx + 1}: invalid markdown table row")
         if len(cells) != len(_TABLE_HEADERS):
             raise ValueError(
                 f"PROTOCOL.md line {idx + 1}: expected {len(_TABLE_HEADERS)} columns, "

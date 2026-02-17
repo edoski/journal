@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING
 
 from sync.goals.identity import generate_goal_id_for
 from sync.io import atomic_write_note, safe_read_file
+from sync.notes.markdown_tables import (
+    render_divider_row,
+    render_markdown_row,
+    split_markdown_row,
+)
 from sync.models.reminders import (
     DailySchedule,
     MonthlyLastDaySchedule,
@@ -35,13 +40,6 @@ WEEKDAY_INDEX = {
 }
 
 
-def _split_table_cells(line: str) -> list[str]:
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        raise ValueError(f"Invalid markdown table row: {line!r}")
-    return [cell.strip() for cell in stripped[1:-1].split("|")]
-
-
 def load_reminder_rules(path: str) -> list[ReminderRule]:
     """Load and validate reminder rules from REMINDERS.md."""
     lines = safe_read_file(path)
@@ -52,7 +50,10 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
     for idx, line in enumerate(lines):
         if not line.strip().startswith("|"):
             continue
-        cells = [c.upper() for c in _split_table_cells(line)]
+        parsed = split_markdown_row(line)
+        if parsed is None:
+            continue
+        cells = [c.upper() for c in parsed]
         if cells == list(TABLE_HEADERS):
             header_idx = idx
             break
@@ -76,7 +77,9 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
         if not raw.startswith("|"):
             break
 
-        row = _split_table_cells(lines[idx])
+        row = split_markdown_row(lines[idx])
+        if row is None:
+            raise ValueError(f"REMINDERS.md line {idx + 1}: invalid markdown table row")
         line_no = idx + 1
         if len(row) != len(TABLE_HEADERS):
             raise ValueError(
@@ -210,11 +213,11 @@ def get_reminders_for_date(
 def render_reminder_rules_markdown(rules: list[ReminderRule]) -> list[str]:
     """Render reminder rules into canonical REMINDERS.md markdown lines."""
     lines = [
-        "| SCHEDULE | BODY |",
-        "| -------- | ---- |",
+        render_markdown_row(TABLE_HEADERS),
+        render_divider_row(len(TABLE_HEADERS), divider_cells=["--------", "----"]),
     ]
     for rule in rules:
-        lines.append(f"| {format_schedule(rule.schedule)} | {rule.body} |")
+        lines.append(render_markdown_row([format_schedule(rule.schedule), rule.body]))
     lines.append("")
     return lines
 
