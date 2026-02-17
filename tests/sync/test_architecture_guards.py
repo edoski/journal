@@ -58,6 +58,14 @@ def test_removed_legacy_module_files_do_not_exist():
         "sync/daily/study.py",
         "sync/daily/goals.py",
         "sync/periods/media.py",
+        "sync/daily/__main__.py",
+        "sync/study/__main__.py",
+        "sync/periods/weekly/__main__.py",
+        "sync/periods/monthly/__main__.py",
+        "sync/periods/quarterly/__main__.py",
+        "sync/periods/yearly/__main__.py",
+        "sync_all.sh",
+        "sync.sh",
         "utils",
     ]
     existing = [path for path in legacy_paths if (ROOT / path).exists()]
@@ -78,6 +86,7 @@ def test_required_domain_packages_exist():
         "sync/adapters",
         "sync/application",
         "sync/daily/orchestrator",
+        "sync/run",
         "sync/writers/charts",
     ]
     missing = [path for path in required_dirs if not (ROOT / path).is_dir()]
@@ -193,77 +202,6 @@ def test_removed_compat_helpers_are_not_reintroduced():
 
     assert not violations, "Removed compat helpers reappeared:\n" + "\n".join(
         violations
-    )
-
-
-def test_period_entrypoints_import_service_and_windows():
-    required: dict[str, dict[str, set[str]]] = {
-        "sync/periods/weekly/__main__.py": {
-            "sync.application.period_sync_service": {"PeriodSyncService"},
-            "sync.periods.runtime": {"resolve_note_path"},
-            "sync.periods.windows": {"build_week_window"},
-        },
-        "sync/periods/monthly/__main__.py": {
-            "sync.application.period_sync_service": {"PeriodSyncService"},
-            "sync.periods.runtime": {"resolve_note_path"},
-            "sync.periods.windows": {"build_month_window"},
-        },
-        "sync/periods/quarterly/__main__.py": {
-            "sync.application.period_sync_service": {"PeriodSyncService"},
-            "sync.periods.runtime": {"resolve_note_path"},
-            "sync.periods.windows": {"build_quarter_window"},
-        },
-        "sync/periods/yearly/__main__.py": {
-            "sync.application.period_sync_service": {"PeriodSyncService"},
-            "sync.periods.runtime": {"resolve_note_path"},
-            "sync.periods.windows": {"build_year_window"},
-        },
-    }
-
-    violations: list[str] = []
-    for rel_path, modules in required.items():
-        path = ROOT / rel_path
-        for module_name, symbols in modules.items():
-            imported = _imported_from(path, module_name)
-            missing = sorted(symbols - imported)
-            if missing:
-                violations.append(
-                    f"{rel_path}: missing {module_name} imports: {', '.join(missing)}"
-                )
-
-    assert not violations, (
-        "Period entrypoint service/window imports regressed:\n" + "\n".join(violations)
-    )
-
-
-def test_period_entrypoints_stay_thin():
-    entrypoints = [
-        ROOT / "sync" / "periods" / "weekly" / "__main__.py",
-        ROOT / "sync" / "periods" / "monthly" / "__main__.py",
-        ROOT / "sync" / "periods" / "quarterly" / "__main__.py",
-        ROOT / "sync" / "periods" / "yearly" / "__main__.py",
-    ]
-    violations: list[str] = []
-
-    for path in entrypoints:
-        source = path.read_text(encoding="utf-8")
-        module = _parse_module(path)
-        import_count = sum(
-            1
-            for line in source.splitlines()
-            if line.startswith("import ") or line.startswith("from ")
-        )
-        if import_count > 12:
-            violations.append(f"{path}: import count {import_count} exceeds 12")
-
-        for node in module.body:
-            if isinstance(node, ast.FunctionDef) and node.name.startswith("build_"):
-                violations.append(
-                    f"{path}: entrypoint should not define builder {node.name}"
-                )
-
-    assert not violations, (
-        "Period entrypoints regressed from thin wrappers:\n" + "\n".join(violations)
     )
 
 
@@ -432,12 +370,7 @@ def test_sync_modules_do_not_import_private_symbols_across_modules():
 
 def test_only_composition_roots_import_adapters_or_application():
     composition_roots = {
-        ROOT / "sync" / "daily" / "__main__.py",
-        ROOT / "sync" / "study" / "__main__.py",
-        ROOT / "sync" / "periods" / "weekly" / "__main__.py",
-        ROOT / "sync" / "periods" / "monthly" / "__main__.py",
-        ROOT / "sync" / "periods" / "quarterly" / "__main__.py",
-        ROOT / "sync" / "periods" / "yearly" / "__main__.py",
+        ROOT / "sync" / "run" / "__main__.py",
     }
     violations: list[str] = []
 

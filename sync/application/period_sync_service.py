@@ -77,6 +77,7 @@ class PeriodSyncService:
         note_path: str,
         *,
         cleanup_previous: bool,
+        cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
         with open_period_note(
             note_path, WEEKLY_TEMPLATE_PATH, self.note_store
@@ -115,8 +116,7 @@ class PeriodSyncService:
         maybe_cleanup_previous(
             enabled=cleanup_previous,
             previous_note_path=journal_path(window.previous_filename),
-            module_name="sync.periods.weekly",
-            module_args=["--date", window.previous_start.isoformat(), "--no-cleanup"],
+            rerun=cleanup_previous_runner,
         )
 
     def sync_month(
@@ -125,6 +125,7 @@ class PeriodSyncService:
         note_path: str,
         *,
         cleanup_previous: bool,
+        cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
         with open_period_note(
             note_path, MONTHLY_TEMPLATE_PATH, self.note_store
@@ -167,12 +168,7 @@ class PeriodSyncService:
         maybe_cleanup_previous(
             enabled=cleanup_previous,
             previous_note_path=journal_path(window.previous_filename),
-            module_name="sync.periods.monthly",
-            module_args=[
-                "--month",
-                f"{window.previous_year}-{window.previous_month:02d}",
-                "--no-cleanup",
-            ],
+            rerun=cleanup_previous_runner,
         )
 
     def sync_quarter(self, window: QuarterWindow, note_path: str) -> None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
 from sync.constants import JOURNAL_DIR
@@ -50,10 +50,9 @@ def maybe_cleanup_previous(
     *,
     enabled: bool,
     previous_note_path: str,
-    module_name: str,
-    module_args: list[str],
+    rerun: Callable[[], None] | None,
 ) -> bool:
     """Run one-time previous-period cleanup when enabled."""
-    if not enabled:
+    if not enabled or rerun is None:
         return False
-    return resync_if_marker(previous_note_path, module_name, module_args)
+    return resync_if_marker(previous_note_path, rerun)

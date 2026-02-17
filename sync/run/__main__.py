@@ -1,22 +1,40 @@
-"""Non-interactive CLI utilities for journal operations."""
+"""Unified runtime CLI for journal sync and session utilities."""
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import os
 import re
 import sqlite3
 import subprocess
 import sys
-from datetime import date, datetime, timedelta
-from pathlib import Path
+from datetime import date, timedelta
 from typing import TypedDict
 
-from sync.adapters.flow_sessions import FlowStudySessionSource
-from sync.adapters.markdown_schedule import MarkdownScheduleSource
-from sync.config import LOGGING
+from sync.adapters import (
+    FlowStudySessionSource,
+    ICloudDailyStatusSource,
+    JsonDailyScreenTimeCacheStore,
+    JsonDailyTrainingCacheStore,
+    JsonGoalCarryForwardCacheStore,
+    JsonGoalReconcileCacheStore,
+    JsonMediaDateCacheStore,
+    MarkdownDailyAggregateSource,
+    MarkdownGoalStore,
+    MarkdownNoteStore,
+    MarkdownReminderRuleStore,
+    MarkdownScheduleSource,
+    ObsidianMediaSource,
+    VaultContextSource,
+    bootstrap_cache_layout,
+)
+from sync.application.daily_sync_service import DailySyncService
+from sync.application.goal_sync_service import GoalSyncService
+from sync.application.period_sync_service import PeriodSyncService
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
+from sync.dates import quarter_of_date
 from sync.log import (
     add_logging_cli_args,
     configure_logging,
@@ -24,12 +42,18 @@ from sync.log import (
     resolve_logging_settings,
 )
 from sync.ports.schedule import ScheduleSource
+from sync.periods.runtime import resolve_note_path
+from sync.periods.windows import (
+    build_month_window,
+    build_quarter_window,
+    build_week_window,
+    build_year_window,
+)
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
 
 SKIP_LAUNCHD_LABEL = "com.edo.skip"
 SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
 SKIP_LAUNCHD_TARGET = f"{SKIP_LAUNCHD_DOMAIN}/{SKIP_LAUNCHD_LABEL}"
-SKIP_LOG_PATH = Path("/tmp/com.edo.skip.log")
 
 logger = get_logger(__name__)
 
@@ -38,66 +62,204 @@ class CliSession(TypedDict):
     pk: int
     phase: str
     duration: float
-    start: datetime | None
-    completed: datetime | None
+    start: datetime.datetime | None
+    completed: datetime.datetime | None
     title: str
     interruptions_count: int
     interruptions_duration: float
 
 
-def _log_cap_bytes() -> int:
-    raw = os.environ.get("JOURNAL_LOG_CAP_BYTES")
-    if raw is None:
-        return LOGGING.cap_bytes
-    try:
-        parsed = int(raw)
-    except ValueError:
-        return LOGGING.cap_bytes
-    return parsed if parsed > 0 else LOGGING.cap_bytes
+def _build_goal_sync_service(note_store: MarkdownNoteStore) -> GoalSyncService:
+    goal_store = MarkdownGoalStore()
+    carry_cache_store = JsonGoalCarryForwardCacheStore()
+    reconcile_cache_store = JsonGoalReconcileCacheStore()
+    return GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=carry_cache_store,
+        reconcile_cache_store=reconcile_cache_store,
+    )
 
 
-def _cap_log_file(path: Path, max_bytes: int) -> None:
-    """Trim a log file in-place to the newest max_bytes bytes."""
-    if max_bytes <= 0:
-        return
-
-    try:
-        size = path.stat().st_size
-    except OSError:
-        return
-
-    if size <= max_bytes:
-        return
-
-    try:
-        with open(path, "rb") as handle:
-            handle.seek(-max_bytes, os.SEEK_END)
-            tail = handle.read(max_bytes)
-        newline = tail.find(b"\n")
-        if newline != -1 and newline + 1 < len(tail):
-            tail = tail[newline + 1 :]
-        with open(path, "wb") as handle:
-            handle.write(tail)
-    except OSError:
-        return
+def _build_period_sync_service() -> PeriodSyncService:
+    note_store = MarkdownNoteStore()
+    media_cache_store = JsonMediaDateCacheStore()
+    return PeriodSyncService(
+        note_store=note_store,
+        aggregate_source=MarkdownDailyAggregateSource(),
+        media_source=ObsidianMediaSource(media_cache_store=media_cache_store),
+        goal_sync_service=_build_goal_sync_service(note_store),
+    )
 
 
-def core_data_to_datetime(timestamp: float | None) -> datetime | None:
-    """Convert CoreData timestamp to datetime."""
+def _run_daily_sync() -> None:
+    bootstrap_cache_layout()
+    day = datetime.date.today()
+    schedule_source = MarkdownScheduleSource()
+    session_source = FlowStudySessionSource()
+    note_store = MarkdownNoteStore()
+    training_cache_store = JsonDailyTrainingCacheStore()
+    screen_time_cache_store = JsonDailyScreenTimeCacheStore()
+    status_source = ICloudDailyStatusSource(
+        screen_time_cache_store=screen_time_cache_store
+    )
+    service = DailySyncService(
+        note_store=note_store,
+        status_source=status_source,
+        context_source=VaultContextSource(),
+        reminder_store=MarkdownReminderRuleStore(),
+        goal_sync_service=_build_goal_sync_service(note_store),
+        training_cache_store=training_cache_store,
+    )
+
+    target_days = status_source.target_days(day)
+    run_days = sorted(d for d in target_days if d != day)
+    run_days.append(day)
+
+    for run_day in run_days:
+        day_schedule = schedule_source.resolve_day(run_day)
+        sessions = session_source.load_sessions(run_day, day_schedule)
+        changed = service.sync_day(run_day, sessions, day_schedule)
+        if changed is False:
+            continue
+
+
+def _run_weekly_sync(*, date_arg: str | None, no_cleanup: bool) -> None:
+    bootstrap_cache_layout()
+
+    if date_arg:
+        target_date = datetime.datetime.strptime(date_arg, "%Y-%m-%d").date()
+    else:
+        target_date = datetime.date.today()
+
+    window = build_week_window(target_date)
+    note_path = resolve_note_path(window.filename)
+
+    service = _build_period_sync_service()
+    cleanup_runner = None
+    if not no_cleanup:
+        previous_date = window.previous_start.isoformat()
+
+        def cleanup_runner() -> None:
+            _run_weekly_sync(date_arg=previous_date, no_cleanup=True)
+
+    service.sync_week(
+        window,
+        note_path,
+        cleanup_previous=not no_cleanup,
+        cleanup_previous_runner=cleanup_runner,
+    )
+
+
+def _run_monthly_sync(*, month_arg: str | None, no_cleanup: bool) -> None:
+    bootstrap_cache_layout()
+
+    if month_arg:
+        year, month = map(int, month_arg.split("-"))
+        target_date = datetime.date(year, month, 1)
+    else:
+        today = datetime.date.today()
+        target_date = datetime.date(today.year, today.month, 1)
+
+    window = build_month_window(target_date)
+    note_path = resolve_note_path(window.filename)
+
+    service = _build_period_sync_service()
+    cleanup_runner = None
+    if not no_cleanup:
+        previous_month = f"{window.previous_year}-{window.previous_month:02d}"
+
+        def cleanup_runner() -> None:
+            _run_monthly_sync(month_arg=previous_month, no_cleanup=True)
+
+    service.sync_month(
+        window,
+        note_path,
+        cleanup_previous=not no_cleanup,
+        cleanup_previous_runner=cleanup_runner,
+    )
+
+
+def _run_quarterly_sync(*, quarter_arg: str | None) -> None:
+    bootstrap_cache_layout()
+
+    if quarter_arg:
+        parts = quarter_arg.upper().split("-Q")
+        if len(parts) != 2:
+            raise ValueError("Quarter must be in format YYYY-Qn")
+        year = int(parts[0])
+        quarter_num = int(parts[1])
+    else:
+        today = datetime.date.today()
+        year, quarter_num = quarter_of_date(today)
+
+    window = build_quarter_window(year, quarter_num)
+    note_path = resolve_note_path(window.filename)
+
+    _build_period_sync_service().sync_quarter(window, note_path)
+
+
+def _run_yearly_sync(*, year_arg: str | None) -> None:
+    bootstrap_cache_layout()
+
+    if year_arg:
+        year = int(year_arg)
+    else:
+        year = datetime.date.today().year
+
+    window = build_year_window(year)
+    note_path = resolve_note_path(window.filename)
+
+    _build_period_sync_service().sync_year(window, note_path)
+
+
+def cmd_period_all(_args: argparse.Namespace) -> int:
+    _run_daily_sync()
+    _run_weekly_sync(date_arg=None, no_cleanup=False)
+    _run_monthly_sync(month_arg=None, no_cleanup=False)
+    _run_quarterly_sync(quarter_arg=None)
+    _run_yearly_sync(year_arg=None)
+    return 0
+
+
+def cmd_period_daily(_args: argparse.Namespace) -> int:
+    _run_daily_sync()
+    return 0
+
+
+def cmd_period_weekly(args: argparse.Namespace) -> int:
+    _run_weekly_sync(date_arg=args.date, no_cleanup=args.no_cleanup)
+    return 0
+
+
+def cmd_period_monthly(args: argparse.Namespace) -> int:
+    _run_monthly_sync(month_arg=args.month, no_cleanup=args.no_cleanup)
+    return 0
+
+
+def cmd_period_quarterly(args: argparse.Namespace) -> int:
+    _run_quarterly_sync(quarter_arg=args.quarter)
+    return 0
+
+
+def cmd_period_yearly(args: argparse.Namespace) -> int:
+    _run_yearly_sync(year_arg=args.year)
+    return 0
+
+
+def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:
     if timestamp is None:
         return None
-    return datetime.fromtimestamp(timestamp + CORE_DATA_EPOCH_OFFSET)
+    return datetime.datetime.fromtimestamp(timestamp + CORE_DATA_EPOCH_OFFSET)
 
 
-def datetime_to_core_data(value: datetime | None) -> float | None:
-    """Convert datetime to CoreData timestamp."""
+def datetime_to_core_data(value: datetime.datetime | None) -> float | None:
     if value is None:
         return None
     return value.timestamp() - CORE_DATA_EPOCH_OFFSET
 
 
 def get_connection(readonly: bool = True) -> sqlite3.Connection:
-    """Open SQLite connection to Study/Flow DB."""
     if readonly:
         uri = f"file:{DB_PATH}?mode=ro"
         return sqlite3.connect(uri, uri=True)
@@ -105,7 +267,6 @@ def get_connection(readonly: bool = True) -> sqlite3.Connection:
 
 
 def format_session(session: CliSession, include_pk: bool = False) -> str:
-    """Format session payload for display."""
     lines = []
     if include_pk:
         lines.append(f"  PK:       {session['pk']}")
@@ -114,15 +275,13 @@ def format_session(session: CliSession, include_pk: bool = False) -> str:
     if session["start"]:
         lines.append(f"  Started:  {session['start'].strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"  Duration: {session['duration']} min (planned)")
-    lines.append(
-        f"  Status:   {'✓ completed' if session['completed'] else '⏳ in-progress'}"
-    )
+    status = "completed" if session["completed"] else "in-progress"
+    lines.append(f"  Status:   {status}")
     return "\n".join(lines)
 
 
-def _now() -> datetime:
-    """Current local datetime, wrapped for deterministic tests."""
-    return datetime.now()
+def _now() -> datetime.datetime:
+    return datetime.datetime.now()
 
 
 def _find_most_recent_focus(sessions: list[CliSession]) -> CliSession | None:
@@ -177,7 +336,7 @@ def _load_recent_focus_sessions(
             break
 
     sessions.sort(
-        key=lambda item: item.get("start") or datetime.min,
+        key=lambda item: item.get("start") or datetime.datetime.min,
         reverse=True,
     )
     return sessions[:limit]
@@ -188,7 +347,7 @@ def _find_associated_break_session(
     focus_session: CliSession,
 ) -> CliSession | None:
     focus_start = focus_session.get("start")
-    if not isinstance(focus_start, datetime):
+    if not isinstance(focus_start, datetime.datetime):
         return None
 
     focus_core = datetime_to_core_data(focus_start)
@@ -226,7 +385,6 @@ def _find_associated_break_session(
 
 
 def cmd_session_rename(args: argparse.Namespace) -> int:
-    """Rename most recent focus session."""
     session_source = FlowStudySessionSource()
     schedule_source = MarkdownScheduleSource()
     sessions = _load_recent_focus_sessions(
@@ -268,7 +426,6 @@ def cmd_session_rename(args: argparse.Namespace) -> int:
 
 
 def cmd_session_undo(args: argparse.Namespace) -> int:
-    """Delete most recent focus session and adjacent break."""
     session_source = FlowStudySessionSource()
     schedule_source = MarkdownScheduleSource()
     sessions = _load_recent_focus_sessions(
@@ -336,7 +493,6 @@ def _skip_enabled_state() -> bool | None:
         stdout,
     )
     if match is None:
-        # Missing entries default to enabled in launchd print-disabled output.
         return True
     return match.group(1) == "false"
 
@@ -368,8 +524,8 @@ def _apply_skip_state(state: str) -> int:
 
     if state != "toggle":
         raise ValueError(f"Unsupported skip state action: {state}")
-    target = not current
 
+    target = not current
     if not _set_skip_enabled(target):
         return 1
 
@@ -382,12 +538,10 @@ def _resolve_day_schedule(day: date) -> DayScheduleProfile:
     return MarkdownScheduleSource().resolve_day(day)
 
 
-def _is_within_study_window(now: datetime, day_schedule: DayScheduleProfile) -> bool:
-    """Return True when `now` falls within the schedule window by minute bucket.
-
-    Launchd triggers are minute-based and can fire a few seconds after the minute,
-    so this gate compares only hour+minute and includes the end minute.
-    """
+def _is_within_study_window(
+    now: datetime.datetime,
+    day_schedule: DayScheduleProfile,
+) -> bool:
     current_minutes = now.hour * 60 + now.minute
     start_minutes = day_schedule.study_start.hour * 60 + day_schedule.study_start.minute
     end_minutes = day_schedule.study_end.hour * 60 + day_schedule.study_end.minute
@@ -410,7 +564,6 @@ def _run_applescript(script: str) -> str | None:
 
 
 def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
-    """Return True when latest session row is an open focus session."""
     cur = conn.cursor()
     cur.execute(
         """
@@ -428,7 +581,6 @@ def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
 
 
 def cmd_session_skip(args: argparse.Namespace) -> int:
-    """Skip active focus session and start break within configured schedule windows."""
     if args.state is not None:
         return _apply_skip_state(args.state)
 
@@ -439,6 +591,7 @@ def cmd_session_skip(args: argparse.Namespace) -> int:
     if not enabled:
         logger.info("Skip no-op: automation disabled")
         return 0
+
     now = _now()
     try:
         day_schedule = _resolve_day_schedule(now.date())
@@ -493,44 +646,87 @@ def cmd_session_skip(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construct CLI parser and subcommands."""
-    parser = argparse.ArgumentParser(description="Study session CLI utilities")
+    parser = argparse.ArgumentParser()
     add_logging_cli_args(parser)
-    sub = parser.add_subparsers(dest="command", required=True)
+    domain = parser.add_subparsers(dest="domain", required=True)
 
-    rename = sub.add_parser("session-rename", help="Rename most recent focus session")
-    rename.add_argument("title")
-    rename.add_argument("--confirm", action="store_true")
-    rename.set_defaults(func=cmd_session_rename)
+    period = domain.add_parser("period", help="Run daily/period journal sync")
+    period_sub = period.add_subparsers(dest="period_command", required=True)
 
-    undo = sub.add_parser("session-undo", help="Delete most recent focus session")
-    undo.add_argument("--confirm", action="store_true")
-    undo.set_defaults(func=cmd_session_undo)
+    period_all = period_sub.add_parser(
+        "all", help="Run daily + all period sync commands"
+    )
+    period_all.set_defaults(func=cmd_period_all)
 
-    skip = sub.add_parser("session-skip", help="Execute or manage skip automation")
-    skip.add_argument(
+    period_daily = period_sub.add_parser("daily", help="Run daily sync")
+    period_daily.set_defaults(func=cmd_period_daily)
+
+    period_weekly = period_sub.add_parser("weekly", help="Run weekly sync")
+    period_weekly.add_argument("--date", help="Date within week (YYYY-MM-DD)")
+    period_weekly.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Skip cleanup of previous period",
+    )
+    period_weekly.set_defaults(func=cmd_period_weekly)
+
+    period_monthly = period_sub.add_parser("monthly", help="Run monthly sync")
+    period_monthly.add_argument("--month", help="Month (YYYY-MM)")
+    period_monthly.add_argument(
+        "--no-cleanup",
+        action="store_true",
+        help="Skip cleanup of previous period",
+    )
+    period_monthly.set_defaults(func=cmd_period_monthly)
+
+    period_quarterly = period_sub.add_parser("quarterly", help="Run quarterly sync")
+    period_quarterly.add_argument("--quarter", help="Quarter (YYYY-Qn)")
+    period_quarterly.set_defaults(func=cmd_period_quarterly)
+
+    period_yearly = period_sub.add_parser("yearly", help="Run yearly sync")
+    period_yearly.add_argument("--year", help="Year (YYYY)")
+    period_yearly.set_defaults(func=cmd_period_yearly)
+
+    session = domain.add_parser("session", help="Run Flow session operations")
+    session_sub = session.add_subparsers(dest="session_command", required=True)
+
+    session_rename = session_sub.add_parser(
+        "rename", help="Rename most recent focus session"
+    )
+    session_rename.add_argument("title")
+    session_rename.add_argument("--confirm", action="store_true")
+    session_rename.set_defaults(func=cmd_session_rename)
+
+    session_undo = session_sub.add_parser(
+        "undo", help="Delete most recent focus session"
+    )
+    session_undo.add_argument("--confirm", action="store_true")
+    session_undo.set_defaults(func=cmd_session_undo)
+
+    session_skip = session_sub.add_parser(
+        "skip", help="Execute or manage skip automation"
+    )
+    session_skip.add_argument(
         "--state",
         choices=["toggle", "status"],
         help="Manage launchd skip automation state",
     )
-    skip.set_defaults(func=cmd_session_skip)
+    session_skip.set_defaults(func=cmd_session_skip)
 
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entrypoint."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    _cap_log_file(SKIP_LOG_PATH, _log_cap_bytes())
     level, log_format = resolve_logging_settings(args)
     configure_logging(level=level, log_format=log_format)
 
     try:
         return int(args.func(args))
     except Exception:
-        logger.exception("CLI command failed: %s", args.command)
+        logger.exception("sync.run command failed")
         return 1
 
 

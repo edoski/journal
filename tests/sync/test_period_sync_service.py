@@ -103,10 +103,10 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
         ),
     )
 
-    cleanup_calls: list[tuple[bool, str, str, list[str]]] = []
+    cleanup_calls: list[tuple[bool, str, object | None]] = []
 
-    def _record_cleanup(*, enabled, previous_note_path, module_name, module_args):
-        cleanup_calls.append((enabled, previous_note_path, module_name, module_args))
+    def _record_cleanup(*, enabled, previous_note_path, rerun):
+        cleanup_calls.append((enabled, previous_note_path, rerun))
         return False
 
     monkeypatch.setattr(
@@ -114,17 +114,24 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
         _record_cleanup,
     )
 
-    service.sync_week(window, note_path, cleanup_previous=True)
+    def _cleanup_runner() -> None:
+        return None
+
+    service.sync_week(
+        window,
+        note_path,
+        cleanup_previous=True,
+        cleanup_previous_runner=_cleanup_runner,
+    )
 
     written = note_store.read(note_path)
     assert written is not None
     assert written[-1] == "week"
     assert goal_sync_service.week_calls == 1
     assert cleanup_calls
-    enabled, _prev_path, module_name, module_args = cleanup_calls[0]
+    enabled, _prev_path, rerun = cleanup_calls[0]
     assert enabled is True
-    assert module_name == "sync.periods.weekly"
-    assert module_args[-1] == "--no-cleanup"
+    assert callable(rerun)
     assert media_source.calls == [(window.start, window.end)]
 
 

@@ -6,7 +6,6 @@ import argparse
 import datetime
 import json
 import logging
-import os
 import sys
 from typing import Final
 
@@ -39,7 +38,7 @@ def _normalize_level(value: str) -> str:
     level = value.strip().upper()
     if level not in _LEVELS:
         raise ValueError(
-            f"Invalid JOURNAL_LOG_LEVEL '{value}'. Expected one of: "
+            f"Invalid log level '{value}'. Expected one of: "
             + ", ".join(sorted(_LEVELS))
         )
     return level
@@ -49,22 +48,18 @@ def _normalize_format(value: str) -> str:
     fmt = value.strip().lower()
     if fmt not in _FORMATS:
         raise ValueError(
-            f"Invalid JOURNAL_LOG_FORMAT '{value}'. Expected one of: "
+            f"Invalid log format '{value}'. Expected one of: "
             + ", ".join(sorted(_FORMATS))
         )
     return fmt
 
 
 def _resolve_level(level: str | None) -> str:
-    override = level if level is not None else os.environ.get("JOURNAL_LOG_LEVEL")
-    return _normalize_level(override or LOGGING.level)
+    return _normalize_level(level or LOGGING.level)
 
 
 def _resolve_format(log_format: str | None) -> str:
-    override = (
-        log_format if log_format is not None else os.environ.get("JOURNAL_LOG_FORMAT")
-    )
-    return _normalize_format(override or LOGGING.format)
+    return _normalize_format(log_format or LOGGING.format)
 
 
 def _map_logger_name(name: str) -> str:
@@ -121,12 +116,12 @@ def add_logging_cli_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--log-level",
         choices=sorted(_LEVELS),
-        help="Override log level (default from JOURNAL_LOG_LEVEL or INFO)",
+        help="Override log level (default INFO)",
     )
     parser.add_argument(
         "--log-format",
         choices=sorted(_FORMATS),
-        help="Override log format (default from JOURNAL_LOG_FORMAT or text)",
+        help="Override log format (default text)",
     )
 
 

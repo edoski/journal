@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 import pytest
 
-import sync.study.__main__ as cli
+import sync.run.__main__ as cli
 from sync.contracts.schedule import DayScheduleProfile
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
@@ -66,6 +66,202 @@ def _insert_session_row(
 def _print_disabled_output(disabled: bool) -> str:
     value = "true" if disabled else "false"
     return f'{{\n  "{cli.SKIP_LAUNCHD_LABEL}" => {value}\n}}'
+
+
+def _patch_common_daily_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "bootstrap_cache_layout", lambda: None)
+    monkeypatch.setattr(cli, "MarkdownNoteStore", lambda: object())
+    monkeypatch.setattr(cli, "MarkdownGoalStore", lambda: object())
+    monkeypatch.setattr(cli, "MarkdownReminderRuleStore", lambda: object())
+    monkeypatch.setattr(cli, "VaultContextSource", lambda: object())
+    monkeypatch.setattr(cli, "JsonGoalCarryForwardCacheStore", lambda: object())
+    monkeypatch.setattr(cli, "JsonGoalReconcileCacheStore", lambda: object())
+    monkeypatch.setattr(cli, "JsonDailyTrainingCacheStore", lambda: object())
+    monkeypatch.setattr(cli, "JsonDailyScreenTimeCacheStore", lambda: object())
+    monkeypatch.setattr(cli, "GoalSyncService", lambda **_kwargs: object())
+
+
+def test_run_daily_sync_non_today_days_first_then_today(monkeypatch):
+    anchor_day = date.today()
+    loaded_session_days: list[date] = []
+    resolved_schedule_days: list[date] = []
+    synced_days: list[tuple[date, list[dict[str, str]]]] = []
+
+    _patch_common_daily_runtime(monkeypatch)
+
+    class _FakeSessionSource:
+        def load_sessions(
+            self,
+            day: date,
+            day_schedule: DayScheduleProfile,
+        ) -> list[dict[str, str]]:
+            loaded_session_days.append(day)
+            assert day_schedule == _default_schedule()
+            return [{"source_day": day.isoformat()}]
+
+    class _FakeStatusSource:
+        def __init__(self, *, screen_time_cache_store) -> None:
+            _ = screen_time_cache_store
+
+        def target_days(self, run_anchor: date) -> tuple[date, ...]:
+            assert run_anchor == anchor_day
+            return (
+                run_anchor,
+                run_anchor - timedelta(days=1),
+                run_anchor - timedelta(days=2),
+            )
+
+    class _FakeDailySyncService:
+        def __init__(self, **kwargs) -> None:
+            _ = kwargs
+
+        def sync_day(
+            self,
+            day: date,
+            sessions: list[dict[str, str]],
+            day_schedule: DayScheduleProfile,
+        ):
+            assert day_schedule == _default_schedule()
+            synced_days.append((day, sessions))
+            return True
+
+    class _FakeScheduleSource:
+        def resolve_day(self, day: date) -> DayScheduleProfile:
+            resolved_schedule_days.append(day)
+            return _default_schedule()
+
+    monkeypatch.setattr(cli, "FlowStudySessionSource", lambda: _FakeSessionSource())
+    monkeypatch.setattr(cli, "ICloudDailyStatusSource", _FakeStatusSource)
+    monkeypatch.setattr(cli, "DailySyncService", _FakeDailySyncService)
+    monkeypatch.setattr(cli, "MarkdownScheduleSource", _FakeScheduleSource)
+
+    cli._run_daily_sync()
+
+    expected_days = [
+        anchor_day - timedelta(days=2),
+        anchor_day - timedelta(days=1),
+        anchor_day,
+    ]
+    assert loaded_session_days == expected_days
+    assert resolved_schedule_days == expected_days
+    assert [day for day, _sessions in synced_days] == expected_days
+
+
+def test_run_daily_sync_today_only_when_no_backfill_targets(monkeypatch):
+    anchor_day = date.today()
+    loaded_session_days: list[date] = []
+    resolved_schedule_days: list[date] = []
+    synced_days: list[date] = []
+
+    _patch_common_daily_runtime(monkeypatch)
+
+    class _FakeSessionSource:
+        def load_sessions(
+            self,
+            day: date,
+            day_schedule: DayScheduleProfile,
+        ) -> list[dict]:
+            loaded_session_days.append(day)
+            assert day_schedule == _default_schedule()
+            return []
+
+    class _FakeStatusSource:
+        def __init__(self, *, screen_time_cache_store) -> None:
+            _ = screen_time_cache_store
+
+        def target_days(self, run_anchor: date) -> tuple[date, ...]:
+            assert run_anchor == anchor_day
+            return (run_anchor,)
+
+    class _FakeDailySyncService:
+        def __init__(self, **kwargs) -> None:
+            _ = kwargs
+
+        def sync_day(
+            self,
+            day: date,
+            sessions: list[dict],
+            day_schedule: DayScheduleProfile,
+        ):
+            _ = sessions
+            assert day_schedule == _default_schedule()
+            synced_days.append(day)
+            return True
+
+    class _FakeScheduleSource:
+        def resolve_day(self, day: date) -> DayScheduleProfile:
+            resolved_schedule_days.append(day)
+            return _default_schedule()
+
+    monkeypatch.setattr(cli, "FlowStudySessionSource", lambda: _FakeSessionSource())
+    monkeypatch.setattr(cli, "ICloudDailyStatusSource", _FakeStatusSource)
+    monkeypatch.setattr(cli, "DailySyncService", _FakeDailySyncService)
+    monkeypatch.setattr(cli, "MarkdownScheduleSource", _FakeScheduleSource)
+
+    cli._run_daily_sync()
+
+    assert loaded_session_days == [anchor_day]
+    assert resolved_schedule_days == [anchor_day]
+    assert synced_days == [anchor_day]
+
+
+def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(cli, "_run_daily_sync", lambda: calls.append("daily"))
+    monkeypatch.setattr(
+        cli,
+        "_run_weekly_sync",
+        lambda *, date_arg, no_cleanup: calls.append(f"weekly:{date_arg}:{no_cleanup}"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_run_monthly_sync",
+        lambda *, month_arg, no_cleanup: calls.append(
+            f"monthly:{month_arg}:{no_cleanup}"
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_run_quarterly_sync",
+        lambda *, quarter_arg: calls.append(f"quarterly:{quarter_arg}"),
+    )
+    monkeypatch.setattr(
+        cli,
+        "_run_yearly_sync",
+        lambda *, year_arg: calls.append(f"yearly:{year_arg}"),
+    )
+
+    rc = cli.cmd_period_all(argparse.Namespace())
+
+    assert rc == 0
+    assert calls == [
+        "daily",
+        "weekly:None:False",
+        "monthly:None:False",
+        "quarterly:None",
+        "yearly:None",
+    ]
+
+
+def test_period_all_is_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def _boom_daily() -> None:
+        calls.append("daily")
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli, "_run_daily_sync", _boom_daily)
+    monkeypatch.setattr(
+        cli,
+        "_run_weekly_sync",
+        lambda *, date_arg, no_cleanup: calls.append("weekly"),
+    )
+
+    rc = cli.main(["period", "all"])
+
+    assert rc == 1
+    assert calls == ["daily"]
 
 
 def test_latest_row_is_open_flow_true_for_open_flow() -> None:
@@ -316,25 +512,40 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
 def test_cli_parser_has_expected_commands() -> None:
     parser = cli.build_parser()
 
-    args = parser.parse_args(["session-rename", "Retitle", "--confirm"])
-    assert args.command == "session-rename"
+    args = parser.parse_args(["session", "rename", "Retitle", "--confirm"])
+    assert args.domain == "session"
+    assert args.session_command == "rename"
     assert args.title == "Retitle"
     assert args.confirm is True
 
-    args = parser.parse_args(["session-undo", "--confirm"])
-    assert args.command == "session-undo"
+    args = parser.parse_args(["session", "undo", "--confirm"])
+    assert args.domain == "session"
+    assert args.session_command == "undo"
     assert args.confirm is True
 
-    args = parser.parse_args(["session-skip", "--state", "status"])
-    assert args.command == "session-skip"
+    args = parser.parse_args(["session", "skip", "--state", "status"])
+    assert args.domain == "session"
+    assert args.session_command == "skip"
     assert args.state == "status"
+
+    args = parser.parse_args(["period", "weekly", "--date", "2026-02-17"])
+    assert args.domain == "period"
+    assert args.period_command == "weekly"
+    assert args.date == "2026-02-17"
+
+    args = parser.parse_args(["period", "monthly", "--month", "2026-02"])
+    assert args.domain == "period"
+    assert args.period_command == "monthly"
+    assert args.month == "2026-02"
 
     with pytest.raises(SystemExit):
         parser.parse_args(["session-preview", "-n", "2"])
     with pytest.raises(SystemExit):
-        parser.parse_args(["session-skip", "--state", "on"])
+        parser.parse_args(["session", "skip", "--state", "on"])
     with pytest.raises(SystemExit):
-        parser.parse_args(["session-skip", "--state", "off"])
+        parser.parse_args(["session", "skip", "--state", "off"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["period", "weekly", "--file", "/tmp/test.md"])
 
 
 def test_cli_parser_accepts_global_logging_flags() -> None:
@@ -345,20 +556,11 @@ def test_cli_parser_accepts_global_logging_flags() -> None:
             "DEBUG",
             "--log-format",
             "json",
-            "session-skip",
-            "--state",
-            "status",
+            "period",
+            "all",
         ]
     )
     assert args.log_level == "DEBUG"
     assert args.log_format == "json"
-    assert args.command == "session-skip"
-
-
-def test_cap_log_file_truncates_large_file(tmp_path) -> None:
-    log_path = tmp_path / "com.edo.skip.log"
-    log_path.write_text("a" * 1024, encoding="utf-8")
-
-    cli._cap_log_file(log_path, 128)
-
-    assert log_path.stat().st_size <= 128
+    assert args.domain == "period"
+    assert args.period_command == "all"

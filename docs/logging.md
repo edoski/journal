@@ -9,22 +9,21 @@
 
 ## Runtime Controls
 
-- `JOURNAL_LOG_LEVEL` (default: `INFO`)
-- `JOURNAL_LOG_FORMAT` (default: `text`)
-- `JOURNAL_LOG_CAP_BYTES` (default: `262144`)
+- default level: `INFO`
+- default format: `text`
 
-CLI overrides are available on sync entrypoints and `sync.study`:
+CLI overrides are available on `sync.run`:
 
 - `--log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}`
 - `--log-format {text,json}`
 
 ## Log Growth Control
 
-- `sync.sh` caps launchd files:
+- Logs are written by launchd to:
   - `/tmp/com.edo.journal.out`
   - `/tmp/com.edo.journal.err`
-- `sync.study` caps `/tmp/com.edo.skip.log` on startup.
-- Cap size is controlled by `JOURNAL_LOG_CAP_BYTES`.
+  - `/tmp/com.edo.skip.log`
+- The application does not rotate or truncate these files.
 
 ## Logger Names
 

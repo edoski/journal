@@ -124,16 +124,18 @@ journal/
       runtime.py
       sections.py
       cleanup.py
-      weekly/                  # Package (composition root in __main__.py)
-      monthly/                 # Package (composition root in __main__.py)
-      quarterly/               # Package (composition root in __main__.py)
-      yearly/                  # Package (composition root in __main__.py)
+      weekly/                  # Package
+      monthly/                 # Package
+      quarterly/               # Package
+      yearly/                  # Package
+
+    run/
+      __main__.py              # Unified runtime composition root
 
   tests/
     sync/
     fixtures/
 
-  sync.sh
   AGENTS.md
 ```
 
@@ -146,12 +148,7 @@ journal/
 - `adapters`: concrete implementations of ports.
 - `application`: orchestration only; depends on `ports` + `contracts`, never on adapter internals.
 - composition roots wire implementations:
-  - `sync/daily/__main__.py`
-  - `sync/study/__main__.py`
-  - `sync/periods/weekly/__main__.py`
-  - `sync/periods/monthly/__main__.py`
-  - `sync/periods/quarterly/__main__.py`
-  - `sync/periods/yearly/__main__.py`
+  - `sync/run/__main__.py`
 
 ### Dependency constraints
 
@@ -240,20 +237,20 @@ source .venv/bin/activate
 ### Sync entrypoints
 
 ```bash
-./sync.sh
-python -m sync.daily
-python -m sync.periods.weekly [--date YYYY-MM-DD]
-python -m sync.periods.monthly [--month YYYY-MM]
-python -m sync.periods.quarterly [--quarter YYYY-Q#]
-python -m sync.periods.yearly [--year YYYY]
+python -m sync.run period all
+python -m sync.run period daily
+python -m sync.run period weekly [--date YYYY-MM-DD] [--no-cleanup]
+python -m sync.run period monthly [--month YYYY-MM] [--no-cleanup]
+python -m sync.run period quarterly [--quarter YYYY-Q#]
+python -m sync.run period yearly [--year YYYY]
 ```
 
 ### Study CLI
 
 ```bash
-python3 -m sync.study session-rename "Title" [--confirm]
-python3 -m sync.study session-undo [--confirm]
-python3 -m sync.study session-skip [--state toggle|status]
+python3 -m sync.run session rename "Title" [--confirm]
+python3 -m sync.run session undo [--confirm]
+python3 -m sync.run session skip [--state toggle|status]
 ```
 
 ## Quality Gate
@@ -340,30 +337,27 @@ Primary env overrides:
 - `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
-- `JOURNAL_LOG_LEVEL`, `JOURNAL_LOG_FORMAT`, `JOURNAL_LOG_CAP_BYTES`
 
 ## Runtime Configuration
 
 Path resolution precedence:
 
-1. `EnvironmentVariables` in LaunchAgent plists (canonical for scheduled runs).
-2. Process env vars from the invoking shell (interactive terminal runs).
-3. Defaults in `sync/config.py` (home/vault-derived fallbacks).
+1. Process env vars from the invoking shell (interactive terminal runs).
+2. Defaults in `sync/config.py` (home/vault-derived fallbacks).
 
 Operational guidance:
 
-- Keep scheduled-job env vars in `~/Library/LaunchAgents/com.edo.journalsync.plist` and `~/Library/LaunchAgents/com.edo.skip.plist`.
+- Keep LaunchAgents minimal and route scheduled jobs through `python -m sync.run`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
-- `sync.study session-skip` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
+- `sync.run session skip` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
 - Logging is stderr-only; no app-level log file sink is used.
-- Keep `/tmp` launchd logs bounded with `JOURNAL_LOG_CAP_BYTES` (default `262144` bytes).
+- Launchd writes logs to `/tmp` and the application does not truncate them.
 
 Move checklist (repo relocation):
 
 - Move repo to new location and recreate `.venv` in the new root.
 - Update both LaunchAgent `ProgramArguments`/`WorkingDirectory` paths.
-- Confirm `EnvironmentVariables` in both LaunchAgents still point to valid external resources.
 - Reload both LaunchAgents with `launchctl unload/load`.
 
 ## Data and Cache Files
