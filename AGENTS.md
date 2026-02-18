@@ -162,6 +162,7 @@ journal/
 - Charts are rendered only via `sync/writers/charts/api.py::render_chart(spec)`.
 - Markdown tables are rendered only via `sync/writers/tables/api.py::render_table(spec)`.
 - Markdown table parsing/row escaping is centralized in `sync/notes/markdown_tables.py`.
+- Chart/table specs should expose one canonical field type per value slot; normalize richer domain payloads at call sites instead of widening spec fields with unions.
 - Do not reintroduce legacy one-off chart/table helpers or compatibility shims.
 
 ## Canonical Services and Interfaces
@@ -276,12 +277,18 @@ deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox,mu
 python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report= --cov-fail-under=78"
 ```
 
-Optional extended gate (security + mutation):
+Extended strict gate (security + mutation):
 
 ```bash
 source .venv/bin/activate
 tox -e extended
 ```
+
+`tox -e extended` is mutation-strict. It fails when `mutmut results` reports any
+non-killed status (`survived`, `no tests`, `timeout`, or other non-killed
+states).
+`extended` runs `mutmut` with `--max-children 1` to reduce false timeout noise
+from parallel worker contention.
 
 Literal everything gate (check + extended):
 
@@ -324,6 +331,9 @@ Validate:
 - goal reconciliation: source/mirror reopen+completion behavior remains correct.
 - parsing edge cases: open sessions, malformed shortcut payloads, missing files.
 - period historical flags (`--date`, `--month`, `--quarter`, `--year`).
+- architecture-layer test taxonomy under `tests/sync/`:
+  - `architecture/`, `adapters/`, `application/`, `readers/`, `writers/`,
+    `domain/`, `integration/`, `snapshots/`
 
 ## Configuration and Paths
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import re
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal
 
 from sync.contracts.schedule import DayScheduleProfile, Weekday
 from sync.io import safe_read_file
@@ -21,6 +21,7 @@ _TABLE_HEADERS = (
 )
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _WEEKDAYS: tuple[Weekday, ...] = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+_WEEKDAY_TOKENS: dict[str, Weekday] = {day: day for day in _WEEKDAYS}
 _WEEKDAY_BY_INDEX: dict[int, Weekday] = {idx: day for idx, day in enumerate(_WEEKDAYS)}
 
 
@@ -135,18 +136,19 @@ def _parse_rule(
             )
         tokens = [token.strip() for token in raw_tokens.split(",")]
         weekdays: list[Weekday] = []
-        seen: set[str] = set()
+        seen: set[Weekday] = set()
         for token in tokens:
-            if token not in _WEEKDAYS:
+            weekday = _WEEKDAY_TOKENS.get(token)
+            if weekday is None:
                 raise ValueError(
                     f"PROTOCOL.md line {line_no}: invalid WEEKDAY token {token!r}"
                 )
-            if token in seen:
+            if weekday in seen:
                 raise ValueError(
                     f"PROTOCOL.md line {line_no}: duplicate WEEKDAY token {token!r}"
                 )
-            weekdays.append(cast(Weekday, token))
-            seen.add(token)
+            weekdays.append(weekday)
+            seen.add(weekday)
         return "weekday", tuple(weekdays)
 
     if value.startswith("DATE:"):
@@ -193,17 +195,14 @@ def load_schedule_rules(path: str) -> ScheduleRules:
     weekday_overrides: dict[Weekday, _ScheduleOverride] = {}
     date_overrides: dict[datetime.date, _ScheduleOverride] = {}
 
-    row_count = 0
+    first_rule_row_index: int | None = None
     for idx in range(divider_idx + 1, len(lines)):
         raw_line = lines[idx].strip()
-        if not raw_line:
-            break
-        if raw_line.startswith("## "):
-            break
-        if not raw_line.startswith("|"):
+        if not raw_line or not raw_line.startswith("|"):
             break
 
-        row_count += 1
+        if first_rule_row_index is None:
+            first_rule_row_index = idx
         cells = split_markdown_row(lines[idx])
         if cells is None:
             raise ValueError(f"PROTOCOL.md line {idx + 1}: invalid markdown table row")
@@ -281,8 +280,8 @@ def load_schedule_rules(path: str) -> ScheduleRules:
             )
 
         if kind == "weekday":
-            weekdays = cast(tuple[Weekday, ...], selector)
-            for weekday in weekdays:
+            assert isinstance(selector, tuple)
+            for weekday in selector:
                 if weekday in weekday_overrides:
                     raise ValueError(
                         f"PROTOCOL.md line {idx + 1}: duplicate WEEKDAY selector {weekday!r}"
@@ -290,14 +289,15 @@ def load_schedule_rules(path: str) -> ScheduleRules:
                 weekday_overrides[weekday] = override
             continue
 
-        date_value = cast(datetime.date, selector)
+        assert isinstance(selector, datetime.date)
+        date_value = selector
         if date_value in date_overrides:
             raise ValueError(
                 f"PROTOCOL.md line {idx + 1}: duplicate DATE selector {date_value.isoformat()!r}"
             )
         date_overrides[date_value] = override
 
-    if row_count == 0:
+    if first_rule_row_index is None:
         raise ValueError("## SCHEDULE table must contain at least one rule row")
     if default_profile is None:
         raise ValueError("## SCHEDULE table must define one DEFAULT row")

@@ -13,7 +13,6 @@ import glob
 import json
 import os
 import time
-from typing import Any
 
 from sync.log import get_logger
 
@@ -27,7 +26,7 @@ logger = get_logger(__name__)
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
 
 
-def read_status_file(filename: str) -> tuple[bool, Any | None, str | None]:
+def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
     """
     Read and JSON-parse a status file dropped in iCloud by Shortcuts.
 
@@ -47,7 +46,7 @@ def read_status_file(filename: str) -> tuple[bool, Any | None, str | None]:
     """
     path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
 
-    def try_parse(target_path: str) -> tuple[bool, Any | None, Exception | None]:
+    def try_parse(target_path: str) -> tuple[bool, object | None, Exception | None]:
         last_size: int | None = None
         stable_count = 0
         max_attempts = 60

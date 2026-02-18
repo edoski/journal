@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
 
 from sync.log import get_logger
 
@@ -69,7 +68,7 @@ def atomic_write_note(path: str, lines: list[str]) -> None:
     os.replace(tmp_path, path)
 
 
-def safe_load_json(path: str, default: Any = None) -> Any:
+def safe_load_json(path: str, default: object = None) -> object:
     """
     Load JSON from a file with graceful error handling.
 
@@ -93,7 +92,7 @@ def safe_load_json(path: str, default: Any = None) -> Any:
         return default
 
 
-def safe_save_json(path: str, data: Any, indent: int = 2) -> bool:
+def safe_save_json(path: str, data: object, indent: int = 2) -> bool:
     """
     Save data as JSON with makedirs and error handling.
 
@@ -119,7 +118,7 @@ def safe_load_dated_cache(
     path: str,
     date_str: str,
     entries_type: type = list,
-) -> Any:
+) -> object:
     """
     Load a date-validated cache file.
 

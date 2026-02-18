@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import datetime
 
+from sync.contracts.metrics import DailyAggregate
 from sync.constants import DAYS
 from sync.dates import daterange
 from sync.formatting import format_minutes
 
 from ..layout import render_simple_grid_table
 from ..specs import ScreenTrendMode, ScreenTrendTableSpec
+
+
+def _screen_totals(data: DailyAggregate | None) -> dict[str, float]:
+    if data is None:
+        return {}
+    return data["screen_time_totals"]
 
 
 def _daily_rows(spec: ScreenTrendTableSpec) -> list[list[str]]:
@@ -26,9 +33,7 @@ def _daily_rows(spec: ScreenTrendTableSpec) -> list[list[str]]:
             day_name = day.strftime("%a").upper()
 
         label = f"**[[{day.isoformat()}\\|{day_name}]]**"
-        data = daily_data.get(day)
-        screen_time = data.get("screen_time_totals", {}) if data is not None else {}
-        day_total = sum(screen_time.values()) if screen_time else 0
+        day_total = sum(_screen_totals(daily_data.get(day)).values())
 
         if day > today:
             duration_str = "—"
@@ -68,9 +73,7 @@ def _period_rows(spec: ScreenTrendTableSpec) -> list[list[str]]:
 
         period_total = 0.0
         for day in daterange(start, end):
-            data = daily_data.get(day)
-            screen_time = data.get("screen_time_totals", {}) if data is not None else {}
-            period_total += sum(screen_time.values()) if screen_time else 0
+            period_total += sum(_screen_totals(daily_data.get(day)).values())
 
         if start > today:
             duration_str = "—"

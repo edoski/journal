@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, TypeAlias, TypedDict
+from typing import Literal, TypeAlias, TypedDict
 
 GoalHorizon: TypeAlias = Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
 GoalIdsByPeriod: TypeAlias = dict[str, list[str]]
@@ -62,7 +62,7 @@ class DailyTrainingCacheEntry(TypedDict):
     """Per-day training cache payload."""
 
     date: str
-    entries: list[dict[str, Any]]
+    entries: list[DailyTrainingCacheRow]
 
 
 class DailyScreenTimeCacheEntry(TypedDict):
@@ -70,3 +70,14 @@ class DailyScreenTimeCacheEntry(TypedDict):
 
     date: str
     entries: dict[str, float]
+
+
+class DailyTrainingCacheRow(TypedDict):
+    """Canonical row stored in per-day training cache."""
+
+    start: str | None
+    end: str | None
+    time_raw: str
+    activity: str
+    duration: str
+    interrupt: float | str

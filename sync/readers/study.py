@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from sync.constants import STUDY_SECTION_HEADER
 from sync.models import StudySession
 from .common import extract_block, parse_duration_to_minutes
 
@@ -18,13 +19,20 @@ _NON_CANONICAL_STUDY_PREFIX_RE = re.compile(
 )
 
 
+def _strip_backticks(value: str) -> str:
+    text = value.strip()
+    if len(text) >= 2 and text[0] == "`" and text[-1] == "`":
+        return text[1:-1]
+    return text
+
+
 def parse_study_table(lines: list[str]) -> list[StudySession]:
     """Parse the canonical STUDY table from daily note lines."""
-    block = extract_block(lines, "### **STUDY**")
+    block = extract_block(lines, STUDY_SECTION_HEADER)
     if not block:
         return []
 
-    header_idx = -1
+    header_idx: int | None = None
     for i, line in enumerate(block):
         stripped = line.strip()
         if _CANONICAL_STUDY_HEADER_RE.match(stripped):
@@ -36,14 +44,14 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
                 "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |'"
             )
 
-    if header_idx == -1:
+    if header_idx is None:
         return []
 
     sessions: list[StudySession] = []
     for line in block[header_idx + 2 :]:
         if not line.strip().startswith("|"):
             break
-        if re.search(r"no study sessions", line, re.IGNORECASE):
+        if "no study sessions" in line.lower():
             continue
 
         parts = [p.strip() for p in line.split("|")]
@@ -53,7 +61,7 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
                 "INTERRUPT/BREAK/CONTEXT/NOTES columns"
             )
 
-        time_raw = parts[1].strip("`").strip()
+        time_raw = _strip_backticks(parts[1])
         start_time = ""
         end_time: str | None = None
         time_match = re.match(r"^(\d{2}:\d{2})(?:\s*-\s*(\d{2}:\d{2}))?$", time_raw)
@@ -61,11 +69,11 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
             start_time = time_match.group(1)
             end_time = time_match.group(2)
 
-        activity = parts[2].strip("`")
+        activity = _strip_backticks(parts[2])
         duration_min = parse_duration_to_minutes(parts[3]) or 0.0
 
         interrupt_min = 0.0
-        interrupt_str = parts[4].strip("`").strip()
+        interrupt_str = _strip_backticks(parts[4])
         interrupt_match = re.search(r"\+(\d+)m", interrupt_str)
         if interrupt_match:
             interrupt_min = float(interrupt_match.group(1))
@@ -75,8 +83,9 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
             minutes = float(interrupt_match_h.group(2) or 0)
             interrupt_min = hours * 60 + minutes
 
-        break_str = parts[5].strip("`").strip()
-        break_min = parse_duration_to_minutes(break_str.split("(", 1)[0].strip()) or 0.0
+        break_str = _strip_backticks(parts[5])
+        break_base, _, _ = break_str.partition("(")
+        break_min = parse_duration_to_minutes(break_base.strip()) or 0.0
         overrun_min = 0.0
         overrun_match = re.search(r"\(\+([^)]+)\)", break_str)
         if overrun_match:

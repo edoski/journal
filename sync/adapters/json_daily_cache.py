@@ -6,9 +6,10 @@ import datetime
 import json
 import os
 from collections.abc import Iterator
-from typing import Any
+from typing import cast
 
 from sync.constants import SCREEN_TIME_CACHE_DIR, STATE_LOCK_DIR, TRAINING_CACHE_DIR
+from sync.contracts.cache import DailyTrainingCacheRow
 from sync.notes.locking import locked_path
 from sync.ports.cache import DailyScreenTimeCacheStore, DailyTrainingCacheStore
 
@@ -19,17 +20,17 @@ def _schema_error(path: str, detail: str) -> ValueError:
     )
 
 
-def _load_json_or_none(path: str) -> Any | None:
+def _load_json_or_none(path: str) -> object | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
+            return cast(object, json.load(handle))
     except FileNotFoundError:
         return None
     except json.JSONDecodeError as exc:
         raise _schema_error(path, f"invalid JSON ({exc})") from exc
 
 
-def _atomic_write_json(path: str, payload: Any) -> None:
+def _atomic_write_json(path: str, payload: object) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as handle:
@@ -67,9 +68,69 @@ def _prune_old_files(cache_dir: str, keep_days: int) -> None:
                 pass
 
 
+def _validate_training_entry(
+    raw: object,
+    *,
+    path: str,
+    index: int,
+) -> DailyTrainingCacheRow:
+    if not isinstance(raw, dict):
+        raise _schema_error(path, f"entries[{index}] must be an object")
+
+    required_keys = {"start", "end", "time_raw", "activity", "duration", "interrupt"}
+    if set(raw) != required_keys:
+        raise _schema_error(
+            path, f"entries[{index}] must contain {sorted(required_keys)}"
+        )
+
+    start = raw.get("start")
+    if start is not None and not isinstance(start, str):
+        raise _schema_error(path, f"entries[{index}].start must be a string or null")
+
+    end = raw.get("end")
+    if end is not None and not isinstance(end, str):
+        raise _schema_error(path, f"entries[{index}].end must be a string or null")
+
+    time_raw = raw.get("time_raw")
+    if not isinstance(time_raw, str):
+        raise _schema_error(path, f"entries[{index}].time_raw must be a string")
+
+    activity = raw.get("activity")
+    if not isinstance(activity, str):
+        raise _schema_error(path, f"entries[{index}].activity must be a string")
+
+    duration = raw.get("duration")
+    if not isinstance(duration, str):
+        raise _schema_error(path, f"entries[{index}].duration must be a string")
+
+    interrupt_raw = raw.get("interrupt")
+    interrupt: float | str
+    if isinstance(interrupt_raw, (int, float)):
+        interrupt = float(interrupt_raw)
+    elif isinstance(interrupt_raw, str):
+        interrupt = interrupt_raw
+    else:
+        raise _schema_error(
+            path,
+            f"entries[{index}].interrupt must be numeric or a string",
+        )
+
+    return {
+        "start": start,
+        "end": end,
+        "time_raw": time_raw,
+        "activity": activity,
+        "duration": duration,
+        "interrupt": interrupt,
+    }
+
+
 def _validate_training_payload(
-    raw: Any, *, path: str, date_str: str
-) -> list[dict[str, Any]]:
+    raw: object,
+    *,
+    path: str,
+    date_str: str,
+) -> list[DailyTrainingCacheRow]:
     if not isinstance(raw, dict):
         raise _schema_error(path, "root payload must be an object")
     if set(raw) != {"date", "entries"}:
@@ -82,17 +143,15 @@ def _validate_training_payload(
     if not isinstance(entries, list):
         raise _schema_error(path, "entries must be a list")
 
-    typed_entries: list[dict[str, Any]] = []
+    typed_entries: list[DailyTrainingCacheRow] = []
     for index, entry in enumerate(entries):
-        if not isinstance(entry, dict):
-            raise _schema_error(path, f"entries[{index}] must be an object")
-        typed_entries.append(entry)
+        typed_entries.append(_validate_training_entry(entry, path=path, index=index))
 
     return typed_entries
 
 
 def _validate_screen_time_payload(
-    raw: Any,
+    raw: object,
     *,
     path: str,
     date_str: str,
@@ -132,7 +191,7 @@ class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
         self.cache_dir = cache_dir or TRAINING_CACHE_DIR
         self.lock_root = lock_root or STATE_LOCK_DIR
 
-    def load_for_date(self, date_str: str) -> list[dict[str, Any]]:
+    def load_for_date(self, date_str: str) -> list[DailyTrainingCacheRow]:
         path = _path_for_date(self.cache_dir, date_str)
         with locked_path(path, lock_root=self.lock_root):
             raw = _load_json_or_none(path)
@@ -140,7 +199,9 @@ class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
             return []
         return _validate_training_payload(raw, path=path, date_str=date_str)
 
-    def save_for_date(self, date_str: str, entries: list[dict[str, Any]]) -> None:
+    def save_for_date(
+        self, date_str: str, entries: list[DailyTrainingCacheRow]
+    ) -> None:
         path = _path_for_date(self.cache_dir, date_str)
         payload = {"date": date_str, "entries": entries}
         _validate_training_payload(payload, path=path, date_str=date_str)

@@ -5,10 +5,12 @@ Shared section assembly helpers for weekly/monthly/quarterly/yearly notes.
 from __future__ import annotations
 
 import datetime
+from typing import cast
 
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import (
     DailyAggregate,
+    MetricValue,
     MovingAverageAggregate,
     PeriodAggregate,
 )
@@ -41,11 +43,18 @@ def append_summary_section(
     total_days: int,
 ) -> None:
     """Render and append the SUMMARY section."""
-    ma_metrics_map = dict(ma_metrics) if ma_metrics is not None else None
+    current_metrics_map = cast(dict[str, MetricValue], dict(current_metrics))
+    previous_metrics_map = cast(dict[str, MetricValue], dict(prev_metrics))
+    ma_metrics_map = (
+        cast(dict[str, MetricValue], dict(ma_metrics))
+        if ma_metrics is not None
+        else None
+    )
+
     summary_lines = render_table(
         SummaryMetricsTableSpec(
-            current_metrics=dict(current_metrics),
-            previous_metrics=dict(prev_metrics),
+            current_metrics=current_metrics_map,
+            previous_metrics=previous_metrics_map,
             current_label=current_label,
             previous_label=prev_label,
             ma_metrics=ma_metrics_map,

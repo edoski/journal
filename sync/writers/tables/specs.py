@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Sequence
+from typing import Sequence
 
-from sync.contracts.metrics import DailyAggregate
+from sync.contracts.metrics import (
+    DailyAggregate,
+    MetricValue,
+)
 from sync.contracts.targets import PeriodType
+from sync.models.deviation import DailyDeviationData
+from sync.models.screen_time import DailyScreenTimeData
 
 
 class TableKind(str, Enum):
@@ -34,11 +40,11 @@ class SimpleGridTableSpec:
 class SummaryMetricsTableSpec:
     """Spec for period summary metrics table section."""
 
-    current_metrics: dict[str, Any]
-    previous_metrics: dict[str, Any]
+    current_metrics: Mapping[str, MetricValue]
+    previous_metrics: Mapping[str, MetricValue]
     current_label: str
     previous_label: str
-    ma_metrics: dict[str, Any] | None = None
+    ma_metrics: Mapping[str, MetricValue] | None = None
     ma_label: str | None = None
     ma_training_unit: str = "7"
     period_type: PeriodType = "week"
@@ -72,8 +78,8 @@ class ScreenTrendTableSpec:
 class DailyProcrastinationTableSpec:
     """Spec for daily procrastination section markdown table."""
 
-    screen_time_data: Any | None
-    deviation_data: Any | None = None
+    screen_time_data: DailyScreenTimeData | None
+    deviation_data: DailyDeviationData | None = None
     include_section_title: bool = True
     kind: TableKind = TableKind.DAILY_PROCRASTINATION
 

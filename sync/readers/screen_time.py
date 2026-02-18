@@ -8,6 +8,11 @@ from __future__ import annotations
 
 import re
 
+from sync.constants import (
+    NO_SCREEN_TIME_TOKEN,
+    PROCRASTINATION_SECTION_HEADER,
+    PROCRASTINATION_TABLE_HEADER_RE,
+)
 from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from .common import extract_block, parse_duration_to_minutes
 
@@ -22,18 +27,21 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
     Returns:
         DailyScreenTimeData or None if no PROCRASTINATION section
     """
-    block = extract_block(lines, "### **PROCRASTINATION**")
+    block = extract_block(lines, PROCRASTINATION_SECTION_HEADER)
     if not block:
         return None
 
     # Find table header
-    header_idx = -1
-    for i, line in enumerate(block):
-        if re.search(r"\|\s*SOURCE\s*\|\s*DURATION\s*\|", line, re.IGNORECASE):
-            header_idx = i
-            break
+    header_idx = next(
+        (
+            i
+            for i, line in enumerate(block)
+            if re.search(PROCRASTINATION_TABLE_HEADER_RE, line, re.IGNORECASE)
+        ),
+        None,
+    )
 
-    if header_idx == -1:
+    if header_idx is None:
         return None
 
     entries: list[ScreenTimeEntry] = []
@@ -53,10 +61,11 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
             continue
 
         # Skip "no screen time" message rows
-        if "no screen time" in source.lower():
+        source_lower = source.lower()
+        if NO_SCREEN_TIME_TOKEN in source_lower:
             continue
 
-        minutes = parse_duration_to_minutes(duration_raw, default=0.0) or 0.0
+        minutes = parse_duration_to_minutes(duration_raw) or 0.0
         if minutes > 0:
             entries.append(ScreenTimeEntry(app=source, minutes=minutes))
 

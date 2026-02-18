@@ -1,0 +1,553 @@
+"""
+Characterization tests for daily parser behavior.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from sync.readers.daily import (
+    _parse_optional_mood,
+    _parse_training_table_rows,
+    parse_daily_note,
+)
+from sync.readers.study import parse_study_table
+
+
+def _write_note(tmp_path, lines: list[str], name: str = "2025-01-15.md") -> str:
+    path = tmp_path / name
+    path.write_text("\n".join(lines) + "\n")
+    return str(path)
+
+
+def test_parse_daily_note_characterization(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h15m",
+            "mood: 7.5",
+            "workout: true",
+            "stretch: false",
+            "meditate: true",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 - 11:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` | [[code.md]] | – |",
+            "| 14:00 - 15:30 | `reading` | `1h30m` | `+1h30m` | `10m (+1h)` | [[read.md]] | – |",
+            "",
+            "### **SLEEP**",
+            "",
+            "| TIME | DURATION | AWAKE | AWAKENINGS |",
+            "| ---- | -------- | ----- | ---------- |",
+            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 07:30-08:30 | `1h00m` | `5m` | `1` |",
+            "",
+            "### **PROCRASTINATION**",
+            "",
+            "| SOURCE | DURATION |",
+            "| ------ | -------- |",
+            "| YouTube | `1h30m` |",
+            "| X | `30m` |",
+            "| **TOTAL** | `2h00m` |",
+            "",
+        ],
+    )
+
+    parsed = parse_daily_note(note_path)
+
+    assert parsed == {
+        "study_minutes": 210.0,
+        "sleep_minutes": 435.0,  # frontmatter overrides sleep table sum
+        "mood": 7.5,
+        "workout": True,
+        "stretch": False,
+        "meditate": True,
+        "awake_minutes": 25.0,
+        "awakenings": 3,
+        "activity_totals": {"coding": 120.0, "reading": 90.0},
+        "interrupt_minutes": 100.0,
+        "overrun_minutes": 65,
+        "planned_break_minutes": 25,
+        "training_type_minutes": {},
+        "training_type_sessions": {},
+        "screen_time_totals": {"YouTube": 90.0, "X": 30.0},
+    }
+
+
+def test_parse_study_table_interrupt_hour_format_characterization():
+    sessions = parse_study_table(
+        [
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 | `coding` | `1h00m` | `+1h30m` | `5m` | – | – |",
+            "",
+        ]
+    )
+
+    assert len(sessions) == 1
+    assert sessions[0].activity == "coding"
+    assert sessions[0].duration_minutes == 60.0
+    assert sessions[0].interrupt_minutes == 90.0
+    assert sessions[0].overrun_minutes == 0
+    assert sessions[0].break_minutes == 5
+
+
+def test_parse_study_table_rejects_non_canonical_header():
+    with pytest.raises(ValueError, match="Non-canonical STUDY table header"):
+        parse_study_table(
+            [
+                "### **STUDY**",
+                "",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| ---- | -------- | -------- | --------- | ----- | ----- |",
+                "| 09:00 | `coding` | `1h00m` | `+00m` | `5m` | note |",
+                "",
+            ]
+        )
+
+
+def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h",
+            "mood: 7",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ----- |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `5m` | note |",
+            "",
+        ],
+        name="2025-12-23.md",
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        parse_daily_note(note_path)
+
+    message = str(excinfo.value)
+    assert f"Invalid daily note schema in {note_path}:" in message
+    assert "Non-canonical STUDY table header" in message
+
+
+def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
+    missing = tmp_path / "missing.md"
+    assert parse_daily_note(str(missing)) is None
+
+
+def test_parse_daily_note_leaves_mood_none_when_frontmatter_mood_missing(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h00m",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+        ],
+    )
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["mood"] is None
+
+
+def test_parse_optional_mood_characterization():
+    assert _parse_optional_mood(None) is None
+    assert _parse_optional_mood("7.5") == 7.5
+    assert _parse_optional_mood("mood: 7.5") == 7.5
+    assert _parse_optional_mood("N/A") is None
+    assert _parse_optional_mood("--7") is None
+
+
+def test_parse_daily_note_training_type_aggregates(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h",
+            "mood: 7.0",
+            "workout: true",
+            "stretch: true",
+            "meditate: true",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **TRAINING**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+00m` |",
+            "| `18:00 - 18:30` | Stretching | `30m` | `+00m` |",
+            "| `21:00 - 21:15` | Meditation | `15m` | `+00m` |",
+            "| `22:00 - 22:00` | Traditional Strength Training | `` | `+00m` |",
+            "",
+        ],
+    )
+
+    parsed = parse_daily_note(note_path)
+
+    assert parsed is not None
+    assert parsed["training_type_minutes"] == {
+        "Traditional Strength Training": 60.0,
+        "Stretching": 30.0,
+        "Meditation": 15.0,
+    }
+    assert parsed["training_type_sessions"] == {
+        "Traditional Strength Training": 1,
+        "Stretching": 1,
+        "Meditation": 1,
+    }
+    assert parsed["workout"] is True
+    assert parsed["stretch"] is True
+    assert parsed["meditate"] is True
+
+
+def test_parse_training_table_rows_handles_edge_cases():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 08:00` | Lift | `1h00m` | `+00m` |",
+            "| no training sessions |",
+            "| malformed | row |",
+            "| `08:00 - 08:30` | Lift | `` | `+00m` |",
+            "not a table row",
+            "| `09:00 - 09:30` | Run | `30m` | `+00m` |",
+        ]
+    )
+
+    assert rows == [("Lift", 60.0)]
+
+
+def test_parse_training_table_rows_returns_empty_when_header_missing():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "",
+            "| SOMETHING | ELSE |",
+            "| --------- | ---- |",
+            "| a | b |",
+        ]
+    )
+    assert rows == []
+
+
+def test_parse_training_table_rows_header_missing_without_blank_still_empty():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| APP | TIME |",
+            "| --- | ---- |",
+            "| Lift | `1h00m` |",
+        ]
+    )
+    assert rows == []
+
+
+def test_parse_training_table_rows_header_missing_no_blank_with_full_columns():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| APP | TIME |",
+            "| --- | ---- |",
+            "| 07:00 | Lift | `1h00m` | `+00m` |",
+        ]
+    )
+    assert rows == []
+
+
+def test_parse_training_table_rows_skips_no_training_message_case_insensitively():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| NO TRAINING SESSIONS |",
+            "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
+        ]
+    )
+    assert rows == [("Lift", 1.0)]
+
+
+def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_is_valid():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| 00:00 - 00:01 | no training sessions | 1m | +00m |",
+            "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
+        ]
+    )
+    assert rows == [("Lift", 1.0)]
+
+
+def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 08:00` | `XLiftX` | `1h00m` | `+00m` |",
+        ]
+    )
+    assert rows == [("XLiftX", 60.0)]
+
+
+def test_parse_training_table_rows_header_match_is_case_insensitive():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| time | activity | duration | interrupt |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 07:10` | Lift | `10m` | `+00m` |",
+        ]
+    )
+    assert rows == [("Lift", 10.0)]
+
+
+def test_parse_training_table_rows_short_row_does_not_break_following_rows():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| short | row |",
+            "| `07:00 - 07:05` | Lift | `5m` | `+00m` |",
+        ]
+    )
+    assert rows == [("Lift", 5.0)]
+
+
+def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
+    rows = _parse_training_table_rows(
+        [
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 07:01` | Lift | `1m` | `+00m`",
+        ]
+    )
+    assert rows == [("Lift", 1.0)]
+
+
+def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "mood: 8.0",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **SLEEP**",
+            "",
+            "| TIME | DURATION | AWAKE | AWAKENINGS |",
+            "| ---- | -------- | ----- | ---------- |",
+            "| 23:00-07:00 | `8h00m` | `15m` | `1` |",
+            "| 08:00-09:00 | `1h00m` | `` | `` |",
+        ],
+    )
+
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["sleep_minutes"] == 540.0
+    assert parsed["awake_minutes"] == 15.0
+    assert parsed["awakenings"] == 1
+
+
+def test_parse_daily_note_mood_invalid_and_sleep_absent_defaults(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "mood: not-a-number",
+            "workout: no",
+            "stretch: yes",
+            "meditate: true",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `0m` | – | – |",
+        ],
+        name="2025-03-01.md",
+    )
+
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["mood"] is None
+    assert parsed["sleep_minutes"] == 0
+    assert parsed["awake_minutes"] is None
+    assert parsed["awakenings"] is None
+    assert parsed["workout"] is False
+    assert parsed["stretch"] is False
+    assert parsed["meditate"] is True
+
+
+def test_parse_daily_note_ignores_empty_procrastination_rows(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h00m",
+            "mood: 7.0",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **PROCRASTINATION**",
+            "",
+            "| SOURCE | DURATION |",
+            "| ------ | -------- |",
+            "| **TOTAL** | `0m` |",
+            "| no screen time today | `0m` |",
+        ],
+        name="2025-03-02.md",
+    )
+
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["screen_time_totals"] == {}
+
+
+def test_parse_daily_note_empty_mood_is_none(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "mood:",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+        ],
+        name="2025-03-03.md",
+    )
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["mood"] is None
+
+
+def test_parse_daily_note_mood_sanitizes_symbolic_input(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "mood: 7.5/10",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+        ],
+        name="2025-03-04.md",
+    )
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["mood"] == 7.51
+
+
+def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "workout: false",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **SLEEP**",
+            "",
+            "| TIME | DURATION | AWAKE | AWAKENINGS |",
+            "| ---- | -------- | ----- | ---------- |",
+            "| 23:00-23:00 | `` | `` | `` |",
+        ],
+        name="2025-03-05.md",
+    )
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["sleep_minutes"] == 0
+
+
+def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 6h00m",
+            "mood: 7",
+            "workout: true",
+            "stretch: true",
+            "meditate: true",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **STUDY**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
+            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| 09:00 - 09:30 | `coding` | `30m` | `+00m` | `0m` | – | – |",
+            "| 10:00 - 10:45 | `coding` | `45m` | `+00m` | `0m` | – | – |",
+            "",
+            "### **TRAINING**",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00 - 07:20` | Lift | `20m` | `+00m` |",
+            "| `08:00 - 08:10` | Lift | `10m` | `+00m` |",
+            "",
+            "### **PROCRASTINATION**",
+            "| SOURCE | DURATION |",
+            "| ------ | -------- |",
+            "| YouTube | `5m` |",
+            "| YouTube | `10m` |",
+        ],
+        name="2025-03-06.md",
+    )
+    parsed = parse_daily_note(note_path)
+    assert parsed is not None
+    assert parsed["activity_totals"] == {"coding": 75.0}
+    assert parsed["training_type_minutes"] == {"Lift": 30.0}
+    assert parsed["training_type_sessions"] == {"Lift": 2}
+    assert parsed["screen_time_totals"] == {"YouTube": 15.0}

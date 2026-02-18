@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, cast
+from typing import Literal
 
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
@@ -81,23 +81,83 @@ YEARLY_TRAINING_BAR_WIDTH = 45
 def _day_values(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
-) -> dict[str, Any]:
-    payload = daily_data.get(day)
-    return cast(dict[str, Any], payload) if payload is not None else {}
+) -> DailyAggregate | None:
+    return daily_data.get(day)
 
 
-def _as_float(value: Any) -> float | None:
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
+def _study_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["study_minutes"]
 
 
-def _as_int(value: Any) -> int | None:
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    return None
+def _sleep_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_minutes"]
+
+
+def _mood_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["mood"]
+
+
+def _awake_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["awake_minutes"]
+
+
+def _awakenings_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> int | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["awakenings"]
+
+
+def _activity_totals_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> dict[str, float]:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return {}
+    return payload["activity_totals"]
+
+
+def _training_done_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+    key: Literal["meditate", "workout", "stretch"],
+) -> bool:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return False
+    if key == "meditate":
+        return payload["meditate"]
+    if key == "workout":
+        return payload["workout"]
+    return payload["stretch"]
 
 
 def _activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
@@ -193,13 +253,9 @@ def build_weekly_metrics(
     if prior_week_metrics and len(prior_week_metrics) >= 4:
         ma_metrics = compute_moving_average(prior_week_metrics, 4)
 
-    study_minutes = [
-        _as_float(_day_values(daily_data, d).get("study_minutes")) for d in dates
-    ]
-    sleep_minutes = [
-        _as_float(_day_values(daily_data, d).get("sleep_minutes")) for d in dates
-    ]
-    mood_vals = [_as_float(_day_values(daily_data, d).get("mood")) for d in dates]
+    study_minutes = [_study_minutes_for_day(daily_data, d) for d in dates]
+    sleep_minutes = [_sleep_minutes_for_day(daily_data, d) for d in dates]
+    mood_vals = [_mood_for_day(daily_data, d) for d in dates]
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
     workout_days = current_metrics["workout_count"]
@@ -332,14 +388,10 @@ def build_weekly_metrics(
     sleep_lines.append("")
 
     awake_vals = [
-        _as_float(_day_values(daily_data, d).get("awake_minutes"))
-        for d in dates
-        if daily_data.get(d)
+        _awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awakenings_vals = [
-        _as_int(_day_values(daily_data, d).get("awakenings"))
-        for d in dates
-        if daily_data.get(d)
+        _awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awake_values: list[float] = [v for v in awake_vals if v is not None]
     awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
@@ -451,10 +503,7 @@ def build_monthly_metrics(
         week_labels.append(label)
         week_days = list(daterange(start, end))
         week_day_lists.append(week_days)
-        mins_raw = [
-            _as_float(_day_values(daily_data, d).get("study_minutes"))
-            for d in week_days
-        ]
+        mins_raw = [_study_minutes_for_day(daily_data, d) for d in week_days]
         mins: list[float] = [m for m in mins_raw if m is not None]
         total_min = sum(mins) if mins else 0
         study_chart_vals.append(
@@ -479,7 +528,7 @@ def build_monthly_metrics(
     study_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: float(
-            _as_float(_day_values(month_delta_data, d).get("study_minutes")) or 0.0
+            _study_minutes_for_day(month_delta_data, d) or 0.0
         ),
         baseline_bucket=prev_baseline_week,
         mode="pace",
@@ -511,8 +560,7 @@ def build_monthly_metrics(
         week_day_lists,
         value_for_day=lambda d: (
             1.0
-            if (_as_float(_day_values(month_delta_data, d).get("study_minutes")) or 0)
-            >= STUDY_TARGET_MIN
+            if (_study_minutes_for_day(month_delta_data, d) or 0) >= STUDY_TARGET_MIN
             else 0.0
         ),
         baseline_bucket=prev_baseline_week,
@@ -542,7 +590,7 @@ def build_monthly_metrics(
     mindful_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(month_delta_data, d).get("meditate")) else 0.0
+            1.0 if _training_done_for_day(month_delta_data, d, "meditate") else 0.0
         ),
         baseline_bucket=prev_baseline_week,
         mode="pace",
@@ -551,7 +599,7 @@ def build_monthly_metrics(
     workout_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(month_delta_data, d).get("workout")) else 0.0
+            1.0 if _training_done_for_day(month_delta_data, d, "workout") else 0.0
         ),
         baseline_bucket=prev_baseline_week,
         mode="pace",
@@ -560,7 +608,7 @@ def build_monthly_metrics(
     stretch_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(month_delta_data, d).get("stretch")) else 0.0
+            1.0 if _training_done_for_day(month_delta_data, d, "stretch") else 0.0
         ),
         baseline_bucket=prev_baseline_week,
         mode="pace",
@@ -583,7 +631,7 @@ def build_monthly_metrics(
         )
     )
     # Inject counts into headers of the grid lines
-    elapsed_days = current_metrics.get("days_up_to_today", days_in_period)
+    elapsed_days = current_metrics["days_up_to_today"] or days_in_period
     if training_grid:
         for idx, line in enumerate(training_grid):
             if line.startswith("┌ MINDFUL"):
@@ -634,10 +682,7 @@ def build_monthly_metrics(
     sleep_chart_vals = []
     sleep_value_labels = []
     for week_days in week_day_lists:
-        mins_raw = [
-            _as_float(_day_values(daily_data, d).get("sleep_minutes"))
-            for d in week_days
-        ]
+        mins_raw = [_sleep_minutes_for_day(daily_data, d) for d in week_days]
         sleep_mins: list[float] = [m for m in mins_raw if m is not None]
         start = week_days[0]
         if sleep_mins:
@@ -658,9 +703,7 @@ def build_monthly_metrics(
 
     sleep_delta_labels = compute_bucket_deltas(
         week_day_lists,
-        value_for_day=lambda d: _as_float(
-            _day_values(month_delta_data, d).get("sleep_minutes")
-        ),
+        value_for_day=lambda d: _sleep_minutes_for_day(month_delta_data, d),
         baseline_bucket=prev_baseline_week,
         mode="average",
         today=today,
@@ -680,14 +723,10 @@ def build_monthly_metrics(
     sleep_lines.append("")
 
     awake_vals = [
-        _as_float(_day_values(daily_data, d).get("awake_minutes"))
-        for d in dates
-        if daily_data.get(d)
+        _awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awakenings_vals = [
-        _as_int(_day_values(daily_data, d).get("awakenings"))
-        for d in dates
-        if daily_data.get(d)
+        _awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awake_values: list[float] = [v for v in awake_vals if v is not None]
     awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
@@ -706,9 +745,7 @@ def build_monthly_metrics(
     mood_chart_vals = []
     mood_value_labels = []
     for week_days in week_day_lists:
-        vals_raw = [
-            _as_float(_day_values(daily_data, d).get("mood")) for d in week_days
-        ]
+        vals_raw = [_mood_for_day(daily_data, d) for d in week_days]
         vals = [v for v in vals_raw if v is not None]
         start = week_days[0]
         if vals:
@@ -728,7 +765,7 @@ def build_monthly_metrics(
 
     mood_delta_labels = compute_bucket_deltas(
         week_day_lists,
-        value_for_day=lambda d: _as_float(_day_values(month_delta_data, d).get("mood")),
+        value_for_day=lambda d: _mood_for_day(month_delta_data, d),
         baseline_bucket=prev_baseline_week,
         mode="average",
         today=today,
@@ -817,8 +854,7 @@ def build_quarterly_metrics(
         days = list(daterange(start, end))
         total_min = 0.0
         for d in days:
-            daily = _day_values(daily_data, d)
-            for activity, mins in daily.get("activity_totals", {}).items():
+            for activity, mins in _activity_totals_for_day(daily_data, d).items():
                 minutes = float(mins or 0.0)
                 activity_totals[activity] = activity_totals.get(activity, 0.0) + minutes
                 total_min += minutes
@@ -832,7 +868,7 @@ def build_quarterly_metrics(
     study_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: float(
-            _as_float(_day_values(quarter_delta_data, d).get("study_minutes")) or 0.0
+            _study_minutes_for_day(quarter_delta_data, d) or 0.0
         ),
         baseline_bucket=prev_last_month_days,
         mode="pace",
@@ -862,8 +898,7 @@ def build_quarterly_metrics(
         month_day_lists,
         value_for_day=lambda d: (
             1.0
-            if (_as_float(_day_values(quarter_delta_data, d).get("study_minutes")) or 0)
-            >= STUDY_TARGET_MIN
+            if (_study_minutes_for_day(quarter_delta_data, d) or 0) >= STUDY_TARGET_MIN
             else 0.0
         ),
         baseline_bucket=prev_last_month_days,
@@ -894,14 +929,16 @@ def build_quarterly_metrics(
 
     def _month_count(
         range_tuple: tuple[datetime.date, datetime.date],
-        key: str,
+        key: Literal["meditate", "workout", "stretch"],
         source_data: dict[datetime.date, DailyAggregate],
     ) -> tuple[int, int, datetime.date]:
         start, end = range_tuple
         days = list(daterange(start, end))
         elapsed = sum(1 for d in days if d <= today)
         done = sum(
-            1 for d in days if d <= today and bool(_day_values(source_data, d).get(key))
+            1
+            for d in days
+            if d <= today and _training_done_for_day(source_data, d, key)
         )
         return done, elapsed, start
 
@@ -911,7 +948,7 @@ def build_quarterly_metrics(
     mindful_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(quarter_delta_data, d).get("meditate")) else 0.0
+            1.0 if _training_done_for_day(quarter_delta_data, d, "meditate") else 0.0
         ),
         baseline_bucket=prev_last_month_days,
         mode="pace",
@@ -920,7 +957,7 @@ def build_quarterly_metrics(
     workout_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(quarter_delta_data, d).get("workout")) else 0.0
+            1.0 if _training_done_for_day(quarter_delta_data, d, "workout") else 0.0
         ),
         baseline_bucket=prev_last_month_days,
         mode="pace",
@@ -929,21 +966,23 @@ def build_quarterly_metrics(
     stretch_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(quarter_delta_data, d).get("stretch")) else 0.0
+            1.0 if _training_done_for_day(quarter_delta_data, d, "stretch") else 0.0
         ),
         baseline_bucket=prev_last_month_days,
         mode="pace",
         today=today,
     )
 
-    def _month_activity_bars(activity_key: str) -> list[str]:
+    def _month_activity_bars(
+        activity_key: Literal["meditate", "workout", "stretch"],
+    ) -> list[str]:
         bars: list[str] = []
         for start, end in month_ranges:
             days = list(daterange(start, end))
             bars.append(
                 compress_activity_time_order(
                     days,
-                    lambda d: bool(_day_values(daily_data, d).get(activity_key)),
+                    lambda d: _training_done_for_day(daily_data, d, activity_key),
                     len(days),
                     fill_char="█",
                     empty_char="·",
@@ -1036,9 +1075,7 @@ def build_quarterly_metrics(
         sleep_labels.append(label)
         days = list(daterange(start, end))
         sleep_mins_raw = [
-            _as_float(_day_values(daily_data, d).get("sleep_minutes"))
-            for d in days
-            if daily_data.get(d)
+            _sleep_minutes_for_day(daily_data, d) for d in days if daily_data.get(d)
         ]
         sleep_mins: list[float] = [m for m in sleep_mins_raw if m is not None]
         if sleep_mins:
@@ -1052,25 +1089,15 @@ def build_quarterly_metrics(
             sleep_value_labels.append("0h00m" if start <= today else "")
 
         awake_vals.extend(
-            [
-                _as_float(_day_values(daily_data, d).get("awake_minutes"))
-                for d in days
-                if daily_data.get(d)
-            ]
+            [_awake_minutes_for_day(daily_data, d) for d in days if daily_data.get(d)]
         )
         awakenings_vals.extend(
-            [
-                _as_int(_day_values(daily_data, d).get("awakenings"))
-                for d in days
-                if daily_data.get(d)
-            ]
+            [_awakenings_for_day(daily_data, d) for d in days if daily_data.get(d)]
         )
 
     sleep_delta_labels = compute_bucket_deltas(
         month_day_lists,
-        value_for_day=lambda d: _as_float(
-            _day_values(quarter_delta_data, d).get("sleep_minutes")
-        ),
+        value_for_day=lambda d: _sleep_minutes_for_day(quarter_delta_data, d),
         baseline_bucket=prev_last_month_days,
         mode="average",
         today=today,
@@ -1091,7 +1118,7 @@ def build_quarterly_metrics(
 
     awake_values: list[float] = [v for v in awake_vals if v is not None]
     awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
-    sleep_avg = current_metrics.get("sleep_avg_minutes")
+    sleep_avg = current_metrics["sleep_avg_minutes"]
     avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
     avg_awakenings = (
         sum(awakening_values) / len(awakening_values) if awakening_values else None
@@ -1110,11 +1137,7 @@ def build_quarterly_metrics(
         label = MONTH_ABBR[start.month - 1]
         mood_labels.append(label)
         days = list(daterange(start, end))
-        vals = [
-            _as_float(_day_values(daily_data, d).get("mood"))
-            for d in days
-            if daily_data.get(d)
-        ]
+        vals = [_mood_for_day(daily_data, d) for d in days if daily_data.get(d)]
         vals_clean = [v for v in vals if v is not None]
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
@@ -1126,9 +1149,7 @@ def build_quarterly_metrics(
 
     mood_delta_labels = compute_bucket_deltas(
         month_day_lists,
-        value_for_day=lambda d: _as_float(
-            _day_values(quarter_delta_data, d).get("mood")
-        ),
+        value_for_day=lambda d: _mood_for_day(quarter_delta_data, d),
         baseline_bucket=prev_last_month_days,
         mode="average",
         today=today,
@@ -1212,10 +1233,7 @@ def build_yearly_metrics(
     for start, end in quarter_ranges:
         total_min = 0.0
         for d in daterange(start, end):
-            daily = daily_data.get(d)
-            if not daily:
-                continue
-            for activity, mins in daily.get("activity_totals", {}).items():
+            for activity, mins in _activity_totals_for_day(daily_data, d).items():
                 minutes = float(mins or 0.0)
                 activity_totals[activity] = activity_totals.get(activity, 0.0) + minutes
                 total_min += minutes
@@ -1231,7 +1249,7 @@ def build_yearly_metrics(
     study_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: float(
-            _as_float(_day_values(year_delta_data, d).get("study_minutes")) or 0.0
+            _study_minutes_for_day(year_delta_data, d) or 0.0
         ),
         baseline_bucket=prev_last_quarter_days,
         mode="pace",
@@ -1267,16 +1285,12 @@ def build_yearly_metrics(
             1
             for d in days
             if d <= today
-            and (_as_float(_day_values(daily_data, d).get("study_minutes")) or 0)
-            >= STUDY_TARGET_MIN
+            and (_study_minutes_for_day(daily_data, d) or 0) >= STUDY_TARGET_MIN
         )
         study_counts.append((done, elapsed_days, start))
         bar = compress_days_time_order(
             days,
-            lambda d: (
-                (_as_float(_day_values(daily_data, d).get("study_minutes")) or 0)
-                >= STUDY_TARGET_MIN
-            ),
+            lambda d: (_study_minutes_for_day(daily_data, d) or 0) >= STUDY_TARGET_MIN,
             YEARLY_STUDY_BAR_WIDTH,
             allow_partial=True,
             fill_char=RENDER.study_symbol_deep,
@@ -1290,8 +1304,7 @@ def build_yearly_metrics(
         quarter_day_lists,
         value_for_day=lambda d: (
             1.0
-            if (_as_float(_day_values(year_delta_data, d).get("study_minutes")) or 0)
-            >= STUDY_TARGET_MIN
+            if (_study_minutes_for_day(year_delta_data, d) or 0) >= STUDY_TARGET_MIN
             else 0.0
         ),
         baseline_bucket=prev_last_quarter_days,
@@ -1334,17 +1347,17 @@ def build_yearly_metrics(
         mindful_done = sum(
             1
             for d in days
-            if d <= today and bool(_day_values(daily_data, d).get("meditate"))
+            if d <= today and _training_done_for_day(daily_data, d, "meditate")
         )
         workout_done = sum(
             1
             for d in days
-            if d <= today and bool(_day_values(daily_data, d).get("workout"))
+            if d <= today and _training_done_for_day(daily_data, d, "workout")
         )
         stretch_done = sum(
             1
             for d in days
-            if d <= today and bool(_day_values(daily_data, d).get("stretch"))
+            if d <= today and _training_done_for_day(daily_data, d, "stretch")
         )
         mindful_counts.append((mindful_done, elapsed_days, start))
         workout_counts.append((workout_done, elapsed_days, start))
@@ -1357,7 +1370,7 @@ def build_yearly_metrics(
     mindful_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(year_delta_data, d).get("meditate")) else 0.0
+            1.0 if _training_done_for_day(year_delta_data, d, "meditate") else 0.0
         ),
         baseline_bucket=prev_last_quarter_days,
         mode="pace",
@@ -1366,7 +1379,7 @@ def build_yearly_metrics(
     workout_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(year_delta_data, d).get("workout")) else 0.0
+            1.0 if _training_done_for_day(year_delta_data, d, "workout") else 0.0
         ),
         baseline_bucket=prev_last_quarter_days,
         mode="pace",
@@ -1375,7 +1388,7 @@ def build_yearly_metrics(
     stretch_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: (
-            1.0 if bool(_day_values(year_delta_data, d).get("stretch")) else 0.0
+            1.0 if _training_done_for_day(year_delta_data, d, "stretch") else 0.0
         ),
         baseline_bucket=prev_last_quarter_days,
         mode="pace",
@@ -1390,7 +1403,7 @@ def build_yearly_metrics(
         mindful_bars.append(
             compress_activity_time_order(
                 days,
-                lambda d: bool(_day_values(daily_data, d).get("meditate")),
+                lambda d: _training_done_for_day(daily_data, d, "meditate"),
                 YEARLY_TRAINING_BAR_WIDTH,
                 fill_char="█",
                 empty_char="·",
@@ -1400,7 +1413,7 @@ def build_yearly_metrics(
         workout_bars.append(
             compress_activity_time_order(
                 days,
-                lambda d: bool(_day_values(daily_data, d).get("workout")),
+                lambda d: _training_done_for_day(daily_data, d, "workout"),
                 YEARLY_TRAINING_BAR_WIDTH,
                 fill_char="█",
                 empty_char="·",
@@ -1410,7 +1423,7 @@ def build_yearly_metrics(
         stretch_bars.append(
             compress_activity_time_order(
                 days,
-                lambda d: bool(_day_values(daily_data, d).get("stretch")),
+                lambda d: _training_done_for_day(daily_data, d, "stretch"),
                 YEARLY_TRAINING_BAR_WIDTH,
                 fill_char="█",
                 empty_char="·",
@@ -1501,9 +1514,7 @@ def build_yearly_metrics(
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         sleep_mins_raw = [
-            _as_float(_day_values(daily_data, d).get("sleep_minutes"))
-            for d in days
-            if daily_data.get(d)
+            _sleep_minutes_for_day(daily_data, d) for d in days if daily_data.get(d)
         ]
         sleep_mins: list[float] = [m for m in sleep_mins_raw if m is not None]
         if sleep_mins:
@@ -1518,9 +1529,7 @@ def build_yearly_metrics(
 
     sleep_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
-        value_for_day=lambda d: _as_float(
-            _day_values(year_delta_data, d).get("sleep_minutes")
-        ),
+        value_for_day=lambda d: _sleep_minutes_for_day(year_delta_data, d),
         baseline_bucket=prev_last_quarter_days,
         mode="average",
         today=today,
@@ -1540,14 +1549,10 @@ def build_yearly_metrics(
     sleep_lines.append("")
 
     awake_vals = [
-        _as_float(_day_values(daily_data, d).get("awake_minutes"))
-        for d in dates
-        if daily_data.get(d)
+        _awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awakenings_vals = [
-        _as_int(_day_values(daily_data, d).get("awakenings"))
-        for d in dates
-        if daily_data.get(d)
+        _awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
     ]
     awake_values: list[float] = [v for v in awake_vals if v is not None]
     awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
@@ -1556,7 +1561,7 @@ def build_yearly_metrics(
     avg_awakenings = (
         sum(awakening_values) / len(awakening_values) if awakening_values else None
     )
-    sleep_avg = current_metrics.get("sleep_avg_minutes")
+    sleep_avg = current_metrics["sleep_avg_minutes"]
 
     sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
     sleep_lines.append("")
@@ -1570,11 +1575,7 @@ def build_yearly_metrics(
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
-        vals = [
-            _as_float(_day_values(daily_data, d).get("mood"))
-            for d in days
-            if daily_data.get(d)
-        ]
+        vals = [_mood_for_day(daily_data, d) for d in days if daily_data.get(d)]
         vals_clean = [v for v in vals if v is not None]
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
@@ -1586,7 +1587,7 @@ def build_yearly_metrics(
 
     mood_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
-        value_for_day=lambda d: _as_float(_day_values(year_delta_data, d).get("mood")),
+        value_for_day=lambda d: _mood_for_day(year_delta_data, d),
         baseline_bucket=prev_last_quarter_days,
         mode="average",
         today=today,

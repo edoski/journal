@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import re
 from collections import OrderedDict
-from typing import Any
 
+from sync.contracts.cache import DailyTrainingCacheRow
 from sync.formatting import format_minutes_seconds
 from sync.notes.markdown_tables import split_markdown_row
 from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
@@ -17,7 +17,7 @@ from sync.ports.cache import DailyTrainingCacheStore
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 # Internal table row shape persisted in cache and used for rendering.
-TrainingTableRow = dict[str, Any]
+TrainingTableRow = DailyTrainingCacheRow
 
 
 def _parse_time_to_minutes(time_str: str) -> int | None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any, cast
 
 from sync.contracts.metrics import DailyAggregate
 from sync.constants import MONTH_ABBR, RENDER, STUDY_TARGET_MIN
@@ -30,32 +29,37 @@ def _study_intensity_symbol(minutes: float | None) -> str:
 def _row_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
-) -> dict[str, Any]:
-    payload = daily_data.get(day)
-    return cast(dict[str, Any], payload) if payload is not None else {}
+) -> DailyAggregate | None:
+    return daily_data.get(day)
+
+
+def _study_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    entry = _row_for_day(daily_data, day)
+    return entry["study_minutes"] if entry is not None else None
 
 
 def _compress_symbols(symbols: list[str], target_width: int) -> str:
-    if target_width <= 0:
+    if target_width < 0:
+        raise ValueError("target_width must be non-negative")
+    if target_width == 0:
         return ""
     total = len(symbols)
     if total == 0:
         return RENDER.study_symbol_none * target_width
-    if total <= target_width:
+    if total + 1 <= target_width:
         return "".join(symbols) + RENDER.study_symbol_none * (target_width - total)
+    if total == target_width:
+        return "".join(symbols)
 
     compressed: list[str] = []
     for idx in range(target_width):
-        start_f = idx * total / target_width
-        end_f = (idx + 1) * total / target_width
-        start = int(start_f)
-        end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
-        end = min(end, total)
-
+        start = (idx * total) // target_width
+        end = ((idx + 1) * total + target_width - 1) // target_width
+        end = min(total, end)
         bucket = symbols[start:end]
-        if not bucket:
-            compressed.append(RENDER.study_symbol_none)
-            continue
         if RENDER.study_symbol_deep in bucket:
             compressed.append(RENDER.study_symbol_deep)
         else:
@@ -74,17 +78,24 @@ def _render_training_rows(
     empty_char: str,
 ) -> list[str]:
     """Render rows in label + bar + count + delta layout."""
+    if len(labels) != len(counts):
+        raise ValueError("labels and counts must have the same length")
+    if bars_override is not None and len(bars_override) != len(counts):
+        raise ValueError("bars_override and counts must have the same length")
+    if not labels:
+        return []
+
     lines: list[str] = []
-    max_label_len = max((len(label) for label in labels), default=0)
+    max_label_len = max(len(label) for label in labels)
     count_strs = [
         f"({done:02d}/{elapsed:02d})" if elapsed else "(00/00)"
         for done, elapsed in counts
     ]
-    max_count_len = max((len(text) for text in count_strs), default=0)
+    max_count_len = max(len(text) for text in count_strs)
     bars: list[str] = []
 
     for idx, (done, elapsed) in enumerate(counts):
-        if bars_override:
+        if bars_override is not None:
             bar = bars_override[idx]
         else:
             elapsed = max(elapsed, 0)
@@ -94,10 +105,9 @@ def _render_training_rows(
             bar = fill_char * bar_len + empty_char * (bar_width - bar_len)
         bars.append(bar)
 
-    max_bar_len = max((len(bar) for bar in bars), default=0)
+    max_bar_len = max(len(bar) for bar in bars)
 
-    for idx, (label, (done, elapsed)) in enumerate(zip(labels, counts)):
-        _ = done, elapsed
+    for idx, label in enumerate(labels):
         bar = bars[idx]
         count_str = count_strs[idx].rjust(max_count_len)
         delta = delta_labels[idx] if idx < len(delta_labels) else ""
@@ -108,7 +118,7 @@ def _render_training_rows(
             line += f" {count_str}"
         if delta_str:
             line += f"   {delta_str}"
-        lines.append(line.rstrip())
+        lines.append(line)
 
     return lines
 
@@ -118,7 +128,7 @@ def render_training_block_rows(spec: TrainingBlockRowsSpec) -> list[str]:
     labels = list(spec.labels)
     counts = list(spec.counts)
     delta_labels = list(spec.delta_labels or [])
-    bars_override = list(spec.bars_override) if spec.bars_override else None
+    bars_override = list(spec.bars_override) if spec.bars_override is not None else None
     return _render_training_rows(
         labels=labels,
         counts=counts,
@@ -146,7 +156,7 @@ def render_training_sections_rows(spec: TrainingSectionsRowsSpec) -> list[str]:
                 delta_labels=list(section.delta_labels or []),
                 bar_width=section.bar_width,
                 bars_override=list(section.bars_override)
-                if section.bars_override
+                if section.bars_override is not None
                 else None,
                 fill_char=section.fill_char,
                 empty_char=section.empty_char,
@@ -170,8 +180,6 @@ def render_quarterly_study_coverage_rows(
     lines: list[str] = []
     bars: list[tuple[str, str, int, int]] = []
     counts: list[str] = []
-    max_bar_len = 0
-    max_count_len = 0
     total_done = 0
     total_elapsed = 0
 
@@ -185,9 +193,7 @@ def render_quarterly_study_coverage_rows(
             if day > today:
                 bar_chars.append(RENDER.study_symbol_none)
                 continue
-            symbol = _study_intensity_symbol(
-                _row_for_day(daily_data, day).get("study_minutes")
-            )
+            symbol = _study_intensity_symbol(_study_minutes_for_day(daily_data, day))
             bar_chars.append(symbol)
             if symbol != RENDER.study_symbol_none:
                 done += 1
@@ -197,10 +203,13 @@ def render_quarterly_study_coverage_rows(
         bars.append((label, bar, done, elapsed_days))
         count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
         counts.append(count_str)
-        max_bar_len = max(max_bar_len, len(bar))
-        max_count_len = max(max_count_len, len(count_str))
         total_done += done
         total_elapsed += elapsed_days
+
+    if not bars:
+        return ["┌ FULL STUDY DAYS (00/00)", "│", "└", "", RENDER.study_legend]
+
+    max_bar_len = max(len(bar) for _, bar, _, _ in bars)
 
     header = (
         f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})"
@@ -214,10 +223,10 @@ def render_quarterly_study_coverage_rows(
         pad_between = (max_bar_len - len(bar)) + 1
         delta = delta_labels[idx] if idx < len(delta_labels) else ""
         delta_str = delta.rjust(4) if delta else ""
-        line = f"│ {label} {bar}{' ' * pad_between}{count_str.rjust(max_count_len)}"
+        line = f"│ {label} {bar}{' ' * pad_between}{count_str}"
         if delta_str:
             line += f"   {delta_str}"
-        lines.append(line.rstrip())
+        lines.append(line)
 
     lines.append("└")
     lines.append("")
@@ -238,8 +247,6 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
     lines: list[str] = []
     bars: list[tuple[str, str, int, int]] = []
     counts: list[str] = []
-    max_bar_len = 0
-    max_count_len = 0
     total_done = 0
     total_elapsed = 0
 
@@ -254,35 +261,35 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
                 1
                 for day in days
                 if day <= today
-                and _study_intensity_symbol(
-                    _row_for_day(daily_data, day).get("study_minutes")
-                )
+                and _study_intensity_symbol(_study_minutes_for_day(daily_data, day))
                 == RENDER.study_symbol_deep
             )
         else:
+            observed_days = [day for day in days if day <= today]
+            future_days = len(days) - len(observed_days)
             bar_chars: list[str] = []
             done = 0
-            elapsed_days = 0
-            for day in days:
-                if day > today:
-                    bar_chars.append(RENDER.study_symbol_none)
-                    continue
-                elapsed_days += 1
+            elapsed_days = len(observed_days)
+            for day in observed_days:
                 symbol = _study_intensity_symbol(
-                    _row_for_day(daily_data, day).get("study_minutes")
+                    _study_minutes_for_day(daily_data, day)
                 )
                 bar_chars.append(symbol)
                 if symbol != RENDER.study_symbol_none:
                     done += 1
+            bar_chars.extend([RENDER.study_symbol_none] * future_days)
             bar = _compress_symbols(bar_chars, bar_width)
 
         bars.append((label, bar, done, elapsed_days))
         count_str = f"({done:02d}/{elapsed_days:02d})" if elapsed_days else "(00/00)"
         counts.append(count_str)
-        max_bar_len = max(max_bar_len, len(bar))
-        max_count_len = max(max_count_len, len(count_str))
         total_done += done
         total_elapsed += elapsed_days
+
+    if not bars:
+        return ["┌ FULL STUDY DAYS (00/00)", "│", "└", "", legend_line]
+
+    max_bar_len = max(len(bar) for _, bar, _, _ in bars)
 
     header = f"┌ FULL STUDY DAYS ({total_done:02d}/{total_elapsed:02d})"
     lines.append(header)
@@ -292,10 +299,10 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
         pad_between = (max_bar_len - len(bar)) + 1
         delta = delta_labels[idx] if idx < len(delta_labels) else ""
         delta_str = delta.rjust(4) if delta else ""
-        line = f"│ {label} {bar}{' ' * pad_between}{count_str.rjust(max_count_len)}"
+        line = f"│ {label} {bar}{' ' * pad_between}{count_str}"
         if delta_str:
             line += f"   {delta_str}"
-        lines.append(line.rstrip())
+        lines.append(line)
 
     lines.append("└")
     lines.append("")

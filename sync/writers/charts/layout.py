@@ -10,7 +10,7 @@ from .specs import HAnchor
 
 def anchor_text_start(anchor_pos: int, text_len: int, anchor: HAnchor) -> int:
     """Return starting column for a text run given anchor position and mode."""
-    if text_len <= 0:
+    if text_len == 0:
         return anchor_pos
     if anchor is HAnchor.START:
         return anchor_pos
@@ -101,23 +101,21 @@ def compress_symbols(
     symbols: Sequence[str], target_width: int, empty_symbol: str
 ) -> str:
     """Compress a sequence of symbols to a fixed width using proportional bucketing."""
-    if target_width <= 0:
+    if target_width < 0:
+        raise ValueError("target_width must be non-negative")
+    if target_width == 0:
         return ""
     total = len(symbols)
     if total == 0:
         return empty_symbol * target_width
-    if total <= target_width:
+    if total + 1 <= target_width:
         return "".join(symbols) + empty_symbol * (target_width - total)
-
+    if total == target_width:
+        return "".join(symbols)
     compressed: list[str] = []
     for idx in range(target_width):
-        start_f = idx * total / target_width
-        end_f = (idx + 1) * total / target_width
-        start = int(start_f)
-        end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
-        end = min(end, total)
-        bucket = symbols[start:end]
-        compressed.append(bucket[0] if bucket else empty_symbol)
+        start = (idx * total) // target_width
+        compressed.append(symbols[start])
     return "".join(compressed)
 
 
@@ -133,22 +131,21 @@ def compress_days_time_order(
     today: datetime.date | None = None,
 ) -> str:
     """Compress time-ordered day flags into fixed width glyphs."""
-    anchor_day = today or datetime.date.today()
+    anchor_day = today if today is not None else datetime.date.today()
     total = len(days)
-    if target_width <= 0 or total == 0:
-        return empty_char * max(target_width, 0)
+    if target_width < 0:
+        raise ValueError("target_width must be non-negative")
+    if target_width == 0:
+        return ""
+    if total == 0:
+        return empty_char * target_width
 
     symbols: list[str] = []
     for idx in range(target_width):
-        start_f = idx * total / target_width
-        end_f = (idx + 1) * total / target_width
-        start = int(start_f)
-        end = int(end_f) if end_f == int(end_f) else int(end_f) + 1
-        end = min(end, total)
+        start = (idx * total) // target_width
+        end = ((idx + 1) * total + target_width - 1) // target_width
+        end = min(total, end)
         bucket = days[start:end]
-        if not bucket:
-            symbols.append(empty_char)
-            continue
 
         observed = [day for day in bucket if day <= anchor_day]
         if not observed:

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import TypeVar
 
 from .renderers.daily_procrastination import render_daily_procrastination
 from .renderers.screen_trend import render_screen_trend
@@ -18,13 +19,29 @@ from .specs import (
 
 
 Renderer = Callable[[object], list[str]]
+SpecT = TypeVar("SpecT")
+
+
+def _typed_renderer(
+    spec_type: type[SpecT], fn: Callable[[SpecT], list[str]]
+) -> Renderer:
+    def _render(spec: object) -> list[str]:
+        if not isinstance(spec, spec_type):
+            raise TypeError(f"Renderer expected {spec_type!r}, received {type(spec)!r}")
+        return fn(spec)
+
+    return _render
 
 
 _RENDERERS: dict[type[object], Renderer] = {
-    SimpleGridTableSpec: cast(Renderer, render_simple_grid),
-    SummaryMetricsTableSpec: cast(Renderer, render_summary_metrics),
-    ScreenTrendTableSpec: cast(Renderer, render_screen_trend),
-    DailyProcrastinationTableSpec: cast(Renderer, render_daily_procrastination),
+    SimpleGridTableSpec: _typed_renderer(SimpleGridTableSpec, render_simple_grid),
+    SummaryMetricsTableSpec: _typed_renderer(
+        SummaryMetricsTableSpec, render_summary_metrics
+    ),
+    ScreenTrendTableSpec: _typed_renderer(ScreenTrendTableSpec, render_screen_trend),
+    DailyProcrastinationTableSpec: _typed_renderer(
+        DailyProcrastinationTableSpec, render_daily_procrastination
+    ),
 }
 
 
@@ -33,4 +50,4 @@ def render_table(spec: TableSpec) -> list[str]:
     renderer = _RENDERERS.get(type(spec))
     if renderer is None:
         raise ValueError(f"Unsupported table spec: {type(spec)!r}")
-    return renderer(cast(object, spec))
+    return renderer(spec)

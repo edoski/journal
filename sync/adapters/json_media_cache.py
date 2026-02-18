@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any
+from typing import cast
 
 from sync.constants import MEDIA_CACHE_DIR, STATE_LOCK_DIR
 from sync.contracts.cache import MediaDateCacheState
@@ -18,17 +18,17 @@ def _schema_error(path: str, detail: str) -> ValueError:
     )
 
 
-def _load_json_or_none(path: str) -> Any | None:
+def _load_json_or_none(path: str) -> object | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
+            return cast(object, json.load(handle))
     except FileNotFoundError:
         return None
     except json.JSONDecodeError as exc:
         raise _schema_error(path, f"invalid JSON ({exc})") from exc
 
 
-def _atomic_write_json(path: str, payload: Any) -> None:
+def _atomic_write_json(path: str, payload: object) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as handle:
@@ -36,7 +36,9 @@ def _atomic_write_json(path: str, payload: Any) -> None:
     os.replace(tmp_path, path)
 
 
-def _validate_title_to_date_map(raw: Any, *, path: str, bucket: str) -> dict[str, str]:
+def _validate_title_to_date_map(
+    raw: object, *, path: str, bucket: str
+) -> dict[str, str]:
     if not isinstance(raw, dict):
         raise _schema_error(path, f"{bucket} must be an object")
 
@@ -51,7 +53,7 @@ def _validate_title_to_date_map(raw: Any, *, path: str, bucket: str) -> dict[str
     return validated
 
 
-def _validate_media_cache(raw: Any, *, path: str) -> MediaDateCacheState:
+def _validate_media_cache(raw: object, *, path: str) -> MediaDateCacheState:
     if not isinstance(raw, dict):
         raise _schema_error(path, "root payload must be an object")
 

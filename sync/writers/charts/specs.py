@@ -148,6 +148,7 @@ class WeeklyStudyGridSpec:
     daily_data: dict[datetime.date, DailyAggregate]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
+    today: datetime.date | None = None
     kind: ChartKind = ChartKind.GROUPED_GRID
 
 
@@ -159,6 +160,7 @@ class MonthlyStudyGridSpec:
     daily_data: dict[datetime.date, DailyAggregate]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
+    today: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
     kind: ChartKind = ChartKind.GROUPED_GRID
 

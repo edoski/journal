@@ -70,6 +70,21 @@ def _map_logger_name(name: str) -> str:
     return f"journal.{name}"
 
 
+def _is_usable_handler(handler: logging.Handler) -> bool:
+    """Return ``True`` when a handler can still emit records."""
+    if not isinstance(handler, logging.StreamHandler):
+        return True
+    stream = getattr(handler, "stream", None)
+    if stream is None:
+        return False
+    return not bool(getattr(stream, "closed", False))
+
+
+def _has_usable_handlers(logger: logging.Logger) -> bool:
+    handlers = list(logger.handlers)
+    return bool(handlers) and all(_is_usable_handler(handler) for handler in handlers)
+
+
 def configure_logging(
     *, level: str | None = None, log_format: str | None = None
 ) -> None:
@@ -82,7 +97,7 @@ def configure_logging(
 
     journal_logger = logging.getLogger("journal")
 
-    if _ACTIVE_CONFIG == config_key and journal_logger.handlers:
+    if _ACTIVE_CONFIG == config_key and _has_usable_handlers(journal_logger):
         return
 
     handler = logging.StreamHandler(sys.stderr)
@@ -98,6 +113,7 @@ def configure_logging(
 
     for existing in list(journal_logger.handlers):
         journal_logger.removeHandler(existing)
+        existing.close()
 
     journal_logger.setLevel(getattr(logging, resolved_level))
     journal_logger.addHandler(handler)

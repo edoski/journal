@@ -18,7 +18,6 @@ def render_simple_grid_table(
     divider_row = render_divider_row(
         len(headers),
         divider_cells=divider_cells,
-        min_width=4,
     )
     body_rows = [render_markdown_row(row) for row in rows]
     return [header_row, divider_row, *body_rows]

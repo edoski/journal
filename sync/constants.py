@@ -60,6 +60,16 @@ MONTH_ABBR = [
 # Study intensity thresholds (minutes)
 STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
 
+# Reader table/section markers
+TRAINING_SECTION_HEADER = "### **TRAINING**"
+STUDY_SECTION_HEADER = "### **STUDY**"
+SLEEP_SECTION_HEADER = "### **SLEEP**"
+TRAINING_TABLE_HEADER_RE = r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|"
+NO_TRAINING_SESSIONS_TOKEN = "no training sessions"
+PROCRASTINATION_SECTION_HEADER = "### **PROCRASTINATION**"
+PROCRASTINATION_TABLE_HEADER_RE = r"\|\s*SOURCE\s*\|\s*DURATION\s*\|"
+NO_SCREEN_TIME_TOKEN = "no screen time"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Configuration Dataclasses

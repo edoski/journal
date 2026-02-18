@@ -160,12 +160,9 @@ def format_ma_training_ratio(avg_count: float | None, unit: str) -> str:
     """
     if avg_count is None:
         return "—"
-    if unit == "7":
-        return f"{avg_count:.1f}/7"
-    elif unit == "yr":
+    if unit == "yr":
         return f"{round(avg_count)}/{unit}"
-    else:
-        return f"{avg_count:.1f}/{unit}"
+    return f"{avg_count:.1f}/{unit}"
 
 
 def format_progress_bar(

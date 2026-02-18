@@ -25,10 +25,7 @@ def render_waterfall(spec: WaterfallSpec) -> list[str]:
     max_name_len = max(len(app) for app, _ in sorted_apps)
     max_name_len = max(max_name_len, 5)
 
-    exact_pcts = [
-        (minutes / total_minutes * 100) if total_minutes > 0 else 0
-        for _, minutes in sorted_apps
-    ]
+    exact_pcts = [(minutes / total_minutes * 100) for _, minutes in sorted_apps]
     floored = [int(pct) for pct in exact_pcts]
     remainders = [(idx, pct - floored[idx]) for idx, pct in enumerate(exact_pcts)]
     remainder_needed = 100 - sum(floored)
@@ -40,11 +37,7 @@ def render_waterfall(spec: WaterfallSpec) -> list[str]:
     bar_rows: list[tuple[str, str, str, str]] = []
     offset = 0
     for idx, (app, minutes) in enumerate(sorted_apps):
-        bar_len = (
-            round(minutes / total_minutes * profile.bar_width)
-            if total_minutes > 0
-            else 0
-        )
+        bar_len = round(minutes / total_minutes * profile.bar_width)
         bar_len = max(1, min(profile.bar_width - offset, bar_len))
         pct = floored[idx]
         bar = " " * offset + profile.fill_char * bar_len
@@ -57,7 +50,7 @@ def render_waterfall(spec: WaterfallSpec) -> list[str]:
     for app, bar, duration_str, pct_str in bar_rows:
         bar_padded = bar.ljust(total_width)
         line = f"{profile.row_prefix}{app.ljust(max_name_len)} {bar_padded} {duration_str.rjust(6)} {pct_str.rjust(5)}"
-        lines.append(line.rstrip())
+        lines.append(line)
 
     separator = "━" * total_width
     lines.append(f"{profile.row_prefix}{' ' * max_name_len} {separator}")

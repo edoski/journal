@@ -35,13 +35,14 @@ def parse_duration_to_minutes(
     s = str(val).strip().strip("`")
     if not s:
         return default
+    s_normalized = s.lower()
 
     hours = 0.0
     minutes = 0.0
     seconds = 0.0
-    match_h = re.search(r"(\d+(?:\.\d+)?)h", s, re.IGNORECASE)
-    match_m = re.search(r"(\d+(?:\.\d+)?)m(?!s)", s, re.IGNORECASE)
-    match_s = re.search(r"(\d+(?:\.\d+)?)s", s, re.IGNORECASE)
+    match_h = re.search(r"(\d+(?:\.\d+)?)h", s_normalized)
+    match_m = re.search(r"(\d+(?:\.\d+)?)m(?!s)", s_normalized)
+    match_s = re.search(r"(\d+(?:\.\d+)?)s", s_normalized)
     if match_h:
         hours = float(match_h.group(1))
     if match_m:

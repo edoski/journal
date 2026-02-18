@@ -81,9 +81,7 @@ def render_goal_lines(
                 body = f"{body} `{goal.date_str}`"
 
         # Add countdown if today is provided and goal has a deadline
-        countdown = ""
-        if today is not None:
-            countdown = format_countdown(goal.deadline, today, goal.done)
+        countdown = format_countdown(goal.deadline, today, goal.done) if today else ""
 
         if countdown:
             rendered.append(f"- [{mark}] {body} {countdown} ^{gid}")
@@ -105,13 +103,11 @@ def build_goals_block(subsections: list[tuple[str, list[str]]]) -> list[str]:
         List of markdown lines for the complete Goals section
     """
     lines = ["## Goals", "---"]
-    for idx, (title, task_lines) in enumerate(subsections):
+    for title, task_lines in subsections:
         lines.append(f"### **{title}**")
         if task_lines:
             lines.extend(task_lines)
-        if idx != len(subsections) - 1:
-            lines.append("")
-    # Ensure a blank line after the Goals block
-    if lines and lines[-1].strip() != "":
+        lines.append("")
+    if not subsections:
         lines.append("")
     return lines

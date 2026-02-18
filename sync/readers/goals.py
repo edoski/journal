@@ -78,8 +78,7 @@ def resolve_deadline(date_str: str) -> datetime.date | None:
     m = DATE_QUARTER_RE.match(date_str)
     if m:
         year, quarter = int(m.group(1)), int(m.group(2))
-        end_months = {1: 3, 2: 6, 3: 9, 4: 12}
-        month = end_months.get(quarter, 12)
+        month = quarter * 3
         _, last_day = calendar.monthrange(year, month)
         return datetime.date(year, month, last_day)
 
@@ -108,10 +107,12 @@ def parse_goal_date(body: str) -> tuple[str, str | None, datetime.date | None, i
 
     # Parse reminder offset if present (e.g., !14d, !2w, !1m)
     reminder_offset = 0
-    if match.group(2) and match.group(3):
-        offset_value = int(match.group(2))
-        offset_unit = match.group(3).lower()
-        reminder_offset = offset_value * REMINDER_UNIT_DAYS.get(offset_unit, 1)
+    offset_value_raw = match.group(2)
+    if offset_value_raw is not None:
+        offset_value = int(offset_value_raw)
+        offset_unit = match.group(3)
+        assert offset_unit is not None
+        reminder_offset = offset_value * REMINDER_UNIT_DAYS[offset_unit.lower()]
 
     # Remove the backtick-wrapped date from body
     body_without_date = body[: match.start()] + body[match.end() :]
@@ -148,15 +149,17 @@ def parse_goal_tasks(lines: list[str]) -> list[Goal]:
         if not match:
             continue
 
-        state = (match.group("state") or "").strip()
+        state = match.group("state").strip()
         body = match.group("body").strip()
-        done_state = state.lower() == "x" or state in {"✓", "✔", "-"}
-        goal_id = _extract_goal_id(line) or generate_goal_id(kind="manual")
+        done_state = state.lower() in {"x", "✓", "✔", "-"}
+        goal_id = _extract_goal_id(line)
+        if goal_id is None:
+            goal_id = generate_goal_id(kind="manual")
 
         # Strip trailing gid marker from body if present
-        body = _TRAILING_GID_MARKER_RE.sub("", body).rstrip()
+        body = _TRAILING_GID_MARKER_RE.sub("", body)
         # Strip any existing countdown suffix
-        body = re.sub(r"\s*—\s*`(?:TODAY|LATE \+\d+d|\d+d)`\s*$", "", body).rstrip()
+        body = re.sub(r"\s*—\s*`(?:TODAY|LATE \+\d+d|\d+d)`\s*$", "", body)
         # Extract date and reminder offset if present
         body_clean, date_str, deadline, reminder_offset = parse_goal_date(body)
 
@@ -198,7 +201,7 @@ def filter_by_proximity(
             result.append(task)
         else:
             # Open goals with deadlines: check proximity
-            reminder_offset = task.reminder_offset or 0
+            reminder_offset = task.reminder_offset
             effective_deadline = deadline - datetime.timedelta(days=reminder_offset)
             days_left = (effective_deadline - today).days
             if days_left <= max_days:
@@ -219,13 +222,13 @@ def ensure_goal_ids(tasks: list[Goal], horizon_key: str, period_key: str) -> lis
     result: list[Goal] = []
 
     for t in tasks:
-        canon = t.canonical or ""
+        canon = t.canonical
+        idx = counts.get(canon, 0)
         if not t.id:
-            idx = counts.get(canon, 0)
             new_id = generate_goal_id_for("manual", horizon_key, period_key, canon, idx)
             result.append(replace(t, id=new_id))
         else:
             result.append(t)
-        counts[canon] = counts.get(canon, 0) + 1
+        counts[canon] = idx + 1
 
     return result

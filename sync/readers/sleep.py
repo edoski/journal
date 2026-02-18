@@ -6,8 +6,13 @@ from __future__ import annotations
 
 import re
 
+from sync.constants import SLEEP_SECTION_HEADER
 from sync.models import SleepEntry
+from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
+
+
+_SLEEP_HEADER_CELLS = ("time", "duration", "awake", "awakenings")
 
 
 def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
@@ -20,21 +25,21 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
     Returns:
         List of SleepEntry dataclasses
     """
-    block = extract_block(lines, "### **SLEEP**")
+    block = extract_block(lines, SLEEP_SECTION_HEADER)
     if not block:
         return []
 
-    header_idx = -1
+    header_idx: int | None = None
     for i, line in enumerate(block):
-        if re.search(
-            r"\|\s*TIME\s*\|\s*DURATION\s*\|\s*AWAKE\s*\|\s*AWAKENINGS\s*\|",
-            line,
-            re.IGNORECASE,
+        cells = split_markdown_row(line)
+        if (
+            cells is not None
+            and tuple(cell.lower() for cell in cells) == _SLEEP_HEADER_CELLS
         ):
             header_idx = i
             break
 
-    if header_idx == -1:
+    if header_idx is None:
         return []
 
     entries: list[SleepEntry] = []

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from typing import Any
+from collections.abc import Mapping
 
 from sync.models.status import (
     CanonicalActivityPayload,
@@ -27,14 +27,14 @@ _TRAINING_DEFAULT_TYPE = {
 }
 
 
-def _required_non_empty_str(payload: dict[str, Any], key: str) -> str:
+def _required_non_empty_str(payload: Mapping[str, object], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"Invalid payload: {key} must be a non-empty string")
     return value.strip()
 
 
-def _required_iso_date(payload: dict[str, Any], key: str = "date") -> str:
+def _required_iso_date(payload: Mapping[str, object], key: str = "date") -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(
@@ -46,7 +46,7 @@ def _required_iso_date(payload: dict[str, Any], key: str = "date") -> str:
         raise ValueError(f"Invalid payload: {key} must be YYYY-MM-DD") from exc
 
 
-def _optional_str(payload: dict[str, Any], key: str) -> str:
+def _optional_str(payload: Mapping[str, object], key: str) -> str:
     value = payload.get(key, "")
     if value is None:
         return ""
@@ -55,19 +55,13 @@ def _optional_str(payload: dict[str, Any], key: str) -> str:
     return value.strip()
 
 
-def _optional_float(payload: dict[str, Any], key: str, default: float = 0.0) -> float:
+def _optional_float(
+    payload: Mapping[str, object], key: str, default: float = 0.0
+) -> float:
     value = payload.get(key, default)
     if value is None:
         return default
-    try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Invalid payload: {key} must be numeric") from exc
-
-
-def _required_float(payload: dict[str, Any], key: str) -> float:
-    value = payload.get(key)
-    if value is None:
+    if not isinstance(value, (str, int, float)):
         raise ValueError(f"Invalid payload: {key} must be numeric")
     try:
         return float(value)
@@ -75,9 +69,23 @@ def _required_float(payload: dict[str, Any], key: str) -> float:
         raise ValueError(f"Invalid payload: {key} must be numeric") from exc
 
 
-def _required_int(payload: dict[str, Any], key: str) -> int:
+def _required_float(payload: Mapping[str, object], key: str) -> float:
     value = payload.get(key)
     if value is None:
+        raise ValueError(f"Invalid payload: {key} must be numeric")
+    if not isinstance(value, (str, int, float)):
+        raise ValueError(f"Invalid payload: {key} must be numeric")
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid payload: {key} must be numeric") from exc
+
+
+def _required_int(payload: Mapping[str, object], key: str) -> int:
+    value = payload.get(key)
+    if value is None:
+        raise ValueError(f"Invalid payload: {key} must be an integer")
+    if not isinstance(value, (str, int, float)):
         raise ValueError(f"Invalid payload: {key} must be an integer")
     try:
         parsed = float(value)
@@ -89,7 +97,7 @@ def _required_int(payload: dict[str, Any], key: str) -> int:
 
 
 def parse_sleep_payload(
-    raw_payload: Any,
+    raw_payload: object,
 ) -> CanonicalSleepPayload:
     """Parse and validate sleep payload for one day."""
     if not isinstance(raw_payload, dict):
@@ -111,7 +119,7 @@ def parse_sleep_payload(
 
 
 def parse_training_payload(
-    raw_payload: Any,
+    raw_payload: object,
     source_kind: str,
 ) -> list[CanonicalTrainingEntry]:
     """Parse workout/stretching/meditation payload into canonical entries."""
@@ -148,7 +156,7 @@ def parse_training_payload(
 
 
 def parse_activity_payload(
-    raw_payload: Any,
+    raw_payload: object,
 ) -> CanonicalActivityPayload:
     """Parse and validate screen-time payload for one day."""
     if not isinstance(raw_payload, dict):

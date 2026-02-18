@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, ContextManager, Protocol
+from typing import ContextManager, Protocol
 
 from sync.contracts.cache import (
     CarryForwardCacheState,
+    DailyTrainingCacheRow,
     GoalReconcileCacheState,
     MediaDateCacheState,
 )
@@ -58,11 +59,13 @@ class MediaDateCacheStore(Protocol):
 class DailyTrainingCacheStore(Protocol):
     """Per-day training cache API."""
 
-    def load_for_date(self, date_str: str) -> list[dict[str, Any]]:
+    def load_for_date(self, date_str: str) -> list[DailyTrainingCacheRow]:
         """Load training entries for a given day."""
         ...
 
-    def save_for_date(self, date_str: str, entries: list[dict[str, Any]]) -> None:
+    def save_for_date(
+        self, date_str: str, entries: list[DailyTrainingCacheRow]
+    ) -> None:
         """Persist training entries for a given day."""
         ...
 

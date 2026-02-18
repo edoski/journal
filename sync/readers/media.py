@@ -16,6 +16,12 @@ from sync.io import safe_read_file
 logger = get_logger(__name__)
 
 
+def _frontmatter_text(frontmatter: dict[str, str], key: str) -> str:
+    """Return a frontmatter value as text, normalizing missing/non-string values."""
+    value = frontmatter.get(key)
+    return value if isinstance(value, str) else ""
+
+
 def _heal_frontmatter_date(
     filepath: str,
     lines: list[str],
@@ -32,35 +38,34 @@ def _heal_frontmatter_date(
         date_key: The frontmatter key to heal (default: "date", use "completed" for books)
     """
     date_str = correct_date.strftime("%Y-%m-%d")
-    new_lines = []
-    in_frontmatter = False
-    frontmatter_done = False
-    date_fixed = False
 
-    for line in lines:
-        if line.strip() == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-            else:
-                frontmatter_done = True
-                in_frontmatter = False
+    delimiter_indexes = [idx for idx, line in enumerate(lines) if line.strip() == "---"]
+    if len(delimiter_indexes) < 2:
+        return
 
-        # Replace date line within frontmatter
-        if in_frontmatter and not frontmatter_done and line.startswith(f"{date_key}:"):
-            new_lines.append(f"{date_key}: {date_str}")
-            date_fixed = True
-        else:
-            new_lines.append(line)
+    frontmatter_start = delimiter_indexes[0] + 1
+    frontmatter_end = delimiter_indexes[1]
+    frontmatter_lines = lines[frontmatter_start:frontmatter_end]
+    rewritten_frontmatter = [
+        (f"{date_key}: {date_str}" if line.startswith(f"{date_key}:") else line)
+        for line in frontmatter_lines
+    ]
 
-    if date_fixed:
-        try:
-            with open(filepath, "w") as f:
-                f.write("\n".join(new_lines))
-            logger.info(
-                "Healed %s in %s -> %s", date_key, os.path.basename(filepath), date_str
-            )
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to heal frontmatter in %s: %s", filepath, e)
+    if rewritten_frontmatter == frontmatter_lines:
+        return
+
+    new_lines = (
+        lines[:frontmatter_start] + rewritten_frontmatter + lines[frontmatter_end:]
+    )
+
+    try:
+        with open(filepath, "w") as f:
+            f.write("\n".join(new_lines))
+        logger.info(
+            "Healed %s in %s -> %s", date_key, os.path.basename(filepath), date_str
+        )
+    except (PermissionError, OSError) as e:
+        logger.warning("Failed to heal frontmatter in %s: %s", filepath, e)
 
 
 def _parse_date_link(value: str) -> datetime.date | None:
@@ -142,7 +147,7 @@ def scan_books(
         frontmatter = parse_frontmatter(lines)
 
         # Parse completed date
-        completed_str = frontmatter.get("completed", "")
+        completed_str = _frontmatter_text(frontmatter, "completed")
         completed_date = _parse_date_link(completed_str)
 
         if completed_date is None:
@@ -175,14 +180,14 @@ def scan_books(
             continue
 
         # Parse other fields
-        started_str = frontmatter.get("started", "")
+        started_str = _frontmatter_text(frontmatter, "started")
         started_date = _parse_date_link(started_str)
-        rating = _parse_rating(frontmatter.get("rating", ""))
+        rating = _parse_rating(_frontmatter_text(frontmatter, "rating"))
 
         books.append(
             Book(
                 title=title,
-                author=frontmatter.get("author", ""),
+                author=_frontmatter_text(frontmatter, "author"),
                 started=started_date,
                 completed=completed_date,
                 rating=rating,
@@ -238,7 +243,7 @@ def scan_podcasts(
         frontmatter = parse_frontmatter(lines)
 
         # Parse date
-        date_str = frontmatter.get("date", "")
+        date_str = _frontmatter_text(frontmatter, "date")
         podcast_date = _parse_date_link(date_str)
 
         if podcast_date is None:
@@ -271,13 +276,14 @@ def scan_podcasts(
             continue
 
         # Parse other fields
-        rating = _parse_rating(frontmatter.get("rating", ""))
-        link = frontmatter.get("link", "") or None
+        rating = _parse_rating(_frontmatter_text(frontmatter, "rating"))
+        link_text = _frontmatter_text(frontmatter, "link").strip()
+        link = link_text or None
 
         podcasts.append(
             Podcast(
                 title=title,
-                host=frontmatter.get("host", ""),
+                host=_frontmatter_text(frontmatter, "host"),
                 date=podcast_date,
                 rating=rating,
                 link=link,

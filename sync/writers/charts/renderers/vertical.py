@@ -118,17 +118,13 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
     has_half_block: list[bool] = []
 
     for value in values:
-        if value is None or value == 0:
-            bar_heights.append(0)
-            has_half_block.append(False)
-            continue
-
-        scaled = value * scale
+        value_num = 0.0 if value is None else max(0.0, float(value))
+        scaled = value_num * scale
         full_height = int(scaled)
         fractional = scaled - full_height
-        has_half = fractional >= 0.5
-        bar_heights.append(min(height, max(0, full_height)))
-        has_half_block.append(has_half and full_height < height)
+        bar_height = min(height, max(0, full_height))
+        bar_heights.append(bar_height)
+        has_half_block.append(fractional >= 0.5 and bar_height != height)
 
     label_starts_overflow = _label_starts(
         labels, prefix_len=x_prefix_len, col_width=col_width
@@ -145,7 +141,7 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
         ref: AnchorRef,
         h_anchor: HAnchor,
         *,
-        label_len: int = 0,
+        label_len: int,
     ) -> int:
         # For even-width bar lanes, this keeps text visually centered in the lane.
         if (
@@ -210,7 +206,7 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
             label = value_labels[idx]
             has_half = has_half_block[idx]
             top_level = bar_h + 1 if has_half else bar_h
-            label_level = top_level + 1 if top_level < height else None
+            draw_label_level = top_level + 1
 
             bar_start, _bar_end = bar_bounds(
                 prefix_len=1,
@@ -220,66 +216,39 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
                 column_index=idx,
             )
 
-            if bar_h == 0 and not has_half and level == 1:
-                anchor, clamp_left, clamp_right = _resolve_anchor(
-                    ref=profile.value_anchor_ref,
-                    h_anchor=profile.value_anchor_h,
-                    idx=idx,
-                    labels=labels,
-                    label_starts=label_starts_bar,
-                    prefix_len=1,
-                    col_width=col_width,
-                    bar_left_gutter=bar_left_gutter,
-                    bar_width=bar_width,
-                )
-                place_anchored_text(
-                    row,
-                    label,
-                    anchor_pos=_adjust_center_anchor(
-                        anchor,
-                        label,
-                        profile.value_anchor_ref,
-                        profile.value_anchor_h,
-                        label_len=len(labels[idx]),
-                    ),
-                    anchor=profile.value_anchor_h,
-                    clamp_left=clamp_left,
-                    clamp_right=clamp_right,
-                )
-            elif bar_h == height and level <= height:
+            if bar_h == height:
                 _draw_bar_segment(row, bar_start, bar_width, glyphs.bar_fill)
-            elif (
-                label_level is not None and level == label_level and top_level < height
-            ):
-                anchor, clamp_left, clamp_right = _resolve_anchor(
-                    ref=profile.value_anchor_ref,
-                    h_anchor=profile.value_anchor_h,
-                    idx=idx,
-                    labels=labels,
-                    label_starts=label_starts_bar,
-                    prefix_len=1,
-                    col_width=col_width,
-                    bar_left_gutter=bar_left_gutter,
-                    bar_width=bar_width,
-                )
-                place_anchored_text(
-                    row,
-                    label,
-                    anchor_pos=_adjust_center_anchor(
-                        anchor,
-                        label,
-                        profile.value_anchor_ref,
-                        profile.value_anchor_h,
-                        label_len=len(labels[idx]),
-                    ),
-                    anchor=profile.value_anchor_h,
-                    clamp_left=clamp_left,
-                    clamp_right=clamp_right,
-                )
             elif has_half and level == bar_h + 1:
                 _draw_bar_segment(row, bar_start, bar_width, glyphs.bar_half)
-            elif bar_h > 0 and level <= bar_h:
+            elif bar_h and level <= bar_h:
                 _draw_bar_segment(row, bar_start, bar_width, glyphs.bar_fill)
+
+            if draw_label_level <= height and level == draw_label_level:
+                anchor, clamp_left, clamp_right = _resolve_anchor(
+                    ref=profile.value_anchor_ref,
+                    h_anchor=profile.value_anchor_h,
+                    idx=idx,
+                    labels=labels,
+                    label_starts=label_starts_bar,
+                    prefix_len=1,
+                    col_width=col_width,
+                    bar_left_gutter=bar_left_gutter,
+                    bar_width=bar_width,
+                )
+                place_anchored_text(
+                    row,
+                    label,
+                    anchor_pos=_adjust_center_anchor(
+                        anchor,
+                        label,
+                        profile.value_anchor_ref,
+                        profile.value_anchor_h,
+                        label_len=len(labels[idx]),
+                    ),
+                    anchor=profile.value_anchor_h,
+                    clamp_left=clamp_left,
+                    clamp_right=clamp_right,
+                )
 
         lines.append("".join(row).rstrip())
 
@@ -336,9 +305,6 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
                     label_len=len(labels[idx]),
                 ),
                 anchor=profile.delta_anchor_h,
-                # Delta labels can span beyond the short x-label token width.
-                clamp_left=None,
-                clamp_right=None,
             )
         lines.append("".join(d_row).rstrip())
 

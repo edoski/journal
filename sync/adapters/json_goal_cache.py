@@ -6,7 +6,7 @@ import json
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Final, cast
+from typing import Final, cast
 
 from sync.constants import GOAL_CACHE_DIR, STATE_LOCK_DIR
 from sync.contracts.cache import (
@@ -34,17 +34,17 @@ def _schema_error(path: str, detail: str) -> ValueError:
     )
 
 
-def _load_json_or_none(path: str) -> Any | None:
+def _load_json_or_none(path: str) -> object | None:
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
+            return cast(object, json.load(handle))
     except FileNotFoundError:
         return None
     except json.JSONDecodeError as exc:
         raise _schema_error(path, f"invalid JSON ({exc})") from exc
 
 
-def _atomic_write_json(path: str, payload: Any) -> None:
+def _atomic_write_json(path: str, payload: object) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp_path = path + ".tmp"
     with open(tmp_path, "w", encoding="utf-8") as handle:
@@ -53,7 +53,7 @@ def _atomic_write_json(path: str, payload: Any) -> None:
 
 
 def _validate_goal_ids_by_period(
-    raw: Any, *, path: str, scope: str
+    raw: object, *, path: str, scope: str
 ) -> dict[str, list[str]]:
     if not isinstance(raw, dict):
         raise _schema_error(path, f"{scope} must be an object")
@@ -71,7 +71,7 @@ def _validate_goal_ids_by_period(
     return validated
 
 
-def _validate_deleted_bucket(raw: Any, *, path: str) -> CarryForwardDeletedBuckets:
+def _validate_deleted_bucket(raw: object, *, path: str) -> CarryForwardDeletedBuckets:
     if not isinstance(raw, dict):
         raise _schema_error(path, "_deleted must be an object")
 
@@ -104,7 +104,7 @@ def _validate_deleted_bucket(raw: Any, *, path: str) -> CarryForwardDeletedBucke
     return validated
 
 
-def _validate_carry_forward_state(raw: Any, *, path: str) -> CarryForwardCacheState:
+def _validate_carry_forward_state(raw: object, *, path: str) -> CarryForwardCacheState:
     if not isinstance(raw, dict):
         raise _schema_error(path, "root payload must be an object")
 
@@ -135,7 +135,7 @@ def _validate_carry_forward_state(raw: Any, *, path: str) -> CarryForwardCacheSt
 
 
 def _validate_reconcile_note_state(
-    raw: Any, *, path: str, scope: str
+    raw: object, *, path: str, scope: str
 ) -> GoalReconcileNoteState:
     if not isinstance(raw, dict):
         raise _schema_error(path, f"{scope} must be an object")
@@ -148,7 +148,7 @@ def _validate_reconcile_note_state(
 
 
 def _validate_reconcile_goal_state(
-    raw: Any, *, path: str, goal_id: str
+    raw: object, *, path: str, goal_id: str
 ) -> GoalReconcileGoalState:
     if not isinstance(raw, dict):
         raise _schema_error(path, f"goals.{goal_id} must be an object")
@@ -194,7 +194,7 @@ def _validate_reconcile_goal_state(
     }
 
 
-def _validate_reconcile_state(raw: Any, *, path: str) -> GoalReconcileCacheState:
+def _validate_reconcile_state(raw: object, *, path: str) -> GoalReconcileCacheState:
     if not isinstance(raw, dict):
         raise _schema_error(path, "root payload must be an object")
 
