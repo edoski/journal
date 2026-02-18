@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 
 from sync.io import atomic_write_note, safe_read_file
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 from sync.notes.sections import (
     ensure_note,
     extract_subsection_tasks,

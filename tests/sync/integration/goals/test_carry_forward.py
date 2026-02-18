@@ -20,7 +20,7 @@ from sync.goals.tombstones import (
     record_carried_ids,
     record_deleted_ids,
 )
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 
 
 def _goal(goal_id: str, body: str = "Task", done: bool = False) -> Goal:

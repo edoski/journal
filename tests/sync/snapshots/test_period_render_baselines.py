@@ -17,7 +17,7 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 from sync.writers.goals import build_goals_block, render_goal_lines
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 from tests.support.snapshot_templates import normalize_summary_dynamic_cells

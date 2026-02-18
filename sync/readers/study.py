@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from sync.constants import STUDY_SECTION_HEADER
-from sync.models import StudySession
+from sync.contracts.study import StudySession
 from .common import extract_block, parse_duration_to_minutes
 
 _CANONICAL_STUDY_HEADER_RE = re.compile(

@@ -9,11 +9,11 @@ from __future__ import annotations
 import datetime
 
 from sync.formatting import format_minutes_seconds
-from sync.models.status import CanonicalSleepPayload
+from sync.contracts.status import SleepPayload
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 
-def _build_sleep_table(data: CanonicalSleepPayload | None) -> list[str]:
+def _build_sleep_table(data: SleepPayload | None) -> list[str]:
     """Build sleep table lines from canonical status data."""
     if data is None:
         return []
@@ -52,7 +52,7 @@ def _build_sleep_table(data: CanonicalSleepPayload | None) -> list[str]:
 
 
 def build_sleep_section(
-    sleep_data: CanonicalSleepPayload | None,
+    sleep_data: SleepPayload | None,
     existing_block: list[str] | None,
 ) -> list[str]:
     """Build SLEEP section lines."""

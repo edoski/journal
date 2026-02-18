@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
-from sync.models.reminders import (
+from sync.contracts.reminders import (
     DailySchedule,
     MonthlyLastDaySchedule,
     ReminderRule,

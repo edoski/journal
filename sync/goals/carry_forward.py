@@ -22,7 +22,7 @@ from sync.goals.tombstones import (
 )
 
 if TYPE_CHECKING:
-    from sync.models.goals import Goal
+    from sync.contracts.goals import Goal
 
 
 def carry_forward_with_tombstones(

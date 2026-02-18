@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -19,6 +18,8 @@ from sync.contracts.cache import (
 from sync.notes.locking import locked_path
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 
+from .json_cache_common import atomic_write_json, load_json_or_none, schema_error
+
 _HORIZONS: Final[tuple[str, ...]] = (
     "daily",
     "weekly",
@@ -28,44 +29,20 @@ _HORIZONS: Final[tuple[str, ...]] = (
 )
 
 
-def _schema_error(path: str, detail: str) -> ValueError:
-    return ValueError(
-        f"Invalid cache schema in {path}: {detail}. Fix command: rm '{path}'"
-    )
-
-
-def _load_json_or_none(path: str) -> object | None:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return cast(object, json.load(handle))
-    except FileNotFoundError:
-        return None
-    except json.JSONDecodeError as exc:
-        raise _schema_error(path, f"invalid JSON ({exc})") from exc
-
-
-def _atomic_write_json(path: str, payload: object) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True)
-    os.replace(tmp_path, path)
-
-
 def _validate_goal_ids_by_period(
     raw: object, *, path: str, scope: str
 ) -> dict[str, list[str]]:
     if not isinstance(raw, dict):
-        raise _schema_error(path, f"{scope} must be an object")
+        raise schema_error(path, f"{scope} must be an object")
 
     validated: dict[str, list[str]] = {}
     for period_key, goal_ids in raw.items():
         if not isinstance(period_key, str) or not period_key:
-            raise _schema_error(path, f"{scope} has non-string period key")
+            raise schema_error(path, f"{scope} has non-string period key")
         if not isinstance(goal_ids, list):
-            raise _schema_error(path, f"{scope}.{period_key} must be a list")
+            raise schema_error(path, f"{scope}.{period_key} must be a list")
         if any(not isinstance(goal_id, str) or not goal_id for goal_id in goal_ids):
-            raise _schema_error(path, f"{scope}.{period_key} contains invalid goal IDs")
+            raise schema_error(path, f"{scope}.{period_key} contains invalid goal IDs")
         validated[period_key] = goal_ids[:]
 
     return validated
@@ -73,11 +50,11 @@ def _validate_goal_ids_by_period(
 
 def _validate_deleted_bucket(raw: object, *, path: str) -> CarryForwardDeletedBuckets:
     if not isinstance(raw, dict):
-        raise _schema_error(path, "_deleted must be an object")
+        raise schema_error(path, "_deleted must be an object")
 
     unknown = set(raw) - set(_HORIZONS)
     if unknown:
-        raise _schema_error(path, f"_deleted has unknown horizons: {sorted(unknown)}")
+        raise schema_error(path, f"_deleted has unknown horizons: {sorted(unknown)}")
 
     validated: CarryForwardDeletedBuckets = {}
     validated_map = cast(dict[str, object], validated)
@@ -86,14 +63,14 @@ def _validate_deleted_bucket(raw: object, *, path: str) -> CarryForwardDeletedBu
             continue
         bucket = raw[horizon]
         if not isinstance(bucket, dict):
-            raise _schema_error(path, f"_deleted.{horizon} must be an object")
+            raise schema_error(path, f"_deleted.{horizon} must be an object")
 
         typed_bucket: dict[str, str] = {}
         for goal_id, period_key in bucket.items():
             if not isinstance(goal_id, str) or not goal_id:
-                raise _schema_error(path, f"_deleted.{horizon} has invalid goal ID")
+                raise schema_error(path, f"_deleted.{horizon} has invalid goal ID")
             if not isinstance(period_key, str) or not period_key:
-                raise _schema_error(
+                raise schema_error(
                     path, f"_deleted.{horizon}.{goal_id} must be a non-empty string"
                 )
             typed_bucket[goal_id] = period_key
@@ -106,12 +83,12 @@ def _validate_deleted_bucket(raw: object, *, path: str) -> CarryForwardDeletedBu
 
 def _validate_carry_forward_state(raw: object, *, path: str) -> CarryForwardCacheState:
     if not isinstance(raw, dict):
-        raise _schema_error(path, "root payload must be an object")
+        raise schema_error(path, "root payload must be an object")
 
     allowed_root_keys = set(_HORIZONS) | {"_deleted"}
     unknown = set(raw) - allowed_root_keys
     if unknown:
-        raise _schema_error(path, f"root has unknown keys: {sorted(unknown)}")
+        raise schema_error(path, f"root has unknown keys: {sorted(unknown)}")
 
     validated: CarryForwardCacheState = {}
     validated_map = cast(dict[str, object], validated)
@@ -138,12 +115,12 @@ def _validate_reconcile_note_state(
     raw: object, *, path: str, scope: str
 ) -> GoalReconcileNoteState:
     if not isinstance(raw, dict):
-        raise _schema_error(path, f"{scope} must be an object")
+        raise schema_error(path, f"{scope} must be an object")
     if set(raw) != {"done"}:
-        raise _schema_error(path, f"{scope} must contain only 'done'")
+        raise schema_error(path, f"{scope} must contain only 'done'")
     done = raw.get("done")
     if not isinstance(done, bool):
-        raise _schema_error(path, f"{scope}.done must be a bool")
+        raise schema_error(path, f"{scope}.done must be a bool")
     return {"done": done}
 
 
@@ -151,35 +128,35 @@ def _validate_reconcile_goal_state(
     raw: object, *, path: str, goal_id: str
 ) -> GoalReconcileGoalState:
     if not isinstance(raw, dict):
-        raise _schema_error(path, f"goals.{goal_id} must be an object")
+        raise schema_error(path, f"goals.{goal_id} must be an object")
 
     required = {"last_value", "last_updated_at", "last_updated_by", "notes"}
     if set(raw) != required:
-        raise _schema_error(
+        raise schema_error(
             path,
             f"goals.{goal_id} must contain exactly {sorted(required)}",
         )
 
     last_value = raw.get("last_value")
     if not isinstance(last_value, bool):
-        raise _schema_error(path, f"goals.{goal_id}.last_value must be a bool")
+        raise schema_error(path, f"goals.{goal_id}.last_value must be a bool")
 
     last_updated_at = raw.get("last_updated_at")
     if not isinstance(last_updated_at, str):
-        raise _schema_error(path, f"goals.{goal_id}.last_updated_at must be a string")
+        raise schema_error(path, f"goals.{goal_id}.last_updated_at must be a string")
 
     last_updated_by = raw.get("last_updated_by")
     if not isinstance(last_updated_by, str):
-        raise _schema_error(path, f"goals.{goal_id}.last_updated_by must be a string")
+        raise schema_error(path, f"goals.{goal_id}.last_updated_by must be a string")
 
     notes_raw = raw.get("notes")
     if not isinstance(notes_raw, dict):
-        raise _schema_error(path, f"goals.{goal_id}.notes must be an object")
+        raise schema_error(path, f"goals.{goal_id}.notes must be an object")
 
     notes: dict[str, GoalReconcileNoteState] = {}
     for note_path, note_entry in notes_raw.items():
         if not isinstance(note_path, str) or not note_path:
-            raise _schema_error(path, f"goals.{goal_id}.notes has invalid note path")
+            raise schema_error(path, f"goals.{goal_id}.notes has invalid note path")
         notes[note_path] = _validate_reconcile_note_state(
             note_entry,
             path=path,
@@ -196,20 +173,20 @@ def _validate_reconcile_goal_state(
 
 def _validate_reconcile_state(raw: object, *, path: str) -> GoalReconcileCacheState:
     if not isinstance(raw, dict):
-        raise _schema_error(path, "root payload must be an object")
+        raise schema_error(path, "root payload must be an object")
 
     required = {"goals"}
     if set(raw) != required:
-        raise _schema_error(path, f"root must contain exactly {sorted(required)}")
+        raise schema_error(path, f"root must contain exactly {sorted(required)}")
 
     goals_raw = raw.get("goals")
     if not isinstance(goals_raw, dict):
-        raise _schema_error(path, "goals must be an object")
+        raise schema_error(path, "goals must be an object")
 
     goals: dict[str, GoalReconcileGoalState] = {}
     for goal_id, entry in goals_raw.items():
         if not isinstance(goal_id, str) or not goal_id:
-            raise _schema_error(path, "goals has invalid goal ID key")
+            raise schema_error(path, "goals has invalid goal ID key")
         goals[goal_id] = _validate_reconcile_goal_state(
             entry,
             path=path,
@@ -233,14 +210,14 @@ class JsonGoalCarryForwardCacheStore(GoalCarryForwardCacheStore):
         self.path = os.path.join(self.cache_dir, "carry_forward.json")
 
     def load(self) -> CarryForwardCacheState:
-        raw = _load_json_or_none(self.path)
+        raw = load_json_or_none(self.path)
         if raw is None:
             return {}
         return _validate_carry_forward_state(raw, path=self.path)
 
     def save(self, state: CarryForwardCacheState) -> None:
         validated = _validate_carry_forward_state(state, path=self.path)
-        _atomic_write_json(self.path, validated)
+        atomic_write_json(self.path, validated)
 
     @contextmanager
     def locked_state(self) -> Iterator[CarryForwardCacheState]:
@@ -266,14 +243,14 @@ class JsonGoalReconcileCacheStore(GoalReconcileCacheStore):
         self.path = os.path.join(self.cache_dir, "reconcile_state.json")
 
     def load(self) -> GoalReconcileCacheState:
-        raw = _load_json_or_none(self.path)
+        raw = load_json_or_none(self.path)
         if raw is None:
             return {"goals": {}}
         return _validate_reconcile_state(raw, path=self.path)
 
     def save(self, state: GoalReconcileCacheState) -> None:
         validated = _validate_reconcile_state(state, path=self.path)
-        _atomic_write_json(self.path, validated)
+        atomic_write_json(self.path, validated)
 
     @contextmanager
     def locked_state(self) -> Iterator[GoalReconcileCacheState]:

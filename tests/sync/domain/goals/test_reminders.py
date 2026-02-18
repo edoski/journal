@@ -7,7 +7,7 @@ import datetime
 import pytest
 
 from sync.goals.reminders import get_reminders_for_date, load_reminder_rules
-from sync.models.reminders import DailySchedule
+from sync.contracts.reminders import DailySchedule
 
 
 HEADER = [

@@ -1,6 +1,4 @@
-"""
-Sleep entry models for the journal sync system.
-"""
+"""Sleep contracts."""
 
 from __future__ import annotations
 
@@ -16,7 +14,7 @@ class SleepEntry:
     awakenings: int | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class DailySleepData:
     """Container for sleep entries with computed properties."""
 
@@ -25,13 +23,15 @@ class DailySleepData:
     @property
     def total_minutes(self) -> float:
         """Total sleep duration across all entries."""
-        return sum(e.duration_minutes for e in self.entries)
+        return sum(entry.duration_minutes for entry in self.entries)
 
     @property
     def total_awake(self) -> float | None:
         """Total awake time across all entries, or None if no data."""
         awake_vals = [
-            e.awake_minutes for e in self.entries if e.awake_minutes is not None
+            entry.awake_minutes
+            for entry in self.entries
+            if entry.awake_minutes is not None
         ]
         return sum(awake_vals) if awake_vals else None
 
@@ -39,6 +39,6 @@ class DailySleepData:
     def total_awakenings(self) -> int | None:
         """Total awakenings across all entries, or None if no data."""
         awakening_vals = [
-            e.awakenings for e in self.entries if e.awakenings is not None
+            entry.awakenings for entry in self.entries if entry.awakenings is not None
         ]
         return sum(awakening_vals) if awakening_vals else None

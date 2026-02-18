@@ -3,39 +3,15 @@
 from __future__ import annotations
 
 import datetime
-import json
 import os
 from collections.abc import Iterator
-from typing import cast
 
 from sync.constants import SCREEN_TIME_CACHE_DIR, STATE_LOCK_DIR, TRAINING_CACHE_DIR
 from sync.contracts.cache import DailyTrainingCacheRow
 from sync.notes.locking import locked_path
 from sync.ports.cache import DailyScreenTimeCacheStore, DailyTrainingCacheStore
 
-
-def _schema_error(path: str, detail: str) -> ValueError:
-    return ValueError(
-        f"Invalid cache schema in {path}: {detail}. Fix command: rm '{path}'"
-    )
-
-
-def _load_json_or_none(path: str) -> object | None:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return cast(object, json.load(handle))
-    except FileNotFoundError:
-        return None
-    except json.JSONDecodeError as exc:
-        raise _schema_error(path, f"invalid JSON ({exc})") from exc
-
-
-def _atomic_write_json(path: str, payload: object) -> None:
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp_path = path + ".tmp"
-    with open(tmp_path, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, indent=2, sort_keys=True)
-    os.replace(tmp_path, path)
+from .json_cache_common import atomic_write_json, load_json_or_none, schema_error
 
 
 def _path_for_date(cache_dir: str, date_str: str) -> str:
@@ -75,33 +51,33 @@ def _validate_training_entry(
     index: int,
 ) -> DailyTrainingCacheRow:
     if not isinstance(raw, dict):
-        raise _schema_error(path, f"entries[{index}] must be an object")
+        raise schema_error(path, f"entries[{index}] must be an object")
 
     required_keys = {"start", "end", "time_raw", "activity", "duration", "interrupt"}
     if set(raw) != required_keys:
-        raise _schema_error(
+        raise schema_error(
             path, f"entries[{index}] must contain {sorted(required_keys)}"
         )
 
     start = raw.get("start")
     if start is not None and not isinstance(start, str):
-        raise _schema_error(path, f"entries[{index}].start must be a string or null")
+        raise schema_error(path, f"entries[{index}].start must be a string or null")
 
     end = raw.get("end")
     if end is not None and not isinstance(end, str):
-        raise _schema_error(path, f"entries[{index}].end must be a string or null")
+        raise schema_error(path, f"entries[{index}].end must be a string or null")
 
     time_raw = raw.get("time_raw")
     if not isinstance(time_raw, str):
-        raise _schema_error(path, f"entries[{index}].time_raw must be a string")
+        raise schema_error(path, f"entries[{index}].time_raw must be a string")
 
     activity = raw.get("activity")
     if not isinstance(activity, str):
-        raise _schema_error(path, f"entries[{index}].activity must be a string")
+        raise schema_error(path, f"entries[{index}].activity must be a string")
 
     duration = raw.get("duration")
     if not isinstance(duration, str):
-        raise _schema_error(path, f"entries[{index}].duration must be a string")
+        raise schema_error(path, f"entries[{index}].duration must be a string")
 
     interrupt_raw = raw.get("interrupt")
     interrupt: float | str
@@ -110,7 +86,7 @@ def _validate_training_entry(
     elif isinstance(interrupt_raw, str):
         interrupt = interrupt_raw
     else:
-        raise _schema_error(
+        raise schema_error(
             path,
             f"entries[{index}].interrupt must be numeric or a string",
         )
@@ -132,16 +108,16 @@ def _validate_training_payload(
     date_str: str,
 ) -> list[DailyTrainingCacheRow]:
     if not isinstance(raw, dict):
-        raise _schema_error(path, "root payload must be an object")
+        raise schema_error(path, "root payload must be an object")
     if set(raw) != {"date", "entries"}:
-        raise _schema_error(path, "root must contain exactly ['date', 'entries']")
+        raise schema_error(path, "root must contain exactly ['date', 'entries']")
 
     if raw.get("date") != date_str:
-        raise _schema_error(path, f"date must equal '{date_str}'")
+        raise schema_error(path, f"date must equal '{date_str}'")
 
     entries = raw.get("entries")
     if not isinstance(entries, list):
-        raise _schema_error(path, "entries must be a list")
+        raise schema_error(path, "entries must be a list")
 
     typed_entries: list[DailyTrainingCacheRow] = []
     for index, entry in enumerate(entries):
@@ -157,23 +133,23 @@ def _validate_screen_time_payload(
     date_str: str,
 ) -> dict[str, float]:
     if not isinstance(raw, dict):
-        raise _schema_error(path, "root payload must be an object")
+        raise schema_error(path, "root payload must be an object")
     if set(raw) != {"date", "entries"}:
-        raise _schema_error(path, "root must contain exactly ['date', 'entries']")
+        raise schema_error(path, "root must contain exactly ['date', 'entries']")
 
     if raw.get("date") != date_str:
-        raise _schema_error(path, f"date must equal '{date_str}'")
+        raise schema_error(path, f"date must equal '{date_str}'")
 
     entries = raw.get("entries")
     if not isinstance(entries, dict):
-        raise _schema_error(path, "entries must be an object")
+        raise schema_error(path, "entries must be an object")
 
     normalized: dict[str, float] = {}
     for app, minutes in entries.items():
         if not isinstance(app, str) or not app:
-            raise _schema_error(path, "entries contains invalid app key")
+            raise schema_error(path, "entries contains invalid app key")
         if not isinstance(minutes, (int, float)):
-            raise _schema_error(path, f"entries.{app} must be numeric")
+            raise schema_error(path, f"entries.{app} must be numeric")
         normalized[app] = float(minutes)
 
     return normalized
@@ -194,7 +170,7 @@ class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
     def load_for_date(self, date_str: str) -> list[DailyTrainingCacheRow]:
         path = _path_for_date(self.cache_dir, date_str)
         with locked_path(path, lock_root=self.lock_root):
-            raw = _load_json_or_none(path)
+            raw = load_json_or_none(path)
         if raw is None:
             return []
         return _validate_training_payload(raw, path=path, date_str=date_str)
@@ -206,7 +182,7 @@ class JsonDailyTrainingCacheStore(DailyTrainingCacheStore):
         payload = {"date": date_str, "entries": entries}
         _validate_training_payload(payload, path=path, date_str=date_str)
         with locked_path(path, lock_root=self.lock_root):
-            _atomic_write_json(path, payload)
+            atomic_write_json(path, payload)
 
     def prune(self, *, keep_days: int) -> None:
         _prune_old_files(self.cache_dir, keep_days)
@@ -227,7 +203,7 @@ class JsonDailyScreenTimeCacheStore(DailyScreenTimeCacheStore):
     def load_for_date(self, date_str: str) -> dict[str, float]:
         path = _path_for_date(self.cache_dir, date_str)
         with locked_path(path, lock_root=self.lock_root):
-            raw = _load_json_or_none(path)
+            raw = load_json_or_none(path)
         if raw is None:
             return {}
         return _validate_screen_time_payload(raw, path=path, date_str=date_str)
@@ -241,7 +217,7 @@ class JsonDailyScreenTimeCacheStore(DailyScreenTimeCacheStore):
             date_str=date_str,
         )
         with locked_path(path, lock_root=self.lock_root):
-            _atomic_write_json(path, {"date": date_str, "entries": validated_entries})
+            atomic_write_json(path, {"date": date_str, "entries": validated_entries})
 
     def prune(self, *, keep_days: int) -> None:
         _prune_old_files(self.cache_dir, keep_days)

@@ -5,10 +5,10 @@ from __future__ import annotations
 import datetime
 from collections.abc import Mapping
 
-from sync.models.status import (
-    CanonicalActivityPayload,
-    CanonicalSleepPayload,
-    CanonicalTrainingEntry,
+from sync.contracts.status import (
+    ActivityPayload,
+    SleepPayload,
+    TrainingEntryPayload,
 )
 
 _SLEEP_REQUIRED_KEYS = (
@@ -98,7 +98,7 @@ def _required_int(payload: Mapping[str, object], key: str) -> int:
 
 def parse_sleep_payload(
     raw_payload: object,
-) -> CanonicalSleepPayload:
+) -> SleepPayload:
     """Parse and validate sleep payload for one day."""
     if not isinstance(raw_payload, dict):
         raise ValueError("Invalid sleep payload: expected JSON object")
@@ -108,7 +108,7 @@ def parse_sleep_payload(
         raise ValueError("Invalid sleep payload: missing keys " + ", ".join(missing))
 
     payload = dict(raw_payload)
-    return CanonicalSleepPayload(
+    return SleepPayload(
         date=_required_iso_date(payload, "date"),
         start=_required_non_empty_str(payload, "start"),
         end=_required_non_empty_str(payload, "end"),
@@ -121,7 +121,7 @@ def parse_sleep_payload(
 def parse_training_payload(
     raw_payload: object,
     source_kind: str,
-) -> list[CanonicalTrainingEntry]:
+) -> list[TrainingEntryPayload]:
     """Parse workout/stretching/meditation payload into canonical entries."""
     if raw_payload is None:
         return []
@@ -133,7 +133,7 @@ def parse_training_payload(
         raise ValueError("Invalid training payload: expected JSON object or array")
 
     source_label = _TRAINING_DEFAULT_TYPE.get(source_kind, "Workout")
-    parsed_entries: list[CanonicalTrainingEntry] = []
+    parsed_entries: list[TrainingEntryPayload] = []
 
     for item in entries:
         if not isinstance(item, dict):
@@ -143,7 +143,7 @@ def parse_training_payload(
 
         activity = _optional_str(payload, "type") or source_label
         parsed_entries.append(
-            CanonicalTrainingEntry(
+            TrainingEntryPayload(
                 date=date_str,
                 start=_optional_str(payload, "start"),
                 end=_optional_str(payload, "end"),
@@ -157,7 +157,7 @@ def parse_training_payload(
 
 def parse_activity_payload(
     raw_payload: object,
-) -> CanonicalActivityPayload:
+) -> ActivityPayload:
     """Parse and validate screen-time payload for one day."""
     if not isinstance(raw_payload, dict):
         raise ValueError("Invalid activity payload: expected JSON object")
@@ -165,7 +165,7 @@ def parse_activity_payload(
     payload = dict(raw_payload)
     date_str = _required_iso_date(payload, "date")
 
-    return CanonicalActivityPayload(
+    return ActivityPayload(
         date=date_str,
         activity_ipad=_optional_str(payload, "activity_ipad"),
         activity_iphone=_optional_str(payload, "activity_iphone"),

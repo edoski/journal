@@ -13,7 +13,7 @@ from sync.constants import (
     PROCRASTINATION_SECTION_HEADER,
     PROCRASTINATION_TABLE_HEADER_RE,
 )
-from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
+from sync.contracts.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from .common import extract_block, parse_duration_to_minutes
 
 

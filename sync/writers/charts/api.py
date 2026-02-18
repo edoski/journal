@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TypeVar
-
 from .renderers.grouped_grid import (
     render_monthly_study_grid,
     render_monthly_training_grid,
@@ -32,6 +29,7 @@ from .specs import (
     WeeklyTrainingGridSpec,
     YearlyStudyCoverageRowsSpec,
 )
+from .._dispatch import Renderer, render_exact_type, typed_renderer
 
 
 def _fence(lines: list[str]) -> list[str]:
@@ -40,19 +38,7 @@ def _fence(lines: list[str]) -> list[str]:
     return ["```", *lines, "```"]
 
 
-Renderer = Callable[[object], list[str]]
-SpecT = TypeVar("SpecT")
-
-
-def _typed_renderer(
-    spec_type: type[SpecT], fn: Callable[[SpecT], list[str]]
-) -> Renderer:
-    def _render(spec: object) -> list[str]:
-        if not isinstance(spec, spec_type):
-            raise TypeError(f"Renderer expected {spec_type!r}, received {type(spec)!r}")
-        return fn(spec)
-
-    return _render
+_typed_renderer = typed_renderer
 
 
 _RENDERERS: dict[type[object], Renderer] = {
@@ -85,7 +71,6 @@ _RENDERERS: dict[type[object], Renderer] = {
 
 def render_chart(spec: ChartSpec) -> list[str]:
     """Render any chart from its typed specification."""
-    renderer = _RENDERERS.get(type(spec))
-    if renderer is None:
-        raise ValueError(f"Unsupported chart spec: {type(spec)!r}")
-    return _fence(renderer(spec))
+    return _fence(
+        render_exact_type(spec=spec, renderers=_RENDERERS, kind_label="chart")
+    )

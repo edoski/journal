@@ -20,7 +20,7 @@ from sync.daily.sleep import build_sleep_section
 from sync.daily.training import build_training_section
 from sync.formatting import format_minutes
 from sync.log import get_logger
-from sync.models.deviation import DailyDeviationData
+from sync.contracts.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
 from sync.notes.markdown_tables import (
     escape_markdown_cell,
@@ -33,10 +33,10 @@ from sync.notes.sections import (
     replace_metrics_block,
     section_bounds,
 )
-from sync.models.status import (
-    CanonicalSleepPayload,
-    CanonicalTrainingEntry,
-    CanonicalTrainingStatus,
+from sync.contracts.status import (
+    SleepPayload,
+    TrainingEntryPayload,
+    TrainingStatus,
 )
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.context import ContextSource
@@ -68,7 +68,7 @@ class _MetricsSectionResult:
     workout_done: bool
     stretch_done: bool
     meditate_done: bool
-    sleep_data: CanonicalSleepPayload | None
+    sleep_data: SleepPayload | None
 
 
 @dataclass(frozen=True)
@@ -591,7 +591,7 @@ class DailySyncService:
         day: datetime.date,
         day_schedule: DayScheduleProfile,
         sessions: list[StudySessionRecord],
-        training_status: CanonicalTrainingStatus,
+        training_status: TrainingStatus,
     ) -> DailyDeviationData:
         deviation_data = DailyDeviationData()
 
@@ -622,7 +622,7 @@ class DailySyncService:
             deviation_data.late_study_start_minutes = study_window_minutes
 
         if training_status.workout_entries:
-            workout_entries: tuple[CanonicalTrainingEntry, ...] = (
+            workout_entries: tuple[TrainingEntryPayload, ...] = (
                 training_status.workout_entries
             )
             earliest_workout_start = None

@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 
 from sync.constants import SLEEP_SECTION_HEADER
-from sync.models import SleepEntry
+from sync.contracts.sleep import SleepEntry
 from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
 

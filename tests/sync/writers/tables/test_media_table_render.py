@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sync.models import Book, Podcast
+from sync.contracts.media import Book, Podcast
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import datetime
-import os
-import re
 
 from sync.constants import IDEAL, JOURNAL_DIR, STUDY_TARGET_MIN
 from sync.contracts.metrics import DailyAggregate, MetricValue
@@ -153,23 +151,6 @@ class QueryService:
     ) -> None:
         self.aggregate_source = aggregate_source
         self.journal_dir = journal_dir
-
-    def list_daily_dates(self) -> list[datetime.date]:
-        """List all daily note dates available in journal directory."""
-        dates: list[datetime.date] = []
-        if not os.path.isdir(self.journal_dir):
-            return dates
-
-        for name in os.listdir(self.journal_dir):
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}\.md", name):
-                continue
-            try:
-                dates.append(datetime.date.fromisoformat(name[:-3]))
-            except ValueError:
-                continue
-
-        dates.sort()
-        return dates
 
     def period_bounds(
         self,

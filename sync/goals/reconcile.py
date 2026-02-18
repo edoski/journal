@@ -20,41 +20,7 @@ from sync.io import safe_read_file
 from sync.ports.cache import GoalReconcileCacheStore
 
 if TYPE_CHECKING:
-    from sync.models.goals import Goal
-
-
-def propagate_goal_status(
-    source_tasks: list[Goal],
-    mirror_tasks: list[Goal],
-) -> bool:
-    """
-    Propagate done=True from mirror to source.
-
-    When a goal is marked done in a lower-level note (e.g., weekly mirror),
-    propagate that status back to the source (e.g., monthly note).
-
-    Args:
-        source_tasks: Source of truth tasks (will be modified if status changed)
-        mirror_tasks: Mirror tasks to check for done status
-
-    Returns:
-        True if any status was changed, False otherwise
-    """
-    mirror_lookup = {t.id: t for t in mirror_tasks if t.id}
-    changed = False
-
-    for i, task in enumerate(source_tasks):
-        tid = task.id
-        if not tid:
-            continue
-        mirror = mirror_lookup.get(tid)
-        if mirror and mirror.done and not task.done:
-            from dataclasses import replace
-
-            source_tasks[i] = replace(task, done=True)
-            changed = True
-
-    return changed
+    from sync.contracts.goals import Goal
 
 
 def reconcile_goal_lists(

@@ -13,8 +13,8 @@ from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.application.goal_sync_service import GoalSyncService
 from sync.goals.reminders import get_reminders_for_date
 from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
-from sync.models.goals import Goal
-from sync.models.reminders import DailySchedule, ReminderRule
+from sync.contracts.goals import Goal
+from sync.contracts.reminders import DailySchedule, ReminderRule
 from sync.periods.windows import build_week_window, build_year_window
 
 

@@ -9,6 +9,7 @@ from sync.constants import DAYS, RENDER, STUDY_TARGET_MIN
 from sync.dates import daterange, format_week_label
 
 from ..grid import GridRowBuilder
+from .common import row_for_day, study_intensity_symbol
 from ..specs import (
     MonthlyStudyGridSpec,
     MonthlyTrainingGridSpec,
@@ -18,11 +19,10 @@ from ..specs import (
 
 
 def _study_intensity_symbol(minutes: float | None) -> str:
-    mins = minutes or 0
-    return (
-        RENDER.study_symbol_deep
-        if mins >= STUDY_TARGET_MIN
-        else RENDER.study_symbol_none
+    return study_intensity_symbol(
+        minutes,
+        deep_symbol=RENDER.study_symbol_deep,
+        none_symbol=RENDER.study_symbol_none,
     )
 
 
@@ -30,7 +30,7 @@ def _row_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
 ) -> DailyAggregate | None:
-    return daily_data.get(day)
+    return row_for_day(daily_data, day)
 
 
 def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:

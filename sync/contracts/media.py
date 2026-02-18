@@ -2,9 +2,30 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass
 
-from sync.models.media import Book, Podcast
+
+@dataclass(frozen=True)
+class Book:
+    """A completed book from the books directory."""
+
+    title: str
+    author: str
+    started: datetime.date | None
+    completed: datetime.date
+    rating: float | None
+
+
+@dataclass(frozen=True)
+class Podcast:
+    """A listened podcast from the podcasts directory."""
+
+    title: str
+    host: str
+    date: datetime.date
+    rating: float | None
+    link: str | None
 
 
 @dataclass(frozen=True)

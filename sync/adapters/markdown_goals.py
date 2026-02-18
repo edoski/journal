@@ -8,7 +8,7 @@ from sync.goals.note_store import (
     extract_goals,
     write_goals_sections,
 )
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 from sync.ports.goals import GoalStore
 
 

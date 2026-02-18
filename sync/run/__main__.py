@@ -49,7 +49,8 @@ from sync.periods.windows import (
     build_week_window,
     build_year_window,
 )
-from sync.study.constants import CORE_DATA_EPOCH_OFFSET, DB_PATH
+from sync.study.constants import DB_PATH
+from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
 
 SKIP_LAUNCHD_LABEL = "com.edo.skip"
 SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
@@ -245,18 +246,6 @@ def cmd_period_quarterly(args: argparse.Namespace) -> int:
 def cmd_period_yearly(args: argparse.Namespace) -> int:
     _run_yearly_sync(year_arg=args.year)
     return 0
-
-
-def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:
-    if timestamp is None:
-        return None
-    return datetime.datetime.fromtimestamp(timestamp + CORE_DATA_EPOCH_OFFSET)
-
-
-def datetime_to_core_data(value: datetime.datetime | None) -> float | None:
-    if value is None:
-        return None
-    return value.timestamp() - CORE_DATA_EPOCH_OFFSET
 
 
 def get_connection(readonly: bool = True) -> sqlite3.Connection:

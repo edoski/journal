@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from sync.models.status import CanonicalSleepPayload
+from sync.contracts.status import SleepPayload
 
 
-def _sleep_minutes_from_payload(sleep_data: CanonicalSleepPayload) -> float:
+def _sleep_minutes_from_payload(sleep_data: SleepPayload) -> float:
     return float(sleep_data.sleep_min)
 
 
@@ -17,7 +17,7 @@ def update_frontmatter(
     workout_done: bool,
     stretch_done: bool,
     meditate_done: bool,
-    sleep_data: CanonicalSleepPayload | None,
+    sleep_data: SleepPayload | None,
 ) -> tuple[list[str], dict[str, str]]:
     """
     Update YAML frontmatter in final_lines with study time and status flags.

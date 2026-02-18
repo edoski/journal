@@ -12,7 +12,7 @@ from collections import OrderedDict
 from sync.contracts.cache import DailyTrainingCacheRow
 from sync.formatting import format_minutes_seconds
 from sync.notes.markdown_tables import split_markdown_row
-from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
+from sync.contracts.status import TrainingEntryPayload, TrainingStatus
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
@@ -95,7 +95,7 @@ def _save_training_cache(
 
 
 def _rows_from_canonical_entries(
-    entries: tuple[CanonicalTrainingEntry, ...],
+    entries: tuple[TrainingEntryPayload, ...],
 ) -> list[TrainingTableRow]:
     rows: list[TrainingTableRow] = []
     for entry in entries:
@@ -213,7 +213,7 @@ def _render_training_rows(entries: list[TrainingTableRow]) -> list[str]:
 
 
 def build_training_section(
-    training_status: CanonicalTrainingStatus,
+    training_status: TrainingStatus,
     existing_block: list[str] | None,
     today_str: str,
     *,

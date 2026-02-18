@@ -1,6 +1,4 @@
-"""
-Screen time entry models for the journal sync system.
-"""
+"""Screen-time contracts."""
 
 from __future__ import annotations
 
@@ -15,19 +13,19 @@ class ScreenTimeEntry:
     minutes: float
 
 
-@dataclass
+@dataclass(frozen=True)
 class DailyScreenTimeData:
     """Container for screen time entries with computed properties."""
 
     entries: list[ScreenTimeEntry]
-    shortcut_ran: bool = True  # True if data came from shortcut (even if empty)
+    shortcut_ran: bool = True
 
     @property
     def total_minutes(self) -> float:
         """Total screen time across all apps."""
-        return sum(e.minutes for e in self.entries)
+        return sum(entry.minutes for entry in self.entries)
 
     @property
     def sorted_entries(self) -> list[ScreenTimeEntry]:
         """Entries sorted by duration descending."""
-        return sorted(self.entries, key=lambda e: e.minutes, reverse=True)
+        return sorted(self.entries, key=lambda entry: entry.minutes, reverse=True)

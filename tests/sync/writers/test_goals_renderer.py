@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sync.models import Goal
+from sync.contracts.goals import Goal
 from sync.readers.goals import parse_goal_tasks
 from sync.writers.goals import (
     _format_reminder_offset as format_reminder_offset,

@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 
 from sync.goals.identity import generate_goal_id
-from sync.models import Goal
+from sync.contracts.goals import Goal
 
 
 def format_countdown(

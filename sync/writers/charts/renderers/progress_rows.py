@@ -9,6 +9,7 @@ from sync.constants import MONTH_ABBR, RENDER, STUDY_TARGET_MIN
 from sync.dates import daterange
 from sync.formatting import round_half_up
 
+from .common import compress_coverage_symbols, row_for_day
 from ..specs import (
     QuarterlyStudyCoverageRowsSpec,
     TrainingBlockRowsSpec,
@@ -30,7 +31,7 @@ def _row_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
 ) -> DailyAggregate | None:
-    return daily_data.get(day)
+    return row_for_day(daily_data, day)
 
 
 def _study_minutes_for_day(
@@ -42,29 +43,12 @@ def _study_minutes_for_day(
 
 
 def _compress_symbols(symbols: list[str], target_width: int) -> str:
-    if target_width < 0:
-        raise ValueError("target_width must be non-negative")
-    if target_width == 0:
-        return ""
-    total = len(symbols)
-    if total == 0:
-        return RENDER.study_symbol_none * target_width
-    if total + 1 <= target_width:
-        return "".join(symbols) + RENDER.study_symbol_none * (target_width - total)
-    if total == target_width:
-        return "".join(symbols)
-
-    compressed: list[str] = []
-    for idx in range(target_width):
-        start = (idx * total) // target_width
-        end = ((idx + 1) * total + target_width - 1) // target_width
-        end = min(total, end)
-        bucket = symbols[start:end]
-        if RENDER.study_symbol_deep in bucket:
-            compressed.append(RENDER.study_symbol_deep)
-        else:
-            compressed.append(RENDER.study_symbol_none)
-    return "".join(compressed)
+    return compress_coverage_symbols(
+        symbols,
+        target_width,
+        deep_symbol=RENDER.study_symbol_deep,
+        none_symbol=RENDER.study_symbol_none,
+    )
 
 
 def _render_training_rows(

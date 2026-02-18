@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 from sync.log import get_logger
-from sync.notes.locking import locked_note
 from sync.notes.sections import ensure_section_with_divider, section_bounds
-from sync.ports.notes import NoteStore
-
-from ..constants import TEMPLATE_PATH
 
 logger = get_logger(__name__)
 
@@ -55,31 +51,6 @@ def ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
         level=2,
         insert_pos=metrics_end if metrics_end != -1 else len(lines),
     )
-
-
-def read_daily_note(
-    file_path: str,
-    note_store: NoteStore,
-    template_path: str | None = None,
-) -> list[str]:
-    """
-    Read the daily note via NoteStore, creating from template when missing.
-
-    Args:
-        file_path: Path to the daily note
-        note_store: NoteStore implementation
-        template_path: Optional template override (defaults to TEMPLATE_PATH)
-
-    Returns:
-        Lines of the note, or empty list on error
-    """
-    selected_template = template_path or TEMPLATE_PATH
-    with locked_note(file_path):
-        try:
-            return note_store.read_or_create(file_path, selected_template)
-        except (PermissionError, OSError) as e:
-            logger.error("Error reading daily note %s: %s", file_path, e)
-            return []
 
 
 def find_yaml_end(lines: list[str]) -> int:

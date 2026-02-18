@@ -6,7 +6,7 @@ import datetime
 
 from sync.contracts.media import MediaBundle
 from sync.dates import daterange
-from sync.models.media import Book
+from sync.contracts.media import Book
 
 FIXTURE_MEDIA_BUNDLE = MediaBundle(
     books=[

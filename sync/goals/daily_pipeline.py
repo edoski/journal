@@ -16,7 +16,7 @@ from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.goals.identity import goal_id_kind
 from sync.goals.note_store import render_goals_or_empty
 from sync.goals.period_pipeline import SourceWriteConfig, propagate_source_sections
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 from sync.notes.locking import locked_note
 from sync.ports.cache import GoalCarryForwardCacheStore
 from sync.ports.goals import GoalStore

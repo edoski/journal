@@ -1,6 +1,4 @@
-"""
-Training entry models for the journal sync system.
-"""
+"""Training contracts."""
 
 from __future__ import annotations
 
@@ -10,16 +8,16 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TrainingEntry:
-    """A single training session (workout or stretching) from the TRAINING table."""
+    """A single training session from the TRAINING table."""
 
     start: datetime.time | None
     end: datetime.time | None
-    activity: str  # Actual workout type, e.g., "Traditional Strength Training"
+    activity: str
     duration_minutes: float
-    interrupt_minutes: float = 0.0  # Time elapsed beyond actual workout duration
+    interrupt_minutes: float = 0.0
 
 
-@dataclass
+@dataclass(frozen=True)
 class DailyTrainingData:
     """Container for training entries."""
 
@@ -28,9 +26,9 @@ class DailyTrainingData:
     @property
     def has_workout(self) -> bool:
         """True if any non-stretching workout was done."""
-        return any(e.activity.lower() != "stretching" for e in self.entries)
+        return any(entry.activity.lower() != "stretching" for entry in self.entries)
 
     @property
     def has_stretch(self) -> bool:
         """True if any stretching was done."""
-        return any(e.activity.lower() == "stretching" for e in self.entries)
+        return any(entry.activity.lower() == "stretching" for entry in self.entries)

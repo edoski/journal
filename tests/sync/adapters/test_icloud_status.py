@@ -7,8 +7,8 @@ import datetime
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.adapters.json_daily_cache import JsonDailyScreenTimeCacheStore
 from sync.contracts.schedule import DayScheduleProfile
-from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
-from sync.models.status import CanonicalActivityPayload, CanonicalTrainingStatus
+from sync.contracts.screen_time import DailyScreenTimeData, ScreenTimeEntry
+from sync.contracts.status import ActivityPayload, TrainingStatus
 
 
 def _build_adapter(tmp_path):
@@ -111,7 +111,7 @@ def test_target_days_stages_payload_dates_and_anchor(monkeypatch, tmp_path):
 
     backfill_training = adapter.load_training(datetime.date(2026, 2, 12))
     today_training = adapter.load_training(datetime.date(2026, 2, 13))
-    assert isinstance(backfill_training, CanonicalTrainingStatus)
+    assert isinstance(backfill_training, TrainingStatus)
     assert backfill_training.workout_done is True
     assert backfill_training.meditate_done is False
     assert today_training.workout_done is False
@@ -150,7 +150,7 @@ def test_load_screen_time_routes_only_matching_payload_day(monkeypatch, tmp_path
         "sync.adapters.icloud_status.finalize_status_file",
         lambda filename, path: finalized.append((filename, path)),
     )
-    calls: list[tuple[str, CanonicalActivityPayload | None]] = []
+    calls: list[tuple[str, ActivityPayload | None]] = []
     expected_payload_day = DailyScreenTimeData(
         entries=[ScreenTimeEntry(app="X", minutes=10)]
     )
@@ -165,7 +165,7 @@ def test_load_screen_time_routes_only_matching_payload_day(monkeypatch, tmp_path
         assert screen_time_cache_store is not None
         calls.append((day_str, activity_payload))
         if day_str == "2026-02-12":
-            assert isinstance(activity_payload, CanonicalActivityPayload)
+            assert isinstance(activity_payload, ActivityPayload)
             assert activity_payload.date == "2026-02-12"
             return expected_payload_day
         assert day_str == "2026-02-13"
@@ -183,7 +183,7 @@ def test_load_screen_time_routes_only_matching_payload_day(monkeypatch, tmp_path
     assert adapter.load_screen_time(anchor_day) == expected_anchor_day
     assert finalized == [("activity_status.json", "/tmp/activity.json")]
     assert calls == [
-        ("2026-02-12", CanonicalActivityPayload("2026-02-12", "X (10m)", "")),
+        ("2026-02-12", ActivityPayload("2026-02-12", "X (10m)", "")),
         ("2026-02-13", None),
     ]
 
@@ -253,7 +253,7 @@ def test_target_days_quarantines_activity_payload_missing_date(monkeypatch, tmp_
         "sync.adapters.icloud_status.quarantine_status_file",
         lambda filename, path: quarantined.append((filename, path)),
     )
-    calls: list[CanonicalActivityPayload | None] = []
+    calls: list[ActivityPayload | None] = []
 
     def fake_load_screen_time_data(
         day_str: str,

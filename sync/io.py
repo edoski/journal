@@ -9,8 +9,6 @@ Functions:
     safe_read_file: Read file lines with graceful error handling
     atomic_write_note: Write lines atomically via temp file + replace
     safe_load_json: Load JSON with fallback default on error
-    safe_save_json: Save JSON with makedirs and error handling
-    safe_load_dated_cache: Load date-validated cache entries
 """
 
 from __future__ import annotations
@@ -90,59 +88,3 @@ def safe_load_json(path: str, default: object = None) -> object:
     except (PermissionError, OSError) as e:
         _logger.warning("Failed to read %s: %s", path, e)
         return default
-
-
-def safe_save_json(path: str, data: object, indent: int = 2) -> bool:
-    """
-    Save data as JSON with makedirs and error handling.
-
-    Args:
-        path: Target file path
-        data: Data to serialize as JSON
-        indent: JSON indentation level (default 2)
-
-    Returns:
-        True if save succeeded, False otherwise
-    """
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(data, f, indent=indent)
-        return True
-    except (PermissionError, OSError) as e:
-        _logger.warning("Failed to write %s: %s", path, e)
-        return False
-
-
-def safe_load_dated_cache(
-    path: str,
-    date_str: str,
-    entries_type: type = list,
-) -> object:
-    """
-    Load a date-validated cache file.
-
-    This handles the common pattern used by training and screen_time caches:
-    - Load JSON with {"date": "YYYY-MM-DD", "entries": ...} structure
-    - Return entries only if the date matches the requested date_str
-    - Return None if date doesn't match, file is missing, or entries are wrong type
-
-    Args:
-        path: Path to the cache JSON file
-        date_str: Date string (YYYY-MM-DD) that must match cache date
-        entries_type: Expected type of entries (list or dict)
-
-    Returns:
-        The entries value if date matches and type is correct, None otherwise
-    """
-    data = safe_load_json(path)
-    if data is None:
-        return None
-    if not isinstance(data, dict):
-        return None
-    if data.get("date") != date_str:
-        return None
-    entries = data.get("entries")
-    if not isinstance(entries, entries_type):
-        return None
-    return entries

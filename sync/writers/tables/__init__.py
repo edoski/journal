@@ -9,13 +9,11 @@ from .specs import (
     ScreenTrendTableSpec,
     SimpleGridTableSpec,
     SummaryMetricsTableSpec,
-    TableKind,
     TableSpec,
 )
 
 __all__ = [
     "render_table",
-    "TableKind",
     "TableSpec",
     "SimpleGridTableSpec",
     "SummaryMetricsTableSpec",

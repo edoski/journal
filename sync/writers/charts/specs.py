@@ -10,15 +10,6 @@ from typing import Sequence
 from sync.contracts.metrics import DailyAggregate
 
 
-class ChartKind(str, Enum):
-    """Top-level chart families supported by ``render_chart``."""
-
-    VERTICAL_BAR = "vertical_bar"
-    GROUPED_GRID = "grouped_grid"
-    PROGRESS_ROWS = "progress_rows"
-    WATERFALL = "waterfall"
-
-
 class HAnchor(str, Enum):
     """Horizontal text anchoring mode."""
 
@@ -137,7 +128,6 @@ class VerticalBarSpec:
     value_labels: Sequence[str]
     profile: VerticalBarProfile
     delta_labels: Sequence[str] | None = None
-    kind: ChartKind = ChartKind.VERTICAL_BAR
 
 
 @dataclass(frozen=True)
@@ -149,7 +139,6 @@ class WeeklyStudyGridSpec:
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
     today: datetime.date | None = None
-    kind: ChartKind = ChartKind.GROUPED_GRID
 
 
 @dataclass(frozen=True)
@@ -162,7 +151,6 @@ class MonthlyStudyGridSpec:
     current_date: datetime.date | None = None
     today: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
-    kind: ChartKind = ChartKind.GROUPED_GRID
 
 
 @dataclass(frozen=True)
@@ -181,7 +169,6 @@ class MonthlyTrainingGridSpec:
     workout_delta_labels: Sequence[str] | None = None
     stretch_delta_labels: Sequence[str] | None = None
     legend_line: str | None = None
-    kind: ChartKind = ChartKind.GROUPED_GRID
 
 
 @dataclass(frozen=True)
@@ -195,7 +182,6 @@ class WeeklyTrainingGridSpec:
     stretch_count: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
-    kind: ChartKind = ChartKind.GROUPED_GRID
 
 
 @dataclass(frozen=True)
@@ -210,7 +196,6 @@ class TrainingBlockRowsSpec:
     fill_char: str = "■"
     empty_char: str = "·"
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-    kind: ChartKind = ChartKind.PROGRESS_ROWS
 
 
 @dataclass(frozen=True)
@@ -219,7 +204,6 @@ class TrainingSectionsRowsSpec:
 
     sections: Sequence[TrainingSection]
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-    kind: ChartKind = ChartKind.PROGRESS_ROWS
 
 
 @dataclass(frozen=True)
@@ -231,7 +215,6 @@ class QuarterlyStudyCoverageRowsSpec:
     today: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-    kind: ChartKind = ChartKind.PROGRESS_ROWS
 
 
 @dataclass(frozen=True)
@@ -246,7 +229,6 @@ class YearlyStudyCoverageRowsSpec:
     bars_override: Sequence[str] | None = None
     legend_line: str | None = None
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-    kind: ChartKind = ChartKind.PROGRESS_ROWS
 
 
 @dataclass(frozen=True)
@@ -255,7 +237,6 @@ class WaterfallSpec:
 
     app_totals: dict[str, float]
     profile: WaterfallProfile = field(default_factory=WaterfallProfile)
-    kind: ChartKind = ChartKind.WATERFALL
 
 
 ChartSpec = (

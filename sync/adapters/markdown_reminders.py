@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sync.constants import REMINDERS_PATH
 from sync.goals.reminders import load_reminder_rules, save_reminder_rules
-from sync.models.reminders import ReminderRule
+from sync.contracts.reminders import ReminderRule
 from sync.ports.reminders import ReminderRuleStore
 
 

@@ -10,7 +10,7 @@ import os
 from sync.adapters.json_goal_cache import JsonGoalReconcileCacheStore
 from sync.goals.reconcile import merge_mirror_goals
 from sync.goals.state import record_note_state
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 
 
 def _goal(

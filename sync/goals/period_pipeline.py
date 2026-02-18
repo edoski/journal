@@ -18,7 +18,7 @@ from sync.goals.reconcile import (
     reconcile_goal_lists,
 )
 from sync.io import safe_read_file
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.writers.goals import render_goal_lines
 

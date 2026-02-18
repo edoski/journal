@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from sync.contracts.goals import GoalSection
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 
 
 class GoalStore(Protocol):

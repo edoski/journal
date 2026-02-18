@@ -18,7 +18,12 @@ journal/
 
     contracts/                 # Pure typed contracts (no I/O)
       study.py
-      daily.py
+      sleep.py
+      training.py
+      screen_time.py
+      status.py
+      reminders.py
+      deviation.py
       schedule.py
       metrics.py
       query.py
@@ -54,10 +59,9 @@ journal/
       period_sync_service.py
       query_service.py
 
-    models/                    # Dataclasses and domain payloads
-    readers/                   # Markdown parsing (markdown -> models/contracts)
+    readers/                   # Markdown parsing (markdown -> contracts)
       schedule.py
-    writers/                   # Rendering (models/contracts -> markdown)
+    writers/                   # Rendering (contracts -> markdown)
       __init__.py
       goals.py
       charts/                  # Unified chart API (typed specs + renderers)
@@ -71,7 +75,6 @@ journal/
         api.py                 # render_table(spec) -> list[str]
         specs.py
         layout.py
-        formatters.py
         renderers/
 
     daily/
@@ -187,8 +190,8 @@ journal/
 - `StudySessionSource.load_sessions(day, day_schedule) -> list[StudySessionRecord]`
 - `DailyStatusSource`:
   - `target_days(anchor_day) -> tuple[date, ...]`
-  - `load_training(day) -> TrainingStatusBundle`
-  - `load_sleep(day) -> SleepStatusPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
+  - `load_training(day) -> TrainingStatus`
+  - `load_sleep(day) -> SleepPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
   - `load_screen_time(day) -> DailyScreenTimeData | None`
   - `write_study_times(day, sessions, day_schedule) -> None`
 - `ScheduleSource.resolve_day(day) -> DayScheduleProfile`
@@ -223,8 +226,8 @@ journal/
 
 ## Data Flow
 
-- parsing path: `markdown -> readers -> contracts/models`
-- rendering path: `contracts/models -> writers -> markdown`
+- parsing path: `markdown -> readers -> contracts`
+- rendering path: `contracts -> writers -> markdown`
 - orchestration path: `composition root -> application service -> ports -> adapters`
 
 ## Run Commands

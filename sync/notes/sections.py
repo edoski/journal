@@ -10,7 +10,7 @@ from sync.notes.markdown import extract_block as _extract_block
 from sync.notes.markdown import normalize_header as _normalize_header
 
 if TYPE_CHECKING:
-    from sync.models.goals import Goal
+    from sync.contracts.goals import Goal
 
 
 def _find_subheader_idx(

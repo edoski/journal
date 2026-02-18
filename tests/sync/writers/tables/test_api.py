@@ -8,8 +8,8 @@ from typing import cast
 
 import pytest
 
-from sync.models.deviation import DailyDeviationData
-from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
+from sync.contracts.deviation import DailyDeviationData
+from sync.contracts.screen_time import DailyScreenTimeData, ScreenTimeEntry
 import sync.writers.tables.api as tables_api_module
 import sync.writers.tables.renderers.screen_trend as screen_trend_renderer
 import sync.writers.tables.renderers.summary_metrics as summary_renderer

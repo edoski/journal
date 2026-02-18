@@ -15,7 +15,7 @@ from sync.daily.screen_time import (
     parse_activity_field,
     build_procrastination_section,
 )
-from sync.models.screen_time import ScreenTimeEntry, DailyScreenTimeData
+from sync.contracts.screen_time import ScreenTimeEntry, DailyScreenTimeData
 
 
 class TestParseDurationString:
@@ -161,7 +161,7 @@ class TestBuildProcrastinationSection:
 
     def test_with_deviations(self):
         """Deviation data is included in the output when non-phone deviation > 0."""
-        from sync.models.deviation import DailyDeviationData
+        from sync.contracts.deviation import DailyDeviationData
 
         screen_data = DailyScreenTimeData(
             entries=[
@@ -182,7 +182,7 @@ class TestBuildProcrastinationSection:
 
     def test_deviation_covered_by_screen_time(self):
         """When screen time exceeds deviation, no DEVIATIONS row appears."""
-        from sync.models.deviation import DailyDeviationData
+        from sync.contracts.deviation import DailyDeviationData
 
         screen_data = DailyScreenTimeData(
             entries=[

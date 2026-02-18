@@ -8,7 +8,7 @@ import os
 from sync.adapters.json_goal_cache import JsonGoalReconcileCacheStore
 from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
 from sync.goals.state import record_note_state
-from sync.models.goals import Goal
+from sync.contracts.goals import Goal
 
 
 def _store(tmp_path) -> JsonGoalReconcileCacheStore:

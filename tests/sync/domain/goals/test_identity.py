@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sync.goals.identity import generate_goal_id, generate_goal_id_for
-from sync.models.goals import canonical_goal_text as canonical_goal
+from sync.contracts.goals import canonical_goal_text as canonical_goal
 
 
 class TestCanonicalGoal:

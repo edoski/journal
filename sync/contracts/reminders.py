@@ -1,4 +1,4 @@
-"""Reminder rule models and schedule parsing/formatting helpers."""
+"""Reminder rule contracts and schedule parsing/formatting helpers."""
 
 from __future__ import annotations
 
@@ -145,5 +145,4 @@ def format_schedule(schedule: ReminderSchedule) -> str:
         case YearlySchedule(month=month, day=day):
             return f"YEARLY:{month:02d}-{day:02d}"
         case _:
-            # Defensive guard in case external callers bypass typing.
             raise ValueError(f"Unsupported reminder schedule object: {schedule!r}")

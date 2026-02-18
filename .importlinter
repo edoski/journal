@@ -26,3 +26,22 @@ source_modules =
     sync.writers
 forbidden_modules =
     sync.readers
+
+[importlinter:contracts_no_ports_or_adapters_or_application]
+name = Contracts layer must stay infrastructure-agnostic
+type = forbidden
+source_modules =
+    sync.contracts
+forbidden_modules =
+    sync.ports
+    sync.adapters
+    sync.application
+
+[importlinter:ports_no_adapters_or_application]
+name = Ports layer must remain abstract interfaces
+type = forbidden
+source_modules =
+    sync.ports
+forbidden_modules =
+    sync.adapters
+    sync.application

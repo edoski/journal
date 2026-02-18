@@ -13,7 +13,7 @@ from sync.notes.markdown_tables import (
     render_markdown_row,
     split_markdown_row,
 )
-from sync.models.reminders import (
+from sync.contracts.reminders import (
     DailySchedule,
     MonthlyLastDaySchedule,
     ReminderRule,
@@ -26,7 +26,7 @@ from sync.models.reminders import (
 )
 
 if TYPE_CHECKING:
-    from sync.models.goals import Goal
+    from sync.contracts.goals import Goal
 
 TABLE_HEADERS = ("SCHEDULE", "BODY")
 WEEKDAY_INDEX = {
@@ -177,7 +177,7 @@ def get_reminders_for_date(
     rules: list[ReminderRule],
 ) -> list["Goal"]:
     """Evaluate configured rules and return reminder goals for this date."""
-    from sync.models.goals import Goal
+    from sync.contracts.goals import Goal
 
     reminders: list[Goal] = []
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from sync.models.reminders import ReminderRule
+from sync.contracts.reminders import ReminderRule
 
 
 class ReminderRuleStore(Protocol):

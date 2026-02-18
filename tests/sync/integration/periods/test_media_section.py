@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 
 from sync.contracts.media import MediaBundle
-from sync.models import Book
+from sync.contracts.media import Book
 from sync.periods.sections import append_media_section
 
 

@@ -11,9 +11,9 @@ from __future__ import annotations
 import re
 
 from sync.constants import SCREEN_TIME
-from sync.models.deviation import DailyDeviationData
-from sync.models.screen_time import DailyScreenTimeData, ScreenTimeEntry
-from sync.models.status import CanonicalActivityPayload
+from sync.contracts.deviation import DailyDeviationData
+from sync.contracts.screen_time import DailyScreenTimeData, ScreenTimeEntry
+from sync.contracts.status import ActivityPayload
 from sync.ports.cache import DailyScreenTimeCacheStore
 from sync.writers.tables import DailyProcrastinationTableSpec, render_table
 
@@ -174,7 +174,7 @@ def _group_by_threshold(
 def load_screen_time_data(
     today_str: str,
     *,
-    activity_payload: CanonicalActivityPayload | None,
+    activity_payload: ActivityPayload | None,
     screen_time_cache_store: DailyScreenTimeCacheStore,
 ) -> DailyScreenTimeData | None:
     """

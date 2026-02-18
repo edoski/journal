@@ -9,7 +9,7 @@ import datetime
 import re
 
 from sync.goals.identity import generate_goal_id, generate_goal_id_for
-from sync.models import Goal
+from sync.contracts.goals import Goal
 
 
 # Regex patterns for date formats in goals

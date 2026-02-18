@@ -12,16 +12,16 @@ from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.schedule import DayScheduleProfile
-from sync.models.screen_time import DailyScreenTimeData
-from sync.models.status import CanonicalTrainingEntry, CanonicalTrainingStatus
+from sync.contracts.screen_time import DailyScreenTimeData
+from sync.contracts.status import TrainingEntryPayload, TrainingStatus
 
 
 class _StubStatusSource:
     def target_days(self, anchor_day: datetime.date) -> tuple[datetime.date, ...]:
         return (anchor_day,)
 
-    def load_training(self, _day: datetime.date) -> CanonicalTrainingStatus:
-        return CanonicalTrainingStatus()
+    def load_training(self, _day: datetime.date) -> TrainingStatus:
+        return TrainingStatus()
 
     def load_sleep(self, _day: datetime.date):
         return None
@@ -543,7 +543,7 @@ def test_build_deviation_data_accrues_full_study_window_without_sessions():
         day,
         schedule,
         [],
-        CanonicalTrainingStatus(),
+        TrainingStatus(),
     )
 
     assert deviation.late_study_start_minutes == 210.0
@@ -573,7 +573,7 @@ def test_build_deviation_data_uses_schedule_study_start_for_lateness():
         day,
         schedule,
         sessions,
-        CanonicalTrainingStatus(),
+        TrainingStatus(),
     )
 
     assert deviation.late_study_start_minutes == 30.0
@@ -588,9 +588,9 @@ def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(19, 0),
     )
-    training = CanonicalTrainingStatus(
+    training = TrainingStatus(
         workout_entries=(
-            CanonicalTrainingEntry(
+            TrainingEntryPayload(
                 date=day.isoformat(),
                 start="19:15",
                 end="20:00",

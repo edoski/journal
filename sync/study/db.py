@@ -15,7 +15,6 @@ from sync.log import get_logger
 
 from sync.study.constants import (
     DB_PATH,
-    CORE_DATA_EPOCH_OFFSET,
     BREAK_LINK_MAX_GAP_SECONDS,
     FLOW_APP_DEFAULTS_DOMAIN,
     FLOW_BREAK_DEFAULT_KEYS,
@@ -24,6 +23,7 @@ from sync.study.constants import (
     FLOW_PHASE_SHORT_BREAK,
     FLOW_PHASE_STUDY,
 )
+from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
 from sync.study.breaks import (
     get_expected_break_minutes,
     compute_dynamic_lunch_window,
@@ -78,13 +78,6 @@ def get_db_connection() -> sqlite3.Connection:
         raise FileNotFoundError(f"Flow database not found at {DB_PATH}")
     # Open in read-only mode to avoid locking
     return sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
-
-
-def core_data_to_datetime(timestamp: float | None) -> datetime.datetime | None:
-    """Convert a CoreData timestamp to a Python datetime."""
-    if timestamp is None:
-        return None
-    return datetime.datetime.fromtimestamp(timestamp + CORE_DATA_EPOCH_OFFSET)
 
 
 def dedupe_sessions(
@@ -214,8 +207,10 @@ def get_sessions_for_day(
     end_of_day = datetime.datetime(day.year, day.month, day.day, 23, 59, 59)
 
     # Convert to CoreData timestamps
-    cd_start = start_of_day.timestamp() - CORE_DATA_EPOCH_OFFSET
-    cd_end = end_of_day.timestamp() - CORE_DATA_EPOCH_OFFSET
+    cd_start = datetime_to_core_data(start_of_day)
+    cd_end = datetime_to_core_data(end_of_day)
+    if cd_start is None or cd_end is None:
+        return []
 
     # Fetch SESSIONS
     query = """

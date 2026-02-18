@@ -29,7 +29,7 @@ from sync.goals.reconcile import (
     reconcile_goal_lists,
 )
 from sync.goals.reminders import get_reminders_for_date
-from sync.models.reminders import ReminderRule
+from sync.contracts.reminders import ReminderRule
 from sync.notes.locking import locked_note
 from sync.notes.sections import goals_section_bounds
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
@@ -47,7 +47,7 @@ from sync.goals.daily_pipeline import (
 )
 
 if TYPE_CHECKING:
-    from sync.models.goals import Goal
+    from sync.contracts.goals import Goal
 
 
 class GoalSyncService:

@@ -1,4 +1,4 @@
-"""Canonical runtime models for shortcut status payloads."""
+"""Contracts for shortcut status payloads."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class CanonicalSleepPayload:
+class SleepPayload:
     """Validated sleep payload used by daily sync internals."""
 
     date: str
@@ -18,7 +18,7 @@ class CanonicalSleepPayload:
 
 
 @dataclass(frozen=True)
-class CanonicalTrainingEntry:
+class TrainingEntryPayload:
     """Validated training entry used by daily sync internals."""
 
     date: str
@@ -29,12 +29,12 @@ class CanonicalTrainingEntry:
 
 
 @dataclass(frozen=True)
-class CanonicalTrainingStatus:
+class TrainingStatus:
     """Normalized training payload set keyed by source file."""
 
-    workout_entries: tuple[CanonicalTrainingEntry, ...] = ()
-    stretch_entries: tuple[CanonicalTrainingEntry, ...] = ()
-    meditation_entries: tuple[CanonicalTrainingEntry, ...] = ()
+    workout_entries: tuple[TrainingEntryPayload, ...] = ()
+    stretch_entries: tuple[TrainingEntryPayload, ...] = ()
+    meditation_entries: tuple[TrainingEntryPayload, ...] = ()
 
     @property
     def workout_done(self) -> bool:
@@ -50,7 +50,7 @@ class CanonicalTrainingStatus:
 
 
 @dataclass(frozen=True)
-class CanonicalActivityPayload:
+class ActivityPayload:
     """Validated screen-time payload used by daily sync internals."""
 
     date: str

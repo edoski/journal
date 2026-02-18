@@ -8,7 +8,6 @@ from .reconcile import (
     load_quarterly_goals,
     merge_mirror_goals,
     process_pierced_goals,
-    propagate_goal_status,
     reconcile_goal_lists,
 )
 from .reminders import (
@@ -41,7 +40,6 @@ __all__ = [
     "reconcile_goal_lists",
     "process_pierced_goals",
     "merge_mirror_goals",
-    "propagate_goal_status",
     "load_quarterly_goals",
     "load_reminder_rules",
     "get_reminders_for_date",

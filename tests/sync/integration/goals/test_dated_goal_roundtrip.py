@@ -4,7 +4,7 @@ Tests for dated goals feature: date parsing, countdown formatting, and proximity
 
 import datetime
 
-from sync.models import Goal
+from sync.contracts.goals import Goal
 from sync.readers.goals import (
     resolve_deadline,
     parse_goal_date,

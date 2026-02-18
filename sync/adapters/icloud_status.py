@@ -14,12 +14,12 @@ from sync.daily.icloud import (
 from sync.daily.screen_time import load_screen_time_data
 from sync.log import get_logger
 from sync.contracts.schedule import DayScheduleProfile
-from sync.models.screen_time import DailyScreenTimeData
-from sync.models.status import (
-    CanonicalActivityPayload,
-    CanonicalSleepPayload,
-    CanonicalTrainingEntry,
-    CanonicalTrainingStatus,
+from sync.contracts.screen_time import DailyScreenTimeData
+from sync.contracts.status import (
+    ActivityPayload,
+    SleepPayload,
+    TrainingEntryPayload,
+    TrainingStatus,
 )
 from sync.ports.cache import DailyScreenTimeCacheStore
 from sync.ports.status import DailyStatusSource
@@ -42,10 +42,10 @@ class ICloudDailyStatusSource(DailyStatusSource):
         self._resolved_days: tuple[datetime.date, ...] = ()
         self._training_by_day: dict[
             datetime.date,
-            dict[str, list[CanonicalTrainingEntry]],
+            dict[str, list[TrainingEntryPayload]],
         ] = {}
-        self._sleep_by_day: dict[datetime.date, CanonicalSleepPayload] = {}
-        self._activity_by_day: dict[datetime.date, CanonicalActivityPayload] = {}
+        self._sleep_by_day: dict[datetime.date, SleepPayload] = {}
+        self._activity_by_day: dict[datetime.date, ActivityPayload] = {}
 
     def target_days(self, anchor_day: datetime.date) -> tuple[datetime.date, ...]:
         """Resolve all shortcut-targeted days for this run."""
@@ -195,20 +195,20 @@ class ICloudDailyStatusSource(DailyStatusSource):
 
         finalize_status_file(filename, parsed_path)
 
-    def load_training(self, day: datetime.date) -> CanonicalTrainingStatus:
+    def load_training(self, day: datetime.date) -> TrainingStatus:
         """Load workout/stretch/meditation payloads for the day."""
         self._ensure_ingested(day)
         day_entries = self._training_by_day.get(day, {})
         workout_entries = day_entries.get("workout", [])
         stretch_entries = day_entries.get("stretching", [])
         meditation_entries = day_entries.get("meditation", [])
-        return CanonicalTrainingStatus(
+        return TrainingStatus(
             workout_entries=tuple(workout_entries),
             stretch_entries=tuple(stretch_entries),
             meditation_entries=tuple(meditation_entries),
         )
 
-    def load_sleep(self, day: datetime.date) -> CanonicalSleepPayload | None:
+    def load_sleep(self, day: datetime.date) -> SleepPayload | None:
         """Load sleep payload for the day if available."""
         self._ensure_ingested(day)
         return self._sleep_by_day.get(day)

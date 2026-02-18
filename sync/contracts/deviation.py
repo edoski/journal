@@ -1,8 +1,4 @@
-"""
-Deviation data model for the journal sync system.
-
-Contains schedule adherence metrics that track deviations from the ideal schedule.
-"""
+"""Deviation contracts for schedule-adherence metrics."""
 
 from __future__ import annotations
 
@@ -11,15 +7,7 @@ from dataclasses import dataclass
 
 @dataclass
 class DailyDeviationData:
-    """
-    Schedule adherence metrics (non-screen-time deviations).
-
-    Tracks time lost due to:
-    - Study session interruptions
-    - Break overruns beyond scheduled break time
-    - Late study start (vs resolved day schedule)
-    - Late workout start (vs resolved day schedule)
-    """
+    """Schedule adherence metrics."""
 
     interrupt_minutes: float = 0.0
     overrun_minutes: float = 0.0

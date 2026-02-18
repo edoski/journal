@@ -31,7 +31,6 @@ from .profiles import (
 )
 from .specs import (
     AnchorRef,
-    ChartKind,
     ChartSpec,
     ColumnTrack,
     GlyphSet,
@@ -57,7 +56,6 @@ from .specs import (
 __all__ = [
     "render_chart",
     "ChartSpec",
-    "ChartKind",
     "HAnchor",
     "AnchorRef",
     "GlyphSet",

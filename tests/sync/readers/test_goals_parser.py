@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 
 from sync.goals.identity import generate_goal_id_for
-from sync.models import Goal
+from sync.contracts.goals import Goal
 import sync.readers.goals as goals_module
 from sync.readers.goals import (
     _extract_goal_id as extract_goal_id,
