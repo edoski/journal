@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import os
-import re
 from dataclasses import dataclass
 from typing import Callable
 
@@ -22,16 +21,10 @@ from sync.formatting import format_minutes
 from sync.log import get_logger
 from sync.contracts.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
-from sync.notes.markdown_tables import (
-    escape_markdown_cell,
-    render_markdown_row,
-    split_markdown_row,
-)
 from sync.notes.sections import (
     extract_block,
     find_header_idx,
     replace_metrics_block,
-    section_bounds,
 )
 from sync.contracts.status import (
     SleepPayload,
@@ -49,18 +42,6 @@ from .goal_sync_service import GoalSyncService
 
 logger = get_logger(__name__)
 
-MAX_REBASE_ATTEMPTS = 2
-_REFLECTIONS_HEADER_TITLE = "Reflections"
-_REFLECTIONS_TABLE_HEADER = "| TIME | ENTRY |"
-_REFLECTIONS_TABLE_DIVIDER = "| ---- | ----- |"
-_REFLECTIONS_DIVIDER_CELL_RE = re.compile(r"^:?-{3,}:?$")
-_REFLECTIONS_TIME_FULL_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_REFLECTIONS_TIME_SHORT_HOUR_RE = re.compile(r"^\d:[0-5]\d$")
-_REFLECTIONS_TIME_PARTIAL_MIN_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]$")
-_REFLECTIONS_TIME_PREFIX_RE = re.compile(
-    r"^`?((?:[01]\d|2[0-3]):[0-5]\d|\d:[0-5]\d|(?:[01]\d|2[0-3]):[0-5])`?\s+(.*)$"
-)
-
 
 @dataclass(frozen=True)
 class _MetricsSectionResult:
@@ -75,13 +56,6 @@ class _MetricsSectionResult:
 class _ComposeResult:
     updated_lines: list[str]
     fm_changes: dict[str, str]
-
-
-@dataclass(frozen=True)
-class _ReflectionsRowRepair:
-    line: str
-    repaired: bool
-    reason: str | None
 
 
 class DailySyncService:
@@ -130,60 +104,41 @@ class DailySyncService:
             )
             return format_context_cell(wikilinks)
 
-        # External side effect runs once per sync call, outside rebase retries.
+        # External side effect runs once per sync call.
         self.status_source.write_study_times(day, sessions, day_schedule)
 
-        for attempt in range(1, MAX_REBASE_ATTEMPTS + 1):
-            with locked_note(file_path):
-                base_lines = self.note_store.read_or_create(
-                    file_path, self.template_path
+        with locked_note(file_path):
+            base_lines = self.note_store.read_or_create(file_path, self.template_path)
+        if not base_lines:
+            return None
+
+        compose_result = self._compose_day_lines(
+            base_lines,
+            day=day,
+            sessions=sessions,
+            day_schedule=day_schedule,
+            file_path=file_path,
+            context_for_session=context_callback,
+        )
+        updated_lines = compose_result.updated_lines
+
+        with locked_note(file_path):
+            current_lines = self.note_store.read(file_path) or []
+            if current_lines != base_lines:
+                logger.warning(
+                    "Detected concurrent update while syncing %s; skipped write.",
+                    file_path,
                 )
-            if not base_lines:
-                return None
+                return False
 
-            compose_result = self._compose_day_lines(
-                base_lines,
-                day=day,
-                sessions=sessions,
-                day_schedule=day_schedule,
-                file_path=file_path,
-                context_for_session=context_callback,
-            )
-            updated_lines = self._repair_reflections_tables(
-                compose_result.updated_lines,
-                note_path=file_path,
-            )
+            current_content = "\n".join(current_lines)
+            new_content = "\n".join(updated_lines)
+            if new_content.strip() == current_content.strip():
+                return False
+            self.note_store.write(file_path, updated_lines)
 
-            with locked_note(file_path):
-                current_lines = self.note_store.read(file_path) or []
-                if current_lines != base_lines:
-                    if attempt < MAX_REBASE_ATTEMPTS:
-                        logger.warning(
-                            "Detected concurrent update while syncing %s "
-                            "(attempt %d/%d); retrying with rebase.",
-                            file_path,
-                            attempt,
-                            MAX_REBASE_ATTEMPTS,
-                        )
-                        continue
-                    logger.warning(
-                        "Detected persistent concurrent updates while syncing %s "
-                        "after %d attempts; skipped write.",
-                        file_path,
-                        MAX_REBASE_ATTEMPTS,
-                    )
-                    return False
-
-                current_content = "\n".join(current_lines)
-                new_content = "\n".join(updated_lines)
-                if new_content.strip() == current_content.strip():
-                    return False
-                self.note_store.write(file_path, updated_lines)
-
-            self._log_frontmatter_changes(today_str, compose_result.fm_changes)
-            return True
-
-        return False
+        self._log_frontmatter_changes(today_str, compose_result.fm_changes)
+        return True
 
     def _compose_day_lines(
         self,
@@ -248,239 +203,6 @@ class DailySyncService:
                 logger.info("Updated %s", today_str + ".md")
             return
         logger.info("Updated %s", today_str + ".md")
-
-    @staticmethod
-    def _normalize_reflections_time(raw: str) -> str | None:
-        cleaned = raw.strip().strip("`").strip()
-        if not cleaned:
-            return None
-        if _REFLECTIONS_TIME_FULL_RE.fullmatch(cleaned):
-            return cleaned
-        if _REFLECTIONS_TIME_SHORT_HOUR_RE.fullmatch(cleaned):
-            hour, minute = cleaned.split(":")
-            return f"{int(hour):02d}:{minute}"
-        if _REFLECTIONS_TIME_PARTIAL_MIN_RE.fullmatch(cleaned):
-            hour, minute = cleaned.split(":")
-            return f"{hour}:{minute}0"
-        return None
-
-    @classmethod
-    def _extract_time_prefix(cls, value: str) -> tuple[str, str] | None:
-        match = _REFLECTIONS_TIME_PREFIX_RE.match(value.strip())
-        if not match:
-            return None
-        normalized = cls._normalize_reflections_time(match.group(1))
-        if not normalized:
-            return None
-        remainder = match.group(2).strip()
-        if not remainder:
-            return None
-        return normalized, remainder
-
-    @staticmethod
-    def _merge_cells(cells: list[str]) -> str:
-        return " | ".join(cell for cell in cells if cell)
-
-    @staticmethod
-    def _is_reflections_divider_cell(cell: str) -> bool:
-        return _REFLECTIONS_DIVIDER_CELL_RE.fullmatch(cell.strip()) is not None
-
-    @classmethod
-    def _classify_reflections_divider(
-        cls,
-        cells: list[str] | None,
-    ) -> tuple[str, str | None]:
-        if cells is None:
-            return "missing", None
-        if len(cells) >= 2 and all(
-            cls._is_reflections_divider_cell(cell) for cell in cells[:2]
-        ):
-            if len(cells) == 2:
-                return "divider", None
-            recovered_entry = cls._merge_cells(cells[2:]).strip()
-            return "merged_divider_and_row", recovered_entry or None
-        return "not_divider", None
-
-    @classmethod
-    def _render_reflections_row(cls, time_cell: str, entry_cell: str) -> str:
-        time_part = f"`{time_cell}`" if time_cell else ""
-        escaped_entry = escape_markdown_cell(entry_cell.strip())
-        return render_markdown_row([time_part, escaped_entry])
-
-    @classmethod
-    def _repair_reflections_row(cls, line: str) -> _ReflectionsRowRepair:
-        cells = split_markdown_row(line)
-        if cells is None:
-            return _ReflectionsRowRepair(line=line, repaired=False, reason=None)
-
-        original = line.strip()
-        if len(cells) == 2:
-            first_raw = cells[0].strip().strip("`").strip()
-            first_time = cls._normalize_reflections_time(cells[0])
-            if first_time is not None:
-                rendered = cls._render_reflections_row(first_time, cells[1])
-                if rendered == original:
-                    return _ReflectionsRowRepair(
-                        line=line,
-                        repaired=False,
-                        reason=None,
-                    )
-                reason = "canonicalized reflections row"
-                if _REFLECTIONS_TIME_SHORT_HOUR_RE.fullmatch(first_raw):
-                    reason = "normalized H:MM to HH:MM"
-                elif _REFLECTIONS_TIME_PARTIAL_MIN_RE.fullmatch(first_raw):
-                    reason = "normalized partial HH:M to HH:M0"
-                return _ReflectionsRowRepair(
-                    line=rendered, repaired=True, reason=reason
-                )
-
-            second_time = cls._normalize_reflections_time(cells[1])
-            if second_time is not None:
-                rendered = cls._render_reflections_row(second_time, cells[0])
-                return _ReflectionsRowRepair(
-                    line=rendered,
-                    repaired=True,
-                    reason="swapped misplaced TIME and ENTRY cells",
-                )
-
-            if not cells[1]:
-                prefixed = cls._extract_time_prefix(cells[0])
-                if prefixed:
-                    prefixed_time, prefixed_entry = prefixed
-                    rendered = cls._render_reflections_row(
-                        prefixed_time,
-                        prefixed_entry,
-                    )
-                    return _ReflectionsRowRepair(
-                        line=rendered,
-                        repaired=True,
-                        reason="split collapsed TIME and ENTRY cell",
-                    )
-
-            entry = cls._merge_cells(cells)
-            rendered = cls._render_reflections_row("", entry)
-            if rendered == original:
-                return _ReflectionsRowRepair(line=line, repaired=False, reason=None)
-            return _ReflectionsRowRepair(
-                line=rendered,
-                repaired=True,
-                reason="unable to recover TIME; preserved ENTRY with blank TIME",
-            )
-
-        first_time = cls._normalize_reflections_time(cells[0])
-        if first_time is not None:
-            merged_entry = " | ".join(cells[1:]).strip()
-            rendered = cls._render_reflections_row(first_time, merged_entry)
-            return _ReflectionsRowRepair(
-                line=rendered,
-                repaired=True,
-                reason="merged overflow ENTRY columns",
-            )
-
-        entry = cls._merge_cells(cells)
-        rendered = cls._render_reflections_row("", entry)
-        return _ReflectionsRowRepair(
-            line=rendered,
-            repaired=True,
-            reason="unable to recover TIME from overflow row; preserved ENTRY with blank TIME",
-        )
-
-    def _repair_reflections_tables(self, lines: list[str], note_path: str) -> list[str]:
-        reflections_idx = find_header_idx(lines, _REFLECTIONS_HEADER_TITLE)
-        if reflections_idx == -1:
-            return lines
-
-        _, reflections_end = section_bounds(lines, reflections_idx, level=2)
-        updated = list(lines)
-        abs_path = os.path.abspath(note_path)
-
-        idx = reflections_idx + 1
-        while idx < reflections_end:
-            header_cells = split_markdown_row(updated[idx])
-            if header_cells is None:
-                idx += 1
-                continue
-
-            if len(header_cells) < 2 or header_cells[-1].strip().lower() != "entry":
-                idx += 1
-                continue
-
-            if updated[idx].strip() != _REFLECTIONS_TABLE_HEADER:
-                updated[idx] = _REFLECTIONS_TABLE_HEADER
-                logger.warning(
-                    "Repaired Reflections table header in %s:%d",
-                    abs_path,
-                    idx + 1,
-                )
-
-            divider_idx = idx + 1
-            divider_cells = (
-                split_markdown_row(updated[divider_idx])
-                if divider_idx < reflections_end
-                else None
-            )
-            divider_kind, recovered_entry = self._classify_reflections_divider(
-                divider_cells
-            )
-            if divider_kind == "missing":
-                updated.insert(divider_idx, _REFLECTIONS_TABLE_DIVIDER)
-                reflections_end += 1
-                logger.warning(
-                    "Inserted Reflections table divider in %s:%d",
-                    abs_path,
-                    divider_idx + 1,
-                )
-            elif divider_kind == "divider":
-                if updated[divider_idx].strip() != _REFLECTIONS_TABLE_DIVIDER:
-                    updated[divider_idx] = _REFLECTIONS_TABLE_DIVIDER
-                    logger.warning(
-                        "Repaired Reflections table divider in %s:%d",
-                        abs_path,
-                        divider_idx + 1,
-                    )
-            elif divider_kind == "merged_divider_and_row":
-                updated[divider_idx] = _REFLECTIONS_TABLE_DIVIDER
-                logger.warning(
-                    "Recovered Reflections table divider in %s:%d",
-                    abs_path,
-                    divider_idx + 1,
-                )
-                if recovered_entry:
-                    recovered_line = self._render_reflections_row("", recovered_entry)
-                    recovered_idx = divider_idx + 1
-                    updated.insert(recovered_idx, recovered_line)
-                    reflections_end += 1
-                    logger.warning(
-                        "Recovered Reflections table row from divider in %s:%d",
-                        abs_path,
-                        recovered_idx + 1,
-                    )
-            else:
-                updated.insert(divider_idx, _REFLECTIONS_TABLE_DIVIDER)
-                reflections_end += 1
-                logger.warning(
-                    "Inserted Reflections table divider before first row in %s:%d",
-                    abs_path,
-                    divider_idx + 1,
-                )
-
-            row_idx = divider_idx + 1
-            while row_idx < reflections_end and updated[row_idx].lstrip().startswith(
-                "|"
-            ):
-                repair_result = self._repair_reflections_row(updated[row_idx])
-                if repair_result.repaired:
-                    updated[row_idx] = repair_result.line
-                    logger.warning(
-                        "Repaired Reflections table row in %s:%d (%s)",
-                        abs_path,
-                        row_idx + 1,
-                        repair_result.reason or "normalized row",
-                    )
-                row_idx += 1
-            idx = row_idx
-
-        return updated
 
     def _build_study_data(
         self,

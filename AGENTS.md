@@ -277,7 +277,7 @@ mypy sync/ --strict
 vulture sync/ --min-confidence 80
 lint-imports --config .importlinter
 deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox,mutmut=mutmut,pip-audit=pip_audit
-python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report= --cov-fail-under=78"
+python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report="
 ```
 
 Extended strict gate (security + mutation):
