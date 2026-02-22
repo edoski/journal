@@ -117,6 +117,10 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         if awak_counts:
             awakenings_total = sum(awak_counts)
 
+    # Extract sleep schedule times from first entry (one sleep session per day)
+    sleep_asleep_time = sleep_rows[0].asleep_time if sleep_rows else None
+    sleep_awake_time = sleep_rows[0].awake_time if sleep_rows else None
+
     activity_totals = defaultdict[str, float](float)
     interrupt_total = 0.0
     overrun_total = 0.0
@@ -150,6 +154,8 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "meditate": meditate,
         "awake_minutes": awake_total,
         "awakenings": awakenings_total,
+        "sleep_asleep_time": sleep_asleep_time,
+        "sleep_awake_time": sleep_awake_time,
         "activity_totals": dict(activity_totals),
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,

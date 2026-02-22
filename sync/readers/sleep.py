@@ -13,6 +13,7 @@ from .common import extract_block, parse_duration_to_minutes
 
 
 _SLEEP_HEADER_CELLS = ("time", "duration", "awake", "awakenings")
+_TIME_RANGE_RE = re.compile(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})")
 
 
 def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
@@ -51,6 +52,15 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
         if len(parts) < 5:
             continue
 
+        # Parse time range from TIME column
+        asleep_time: str | None = None
+        awake_time: str | None = None
+        time_cell = parts[1].replace("`", "")
+        time_match = _TIME_RANGE_RE.search(time_cell)
+        if time_match:
+            asleep_time = time_match.group(1)
+            awake_time = time_match.group(2)
+
         duration_min = parse_duration_to_minutes(parts[2])
         awake_min = parse_duration_to_minutes(parts[3])
 
@@ -66,6 +76,8 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
                 duration_minutes=duration_min or 0.0,
                 awake_minutes=awake_min,
                 awakenings=awakenings,
+                asleep_time=asleep_time,
+                awake_time=awake_time,
             )
         )
 

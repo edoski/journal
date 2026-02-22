@@ -16,6 +16,8 @@ class DailyAggregate(TypedDict):
     meditate: bool
     awake_minutes: float | None
     awakenings: int | None
+    sleep_asleep_time: str | None
+    sleep_awake_time: str | None
     activity_totals: dict[str, float]
     interrupt_minutes: float
     overrun_minutes: float

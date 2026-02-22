@@ -43,6 +43,40 @@ def test_parses_case_insensitive_header_and_numeric_awakenings():
     assert entry.duration_minutes == 480.0
     assert entry.awake_minutes == 20.0
     assert entry.awakenings == 2
+    assert entry.asleep_time == "23:00"
+    assert entry.awake_time == "07:00"
+
+
+def test_parses_backtick_wrapped_time_range():
+    entries = parse_sleep_table(
+        [
+            "### **SLEEP**",
+            "",
+            _HEADER,
+            _DIVIDER,
+            "| `22:30 - 06:45` | `8h15m` | `15m` | `1` |",
+            "",
+        ]
+    )
+    assert len(entries) == 1
+    assert entries[0].asleep_time == "22:30"
+    assert entries[0].awake_time == "06:45"
+
+
+def test_no_time_range_sets_none():
+    entries = parse_sleep_table(
+        [
+            "### **SLEEP**",
+            "",
+            _HEADER,
+            _DIVIDER,
+            "| N/A | `8h00m` | `20m` | `2` |",
+            "",
+        ]
+    )
+    assert len(entries) == 1
+    assert entries[0].asleep_time is None
+    assert entries[0].awake_time is None
 
 
 def test_stops_at_first_non_table_line():

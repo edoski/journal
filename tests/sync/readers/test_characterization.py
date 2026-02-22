@@ -70,6 +70,8 @@ def test_parse_daily_note_characterization(tmp_path):
         "meditate": True,
         "awake_minutes": 25.0,
         "awakenings": 3,
+        "sleep_asleep_time": "23:00",
+        "sleep_awake_time": "07:00",
         "activity_totals": {"coding": 120.0, "reading": 90.0},
         "interrupt_minutes": 100.0,
         "overrun_minutes": 65,

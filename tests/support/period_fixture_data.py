@@ -37,6 +37,8 @@ def payload_for_date(day: datetime.date) -> dict:
         "meditate": idx % 4 in {0, 1},
         "awake_minutes": float(10 + (idx % 5) * 5),
         "awakenings": int((idx % 4) + 1),
+        "sleep_asleep_time": f"{22 + (idx % 3)}:{(idx % 4) * 15:02d}",
+        "sleep_awake_time": f"{6 + (idx % 3)}:{(idx % 4) * 15:02d}",
         "activity_totals": (
             {"coding": coding, "reading": reading} if study > 0 else {}
         ),

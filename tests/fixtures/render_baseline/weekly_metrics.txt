@@ -99,7 +99,8 @@
 
 | ACTIVITY | AVERAGE |
 | -------- | ------- |
-| **SLEEP**      | `7h15m` |
+| **SCHEDULE**   | `23:11 - 07:11` |
+| **ASLEEP**     | `7h15m` |
 | **AWAKE**      | `19m` |
 | **AWAKENINGS** | `2.3` |
 

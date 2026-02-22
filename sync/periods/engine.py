@@ -135,6 +135,80 @@ def _awakenings_for_day(
     return payload["awakenings"]
 
 
+def _sleep_asleep_time_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> str | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_asleep_time"]
+
+
+def _sleep_awake_time_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> str | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_awake_time"]
+
+
+def _time_str_to_minutes(t: str) -> int:
+    """Convert 'HH:MM' to minutes since midnight."""
+    h, m = t.split(":")
+    return int(h) * 60 + int(m)
+
+
+def _minutes_to_time_str(minutes: int) -> str:
+    """Convert minutes since midnight to 'HH:MM'."""
+    minutes = minutes % (24 * 60)
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def _avg_time_of_day(times: list[str], is_evening: bool) -> str | None:
+    """Average a list of 'HH:MM' time-of-day strings.
+
+    For evening times (is_evening=True), treats times ≤ 12:00 as past-midnight
+    (offset by +24h) before averaging, so that e.g. 23:30 and 00:30 average
+    to 00:00 rather than 12:00.
+    """
+    if not times:
+        return None
+    total = 0
+    for t in times:
+        mins = _time_str_to_minutes(t)
+        if is_evening and mins <= 720:  # ≤ 12:00 → past midnight
+            mins += 1440
+        total += mins
+    avg = round(total / len(times))
+    return _minutes_to_time_str(avg)
+
+
+def _compute_avg_schedule(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, DailyAggregate],
+) -> str | None:
+    """Compute average sleep schedule as 'HH:MM - HH:MM' for given dates."""
+    asleep_times: list[str] = []
+    awake_times: list[str] = []
+    for d in dates:
+        if not daily_data.get(d):
+            continue
+        at = _sleep_asleep_time_for_day(daily_data, d)
+        wt = _sleep_awake_time_for_day(daily_data, d)
+        if at is not None:
+            asleep_times.append(at)
+        if wt is not None:
+            awake_times.append(wt)
+    avg_asleep = _avg_time_of_day(asleep_times, is_evening=True)
+    avg_awake = _avg_time_of_day(awake_times, is_evening=False)
+    if avg_asleep is not None and avg_awake is not None:
+        return f"{avg_asleep} - {avg_awake}"
+    return None
+
+
 def _activity_totals_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
@@ -191,6 +265,7 @@ def _sleep_stats_table_lines(
     sleep_avg: float | None,
     avg_awake: float | None,
     avg_awakenings: float | None,
+    avg_schedule: str | None = None,
 ) -> list[str]:
     if avg_awakenings is not None:
         awaken_val = (
@@ -203,7 +278,11 @@ def _sleep_stats_table_lines(
 
     rows = [
         [
-            "**SLEEP**     ",
+            "**SCHEDULE**  ",
+            f"`{avg_schedule}`" if avg_schedule else "",
+        ],
+        [
+            "**ASLEEP**    ",
             f"`{format_minutes(sleep_avg)}`" if sleep_avg is not None else "",
         ],
         [
@@ -401,7 +480,14 @@ def build_weekly_metrics(
         sum(awakening_values) / len(awakening_values) if awakening_values else None
     )
 
-    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(
+        _sleep_stats_table_lines(
+            sleep_avg,
+            avg_awake,
+            avg_awakenings,
+            avg_schedule=_compute_avg_schedule(dates, daily_data),
+        )
+    )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -736,7 +822,14 @@ def build_monthly_metrics(
         sum(awakening_values) / len(awakening_values) if awakening_values else None
     )
 
-    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(
+        _sleep_stats_table_lines(
+            sleep_avg,
+            avg_awake,
+            avg_awakenings,
+            avg_schedule=_compute_avg_schedule(dates, daily_data),
+        )
+    )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -1124,7 +1217,14 @@ def build_quarterly_metrics(
         sum(awakening_values) / len(awakening_values) if awakening_values else None
     )
 
-    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(
+        _sleep_stats_table_lines(
+            sleep_avg,
+            avg_awake,
+            avg_awakenings,
+            avg_schedule=_compute_avg_schedule(dates, daily_data),
+        )
+    )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
@@ -1563,7 +1663,14 @@ def build_yearly_metrics(
     )
     sleep_avg = current_metrics["sleep_avg_minutes"]
 
-    sleep_lines.extend(_sleep_stats_table_lines(sleep_avg, avg_awake, avg_awakenings))
+    sleep_lines.extend(
+        _sleep_stats_table_lines(
+            sleep_avg,
+            avg_awake,
+            avg_awakenings,
+            avg_schedule=_compute_avg_schedule(dates, daily_data),
+        )
+    )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
 
