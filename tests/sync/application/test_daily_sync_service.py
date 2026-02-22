@@ -313,7 +313,7 @@ def _extract_reflections_lines(note_path: Path) -> list[str]:
     return lines[start:end]
 
 
-def test_sync_day_preserves_non_canonical_reflections_block_verbatim(
+def test_sync_day_normalizes_reflections_header_and_colon_divider(
     monkeypatch, tmp_path
 ):
     day = datetime.date(2025, 1, 15)
@@ -321,6 +321,78 @@ def test_sync_day_preserves_non_canonical_reflections_block_verbatim(
     reflections_lines = [
         "| TIME    | ENTRY                                                                 |",
         "| :------- | -------: |",
+        "| `7:18` | keep timestamp exactly as typed |",
+    ]
+    note_path = _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=reflections_lines,
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized[0] == "| TIME | ENTRY |"
+    assert normalized[1] == "| ---- | ----- |"
+    assert ":" not in normalized[1]
+    assert normalized[2:] == reflections_lines[2:]
+
+
+def test_sync_day_normalizes_reflections_long_dash_divider(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    reflections_lines = [
+        "| TIME | ENTRY |",
+        "| ----------- | ------------------------------------------------ |",
+        "| `08:43` | long entry that should remain untouched |",
+    ]
+    note_path = _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=reflections_lines,
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized[0] == "| TIME | ENTRY |"
+    assert normalized[1] == "| ---- | ----- |"
+    assert normalized[2:] == reflections_lines[2:]
+
+
+def test_sync_day_inserts_missing_reflections_divider_before_first_row(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    reflections_lines = [
+        "| TIME | ENTRY |",
+        "| `08:43` | long reflection entry that should be preserved |",
+    ]
+    note_path = _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=reflections_lines,
+    )
+
+    changed = service.sync_day(day, [], _default_schedule())
+    assert changed is True
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized == [
+        "| TIME | ENTRY |",
+        "| ---- | ----- |",
+        "| `08:43` | long reflection entry that should be preserved |",
+    ]
+
+
+def test_sync_day_preserves_reflections_rows_verbatim_after_header_normalization(
+    monkeypatch, tmp_path
+):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    reflections_lines = [
+        "| TIME    | ENTRY                                                                 |",
+        "| ----------- | ------------------------------------------------ |",
         "| `7:18` | keep timestamp exactly as typed |",
         "| `08:43` | part one | part two |",
         "| broken time text | |",
@@ -333,28 +405,10 @@ def test_sync_day_preserves_non_canonical_reflections_block_verbatim(
 
     changed = service.sync_day(day, [], _default_schedule())
     assert changed is True
-    assert _extract_reflections_lines(note_path) == reflections_lines
-
-
-def test_sync_day_preserves_malformed_reflections_incomplete_row_verbatim(
-    monkeypatch, tmp_path
-):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    reflections_lines = [
-        "| TIME | ENTRY |",
-        "| ---- | ----- |",
-        "| `08:3 collapsed reflection content | |",
-    ]
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=reflections_lines,
-    )
-
-    changed = service.sync_day(day, [], _default_schedule())
-    assert changed is True
-    assert _extract_reflections_lines(note_path) == reflections_lines
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized[0] == "| TIME | ENTRY |"
+    assert normalized[1] == "| ---- | ----- |"
+    assert normalized[2:] == reflections_lines[2:]
 
 
 def test_sync_day_does_not_emit_reflections_repair_warnings(
@@ -384,7 +438,36 @@ def test_sync_day_does_not_emit_reflections_repair_warnings(
         journal_logger.setLevel(prior_level)
 
     assert changed is True
+    note_path = Path(journal_dir, f"{day:%Y-%m-%d}.md")
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized[0] == "| TIME | ENTRY |"
+    assert normalized[1] == "| ---- | ----- |"
+    assert ":" not in normalized[1]
     assert not any("Repaired Reflections" in rec.getMessage() for rec in caplog.records)
+
+
+def test_sync_day_reflections_header_normalization_is_idempotent(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    service, journal_dir = _build_service(monkeypatch, tmp_path)
+    note_path = _seed_daily_note(
+        journal_dir=journal_dir,
+        day=day,
+        reflections_lines=[
+            "| TIME is corrupted text | ENTRY |",
+            "| :------- | -------: |",
+            "| `08:3 collapsed reflection content | |",
+        ],
+    )
+
+    first = service.sync_day(day, [], _default_schedule())
+    second = service.sync_day(day, [], _default_schedule())
+
+    assert first is True
+    assert second is False
+    normalized = _extract_reflections_lines(note_path)
+    assert normalized[0] == "| TIME | ENTRY |"
+    assert normalized[1] == "| ---- | ----- |"
+    assert normalized[2] == "| `08:3 collapsed reflection content | |"
 
 
 def test_build_deviation_data_accrues_full_study_window_without_sessions():

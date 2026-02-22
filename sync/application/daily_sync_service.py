@@ -21,10 +21,12 @@ from sync.formatting import format_minutes
 from sync.log import get_logger
 from sync.contracts.deviation import DailyDeviationData
 from sync.notes.locking import locked_note
+from sync.notes.markdown_tables import split_markdown_row
 from sync.notes.sections import (
     extract_block,
     find_header_idx,
     replace_metrics_block,
+    section_bounds,
 )
 from sync.contracts.status import (
     SleepPayload,
@@ -41,6 +43,9 @@ from sync.study.section import build_study_section, extract_existing_data
 from .goal_sync_service import GoalSyncService
 
 logger = get_logger(__name__)
+_REFLECTIONS_HEADER_TITLE = "Reflections"
+_REFLECTIONS_TABLE_HEADER = "| TIME | ENTRY |"
+_REFLECTIONS_TABLE_DIVIDER = "| ---- | ----- |"
 
 
 @dataclass(frozen=True)
@@ -120,7 +125,9 @@ class DailySyncService:
             file_path=file_path,
             context_for_session=context_callback,
         )
-        updated_lines = compose_result.updated_lines
+        updated_lines = self._normalize_reflections_table_header(
+            compose_result.updated_lines
+        )
 
         with locked_note(file_path):
             current_lines = self.note_store.read(file_path) or []
@@ -203,6 +210,62 @@ class DailySyncService:
                 logger.info("Updated %s", today_str + ".md")
             return
         logger.info("Updated %s", today_str + ".md")
+
+    @staticmethod
+    def _is_reflections_divider_cell(cell: str) -> bool:
+        marker = cell.strip()
+        if marker.startswith(":"):
+            marker = marker[1:]
+        if marker.endswith(":"):
+            marker = marker[:-1]
+        return len(marker) >= 3 and set(marker) == {"-"}
+
+    def _normalize_reflections_table_header(self, lines: list[str]) -> list[str]:
+        reflections_idx = find_header_idx(lines, _REFLECTIONS_HEADER_TITLE)
+        if reflections_idx == -1:
+            return lines
+
+        _, reflections_end = section_bounds(lines, reflections_idx, level=2)
+        header_idx = -1
+        for idx in range(reflections_idx + 1, reflections_end):
+            cells = split_markdown_row(lines[idx])
+            if cells is None or len(cells) < 2:
+                continue
+            if cells[1].strip().lower() == "entry":
+                header_idx = idx
+                break
+
+        if header_idx == -1:
+            return lines
+
+        updated = list(lines)
+        changed = False
+        if updated[header_idx].strip() != _REFLECTIONS_TABLE_HEADER:
+            updated[header_idx] = _REFLECTIONS_TABLE_HEADER
+            changed = True
+
+        divider_idx = header_idx + 1
+        divider_cells = (
+            split_markdown_row(updated[divider_idx])
+            if divider_idx < reflections_end
+            else None
+        )
+        has_divider = (
+            divider_cells is not None
+            and len(divider_cells) >= 2
+            and all(
+                self._is_reflections_divider_cell(cell) for cell in divider_cells[:2]
+            )
+        )
+        if has_divider:
+            if updated[divider_idx].strip() != _REFLECTIONS_TABLE_DIVIDER:
+                updated[divider_idx] = _REFLECTIONS_TABLE_DIVIDER
+                changed = True
+        else:
+            updated.insert(divider_idx, _REFLECTIONS_TABLE_DIVIDER)
+            changed = True
+
+        return updated if changed else lines
 
     def _build_study_data(
         self,
