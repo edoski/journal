@@ -16,6 +16,7 @@ def test_load_sessions_delegates_to_flow_db(monkeypatch):
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(18, 0),
+        is_off_day=False,
     )
     expected = [
         {

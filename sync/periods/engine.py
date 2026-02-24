@@ -308,6 +308,8 @@ def build_weekly_metrics(
     prev_daily_data: dict[datetime.date, DailyAggregate],
     prev_week_label: str,
     media_bundle: MediaBundle,
+    *,
+    study_target_minutes: int | None,
     prior_week_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     """
@@ -353,6 +355,7 @@ def build_weekly_metrics(
         prev_metrics,
         "THIS WEEK",
         prev_week_label,
+        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="4-WK AVG" if ma_metrics else None,
         ma_training_unit="7",
@@ -529,6 +532,8 @@ def build_monthly_metrics(
     current_month_label: str,
     prev_month_label: str,
     media_bundle: MediaBundle,
+    *,
+    study_target_minutes: int | None,
     prior_month_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     """
@@ -568,6 +573,7 @@ def build_monthly_metrics(
         prev_metrics,
         current_month_label,
         prev_month_label,
+        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="3-MO AVG" if ma_metrics else None,
         ma_training_unit="mo",
@@ -892,6 +898,8 @@ def build_quarterly_metrics(
     prev_year: int,
     prev_quarter: int,
     media_bundle: MediaBundle,
+    *,
+    study_target_minutes: int | None,
     prior_quarter_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     today = datetime.date.today()
@@ -917,6 +925,7 @@ def build_quarterly_metrics(
         prev_metrics,
         "THIS QUARTER",
         prev_label,
+        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="4-QTR AVG" if ma_metrics else None,
         ma_training_unit="qtr",
@@ -1283,6 +1292,8 @@ def build_yearly_metrics(
     daily_data: dict[datetime.date, DailyAggregate],
     prev_daily_data: dict[datetime.date, DailyAggregate],
     media_bundle: MediaBundle,
+    *,
+    study_target_minutes: int | None,
     prior_year_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     today = datetime.date.today()
@@ -1307,6 +1318,7 @@ def build_yearly_metrics(
         prev_metrics,
         "THIS YEAR",
         f"**[[{year - 1}\\|LAST YEAR]]**",
+        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="3-YR AVG" if ma_metrics else None,
         ma_training_unit="yr",

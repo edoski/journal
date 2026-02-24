@@ -18,3 +18,4 @@ class DayScheduleProfile:
     lunch_start: datetime.time
     lunch_end: datetime.time
     workout_start: datetime.time
+    is_off_day: bool

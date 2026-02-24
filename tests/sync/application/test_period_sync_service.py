@@ -6,6 +6,7 @@ import datetime
 
 from sync.application.period_sync_service import PeriodSyncService
 from sync.contracts.media import MediaBundle
+from sync.contracts.schedule import DayScheduleProfile
 from sync.periods.windows import build_week_window, build_year_window
 
 
@@ -70,6 +71,18 @@ class _StubMediaSource:
         return MediaBundle(books=[], podcasts=[])
 
 
+class _StubScheduleSource:
+    def resolve_day(self, _day: datetime.date) -> DayScheduleProfile:
+        return DayScheduleProfile(
+            study_start=datetime.time(8, 0),
+            study_end=datetime.time(18, 0),
+            lunch_start=datetime.time(13, 0),
+            lunch_end=datetime.time(14, 0),
+            workout_start=datetime.time(18, 0),
+            is_off_day=False,
+        )
+
+
 def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
     goal_sync_service = _StubGoalSyncService()
@@ -78,6 +91,7 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
+        schedule_source=_StubScheduleSource(),
         goal_sync_service=goal_sync_service,
     )
 
@@ -92,9 +106,15 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
         "sync.application.period_sync_service.journal_path",
         lambda filename: str(base_dir / filename),
     )
+    captured_study_target: list[int | None] = []
+
+    def _stub_build_weekly_metrics(*_a, **kwargs):
+        captured_study_target.append(kwargs.get("study_target_minutes"))
+        return ["### **SUMMARY**", "", "week"]
+
     monkeypatch.setattr(
         "sync.application.period_sync_service.build_weekly_metrics",
-        lambda *_a, **_kw: ["### **SUMMARY**", "", "week"],
+        _stub_build_weekly_metrics,
     )
     monkeypatch.setattr(
         "sync.application.period_sync_service.write_note_metrics",
@@ -133,6 +153,7 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     assert enabled is True
     assert callable(rerun)
     assert media_source.calls == [(window.start, window.end)]
+    assert captured_study_target == [2520]
 
 
 def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
@@ -143,6 +164,7 @@ def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
+        schedule_source=_StubScheduleSource(),
         goal_sync_service=goal_sync_service,
     )
 
@@ -167,3 +189,46 @@ def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
     assert written[-1] == "year"
     assert goal_sync_service.year_calls == 1
     assert media_source.calls == [(window.start, window.end)]
+
+
+def test_sync_week_passes_none_when_schedule_resolution_fails(monkeypatch, tmp_path):
+    note_store = _StubNoteStore()
+    goal_sync_service = _StubGoalSyncService()
+    media_source = _StubMediaSource()
+
+    class _RaisingScheduleSource:
+        def resolve_day(self, _day: datetime.date) -> DayScheduleProfile:
+            raise ValueError("invalid schedule")
+
+    service = PeriodSyncService(
+        note_store=note_store,
+        aggregate_source=_StubAggregateSource(),
+        media_source=media_source,
+        schedule_source=_RaisingScheduleSource(),
+        goal_sync_service=goal_sync_service,
+    )
+
+    day = datetime.date(2026, 2, 6)
+    window = build_week_window(day)
+    note_path = str(tmp_path / window.filename)
+
+    captured_study_target: list[int | None] = []
+
+    def _stub_build_weekly_metrics(*_a, **kwargs):
+        captured_study_target.append(kwargs.get("study_target_minutes"))
+        return ["### **SUMMARY**", "", "week"]
+
+    monkeypatch.setattr(
+        "sync.application.period_sync_service.build_weekly_metrics",
+        _stub_build_weekly_metrics,
+    )
+    monkeypatch.setattr(
+        "sync.application.period_sync_service.write_note_metrics",
+        lambda path, lines, metrics_block, store: store.write(
+            path, lines + metrics_block
+        ),
+    )
+
+    service.sync_week(window, note_path, cleanup_previous=False)
+
+    assert captured_study_target == [None]

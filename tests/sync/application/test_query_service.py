@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 
 from sync.application.query_service import QueryService
+from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.query import (
     MetricHistoryPoint,
     MetricHistorySnapshot,
@@ -23,9 +24,24 @@ class _StubAggregateSource:
         return {day: self.by_day[day] for day in dates if day in self.by_day}
 
 
+class _StubScheduleSource:
+    def resolve_day(self, _day: datetime.date) -> DayScheduleProfile:
+        return DayScheduleProfile(
+            study_start=datetime.time(8, 0),
+            study_end=datetime.time(18, 0),
+            lunch_start=datetime.time(13, 0),
+            lunch_end=datetime.time(14, 0),
+            workout_start=datetime.time(18, 0),
+            is_off_day=False,
+        )
+
+
 def _service_with_data() -> tuple[QueryService, _StubAggregateSource]:
     source = _StubAggregateSource()
-    service = QueryService(aggregate_source=source)
+    service = QueryService(
+        aggregate_source=source,
+        schedule_source=_StubScheduleSource(),
+    )
     return service, source
 
 
@@ -101,9 +117,45 @@ def test_query_period_detail_contains_sorted_breakdowns():
     assert detail.days_total == 7
     assert detail.days_with_data == 1
     assert detail.rows[0].key == "study_minutes"
+    study_row = next(row for row in detail.rows if row.key == "study_minutes")
+    assert study_row.target == 2520.0
     assert detail.activity_breakdown[0].label == "Writing"
     assert detail.training_breakdown[0].label == "Workout"
     assert detail.screen_time_breakdown[0].label == "YouTube"
+
+
+def test_query_period_detail_sets_study_target_none_when_schedule_fails():
+    class _RaisingScheduleSource:
+        def resolve_day(self, _day: datetime.date) -> DayScheduleProfile:
+            raise ValueError("invalid schedule")
+
+    source = _StubAggregateSource()
+    service = QueryService(
+        aggregate_source=source,
+        schedule_source=_RaisingScheduleSource(),
+    )
+    anchor = datetime.date(2026, 2, 6)
+    source.by_day[anchor] = {
+        "study_minutes": 420.0,
+        "sleep_minutes": 470.0,
+        "mood": 6.5,
+        "workout": True,
+        "stretch": False,
+        "meditate": True,
+        "awake_minutes": 18.0,
+        "awakenings": 1,
+        "activity_totals": {"Writing": 180.0},
+        "interrupt_minutes": 15.0,
+        "overrun_minutes": 10.0,
+        "planned_break_minutes": 30.0,
+        "training_type_minutes": {"Workout": 50.0},
+        "training_type_sessions": {"Workout": 2},
+        "screen_time_totals": {"YouTube": 40.0},
+    }
+
+    detail = service.query_period_detail("week", anchor)
+    study_row = next(row for row in detail.rows if row.key == "study_minutes")
+    assert study_row.target is None
 
 
 def test_query_metric_history_returns_lookback_points(monkeypatch):

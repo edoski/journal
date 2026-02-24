@@ -72,11 +72,14 @@ def test_schedule_rules_resolve_default_weekday_and_date_precedence(tmp_path):
     assert monday.study_start == datetime.time(8, 0)
     assert monday.study_end == datetime.time(18, 0)
     assert monday.workout_start == datetime.time(18, 0)
+    assert monday.is_off_day is False
     assert wednesday.study_start == datetime.time(14, 30)
     assert wednesday.study_end == datetime.time(18, 0)
     assert wednesday.workout_start == datetime.time(18, 0)
+    assert wednesday.is_off_day is False
     assert friday_with_date_override.study_start == datetime.time(15, 0)
     assert friday_with_date_override.workout_start == datetime.time(18, 0)
+    assert friday_with_date_override.is_off_day is False
 
 
 def test_schedule_rules_date_override_updates_end_lunch_and_workout_fields(tmp_path):
@@ -406,6 +409,78 @@ def test_schedule_rules_reject_override_without_values(tmp_path):
         str(excinfo.value)
         == "PROTOCOL.md line 8: override rows must set at least one field"
     )
+
+
+def test_schedule_rules_reject_default_off_row(tmp_path):
+    path = _write_protocol(
+        tmp_path,
+        [
+            _HEADER,
+            _DIVIDER,
+            "| DEFAULT | OFF | OFF | 13:30 | 14:30 | 18:00 |",
+        ],
+    )
+    with pytest.raises(ValueError) as excinfo:
+        load_schedule_rules(path)
+    assert str(excinfo.value) == "PROTOCOL.md line 7: DEFAULT row cannot be OFF"
+
+
+def test_schedule_rules_reject_partial_off_row(tmp_path):
+    path = _write_protocol(
+        tmp_path,
+        [
+            _HEADER,
+            _DIVIDER,
+            _default_row(),
+            "| WEEKDAY:SUN | OFF | | | | |",
+        ],
+    )
+    with pytest.raises(ValueError) as excinfo:
+        load_schedule_rules(path)
+    assert (
+        str(excinfo.value)
+        == "PROTOCOL.md line 8: OFF must be used in both STUDY_START and STUDY_END"
+    )
+
+
+def test_schedule_rules_reject_off_row_with_non_blank_lunch_or_workout(tmp_path):
+    path = _write_protocol(
+        tmp_path,
+        [
+            _HEADER,
+            _DIVIDER,
+            _default_row(),
+            "| WEEKDAY:SUN | OFF | OFF | 13:30 | | |",
+        ],
+    )
+    with pytest.raises(ValueError) as excinfo:
+        load_schedule_rules(path)
+    assert (
+        str(excinfo.value)
+        == "PROTOCOL.md line 8: OFF rows must leave LUNCH_START, LUNCH_END, and WORKOUT_START blank"
+    )
+
+
+def test_schedule_rules_resolve_weekday_off_and_date_reenable_precedence(tmp_path):
+    path = _write_protocol(
+        tmp_path,
+        [
+            _HEADER,
+            _DIVIDER,
+            _default_row(),
+            "| WEEKDAY:SAT,SUN | OFF | OFF | | | |",
+            "| DATE:2026-02-22 | 10:00 | 12:00 | | | |",
+        ],
+    )
+    rules = load_schedule_rules(path)
+
+    saturday = rules.resolve_day(datetime.date(2026, 2, 21))
+    sunday = rules.resolve_day(datetime.date(2026, 2, 22))
+
+    assert saturday.is_off_day is True
+    assert sunday.is_off_day is False
+    assert sunday.study_start == datetime.time(10, 0)
+    assert sunday.study_end == datetime.time(12, 0)
 
 
 def test_schedule_rules_reject_duplicate_date_selector(tmp_path):

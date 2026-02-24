@@ -380,21 +380,22 @@ class DailySyncService:
     ) -> DailyDeviationData:
         deviation_data = DailyDeviationData()
 
+        study_window_minutes = 0.0
         day_study_start = datetime.datetime.combine(day, day_schedule.study_start)
         day_study_end = datetime.datetime.combine(day, day_schedule.study_end)
-        study_window_minutes = 0.0
-        if day_study_end > day_study_start:
+        if not day_schedule.is_off_day and day_study_end > day_study_start:
             study_window_minutes = (
                 day_study_end - day_study_start
             ).total_seconds() / 60
 
         if sessions:
-            first_start = sessions[0]["start"]
-            effective_first_start = min(first_start, day_study_end)
-            if effective_first_start > day_study_start:
-                deviation_data.late_study_start_minutes = (
-                    effective_first_start - day_study_start
-                ).total_seconds() / 60
+            if not day_schedule.is_off_day:
+                first_start = sessions[0]["start"]
+                effective_first_start = min(first_start, day_study_end)
+                if effective_first_start > day_study_start:
+                    deviation_data.late_study_start_minutes = (
+                        effective_first_start - day_study_start
+                    ).total_seconds() / 60
 
             deviation_data.interrupt_minutes = sum(
                 (session.get("interruptions_duration", 0) or 0) / 60

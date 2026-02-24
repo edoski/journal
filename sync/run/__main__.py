@@ -715,6 +715,8 @@ def _is_within_study_window(
     now: datetime.datetime,
     day_schedule: DayScheduleProfile,
 ) -> bool:
+    if day_schedule.is_off_day:
+        return False
     current_minutes = now.hour * 60 + now.minute
     start_minutes = day_schedule.study_start.hour * 60 + day_schedule.study_start.minute
     end_minutes = day_schedule.study_end.hour * 60 + day_schedule.study_end.minute
@@ -772,6 +774,10 @@ def cmd_session_skip(args: argparse.Namespace) -> int:
         logger.warning(
             "Skip no-op: failed to resolve schedule for %s: %s", now.date(), exc
         )
+        return 0
+
+    if day_schedule.is_off_day:
+        logger.info("Skip no-op: day is configured OFF in schedule")
         return 0
 
     if not _is_within_study_window(now, day_schedule):

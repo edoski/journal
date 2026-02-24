@@ -89,6 +89,14 @@ class IdealSchedule:
 
 
 @dataclass(frozen=True)
+class StudyCadenceConfig:
+    """Canonical planned study cadence used for period target calculations."""
+
+    study_block_min: int = 90
+    break_min: int = 30
+
+
+@dataclass(frozen=True)
 class ChartConfig:
     """Chart dimension constants for bar charts and grids."""
 
@@ -127,6 +135,7 @@ class ScreenTimeConfig:
 
 # Singleton instances
 IDEAL = IdealSchedule()
+STUDY_CADENCE = StudyCadenceConfig()
 CHART = ChartConfig()
 RENDER = RenderConfig()
 SCREEN_TIME = ScreenTimeConfig()

@@ -223,6 +223,8 @@ journal/
   - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
   - required `DEFAULT` row with full values
   - optional `WEEKDAY:...` and `DATE:YYYY-MM-DD` override rows
+  - `OFF` is allowed only as `STUDY_START=OFF` and `STUDY_END=OFF` on non-`DEFAULT` rows
+  - `OFF` rows must leave `LUNCH_START`, `LUNCH_END`, and `WORKOUT_START` blank
 
 ## Data Flow
 
@@ -247,6 +249,7 @@ python -m sync.run period weekly [--date YYYY-MM-DD] [--no-cleanup]
 python -m sync.run period monthly [--month YYYY-MM] [--no-cleanup]
 python -m sync.run period quarterly [--quarter YYYY-Q#]
 python -m sync.run period yearly [--year YYYY]
+python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
 ```
 
 ### Study CLI
@@ -346,7 +349,7 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `REMINDERS_PATH`, `SCHEDULE_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
+- `REMINDERS_PATH`, `SCHEDULE_PATH`, `GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
 - `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`

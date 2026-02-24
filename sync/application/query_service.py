@@ -37,8 +37,13 @@ from sync.periods.windows import (
     build_year_window,
 )
 from sync.ports.daily_aggregates import DailyAggregateSource
+from sync.ports.schedule import ScheduleSource
+from sync.log import get_logger
+from sync.target_policy import study_target_minutes_for_dates
 from sync.target_policy import target_for_metric as resolve_target_for_metric
 from sync.target_policy import training_type_target
+
+logger = get_logger(__name__)
 
 _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
     MetricDefinition(
@@ -147,9 +152,11 @@ class QueryService:
         self,
         *,
         aggregate_source: DailyAggregateSource,
+        schedule_source: ScheduleSource,
         journal_dir: str = JOURNAL_DIR,
     ) -> None:
         self.aggregate_source = aggregate_source
+        self.schedule_source = schedule_source
         self.journal_dir = journal_dir
 
     def period_bounds(
@@ -307,6 +314,25 @@ class QueryService:
             "days_elapsed": period_metrics["days_up_to_today"],
         }
 
+    def _resolve_study_target_minutes(
+        self,
+        dates: list[datetime.date],
+    ) -> int | None:
+        if not dates:
+            return None
+        try:
+            return study_target_minutes_for_dates(
+                dates, self.schedule_source.resolve_day
+            )
+        except Exception as exc:
+            logger.warning(
+                "Study target unavailable for %s -> %s: %s",
+                dates[0].isoformat(),
+                dates[-1].isoformat(),
+                exc,
+            )
+            return None
+
     def _moving_average_for_metric(
         self,
         metric: str,
@@ -367,10 +393,18 @@ class QueryService:
         previous_snapshot = self.query_by_period(period, prev_anchor)
 
         days_total = int(current_metrics.get("days_total") or len(dates))
+        study_target_minutes = self._resolve_study_target_minutes(dates)
         rows: list[PeriodMetricRow] = []
         for definition in self.metric_definitions():
             current_value = current_metrics.get(definition.key)
             previous_value = previous_snapshot.metrics.get(definition.key)
+            target_value = resolve_target_for_metric(definition.key, days_total)
+            if definition.key == "study_minutes":
+                target_value = (
+                    float(study_target_minutes)
+                    if study_target_minutes is not None
+                    else None
+                )
             rows.append(
                 PeriodMetricRow(
                     key=definition.key,
@@ -386,7 +420,7 @@ class QueryService:
                         period,
                         anchor_date,
                     ),
-                    target=resolve_target_for_metric(definition.key, days_total),
+                    target=target_value,
                 )
             )
 

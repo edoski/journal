@@ -74,6 +74,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         assert lines[0] == "### **SUMMARY**"
@@ -110,6 +111,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
 
@@ -144,6 +146,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
 
@@ -177,6 +180,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         assert lines == [
@@ -228,6 +232,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics=ma_metrics,
                 ma_label="3W AVG",
                 ma_training_unit="7",
@@ -275,6 +280,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics={"study_avg_minutes": 360},
                 ma_label=None,
             )
@@ -285,6 +291,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics=None,
                 ma_label="3W AVG",
             )
@@ -328,6 +335,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         study_line = next(line for line in lines if "**STUDY**" in line)
@@ -358,6 +366,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WINDOW",
                 previous_label="LAST WINDOW",
+                study_target_minutes=2520,
             )
         )
         study_line = next(line for line in lines if "**STUDY**" in line)
@@ -388,6 +397,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         study_line = next(line for line in lines if "**STUDY**" in line)
@@ -419,6 +429,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         study_line = next(line for line in lines if "**STUDY**" in line)
@@ -450,6 +461,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WINDOW",
                 previous_label="LAST WINDOW",
+                study_target_minutes=2520,
             )
         )
         study_line = next(line for line in lines if "**STUDY**" in line)
@@ -482,6 +494,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         sleep_line = next(line for line in lines if "**SLEEP**" in line)
@@ -514,6 +527,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics={"study_avg_minutes": 0},
                 ma_label="3W AVG",
                 ma_training_unit="7",
@@ -560,6 +574,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
         empty_bar = "." * custom_render.progress_bar_width
@@ -578,6 +593,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
 
@@ -616,6 +632,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
             )
         )
 
@@ -656,6 +673,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics={},
                 ma_label="3W AVG",
                 ma_training_unit="7",
@@ -695,6 +713,7 @@ class TestSummaryMetricsTable:
                 previous_metrics=previous,
                 current_label="THIS WEEK",
                 previous_label="LAST WEEK",
+                study_target_minutes=2520,
                 ma_metrics={"study_avg_minutes": 30, "sleep_avg_minutes": 45},
                 ma_label="3W AVG",
                 ma_training_unit="7",
@@ -704,6 +723,74 @@ class TestSummaryMetricsTable:
         sleep_line = next(line for line in lines if "**SLEEP**" in line)
         assert "| `0h30m/day` |" in study_line
         assert "| `0h45m/night` |" in sleep_line
+
+    def test_study_target_unavailable_renders_emdash_target_and_progress(self):
+        current = {
+            "study_total_minutes": 420,
+            "sleep_avg_minutes": 480,
+            "mood_avg": 7.5,
+            "workout_count": 5,
+            "stretch_count": 3,
+            "mindful_count": 4,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+        previous = {
+            "study_total_minutes": 350,
+            "sleep_avg_minutes": 450,
+            "mood_avg": 7.0,
+            "workout_count": 4,
+            "stretch_count": 4,
+            "mindful_count": 3,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+        lines = render_table(
+            SummaryMetricsTableSpec(
+                current_metrics=current,
+                previous_metrics=previous,
+                current_label="THIS WEEK",
+                previous_label="LAST WEEK",
+                study_target_minutes=None,
+            )
+        )
+
+        study_line = next(line for line in lines if "**STUDY**" in line)
+        assert "| `—` | `—` |" in study_line
+
+    def test_study_target_uses_provided_minutes_for_label_and_progress(self):
+        current = {
+            "study_total_minutes": 420,
+            "sleep_avg_minutes": 480,
+            "mood_avg": 7.5,
+            "workout_count": 5,
+            "stretch_count": 3,
+            "mindful_count": 4,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+        previous = {
+            "study_total_minutes": 350,
+            "sleep_avg_minutes": 450,
+            "mood_avg": 7.0,
+            "workout_count": 4,
+            "stretch_count": 4,
+            "mindful_count": 3,
+            "total_days": 7,
+            "days_up_to_today": 7,
+        }
+        lines = render_table(
+            SummaryMetricsTableSpec(
+                current_metrics=current,
+                previous_metrics=previous,
+                current_label="THIS WEEK",
+                previous_label="LAST WEEK",
+                study_target_minutes=300,
+            )
+        )
+
+        study_line = next(line for line in lines if "**STUDY**" in line)
+        assert "| `5h/wk` | `█████████████████████████` `140%` |" in study_line
 
 
 class TestScreenTrendTable:

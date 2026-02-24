@@ -15,6 +15,7 @@ from sync.formatting import (
     format_progress_bar,
     format_training_ratio,
 )
+from sync.target_policy import study_target_label as format_study_target_label
 from sync.target_policy import summary_targets
 
 from ..specs import SummaryMetricsTableSpec
@@ -69,20 +70,20 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     ma_training_unit = spec.ma_training_unit
     period_type = spec.period_type
     total_days = spec.total_days
+    study_target_minutes = spec.study_target_minutes
 
     lines = ["### **SUMMARY**", ""]
 
     show_ma = ma_metrics is not None and ma_label is not None
 
     targets = summary_targets(period_type, total_days)
-    study_target_minutes = targets.study_minutes
     sleep_target_minutes = targets.sleep_minutes
     mindful_target = targets.training.mindful
     workout_target = targets.training.workout
     stretch_target = targets.training.stretch
     mood_target = targets.mood
 
-    study_target_label = targets.study_label
+    study_target_label = format_study_target_label(period_type, study_target_minutes)
     sleep_target_label = targets.sleep_label
     mood_target_label = targets.mood_label
     mindful_target_label = targets.training.mindful_label
@@ -136,21 +137,25 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         curr_study_avg_mins, prev_study_avg_mins
     )
 
-    study_bar, study_progress_pct = format_progress_bar(
-        curr_study_total,
-        study_target_minutes,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
+    if study_target_minutes is None:
+        study_progress_cell = "`—`"
+    else:
+        study_bar, study_progress_pct = format_progress_bar(
+            curr_study_total,
+            float(study_target_minutes),
+            RENDER.progress_bar_width,
+            RENDER.progress_filled,
+            RENDER.progress_empty,
+        )
+        study_progress_cell = f"`{study_bar}` `{study_progress_pct}%`"
 
     if show_ma:
         lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` | `{study_target_label}` | `{study_bar}` `{study_progress_pct}%` |"
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` | `{study_target_label}` | {study_progress_cell} |"
         )
     else:
         lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{study_target_label}` | `{study_bar}` `{study_progress_pct}%` |"
+            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{study_target_label}` | {study_progress_cell} |"
         )
 
     curr_sleep_avg = _metric_float_or(current_metrics, "sleep_avg_minutes", 0.0)

@@ -34,6 +34,7 @@ class SummaryMetricsTableSpec:
     previous_metrics: Mapping[str, MetricValue]
     current_label: str
     previous_label: str
+    study_target_minutes: int | None
     ma_metrics: Mapping[str, MetricValue] | None = None
     ma_label: str | None = None
     ma_training_unit: str = "7"

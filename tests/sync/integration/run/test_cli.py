@@ -31,6 +31,10 @@ def _media_add_args(
     return argparse.Namespace(url=url, date=date, title=title, host=host)
 
 
+def _grades_sync_args(path: str | None = None) -> argparse.Namespace:
+    return argparse.Namespace(path=path)
+
+
 def _default_schedule() -> DayScheduleProfile:
     return DayScheduleProfile(
         study_start=time(8, 0),
@@ -38,6 +42,7 @@ def _default_schedule() -> DayScheduleProfile:
         lunch_start=time(13, 30),
         lunch_end=time(14, 30),
         workout_start=time(18, 0),
+        is_off_day=False,
     )
 
 
@@ -441,6 +446,38 @@ def test_session_skip_noops_when_schedule_cannot_be_resolved(
     assert rc == 0
 
 
+def test_session_skip_noops_when_schedule_day_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
+    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 19, 10, 30))
+    monkeypatch.setattr(
+        cli,
+        "_resolve_day_schedule",
+        lambda _day: DayScheduleProfile(
+            study_start=time(8, 0),
+            study_end=time(18, 0),
+            lunch_start=time(13, 30),
+            lunch_end=time(14, 30),
+            workout_start=time(18, 0),
+            is_off_day=True,
+        ),
+    )
+
+    def _fail_run(_script: str) -> str:
+        raise AssertionError("AppleScript should not run for OFF schedule day")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
+
+    def _fail_conn(*_args, **_kwargs):
+        raise AssertionError("DB should not be opened for OFF schedule day")
+
+    monkeypatch.setattr(cli, "get_connection", _fail_conn)
+
+    rc = cli.cmd_session_skip(_skip_args())
+    assert rc == 0
+
+
 def test_session_skip_noops_when_now_outside_schedule_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -455,6 +492,7 @@ def test_session_skip_noops_when_now_outside_schedule_window(
             lunch_start=time(13, 30),
             lunch_end=time(14, 30),
             workout_start=time(18, 0),
+            is_off_day=False,
         ),
     )
 
@@ -688,6 +726,63 @@ def test_media_podcast_add_fails_on_invalid_date(
     assert rc == 1
 
 
+def _write_grades_note(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "## YEAR 1",
+                "| EXAM | CFU | DONE | GRADE |",
+                "| ---- | --- | ---- | ----- |",
+                "| ALGORITHMS | 6 | 1 | 30L |",
+                "| ENGLISH B1 | 3 | 1 | ID |",
+                "",
+                "## YEAR 2",
+                "| EXAM | CFU | DONE | GRADE |",
+                "| ---- | --- | ---- | ----- |",
+                "| MICROECONOMIA | 6 | 1 | 24 |",
+                "",
+                "## OVERALL",
+                "| AVERAGE GRADE | % | CFU | LODE | BONUS | THESIS | FINAL |",
+                "| ------------- | - | --- | ---- | ----- | ------ | ----- |",
+                "| 0 | 0 | 0 | 0 | 0 | 6 | 0 |",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def test_grades_sync_updates_overall_values(tmp_path: Path) -> None:
+    grades_path = tmp_path / "GRADES.md"
+    _write_grades_note(grades_path)
+
+    rc = cli.cmd_grades_sync(_grades_sync_args(str(grades_path)))
+
+    assert rc == 0
+    content = grades_path.read_text(encoding="utf-8")
+    assert "| 27.00 | 0.90 | 15 | 1 | 0 | 6 | 105 |" in content
+
+
+def test_grades_sync_uses_default_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    grades_path = tmp_path / "GRADES.md"
+    _write_grades_note(grades_path)
+    monkeypatch.setattr(cli, "GRADES_PATH", str(grades_path))
+
+    rc = cli.cmd_grades_sync(_grades_sync_args())
+
+    assert rc == 0
+    content = grades_path.read_text(encoding="utf-8")
+    assert "| 27.00 | 0.90 | 15 | 1 | 0 | 6 | 105 |" in content
+
+
+def test_grades_sync_returns_error_when_file_is_missing(tmp_path: Path) -> None:
+    rc = cli.cmd_grades_sync(_grades_sync_args(str(tmp_path / "missing.md")))
+    assert rc == 1
+
+
 def test_cli_parser_has_expected_commands() -> None:
     parser = cli.build_parser()
 
@@ -737,6 +832,11 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.date == "2026-02-20"
     assert args.title == "Podcast Title"
     assert args.host == "Podcast Host"
+
+    args = parser.parse_args(["grades", "sync", "--path", "/tmp/GRADES.md"])
+    assert args.domain == "grades"
+    assert args.grades_command == "sync"
+    assert args.path == "/tmp/GRADES.md"
 
     with pytest.raises(SystemExit):
         parser.parse_args(["session-preview", "-n", "2"])

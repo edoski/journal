@@ -27,6 +27,7 @@ def _default_schedule() -> DayScheduleProfile:
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(18, 0),
+        is_off_day=False,
     )
 
 

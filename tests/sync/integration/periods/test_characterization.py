@@ -16,6 +16,7 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
+from sync.target_policy import summary_targets
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 from tests.support.summary_assertions import assert_summary_targets_and_progress
 
@@ -60,6 +61,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
     second_lines = period_engine.build_weekly_metrics(
@@ -69,6 +71,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
 
@@ -110,6 +113,10 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "month",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_month_metrics=prior_month_metrics,
     )
     second_lines = period_engine.build_monthly_metrics(
@@ -121,6 +128,10 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "month",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_month_metrics=prior_month_metrics,
     )
 
@@ -162,6 +173,10 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "quarter",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
     second_lines = period_engine.build_quarterly_metrics(
@@ -173,6 +188,10 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "quarter",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
 
@@ -217,6 +236,10 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "year",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_year_metrics=prior_year_metrics,
     )
     second_lines = period_engine.build_yearly_metrics(
@@ -228,6 +251,10 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "year",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_year_metrics=prior_year_metrics,
     )
 

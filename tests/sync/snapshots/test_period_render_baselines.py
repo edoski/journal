@@ -18,6 +18,7 @@ from sync.dates import (
 )
 from sync.metrics import compute_period_metrics
 from sync.contracts.goals import Goal
+from sync.target_policy import summary_targets
 from sync.writers.goals import build_goals_block, render_goal_lines
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 from tests.support.snapshot_templates import normalize_summary_dynamic_cells
@@ -69,6 +70,7 @@ def test_weekly_metrics_snapshot(monkeypatch):
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
     dates = [start + datetime.timedelta(days=i) for i in range(7)]
@@ -108,6 +110,10 @@ def test_monthly_metrics_snapshot(monkeypatch):
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "month",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_month_metrics=prior_month_metrics,
     )
     dates = list(daterange(start, end))
@@ -147,6 +153,10 @@ def test_quarterly_metrics_snapshot(monkeypatch):
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "quarter",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
     dates = list(daterange(start, end))
@@ -189,6 +199,10 @@ def test_yearly_metrics_snapshot(monkeypatch):
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        study_target_minutes=summary_targets(
+            "year",
+            len(list(daterange(start, end))),
+        ).study_minutes,
         prior_year_metrics=prior_year_metrics,
     )
     dates = list(daterange(start, end))

@@ -32,14 +32,34 @@ class _ScheduleOverride:
     lunch_start: datetime.time | None = None
     lunch_end: datetime.time | None = None
     workout_start: datetime.time | None = None
+    is_off_day: bool | None = None
 
     def apply(self, profile: DayScheduleProfile) -> DayScheduleProfile:
         return DayScheduleProfile(
-            study_start=self.study_start or profile.study_start,
-            study_end=self.study_end or profile.study_end,
-            lunch_start=self.lunch_start or profile.lunch_start,
-            lunch_end=self.lunch_end or profile.lunch_end,
-            workout_start=self.workout_start or profile.workout_start,
+            study_start=(
+                self.study_start
+                if self.study_start is not None
+                else profile.study_start
+            ),
+            study_end=self.study_end
+            if self.study_end is not None
+            else profile.study_end,
+            lunch_start=(
+                self.lunch_start
+                if self.lunch_start is not None
+                else profile.lunch_start
+            ),
+            lunch_end=self.lunch_end
+            if self.lunch_end is not None
+            else profile.lunch_end,
+            workout_start=(
+                self.workout_start
+                if self.workout_start is not None
+                else profile.workout_start
+            ),
+            is_off_day=(
+                self.is_off_day if self.is_off_day is not None else profile.is_off_day
+            ),
         )
 
 
@@ -167,6 +187,34 @@ def _parse_rule(
     )
 
 
+def _parse_study_window_cells(
+    study_start_raw: str,
+    study_end_raw: str,
+    *,
+    line_no: int,
+) -> tuple[datetime.time | None, datetime.time | None, bool]:
+    start_is_off = study_start_raw == "OFF"
+    end_is_off = study_end_raw == "OFF"
+    if start_is_off != end_is_off:
+        raise ValueError(
+            f"PROTOCOL.md line {line_no}: OFF must be used in both STUDY_START and STUDY_END"
+        )
+    if start_is_off and end_is_off:
+        return None, None, True
+
+    study_start = _parse_optional_time(
+        study_start_raw,
+        line_no=line_no,
+        column="STUDY_START",
+    )
+    study_end = _parse_optional_time(
+        study_end_raw,
+        line_no=line_no,
+        column="STUDY_END",
+    )
+    return study_start, study_end, False
+
+
 def load_schedule_rules(path: str) -> ScheduleRules:
     """Parse strict schedule rules from PROTOCOL.md."""
     lines = safe_read_file(path)
@@ -213,26 +261,57 @@ def load_schedule_rules(path: str) -> ScheduleRules:
             )
 
         rule_raw = cells[0]
-        study_start = _parse_optional_time(
-            cells[1], line_no=idx + 1, column="STUDY_START"
+        kind, selector = _parse_rule(rule_raw, line_no=idx + 1)
+        study_start, study_end, is_off_row = _parse_study_window_cells(
+            cells[1].strip(),
+            cells[2].strip(),
+            line_no=idx + 1,
         )
-        study_end = _parse_optional_time(cells[2], line_no=idx + 1, column="STUDY_END")
-        lunch_start = _parse_optional_time(
-            cells[3], line_no=idx + 1, column="LUNCH_START"
+
+        if is_off_row and kind == "default":
+            raise ValueError(f"PROTOCOL.md line {idx + 1}: DEFAULT row cannot be OFF")
+        if is_off_row and any(cells[col].strip() for col in (3, 4, 5)):
+            raise ValueError(
+                f"PROTOCOL.md line {idx + 1}: OFF rows must leave LUNCH_START, LUNCH_END, and WORKOUT_START blank"
+            )
+
+        lunch_start = (
+            None
+            if is_off_row
+            else _parse_optional_time(cells[3], line_no=idx + 1, column="LUNCH_START")
         )
-        lunch_end = _parse_optional_time(cells[4], line_no=idx + 1, column="LUNCH_END")
-        workout_start = _parse_optional_time(
-            cells[5], line_no=idx + 1, column="WORKOUT_START"
+        lunch_end = (
+            None
+            if is_off_row
+            else _parse_optional_time(cells[4], line_no=idx + 1, column="LUNCH_END")
         )
+        workout_start = (
+            None
+            if is_off_row
+            else _parse_optional_time(
+                cells[5],
+                line_no=idx + 1,
+                column="WORKOUT_START",
+            )
+        )
+
+        off_day_override: bool | None
+        if is_off_row:
+            off_day_override = True
+        elif study_start is not None or study_end is not None:
+            off_day_override = False
+        else:
+            off_day_override = None
+
         override = _ScheduleOverride(
             study_start=study_start,
             study_end=study_end,
             lunch_start=lunch_start,
             lunch_end=lunch_end,
             workout_start=workout_start,
+            is_off_day=off_day_override,
         )
 
-        kind, selector = _parse_rule(rule_raw, line_no=idx + 1)
         if kind == "default":
             if default_profile is not None:
                 raise ValueError(
@@ -262,10 +341,11 @@ def load_schedule_rules(path: str) -> ScheduleRules:
                 lunch_start=lunch_start,
                 lunch_end=lunch_end,
                 workout_start=workout_start,
+                is_off_day=False,
             )
             continue
 
-        if all(
+        if not is_off_row and all(
             value is None
             for value in (
                 override.study_start,

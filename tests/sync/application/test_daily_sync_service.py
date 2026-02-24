@@ -122,6 +122,7 @@ def _default_schedule() -> DayScheduleProfile:
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(18, 0),
+        is_off_day=False,
     )
 
 
@@ -478,6 +479,7 @@ def test_build_deviation_data_accrues_full_study_window_without_sessions():
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(18, 0),
+        is_off_day=False,
     )
 
     deviation = DailySyncService._build_deviation_data(
@@ -498,6 +500,7 @@ def test_build_deviation_data_uses_schedule_study_start_for_lateness():
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(18, 0),
+        is_off_day=False,
     )
     session_start = datetime.datetime.combine(day, datetime.time(15, 0))
     session_end = datetime.datetime.combine(day, datetime.time(16, 0))
@@ -528,6 +531,7 @@ def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
         lunch_start=datetime.time(13, 30),
         lunch_end=datetime.time(14, 30),
         workout_start=datetime.time(19, 0),
+        is_off_day=False,
     )
     training = TrainingStatus(
         workout_entries=(
@@ -549,3 +553,43 @@ def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
     )
 
     assert deviation.late_workout_start_minutes == 15.0
+
+
+def test_build_deviation_data_off_day_has_no_late_study_start_penalty():
+    day = datetime.date(2026, 2, 21)
+    schedule = DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(19, 0),
+        is_off_day=True,
+    )
+    session_start = datetime.datetime.combine(day, datetime.time(15, 0))
+    session_end = datetime.datetime.combine(day, datetime.time(16, 0))
+    sessions = [
+        {
+            "start": session_start,
+            "end": session_end,
+            "interruptions_duration": 30,
+            "break_overrun": 5,
+        }
+    ]
+
+    no_sessions_deviation = DailySyncService._build_deviation_data(
+        day,
+        schedule,
+        [],
+        TrainingStatus(),
+    )
+    with_sessions_deviation = DailySyncService._build_deviation_data(
+        day,
+        schedule,
+        sessions,
+        TrainingStatus(),
+    )
+
+    assert no_sessions_deviation.late_study_start_minutes == 0.0
+    assert with_sessions_deviation.late_study_start_minutes == 0.0
+    assert with_sessions_deviation.interrupt_minutes == 0.5
+    assert with_sessions_deviation.overrun_minutes == 5
