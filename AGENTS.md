@@ -252,6 +252,14 @@ python -m sync.run period yearly [--year YYYY]
 python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
 ```
 
+### Snapshot baseline fixtures
+
+```bash
+python tools/regenerate_baselines.py
+python tools/regenerate_baselines.py --check
+python tools/regenerate_baselines.py --only weekly_metrics.txt --only yearly_metrics.txt
+```
+
 ### Study CLI
 
 ```bash
@@ -333,7 +341,7 @@ python3 -m pytest tests/ -v --tb=short --cov=sync --cov-branch --cov-report=term
 Validate:
 
 - idempotency: repeated sync runs produce stable output.
-- period rendering snapshots: line-for-line invariance unless intentionally changed.
+- period rendering snapshots: strict line-for-line invariance against deterministic fixture generators; regenerate via `python tools/regenerate_baselines.py` when changes are intentional.
 - goal reconciliation: source/mirror reopen+completion behavior remains correct.
 - parsing edge cases: open sessions, malformed shortcut payloads, missing files.
 - period historical flags (`--date`, `--month`, `--quarter`, `--year`).
