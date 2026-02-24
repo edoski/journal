@@ -15,6 +15,7 @@ from .goals import parse_goal_tasks, resolve_deadline, parse_goal_date
 from .media import scan_books, scan_podcasts
 from .screen_time import parse_procrastination_table
 from .schedule import load_schedule_rules
+from .grades import load_grades, parse_grades_lines
 
 
 __all__ = [
@@ -37,4 +38,7 @@ __all__ = [
     "parse_procrastination_table",
     # Schedule
     "load_schedule_rules",
+    # Grades
+    "load_grades",
+    "parse_grades_lines",
 ]

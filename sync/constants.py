@@ -26,6 +26,7 @@ YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 # Reminder rules markdown path (required, user-managed)
 REMINDERS_PATH = PATHS.reminders_path
 SCHEDULE_PATH = PATHS.schedule_path
+GRADES_PATH = PATHS.grades_path
 
 # Cache directories
 JOURNAL_CACHE_DIR = PATHS.journal_cache_dir

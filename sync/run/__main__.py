@@ -36,10 +36,12 @@ from sync.adapters import (
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
+from sync.constants import GRADES_PATH
 from sync.config import PATHS
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.dates import quarter_of_date
+from sync.grades.engine import compute_grades
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import (
     add_logging_cli_args,
@@ -56,8 +58,10 @@ from sync.periods.windows import (
     build_week_window,
     build_year_window,
 )
+from sync.readers.grades import load_grades
 from sync.study.constants import DB_PATH
 from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
+from sync.writers.grades import render_grades_note
 
 SKIP_LAUNCHD_LABEL = "com.edo.skip"
 SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
@@ -255,6 +259,37 @@ def cmd_period_quarterly(args: argparse.Namespace) -> int:
 
 def cmd_period_yearly(args: argparse.Namespace) -> int:
     _run_yearly_sync(year_arg=args.year)
+    return 0
+
+
+def cmd_grades_sync(args: argparse.Namespace) -> int:
+    path = args.path or GRADES_PATH
+    try:
+        document = load_grades(path)
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}")
+        return 1
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    computed = compute_grades(document, status_bonus=0)
+    rendered = render_grades_note(document, computed)
+
+    try:
+        with locked_note(path):
+            atomic_write_note(path, rendered)
+    except TimeoutError as exc:
+        print(f"Error: could not lock note for write: {exc}")
+        return 1
+    except OSError as exc:
+        print(f"Error: failed to write grades note: {exc}")
+        return 1
+
+    print("Updated grades note:")
+    print(f"  Path: {path}")
+    if computed.final_grade is not None:
+        print(f"  Final: {computed.final_grade}")
     return 0
 
 
@@ -891,6 +926,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="Manage launchd skip automation state",
     )
     session_skip.set_defaults(func=cmd_session_skip)
+
+    grades = domain.add_parser("grades", help="Run grades note operations")
+    grades_sub = grades.add_subparsers(dest="grades_command", required=True)
+
+    grades_sync = grades_sub.add_parser(
+        "sync", help="Recompute OVERALL summary values in GRADES.md"
+    )
+    grades_sync.add_argument(
+        "--path",
+        help="Override grades note path",
+    )
+    grades_sync.set_defaults(func=cmd_grades_sync)
 
     media = domain.add_parser("media", help="Run media note operations")
     media_sub = media.add_subparsers(dest="media_command", required=True)

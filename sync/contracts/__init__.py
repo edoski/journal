@@ -2,6 +2,14 @@
 
 from .deviation import DailyDeviationData
 from .goals import Goal, GoalSection
+from .grades import (
+    GradeEntry,
+    GradesComputation,
+    GradesDocument,
+    OverallInput,
+    YearGradeStats,
+    YearGradeTable,
+)
 from .media import Book, MediaBundle, Podcast
 from .reminders import (
     DailySchedule,
@@ -38,6 +46,12 @@ from .training import DailyTrainingData, TrainingEntry
 __all__ = [
     "Goal",
     "GoalSection",
+    "GradeEntry",
+    "YearGradeTable",
+    "OverallInput",
+    "GradesDocument",
+    "YearGradeStats",
+    "GradesComputation",
     "ReminderRule",
     "ReminderSchedule",
     "DailySchedule",
