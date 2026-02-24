@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import sqlite3
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +19,16 @@ FLOW_SHOW = 'tell application "Flow" to show'
 
 def _skip_args(state: str | None = None) -> argparse.Namespace:
     return argparse.Namespace(state=state)
+
+
+def _media_add_args(
+    *,
+    url: str = "https://www.youtube.com/watch?v=abc123",
+    date: str | None = None,
+    title: str | None = None,
+    host: str | None = None,
+) -> argparse.Namespace:
+    return argparse.Namespace(url=url, date=date, title=title, host=host)
 
 
 def _default_schedule() -> DayScheduleProfile:
@@ -509,6 +521,173 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
     assert "Skip automation: DISABLED" in capsys.readouterr().out
 
 
+def _write_podcast_template(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "host:",
+                'date: <% tp.date.now("YYYY-MM-DD") %>',
+                "link:",
+                "genre: psychology",
+                "---",
+                "",
+                "# Notes",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+class _StubMediaCacheStore:
+    def __init__(self) -> None:
+        self.saved: list[dict[str, dict[str, str]]] = []
+
+    def load(self) -> dict[str, dict[str, str]]:
+        return {"books": {"Book A": "2026-01-01"}, "podcasts": {}}
+
+    def save(self, state: dict[str, dict[str, str]]) -> None:
+        self.saved.append(state)
+
+
+def _patch_media_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    vault_dir = tmp_path / "vault"
+    templates_dir = vault_dir / "notes" / "templates"
+    podcasts_dir = vault_dir / "notes" / "podcasts"
+    templates_dir.mkdir(parents=True, exist_ok=True)
+    podcasts_dir.mkdir(parents=True, exist_ok=True)
+    _write_podcast_template(templates_dir / "podcast.md")
+    monkeypatch.setattr(
+        cli,
+        "PATHS",
+        SimpleNamespace(vault_dir=str(vault_dir), podcasts_dir=str(podcasts_dir)),
+    )
+    return podcasts_dir
+
+
+def test_media_podcast_add_creates_note_with_sanitized_filename(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    podcasts_dir = _patch_media_paths(monkeypatch, tmp_path)
+    cache_store = _StubMediaCacheStore()
+    monkeypatch.setattr(cli, "JsonMediaDateCacheStore", lambda: cache_store)
+    monkeypatch.setattr(
+        cli,
+        "_fetch_youtube_oembed_metadata",
+        lambda _url: ("2017 Personality 01: Introduction", "Jordan B Peterson"),
+    )
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(
+            url="https://www.youtube.com/watch?v=kYYJlNbV1OM",
+            date="2026-02-20",
+        )
+    )
+
+    assert rc == 0
+    note_path = podcasts_dir / "2017 Personality 01 - Introduction.md"
+    assert note_path.exists()
+    lines = note_path.read_text(encoding="utf-8").splitlines()
+    assert "host: Jordan B Peterson" in lines
+    assert "date: 2026-02-20" in lines
+    assert "link: https://www.youtube.com/watch?v=kYYJlNbV1OM" in lines
+    assert "genre: psychology" in lines
+    assert lines[-1] == "# Notes"
+    assert cache_store.saved == [
+        {
+            "books": {"Book A": "2026-01-01"},
+            "podcasts": {"2017 Personality 01 - Introduction": "2026-02-20"},
+        }
+    ]
+
+
+def test_media_podcast_add_fails_when_note_already_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    podcasts_dir = _patch_media_paths(monkeypatch, tmp_path)
+    existing_path = podcasts_dir / "Existing Episode.md"
+    existing_content = "---\nhost: Existing\ndate: 2026-01-01\nlink: x\n---\n"
+    existing_path.write_text(existing_content, encoding="utf-8")
+    cache_store = _StubMediaCacheStore()
+    monkeypatch.setattr(cli, "JsonMediaDateCacheStore", lambda: cache_store)
+    monkeypatch.setattr(
+        cli,
+        "_fetch_youtube_oembed_metadata",
+        lambda _url: ("Existing Episode", "Jordan B Peterson"),
+    )
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(url="https://www.youtube.com/watch?v=dup1", date="2026-02-20")
+    )
+
+    assert rc == 1
+    assert existing_path.read_text(encoding="utf-8") == existing_content
+    assert cache_store.saved == []
+
+
+def test_media_podcast_add_uses_manual_overrides_when_metadata_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    podcasts_dir = _patch_media_paths(monkeypatch, tmp_path)
+    cache_store = _StubMediaCacheStore()
+    monkeypatch.setattr(cli, "JsonMediaDateCacheStore", lambda: cache_store)
+    monkeypatch.setattr(
+        cli, "_fetch_youtube_oembed_metadata", lambda _url: (None, None)
+    )
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(
+            url="https://www.youtube.com/watch?v=manual1",
+            date="2026-02-21",
+            title="Manual: Title",
+            host="Manual Host",
+        )
+    )
+
+    assert rc == 0
+    note_path = podcasts_dir / "Manual - Title.md"
+    assert note_path.exists()
+    lines = note_path.read_text(encoding="utf-8").splitlines()
+    assert "host: Manual Host" in lines
+    assert "date: 2026-02-21" in lines
+
+
+def test_media_podcast_add_fails_when_title_and_host_cannot_be_resolved(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        cli, "_fetch_youtube_oembed_metadata", lambda _url: (None, None)
+    )
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(url="https://www.youtube.com/watch?v=missing")
+    )
+
+    assert rc == 1
+
+
+def test_media_podcast_add_fails_on_invalid_date(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "_fetch_youtube_oembed_metadata",
+        lambda _url: ("Valid Title", "Valid Host"),
+    )
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(
+            url="https://www.youtube.com/watch?v=bad-date",
+            date="2026-99-99",
+        )
+    )
+
+    assert rc == 1
+
+
 def test_cli_parser_has_expected_commands() -> None:
     parser = cli.build_parser()
 
@@ -537,6 +716,27 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.domain == "period"
     assert args.period_command == "monthly"
     assert args.month == "2026-02"
+
+    args = parser.parse_args(
+        [
+            "media",
+            "podcast",
+            "add",
+            "https://www.youtube.com/watch?v=kYYJlNbV1OM",
+            "--date",
+            "2026-02-20",
+            "--title",
+            "Podcast Title",
+            "--host",
+            "Podcast Host",
+        ]
+    )
+    assert args.domain == "media"
+    assert args.media_command == "podcast"
+    assert args.podcast_command == "add"
+    assert args.date == "2026-02-20"
+    assert args.title == "Podcast Title"
+    assert args.host == "Podcast Host"
 
     with pytest.raises(SystemExit):
         parser.parse_args(["session-preview", "-n", "2"])
