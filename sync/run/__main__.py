@@ -331,8 +331,8 @@ def _fetch_youtube_oembed_metadata(url: str) -> tuple[str | None, str | None]:
 def _sanitize_podcast_title(raw_title: str) -> str:
     value = raw_title.strip()
     value = value.replace(":", " - ")
-    value = value.replace("/", " - ")
-    value = value.replace("\\", " - ")
+    value = value.replace("/", "-")
+    value = value.replace("\\", "-")
     value = re.sub(r'[<>"|?*\x00-\x1f]', "", value)
     value = re.sub(r"\s+", " ", value)
     value = value.strip().rstrip(".").strip()
