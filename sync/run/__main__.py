@@ -38,7 +38,6 @@ from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
 from sync.constants import GRADES_PATH
 from sync.config import PATHS
-from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.dates import quarter_of_date
 from sync.grades.engine import compute_grades
@@ -742,22 +741,6 @@ def _apply_skip_state(state: str) -> int:
     return 0
 
 
-def _resolve_day_schedule(day: date) -> DayScheduleProfile:
-    return MarkdownScheduleSource().resolve_day(day)
-
-
-def _is_within_study_window(
-    now: datetime.datetime,
-    day_schedule: DayScheduleProfile,
-) -> bool:
-    if day_schedule.is_off_day:
-        return False
-    current_minutes = now.hour * 60 + now.minute
-    start_minutes = day_schedule.study_start.hour * 60 + day_schedule.study_start.minute
-    end_minutes = day_schedule.study_end.hour * 60 + day_schedule.study_end.minute
-    return start_minutes <= current_minutes <= end_minutes
-
-
 def _run_applescript(script: str) -> str | None:
     try:
         result = subprocess.run(
@@ -800,27 +783,6 @@ def cmd_session_skip(args: argparse.Namespace) -> int:
         return 0
     if not enabled:
         logger.info("Skip no-op: automation disabled")
-        return 0
-
-    now = _now()
-    try:
-        day_schedule = _resolve_day_schedule(now.date())
-    except Exception as exc:
-        logger.warning(
-            "Skip no-op: failed to resolve schedule for %s: %s", now.date(), exc
-        )
-        return 0
-
-    if day_schedule.is_off_day:
-        logger.info("Skip no-op: day is configured OFF in schedule")
-        return 0
-
-    if not _is_within_study_window(now, day_schedule):
-        logger.info(
-            "Skip no-op: outside scheduled study window (%s-%s)",
-            day_schedule.study_start.strftime("%H:%M"),
-            day_schedule.study_end.strftime("%H:%M"),
-        )
         return 0
 
     phase = _run_applescript('tell application "Flow" to getPhase')

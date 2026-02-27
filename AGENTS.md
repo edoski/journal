@@ -374,7 +374,7 @@ Operational guidance:
 - Keep LaunchAgents minimal and route scheduled jobs through `python -m sync.run`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
-- `sync.run session skip` resolves the current day schedule from `SCHEDULE_PATH` and no-ops outside the resolved study window (minute-based; end minute included).
+- `sync.run session skip` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
 - Logging is stderr-only; no app-level log file sink is used.
 - Launchd writes logs to `/tmp` and the application does not truncate them.
 

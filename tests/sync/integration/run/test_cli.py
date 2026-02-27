@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
-from datetime import date, datetime, time, timedelta
+from datetime import date, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -44,11 +44,6 @@ def _default_schedule() -> DayScheduleProfile:
         workout_start=time(18, 0),
         is_off_day=False,
     )
-
-
-def _set_schedule_ready(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
-    monkeypatch.setattr(cli, "_resolve_day_schedule", lambda _day: _default_schedule())
 
 
 def _make_session_conn() -> sqlite3.Connection:
@@ -336,7 +331,6 @@ def test_session_skip_noops_when_phase_is_not_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
     def _fake_run(script: str) -> str:
@@ -361,7 +355,6 @@ def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=None)
     monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
@@ -384,7 +377,6 @@ def test_session_skip_noops_when_latest_row_is_completed_flow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    _set_schedule_ready(monkeypatch)
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=1234.0)
     monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
@@ -405,7 +397,6 @@ def test_session_skip_noops_when_latest_row_is_completed_flow(
 
 def test_session_skip_noops_on_db_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    _set_schedule_ready(monkeypatch)
     calls: list[str] = []
 
     def _fake_run(script: str) -> str:
@@ -426,95 +417,31 @@ def test_session_skip_noops_on_db_error(monkeypatch: pytest.MonkeyPatch) -> None
     assert calls == [FLOW_GET_PHASE]
 
 
-def test_session_skip_noops_when_schedule_cannot_be_resolved(
+def test_session_skip_executes_without_schedule_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 16, 10, 0))
 
-    def _raise_schedule(_day: date):
-        raise ValueError("missing schedule")
+    def _fail_schedule_source() -> object:
+        raise AssertionError("Schedule source should not be consulted by session skip")
 
-    monkeypatch.setattr(cli, "_resolve_day_schedule", _raise_schedule)
+    monkeypatch.setattr(cli, "MarkdownScheduleSource", _fail_schedule_source)
+    conn = _make_session_conn()
+    _insert_session_row(conn, phase="flow", completed_at=None)
+    monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
+    calls: list[str] = []
 
-    def _fail_run(_script: str) -> str:
-        raise AssertionError("AppleScript should not run when schedule is unresolved")
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        return "ok"
 
-    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
-
-    rc = cli.cmd_session_skip(_skip_args())
-    assert rc == 0
-
-
-def test_session_skip_noops_when_schedule_day_is_off(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 19, 10, 30))
-    monkeypatch.setattr(
-        cli,
-        "_resolve_day_schedule",
-        lambda _day: DayScheduleProfile(
-            study_start=time(8, 0),
-            study_end=time(18, 0),
-            lunch_start=time(13, 30),
-            lunch_end=time(14, 30),
-            workout_start=time(18, 0),
-            is_off_day=True,
-        ),
-    )
-
-    def _fail_run(_script: str) -> str:
-        raise AssertionError("AppleScript should not run for OFF schedule day")
-
-    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
-
-    def _fail_conn(*_args, **_kwargs):
-        raise AssertionError("DB should not be opened for OFF schedule day")
-
-    monkeypatch.setattr(cli, "get_connection", _fail_conn)
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
 
     rc = cli.cmd_session_skip(_skip_args())
     assert rc == 0
-
-
-def test_session_skip_noops_when_now_outside_schedule_window(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(cli, "_skip_enabled_state", lambda: True)
-    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 19, 9, 30))
-    monkeypatch.setattr(
-        cli,
-        "_resolve_day_schedule",
-        lambda _day: DayScheduleProfile(
-            study_start=time(14, 30),
-            study_end=time(18, 0),
-            lunch_start=time(13, 30),
-            lunch_end=time(14, 30),
-            workout_start=time(18, 0),
-            is_off_day=False,
-        ),
-    )
-
-    def _fail_run(_script: str) -> str:
-        raise AssertionError("AppleScript should not run outside schedule window")
-
-    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
-
-    def _fail_conn(*_args, **_kwargs):
-        raise AssertionError("DB should not be opened outside schedule window")
-
-    monkeypatch.setattr(cli, "get_connection", _fail_conn)
-
-    rc = cli.cmd_session_skip(_skip_args())
-    assert rc == 0
-
-
-def test_is_within_study_window_includes_end_minute_bucket() -> None:
-    schedule = _default_schedule()
-
-    assert cli._is_within_study_window(datetime(2026, 2, 16, 18, 0, 1), schedule)
-    assert not cli._is_within_study_window(datetime(2026, 2, 16, 18, 1, 0), schedule)
+    assert calls == [FLOW_GET_PHASE, FLOW_SKIP, FLOW_START, FLOW_SHOW]
 
 
 def test_session_skip_state_status_prints_state(
