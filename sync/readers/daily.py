@@ -14,11 +14,22 @@ from sync.constants import (
 )
 from sync.contracts.metrics import DailyAggregate
 from sync.io import safe_read_file
+from sync.notes.markdown_tables import split_markdown_row
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.screen_time import parse_procrastination_table
 from sync.readers.sleep import parse_sleep_table
 from sync.readers.study import parse_study_table
+
+
+def _split_row(line: str) -> list[str] | None:
+    row = split_markdown_row(line)
+    if row is not None:
+        return row
+    stripped = line.strip()
+    if stripped.startswith("|") and not stripped.endswith("|"):
+        return split_markdown_row(f"{stripped}|")
+    return None
 
 
 def _parse_bool(val: object) -> bool:
@@ -67,12 +78,12 @@ def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
         if NO_TRAINING_SESSIONS_TOKEN in line_lower:
             continue
 
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 5:
+        parts = _split_row(line)
+        if parts is None or len(parts) < 3:
             continue
 
-        activity = parts[2].strip().strip("`")
-        duration_min = parse_duration_to_minutes(parts[3]) or 0.0
+        activity = parts[1].strip().strip("`")
+        duration_min = parse_duration_to_minutes(parts[2]) or 0.0
         if activity and duration_min > 0:
             rows.append((activity, duration_min))
 

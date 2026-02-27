@@ -6,12 +6,10 @@ Consumes canonical training entries and renders/caches the TRAINING table.
 
 from __future__ import annotations
 
-import re
 from collections import OrderedDict
 
 from sync.contracts.cache import DailyTrainingCacheRow
 from sync.formatting import format_minutes_seconds
-from sync.notes.markdown_tables import split_markdown_row
 from sync.contracts.status import TrainingEntryPayload, TrainingStatus
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.writers.tables import SimpleGridTableSpec, render_table
@@ -27,55 +25,6 @@ def _parse_time_to_minutes(time_str: str) -> int | None:
         return h * 60 + m
     except (ValueError, AttributeError):
         return None
-
-
-def _parse_training_table(block_lines: list[str] | None) -> list[TrainingTableRow]:
-    """Convert an existing TRAINING table into structured rows."""
-    if block_lines is None:
-        return []
-    entries: list[TrainingTableRow] = []
-    header_re = re.compile(r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|", re.IGNORECASE)
-    header_idx = -1
-    for idx, line in enumerate(block_lines):
-        if header_re.search(line):
-            header_idx = idx
-            break
-    if header_idx == -1:
-        return entries
-
-    row_start = header_idx + 2
-    for line in block_lines[row_start:]:
-        if not line.lstrip().startswith("|"):
-            break
-        parts = split_markdown_row(line)
-        if parts is None or len(parts) < 4:
-            continue
-        raw_time = parts[0].strip("` ").replace("`", "")
-        activity = parts[1]
-        duration = parts[2].strip("` ").replace("`", "")
-        interrupt = parts[3].strip("` ").replace("`", "")
-
-        start_val: str | None = None
-        end_val: str | None = None
-        time_match = re.match(
-            r"^([0-2]\d:[0-5]\d)(?:\s*-\s*([0-2]\d:[0-5]\d))?$",
-            raw_time,
-        )
-        if time_match:
-            start_val = time_match.group(1)
-            end_val = time_match.group(2)
-
-        entries.append(
-            {
-                "start": start_val,
-                "end": end_val,
-                "time_raw": raw_time,
-                "activity": activity,
-                "duration": duration,
-                "interrupt": interrupt,
-            }
-        )
-    return entries
 
 
 def _load_training_cache(
@@ -214,7 +163,7 @@ def _render_training_rows(entries: list[TrainingTableRow]) -> list[str]:
 
 def build_training_section(
     training_status: TrainingStatus,
-    existing_block: list[str] | None,
+    _existing_block: list[str] | None,
     today_str: str,
     *,
     training_cache_store: DailyTrainingCacheStore,
@@ -222,7 +171,6 @@ def build_training_section(
     """
     Build TRAINING section lines from canonical training status data.
     """
-    _ = existing_block
     new_rows = (
         _rows_from_canonical_entries(training_status.workout_entries)
         + _rows_from_canonical_entries(training_status.stretch_entries)

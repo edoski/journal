@@ -13,7 +13,7 @@ journal/
     constants.py               # Shared non-I/O constants
     dates.py                   # Date/period math
     formatting.py              # Formatting + percent helpers
-    io.py                      # Safe file/json I/O
+    io.py                      # Safe file I/O
     log.py                     # Logger helper
 
     contracts/                 # Pure typed contracts (no I/O)
@@ -100,6 +100,7 @@ journal/
     goals/
       daily_pipeline.py        # Daily goal orchestration helpers (domain-owned)
       identity.py
+      reminder_codec.py        # Reminder schedule parse/format codecs
       tombstones.py
       carry_forward.py
       state.py
@@ -122,7 +123,8 @@ journal/
 
     periods/
       __init__.py
-      engine.py                # Shared period metrics renderer
+      engine.py                # Period metrics facade (delegates to builders)
+      builders/                # Period-specific metric builders + shared helpers
       windows.py
       runtime.py
       sections.py
@@ -134,6 +136,9 @@ journal/
 
     run/
       __main__.py              # Unified runtime composition root
+      parser.py                # CLI parser wiring
+      wiring.py                # Runtime DI wiring + period runners
+      commands/                # Command domain handlers
 
   tests/
     sync/
@@ -151,13 +156,16 @@ journal/
 - `adapters`: concrete implementations of ports.
 - `application`: orchestration only; depends on `ports` + `contracts`, never on adapter internals.
 - composition roots wire implementations:
-  - `sync/run/__main__.py`
+  - `sync/run/*` (entrypoint in `sync/run/__main__.py`)
 
 ### Dependency constraints
 
 - `sync/application` must not import `sync/adapters`.
 - `sync/writers` must not import `sync/ports` or `sync/adapters`.
-- Non-composition modules must not import `sync/application` or `sync/adapters`.
+- Non-composition modules outside `sync/run/*` must not import `sync/application` or `sync/adapters`.
+- `sync/readers` must stay parse-only (no `sync/application`, `sync/adapters`, `sync/writers`, or `sync/run` imports).
+- `sync/periods` must not import `sync/run`.
+- `sync/goals` must not import `sync/adapters`.
 - No cross-module private (`_name`) imports in `sync/`.
 
 ### Rendering architecture
@@ -175,6 +183,7 @@ journal/
 - `DailySyncService`: builds and writes daily note metrics/frontmatter, delegates goal orchestration to `GoalSyncService`.
 - `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation) using explicit target dates from inputs (no wall-clock coupling).
 - `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
+  - `sync/periods/engine.py` is a facade; period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
   - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
@@ -213,6 +222,9 @@ journal/
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
 - Query snapshot contract is canonical across `sync/application` and CLI consumers:
   - `PeriodSnapshot` in `sync/contracts/query.py`
+- Reminder schedule parsing/formatting is canonical in:
+  - `sync/goals/reminder_codec.py`
+  - `sync/contracts/reminders.py` stays typed contracts only
 
 ## Canonical Markdown Schemas
 

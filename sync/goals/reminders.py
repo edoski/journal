@@ -13,6 +13,7 @@ from sync.notes.markdown_tables import (
     render_markdown_row,
     split_markdown_row,
 )
+from sync.goals.reminder_codec import format_schedule, parse_schedule
 from sync.contracts.reminders import (
     DailySchedule,
     MonthlyLastDaySchedule,
@@ -21,8 +22,6 @@ from sync.contracts.reminders import (
     WeeklyOddSchedule,
     WeeklySchedule,
     YearlySchedule,
-    format_schedule,
-    parse_schedule,
 )
 
 if TYPE_CHECKING:

@@ -98,19 +98,6 @@ class StudyCadenceConfig:
 
 
 @dataclass(frozen=True)
-class ChartConfig:
-    """Chart dimension constants for bar charts and grids."""
-
-    height_default: int = 10
-    height_quarterly: int = 12
-    height_yearly: int = 12
-    y_max_weekly_study: int = 10  # 10 hours
-    y_max_monthly_study: int = 40  # 40 hours/week
-    y_max_quarterly_study: int = 240  # 240 hours/month
-    y_max_yearly_study: int = 720  # 720 hours/quarter
-
-
-@dataclass(frozen=True)
 class RenderConfig:
     """Rendering symbols and progress bar settings."""
 
@@ -137,6 +124,5 @@ class ScreenTimeConfig:
 # Singleton instances
 IDEAL = IdealSchedule()
 STUDY_CADENCE = StudyCadenceConfig()
-CHART = ChartConfig()
 RENDER = RenderConfig()
 SCREEN_TIME = ScreenTimeConfig()

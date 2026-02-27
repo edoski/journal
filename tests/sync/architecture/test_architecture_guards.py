@@ -42,13 +42,13 @@ def test_sync_modules_do_not_import_private_symbols_across_modules() -> None:
 
 
 def test_only_composition_roots_import_adapters_or_application() -> None:
-    composition_roots = {
-        ROOT / "sync" / "run" / "__main__.py",
+    composition_root_dirs = {
+        ROOT / "sync" / "run",
     }
     violations: list[str] = []
 
     for path in _iter_python_files("sync"):
-        if path in composition_roots:
+        if any(path.is_relative_to(root_dir) for root_dir in composition_root_dirs):
             continue
         if path.is_relative_to(ROOT / "sync" / "application"):
             continue
@@ -88,4 +88,29 @@ def test_period_snapshot_contract_is_defined_once() -> None:
     assert definitions == ["sync/contracts/query.py"], (
         "PeriodSnapshot must be defined exactly once in sync/contracts/query.py, "
         "but found:\n" + "\n".join(definitions)
+    )
+
+
+def test_readers_do_not_split_markdown_rows_manually() -> None:
+    violations: list[str] = []
+    readers_dir = ROOT / "sync" / "readers"
+    for path in sorted(readers_dir.rglob("*.py")):
+        module = _parse_module(path)
+        for node in ast.walk(module):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr != "split":
+                continue
+            if len(node.args) != 1:
+                continue
+            arg = node.args[0]
+            if isinstance(arg, ast.Constant) and arg.value == "|":
+                rel_path = path.relative_to(ROOT)
+                violations.append(f"{rel_path}:{node.lineno}")
+
+    assert not violations, (
+        "Readers must use sync.notes.markdown_tables.split_markdown_row "
+        "instead of line.split('|'):\n" + "\n".join(violations)
     )

@@ -8,12 +8,10 @@ sync modules, allowing it to be imported anywhere without circular import issues
 Functions:
     safe_read_file: Read file lines with graceful error handling
     atomic_write_note: Write lines atomically via temp file + replace
-    safe_load_json: Load JSON with fallback default on error
 """
 
 from __future__ import annotations
 
-import json
 import os
 
 from sync.log import get_logger
@@ -64,27 +62,3 @@ def atomic_write_note(path: str, lines: list[str]) -> None:
     with open(tmp_path, "w") as f:
         f.write("\n".join(lines).rstrip() + "\n")
     os.replace(tmp_path, path)
-
-
-def safe_load_json(path: str, default: object = None) -> object:
-    """
-    Load JSON from a file with graceful error handling.
-
-    Args:
-        path: Path to the JSON file
-        default: Value to return if file doesn't exist or can't be parsed
-
-    Returns:
-        Parsed JSON data, or default if file is missing/corrupt/inaccessible
-    """
-    try:
-        with open(path, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return default
-    except json.JSONDecodeError as e:
-        _logger.debug("Corrupt JSON in %s: %s", path, e)
-        return default
-    except (PermissionError, OSError) as e:
-        _logger.warning("Failed to read %s: %s", path, e)
-        return default

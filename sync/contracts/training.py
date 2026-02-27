@@ -15,20 +15,3 @@ class TrainingEntry:
     activity: str
     duration_minutes: float
     interrupt_minutes: float = 0.0
-
-
-@dataclass(frozen=True)
-class DailyTrainingData:
-    """Container for training entries."""
-
-    entries: list[TrainingEntry]
-
-    @property
-    def has_workout(self) -> bool:
-        """True if any non-stretching workout was done."""
-        return any(entry.activity.lower() != "stretching" for entry in self.entries)
-
-    @property
-    def has_stretch(self) -> bool:
-        """True if any stretching was done."""
-        return any(entry.activity.lower() == "stretching" for entry in self.entries)

@@ -1144,7 +1144,7 @@ class TestTableDispatch:
         class _Spec:
             pass
 
-        renderer = tables_api_module._typed_renderer(_Spec, lambda spec: [str(spec)])
+        renderer = tables_api_module.typed_renderer(_Spec, lambda spec: [str(spec)])
         with pytest.raises(TypeError) as excinfo:
             renderer(object())
         message = str(excinfo.value)
@@ -1161,5 +1161,5 @@ class TestTableDispatch:
             assert spec is sentinel
             return ["ok"]
 
-        renderer = tables_api_module._typed_renderer(_Spec, _callback)
+        renderer = tables_api_module.typed_renderer(_Spec, _callback)
         assert renderer(sentinel) == ["ok"]

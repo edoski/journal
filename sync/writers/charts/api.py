@@ -38,34 +38,31 @@ def _fence(lines: list[str]) -> list[str]:
     return ["```", *lines, "```"]
 
 
-_typed_renderer = typed_renderer
-
-
 _RENDERERS: dict[type[object], Renderer] = {
-    VerticalBarSpec: _typed_renderer(VerticalBarSpec, render_vertical_bar),
-    WeeklyStudyGridSpec: _typed_renderer(WeeklyStudyGridSpec, render_weekly_study_grid),
-    MonthlyStudyGridSpec: _typed_renderer(
+    VerticalBarSpec: typed_renderer(VerticalBarSpec, render_vertical_bar),
+    WeeklyStudyGridSpec: typed_renderer(WeeklyStudyGridSpec, render_weekly_study_grid),
+    MonthlyStudyGridSpec: typed_renderer(
         MonthlyStudyGridSpec, render_monthly_study_grid
     ),
-    MonthlyTrainingGridSpec: _typed_renderer(
+    MonthlyTrainingGridSpec: typed_renderer(
         MonthlyTrainingGridSpec, render_monthly_training_grid
     ),
-    WeeklyTrainingGridSpec: _typed_renderer(
+    WeeklyTrainingGridSpec: typed_renderer(
         WeeklyTrainingGridSpec, render_weekly_training_grid
     ),
-    TrainingBlockRowsSpec: _typed_renderer(
+    TrainingBlockRowsSpec: typed_renderer(
         TrainingBlockRowsSpec, render_training_block_rows
     ),
-    TrainingSectionsRowsSpec: _typed_renderer(
+    TrainingSectionsRowsSpec: typed_renderer(
         TrainingSectionsRowsSpec, render_training_sections_rows
     ),
-    QuarterlyStudyCoverageRowsSpec: _typed_renderer(
+    QuarterlyStudyCoverageRowsSpec: typed_renderer(
         QuarterlyStudyCoverageRowsSpec, render_quarterly_study_coverage_rows
     ),
-    YearlyStudyCoverageRowsSpec: _typed_renderer(
+    YearlyStudyCoverageRowsSpec: typed_renderer(
         YearlyStudyCoverageRowsSpec, render_yearly_study_coverage_rows
     ),
-    WaterfallSpec: _typed_renderer(WaterfallSpec, render_waterfall),
+    WaterfallSpec: typed_renderer(WaterfallSpec, render_waterfall),
 }
 
 

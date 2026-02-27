@@ -4,240 +4,167 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import json
-import os
-import re
 import sqlite3
-import subprocess
 import sys
-import urllib.error
-import urllib.parse
-import urllib.request
-from datetime import date, timedelta
-from typing import TypedDict
 
-from sync.adapters import (
-    FlowStudySessionSource,
-    ICloudDailyStatusSource,
+from sync.adapters.cache_bootstrap import bootstrap_cache_layout
+from sync.adapters.flow_sessions import FlowStudySessionSource
+from sync.adapters.icloud_status import ICloudDailyStatusSource
+from sync.adapters.json_daily_cache import (
     JsonDailyScreenTimeCacheStore,
     JsonDailyTrainingCacheStore,
+)
+from sync.adapters.json_goal_cache import (
     JsonGoalCarryForwardCacheStore,
     JsonGoalReconcileCacheStore,
-    JsonMediaDateCacheStore,
-    MarkdownDailyAggregateSource,
-    MarkdownGoalStore,
-    MarkdownNoteStore,
-    MarkdownReminderRuleStore,
-    MarkdownScheduleSource,
-    ObsidianMediaSource,
-    VaultContextSource,
-    bootstrap_cache_layout,
 )
+from sync.adapters.json_media_cache import JsonMediaDateCacheStore
+from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
+from sync.adapters.markdown_goals import MarkdownGoalStore
+from sync.adapters.markdown_notes import MarkdownNoteStore
+from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
+from sync.adapters.markdown_schedule import MarkdownScheduleSource
+from sync.adapters.obsidian_media import ObsidianMediaSource
+from sync.adapters.vault_context import VaultContextSource
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
-from sync.constants import GRADES_PATH
 from sync.config import PATHS
-from sync.contracts.study import StudySessionRecord
-from sync.dates import quarter_of_date
-from sync.grades.engine import compute_grades
-from sync.io import atomic_write_note, safe_read_file
-from sync.log import (
-    add_logging_cli_args,
-    configure_logging,
-    get_logger,
-    resolve_logging_settings,
-)
-from sync.notes.locking import locked_note
-from sync.ports.schedule import ScheduleSource
-from sync.periods.runtime import resolve_note_path
-from sync.periods.windows import (
-    build_month_window,
-    build_quarter_window,
-    build_week_window,
-    build_year_window,
-)
-from sync.readers.grades import load_grades
-from sync.study.constants import DB_PATH
-from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
-from sync.writers.grades import render_grades_note
+from sync.constants import GRADES_PATH
+from sync.log import configure_logging, get_logger, resolve_logging_settings
+from sync.run import parser as parser_mod
+from sync.run import wiring
+from sync.run.commands import grades as grades_cmd
+from sync.run.commands import media as media_cmd
+from sync.run.commands import reminders as reminders_cmd
+from sync.run.commands import session as session_cmd
 
-SKIP_LAUNCHD_LABEL = "com.edo.skip"
-SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
-SKIP_LAUNCHD_TARGET = f"{SKIP_LAUNCHD_DOMAIN}/{SKIP_LAUNCHD_LABEL}"
-REMIND_LAUNCHD_LABEL = "com.edo.remind"
-REMIND_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
-REMIND_LAUNCHD_TARGET = f"{REMIND_LAUNCHD_DOMAIN}/{REMIND_LAUNCHD_LABEL}"
-FLOW_REMINDER_STATE_FILENAME = "flow_reminder_state.json"
-FLOW_REMINDER_COOLDOWN_SECONDS = 120
-FLOW_REMINDER_STAGNANT_THRESHOLD = 1
-YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
-PODCAST_TEMPLATE_FILENAME = "podcast.md"
+SKIP_LAUNCHD_LABEL = reminders_cmd.SKIP_LAUNCHD_LABEL
+SKIP_LAUNCHD_DOMAIN = reminders_cmd.SKIP_LAUNCHD_DOMAIN
+SKIP_LAUNCHD_TARGET = reminders_cmd.SKIP_LAUNCHD_TARGET
+REMIND_LAUNCHD_LABEL = reminders_cmd.REMIND_LAUNCHD_LABEL
+REMIND_LAUNCHD_DOMAIN = reminders_cmd.REMIND_LAUNCHD_DOMAIN
+REMIND_LAUNCHD_TARGET = reminders_cmd.REMIND_LAUNCHD_TARGET
+FLOW_REMINDER_STATE_FILENAME = reminders_cmd.FLOW_REMINDER_STATE_FILENAME
 
 logger = get_logger(__name__)
 
+_REMINDERS_RUN_LAUNCHCTL_IMPL = reminders_cmd._run_launchctl
+_REMINDERS_SKIP_ENABLED_IMPL = reminders_cmd._skip_enabled_state
+_REMINDERS_SET_SKIP_ENABLED_IMPL = reminders_cmd._set_skip_enabled
+_REMINDERS_PRINT_SKIP_STATUS_IMPL = reminders_cmd._print_skip_status
+_REMINDERS_APPLY_SKIP_STATE_IMPL = reminders_cmd._apply_skip_state
+_REMINDERS_FLOW_STATE_PATH_IMPL = reminders_cmd._flow_reminder_state_path
+_REMINDERS_LOAD_STATE_IMPL = reminders_cmd._load_flow_reminder_state
+_REMINDERS_SAVE_STATE_IMPL = reminders_cmd._save_flow_reminder_state
+_REMINDERS_CLEAR_STATE_IMPL = reminders_cmd._clear_flow_reminder_state
+_REMINDERS_REMIND_ENABLED_IMPL = reminders_cmd._remind_enabled_state
+_REMINDERS_SET_REMIND_ENABLED_IMPL = reminders_cmd._set_remind_enabled
+_REMINDERS_PRINT_REMIND_STATUS_IMPL = reminders_cmd._print_remind_status
+_REMINDERS_APPLY_REMIND_STATE_IMPL = reminders_cmd._apply_remind_state
+_REMINDERS_RUN_APPLESCRIPT_IMPL = reminders_cmd._run_applescript
+_REMINDERS_LATEST_ROW_OPEN_FLOW_IMPL = reminders_cmd._latest_row_is_open_flow
+_REMINDERS_LATEST_OPEN_FLOW_STARTED_IMPL = reminders_cmd._latest_open_flow_started_at
+_REMINDERS_NOW_IMPL = reminders_cmd._now
 
-class CliSession(TypedDict):
-    pk: int
-    phase: str
-    duration: float
-    start: datetime.datetime | None
-    completed: datetime.datetime | None
-    title: str
-    interruptions_count: int
-    interruptions_duration: float
+
+def _set_module_attr(module: object, name: str, value: object) -> None:
+    setattr(module, name, value)
 
 
-class FlowReminderState(TypedDict, total=False):
-    open_session_started_at: float | None
-    remaining_time: str | None
-    stagnant_checks: int
-    last_reminded_epoch: float | None
+def _sync_wiring_patch_points() -> None:
+    _set_module_attr(wiring, "bootstrap_cache_layout", bootstrap_cache_layout)
+    _set_module_attr(wiring, "FlowStudySessionSource", FlowStudySessionSource)
+    _set_module_attr(wiring, "ICloudDailyStatusSource", ICloudDailyStatusSource)
+    _set_module_attr(
+        wiring, "JsonDailyScreenTimeCacheStore", JsonDailyScreenTimeCacheStore
+    )
+    _set_module_attr(wiring, "JsonDailyTrainingCacheStore", JsonDailyTrainingCacheStore)
+    _set_module_attr(
+        wiring, "JsonGoalCarryForwardCacheStore", JsonGoalCarryForwardCacheStore
+    )
+    _set_module_attr(wiring, "JsonGoalReconcileCacheStore", JsonGoalReconcileCacheStore)
+    _set_module_attr(wiring, "JsonMediaDateCacheStore", JsonMediaDateCacheStore)
+    _set_module_attr(
+        wiring, "MarkdownDailyAggregateSource", MarkdownDailyAggregateSource
+    )
+    _set_module_attr(wiring, "MarkdownGoalStore", MarkdownGoalStore)
+    _set_module_attr(wiring, "MarkdownNoteStore", MarkdownNoteStore)
+    _set_module_attr(wiring, "MarkdownReminderRuleStore", MarkdownReminderRuleStore)
+    _set_module_attr(wiring, "MarkdownScheduleSource", MarkdownScheduleSource)
+    _set_module_attr(wiring, "ObsidianMediaSource", ObsidianMediaSource)
+    _set_module_attr(wiring, "VaultContextSource", VaultContextSource)
+    _set_module_attr(wiring, "DailySyncService", DailySyncService)
+    _set_module_attr(wiring, "GoalSyncService", GoalSyncService)
+    _set_module_attr(wiring, "PeriodSyncService", PeriodSyncService)
+
+
+def _sync_session_patch_points() -> None:
+    _set_module_attr(session_cmd, "FlowStudySessionSource", FlowStudySessionSource)
+    _set_module_attr(session_cmd, "MarkdownScheduleSource", MarkdownScheduleSource)
+
+
+def _sync_reminders_patch_points() -> None:
+    _set_module_attr(reminders_cmd, "PATHS", PATHS)
+    _set_module_attr(
+        reminders_cmd, "FLOW_REMINDER_STATE_FILENAME", FLOW_REMINDER_STATE_FILENAME
+    )
+    _set_module_attr(reminders_cmd, "SKIP_LAUNCHD_LABEL", SKIP_LAUNCHD_LABEL)
+    _set_module_attr(reminders_cmd, "SKIP_LAUNCHD_DOMAIN", SKIP_LAUNCHD_DOMAIN)
+    _set_module_attr(reminders_cmd, "SKIP_LAUNCHD_TARGET", SKIP_LAUNCHD_TARGET)
+    _set_module_attr(reminders_cmd, "REMIND_LAUNCHD_LABEL", REMIND_LAUNCHD_LABEL)
+    _set_module_attr(reminders_cmd, "REMIND_LAUNCHD_DOMAIN", REMIND_LAUNCHD_DOMAIN)
+    _set_module_attr(reminders_cmd, "REMIND_LAUNCHD_TARGET", REMIND_LAUNCHD_TARGET)
+    _set_module_attr(reminders_cmd, "get_connection", get_connection)
+    _set_module_attr(reminders_cmd, "_run_launchctl", _run_launchctl)
+    _set_module_attr(reminders_cmd, "_skip_enabled_state", _skip_enabled_state)
+    _set_module_attr(reminders_cmd, "_remind_enabled_state", _remind_enabled_state)
+    _set_module_attr(reminders_cmd, "_run_applescript", _run_applescript)
+    _set_module_attr(reminders_cmd, "_now", _now)
+
+
+def _sync_media_patch_points() -> None:
+    _set_module_attr(media_cmd, "PATHS", PATHS)
+    _set_module_attr(media_cmd, "JsonMediaDateCacheStore", JsonMediaDateCacheStore)
+
+
+def _sync_grades_patch_points() -> None:
+    _set_module_attr(grades_cmd, "GRADES_PATH", GRADES_PATH)
 
 
 def _build_goal_sync_service(note_store: MarkdownNoteStore) -> GoalSyncService:
-    goal_store = MarkdownGoalStore()
-    carry_cache_store = JsonGoalCarryForwardCacheStore()
-    reconcile_cache_store = JsonGoalReconcileCacheStore()
-    return GoalSyncService(
-        note_store=note_store,
-        goal_store=goal_store,
-        carry_cache_store=carry_cache_store,
-        reconcile_cache_store=reconcile_cache_store,
-    )
+    _sync_wiring_patch_points()
+    return wiring._build_goal_sync_service(note_store)
 
 
 def _build_period_sync_service() -> PeriodSyncService:
-    note_store = MarkdownNoteStore()
-    media_cache_store = JsonMediaDateCacheStore()
-    return PeriodSyncService(
-        note_store=note_store,
-        aggregate_source=MarkdownDailyAggregateSource(),
-        media_source=ObsidianMediaSource(media_cache_store=media_cache_store),
-        schedule_source=MarkdownScheduleSource(),
-        goal_sync_service=_build_goal_sync_service(note_store),
-    )
+    _sync_wiring_patch_points()
+    return wiring._build_period_sync_service()
 
 
 def _run_daily_sync() -> None:
-    bootstrap_cache_layout()
-    day = datetime.date.today()
-    schedule_source = MarkdownScheduleSource()
-    session_source = FlowStudySessionSource()
-    note_store = MarkdownNoteStore()
-    training_cache_store = JsonDailyTrainingCacheStore()
-    screen_time_cache_store = JsonDailyScreenTimeCacheStore()
-    status_source = ICloudDailyStatusSource(
-        screen_time_cache_store=screen_time_cache_store
-    )
-    service = DailySyncService(
-        note_store=note_store,
-        status_source=status_source,
-        context_source=VaultContextSource(),
-        reminder_store=MarkdownReminderRuleStore(),
-        goal_sync_service=_build_goal_sync_service(note_store),
-        training_cache_store=training_cache_store,
-    )
-
-    target_days = status_source.target_days(day)
-    run_days = sorted(d for d in target_days if d != day)
-    run_days.append(day)
-
-    for run_day in run_days:
-        day_schedule = schedule_source.resolve_day(run_day)
-        sessions = session_source.load_sessions(run_day, day_schedule)
-        changed = service.sync_day(run_day, sessions, day_schedule)
-        if changed is False:
-            continue
+    _sync_wiring_patch_points()
+    wiring.run_daily_sync()
 
 
 def _run_weekly_sync(*, date_arg: str | None, no_cleanup: bool) -> None:
-    bootstrap_cache_layout()
-
-    if date_arg:
-        target_date = datetime.datetime.strptime(date_arg, "%Y-%m-%d").date()
-    else:
-        target_date = datetime.date.today()
-
-    window = build_week_window(target_date)
-    note_path = resolve_note_path(window.filename)
-
-    service = _build_period_sync_service()
-    cleanup_runner = None
-    if not no_cleanup:
-        previous_date = window.previous_start.isoformat()
-
-        def cleanup_runner() -> None:
-            _run_weekly_sync(date_arg=previous_date, no_cleanup=True)
-
-    service.sync_week(
-        window,
-        note_path,
-        cleanup_previous=not no_cleanup,
-        cleanup_previous_runner=cleanup_runner,
-    )
+    _sync_wiring_patch_points()
+    wiring.run_weekly_sync(date_arg=date_arg, no_cleanup=no_cleanup)
 
 
 def _run_monthly_sync(*, month_arg: str | None, no_cleanup: bool) -> None:
-    bootstrap_cache_layout()
-
-    if month_arg:
-        year, month = map(int, month_arg.split("-"))
-        target_date = datetime.date(year, month, 1)
-    else:
-        today = datetime.date.today()
-        target_date = datetime.date(today.year, today.month, 1)
-
-    window = build_month_window(target_date)
-    note_path = resolve_note_path(window.filename)
-
-    service = _build_period_sync_service()
-    cleanup_runner = None
-    if not no_cleanup:
-        previous_month = f"{window.previous_year}-{window.previous_month:02d}"
-
-        def cleanup_runner() -> None:
-            _run_monthly_sync(month_arg=previous_month, no_cleanup=True)
-
-    service.sync_month(
-        window,
-        note_path,
-        cleanup_previous=not no_cleanup,
-        cleanup_previous_runner=cleanup_runner,
-    )
+    _sync_wiring_patch_points()
+    wiring.run_monthly_sync(month_arg=month_arg, no_cleanup=no_cleanup)
 
 
 def _run_quarterly_sync(*, quarter_arg: str | None) -> None:
-    bootstrap_cache_layout()
-
-    if quarter_arg:
-        parts = quarter_arg.upper().split("-Q")
-        if len(parts) != 2:
-            raise ValueError("Quarter must be in format YYYY-Qn")
-        year = int(parts[0])
-        quarter_num = int(parts[1])
-    else:
-        today = datetime.date.today()
-        year, quarter_num = quarter_of_date(today)
-
-    window = build_quarter_window(year, quarter_num)
-    note_path = resolve_note_path(window.filename)
-
-    _build_period_sync_service().sync_quarter(window, note_path)
+    _sync_wiring_patch_points()
+    wiring.run_quarterly_sync(quarter_arg=quarter_arg)
 
 
 def _run_yearly_sync(*, year_arg: str | None) -> None:
-    bootstrap_cache_layout()
-
-    if year_arg:
-        year = int(year_arg)
-    else:
-        year = datetime.date.today().year
-
-    window = build_year_window(year)
-    note_path = resolve_note_path(window.filename)
-
-    _build_period_sync_service().sync_year(window, note_path)
+    _sync_wiring_patch_points()
+    wiring.run_yearly_sync(year_arg=year_arg)
 
 
 def cmd_period_all(_args: argparse.Namespace) -> int:
@@ -275,118 +202,133 @@ def cmd_period_yearly(args: argparse.Namespace) -> int:
 
 
 def cmd_grades_sync(args: argparse.Namespace) -> int:
-    path = args.path or GRADES_PATH
-    try:
-        document = load_grades(path)
-    except FileNotFoundError as exc:
-        print(f"Error: {exc}")
-        return 1
-    except ValueError as exc:
-        print(f"Error: {exc}")
-        return 1
+    _sync_grades_patch_points()
+    return grades_cmd.cmd_grades_sync(args)
 
-    computed = compute_grades(document, status_bonus=0)
-    rendered = render_grades_note(document, computed)
 
-    try:
-        with locked_note(path):
-            atomic_write_note(path, rendered)
-    except TimeoutError as exc:
-        print(f"Error: could not lock note for write: {exc}")
-        return 1
-    except OSError as exc:
-        print(f"Error: failed to write grades note: {exc}")
-        return 1
+def get_connection(readonly: bool = True) -> sqlite3.Connection:
+    _sync_session_patch_points()
+    return session_cmd.get_connection(readonly=readonly)
 
-    print("Updated grades note:")
-    print(f"  Path: {path}")
-    if computed.final_grade is not None:
-        print(f"  Final: {computed.final_grade}")
-    return 0
+
+def format_session(
+    session: session_cmd.CliSession,
+    include_pk: bool = False,
+) -> str:
+    return session_cmd.format_session(session, include_pk=include_pk)
+
+
+def cmd_session_rename(args: argparse.Namespace) -> int:
+    _sync_session_patch_points()
+    return session_cmd.cmd_session_rename(args)
+
+
+def cmd_session_undo(args: argparse.Namespace) -> int:
+    _sync_session_patch_points()
+    return session_cmd.cmd_session_undo(args)
+
+
+def _run_launchctl(args: list[str]) -> tuple[int, str, str]:
+    return _REMINDERS_RUN_LAUNCHCTL_IMPL(args)
+
+
+def _skip_enabled_state() -> bool | None:
+    return _REMINDERS_SKIP_ENABLED_IMPL()
+
+
+def _set_skip_enabled(enabled: bool) -> bool:
+    return _REMINDERS_SET_SKIP_ENABLED_IMPL(enabled)
+
+
+def _print_skip_status(enabled: bool) -> None:
+    _REMINDERS_PRINT_SKIP_STATUS_IMPL(enabled)
+
+
+def _apply_skip_state(state: str) -> int:
+    return _REMINDERS_APPLY_SKIP_STATE_IMPL(state)
+
+
+def _flow_reminder_state_path() -> str:
+    _sync_reminders_patch_points()
+    return _REMINDERS_FLOW_STATE_PATH_IMPL()
+
+
+def _load_flow_reminder_state() -> reminders_cmd.FlowReminderState:
+    _sync_reminders_patch_points()
+    return _REMINDERS_LOAD_STATE_IMPL()
+
+
+def _save_flow_reminder_state(state: reminders_cmd.FlowReminderState) -> None:
+    _sync_reminders_patch_points()
+    _REMINDERS_SAVE_STATE_IMPL(state)
+
+
+def _clear_flow_reminder_state() -> None:
+    _sync_reminders_patch_points()
+    _REMINDERS_CLEAR_STATE_IMPL()
+
+
+def _remind_enabled_state() -> bool | None:
+    return _REMINDERS_REMIND_ENABLED_IMPL()
+
+
+def _set_remind_enabled(enabled: bool) -> bool:
+    return _REMINDERS_SET_REMIND_ENABLED_IMPL(enabled)
+
+
+def _print_remind_status(enabled: bool) -> None:
+    _REMINDERS_PRINT_REMIND_STATUS_IMPL(enabled)
+
+
+def _apply_remind_state(state: str) -> int:
+    return _REMINDERS_APPLY_REMIND_STATE_IMPL(state)
+
+
+def _run_applescript(script: str) -> str | None:
+    return _REMINDERS_RUN_APPLESCRIPT_IMPL(script)
+
+
+def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
+    return _REMINDERS_LATEST_ROW_OPEN_FLOW_IMPL(conn)
+
+
+def _latest_open_flow_started_at(conn: sqlite3.Connection) -> float | None:
+    return _REMINDERS_LATEST_OPEN_FLOW_STARTED_IMPL(conn)
+
+
+def _now() -> datetime.datetime:
+    return _REMINDERS_NOW_IMPL()
+
+
+def cmd_session_skip(args: argparse.Namespace) -> int:
+    _sync_reminders_patch_points()
+    return reminders_cmd.cmd_session_skip(args)
+
+
+def cmd_session_remind(args: argparse.Namespace) -> int:
+    _sync_reminders_patch_points()
+    return reminders_cmd.cmd_session_remind(args)
 
 
 def _parse_iso_day(value: str) -> datetime.date:
-    try:
-        return datetime.datetime.strptime(value, "%Y-%m-%d").date()
-    except ValueError as exc:
-        raise ValueError("Date must be in format YYYY-MM-DD") from exc
+    return media_cmd._parse_iso_day(value)
 
 
 def _fetch_youtube_oembed_metadata(url: str) -> tuple[str | None, str | None]:
-    query = urllib.parse.urlencode({"url": url, "format": "json"})
-    endpoint = f"{YOUTUBE_OEMBED_ENDPOINT}?{query}"
-    request = urllib.request.Request(endpoint)
-    try:
-        with urllib.request.urlopen(request, timeout=10) as response:
-            payload = json.load(response)
-    except (
-        urllib.error.URLError,
-        TimeoutError,
-        OSError,
-        ValueError,
-        json.JSONDecodeError,
-    ) as exc:
-        logger.warning("Failed to fetch YouTube metadata: %s", exc)
-        return None, None
-
-    if not isinstance(payload, dict):
-        logger.warning("Failed to fetch YouTube metadata: invalid payload type")
-        return None, None
-
-    title_value = payload.get("title")
-    host_value = payload.get("author_name")
-    title = title_value.strip() if isinstance(title_value, str) else None
-    host = host_value.strip() if isinstance(host_value, str) else None
-    return title or None, host or None
+    return media_cmd._fetch_youtube_oembed_metadata(url)
 
 
 def _sanitize_podcast_title(raw_title: str) -> str:
-    value = raw_title.strip()
-    value = value.replace(":", " - ")
-    value = value.replace("/", "-")
-    value = value.replace("\\", "-")
-    value = re.sub(r'[<>"|?*\x00-\x1f]', "", value)
-    value = re.sub(r"\s+", " ", value)
-    value = value.strip().rstrip(".").strip()
-    if not value:
-        raise ValueError("Could not derive a valid filename from title")
-    return value
+    return media_cmd._sanitize_podcast_title(raw_title)
 
 
 def _podcast_template_path() -> str:
-    return os.path.join(
-        PATHS.vault_dir, "notes", "templates", PODCAST_TEMPLATE_FILENAME
-    )
+    _sync_media_patch_points()
+    return media_cmd._podcast_template_path()
 
 
 def _apply_frontmatter_value(lines: list[str], key: str, value: str) -> list[str]:
-    if not lines or lines[0].strip() != "---":
-        frontmatter = ["---", f"{key}: {value}", "---"]
-        if lines and lines[0].strip():
-            frontmatter.append("")
-        return frontmatter + lines
-
-    closing_idx = -1
-    for idx in range(1, len(lines)):
-        if lines[idx].strip() == "---":
-            closing_idx = idx
-            break
-
-    if closing_idx == -1:
-        frontmatter = ["---", f"{key}: {value}", "---"]
-        if lines and lines[0].strip():
-            frontmatter.append("")
-        return frontmatter + lines
-
-    target_prefix = f"{key}:"
-    frontmatter_lines = list(lines[1:closing_idx])
-    for idx, line in enumerate(frontmatter_lines):
-        if line.strip().startswith(target_prefix):
-            frontmatter_lines[idx] = f"{key}: {value}"
-            return lines[:1] + frontmatter_lines + lines[closing_idx:]
-
-    frontmatter_lines.append(f"{key}: {value}")
-    return lines[:1] + frontmatter_lines + lines[closing_idx:]
+    return media_cmd._apply_frontmatter_value(lines, key, value)
 
 
 def _render_podcast_note_lines(
@@ -396,805 +338,41 @@ def _render_podcast_note_lines(
     note_date: datetime.date,
     link: str,
 ) -> list[str]:
-    rendered = list(template_lines)
-    rendered = _apply_frontmatter_value(rendered, "host", host)
-    rendered = _apply_frontmatter_value(rendered, "date", note_date.isoformat())
-    rendered = _apply_frontmatter_value(rendered, "link", link)
-    return rendered
+    return media_cmd._render_podcast_note_lines(
+        template_lines,
+        host=host,
+        note_date=note_date,
+        link=link,
+    )
 
 
 def _update_media_cache_for_podcast(title: str, note_date: datetime.date) -> None:
-    try:
-        cache_store = JsonMediaDateCacheStore()
-        cache = cache_store.load()
-        books = dict(cache.get("books", {}))
-        podcasts = dict(cache.get("podcasts", {}))
-        podcasts[title] = note_date.isoformat()
-        cache_store.save({"books": books, "podcasts": podcasts})
-    except Exception as exc:
-        logger.warning("Failed to update media cache for %s: %s", title, exc)
+    _sync_media_patch_points()
+    media_cmd._update_media_cache_for_podcast(title, note_date)
 
 
 def cmd_media_podcast_add(args: argparse.Namespace) -> int:
-    note_date = datetime.date.today()
-    if args.date:
-        try:
-            note_date = _parse_iso_day(args.date)
-        except ValueError as exc:
-            print(f"Error: {exc}")
-            return 1
-
-    fetched_title, fetched_host = _fetch_youtube_oembed_metadata(args.url)
-    raw_title = (args.title or fetched_title or "").strip()
-    raw_host = (args.host or fetched_host or "").strip()
-
-    if not raw_title:
-        print("Error: could not resolve title from URL. Provide --title.")
-        return 1
-    if not raw_host:
-        print("Error: could not resolve host from URL. Provide --host.")
-        return 1
-
-    try:
-        title = _sanitize_podcast_title(raw_title)
-    except ValueError as exc:
-        print(f"Error: {exc}")
-        return 1
-
-    template_path = _podcast_template_path()
-    template_lines = safe_read_file(template_path)
-    if template_lines is None:
-        print(f"Error: required podcast template not found: {template_path}")
-        return 1
-
-    note_lines = _render_podcast_note_lines(
-        template_lines,
-        host=raw_host,
-        note_date=note_date,
-        link=args.url,
-    )
-
-    os.makedirs(PATHS.podcasts_dir, exist_ok=True)
-    note_path = os.path.join(PATHS.podcasts_dir, f"{title}.md")
-
-    try:
-        with locked_note(note_path):
-            if os.path.exists(note_path):
-                print(f"Error: podcast note already exists: {note_path}")
-                return 1
-            atomic_write_note(note_path, note_lines)
-    except TimeoutError as exc:
-        print(f"Error: could not lock note for write: {exc}")
-        return 1
-    except OSError as exc:
-        print(f"Error: failed to write podcast note: {exc}")
-        return 1
-
-    _update_media_cache_for_podcast(title, note_date)
-    print("Created podcast note:")
-    print(f"  Path: {note_path}")
-    print(f"  Title: {title}")
-    print(f"  Host: {raw_host}")
-    print(f"  Date: {note_date.isoformat()}")
-    return 0
-
-
-def get_connection(readonly: bool = True) -> sqlite3.Connection:
-    if readonly:
-        uri = f"file:{DB_PATH}?mode=ro"
-        return sqlite3.connect(uri, uri=True)
-    return sqlite3.connect(str(DB_PATH))
-
-
-def format_session(session: CliSession, include_pk: bool = False) -> str:
-    lines = []
-    if include_pk:
-        lines.append(f"  PK:       {session['pk']}")
-    lines.append(f"  Phase:    {session['phase']}")
-    lines.append(f"  Title:    {session['title'] or '(no title)'}")
-    if session["start"]:
-        lines.append(f"  Started:  {session['start'].strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append(f"  Duration: {session['duration']} min (planned)")
-    status = "completed" if session["completed"] else "in-progress"
-    lines.append(f"  Status:   {status}")
-    return "\n".join(lines)
-
-
-def _now() -> datetime.datetime:
-    return datetime.datetime.now()
-
-
-def _find_most_recent_focus(sessions: list[CliSession]) -> CliSession | None:
-    for session in sessions:
-        if session["phase"] == "flow":
-            return session
-    return None
-
-
-def _delete_session(conn: sqlite3.Connection, pk: int) -> int:
-    cur = conn.cursor()
-    cur.execute("DELETE FROM ZINTERRUPTION WHERE ZSESSION = ?", (pk,))
-    deleted_interruptions = cur.rowcount
-    cur.execute("DELETE FROM ZSESSION WHERE Z_PK = ?", (pk,))
-    return deleted_interruptions
-
-
-def _record_to_cli_session(record: StudySessionRecord) -> CliSession:
-    planned = record.get("planned_duration") or record.get("duration") or 0.0
-    return {
-        "pk": int(record.get("pk", 0) or 0),
-        "phase": "flow",
-        "duration": float(planned),
-        "start": record.get("start"),
-        "completed": record.get("completed_at"),
-        "title": record.get("title") or "",
-        "interruptions_count": int(record.get("interruptions_count", 0) or 0),
-        "interruptions_duration": float(record.get("interruptions_duration", 0) or 0),
-    }
-
-
-def _load_recent_focus_sessions(
-    source: FlowStudySessionSource,
-    schedule_source: ScheduleSource,
-    *,
-    limit: int,
-    lookback_days: int = 14,
-) -> list[CliSession]:
-    sessions: list[CliSession] = []
-    today = date.today()
-
-    for delta_days in range(lookback_days + 1):
-        day = today - timedelta(days=delta_days)
-        try:
-            day_schedule = schedule_source.resolve_day(day)
-            day_sessions = source.load_sessions(day, day_schedule)
-        except Exception as exc:
-            logger.debug("Failed to load sessions for %s: %s", day, exc)
-            continue
-        sessions.extend(_record_to_cli_session(item) for item in day_sessions)
-        if len(sessions) >= limit:
-            break
-
-    sessions.sort(
-        key=lambda item: item.get("start") or datetime.datetime.min,
-        reverse=True,
-    )
-    return sessions[:limit]
-
-
-def _find_associated_break_session(
-    conn: sqlite3.Connection,
-    focus_session: CliSession,
-) -> CliSession | None:
-    focus_start = focus_session.get("start")
-    if not isinstance(focus_start, datetime.datetime):
-        return None
-
-    focus_core = datetime_to_core_data(focus_start)
-    if focus_core is None:
-        return None
-
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE
-        FROM ZSESSION
-        WHERE ZPHASE IN ('shortBreak', 'longBreak')
-          AND ZSTARTEDAT >= ?
-          AND ZSTARTEDAT <= ?
-        ORDER BY ZSTARTEDAT ASC
-        LIMIT 1
-        """,
-        (focus_core, focus_core + 120),
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-
-    pk, phase, duration, started_at, completed_at, title = row
-    return {
-        "pk": int(pk),
-        "phase": str(phase),
-        "duration": float(duration or 0.0),
-        "start": core_data_to_datetime(started_at),
-        "completed": core_data_to_datetime(completed_at),
-        "title": str(title or ""),
-        "interruptions_count": 0,
-        "interruptions_duration": 0.0,
-    }
-
-
-def cmd_session_rename(args: argparse.Namespace) -> int:
-    session_source = FlowStudySessionSource()
-    schedule_source = MarkdownScheduleSource()
-    sessions = _load_recent_focus_sessions(
-        session_source,
-        schedule_source,
-        limit=10,
-    )
-    focus = _find_most_recent_focus(sessions)
-    if not focus:
-        print("No focus session found to rename.")
-        return 0
-
-    try:
-        conn = get_connection(readonly=not args.confirm)
-    except Exception as exc:
-        print(f"Error: could not open database: {exc}")
-        return 1
-
-    print("=" * 60)
-    print("SESSION TO BE RENAMED")
-    print("=" * 60)
-    print("\nCURRENT:")
-    print(format_session(focus, include_pk=True))
-    print(f'\nNEW TITLE: "{args.title}"')
-
-    if not args.confirm:
-        print("\nPreview only. Re-run with --confirm to apply.")
-        conn.close()
-        return 0
-
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE ZSESSION SET ZTITLE = ? WHERE Z_PK = ?", (args.title, focus["pk"])
-    )
-    conn.commit()
-    conn.close()
-    print(f'\nUpdated session title to "{args.title}"')
-    return 0
-
-
-def cmd_session_undo(args: argparse.Namespace) -> int:
-    session_source = FlowStudySessionSource()
-    schedule_source = MarkdownScheduleSource()
-    sessions = _load_recent_focus_sessions(
-        session_source,
-        schedule_source,
-        limit=10,
-    )
-    focus = _find_most_recent_focus(sessions)
-    if not focus:
-        print("No focus session found to delete.")
-        return 0
-
-    try:
-        conn = get_connection(readonly=not args.confirm)
-    except Exception as exc:
-        print(f"Error: could not open database: {exc}")
-        return 1
-
-    brk = _find_associated_break_session(conn, focus)
-
-    print("=" * 60)
-    print("SESSIONS TO DELETE")
-    print("=" * 60)
-    print("\nFOCUS:")
-    print(format_session(focus, include_pk=True))
-    if brk:
-        print("\nASSOCIATED BREAK:")
-        print(format_session(brk, include_pk=True))
-
-    if not args.confirm:
-        print("\nPreview only. Re-run with --confirm to apply deletion.")
-        conn.close()
-        return 0
-
-    total_interruptions = 0
-    if brk:
-        total_interruptions += _delete_session(conn, brk["pk"])
-    total_interruptions += _delete_session(conn, focus["pk"])
-
-    conn.commit()
-    conn.close()
-    print(f"Deleted session(s). Interruptions deleted: {total_interruptions}")
-    return 0
-
-
-def _run_launchctl(args: list[str]) -> tuple[int, str, str]:
-    result = subprocess.run(
-        ["launchctl", *args],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.returncode, result.stdout.strip(), result.stderr.strip()
-
-
-def _skip_enabled_state() -> bool | None:
-    code, stdout, stderr = _run_launchctl(["print-disabled", SKIP_LAUNCHD_DOMAIN])
-    if code != 0:
-        detail = stderr or stdout or f"exit {code}"
-        logger.warning("Unable to read launchd skip state: %s", detail)
-        return None
-
-    match = re.search(
-        rf'"{re.escape(SKIP_LAUNCHD_LABEL)}"\s*=>\s*(true|false)',
-        stdout,
-    )
-    if match is None:
-        return True
-    return match.group(1) == "false"
-
-
-def _set_skip_enabled(enabled: bool) -> bool:
-    command = "enable" if enabled else "disable"
-    code, stdout, stderr = _run_launchctl([command, SKIP_LAUNCHD_TARGET])
-    if code != 0:
-        detail = stderr or stdout or f"exit {code}"
-        logger.error("Failed to %s %s: %s", command, SKIP_LAUNCHD_TARGET, detail)
-        return False
-    return True
-
-
-def _print_skip_status(enabled: bool) -> None:
-    status = "ENABLED" if enabled else "DISABLED"
-    print(f"Skip automation: {status}")
-
-
-def _apply_skip_state(state: str) -> int:
-    current = _skip_enabled_state()
-    if current is None:
-        print("Skip automation: UNKNOWN (launchd state unavailable)")
-        return 1
-
-    if state == "status":
-        _print_skip_status(current)
-        return 0
-
-    if state != "toggle":
-        raise ValueError(f"Unsupported skip state action: {state}")
-
-    target = not current
-    if not _set_skip_enabled(target):
-        return 1
-
-    updated = _skip_enabled_state()
-    _print_skip_status(target if updated is None else updated)
-    return 0
-
-
-def _flow_reminder_state_path() -> str:
-    return os.path.join(PATHS.journal_cache_dir, FLOW_REMINDER_STATE_FILENAME)
-
-
-def _load_flow_reminder_state() -> FlowReminderState:
-    path = _flow_reminder_state_path()
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            raw = json.load(handle)
-    except FileNotFoundError:
-        return {}
-    except json.JSONDecodeError as exc:
-        logger.warning("Invalid reminder state JSON at %s: %s", path, exc)
-        return {}
-    except (PermissionError, OSError) as exc:
-        logger.warning("Failed to read reminder state %s: %s", path, exc)
-        return {}
-
-    if not isinstance(raw, dict):
-        logger.warning("Invalid reminder state payload at %s: expected object", path)
-        return {}
-
-    state: FlowReminderState = {}
-    marker = raw.get("open_session_started_at")
-    if isinstance(marker, (int, float)):
-        state["open_session_started_at"] = float(marker)
-    elif marker is None:
-        state["open_session_started_at"] = None
-
-    remaining = raw.get("remaining_time")
-    if isinstance(remaining, str):
-        state["remaining_time"] = remaining
-    elif remaining is None:
-        state["remaining_time"] = None
-
-    stagnant = raw.get("stagnant_checks")
-    if isinstance(stagnant, int):
-        state["stagnant_checks"] = max(0, stagnant)
-
-    reminded = raw.get("last_reminded_epoch")
-    if isinstance(reminded, (int, float)):
-        state["last_reminded_epoch"] = float(reminded)
-    elif reminded is None:
-        state["last_reminded_epoch"] = None
-    return state
-
-
-def _save_flow_reminder_state(state: FlowReminderState) -> None:
-    path = _flow_reminder_state_path()
-    payload = {
-        "open_session_started_at": state.get("open_session_started_at"),
-        "remaining_time": state.get("remaining_time"),
-        "stagnant_checks": max(0, int(state.get("stagnant_checks", 0))),
-        "last_reminded_epoch": state.get("last_reminded_epoch"),
-    }
-
-    try:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp_path = path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-        os.replace(tmp_path, path)
-    except (PermissionError, OSError) as exc:
-        logger.warning("Failed to write reminder state %s: %s", path, exc)
-
-
-def _clear_flow_reminder_state() -> None:
-    path = _flow_reminder_state_path()
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        return
-    except (PermissionError, OSError) as exc:
-        logger.warning("Failed to clear reminder state %s: %s", path, exc)
-
-
-def _remind_enabled_state() -> bool | None:
-    code, stdout, stderr = _run_launchctl(["print-disabled", REMIND_LAUNCHD_DOMAIN])
-    if code != 0:
-        detail = stderr or stdout or f"exit {code}"
-        logger.warning("Unable to read launchd remind state: %s", detail)
-        return None
-
-    match = re.search(
-        rf'"{re.escape(REMIND_LAUNCHD_LABEL)}"\s*=>\s*(true|false)',
-        stdout,
-    )
-    if match is None:
-        return True
-    return match.group(1) == "false"
-
-
-def _set_remind_enabled(enabled: bool) -> bool:
-    command = "enable" if enabled else "disable"
-    code, stdout, stderr = _run_launchctl([command, REMIND_LAUNCHD_TARGET])
-    if code != 0:
-        detail = stderr or stdout or f"exit {code}"
-        logger.error("Failed to %s %s: %s", command, REMIND_LAUNCHD_TARGET, detail)
-        return False
-    return True
-
-
-def _print_remind_status(enabled: bool) -> None:
-    status = "ENABLED" if enabled else "DISABLED"
-    print(f"Remind automation: {status}")
-
-
-def _apply_remind_state(state: str) -> int:
-    current = _remind_enabled_state()
-    if current is None:
-        print("Remind automation: UNKNOWN (launchd state unavailable)")
-        return 1
-
-    if state == "status":
-        _print_remind_status(current)
-        return 0
-
-    if state != "toggle":
-        raise ValueError(f"Unsupported remind state action: {state}")
-
-    target = not current
-    if not _set_remind_enabled(target):
-        return 1
-
-    updated = _remind_enabled_state()
-    _print_remind_status(target if updated is None else updated)
-    return 0
-
-
-def _run_applescript(script: str) -> str | None:
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as exc:
-        detail = exc.stderr.strip() if exc.stderr else str(exc)
-        logger.error("AppleScript error: %s", detail)
-        return None
-
-
-def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
-    return _latest_open_flow_started_at(conn) is not None
-
-
-def _latest_open_flow_started_at(conn: sqlite3.Connection) -> float | None:
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT ZPHASE, ZCOMPLETEDAT, ZSTARTEDAT
-        FROM ZSESSION
-        ORDER BY ZSTARTEDAT DESC
-        LIMIT 1
-        """
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-    phase, completed_at, started_at = row
-    if phase != "flow" or completed_at is not None:
-        return None
-    if started_at is None:
-        return None
-    try:
-        return float(started_at)
-    except (TypeError, ValueError):
-        return None
-
-
-def cmd_session_skip(args: argparse.Namespace) -> int:
-    if args.state is not None:
-        return _apply_skip_state(args.state)
-
-    enabled = _skip_enabled_state()
-    if enabled is None:
-        logger.warning("Skip no-op: unable to resolve launchd skip state")
-        return 0
-    if not enabled:
-        logger.info("Skip no-op: automation disabled")
-        return 0
-
-    phase = _run_applescript('tell application "Flow" to getPhase')
-    logger.info("Current phase: %s", phase)
-    if phase != "Flow":
-        logger.info("Skip no-op: current phase is not Flow")
-        return 0
-
-    try:
-        conn = get_connection(readonly=True)
-    except Exception as exc:
-        logger.warning("Skip no-op: failed to read Flow DB state: %s", exc)
-        return 0
-
-    try:
-        if not _latest_row_is_open_flow(conn):
-            logger.info("Skip no-op: latest session is not an open flow row")
-            return 0
-    except Exception as exc:
-        logger.warning("Skip no-op: failed to evaluate latest session row: %s", exc)
-        return 0
-    finally:
-        conn.close()
-
-    if _run_applescript('tell application "Flow" to skip') is None:
-        logger.warning("Skip no-op: Flow skip command failed")
-        return 0
-    if _run_applescript('tell application "Flow" to start') is None:
-        logger.warning("Skip no-op: Flow start command failed after skip")
-        return 0
-    if _run_applescript('tell application "Flow" to show') is None:
-        logger.warning("Skip no-op: Flow show command failed after skip/start")
-        return 0
-
-    logger.info("Skip executed")
-    return 0
-
-
-def cmd_session_remind(args: argparse.Namespace) -> int:
-    if args.state is not None:
-        return _apply_remind_state(args.state)
-
-    enabled = _remind_enabled_state()
-    if enabled is None:
-        logger.warning("Remind no-op: unable to resolve launchd remind state")
-        return 0
-    if not enabled:
-        logger.info("Remind no-op: automation disabled")
-        return 0
-
-    phase = _run_applescript('tell application "Flow" to getPhase')
-    logger.info("Current phase: %s", phase)
-    if phase != "Flow":
-        logger.info("Remind no-op: current phase is not Flow")
-        _clear_flow_reminder_state()
-        return 0
-
-    try:
-        conn = get_connection(readonly=True)
-    except Exception as exc:
-        logger.warning("Remind no-op: failed to read Flow DB state: %s", exc)
-        return 0
-
-    try:
-        open_started_at = _latest_open_flow_started_at(conn)
-    except Exception as exc:
-        logger.warning("Remind no-op: failed to evaluate latest session row: %s", exc)
-        return 0
-    finally:
-        conn.close()
-
-    if open_started_at is None:
-        logger.info("Remind no-op: latest session is not an open flow row")
-        _clear_flow_reminder_state()
-        return 0
-
-    remaining_time = _run_applescript('tell application "Flow" to getTime')
-    if remaining_time is None:
-        logger.warning("Remind no-op: failed to read Flow remaining time")
-        return 0
-    remaining_time = remaining_time.strip()
-    if not remaining_time:
-        logger.warning("Remind no-op: Flow remaining time was empty")
-        return 0
-
-    state = _load_flow_reminder_state()
-    previous_started_at = state.get("open_session_started_at")
-    previous_remaining = state.get("remaining_time")
-    previous_stagnant = int(state.get("stagnant_checks", 0))
-    previous_last_reminded = state.get("last_reminded_epoch")
-
-    next_state: FlowReminderState = {
-        "open_session_started_at": open_started_at,
-        "remaining_time": remaining_time,
-        "stagnant_checks": 0,
-        "last_reminded_epoch": (
-            float(previous_last_reminded)
-            if isinstance(previous_last_reminded, (int, float))
-            else None
-        ),
-    }
-
-    if previous_started_at != open_started_at:
-        logger.info("Remind no-op: baseline reset for new/open Flow session")
-        _save_flow_reminder_state(next_state)
-        return 0
-
-    if previous_remaining != remaining_time:
-        logger.info(
-            "Remind no-op: timer moved (%s -> %s)", previous_remaining, remaining_time
-        )
-        _save_flow_reminder_state(next_state)
-        return 0
-
-    stagnant_checks = max(0, previous_stagnant) + 1
-    next_state["stagnant_checks"] = stagnant_checks
-
-    if stagnant_checks < FLOW_REMINDER_STAGNANT_THRESHOLD:
-        logger.info("Remind no-op: stagnant checks below threshold")
-        _save_flow_reminder_state(next_state)
-        return 0
-
-    now_epoch = _now().timestamp()
-    last_reminded = next_state.get("last_reminded_epoch")
-    if isinstance(last_reminded, (int, float)):
-        elapsed = now_epoch - float(last_reminded)
-        if elapsed < FLOW_REMINDER_COOLDOWN_SECONDS:
-            logger.info(
-                "Remind no-op: cooldown active (%ss remaining)",
-                int(FLOW_REMINDER_COOLDOWN_SECONDS - elapsed),
-            )
-            _save_flow_reminder_state(next_state)
-            return 0
-
-    if _run_applescript('tell application "Flow" to show') is None:
-        logger.warning("Remind no-op: Flow show command failed")
-        _save_flow_reminder_state(next_state)
-        return 0
-
-    next_state["last_reminded_epoch"] = now_epoch
-    _save_flow_reminder_state(next_state)
-    logger.info("Remind executed")
-    return 0
+    _sync_media_patch_points()
+    return media_cmd.cmd_media_podcast_add(args)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    add_logging_cli_args(parser)
-    domain = parser.add_subparsers(dest="domain", required=True)
-
-    period = domain.add_parser("period", help="Run daily/period journal sync")
-    period_sub = period.add_subparsers(dest="period_command", required=True)
-
-    period_all = period_sub.add_parser(
-        "all", help="Run daily + all period sync commands"
+    return parser_mod.build_parser(
+        handlers={
+            "period_all": cmd_period_all,
+            "period_daily": cmd_period_daily,
+            "period_weekly": cmd_period_weekly,
+            "period_monthly": cmd_period_monthly,
+            "period_quarterly": cmd_period_quarterly,
+            "period_yearly": cmd_period_yearly,
+            "session_rename": cmd_session_rename,
+            "session_undo": cmd_session_undo,
+            "session_skip": cmd_session_skip,
+            "session_remind": cmd_session_remind,
+            "grades_sync": cmd_grades_sync,
+            "media_podcast_add": cmd_media_podcast_add,
+        }
     )
-    period_all.set_defaults(func=cmd_period_all)
-
-    period_daily = period_sub.add_parser("daily", help="Run daily sync")
-    period_daily.set_defaults(func=cmd_period_daily)
-
-    period_weekly = period_sub.add_parser("weekly", help="Run weekly sync")
-    period_weekly.add_argument("--date", help="Date within week (YYYY-MM-DD)")
-    period_weekly.add_argument(
-        "--no-cleanup",
-        action="store_true",
-        help="Skip cleanup of previous period",
-    )
-    period_weekly.set_defaults(func=cmd_period_weekly)
-
-    period_monthly = period_sub.add_parser("monthly", help="Run monthly sync")
-    period_monthly.add_argument("--month", help="Month (YYYY-MM)")
-    period_monthly.add_argument(
-        "--no-cleanup",
-        action="store_true",
-        help="Skip cleanup of previous period",
-    )
-    period_monthly.set_defaults(func=cmd_period_monthly)
-
-    period_quarterly = period_sub.add_parser("quarterly", help="Run quarterly sync")
-    period_quarterly.add_argument("--quarter", help="Quarter (YYYY-Qn)")
-    period_quarterly.set_defaults(func=cmd_period_quarterly)
-
-    period_yearly = period_sub.add_parser("yearly", help="Run yearly sync")
-    period_yearly.add_argument("--year", help="Year (YYYY)")
-    period_yearly.set_defaults(func=cmd_period_yearly)
-
-    session = domain.add_parser("session", help="Run Flow session operations")
-    session_sub = session.add_subparsers(dest="session_command", required=True)
-
-    session_rename = session_sub.add_parser(
-        "rename", help="Rename most recent focus session"
-    )
-    session_rename.add_argument("title")
-    session_rename.add_argument("--confirm", action="store_true")
-    session_rename.set_defaults(func=cmd_session_rename)
-
-    session_undo = session_sub.add_parser(
-        "undo", help="Delete most recent focus session"
-    )
-    session_undo.add_argument("--confirm", action="store_true")
-    session_undo.set_defaults(func=cmd_session_undo)
-
-    session_skip = session_sub.add_parser(
-        "skip", help="Execute or manage skip automation"
-    )
-    session_skip.add_argument(
-        "--state",
-        choices=["toggle", "status"],
-        help="Manage launchd skip automation state",
-    )
-    session_skip.set_defaults(func=cmd_session_skip)
-
-    session_remind = session_sub.add_parser(
-        "remind", help="Execute or manage resume reminder automation"
-    )
-    session_remind.add_argument(
-        "--state",
-        choices=["toggle", "status"],
-        help="Manage launchd remind automation state",
-    )
-    session_remind.set_defaults(func=cmd_session_remind)
-
-    grades = domain.add_parser("grades", help="Run grades note operations")
-    grades_sub = grades.add_subparsers(dest="grades_command", required=True)
-
-    grades_sync = grades_sub.add_parser(
-        "sync", help="Recompute OVERALL summary values in GRADES.md"
-    )
-    grades_sync.add_argument(
-        "--path",
-        help="Override grades note path",
-    )
-    grades_sync.set_defaults(func=cmd_grades_sync)
-
-    media = domain.add_parser("media", help="Run media note operations")
-    media_sub = media.add_subparsers(dest="media_command", required=True)
-
-    media_podcast = media_sub.add_parser("podcast", help="Run podcast note operations")
-    media_podcast_sub = media_podcast.add_subparsers(
-        dest="podcast_command", required=True
-    )
-
-    media_podcast_add = media_podcast_sub.add_parser(
-        "add", help="Create podcast note from a YouTube URL"
-    )
-    media_podcast_add.add_argument("url")
-    media_podcast_add.add_argument("--date", help="Override date (YYYY-MM-DD)")
-    media_podcast_add.add_argument(
-        "--title",
-        help="Override fetched title when metadata lookup fails",
-    )
-    media_podcast_add.add_argument(
-        "--host",
-        help="Override fetched host when metadata lookup fails",
-    )
-    media_podcast_add.set_defaults(func=cmd_media_podcast_add)
-
-    return parser
 
 
 def main(argv: list[str] | None = None) -> int:

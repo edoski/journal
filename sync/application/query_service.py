@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-from sync.constants import IDEAL, JOURNAL_DIR, STUDY_TARGET_MIN
+from sync.constants import IDEAL, STUDY_TARGET_MIN
 from sync.contracts.metrics import DailyAggregate, MetricValue
 from sync.contracts.query import (
     BreakdownRow,
@@ -153,11 +153,9 @@ class QueryService:
         *,
         aggregate_source: DailyAggregateSource,
         schedule_source: ScheduleSource,
-        journal_dir: str = JOURNAL_DIR,
     ) -> None:
         self.aggregate_source = aggregate_source
         self.schedule_source = schedule_source
-        self.journal_dir = journal_dir
 
     def period_bounds(
         self,

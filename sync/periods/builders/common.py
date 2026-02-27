@@ -1,0 +1,233 @@
+"""Shared helper routines for period metric builders."""
+
+from __future__ import annotations
+
+import datetime
+from typing import Literal
+
+from sync.contracts.metrics import DailyAggregate
+from sync.formatting import format_minutes
+from sync.writers.tables import SimpleGridTableSpec, render_table
+
+
+def _day_values(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> DailyAggregate | None:
+    return daily_data.get(day)
+
+
+def study_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["study_minutes"]
+
+
+def sleep_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_minutes"]
+
+
+def mood_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["mood"]
+
+
+def awake_minutes_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> float | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["awake_minutes"]
+
+
+def awakenings_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> int | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["awakenings"]
+
+
+def _sleep_asleep_time_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> str | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_asleep_time"]
+
+
+def _sleep_awake_time_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> str | None:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return None
+    return payload["sleep_awake_time"]
+
+
+def _time_str_to_minutes(t: str) -> int:
+    """Convert 'HH:MM' to minutes since midnight."""
+    h, m = t.split(":")
+    return int(h) * 60 + int(m)
+
+
+def _minutes_to_time_str(minutes: int) -> str:
+    """Convert minutes since midnight to 'HH:MM'."""
+    minutes = minutes % (24 * 60)
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def avg_time_of_day(times: list[str], is_evening: bool) -> str | None:
+    """Average a list of 'HH:MM' time-of-day strings.
+
+    For evening times (is_evening=True), treats times ≤ 12:00 as past-midnight
+    (offset by +24h) before averaging, so that e.g. 23:30 and 00:30 average
+    to 00:00 rather than 12:00.
+    """
+    if not times:
+        return None
+    total = 0
+    for t in times:
+        mins = _time_str_to_minutes(t)
+        if is_evening and mins <= 720:  # ≤ 12:00 → past midnight
+            mins += 1440
+        total += mins
+    avg = round(total / len(times))
+    return _minutes_to_time_str(avg)
+
+
+def compute_avg_schedule(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, DailyAggregate],
+) -> str | None:
+    """Compute average sleep schedule as 'HH:MM - HH:MM' for given dates."""
+    asleep_times: list[str] = []
+    awake_times: list[str] = []
+    for d in dates:
+        if not daily_data.get(d):
+            continue
+        at = _sleep_asleep_time_for_day(daily_data, d)
+        wt = _sleep_awake_time_for_day(daily_data, d)
+        if at is not None:
+            asleep_times.append(at)
+        if wt is not None:
+            awake_times.append(wt)
+    avg_asleep = avg_time_of_day(asleep_times, is_evening=True)
+    avg_awake = avg_time_of_day(awake_times, is_evening=False)
+    if avg_asleep is not None and avg_awake is not None:
+        return f"{avg_asleep} - {avg_awake}"
+    return None
+
+
+def activity_totals_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+) -> dict[str, float]:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return {}
+    return payload["activity_totals"]
+
+
+def training_done_for_day(
+    daily_data: dict[datetime.date, DailyAggregate],
+    day: datetime.date,
+    key: Literal["meditate", "workout", "stretch"],
+) -> bool:
+    payload = _day_values(daily_data, day)
+    if payload is None:
+        return False
+    if key == "meditate":
+        return payload["meditate"]
+    if key == "workout":
+        return payload["workout"]
+    return payload["stretch"]
+
+
+def activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
+    total_activity = sum(activity_totals.values())
+    rows: list[list[str]] = []
+    if activity_totals:
+        for activity, mins in sorted(
+            activity_totals.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        ):
+            share = (
+                f"{int(round((mins / total_activity) * 100))}%"
+                if total_activity
+                else "0%"
+            )
+            rows.append([f"**{activity}**", f"`{format_minutes(mins)}`", f"`{share}`"])
+    else:
+        rows.append(["", "", ""])
+
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["ACTIVITY", "TIME", "SHARE"],
+            divider_cells=["--------", "----", "-----"],
+            rows=rows,
+        )
+    )
+
+
+def sleep_stats_table_lines(
+    sleep_avg: float | None,
+    avg_awake: float | None,
+    avg_awakenings: float | None,
+    avg_schedule: str | None = None,
+) -> list[str]:
+    if avg_awakenings is not None:
+        awaken_val = (
+            f"{avg_awakenings:.1f}"
+            if abs(avg_awakenings - round(avg_awakenings)) >= 0.05
+            else str(int(round(avg_awakenings)))
+        )
+    else:
+        awaken_val = ""
+
+    rows = [
+        [
+            "**SCHEDULE**  ",
+            f"`{avg_schedule}`" if avg_schedule else "",
+        ],
+        [
+            "**ASLEEP**    ",
+            f"`{format_minutes(sleep_avg)}`" if sleep_avg is not None else "",
+        ],
+        [
+            "**AWAKE**     ",
+            f"`{format_minutes(avg_awake)}`" if avg_awake is not None else "",
+        ],
+        ["**AWAKENINGS**", f"`{awaken_val}`" if awaken_val else ""],
+    ]
+
+    return render_table(
+        SimpleGridTableSpec(
+            headers=["ACTIVITY", "AVERAGE"],
+            divider_cells=["--------", "-------"],
+            rows=rows,
+        )
+    )

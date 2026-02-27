@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 import datetime
+import re
 from dataclasses import dataclass, field
 
-from sync.goals.identity import canonical_goal_text
+
+def _canonical_goal_text(text: str) -> str:
+    """Normalize goal text for comparison and deduplication."""
+    text = re.sub(
+        r"^[-*]\s*\[[x \-✓✔]\]\s*",
+        "",
+        text.strip(),
+        flags=re.IGNORECASE,
+    )
+    text = re.sub(r"\[\[([^\]]+)\]\]", r"\1", text)
+    text = re.sub(r"(\s+\^gid-[mr][a-f0-9]{9})+\s*$", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text)
+    text = text.strip(" `")
+    return text.rstrip(".,;:!?").lower()
 
 
 @dataclass(frozen=True)
@@ -22,7 +36,7 @@ class Goal:
 
     def __post_init__(self) -> None:
         """Compute canonical form for deduplication."""
-        object.__setattr__(self, "canonical", canonical_goal_text(self.body))
+        object.__setattr__(self, "canonical", _canonical_goal_text(self.body))
 
 
 @dataclass(frozen=True)

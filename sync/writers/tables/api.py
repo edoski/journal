@@ -16,16 +16,13 @@ from .specs import (
 from .._dispatch import Renderer, render_exact_type, typed_renderer
 
 
-_typed_renderer = typed_renderer
-
-
 _RENDERERS: dict[type[object], Renderer] = {
-    SimpleGridTableSpec: _typed_renderer(SimpleGridTableSpec, render_simple_grid),
-    SummaryMetricsTableSpec: _typed_renderer(
+    SimpleGridTableSpec: typed_renderer(SimpleGridTableSpec, render_simple_grid),
+    SummaryMetricsTableSpec: typed_renderer(
         SummaryMetricsTableSpec, render_summary_metrics
     ),
-    ScreenTrendTableSpec: _typed_renderer(ScreenTrendTableSpec, render_screen_trend),
-    DailyProcrastinationTableSpec: _typed_renderer(
+    ScreenTrendTableSpec: typed_renderer(ScreenTrendTableSpec, render_screen_trend),
+    DailyProcrastinationTableSpec: typed_renderer(
         DailyProcrastinationTableSpec, render_daily_procrastination
     ),
 }

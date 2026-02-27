@@ -14,33 +14,3 @@ class SleepEntry:
     awakenings: int | None = None
     asleep_time: str | None = None
     awake_time: str | None = None
-
-
-@dataclass(frozen=True)
-class DailySleepData:
-    """Container for sleep entries with computed properties."""
-
-    entries: list[SleepEntry]
-
-    @property
-    def total_minutes(self) -> float:
-        """Total sleep duration across all entries."""
-        return sum(entry.duration_minutes for entry in self.entries)
-
-    @property
-    def total_awake(self) -> float | None:
-        """Total awake time across all entries, or None if no data."""
-        awake_vals = [
-            entry.awake_minutes
-            for entry in self.entries
-            if entry.awake_minutes is not None
-        ]
-        return sum(awake_vals) if awake_vals else None
-
-    @property
-    def total_awakenings(self) -> int | None:
-        """Total awakenings across all entries, or None if no data."""
-        awakening_vals = [
-            entry.awakenings for entry in self.entries if entry.awakenings is not None
-        ]
-        return sum(awakening_vals) if awakening_vals else None

@@ -1,4 +1,4 @@
-"""Reader modules for markdown -> contract parsing."""
+"""Command handler modules for sync.run."""
 
 from __future__ import annotations
 

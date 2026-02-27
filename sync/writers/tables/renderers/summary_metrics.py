@@ -59,6 +59,28 @@ def _metric_int_or(
     return value
 
 
+def _append_summary_row(
+    lines: list[str],
+    *,
+    show_ma: bool,
+    metric_label: str,
+    current: str,
+    previous: str,
+    change: str,
+    target: str,
+    progress: str,
+    ma_value: str = "—",
+) -> None:
+    if show_ma:
+        lines.append(
+            f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` | `{ma_value}` | `{target}` | {progress} |"
+        )
+        return
+    lines.append(
+        f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` | `{target}` | {progress} |"
+    )
+
+
 def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     """Render markdown summary section and table."""
     current_metrics = spec.current_metrics
@@ -149,14 +171,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         )
         study_progress_cell = f"`{study_bar}` `{study_progress_pct}%`"
 
-    if show_ma:
-        lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{ma_study_str}` | `{study_target_label}` | {study_progress_cell} |"
-        )
-    else:
-        lines.append(
-            f"| **STUDY** | `{curr_study_avg}` | `{prev_study_avg}` | `{study_pct_str}` | `{study_target_label}` | {study_progress_cell} |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="STUDY",
+        current=curr_study_avg,
+        previous=prev_study_avg,
+        change=study_pct_str,
+        ma_value=ma_study_str,
+        target=study_target_label,
+        progress=study_progress_cell,
+    )
 
     curr_sleep_avg = _metric_float_or(current_metrics, "sleep_avg_minutes", 0.0)
     prev_sleep_avg = _metric_float_or(previous_metrics, "sleep_avg_minutes", 0.0)
@@ -180,14 +205,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         RENDER.progress_empty,
     )
 
-    if show_ma:
-        lines.append(
-            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{ma_sleep_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
-        )
-    else:
-        lines.append(
-            f"| **SLEEP** | `{curr_sleep}` | `{prev_sleep}` | `{sleep_pct_str}` | `{sleep_target_label}` | `{sleep_bar}` `{sleep_progress_pct}%` |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="SLEEP",
+        current=curr_sleep,
+        previous=prev_sleep,
+        change=sleep_pct_str,
+        ma_value=ma_sleep_str,
+        target=sleep_target_label,
+        progress=f"`{sleep_bar}` `{sleep_progress_pct}%`",
+    )
 
     curr_mindful_count = _metric_int_or(current_metrics, "mindful_count", 0)
     prev_mindful_count = _metric_int_or(previous_metrics, "mindful_count", 0)
@@ -211,14 +239,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         RENDER.progress_empty,
     )
 
-    if show_ma:
-        lines.append(
-            f"| **MINDFUL** | `{curr_mindful}` | `{prev_mindful}` | `{mindful_pct_str}` | `{ma_mindful_str}` | `{mindful_target_label}` | `{mindful_bar}` `{mindful_progress_pct}%` |"
-        )
-    else:
-        lines.append(
-            f"| **MINDFUL** | `{curr_mindful}` | `{prev_mindful}` | `{mindful_pct_str}` | `{mindful_target_label}` | `{mindful_bar}` `{mindful_progress_pct}%` |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="MINDFUL",
+        current=curr_mindful,
+        previous=prev_mindful,
+        change=mindful_pct_str,
+        ma_value=ma_mindful_str,
+        target=mindful_target_label,
+        progress=f"`{mindful_bar}` `{mindful_progress_pct}%`",
+    )
 
     curr_workout_count = _metric_int_or(current_metrics, "workout_count", 0)
     prev_workout_count = _metric_int_or(previous_metrics, "workout_count", 0)
@@ -242,14 +273,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         RENDER.progress_empty,
     )
 
-    if show_ma:
-        lines.append(
-            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{ma_workout_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
-        )
-    else:
-        lines.append(
-            f"| **WORKOUT** | `{curr_workout}` | `{prev_workout}` | `{workout_pct_str}` | `{workout_target_label}` | `{workout_bar}` `{workout_progress_pct}%` |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="WORKOUT",
+        current=curr_workout,
+        previous=prev_workout,
+        change=workout_pct_str,
+        ma_value=ma_workout_str,
+        target=workout_target_label,
+        progress=f"`{workout_bar}` `{workout_progress_pct}%`",
+    )
 
     curr_stretch_count = _metric_int_or(current_metrics, "stretch_count", 0)
     prev_stretch_count = _metric_int_or(previous_metrics, "stretch_count", 0)
@@ -273,14 +307,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         RENDER.progress_empty,
     )
 
-    if show_ma:
-        lines.append(
-            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{ma_stretch_str}` | `{stretch_target_label}` | `{stretch_bar}` `{stretch_progress_pct}%` |"
-        )
-    else:
-        lines.append(
-            f"| **STRETCH** | `{curr_stretch}` | `{prev_stretch}` | `{stretch_pct_str}` | `{stretch_target_label}` | `{stretch_bar}` `{stretch_progress_pct}%` |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="STRETCH",
+        current=curr_stretch,
+        previous=prev_stretch,
+        change=stretch_pct_str,
+        ma_value=ma_stretch_str,
+        target=stretch_target_label,
+        progress=f"`{stretch_bar}` `{stretch_progress_pct}%`",
+    )
 
     curr_mood_avg = _metric_float_or(current_metrics, "mood_avg", 0.0)
     prev_mood_avg = _metric_float_or(previous_metrics, "mood_avg", 0.0)
@@ -302,14 +339,17 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         RENDER.progress_empty,
     )
 
-    if show_ma:
-        lines.append(
-            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{ma_mood_str}` | `{mood_target_label}` | `{mood_bar}` `{mood_progress_pct}%` |"
-        )
-    else:
-        lines.append(
-            f"| **MOOD** | `{curr_mood}` | `{prev_mood}` | `{mood_pct_str}` | `{mood_target_label}` | `{mood_bar}` `{mood_progress_pct}%` |"
-        )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="MOOD",
+        current=curr_mood,
+        previous=prev_mood,
+        change=mood_pct_str,
+        ma_value=ma_mood_str,
+        target=mood_target_label,
+        progress=f"`{mood_bar}` `{mood_progress_pct}%`",
+    )
 
     lines.append("")
     return lines

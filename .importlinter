@@ -45,3 +45,30 @@ source_modules =
 forbidden_modules =
     sync.adapters
     sync.application
+
+[importlinter:readers_no_runtime_or_rendering]
+name = Readers must stay parse-only
+type = forbidden
+source_modules =
+    sync.readers
+forbidden_modules =
+    sync.application
+    sync.adapters
+    sync.writers
+    sync.run
+
+[importlinter:periods_no_runtime]
+name = Period engine must stay runtime-agnostic
+type = forbidden
+source_modules =
+    sync.periods
+forbidden_modules =
+    sync.run
+
+[importlinter:goals_no_adapters]
+name = Goals domain must not depend on adapters
+type = forbidden
+source_modules =
+    sync.goals
+forbidden_modules =
+    sync.adapters

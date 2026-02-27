@@ -16,6 +16,16 @@ _SLEEP_HEADER_CELLS = ("time", "duration", "awake", "awakenings")
 _TIME_RANGE_RE = re.compile(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})")
 
 
+def _split_row(line: str) -> list[str] | None:
+    row = split_markdown_row(line)
+    if row is not None:
+        return row
+    stripped = line.strip()
+    if stripped.startswith("|") and not stripped.endswith("|"):
+        return split_markdown_row(f"{stripped}|")
+    return None
+
+
 def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
     """
     Parse the SLEEP table from daily note lines.
@@ -32,7 +42,7 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
 
     header_idx: int | None = None
     for i, line in enumerate(block):
-        cells = split_markdown_row(line)
+        cells = _split_row(line)
         if (
             cells is not None
             and tuple(cell.lower() for cell in cells) == _SLEEP_HEADER_CELLS
@@ -48,26 +58,26 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
         if not line.strip().startswith("|"):
             break
 
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 5:
+        parts = _split_row(line)
+        if parts is None or len(parts) < 4:
             continue
 
         # Parse time range from TIME column
         asleep_time: str | None = None
         awake_time: str | None = None
-        time_cell = parts[1].replace("`", "")
+        time_cell = parts[0].replace("`", "")
         time_match = _TIME_RANGE_RE.search(time_cell)
         if time_match:
             asleep_time = time_match.group(1)
             awake_time = time_match.group(2)
 
-        duration_min = parse_duration_to_minutes(parts[2])
-        awake_min = parse_duration_to_minutes(parts[3])
+        duration_min = parse_duration_to_minutes(parts[1])
+        awake_min = parse_duration_to_minutes(parts[2])
 
         awakenings: int | None = None
-        if parts[4]:
+        if parts[3]:
             try:
-                awakenings = int(re.sub(r"[^0-9]", "", parts[4]))
+                awakenings = int(re.sub(r"[^0-9]", "", parts[3]))
             except ValueError:
                 awakenings = None
 

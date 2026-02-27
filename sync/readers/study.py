@@ -6,6 +6,7 @@ import re
 
 from sync.constants import STUDY_SECTION_HEADER
 from sync.contracts.study import StudySession
+from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
 
 _CANONICAL_STUDY_HEADER_RE = re.compile(
@@ -54,14 +55,14 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
         if "no study sessions" in line.lower():
             continue
 
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 9:
+        parts = split_markdown_row(line)
+        if parts is None or len(parts) < 7:
             raise ValueError(
                 "Invalid STUDY row: expected TIME/ACTIVITY/DURATION/"
                 "INTERRUPT/BREAK/CONTEXT/NOTES columns"
             )
 
-        time_raw = _strip_backticks(parts[1])
+        time_raw = _strip_backticks(parts[0])
         start_time = ""
         end_time: str | None = None
         time_match = re.match(r"^(\d{2}:\d{2})(?:\s*-\s*(\d{2}:\d{2}))?$", time_raw)
@@ -69,11 +70,11 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
             start_time = time_match.group(1)
             end_time = time_match.group(2)
 
-        activity = _strip_backticks(parts[2])
-        duration_min = parse_duration_to_minutes(parts[3]) or 0.0
+        activity = _strip_backticks(parts[1])
+        duration_min = parse_duration_to_minutes(parts[2]) or 0.0
 
         interrupt_min = 0.0
-        interrupt_str = _strip_backticks(parts[4])
+        interrupt_str = _strip_backticks(parts[3])
         interrupt_match = re.search(r"\+(\d+)m", interrupt_str)
         if interrupt_match:
             interrupt_min = float(interrupt_match.group(1))
@@ -83,7 +84,7 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
             minutes = float(interrupt_match_h.group(2) or 0)
             interrupt_min = hours * 60 + minutes
 
-        break_str = _strip_backticks(parts[5])
+        break_str = _strip_backticks(parts[4])
         break_base, _, _ = break_str.partition("(")
         break_min = parse_duration_to_minutes(break_base.strip()) or 0.0
         overrun_min = 0.0
@@ -91,8 +92,8 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
         if overrun_match:
             overrun_min = parse_duration_to_minutes(overrun_match.group(1)) or 0.0
 
-        context = parts[6].strip()
-        notes = parts[7].strip()
+        context = parts[5].strip()
+        notes = parts[6].strip()
 
         if activity and duration_min:
             sessions.append(

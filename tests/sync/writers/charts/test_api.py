@@ -1694,7 +1694,7 @@ class TestChartDispatch:
         class _Spec:
             pass
 
-        renderer = charts_api_module._typed_renderer(_Spec, lambda spec: [str(spec)])
+        renderer = charts_api_module.typed_renderer(_Spec, lambda spec: [str(spec)])
         with pytest.raises(TypeError) as excinfo:
             renderer(object())
         message = str(excinfo.value)
@@ -1711,7 +1711,7 @@ class TestChartDispatch:
             assert spec is sentinel
             return ["ok"]
 
-        renderer = charts_api_module._typed_renderer(_Spec, _callback)
+        renderer = charts_api_module.typed_renderer(_Spec, _callback)
         assert renderer(sentinel) == ["ok"]
 
 

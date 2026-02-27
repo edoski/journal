@@ -14,7 +14,18 @@ from sync.constants import (
     PROCRASTINATION_TABLE_HEADER_RE,
 )
 from sync.contracts.screen_time import ScreenTimeEntry, DailyScreenTimeData
+from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
+
+
+def _split_row(line: str) -> list[str] | None:
+    row = split_markdown_row(line)
+    if row is not None:
+        return row
+    stripped = line.strip()
+    if stripped.startswith("|") and not stripped.endswith("|"):
+        return split_markdown_row(f"{stripped}|")
+    return None
 
 
 def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
@@ -49,12 +60,12 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
         if not line.strip().startswith("|"):
             break
 
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) < 3:
+        parts = _split_row(line)
+        if parts is None or len(parts) < 2:
             continue
 
-        source = parts[1].strip().strip("*")  # Handle **TOTAL**
-        duration_raw = parts[2].strip()
+        source = parts[0].strip().strip("*")  # Handle **TOTAL**
+        duration_raw = parts[1].strip()
 
         # Skip TOTAL row and empty rows
         if source.upper() == "TOTAL" or not source:
