@@ -171,54 +171,15 @@ def write_study_times_to_icloud(
         today_str: Today's date string (YYYY-MM-DD)
         day_schedule: Resolved daily schedule profile
     """
-    if not sessions:
-        return
-
     # All calculations anchor to the note date to keep fallbacks deterministic
     note_date = datetime.date.fromisoformat(today_str)
+    minute = datetime.timedelta(minutes=1)
 
     # Default schedule used when actual times would create invalid ranges
     default_morning = datetime.datetime.combine(note_date, day_schedule.study_start)
     default_lunch = datetime.datetime.combine(note_date, day_schedule.lunch_start)
     default_afternoon = datetime.datetime.combine(note_date, day_schedule.lunch_end)
     default_afternoon_end = datetime.datetime.combine(note_date, day_schedule.study_end)
-
-    first_start = sessions[0]["start"]
-    last_end = sessions[-1]["end"]
-
-    # Find last session ending near lunch to preserve dynamic afternoon anchoring.
-    lunch_duration = default_afternoon - default_lunch
-    if lunch_duration <= datetime.timedelta(0):
-        lunch_duration = datetime.timedelta(hours=1)
-    lunch_window_start = default_lunch - datetime.timedelta(minutes=90)
-    lunch_window_end = default_afternoon + datetime.timedelta(minutes=30)
-
-    lunch_start = None
-    for session in sessions:
-        end_time = session["end"]
-        if lunch_window_start <= end_time < lunch_window_end:
-            lunch_start = session["end"]
-
-    # Compute afternoon start (configured lunch duration after lunch start)
-    afternoon_start = None
-    if lunch_start:
-        afternoon_start = lunch_start + lunch_duration
-
-    # Compute afternoon start time for comparison (use actual or schedule default).
-    afternoon_start_time = (
-        afternoon_start
-        if afternoon_start
-        else first_start.replace(
-            hour=day_schedule.lunch_end.hour,
-            minute=day_schedule.lunch_end.minute,
-            second=0,
-            microsecond=0,
-        )
-    )
-
-    afternoon_end = (
-        last_end if last_end >= afternoon_start_time else default_afternoon_end
-    )
 
     def _normalize_study_times(
         morning: datetime.datetime,
@@ -234,8 +195,6 @@ def write_study_times_to_icloud(
         real data would violate ordering. Equal times are nudged forward by 1 minute
         to keep the Shortcut's "between" action happy with positive windows.
         """
-
-        minute = datetime.timedelta(minutes=1)
 
         m_start = morning or default_morning
         l_start = lunch or default_lunch
@@ -266,9 +225,43 @@ def write_study_times_to_icloud(
 
         return m_start, l_start, a_start, a_end
 
-    m_start, l_start, a_start, a_end = _normalize_study_times(
-        first_start, lunch_start, afternoon_start, afternoon_end
-    )
+    if default_morning >= default_lunch:
+        # Inverted schedules (e.g. 15:00 study start, 13:30 lunch start) are
+        # remapped to minimal valid boundaries for the Shortcut's two blocks.
+        m_start = default_morning
+        l_start = m_start + minute
+        a_start = l_start
+        a_end = max(default_afternoon_end, a_start + minute)
+    else:
+        first_start = sessions[0]["start"] if sessions else default_morning
+        last_end = sessions[-1]["end"] if sessions else default_afternoon_end
+
+        # Find last session ending near lunch to preserve dynamic afternoon anchoring.
+        lunch_duration = default_afternoon - default_lunch
+        if lunch_duration <= datetime.timedelta(0):
+            lunch_duration = datetime.timedelta(hours=1)
+        lunch_window_start = default_lunch - datetime.timedelta(minutes=90)
+        lunch_window_end = default_afternoon + datetime.timedelta(minutes=30)
+
+        lunch_start: datetime.datetime | None = None
+        for session in sessions:
+            end_time = session["end"]
+            if lunch_window_start <= end_time < lunch_window_end:
+                lunch_start = end_time
+
+        # Compute afternoon start (configured lunch duration after lunch start)
+        afternoon_start = (
+            lunch_start + lunch_duration if lunch_start else default_afternoon
+        )
+        afternoon_end = (
+            last_end if last_end >= afternoon_start else default_afternoon_end
+        )
+        m_start, l_start, a_start, a_end = _normalize_study_times(
+            first_start,
+            lunch_start,
+            afternoon_start,
+            afternoon_end,
+        )
 
     data = {
         "date": today_str,

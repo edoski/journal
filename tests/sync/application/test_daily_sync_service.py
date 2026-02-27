@@ -14,6 +14,7 @@ from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.screen_time import DailyScreenTimeData
 from sync.contracts.status import TrainingEntryPayload, TrainingStatus
+from sync.target_policy import effective_study_minutes
 
 
 class _StubStatusSource:
@@ -469,6 +470,44 @@ def test_sync_day_reflections_header_normalization_is_idempotent(monkeypatch, tm
     assert normalized[0] == "| TIME | ENTRY |"
     assert normalized[1] == "| ---- | ----- |"
     assert normalized[2] == "| `08:3 collapsed reflection content | |"
+
+
+def test_sync_day_passes_schedule_cap_to_procrastination_section(monkeypatch, tmp_path):
+    captured_max_total: dict[str, float | None] = {"value": None}
+
+    def _capture_procrastination_section(
+        screen_time_data,
+        deviation_data=None,
+        max_total_minutes=None,
+    ) -> list[str]:
+        _ = screen_time_data, deviation_data
+        captured_max_total["value"] = max_total_minutes
+        return [
+            "### **PROCRASTINATION**",
+            "",
+            "_No screen time data available._",
+        ]
+
+    monkeypatch.setattr(
+        "sync.application.daily_sync_service.build_procrastination_section",
+        _capture_procrastination_section,
+    )
+
+    day = datetime.date(2026, 2, 19)
+    schedule = DayScheduleProfile(
+        study_start=datetime.time(15, 0),
+        study_end=datetime.time(22, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(22, 0),
+        is_off_day=False,
+    )
+
+    service, _ = _build_service(monkeypatch, tmp_path)
+    changed = service.sync_day(day, [], schedule)
+
+    assert changed is True
+    assert captured_max_total["value"] == float(effective_study_minutes(schedule))
 
 
 def test_build_deviation_data_accrues_full_study_window_without_sessions():

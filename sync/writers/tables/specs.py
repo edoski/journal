@@ -69,6 +69,7 @@ class DailyProcrastinationTableSpec:
 
     screen_time_data: DailyScreenTimeData | None
     deviation_data: DailyDeviationData | None = None
+    max_total_minutes: float | None = None
     include_section_title: bool = True
 
 

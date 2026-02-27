@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from dataclasses import replace
 from typing import cast
 
@@ -929,6 +930,15 @@ class TestScreenTrendTable:
 
 
 class TestDailyProcrastinationTable:
+    @staticmethod
+    def _duration_cell_to_minutes(cell: str) -> int:
+        cleaned = cell.replace("`", "").replace("*", "").replace("+", "").strip()
+        match = re.fullmatch(r"(?:(\d+)h)?(\d+)m", cleaned)
+        assert match is not None
+        hours = int(match.group(1) or 0)
+        minutes = int(match.group(2))
+        return hours * 60 + minutes
+
     def test_no_screen_time_data_with_title(self):
         lines = render_table(
             DailyProcrastinationTableSpec(
@@ -1034,6 +1044,88 @@ class TestDailyProcrastinationTable:
             "| DEVIATIONS | `+1m` |",
             "| **TOTAL** | **`6m`** |",
         ]
+
+    def test_cap_applies_and_preserves_screen_precedence(self):
+        lines = render_table(
+            DailyProcrastinationTableSpec(
+                screen_time_data=DailyScreenTimeData(
+                    entries=[
+                        ScreenTimeEntry(app="A", minutes=100),
+                        ScreenTimeEntry(app="B", minutes=50),
+                    ]
+                ),
+                deviation_data=DailyDeviationData(late_study_start_minutes=200),
+                max_total_minutes=120,
+                include_section_title=False,
+            )
+        )
+
+        assert not any("DEVIATIONS" in line for line in lines)
+        assert any("| A | `+1h20m` |" == line for line in lines)
+        assert any("| B | `+40m` |" == line for line in lines)
+        assert any("| **TOTAL** | **`2h00m`** |" == line for line in lines)
+
+        body_rows = [
+            line
+            for line in lines
+            if line.startswith("| ") and "SOURCE" not in line and "---" not in line
+        ]
+        values = [
+            self._duration_cell_to_minutes(row.split("|")[2]) for row in body_rows[:-1]
+        ]
+        total = self._duration_cell_to_minutes(body_rows[-1].split("|")[2])
+        assert sum(values) == total == 120
+
+    def test_cap_leaves_deviation_when_screen_is_below_cap(self):
+        lines = render_table(
+            DailyProcrastinationTableSpec(
+                screen_time_data=DailyScreenTimeData(
+                    entries=[
+                        ScreenTimeEntry(app="A", minutes=60),
+                    ]
+                ),
+                deviation_data=DailyDeviationData(late_study_start_minutes=100),
+                max_total_minutes=90,
+                include_section_title=False,
+            )
+        )
+
+        assert any("| A | `+1h00m` |" == line for line in lines)
+        assert any("| DEVIATIONS | `+30m` |" == line for line in lines)
+        assert any("| **TOTAL** | **`1h30m`** |" == line for line in lines)
+
+        body_rows = [
+            line
+            for line in lines
+            if line.startswith("| ") and "SOURCE" not in line and "---" not in line
+        ]
+        values = [
+            self._duration_cell_to_minutes(row.split("|")[2]) for row in body_rows[:-1]
+        ]
+        total = self._duration_cell_to_minutes(body_rows[-1].split("|")[2])
+        assert sum(values) == total == 90
+
+    def test_none_cap_keeps_uncapped_behavior(self):
+        baseline = render_table(
+            DailyProcrastinationTableSpec(
+                screen_time_data=DailyScreenTimeData(
+                    entries=[ScreenTimeEntry(app="A", minutes=45)]
+                ),
+                deviation_data=DailyDeviationData(late_study_start_minutes=70),
+                include_section_title=False,
+            )
+        )
+        with_none_cap = render_table(
+            DailyProcrastinationTableSpec(
+                screen_time_data=DailyScreenTimeData(
+                    entries=[ScreenTimeEntry(app="A", minutes=45)]
+                ),
+                deviation_data=DailyDeviationData(late_study_start_minutes=70),
+                max_total_minutes=None,
+                include_section_title=False,
+            )
+        )
+        assert with_none_cap == baseline
 
 
 class TestTableDispatch:

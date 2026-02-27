@@ -39,6 +39,7 @@ from sync.ports.notes import NoteStore
 from sync.ports.reminders import ReminderRuleStore
 from sync.ports.status import DailyStatusSource
 from sync.study.section import build_study_section, extract_existing_data
+from sync.target_policy import effective_study_minutes
 
 from .goal_sync_service import GoalSyncService
 
@@ -348,9 +349,11 @@ class DailySyncService:
             sessions,
             training_status,
         )
+        max_total_minutes = float(effective_study_minutes(day_schedule))
         procrastination_lines = build_procrastination_section(
             screen_time_data,
             deviation_data,
+            max_total_minutes=max_total_minutes,
         )
 
         sections = [study_lines, training_lines, procrastination_lines, sleep_lines]

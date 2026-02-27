@@ -82,4 +82,28 @@ def test_study_times_uses_schedule_defaults(monkeypatch, tmp_path):
 
     data = json.loads(path.read_text())
     assert data["morning_start"] == "14:30"
-    assert data["lunch_start"] == "13:30"
+    assert data["lunch_start"] == "14:31"
+    assert data["afternoon_start"] == "14:31"
+    assert data["afternoon_end"] == "19:00"
+
+    morning = datetime.datetime.strptime(data["morning_start"], "%H:%M")
+    lunch = datetime.datetime.strptime(data["lunch_start"], "%H:%M")
+    afternoon = datetime.datetime.strptime(data["afternoon_start"], "%H:%M")
+    afternoon_end = datetime.datetime.strptime(data["afternoon_end"], "%H:%M")
+    assert morning < lunch <= afternoon < afternoon_end
+
+
+def test_study_times_no_sessions_still_writes_file(monkeypatch, tmp_path):
+    path = tmp_path / "study_times.json"
+    monkeypatch.setattr(icloud, "STUDY_TIMES_ICLOUD_PATH", str(path))
+
+    icloud.write_study_times_to_icloud([], "2025-01-01", _default_schedule())
+
+    data = json.loads(path.read_text())
+    assert data == {
+        "date": "2025-01-01",
+        "morning_start": "08:00",
+        "lunch_start": "13:30",
+        "afternoon_start": "14:30",
+        "afternoon_end": "18:00",
+    }

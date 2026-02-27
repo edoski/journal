@@ -235,6 +235,7 @@ def load_screen_time_data(
 def build_procrastination_section(
     screen_time_data: DailyScreenTimeData | None,
     deviation_data: DailyDeviationData | None = None,
+    max_total_minutes: float | None = None,
 ) -> list[str]:
     """
     Build the PROCRASTINATION section markdown lines.
@@ -242,6 +243,7 @@ def build_procrastination_section(
     Args:
         screen_time_data: Screen time data, or None if no data
         deviation_data: Schedule deviation data, or None if no deviations
+        max_total_minutes: Optional cap for TOTAL procrastination minutes
 
     Returns:
         List of markdown lines for the section
@@ -250,6 +252,7 @@ def build_procrastination_section(
         DailyProcrastinationTableSpec(
             screen_time_data=screen_time_data,
             deviation_data=deviation_data,
+            max_total_minutes=max_total_minutes,
             include_section_title=True,
         )
     )
