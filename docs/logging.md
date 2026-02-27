@@ -23,6 +23,7 @@ CLI overrides are available on `sync.run`:
   - `/tmp/com.edo.journal.out`
   - `/tmp/com.edo.journal.err`
   - `/tmp/com.edo.skip.log`
+  - `/tmp/com.edo.remind.log`
 - The application does not rotate or truncate these files.
 
 ## Logger Names

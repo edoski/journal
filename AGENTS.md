@@ -266,6 +266,7 @@ python tools/regenerate_baselines.py --only weekly_metrics.txt --only yearly_met
 python3 -m sync.run session rename "Title" [--confirm]
 python3 -m sync.run session undo [--confirm]
 python3 -m sync.run session skip [--state toggle|status]
+python3 -m sync.run session remind [--state toggle|status]
 ```
 
 ## Quality Gate
@@ -375,6 +376,7 @@ Operational guidance:
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
 - `sync.run session skip` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
+- `sync.run session remind` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
 - Logging is stderr-only; no app-level log file sink is used.
 - Launchd writes logs to `/tmp` and the application does not truncate them.
 
@@ -389,6 +391,7 @@ Move checklist (repo relocation):
 - carried-goals cache: `~/.cache/journal/goals/carry_forward.json`
 - goal-sync state cache: `~/.cache/journal/goals/reconcile_state.json`
 - media cache: `~/.cache/journal/media/dates.json`
+- flow reminder state cache: `~/.cache/journal/flow_reminder_state.json`
 - training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
 - screen-time cache: `~/.cache/journal/daily/screen_time/YYYY-MM-DD.json`
 - note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`
@@ -398,6 +401,7 @@ Move checklist (repo relocation):
 
 - Journal sync: `~/Library/LaunchAgents/com.edo.journalsync.plist`
 - Skip automation: `~/Library/LaunchAgents/com.edo.skip.plist`
+- Remind automation: `~/Library/LaunchAgents/com.edo.remind.plist`
 
 Reload:
 
@@ -407,6 +411,9 @@ launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
 
 launchctl unload ~/Library/LaunchAgents/com.edo.skip.plist
 launchctl load ~/Library/LaunchAgents/com.edo.skip.plist
+
+launchctl unload ~/Library/LaunchAgents/com.edo.remind.plist
+launchctl load ~/Library/LaunchAgents/com.edo.remind.plist
 ```
 
 ## Coding Conventions

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,12 +12,17 @@ import sync.run.__main__ as cli
 from sync.contracts.schedule import DayScheduleProfile
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
+FLOW_GET_TIME = 'tell application "Flow" to getTime'
 FLOW_SKIP = 'tell application "Flow" to skip'
 FLOW_START = 'tell application "Flow" to start'
 FLOW_SHOW = 'tell application "Flow" to show'
 
 
 def _skip_args(state: str | None = None) -> argparse.Namespace:
+    return argparse.Namespace(state=state)
+
+
+def _remind_args(state: str | None = None) -> argparse.Namespace:
     return argparse.Namespace(state=state)
 
 
@@ -75,9 +80,22 @@ def _insert_session_row(
     conn.commit()
 
 
-def _print_disabled_output(disabled: bool) -> str:
+def _make_open_flow_conn(*, started_at: float = 1.0) -> sqlite3.Connection:
+    conn = _make_session_conn()
+    _insert_session_row(conn, phase="flow", completed_at=None, started_at=started_at)
+    return conn
+
+
+def _print_disabled_output(disabled: bool, *, label: str) -> str:
     value = "true" if disabled else "false"
-    return f'{{\n  "{cli.SKIP_LAUNCHD_LABEL}" => {value}\n}}'
+    return f'{{\n  "{label}" => {value}\n}}'
+
+
+def _set_remind_state_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cli, "PATHS", SimpleNamespace(journal_cache_dir=str(cache_dir)))
+    return cache_dir / cli.FLOW_REMINDER_STATE_FILENAME
 
 
 def _patch_common_daily_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -450,7 +468,11 @@ def test_session_skip_state_status_prints_state(
     monkeypatch.setattr(
         cli,
         "_run_launchctl",
-        lambda args: (0, _print_disabled_output(disabled=False), ""),
+        lambda args: (
+            0,
+            _print_disabled_output(disabled=False, label=cli.SKIP_LAUNCHD_LABEL),
+            "",
+        ),
     )
 
     rc = cli.cmd_session_skip(_skip_args("status"))
@@ -464,9 +486,9 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
 ) -> None:
     calls: list[list[str]] = []
     responses = [
-        (0, _print_disabled_output(disabled=False), ""),
+        (0, _print_disabled_output(disabled=False, label=cli.SKIP_LAUNCHD_LABEL), ""),
         (0, "", ""),
-        (0, _print_disabled_output(disabled=True), ""),
+        (0, _print_disabled_output(disabled=True, label=cli.SKIP_LAUNCHD_LABEL), ""),
     ]
 
     def _fake_launchctl(args: list[str]) -> tuple[int, str, str]:
@@ -484,6 +506,413 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
         ["print-disabled", cli.SKIP_LAUNCHD_DOMAIN],
     ]
     assert "Skip automation: DISABLED" in capsys.readouterr().out
+
+
+def test_session_remind_noops_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: False)
+
+    def _fail_run(_script: str) -> str:
+        raise AssertionError(
+            "AppleScript should not run when remind automation is disabled"
+        )
+
+    monkeypatch.setattr(cli, "_run_applescript", _fail_run)
+
+    def _fail_conn(*_args, **_kwargs):
+        raise AssertionError(
+            "DB should not be opened when remind automation is disabled"
+        )
+
+    monkeypatch.setattr(cli, "get_connection", _fail_conn)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+
+
+def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_path = _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 1.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 2,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    assert state_path.exists()
+
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Break"
+        return "ok"
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    def _fail_conn(*_args, **_kwargs):
+        raise AssertionError("DB should not be opened when phase is not Flow")
+
+    monkeypatch.setattr(cli, "get_connection", _fail_conn)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE]
+    assert not state_path.exists()
+
+
+def test_session_remind_noops_when_latest_row_is_not_open_flow_and_clears_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    state_path = _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 1.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 2,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    assert state_path.exists()
+
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    conn = _make_session_conn()
+    _insert_session_row(conn, phase="flow", completed_at=1234.0, started_at=2.0)
+    monkeypatch.setattr(cli, "get_connection", lambda readonly=True: conn)
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        return "ok"
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE]
+    assert not state_path.exists()
+
+
+def test_session_remind_establishes_baseline_without_revealing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        raise AssertionError("Flow show should not run while baseline is establishing")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
+    assert cli._load_flow_reminder_state() == {
+        "open_session_started_at": 10.0,
+        "remaining_time": "25:00",
+        "stagnant_checks": 0,
+        "last_reminded_epoch": None,
+    }
+
+
+def test_session_remind_reveals_on_first_stagnant_check(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    monkeypatch.setattr(cli, "_now", lambda: datetime(2026, 2, 27, 12, 0, 0))
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        if script == FLOW_SHOW:
+            return "Flow"
+        return "ok"
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    first_rc = cli.cmd_session_remind(_remind_args())
+    second_rc = cli.cmd_session_remind(_remind_args())
+
+    assert first_rc == 0
+    assert second_rc == 0
+    assert calls == [
+        FLOW_GET_PHASE,
+        FLOW_GET_TIME,
+        FLOW_GET_PHASE,
+        FLOW_GET_TIME,
+        FLOW_SHOW,
+    ]
+    state = cli._load_flow_reminder_state()
+    assert state["open_session_started_at"] == 10.0
+    assert state["remaining_time"] == "25:00"
+    assert state["stagnant_checks"] == 1
+    assert state["last_reminded_epoch"] == datetime(2026, 2, 27, 12, 0, 0).timestamp()
+
+
+def test_session_remind_respects_cooldown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 10.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 1,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    monkeypatch.setattr(cli, "_now", lambda: datetime.fromtimestamp(1060.0))
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        raise AssertionError("Flow show should not run while cooldown is active")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
+    state = cli._load_flow_reminder_state()
+    assert state["stagnant_checks"] == 2
+    assert state["last_reminded_epoch"] == 1000.0
+
+
+def test_session_remind_allows_reremind_after_cooldown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 10.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 1,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    monkeypatch.setattr(cli, "_now", lambda: datetime.fromtimestamp(1121.0))
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        if script == FLOW_SHOW:
+            return "Flow"
+        return "ok"
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME, FLOW_SHOW]
+    state = cli._load_flow_reminder_state()
+    assert state["stagnant_checks"] == 2
+    assert state["last_reminded_epoch"] == 1121.0
+
+
+def test_session_remind_resets_counter_when_timer_moves(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 10.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 4,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "24:59"
+        raise AssertionError("Flow show should not run when timer moved")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
+    state = cli._load_flow_reminder_state()
+    assert state["stagnant_checks"] == 0
+    assert state["remaining_time"] == "24:59"
+    assert state["last_reminded_epoch"] == 1000.0
+
+
+def test_session_remind_resets_baseline_when_session_marker_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    cli._save_flow_reminder_state(
+        {
+            "open_session_started_at": 10.0,
+            "remaining_time": "25:00",
+            "stagnant_checks": 4,
+            "last_reminded_epoch": 1000.0,
+        }
+    )
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=11.0),
+    )
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        raise AssertionError("Flow show should not run when session marker changed")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
+    state = cli._load_flow_reminder_state()
+    assert state["open_session_started_at"] == 11.0
+    assert state["stagnant_checks"] == 0
+    assert state["last_reminded_epoch"] == 1000.0
+
+
+def test_session_remind_state_status_prints_state(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(
+        cli,
+        "_run_launchctl",
+        lambda args: (
+            0,
+            _print_disabled_output(disabled=False, label=cli.REMIND_LAUNCHD_LABEL),
+            "",
+        ),
+    )
+
+    rc = cli.cmd_session_remind(_remind_args("status"))
+
+    assert rc == 0
+    assert "Remind automation: ENABLED" in capsys.readouterr().out
+
+
+def test_session_remind_state_toggle_calls_launchctl_disable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[list[str]] = []
+    responses = [
+        (0, _print_disabled_output(disabled=False, label=cli.REMIND_LAUNCHD_LABEL), ""),
+        (0, "", ""),
+        (0, _print_disabled_output(disabled=True, label=cli.REMIND_LAUNCHD_LABEL), ""),
+    ]
+
+    def _fake_launchctl(args: list[str]) -> tuple[int, str, str]:
+        calls.append(args)
+        return responses[len(calls) - 1]
+
+    monkeypatch.setattr(cli, "_run_launchctl", _fake_launchctl)
+
+    rc = cli.cmd_session_remind(_remind_args("toggle"))
+
+    assert rc == 0
+    assert calls == [
+        ["print-disabled", cli.REMIND_LAUNCHD_DOMAIN],
+        ["disable", cli.REMIND_LAUNCHD_TARGET],
+        ["print-disabled", cli.REMIND_LAUNCHD_DOMAIN],
+    ]
+    assert "Remind automation: DISABLED" in capsys.readouterr().out
+
+
+def test_session_remind_executes_without_schedule_dependency(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _set_remind_state_dir(monkeypatch, tmp_path)
+    monkeypatch.setattr(cli, "_remind_enabled_state", lambda: True)
+
+    def _fail_schedule_source() -> object:
+        raise AssertionError(
+            "Schedule source should not be consulted by session remind"
+        )
+
+    monkeypatch.setattr(cli, "MarkdownScheduleSource", _fail_schedule_source)
+    monkeypatch.setattr(
+        cli,
+        "get_connection",
+        lambda readonly=True: _make_open_flow_conn(started_at=10.0),
+    )
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        raise AssertionError("Flow show should not run while baseline is establishing")
+
+    monkeypatch.setattr(cli, "_run_applescript", _fake_run)
+
+    rc = cli.cmd_session_remind(_remind_args())
+    assert rc == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
 
 
 def _write_podcast_template(path: Path) -> None:
@@ -727,6 +1156,11 @@ def test_cli_parser_has_expected_commands() -> None:
     args = parser.parse_args(["session", "skip", "--state", "status"])
     assert args.domain == "session"
     assert args.session_command == "skip"
+    assert args.state == "status"
+
+    args = parser.parse_args(["session", "remind", "--state", "status"])
+    assert args.domain == "session"
+    assert args.session_command == "remind"
     assert args.state == "status"
 
     args = parser.parse_args(["period", "weekly", "--date", "2026-02-17"])
