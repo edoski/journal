@@ -1199,6 +1199,33 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.grades_command == "sync"
     assert args.path == "/tmp/GRADES.md"
 
+    args = parser.parse_args(
+        [
+            "goals",
+            "add",
+            "--period",
+            "monthly",
+            "--next",
+            "Prepare next month review",
+        ]
+    )
+    assert args.domain == "goals"
+    assert args.goals_command == "add"
+    assert args.period == "monthly"
+    assert args.next is True
+    assert args.current is False
+    assert args.text == "Prepare next month review"
+
+    args = parser.parse_args(
+        ["goals", "add", "--period", "daily", "Plan tomorrow priorities"]
+    )
+    assert args.domain == "goals"
+    assert args.goals_command == "add"
+    assert args.period == "daily"
+    assert args.next is False
+    assert args.current is False
+    assert args.text == "Plan tomorrow priorities"
+
     with pytest.raises(SystemExit):
         parser.parse_args(["session-preview", "-n", "2"])
     with pytest.raises(SystemExit):
@@ -1207,6 +1234,8 @@ def test_cli_parser_has_expected_commands() -> None:
         parser.parse_args(["session", "skip", "--state", "off"])
     with pytest.raises(SystemExit):
         parser.parse_args(["period", "weekly", "--file", "/tmp/test.md"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["goals", "add", "--period", "biweekly", "Invalid"])
 
 
 def test_cli_parser_accepts_global_logging_flags() -> None:

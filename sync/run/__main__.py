@@ -30,11 +30,20 @@ from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
 from sync.config import PATHS
-from sync.constants import GRADES_PATH
+from sync.constants import (
+    DAILY_TEMPLATE_PATH,
+    GRADES_PATH,
+    JOURNAL_DIR,
+    MONTHLY_TEMPLATE_PATH,
+    QUARTERLY_TEMPLATE_PATH,
+    WEEKLY_TEMPLATE_PATH,
+    YEARLY_TEMPLATE_PATH,
+)
 from sync.log import configure_logging, get_logger, resolve_logging_settings
 from sync.run import parser as parser_mod
 from sync.run import wiring
 from sync.run.commands import grades as grades_cmd
+from sync.run.commands import goals as goals_cmd
 from sync.run.commands import media as media_cmd
 from sync.run.commands import reminders as reminders_cmd
 from sync.run.commands import session as session_cmd
@@ -132,6 +141,15 @@ def _sync_grades_patch_points() -> None:
     _set_module_attr(grades_cmd, "GRADES_PATH", GRADES_PATH)
 
 
+def _sync_goals_patch_points() -> None:
+    _set_module_attr(goals_cmd, "JOURNAL_DIR", JOURNAL_DIR)
+    _set_module_attr(goals_cmd, "DAILY_TEMPLATE_PATH", DAILY_TEMPLATE_PATH)
+    _set_module_attr(goals_cmd, "WEEKLY_TEMPLATE_PATH", WEEKLY_TEMPLATE_PATH)
+    _set_module_attr(goals_cmd, "MONTHLY_TEMPLATE_PATH", MONTHLY_TEMPLATE_PATH)
+    _set_module_attr(goals_cmd, "QUARTERLY_TEMPLATE_PATH", QUARTERLY_TEMPLATE_PATH)
+    _set_module_attr(goals_cmd, "YEARLY_TEMPLATE_PATH", YEARLY_TEMPLATE_PATH)
+
+
 def _build_goal_sync_service(note_store: MarkdownNoteStore) -> GoalSyncService:
     _sync_wiring_patch_points()
     return wiring._build_goal_sync_service(note_store)
@@ -204,6 +222,11 @@ def cmd_period_yearly(args: argparse.Namespace) -> int:
 def cmd_grades_sync(args: argparse.Namespace) -> int:
     _sync_grades_patch_points()
     return grades_cmd.cmd_grades_sync(args)
+
+
+def cmd_goals_add(args: argparse.Namespace) -> int:
+    _sync_goals_patch_points()
+    return goals_cmd.cmd_goals_add(args)
 
 
 def get_connection(readonly: bool = True) -> sqlite3.Connection:
@@ -370,6 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
             "session_skip": cmd_session_skip,
             "session_remind": cmd_session_remind,
             "grades_sync": cmd_grades_sync,
+            "goals_add": cmd_goals_add,
             "media_podcast_add": cmd_media_podcast_add,
         }
     )

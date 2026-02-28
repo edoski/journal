@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping
 
 from sync.log import add_logging_cli_args
 from sync.run.commands.grades import cmd_grades_sync
+from sync.run.commands.goals import cmd_goals_add
 from sync.run.commands.media import cmd_media_podcast_add
 from sync.run.commands.period import (
     cmd_period_all,
@@ -34,6 +35,7 @@ _DEFAULT_HANDLERS: dict[str, CommandHandler] = {
     "session_skip": cmd_session_skip,
     "session_remind": cmd_session_remind,
     "grades_sync": cmd_grades_sync,
+    "goals_add": cmd_goals_add,
     "media_podcast_add": cmd_media_podcast_add,
 }
 
@@ -138,6 +140,30 @@ def build_parser(
         help="Override grades note path",
     )
     grades_sync.set_defaults(func=_resolve_handler(handlers, "grades_sync"))
+
+    goals = domain.add_parser("goals", help="Run goal note operations")
+    goals_sub = goals.add_subparsers(dest="goals_command", required=True)
+
+    goals_add = goals_sub.add_parser("add", help="Add a goal to a source period note")
+    goals_add.add_argument(
+        "--period",
+        choices=["daily", "weekly", "monthly", "quarterly", "yearly"],
+        required=True,
+        help="Goal source period",
+    )
+    goals_time = goals_add.add_mutually_exclusive_group()
+    goals_time.add_argument(
+        "--current",
+        action="store_true",
+        help="Target current period (default)",
+    )
+    goals_time.add_argument(
+        "--next",
+        action="store_true",
+        help="Target next period",
+    )
+    goals_add.add_argument("text", help="Goal text")
+    goals_add.set_defaults(func=_resolve_handler(handlers, "goals_add"))
 
     media = domain.add_parser("media", help="Run media note operations")
     media_sub = media.add_subparsers(dest="media_command", required=True)
