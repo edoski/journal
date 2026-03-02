@@ -12,3 +12,4 @@ class VaultFileRecord(TypedDict):
     path: str
     basename: str
     mtime: datetime.datetime
+    created_at: datetime.datetime

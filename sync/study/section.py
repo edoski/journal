@@ -25,6 +25,7 @@ _CANONICAL_STUDY_HEADER_RE = re.compile(
     r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|\s*INTERRUPT\s*\|\s*BREAK\s*\|\s*CONTEXT\s*\|\s*NOTES\s*\|$",
     re.IGNORECASE,
 )
+_NOTE_PLACEHOLDERS = frozenset({"", "–", "—", "❌"})
 
 
 def extract_existing_data(lines: list[str]) -> tuple[dict[str, str], dict[str, str]]:
@@ -105,6 +106,24 @@ def _format_interrupt(minutes: int) -> str:
     return f"`+{minutes:02d}m`"
 
 
+def _warn_unmapped_existing_notes(
+    existing_notes: dict[str, str],
+    rendered_start_keys: set[str],
+) -> None:
+    """Warn when user-authored note text cannot be mapped by start-key."""
+    unmapped = sorted(
+        start_key
+        for start_key, note in existing_notes.items()
+        if start_key not in rendered_start_keys
+        and note.strip() not in _NOTE_PLACEHOLDERS
+    )
+    if unmapped:
+        logger.warning(
+            "Unmapped STUDY notes found; start-key preservation missed session starts: %s",
+            ", ".join(unmapped),
+        )
+
+
 def build_study_section(
     sessions: list[StudySessionRecord],
     existing_notes: dict[str, str],
@@ -133,10 +152,12 @@ def build_study_section(
         return [], 0
 
     rows: list[list[str]] = []
+    rendered_start_keys: set[str] = set()
 
     for session in sessions:
         start_s = session["start"].strftime("%H:%M")
         end_s = session["end"].strftime("%H:%M")
+        rendered_start_keys.add(start_s)
         time_str = f"`{start_s} - {end_s}`"
 
         title = (session.get("title") or "").strip()
@@ -209,6 +230,8 @@ def build_study_section(
                 notes_str,
             ]
         )
+
+    _warn_unmapped_existing_notes(existing_notes, rendered_start_keys)
 
     total_focus = sum(s.get("focus_minutes_rounded", 0) for s in sessions)
     table_lines = render_table(

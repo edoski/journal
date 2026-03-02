@@ -29,7 +29,7 @@ def get_vault_files_modified_on_date(
     extensions: tuple[str, ...] = (".md",),
 ) -> list[FileInfo]:
     """
-    Find all files in the vault modified on a specific date.
+    Find all files in the vault touched on a specific date.
 
     Args:
         target_date: Date to check for modifications
@@ -37,7 +37,7 @@ def get_vault_files_modified_on_date(
         extensions: File extensions to include (default: .md only)
 
     Returns:
-        List of dicts with 'path', 'basename', 'mtime' keys
+        List of dicts with 'path', 'basename', 'mtime', 'created_at' keys
     """
     modified_files: list[FileInfo] = []
 
@@ -68,10 +68,12 @@ def get_vault_files_modified_on_date(
             try:
                 stat = os.stat(fpath)
                 mtime = datetime.fromtimestamp(stat.st_mtime)
-            except OSError:
+                birthtime = getattr(stat, "st_birthtime", stat.st_mtime)
+                created_at = datetime.fromtimestamp(birthtime)
+            except (OSError, OverflowError, ValueError):
                 continue
 
-            if mtime.date() == target_date:
+            if mtime.date() == target_date or created_at.date() == target_date:
                 basename = os.path.splitext(fname)[0]
                 # Skip excluded files (AI/meta files)
                 if basename in CONTEXT_EXCLUDED_FILES:
@@ -81,6 +83,7 @@ def get_vault_files_modified_on_date(
                         "path": fpath,
                         "basename": basename,
                         "mtime": mtime,
+                        "created_at": created_at,
                     }
                 )
 
@@ -94,7 +97,7 @@ def files_for_session(
     buffer_minutes: int = CONTEXT_SESSION_BUFFER_MINUTES,
 ) -> list[str]:
     """
-    Return wikilink-formatted basenames of files modified during a session.
+    Return wikilink-formatted basenames of files touched during a session.
 
     Args:
         files: List of file info dicts from get_vault_files_modified_on_date
@@ -110,7 +113,11 @@ def files_for_session(
     matched: list[str] = []
     for f in files:
         mtime = f["mtime"]
-        if session_start <= mtime <= end_with_buffer:
+        created_at = f["created_at"]
+        if (
+            session_start <= mtime <= end_with_buffer
+            or session_start <= created_at <= end_with_buffer
+        ):
             matched.append(f"[[{f['basename']}]]")
 
     return matched
