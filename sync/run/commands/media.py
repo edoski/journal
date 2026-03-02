@@ -16,9 +16,15 @@ from sync.config import PATHS
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import get_logger
 from sync.notes.locking import locked_note
+from sync.notes.markdown import normalize_header
+from sync.notes.markdown_tables import escape_markdown_cell
+from sync.readers.kindle_annotations import parse_kindle_notebook_html
+from sync.writers.tables import SimpleGridTableSpec, render_table
 
 YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
 PODCAST_TEMPLATE_FILENAME = "podcast.md"
+HIGHLIGHTS_SECTION_TITLE = "Highlights"
+REFLECTIONS_SECTION_TITLE = "Reflections"
 
 logger = get_logger(__name__)
 
@@ -131,6 +137,163 @@ def _update_media_cache_for_podcast(title: str, note_date: datetime.date) -> Non
         cache_store.save({"books": books, "podcasts": podcasts})
     except Exception as exc:
         logger.warning("Failed to update media cache for %s: %s", title, exc)
+
+
+def _find_h2_section_bounds(lines: list[str], title: str) -> tuple[int, int]:
+    needle = normalize_header(f"## {title}")
+    start = -1
+    for idx, line in enumerate(lines):
+        if normalize_header(line) == needle:
+            start = idx
+            break
+    if start == -1:
+        return -1, -1
+
+    end = len(lines)
+    for idx in range(start + 1, len(lines)):
+        stripped = lines[idx].strip()
+        if stripped.startswith("## ") and normalize_header(stripped) != needle:
+            end = idx
+            break
+    return start, end
+
+
+def _insert_h2_section(lines: list[str], title: str, insert_at: int) -> None:
+    section_lines: list[str] = []
+    if insert_at > 0 and lines[insert_at - 1].strip() != "":
+        section_lines.append("")
+    section_lines.extend([f"## {title}", "---"])
+    if insert_at < len(lines) and lines[insert_at].strip() != "":
+        section_lines.append("")
+    lines[insert_at:insert_at] = section_lines
+
+
+def _ensure_highlights_reflections_sections(lines: list[str]) -> list[str]:
+    updated = list(lines)
+    highlights_start, highlights_end = _find_h2_section_bounds(
+        updated, HIGHLIGHTS_SECTION_TITLE
+    )
+    reflections_start, _ = _find_h2_section_bounds(updated, REFLECTIONS_SECTION_TITLE)
+
+    if highlights_start == -1 and reflections_start == -1:
+        _insert_h2_section(updated, HIGHLIGHTS_SECTION_TITLE, len(updated))
+        _insert_h2_section(updated, REFLECTIONS_SECTION_TITLE, len(updated))
+        return updated
+
+    if highlights_start == -1:
+        _insert_h2_section(updated, HIGHLIGHTS_SECTION_TITLE, reflections_start)
+        return updated
+
+    if reflections_start == -1:
+        _insert_h2_section(updated, REFLECTIONS_SECTION_TITLE, highlights_end)
+        return updated
+
+    return updated
+
+
+def _render_book_annotation_tables(
+    html_path: str,
+) -> tuple[list[str], int, int, str]:
+    with open(html_path, "r", encoding="utf-8") as handle:
+        html = handle.read()
+
+    export = parse_kindle_notebook_html(html)
+    page_rows: list[list[str]] = []
+    loc_rows: list[list[str]] = []
+
+    for annotation in export.annotations:
+        row = [f"**{annotation.locator}**", escape_markdown_cell(annotation.quote)]
+        if annotation.locator_kind == "page":
+            page_rows.append(row)
+        else:
+            loc_rows.append(row)
+
+    if not page_rows and not loc_rows:
+        raise ValueError("No page/location annotation rows were found in HTML export")
+
+    rendered: list[str] = []
+    if page_rows:
+        rendered.extend(
+            render_table(SimpleGridTableSpec(headers=["PAGE", "QUOTE"], rows=page_rows))
+        )
+    if page_rows and loc_rows:
+        rendered.append("")
+    if loc_rows:
+        rendered.extend(
+            render_table(SimpleGridTableSpec(headers=["LOC.", "QUOTE"], rows=loc_rows))
+        )
+
+    return rendered, len(page_rows), len(loc_rows), export.book_title
+
+
+def _replace_highlights_content(lines: list[str], new_content: list[str]) -> list[str]:
+    updated = _ensure_highlights_reflections_sections(lines)
+    highlights_start, highlights_end = _find_h2_section_bounds(
+        updated, HIGHLIGHTS_SECTION_TITLE
+    )
+    if highlights_start == -1:
+        raise ValueError("Could not resolve ## Highlights section in target note")
+
+    divider_idx = highlights_start + 1
+    if divider_idx >= len(updated) or updated[divider_idx].strip() != "---":
+        updated.insert(divider_idx, "---")
+        highlights_end += 1
+
+    body_start = divider_idx + 1
+    replacement = ["", *new_content]
+    updated[body_start:highlights_end] = replacement
+    return updated
+
+
+def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
+    html_path = args.html_path
+    note_path = args.note
+
+    if not os.path.isabs(html_path):
+        print(f"Error: HTML path must be absolute: {html_path}")
+        return 1
+    if not os.path.isabs(note_path):
+        print(f"Error: note path must be absolute: {note_path}")
+        return 1
+    if not os.path.isfile(html_path):
+        print(f"Error: HTML file not found: {html_path}")
+        return 1
+    if not os.path.isfile(note_path):
+        print(f"Error: target note file not found: {note_path}")
+        return 1
+
+    try:
+        table_lines, page_count, loc_count, book_title = _render_book_annotation_tables(
+            html_path
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
+    except OSError as exc:
+        print(f"Error: failed to read HTML file: {exc}")
+        return 1
+
+    try:
+        with locked_note(note_path):
+            existing_lines = safe_read_file(note_path)
+            if existing_lines is None:
+                print(f"Error: failed to read target note: {note_path}")
+                return 1
+            updated_lines = _replace_highlights_content(existing_lines, table_lines)
+            atomic_write_note(note_path, updated_lines)
+    except TimeoutError as exc:
+        print(f"Error: could not lock note for write: {exc}")
+        return 1
+    except OSError as exc:
+        print(f"Error: failed to write target note: {exc}")
+        return 1
+
+    print("Imported Kindle annotations:")
+    print(f"  Path: {note_path}")
+    if book_title:
+        print(f"  Book: {book_title}")
+    print(f"  Rows: {page_count + loc_count} (PAGE: {page_count}, LOC.: {loc_count})")
+    return 0
 
 
 def cmd_media_podcast_add(args: argparse.Namespace) -> int:

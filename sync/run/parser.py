@@ -8,7 +8,10 @@ from collections.abc import Callable, Mapping
 from sync.log import add_logging_cli_args
 from sync.run.commands.grades import cmd_grades_sync
 from sync.run.commands.goals import cmd_goals_add
-from sync.run.commands.media import cmd_media_podcast_add
+from sync.run.commands.media import (
+    cmd_media_book_annotations_import,
+    cmd_media_podcast_add,
+)
 from sync.run.commands.period import (
     cmd_period_all,
     cmd_period_daily,
@@ -37,6 +40,7 @@ _DEFAULT_HANDLERS: dict[str, CommandHandler] = {
     "grades_sync": cmd_grades_sync,
     "goals_add": cmd_goals_add,
     "media_podcast_add": cmd_media_podcast_add,
+    "media_book_annotations_import": cmd_media_book_annotations_import,
 }
 
 
@@ -187,5 +191,34 @@ def build_parser(
         help="Override fetched host when metadata lookup fails",
     )
     media_podcast_add.set_defaults(func=_resolve_handler(handlers, "media_podcast_add"))
+
+    media_book = media_sub.add_parser("book", help="Run book note operations")
+    media_book_sub = media_book.add_subparsers(dest="book_command", required=True)
+
+    media_book_annotations = media_book_sub.add_parser(
+        "annotations",
+        help="Run book annotation operations",
+    )
+    media_book_annotations_sub = media_book_annotations.add_subparsers(
+        dest="book_annotations_command",
+        required=True,
+    )
+
+    media_book_annotations_import = media_book_annotations_sub.add_parser(
+        "import",
+        help="Import Kindle Notebook HTML annotations into a book note",
+    )
+    media_book_annotations_import.add_argument(
+        "html_path",
+        help="Absolute path to Kindle Notebook HTML export",
+    )
+    media_book_annotations_import.add_argument(
+        "--note",
+        required=True,
+        help="Absolute path to target book markdown note",
+    )
+    media_book_annotations_import.set_defaults(
+        func=_resolve_handler(handlers, "media_book_annotations_import")
+    )
 
     return parser

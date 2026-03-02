@@ -36,6 +36,14 @@ def _media_add_args(
     return argparse.Namespace(url=url, date=date, title=title, host=host)
 
 
+def _media_book_annotations_import_args(
+    *,
+    html_path: str,
+    note: str,
+) -> argparse.Namespace:
+    return argparse.Namespace(html_path=html_path, note=note)
+
+
 def _grades_sync_args(path: str | None = None) -> argparse.Namespace:
     return argparse.Namespace(path=path)
 
@@ -960,6 +968,54 @@ def _patch_media_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return podcasts_dir
 
 
+def _write_book_note(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "author: Carl Jung",
+                "started: 2026-01-01",
+                "completed:",
+                "rating:",
+                "---",
+                "",
+                "## Highlights",
+                "---",
+                "",
+                "| PAGE | QUOTE |",
+                "| ---- | ----- |",
+                "| **1** | Old quote |",
+                "",
+                "## Reflections",
+                "---",
+                "",
+                "- Keep this reflection",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_kindle_export(path: Path) -> None:
+    path.write_text(
+        "".join(
+            [
+                "<html><body>",
+                '<div class="bookTitle">Memories Dreams Reflections</div>',
+                '<div class="noteHeading">Highlight - Page 293 · Location 3835</div>',
+                '<div class="noteText">First quote with a | pipe</div>',
+                '<div class="noteHeading">Bookmark - Page 294 · Location 3840</div>',
+                '<div class="noteHeading">Highlight - Location 3901</div>',
+                '<div class="noteText">Second quote</div>',
+                "</body></html>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_media_podcast_add_creates_note_with_sanitized_filename(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1082,6 +1138,120 @@ def test_media_podcast_add_fails_on_invalid_date(
     assert rc == 1
 
 
+def test_media_book_annotations_import_replaces_highlights_and_keeps_reflections(
+    tmp_path: Path,
+) -> None:
+    html_path = tmp_path / "kindle.html"
+    note_path = tmp_path / "book.md"
+    _write_kindle_export(html_path)
+    _write_book_note(note_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 0
+    content = note_path.read_text(encoding="utf-8")
+    assert "| PAGE | QUOTE |" in content
+    assert "| LOC. | QUOTE |" in content
+    assert "| **293** | First quote with a \\| pipe |" in content
+    assert "| **3901** | Second quote |" in content
+    assert "Old quote" not in content
+    assert "- Keep this reflection" in content
+
+
+def test_media_book_annotations_import_creates_missing_sections(tmp_path: Path) -> None:
+    html_path = tmp_path / "kindle.html"
+    note_path = tmp_path / "book.md"
+    _write_kindle_export(html_path)
+    note_path.write_text("---\nauthor: Carl Jung\n---\n", encoding="utf-8")
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 0
+    lines = note_path.read_text(encoding="utf-8").splitlines()
+    assert "## Highlights" in lines
+    assert "## Reflections" in lines
+
+
+def test_media_book_annotations_import_fails_on_relative_paths(tmp_path: Path) -> None:
+    html_path = tmp_path / "kindle.html"
+    note_path = tmp_path / "book.md"
+    _write_kindle_export(html_path)
+    _write_book_note(note_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=html_path.name,
+            note=str(note_path),
+        )
+    )
+    assert rc == 1
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=note_path.name,
+        )
+    )
+    assert rc == 1
+
+
+def test_media_book_annotations_import_fails_when_note_is_missing(
+    tmp_path: Path,
+) -> None:
+    html_path = tmp_path / "kindle.html"
+    _write_kindle_export(html_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(tmp_path / "missing.md"),
+        )
+    )
+
+    assert rc == 1
+
+
+def test_media_book_annotations_import_fails_when_no_parsable_rows(
+    tmp_path: Path,
+) -> None:
+    html_path = tmp_path / "kindle.html"
+    note_path = tmp_path / "book.md"
+    note_path.write_text(
+        "## Highlights\n---\n\n## Reflections\n---\n", encoding="utf-8"
+    )
+    html_path.write_text(
+        "".join(
+            [
+                "<html><body>",
+                '<div class="bookTitle">Memories Dreams Reflections</div>',
+                '<div class="noteHeading">Highlight - Chapter III</div>',
+                '<div class="noteText">Quote without page or location</div>',
+                "</body></html>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 1
+
+
 def _write_grades_note(path: Path) -> None:
     path.write_text(
         "\n".join(
@@ -1193,6 +1363,24 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.date == "2026-02-20"
     assert args.title == "Podcast Title"
     assert args.host == "Podcast Host"
+
+    args = parser.parse_args(
+        [
+            "media",
+            "book",
+            "annotations",
+            "import",
+            "/tmp/kindle.html",
+            "--note",
+            "/tmp/Book.md",
+        ]
+    )
+    assert args.domain == "media"
+    assert args.media_command == "book"
+    assert args.book_command == "annotations"
+    assert args.book_annotations_command == "import"
+    assert args.html_path == "/tmp/kindle.html"
+    assert args.note == "/tmp/Book.md"
 
     args = parser.parse_args(["grades", "sync", "--path", "/tmp/GRADES.md"])
     assert args.domain == "grades"

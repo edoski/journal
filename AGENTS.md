@@ -266,6 +266,7 @@ python -m sync.run period quarterly [--quarter YYYY-Q#]
 python -m sync.run period yearly [--year YYYY]
 python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
 python -m sync.run goals add --period {daily|weekly|monthly|quarterly|yearly} [--current|--next] "goal text"
+python -m sync.run media book annotations import /abs/path/to/export.html --note /abs/path/to/book.md
 ```
 
 ### Snapshot baseline fixtures

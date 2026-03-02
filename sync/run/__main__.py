@@ -379,6 +379,11 @@ def cmd_media_podcast_add(args: argparse.Namespace) -> int:
     return media_cmd.cmd_media_podcast_add(args)
 
 
+def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
+    _sync_media_patch_points()
+    return media_cmd.cmd_media_book_annotations_import(args)
+
+
 def build_parser() -> argparse.ArgumentParser:
     return parser_mod.build_parser(
         handlers={
@@ -395,6 +400,7 @@ def build_parser() -> argparse.ArgumentParser:
             "grades_sync": cmd_grades_sync,
             "goals_add": cmd_goals_add,
             "media_podcast_add": cmd_media_podcast_add,
+            "media_book_annotations_import": cmd_media_book_annotations_import,
         }
     )
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,23 @@ class Podcast:
     date: datetime.date
     rating: float | None
     link: str | None
+
+
+@dataclass(frozen=True)
+class BookAnnotation:
+    """A parsed Kindle annotation tied to a page or location."""
+
+    locator_kind: Literal["page", "loc"]
+    locator: str
+    quote: str
+
+
+@dataclass(frozen=True)
+class KindleNotebookExport:
+    """Annotations extracted from a Kindle Notebook HTML export."""
+
+    book_title: str
+    annotations: list[BookAnnotation]
 
 
 @dataclass(frozen=True)
