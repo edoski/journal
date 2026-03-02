@@ -74,9 +74,11 @@
 └
 ```
 
-| TYPE | SESSIONS | AVERAGE |
-| ---- | -------- | ------- |
-|  |  |  |
+| TYPE | SESSIONS | DURATION | SCHEDULE |
+| ---- | -------- | -------- | -------- |
+| **Mind & Body** | `46/92` | `12m/session` | `07:25 - 07:37` |
+| **Functional Strength Training** | `31/92` | `33m/session` | `18:10 - 18:43` |
+| **Cooldown** | `46/92` | `26m/session` | `19:07 - 19:33` |
 
 ### **PROCRASTINATION**
 ```

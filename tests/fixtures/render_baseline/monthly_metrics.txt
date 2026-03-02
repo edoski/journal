@@ -72,9 +72,11 @@
 └     +33%            -36%            +33%            -25%            +33%
 ```
 
-| TYPE | SESSIONS | AVERAGE |
-| ---- | -------- | ------- |
-|  |  |  |
+| TYPE | SESSIONS | DURATION | SCHEDULE |
+| ---- | -------- | -------- | -------- |
+| **Mind & Body** | `15/31` | `12m/session` | `07:25 - 07:37` |
+| **Functional Strength Training** | `10/31` | `33m/session` | `18:10 - 18:44` |
+| **Cooldown** | `16/31` | `26m/session` | `19:07 - 19:33` |
 
 ### **PROCRASTINATION**
 ```

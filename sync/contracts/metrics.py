@@ -24,6 +24,8 @@ class DailyAggregate(TypedDict):
     planned_break_minutes: float
     training_type_minutes: dict[str, float]
     training_type_sessions: dict[str, int]
+    training_type_start_minutes: dict[str, tuple[int, ...]]
+    training_type_end_minutes: dict[str, tuple[int, ...]]
     screen_time_totals: dict[str, float]
 
 
@@ -47,6 +49,8 @@ class TrainingTypeSessionStat(TypedDict):
     sessions: int
     target: int
     average_minutes: float
+    average_start_time: str
+    average_end_time: str
 
 
 class MovingAverageAggregate(TypedDict):

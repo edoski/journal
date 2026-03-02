@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
+
 import sync.metrics.loading as metrics_loading
 from sync.metrics import (
     compute_period_metrics,
@@ -330,10 +332,20 @@ class TestAggregateTrainingTypeSessionStats:
             dates[0]: {
                 "training_type_minutes": {"Traditional Strength Training": 60.0},
                 "training_type_sessions": {"Traditional Strength Training": 1},
+                "training_type_start_minutes": {
+                    "Traditional Strength Training": (1080,)
+                },
+                "training_type_end_minutes": {"Traditional Strength Training": (1140,)},
             },
             dates[1]: {
                 "training_type_minutes": {"Traditional Strength Training": 90.0},
                 "training_type_sessions": {"Traditional Strength Training": 2},
+                "training_type_start_minutes": {
+                    "Traditional Strength Training": (1080, 1140)
+                },
+                "training_type_end_minutes": {
+                    "Traditional Strength Training": (1110, 1170)
+                },
             },
         }
 
@@ -343,6 +355,8 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["type"] == "Traditional Strength Training"
         assert rows[0]["sessions"] == 3
         assert rows[0]["average_minutes"] == 50.0
+        assert rows[0]["average_start_time"] == "18:20"
+        assert rows[0]["average_end_time"] == "19:00"
 
     def test_applies_bucket_mapping_for_target_denominator(self):
         dates = [
@@ -359,6 +373,16 @@ class TestAggregateTrainingTypeSessionStats:
                     "Meditation": 1,
                     "Stretching": 1,
                     "Traditional Strength Training": 1,
+                },
+                "training_type_start_minutes": {
+                    "Meditation": (430,),
+                    "Stretching": (1140,),
+                    "Traditional Strength Training": (1080,),
+                },
+                "training_type_end_minutes": {
+                    "Meditation": (440,),
+                    "Stretching": (1160,),
+                    "Traditional Strength Training": (1140,),
                 },
             }
         }
@@ -382,6 +406,10 @@ class TestAggregateTrainingTypeSessionStats:
             dates[0]: {
                 "training_type_minutes": {"Traditional Strength Training": 60.0},
                 "training_type_sessions": {"Traditional Strength Training": 1},
+                "training_type_start_minutes": {
+                    "Traditional Strength Training": (1080,)
+                },
+                "training_type_end_minutes": {"Traditional Strength Training": (1140,)},
             }
         }
 
@@ -390,7 +418,7 @@ class TestAggregateTrainingTypeSessionStats:
         assert len(rows) == 1
         assert rows[0]["target"] == training_type_target(len(dates), "workout")
 
-    def test_sorts_by_average_desc_then_sessions(self):
+    def test_sorts_by_average_start_then_end_then_duration(self):
         dates = [
             datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
         ]
@@ -406,15 +434,23 @@ class TestAggregateTrainingTypeSessionStats:
                     "Traditional Strength Training": 2,
                     "Yoga": 3,
                 },
+                "training_type_start_minutes": {
+                    "Zone 2 Run": (1140,),
+                    "Traditional Strength Training": (1080, 1080),
+                    "Yoga": (420, 420, 420),
+                },
+                "training_type_end_minutes": {
+                    "Zone 2 Run": (1180,),
+                    "Traditional Strength Training": (1140, 1140),
+                    "Yoga": (460, 460, 460),
+                },
             }
         }
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
         labels = [row["type"] for row in rows]
 
-        # Averages: Run=40, Strength=60, Yoga=40 => Strength first.
-        # Tie on 40s resolved by sessions desc => Yoga before Run.
-        assert labels == ["Traditional Strength Training", "Yoga", "Zone 2 Run"]
+        assert labels == ["Yoga", "Traditional Strength Training", "Zone 2 Run"]
 
     def test_merges_case_and_whitespace_variants(self):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
@@ -422,10 +458,14 @@ class TestAggregateTrainingTypeSessionStats:
             dates[0]: {
                 "training_type_minutes": {"  Stretching ": 20.0},
                 "training_type_sessions": {"  Stretching ": 1},
+                "training_type_start_minutes": {"  Stretching ": (1140,)},
+                "training_type_end_minutes": {"  Stretching ": (1160,)},
             },
             dates[1]: {
                 "training_type_minutes": {"stretching": 25.0},
                 "training_type_sessions": {"stretching": 1},
+                "training_type_start_minutes": {"stretching": (1145,)},
+                "training_type_end_minutes": {"stretching": (1165,)},
             },
         }
 
@@ -435,6 +475,22 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["type"] == "Stretching"
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 22.5
+        assert rows[0]["average_start_time"] == "19:02"
+        assert rows[0]["average_end_time"] == "19:22"
+
+    def test_raises_when_schedule_samples_are_missing(self):
+        dates = [datetime.date(2025, 1, 1)]
+        daily_data = {
+            dates[0]: {
+                "training_type_minutes": {"Stretching": 20.0},
+                "training_type_sessions": {"Stretching": 1},
+                "training_type_start_minutes": {},
+                "training_type_end_minutes": {},
+            }
+        }
+
+        with pytest.raises(ValueError, match="sample count mismatch"):
+            aggregate_training_type_session_stats(dates, daily_data)
 
 
 class TestLoadDailyData:

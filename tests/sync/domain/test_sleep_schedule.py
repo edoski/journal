@@ -64,6 +64,8 @@ class TestComputeAvgSchedule:
                 "planned_break_minutes": 0,
                 "training_type_minutes": {},
                 "training_type_sessions": {},
+                "training_type_start_minutes": {},
+                "training_type_end_minutes": {},
                 "screen_time_totals": {},
             }
         }
@@ -89,6 +91,8 @@ class TestComputeAvgSchedule:
                 "planned_break_minutes": 0,
                 "training_type_minutes": {},
                 "training_type_sessions": {},
+                "training_type_start_minutes": {},
+                "training_type_end_minutes": {},
                 "screen_time_totals": {},
             },
             datetime.date(2020, 1, 2): {
@@ -108,6 +112,8 @@ class TestComputeAvgSchedule:
                 "planned_break_minutes": 0,
                 "training_type_minutes": {},
                 "training_type_sessions": {},
+                "training_type_start_minutes": {},
+                "training_type_end_minutes": {},
                 "screen_time_totals": {},
             },
         }

@@ -78,6 +78,8 @@ def test_parse_daily_note_characterization(tmp_path):
         "planned_break_minutes": 25,
         "training_type_minutes": {},
         "training_type_sessions": {},
+        "training_type_start_minutes": {},
+        "training_type_end_minutes": {},
         "screen_time_totals": {"YouTube": 90.0, "X": 30.0},
     }
 
@@ -218,9 +220,49 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
         "Stretching": 1,
         "Meditation": 1,
     }
+    assert parsed["training_type_start_minutes"] == {
+        "Traditional Strength Training": (420,),
+        "Stretching": (1080,),
+        "Meditation": (1260,),
+    }
+    assert parsed["training_type_end_minutes"] == {
+        "Traditional Strength Training": (480,),
+        "Stretching": (1110,),
+        "Meditation": (1275,),
+    }
     assert parsed["workout"] is True
     assert parsed["stretch"] is True
     assert parsed["meditate"] is True
+
+
+def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
+    note_path = _write_note(
+        tmp_path,
+        [
+            "---",
+            "sleep: 7h",
+            "mood: 7.0",
+            "workout: true",
+            "stretch: false",
+            "meditate: false",
+            "---",
+            "",
+            "## Metrics",
+            "---",
+            "### **TRAINING**",
+            "",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+            "| ---- | -------- | -------- | --------- |",
+            "| `07:00-07:30` | Lift | `30m` | `+00m` |",
+        ],
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        parse_daily_note(note_path)
+
+    message = str(excinfo.value)
+    assert f"Invalid daily note schema in {note_path}:" in message
+    assert "Non-canonical TRAINING TIME value" in message
 
 
 def test_parse_training_table_rows_handles_edge_cases():
@@ -239,7 +281,7 @@ def test_parse_training_table_rows_handles_edge_cases():
         ]
     )
 
-    assert rows == [("Lift", 60.0)]
+    assert rows == [("Lift", 60.0, 420, 480)]
 
 
 def test_parse_training_table_rows_returns_empty_when_header_missing():
@@ -289,7 +331,7 @@ def test_parse_training_table_rows_skips_no_training_message_case_insensitively(
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0)]
+    assert rows == [("Lift", 1.0, 420, 421)]
 
 
 def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_is_valid():
@@ -302,7 +344,7 @@ def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_i
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0)]
+    assert rows == [("Lift", 1.0, 420, 421)]
 
 
 def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars():
@@ -314,7 +356,7 @@ def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars(
             "| `07:00 - 08:00` | `XLiftX` | `1h00m` | `+00m` |",
         ]
     )
-    assert rows == [("XLiftX", 60.0)]
+    assert rows == [("XLiftX", 60.0, 420, 480)]
 
 
 def test_parse_training_table_rows_header_match_is_case_insensitive():
@@ -326,7 +368,7 @@ def test_parse_training_table_rows_header_match_is_case_insensitive():
             "| `07:00 - 07:10` | Lift | `10m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 10.0)]
+    assert rows == [("Lift", 10.0, 420, 430)]
 
 
 def test_parse_training_table_rows_short_row_does_not_break_following_rows():
@@ -339,7 +381,7 @@ def test_parse_training_table_rows_short_row_does_not_break_following_rows():
             "| `07:00 - 07:05` | Lift | `5m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 5.0)]
+    assert rows == [("Lift", 5.0, 420, 425)]
 
 
 def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
@@ -351,7 +393,19 @@ def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
             "| `07:00 - 07:01` | Lift | `1m` | `+00m`",
         ]
     )
-    assert rows == [("Lift", 1.0)]
+    assert rows == [("Lift", 1.0, 420, 421)]
+
+
+def test_parse_training_table_rows_rejects_non_canonical_time_range():
+    with pytest.raises(ValueError, match="Non-canonical TRAINING TIME value"):
+        _parse_training_table_rows(
+            [
+                "### **TRAINING**",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+                "| ---- | -------- | -------- | --------- |",
+                "| `07:00-07:01` | Lift | `1m` | `+00m` |",
+            ]
+        )
 
 
 def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_path):
@@ -552,4 +606,6 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
     assert parsed["activity_totals"] == {"coding": 75.0}
     assert parsed["training_type_minutes"] == {"Lift": 30.0}
     assert parsed["training_type_sessions"] == {"Lift": 2}
+    assert parsed["training_type_start_minutes"] == {"Lift": (420, 480)}
+    assert parsed["training_type_end_minutes"] == {"Lift": (440, 490)}
     assert parsed["screen_time_totals"] == {"YouTube": 15.0}

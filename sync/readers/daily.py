@@ -21,6 +21,9 @@ from sync.readers.screen_time import parse_procrastination_table
 from sync.readers.sleep import parse_sleep_table
 from sync.readers.study import parse_study_table
 
+_TRAINING_TIME_RE = re.compile(r"\d{2}:\d{2}")
+_TRAINING_TIME_RANGE_RE = re.compile(r"^(?P<start>\d{2}:\d{2}) - (?P<end>\d{2}:\d{2})$")
+
 
 def _split_row(line: str) -> list[str] | None:
     row = split_markdown_row(line)
@@ -53,8 +56,46 @@ def _parse_optional_mood(value: object) -> float | None:
     return float(mood_clean)
 
 
-def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
-    """Parse the TRAINING table into (activity, duration_minutes) rows."""
+def _parse_hhmm_to_minutes(value: str) -> int | None:
+    """Parse canonical HH:MM into minutes since midnight."""
+    if _TRAINING_TIME_RE.fullmatch(value) is None:
+        return None
+    hour, minute = map(int, value.split(":"))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        return None
+    return hour * 60 + minute
+
+
+def _parse_training_time_range(raw: str, *, line_no: int) -> tuple[int, int]:
+    """
+    Parse strict training time range `HH:MM - HH:MM`.
+
+    Raises ValueError when format is invalid because training aggregation
+    requires canonical schedule times for every counted session.
+    """
+    cleaned = raw.strip().strip("`")
+    match = _TRAINING_TIME_RANGE_RE.fullmatch(cleaned)
+    if match is None:
+        raise ValueError(
+            "Non-canonical TRAINING TIME value on row "
+            f"{line_no}: expected `HH:MM - HH:MM`, got {raw!r}"
+        )
+    start_raw = match.group("start")
+    end_raw = match.group("end")
+    start_minutes = _parse_hhmm_to_minutes(start_raw)
+    end_minutes = _parse_hhmm_to_minutes(end_raw)
+    if start_minutes is None or end_minutes is None:
+        raise ValueError(
+            "Invalid TRAINING TIME value on row "
+            f"{line_no}: expected valid 24h times, got {raw!r}"
+        )
+    return start_minutes, end_minutes
+
+
+def _parse_training_table_rows(
+    lines: list[str],
+) -> list[tuple[str, float, int, int]]:
+    """Parse the TRAINING table into session rows."""
     block = extract_block(lines, TRAINING_SECTION_HEADER)
     if not block:
         return []
@@ -70,8 +111,8 @@ def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
     if header_idx is None:
         return []
 
-    rows: list[tuple[str, float]] = []
-    for line in block[header_idx + 2 :]:
+    rows: list[tuple[str, float, int, int]] = []
+    for row_no, line in enumerate(block[header_idx + 2 :], start=header_idx + 3):
         if not line.strip().startswith("|"):
             break
         line_lower = line.lower()
@@ -85,7 +126,10 @@ def _parse_training_table_rows(lines: list[str]) -> list[tuple[str, float]]:
         activity = parts[1].strip().strip("`")
         duration_min = parse_duration_to_minutes(parts[2]) or 0.0
         if activity and duration_min > 0:
-            rows.append((activity, duration_min))
+            start_minutes, end_minutes = _parse_training_time_range(
+                parts[0], line_no=row_no
+            )
+            rows.append((activity, duration_min, start_minutes, end_minutes))
 
     return rows
 
@@ -102,7 +146,10 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
     except ValueError as exc:
         raise ValueError(f"Invalid daily note schema in {path}: {exc}") from exc
     sleep_rows = parse_sleep_table(lines)
-    training_rows = _parse_training_table_rows(lines)
+    try:
+        training_rows = _parse_training_table_rows(lines)
+    except ValueError as exc:
+        raise ValueError(f"Invalid daily note schema in {path}: {exc}") from exc
 
     sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
     sleep_total = (
@@ -146,9 +193,13 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
 
     training_type_minutes = defaultdict[str, float](float)
     training_type_sessions = defaultdict[str, int](int)
-    for activity, minutes in training_rows:
+    training_type_start_minutes = defaultdict[str, list[int]](list)
+    training_type_end_minutes = defaultdict[str, list[int]](list)
+    for activity, minutes, start_minutes, end_minutes in training_rows:
         training_type_minutes[activity] += minutes
         training_type_sessions[activity] += 1
+        training_type_start_minutes[activity].append(start_minutes)
+        training_type_end_minutes[activity].append(end_minutes)
 
     screen_time_data = parse_procrastination_table(lines)
     screen_time_totals = defaultdict[str, float](float)
@@ -173,5 +224,13 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "planned_break_minutes": planned_break_total,
         "training_type_minutes": dict(training_type_minutes),
         "training_type_sessions": dict(training_type_sessions),
+        "training_type_start_minutes": {
+            activity: tuple(values)
+            for activity, values in training_type_start_minutes.items()
+        },
+        "training_type_end_minutes": {
+            activity: tuple(values)
+            for activity, values in training_type_end_minutes.items()
+        },
         "screen_time_totals": dict(screen_time_totals),
     }

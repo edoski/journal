@@ -106,25 +106,33 @@ def append_training_type_table(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
 ) -> None:
-    """Render and append the TYPE/SESSIONS/AVERAGE table to TRAINING section lines."""
+    """Render and append the TYPE/SESSIONS/DURATION/SCHEDULE table."""
     training_stats = aggregate_training_type_session_stats(dates, daily_data)
 
     rows: list[list[str]] = []
     if training_stats:
         for row in training_stats:
-            label = str(row.get("type") or "").strip()
-            sessions = int(row.get("sessions", 0) or 0)
-            target = int(row.get("target", 0) or 0)
-            avg_minutes = float(row.get("average_minutes", 0.0) or 0.0)
+            label = row["type"].strip()
+            sessions = int(row["sessions"])
+            target = int(row["target"])
+            avg_minutes = float(row["average_minutes"])
             avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
-            rows.append([f"**{label}**", f"`{sessions}/{target}`", f"`{avg_label}`"])
+            schedule_label = f"{row['average_start_time']} - {row['average_end_time']}"
+            rows.append(
+                [
+                    f"**{label}**",
+                    f"`{sessions}/{target}`",
+                    f"`{avg_label}`",
+                    f"`{schedule_label}`",
+                ]
+            )
     else:
-        rows.append(["", "", ""])
+        rows.append(["", "", "", ""])
 
     table_lines = render_table(
         SimpleGridTableSpec(
-            headers=["TYPE", "SESSIONS", "AVERAGE"],
-            divider_cells=["----", "--------", "-------"],
+            headers=["TYPE", "SESSIONS", "DURATION", "SCHEDULE"],
+            divider_cells=["----", "--------", "--------", "--------"],
             rows=rows,
         )
     )

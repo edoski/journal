@@ -56,9 +56,11 @@
 └           MON TUE WED THU FRI SAT SUN
 ```
 
-| TYPE | SESSIONS | AVERAGE |
-| ---- | -------- | ------- |
-|  |  |  |
+| TYPE | SESSIONS | DURATION | SCHEDULE |
+| ---- | -------- | -------- | -------- |
+| **Mind & Body** | `4/7` | `12m/session` | `07:24 - 07:36` |
+| **Functional Strength Training** | `3/7` | `33m/session` | `18:12 - 18:45` |
+| **Cooldown** | `4/7` | `26m/session` | `19:09 - 19:35` |
 
 ### **PROCRASTINATION**
 ```

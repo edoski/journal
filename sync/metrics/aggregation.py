@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sync.contracts.metrics import (
     DailyAggregate,
@@ -20,6 +20,8 @@ class _TrainingAccumulator:
     display_type: str
     sessions: int = 0
     total_minutes: float = 0.0
+    start_minutes: list[int] = field(default_factory=list)
+    end_minutes: list[int] = field(default_factory=list)
 
 
 def compute_period_metrics(
@@ -182,6 +184,36 @@ def _target_bucket_for_training_type(normalized_label: str) -> str:
     return "workout"
 
 
+def _average_clock_minutes(samples: list[int]) -> int:
+    """Average time-of-day samples with wrap-around handling."""
+    if not samples:
+        raise ValueError("Cannot average empty training schedule sample set")
+
+    normalized = [int(sample) % (24 * 60) for sample in samples]
+    anchor = normalized[0]
+    aligned: list[int] = []
+    for sample in normalized:
+        aligned.append(
+            min(
+                (sample - 24 * 60, sample, sample + 24 * 60),
+                key=lambda candidate: abs(candidate - anchor),
+            )
+        )
+    return round(sum(aligned) / len(aligned)) % (24 * 60)
+
+
+def _minutes_to_hhmm(minutes: int) -> str:
+    """Convert minutes-since-midnight to canonical HH:MM."""
+    value = minutes % (24 * 60)
+    return f"{value // 60:02d}:{value % 60:02d}"
+
+
+def _hhmm_to_minutes(value: str) -> int:
+    """Convert canonical HH:MM to minutes-since-midnight."""
+    hour, minute = value.split(":")
+    return int(hour) * 60 + int(minute)
+
+
 def aggregate_training_type_session_stats(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
@@ -194,6 +226,8 @@ def aggregate_training_type_session_stats(
       - sessions: raw session count
       - target: scaled target denominator for period
       - average_minutes: average duration per session
+      - average_start_time: average session start (HH:MM)
+      - average_end_time: average session end (HH:MM)
     """
     per_type: dict[str, _TrainingAccumulator] = {}
 
@@ -201,23 +235,61 @@ def aggregate_training_type_session_stats(
         daily = daily_data.get(d)
         if daily is None:
             continue
-        minutes_map = daily.get("training_type_minutes", {})
-        sessions_map = daily.get("training_type_sessions", {})
-        if not minutes_map and not sessions_map:
+        try:
+            minutes_map = daily["training_type_minutes"]
+            sessions_map = daily["training_type_sessions"]
+            start_minutes_map = daily["training_type_start_minutes"]
+            end_minutes_map = daily["training_type_end_minutes"]
+        except KeyError as exc:
+            missing_key = str(exc).strip("'")
+            raise ValueError(
+                "Daily aggregate missing required training field "
+                f"{missing_key!r} on {d.isoformat()}"
+            ) from exc
+
+        if (
+            not minutes_map
+            and not sessions_map
+            and not start_minutes_map
+            and not end_minutes_map
+        ):
             continue
 
-        keys = set(minutes_map.keys()) | set(sessions_map.keys())
+        keys = (
+            set(minutes_map.keys())
+            | set(sessions_map.keys())
+            | set(start_minutes_map.keys())
+            | set(end_minutes_map.keys())
+        )
         for raw_label in keys:
             label = (raw_label or "").strip()
             norm = _normalize_training_type_label(label)
             if not norm:
                 continue
+
+            sessions = int(sessions_map.get(raw_label, 0) or 0)
+            total_minutes = float(minutes_map.get(raw_label, 0.0) or 0.0)
+            if sessions <= 0 or total_minutes <= 0.0:
+                continue
+
+            start_samples = tuple(start_minutes_map.get(raw_label, ()))
+            end_samples = tuple(end_minutes_map.get(raw_label, ()))
+            if len(start_samples) != sessions or len(end_samples) != sessions:
+                raise ValueError(
+                    "Training schedule sample count mismatch for "
+                    f"{label or norm!r} on {d.isoformat()}: "
+                    f"sessions={sessions}, starts={len(start_samples)}, "
+                    f"ends={len(end_samples)}"
+                )
+
             entry = per_type.setdefault(norm, _TrainingAccumulator(display_type=label))
             # Preserve source-case display label from first observed non-empty entry.
             if not entry.display_type and label:
                 entry.display_type = label
-            entry.sessions += int(sessions_map.get(raw_label, 0) or 0)
-            entry.total_minutes += float(minutes_map.get(raw_label, 0.0) or 0.0)
+            entry.sessions += sessions
+            entry.total_minutes += total_minutes
+            entry.start_minutes.extend(int(sample) for sample in start_samples)
+            entry.end_minutes.extend(int(sample) for sample in end_samples)
 
     total_days = len(dates)
     mindful_target = training_type_target(total_days, "mindful")
@@ -230,6 +302,13 @@ def aggregate_training_type_session_stats(
         total_minutes = data.total_minutes
         if sessions <= 0 or total_minutes <= 0:
             continue
+        if len(data.start_minutes) != sessions or len(data.end_minutes) != sessions:
+            raise ValueError(
+                "Training schedule sample count mismatch for "
+                f"{data.display_type or norm!r}: "
+                f"sessions={sessions}, starts={len(data.start_minutes)}, "
+                f"ends={len(data.end_minutes)}"
+            )
 
         bucket = _target_bucket_for_training_type(norm)
         if bucket == "mindful":
@@ -239,17 +318,26 @@ def aggregate_training_type_session_stats(
         else:
             target = workout_target
 
+        average_start_time = _minutes_to_hhmm(
+            _average_clock_minutes(data.start_minutes)
+        )
+        average_end_time = _minutes_to_hhmm(_average_clock_minutes(data.end_minutes))
+
         stats.append(
             TrainingTypeSessionStat(
                 type=data.display_type or norm,
                 sessions=sessions,
                 target=target,
                 average_minutes=total_minutes / sessions,
+                average_start_time=average_start_time,
+                average_end_time=average_end_time,
             )
         )
 
     stats.sort(
         key=lambda row: (
+            _hhmm_to_minutes(row["average_start_time"]),
+            _hhmm_to_minutes(row["average_end_time"]),
             -row["average_minutes"],
             -row["sessions"],
             row["type"].casefold(),
