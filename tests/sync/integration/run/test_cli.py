@@ -1161,6 +1161,7 @@ def test_media_book_annotations_import_replaces_highlights_and_keeps_reflections
     assert "| **3901** | Second quote |" in content
     assert "Old quote" not in content
     assert "- Keep this reflection" in content
+    assert not html_path.exists()
 
 
 def test_media_book_annotations_import_creates_missing_sections(tmp_path: Path) -> None:
@@ -1219,6 +1220,7 @@ def test_media_book_annotations_import_fails_when_note_is_missing(
     )
 
     assert rc == 1
+    assert html_path.exists()
 
 
 def test_media_book_annotations_import_fails_when_no_parsable_rows(
@@ -1250,6 +1252,7 @@ def test_media_book_annotations_import_fails_when_no_parsable_rows(
     )
 
     assert rc == 1
+    assert html_path.exists()
 
 
 def _write_grades_note(path: Path) -> None:

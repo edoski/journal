@@ -288,6 +288,12 @@ def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
         print(f"Error: failed to write target note: {exc}")
         return 1
 
+    try:
+        os.remove(html_path)
+    except OSError as exc:
+        print(f"Error: imported note but failed to delete source HTML: {exc}")
+        return 1
+
     print("Imported Kindle annotations:")
     print(f"  Path: {note_path}")
     if book_title:
