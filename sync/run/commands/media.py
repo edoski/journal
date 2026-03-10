@@ -32,6 +32,7 @@ PODCAST_TEMPLATE_FILENAME = "podcast.md"
 BOOK_FRONTMATTER_KEYS = ("author", "started", "completed", "rating")
 HIGHLIGHTS_SECTION_TITLE = "Highlights"
 REFLECTIONS_SECTION_TITLE = "Reflections"
+REFLECTIONS_PLACEHOLDER = "_No reflections have been made yet._"
 _TITLE_KEY_RE = re.compile(r"[^0-9a-z]+")
 
 logger = get_logger(__name__)
@@ -267,34 +268,53 @@ def _find_h2_section_bounds(lines: list[str], title: str) -> tuple[int, int]:
     return start, end
 
 
-def _insert_h2_section(lines: list[str], title: str, insert_at: int) -> None:
+def _insert_h2_section(
+    lines: list[str],
+    title: str,
+    insert_at: int,
+    *,
+    body_lines: list[str] | None = None,
+) -> None:
     section_lines: list[str] = []
     if insert_at > 0 and lines[insert_at - 1].strip() != "":
         section_lines.append("")
     section_lines.extend([f"## {title}", "---"])
+    if body_lines:
+        section_lines.append("")
+        section_lines.extend(body_lines)
     if insert_at < len(lines) and lines[insert_at].strip() != "":
         section_lines.append("")
     lines[insert_at:insert_at] = section_lines
 
 
-def _ensure_highlights_reflections_sections(lines: list[str]) -> list[str]:
+def _ensure_reflections_highlights_sections(lines: list[str]) -> list[str]:
     updated = list(lines)
-    highlights_start, highlights_end = _find_h2_section_bounds(
-        updated, HIGHLIGHTS_SECTION_TITLE
+    reflections_start, reflections_end = _find_h2_section_bounds(
+        updated, REFLECTIONS_SECTION_TITLE
     )
-    reflections_start, _ = _find_h2_section_bounds(updated, REFLECTIONS_SECTION_TITLE)
+    highlights_start, _ = _find_h2_section_bounds(updated, HIGHLIGHTS_SECTION_TITLE)
 
     if highlights_start == -1 and reflections_start == -1:
+        _insert_h2_section(
+            updated,
+            REFLECTIONS_SECTION_TITLE,
+            len(updated),
+            body_lines=[REFLECTIONS_PLACEHOLDER],
+        )
         _insert_h2_section(updated, HIGHLIGHTS_SECTION_TITLE, len(updated))
-        _insert_h2_section(updated, REFLECTIONS_SECTION_TITLE, len(updated))
         return updated
 
     if highlights_start == -1:
-        _insert_h2_section(updated, HIGHLIGHTS_SECTION_TITLE, reflections_start)
+        _insert_h2_section(updated, HIGHLIGHTS_SECTION_TITLE, reflections_end)
         return updated
 
     if reflections_start == -1:
-        _insert_h2_section(updated, REFLECTIONS_SECTION_TITLE, highlights_end)
+        _insert_h2_section(
+            updated,
+            REFLECTIONS_SECTION_TITLE,
+            highlights_start,
+            body_lines=[REFLECTIONS_PLACEHOLDER],
+        )
         return updated
 
     return updated
@@ -343,7 +363,7 @@ def _render_book_annotation_tables(
 
 
 def _replace_highlights_content(lines: list[str], new_content: list[str]) -> list[str]:
-    updated = _ensure_highlights_reflections_sections(lines)
+    updated = _ensure_reflections_highlights_sections(lines)
     highlights_start, highlights_end = _find_h2_section_bounds(
         updated, HIGHLIGHTS_SECTION_TITLE
     )

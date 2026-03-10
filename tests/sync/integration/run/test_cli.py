@@ -1248,6 +1248,8 @@ def test_media_book_annotations_import_creates_missing_sections(
     lines = note_path.read_text(encoding="utf-8").splitlines()
     assert "## Highlights" in lines
     assert "## Reflections" in lines
+    assert "_No reflections have been made yet._" in lines
+    assert lines.index("## Reflections") < lines.index("## Highlights")
 
 
 def test_media_book_annotations_import_fails_on_relative_paths(
