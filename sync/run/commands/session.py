@@ -13,7 +13,7 @@ from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 from sync.ports.schedule import ScheduleSource
-from sync.study.constants import DB_PATH
+from sync.study.constants import BREAK_LINK_MAX_GAP_SECONDS, DB_PATH
 from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
 
 logger = get_logger(__name__)
@@ -109,17 +109,32 @@ def _load_recent_focus_sessions(
     return sessions[:limit]
 
 
-def _find_associated_break_session(
+def _session_end_for_break_lookup(
+    focus_session: CliSession,
+) -> datetime.datetime | None:
+    """Return the best end timestamp to use when locating linked breaks."""
+    completed = focus_session.get("completed")
+    if isinstance(completed, datetime.datetime):
+        return completed
+
+    start = focus_session.get("start")
+    if not isinstance(start, datetime.datetime):
+        return None
+    planned_minutes = max(0.0, float(focus_session.get("duration", 0) or 0))
+    return start + datetime.timedelta(minutes=planned_minutes)
+
+
+def _find_associated_break_sessions(
     conn: sqlite3.Connection,
     focus_session: CliSession,
-) -> CliSession | None:
-    focus_start = focus_session.get("start")
-    if not isinstance(focus_start, datetime.datetime):
-        return None
+) -> list[CliSession]:
+    focus_end = _session_end_for_break_lookup(focus_session)
+    if not isinstance(focus_end, datetime.datetime):
+        return []
 
-    focus_core = datetime_to_core_data(focus_start)
+    focus_core = datetime_to_core_data(focus_end)
     if focus_core is None:
-        return None
+        return []
 
     cur = conn.cursor()
     cur.execute(
@@ -130,25 +145,25 @@ def _find_associated_break_session(
           AND ZSTARTEDAT >= ?
           AND ZSTARTEDAT <= ?
         ORDER BY ZSTARTEDAT ASC
-        LIMIT 1
         """,
-        (focus_core, focus_core + 120),
+        (focus_core, focus_core + BREAK_LINK_MAX_GAP_SECONDS),
     )
-    row = cur.fetchone()
-    if not row:
-        return None
-
-    pk, phase, duration, started_at, completed_at, title = row
-    return {
-        "pk": int(pk),
-        "phase": str(phase),
-        "duration": float(duration or 0.0),
-        "start": core_data_to_datetime(started_at),
-        "completed": core_data_to_datetime(completed_at),
-        "title": str(title or ""),
-        "interruptions_count": 0,
-        "interruptions_duration": 0.0,
-    }
+    rows = cur.fetchall()
+    breaks: list[CliSession] = []
+    for pk, phase, duration, started_at, completed_at, title in rows:
+        breaks.append(
+            {
+                "pk": int(pk),
+                "phase": str(phase),
+                "duration": float(duration or 0.0),
+                "start": core_data_to_datetime(started_at),
+                "completed": core_data_to_datetime(completed_at),
+                "title": str(title or ""),
+                "interruptions_count": 0,
+                "interruptions_duration": 0.0,
+            }
+        )
+    return breaks
 
 
 def cmd_session_rename(args: argparse.Namespace) -> int:
@@ -211,14 +226,14 @@ def cmd_session_undo(args: argparse.Namespace) -> int:
         print(f"Error: could not open database: {exc}")
         return 1
 
-    brk = _find_associated_break_session(conn, focus)
+    breaks = _find_associated_break_sessions(conn, focus)
 
     print("=" * 60)
     print("SESSIONS TO DELETE")
     print("=" * 60)
     print("\nFOCUS:")
     print(format_session(focus, include_pk=True))
-    if brk:
+    for brk in breaks:
         print("\nASSOCIATED BREAK:")
         print(format_session(brk, include_pk=True))
 
@@ -228,7 +243,7 @@ def cmd_session_undo(args: argparse.Namespace) -> int:
         return 0
 
     total_interruptions = 0
-    if brk:
+    for brk in breaks:
         total_interruptions += _delete_session(conn, brk["pk"])
     total_interruptions += _delete_session(conn, focus["pk"])
 

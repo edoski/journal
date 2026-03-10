@@ -7,8 +7,13 @@ Tests session deduplication and timestamp conversion.
 from __future__ import annotations
 
 import datetime
+import sqlite3
 
-from sync.study.db import dedupe_sessions, core_data_to_datetime
+import pytest
+
+from sync.contracts.schedule import DayScheduleProfile
+from sync.study.core_data_time import datetime_to_core_data
+from sync.study.db import dedupe_sessions, get_sessions_for_day, core_data_to_datetime
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET
 
 
@@ -252,3 +257,263 @@ class TestRetroactiveLunchDetection:
 
         overlap = overlap_minutes_with_window(prev_end, current_start, lunch_window)
         assert overlap == 0
+
+
+def _default_schedule() -> DayScheduleProfile:
+    return DayScheduleProfile(
+        study_start=datetime.time(8, 0),
+        study_end=datetime.time(18, 0),
+        lunch_start=datetime.time(13, 30),
+        lunch_end=datetime.time(14, 30),
+        workout_start=datetime.time(18, 0),
+        is_off_day=False,
+    )
+
+
+def _make_flow_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.execute(
+        """
+        CREATE TABLE ZSESSION (
+            Z_PK INTEGER PRIMARY KEY,
+            ZSTARTEDAT REAL,
+            ZDURATION REAL,
+            ZPHASE TEXT,
+            ZTITLE TEXT,
+            ZCOMPLETEDAT REAL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE TABLE ZINTERRUPTION (
+            ZSESSION INTEGER,
+            ZSTARTEDAT REAL,
+            ZFINISHEDAT REAL
+        )
+        """
+    )
+    conn.commit()
+    return conn
+
+
+def _insert_session(
+    conn: sqlite3.Connection,
+    *,
+    pk: int,
+    start: datetime.datetime,
+    duration: float,
+    phase: str,
+    title: str,
+    completed_at: datetime.datetime | None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO ZSESSION (Z_PK, ZSTARTEDAT, ZDURATION, ZPHASE, ZTITLE, ZCOMPLETEDAT)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            pk,
+            datetime_to_core_data(start),
+            duration,
+            phase,
+            title,
+            datetime_to_core_data(completed_at),
+        ),
+    )
+    conn.commit()
+
+
+def _load_day_sessions(
+    monkeypatch: pytest.MonkeyPatch,
+    conn: sqlite3.Connection,
+    day: datetime.date,
+) -> list[dict[str, object]]:
+    monkeypatch.setattr("sync.study.db.get_db_connection", lambda: conn)
+    monkeypatch.setattr(
+        "sync.study.db.BREAK_DEFAULTS",
+        {"shortBreak": 30, "longBreak": 60},
+    )
+    return get_sessions_for_day(day, _default_schedule())
+
+
+@pytest.mark.parametrize(
+    ("gap_seconds", "expected_break_minutes"),
+    [(5, 0), (20, 0), (29, 0), (30, 1)],
+)
+def test_get_sessions_for_day_rounds_micro_break_gaps(
+    monkeypatch: pytest.MonkeyPatch,
+    gap_seconds: int,
+    expected_break_minutes: int,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn = _make_flow_conn()
+    first_start = datetime.datetime(2025, 12, 27, 9, 0)
+    first_end = datetime.datetime(2025, 12, 27, 10, 0)
+    next_start = first_end + datetime.timedelta(seconds=gap_seconds)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=first_start,
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=first_end,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=first_end,
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=first_end + datetime.timedelta(minutes=30),
+    )
+    _insert_session(
+        conn,
+        pk=3,
+        start=next_start,
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=next_start + datetime.timedelta(minutes=60),
+    )
+
+    sessions = _load_day_sessions(monkeypatch, conn, day)
+
+    assert sessions[0]["break_reason"] is None
+    assert sessions[0]["break_expected"] == expected_break_minutes
+    assert sessions[0]["break_duration"] == expected_break_minutes
+
+
+def test_get_sessions_for_day_restores_lunch_after_micro_session_undo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn = _make_flow_conn()
+    lunch_start = datetime.datetime(2025, 12, 27, 12, 30)
+    lunch_end = datetime.datetime(2025, 12, 27, 13, 30)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=lunch_start,
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=lunch_end,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=lunch_end,
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=3,
+        start=lunch_end + datetime.timedelta(minutes=9, seconds=20),
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=None,
+    )
+
+    sessions = _load_day_sessions(monkeypatch, conn, day)
+
+    assert len(sessions) == 1
+    assert sessions[0]["break_reason"] == "lunch"
+    assert sessions[0]["break_expected"] == 60
+
+
+def test_get_sessions_for_day_assigns_lunch_to_later_pre_lunch_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn = _make_flow_conn()
+    first_end = datetime.datetime(2025, 12, 27, 13, 30)
+    second_start = datetime.datetime(2025, 12, 27, 13, 45)
+    second_end = datetime.datetime(2025, 12, 27, 14, 0)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=datetime.datetime(2025, 12, 27, 12, 30),
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=first_end,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=first_end,
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=3,
+        start=second_start,
+        duration=15,
+        phase="flow",
+        title="Study",
+        completed_at=second_end,
+    )
+
+    sessions = _load_day_sessions(monkeypatch, conn, day)
+
+    assert sessions[0]["break_reason"] is None
+    assert sessions[0]["break_expected"] == 15
+    assert sessions[0].get("linked_break_start") is None
+    assert sessions[1]["break_reason"] == "lunch"
+    assert sessions[1]["break_expected"] == 60
+
+
+def test_get_sessions_for_day_ignores_open_breaks_before_later_focus(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn = _make_flow_conn()
+    first_end = datetime.datetime(2025, 12, 27, 10, 0)
+    next_start = datetime.datetime(2025, 12, 27, 10, 3)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=datetime.datetime(2025, 12, 27, 9, 0),
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=first_end,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=first_end,
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=3,
+        start=next_start,
+        duration=45,
+        phase="flow",
+        title="Study",
+        completed_at=next_start + datetime.timedelta(minutes=45),
+    )
+
+    sessions = _load_day_sessions(monkeypatch, conn, day)
+
+    assert sessions[0]["break_expected"] == 3
+    assert sessions[0]["break_reason"] is None
+    assert sessions[0].get("linked_break_start") is None

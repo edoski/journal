@@ -105,3 +105,15 @@ def test_build_study_section_does_not_warn_for_placeholder_only_unmapped_notes(
     build_study_section(sessions, existing_notes)
 
     assert warnings == []
+
+
+def test_build_study_section_renders_explicit_zero_minute_break():
+    day = datetime.date(2026, 3, 2)
+    sessions = [_session_for(day, 9, 0, 10, 0)]
+    sessions[0]["break_expected"] = 0
+    sessions[0]["break_duration"] = 0
+    sessions[0]["break_missing"] = False
+
+    lines, _ = build_study_section(sessions, {})
+
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `0m` | – | – |" in lines

@@ -71,6 +71,36 @@ def _read_break_defaults() -> dict[str, int | None]:
 BREAK_DEFAULTS = _read_break_defaults()
 
 
+def _select_linked_break(
+    break_sessions: list[StudySessionRecord],
+    *,
+    session_end: datetime.datetime,
+    next_study_start: datetime.datetime | None,
+) -> StudySessionRecord | None:
+    """Choose the nearest relevant break row for a study session."""
+    candidates: list[StudySessionRecord] = []
+    for break_session in break_sessions:
+        break_start = break_session["start"]
+        gap_seconds = (break_start - session_end).total_seconds()
+        if gap_seconds < 0:
+            continue
+        if gap_seconds > BREAK_LINK_MAX_GAP_SECONDS:
+            break
+        if next_study_start and break_start >= next_study_start:
+            break
+        if next_study_start and not break_session.get("completed_at"):
+            continue
+        candidates.append(break_session)
+
+    if not candidates:
+        return None
+
+    for candidate in candidates:
+        if candidate.get("completed_at"):
+            return candidate
+    return candidates[0]
+
+
 def get_db_connection() -> sqlite3.Connection:
     """Get a read-only connection to the Flow database."""
     if not os.path.exists(DB_PATH):
@@ -304,6 +334,10 @@ def get_sessions_for_day(
             lunch_duration_minutes = 0
 
     for idx, session in enumerate(study_sessions):
+        next_study_start = (
+            study_sessions[idx + 1]["start"] if idx + 1 < len(study_sessions) else None
+        )
+
         # Fetch Interruptions for this session
         pk_list = session.get("interrupt_pks") or session.get("pks") or [session["pk"]]
         total_count = 0
@@ -324,15 +358,13 @@ def get_sessions_for_day(
         session["interruptions_count"] = total_count
         session["interruptions_duration"] = total_duration
 
-        # Find nearest subsequent break (first one after session end within gap cap)
-        best_break: StudySessionRecord | None = None
-        for b in break_sessions:
-            gap_seconds = (b["start"] - session["end"]).total_seconds()
-            if gap_seconds < 0:
-                continue
-            if gap_seconds <= BREAK_LINK_MAX_GAP_SECONDS:
-                best_break = b
-            break
+        # Link only breaks that fit before the next focus block; stale open breaks
+        # left behind by undo/resume flows should not affect prior sessions.
+        best_break = _select_linked_break(
+            break_sessions,
+            session_end=session["end"],
+            next_study_start=next_study_start,
+        )
 
         anchored = anchor_lunch_window(session["end"], lunch_window)
         if anchored:
@@ -362,11 +394,24 @@ def get_sessions_for_day(
 
         # Overrun calculation: gap until next study block (or end of day),
         # less lunch and less expected break.
-        if idx == len(study_sessions) - 1:
+        if next_study_start is None:
             # No future study block: do not accrue overrun past the final block
             session["break_overrun"] = 0
         else:
-            next_study_start = study_sessions[idx + 1]["start"]
+            effective_lunch_window = (
+                session.get("anchored_lunch_window") or lunch_window
+            )
+            lunch_overlap = overlap_minutes_with_window(
+                session["end"], next_study_start, effective_lunch_window
+            )
+            if session.get("break_reason") == "lunch" and lunch_overlap < 30:
+                session["break_reason"] = None
+                session["anchored_lunch_window"] = None
+                effective_lunch_window = lunch_window
+                lunch_overlap = overlap_minutes_with_window(
+                    session["end"], next_study_start, effective_lunch_window
+                )
+
             # If actual break (gap) is less than expected, overwrite expected with actual
             actual_break_minutes = (
                 next_study_start - session["end"]
@@ -383,9 +428,6 @@ def get_sessions_for_day(
                 gap_minutes = (
                     effective_next_start - session["end"]
                 ).total_seconds() / 60
-                effective_lunch_window = (
-                    session.get("anchored_lunch_window") or lunch_window
-                )
                 lunch_overlap = overlap_minutes_with_window(
                     session["end"], effective_next_start, effective_lunch_window
                 )

@@ -182,10 +182,12 @@ def build_study_section(
         break_expected_val = (
             session.get("break_expected", session.get("break_duration", 0)) or 0
         )
+        has_break_value = "break_expected" in session or "break_duration" in session
         break_min = ceil_minutes(break_expected_val)
         overrun = int(session.get("break_overrun", 0))
         break_reason = session.get("break_reason")
-        if break_min > 0:
+        break_missing = bool(session.get("break_missing", False))
+        if break_min > 0 or (has_break_value and not break_missing):
             break_display = (
                 f"{break_min}m"
                 if break_reason == "lunch"
