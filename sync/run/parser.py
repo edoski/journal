@@ -217,6 +217,10 @@ def build_parser(
         required=True,
         help="Absolute path to target book markdown note",
     )
+    media_book_annotations_import.add_argument(
+        "--work",
+        help="Override the work title to import from anthology exports",
+    )
     media_book_annotations_import.set_defaults(
         func=_resolve_handler(handlers, "media_book_annotations_import")
     )

@@ -13,8 +13,12 @@ _LOCATION_RE = re.compile(
     r"\b(?:Location|Loc\.?)\s+([0-9][0-9,]*)\b",
     flags=re.IGNORECASE,
 )
-_TRACKED_DIV_CLASSES = frozenset({"bookTitle", "noteHeading", "noteText"})
-_TRACKED_DIV_ORDER = ("bookTitle", "noteHeading", "noteText")
+_WORK_TITLE_RE = re.compile(
+    r"-\s*(.*?)\s*>\s*(?:Page|Location|Loc\.?)\b",
+    flags=re.IGNORECASE,
+)
+_TRACKED_DIV_CLASSES = frozenset({"authors", "bookTitle", "noteHeading", "noteText"})
+_TRACKED_DIV_ORDER = ("bookTitle", "authors", "noteHeading", "noteText")
 
 
 def _normalize_whitespace(value: str) -> str:
@@ -33,12 +37,21 @@ def _extract_locator(heading: str) -> tuple[Literal["page", "loc"], str] | None:
     return None
 
 
+def _extract_work_title(heading: str) -> str | None:
+    match = _WORK_TITLE_RE.search(heading)
+    if match is None:
+        return None
+    value = _normalize_whitespace(match.group(1))
+    return value or None
+
+
 class _KindleNotebookHtmlParser(HTMLParser):
     """Collect Kindle note headings/text while preserving source order."""
 
     def __init__(self) -> None:
         super().__init__()
         self.book_title: str = ""
+        self.author: str = ""
         self.heading_text_pairs: list[tuple[str, str]] = []
         self._last_heading: str | None = None
         self._capture_target: str | None = None
@@ -88,6 +101,9 @@ class _KindleNotebookHtmlParser(HTMLParser):
         if target == "bookTitle":
             if captured:
                 self.book_title = captured
+        elif target == "authors":
+            if captured:
+                self.author = captured
         elif target == "noteHeading":
             self._last_heading = captured or None
         elif target == "noteText":
@@ -118,8 +134,15 @@ def parse_kindle_notebook_html(html: str) -> KindleNotebookExport:
         locator_kind, locator_value = locator
         annotations.append(
             BookAnnotation(
-                locator_kind=locator_kind, locator=locator_value, quote=quote
+                locator_kind=locator_kind,
+                locator=locator_value,
+                quote=quote,
+                work_title=_extract_work_title(heading),
             )
         )
 
-    return KindleNotebookExport(book_title=parser.book_title, annotations=annotations)
+    return KindleNotebookExport(
+        book_title=parser.book_title,
+        author=parser.author,
+        annotations=annotations,
+    )

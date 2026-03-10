@@ -40,8 +40,9 @@ def _media_book_annotations_import_args(
     *,
     html_path: str,
     note: str,
+    work: str | None = None,
 ) -> argparse.Namespace:
-    return argparse.Namespace(html_path=html_path, note=note)
+    return argparse.Namespace(html_path=html_path, note=note, work=work)
 
 
 def _grades_sync_args(path: str | None = None) -> argparse.Namespace:
@@ -959,6 +960,7 @@ def _patch_media_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     podcasts_dir = vault_dir / "notes" / "podcasts"
     templates_dir.mkdir(parents=True, exist_ok=True)
     podcasts_dir.mkdir(parents=True, exist_ok=True)
+    _write_book_template(templates_dir / "book.md")
     _write_podcast_template(templates_dir / "podcast.md")
     monkeypatch.setattr(
         cli,
@@ -966,6 +968,29 @@ def _patch_media_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
         SimpleNamespace(vault_dir=str(vault_dir), podcasts_dir=str(podcasts_dir)),
     )
     return podcasts_dir
+
+
+def _write_book_template(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "---",
+                "author:",
+                'started: <% tp.date.now("YYYY-MM-DD") %>',
+                "completed:",
+                "rating:",
+                "---",
+                "",
+                "## Highlights",
+                "---",
+                "",
+                "## Reflections",
+                "---",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def _write_book_note(path: Path) -> None:
@@ -1004,11 +1029,47 @@ def _write_kindle_export(path: Path) -> None:
             [
                 "<html><body>",
                 '<div class="bookTitle">Memories Dreams Reflections</div>',
+                '<div class="authors">Carl Jung</div>',
                 '<div class="noteHeading">Highlight - Page 293 · Location 3835</div>',
                 '<div class="noteText">First quote with a | pipe</div>',
                 '<div class="noteHeading">Bookmark - Page 294 · Location 3840</div>',
                 '<div class="noteHeading">Highlight - Location 3901</div>',
                 '<div class="noteText">Second quote</div>',
+                "</body></html>",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_anthology_kindle_export(path: Path) -> None:
+    path.write_text(
+        "".join(
+            [
+                "<html><body>",
+                '<div class="bookTitle">Complete Works of Fyodor Dostoyevsky</div>',
+                '<div class="authors">Fyodor Dostoyevsky</div>',
+                (
+                    '<div class="noteHeading">'
+                    'Highlight(<span class="highlight_yellow">yellow</span>) - '
+                    "THE IDIOT > Location 38592"
+                    "</div>"
+                ),
+                '<div class="noteText">The Idiot quote</div>',
+                (
+                    '<div class="noteHeading">'
+                    'Highlight(<span class="highlight_yellow">yellow</span>) - '
+                    "THE BROTHERS KARAMAZOV > Location 73625"
+                    "</div>"
+                ),
+                '<div class="noteText">Karamazov quote one</div>',
+                (
+                    '<div class="noteHeading">'
+                    'Highlight(<span class="highlight_yellow">yellow</span>) - '
+                    "THE BROTHERS KARAMAZOV > Page 512 · Location 74206"
+                    "</div>"
+                ),
+                '<div class="noteText">Karamazov quote two</div>',
                 "</body></html>",
             ]
         ),
@@ -1139,8 +1200,10 @@ def test_media_podcast_add_fails_on_invalid_date(
 
 
 def test_media_book_annotations_import_replaces_highlights_and_keeps_reflections(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
     html_path = tmp_path / "kindle.html"
     note_path = tmp_path / "book.md"
     _write_kindle_export(html_path)
@@ -1164,7 +1227,11 @@ def test_media_book_annotations_import_replaces_highlights_and_keeps_reflections
     assert not html_path.exists()
 
 
-def test_media_book_annotations_import_creates_missing_sections(tmp_path: Path) -> None:
+def test_media_book_annotations_import_creates_missing_sections(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
     html_path = tmp_path / "kindle.html"
     note_path = tmp_path / "book.md"
     _write_kindle_export(html_path)
@@ -1183,7 +1250,11 @@ def test_media_book_annotations_import_creates_missing_sections(tmp_path: Path) 
     assert "## Reflections" in lines
 
 
-def test_media_book_annotations_import_fails_on_relative_paths(tmp_path: Path) -> None:
+def test_media_book_annotations_import_fails_on_relative_paths(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
     html_path = tmp_path / "kindle.html"
     note_path = tmp_path / "book.md"
     _write_kindle_export(html_path)
@@ -1206,9 +1277,46 @@ def test_media_book_annotations_import_fails_on_relative_paths(tmp_path: Path) -
     assert rc == 1
 
 
-def test_media_book_annotations_import_fails_when_note_is_missing(
+def test_media_book_annotations_import_creates_missing_note_from_template(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    html_path = tmp_path / "kindle.html"
+    note_path = tmp_path / "The Brothers Karamazov.md"
+    _write_anthology_kindle_export(html_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 0
+    assert not html_path.exists()
+    lines = note_path.read_text(encoding="utf-8").splitlines()
+    assert "author: Fyodor Dostoyevsky" in lines
+    assert f"completed: {date.today().isoformat()}" in lines
+    assert 'started: <% tp.date.now("YYYY-MM-DD") %>' in lines
+    assert "rating:" in lines
+    assert "| **73625** | Karamazov quote one |" in lines
+    assert "| **512** | Karamazov quote two |" in lines
+    assert "The Idiot quote" not in note_path.read_text(encoding="utf-8")
+
+
+def test_media_book_annotations_import_fails_when_template_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    vault_dir = tmp_path / "vault"
+    monkeypatch.setattr(
+        cli,
+        "PATHS",
+        SimpleNamespace(
+            vault_dir=str(vault_dir), podcasts_dir=str(vault_dir / "podcasts")
+        ),
+    )
     html_path = tmp_path / "kindle.html"
     _write_kindle_export(html_path)
 
@@ -1224,8 +1332,10 @@ def test_media_book_annotations_import_fails_when_note_is_missing(
 
 
 def test_media_book_annotations_import_fails_when_no_parsable_rows(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
     html_path = tmp_path / "kindle.html"
     note_path = tmp_path / "book.md"
     note_path.write_text(
@@ -1253,6 +1363,96 @@ def test_media_book_annotations_import_fails_when_no_parsable_rows(
 
     assert rc == 1
     assert html_path.exists()
+
+
+def test_media_book_annotations_import_supports_explicit_work_override(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    html_path = tmp_path / "anthology.html"
+    note_path = tmp_path / "Selected Work.md"
+    _write_anthology_kindle_export(html_path)
+    _write_book_note(note_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+            work="The Brothers Karamazov",
+        )
+    )
+
+    assert rc == 0
+    content = note_path.read_text(encoding="utf-8")
+    assert "Karamazov quote one" in content
+    assert "Karamazov quote two" in content
+    assert "The Idiot quote" not in content
+
+
+def test_media_book_annotations_import_preserves_existing_completed_date(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    html_path = tmp_path / "anthology.html"
+    note_path = tmp_path / "The Brothers Karamazov.md"
+    _write_anthology_kindle_export(html_path)
+    note_path.write_text(
+        "\n".join(
+            [
+                "---",
+                "author: Existing Author",
+                "started: 2025-12-03",
+                "completed: 2026-01-20",
+                "rating: 10",
+                "---",
+                "",
+                "## Highlights",
+                "---",
+                "",
+                "## Reflections",
+                "---",
+                "",
+                "- Keep this reflection",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 0
+    content = note_path.read_text(encoding="utf-8")
+    assert "author: Existing Author" in content
+    assert "completed: 2026-01-20" in content
+    assert "- Keep this reflection" in content
+
+
+def test_media_book_annotations_import_fails_when_work_title_has_no_match(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_media_paths(monkeypatch, tmp_path)
+    html_path = tmp_path / "anthology.html"
+    note_path = tmp_path / "Notes from Underground.md"
+    _write_anthology_kindle_export(html_path)
+
+    rc = cli.cmd_media_book_annotations_import(
+        _media_book_annotations_import_args(
+            html_path=str(html_path),
+            note=str(note_path),
+        )
+    )
+
+    assert rc == 1
+    assert html_path.exists()
+    assert not note_path.exists()
 
 
 def _write_grades_note(path: Path) -> None:
@@ -1384,6 +1584,7 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.book_annotations_command == "import"
     assert args.html_path == "/tmp/kindle.html"
     assert args.note == "/tmp/Book.md"
+    assert args.work is None
 
     args = parser.parse_args(["grades", "sync", "--path", "/tmp/GRADES.md"])
     assert args.domain == "grades"

@@ -36,6 +36,7 @@ class BookAnnotation:
     locator_kind: Literal["page", "loc"]
     locator: str
     quote: str
+    work_title: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class KindleNotebookExport:
     """Annotations extracted from a Kindle Notebook HTML export."""
 
     book_title: str
+    author: str
     annotations: list[BookAnnotation]
 
 

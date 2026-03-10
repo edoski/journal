@@ -7,24 +7,32 @@ import datetime
 import json
 import os
 import re
+from collections import OrderedDict
+from pathlib import Path
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 from sync.config import PATHS
+from sync.contracts.media import BookAnnotation
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import get_logger
 from sync.notes.locking import locked_note
 from sync.notes.markdown import normalize_header
 from sync.notes.markdown_tables import escape_markdown_cell
+from sync.notes.sections import ensure_note
+from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.kindle_annotations import parse_kindle_notebook_html
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
+BOOK_TEMPLATE_FILENAME = "book.md"
 PODCAST_TEMPLATE_FILENAME = "podcast.md"
+BOOK_FRONTMATTER_KEYS = ("author", "started", "completed", "rating")
 HIGHLIGHTS_SECTION_TITLE = "Highlights"
 REFLECTIONS_SECTION_TITLE = "Reflections"
+_TITLE_KEY_RE = re.compile(r"[^0-9a-z]+")
 
 logger = get_logger(__name__)
 
@@ -83,6 +91,10 @@ def _podcast_template_path() -> str:
     )
 
 
+def _book_template_path() -> str:
+    return os.path.join(PATHS.vault_dir, "notes", "templates", BOOK_TEMPLATE_FILENAME)
+
+
 def _apply_frontmatter_value(lines: list[str], key: str, value: str) -> list[str]:
     if not lines or lines[0].strip() != "---":
         frontmatter = ["---", f"{key}: {value}", "---"]
@@ -111,6 +123,103 @@ def _apply_frontmatter_value(lines: list[str], key: str, value: str) -> list[str
 
     frontmatter_lines.append(f"{key}: {value}")
     return lines[:1] + frontmatter_lines + lines[closing_idx:]
+
+
+def _frontmatter_end_index(lines: list[str]) -> int:
+    if not lines or lines[0].strip() != "---":
+        return -1
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == "---":
+            return idx
+    return -1
+
+
+def _normalize_title_key(value: str) -> str:
+    return " ".join(_TITLE_KEY_RE.sub(" ", value.casefold()).split())
+
+
+def _render_frontmatter_block(
+    lines: list[str],
+    values: OrderedDict[str, str],
+) -> list[str]:
+    frontmatter_end = _frontmatter_end_index(lines)
+    body = lines[frontmatter_end + 1 :] if frontmatter_end != -1 else list(lines)
+    while body and body[0].strip() == "":
+        body = body[1:]
+
+    rendered = [
+        "---",
+        *[(f"{key}: {value}" if value else f"{key}:") for key, value in values.items()],
+        "---",
+    ]
+    if body:
+        rendered.append("")
+        rendered.extend(body)
+    return rendered
+
+
+def _normalize_book_frontmatter(
+    lines: list[str],
+    *,
+    author: str | None,
+    completed_day: datetime.date,
+) -> list[str]:
+    existing = parse_frontmatter(lines)
+    values: OrderedDict[str, str] = OrderedDict(
+        (key, existing.get(key, "")) for key in BOOK_FRONTMATTER_KEYS
+    )
+    for key, value in existing.items():
+        if key not in values:
+            values[key] = value
+
+    if not values["author"] and author:
+        values["author"] = author
+    if not values["completed"]:
+        values["completed"] = completed_day.isoformat()
+
+    return _render_frontmatter_block(lines, values)
+
+
+def _select_target_annotations(
+    target_title: str,
+    export_book_title: str,
+    annotations: list[BookAnnotation],
+) -> list[BookAnnotation]:
+    target_key = _normalize_title_key(target_title)
+    if not target_key or _normalize_title_key(export_book_title) == target_key:
+        return annotations
+
+    matches = [
+        annotation
+        for annotation in annotations
+        if annotation.work_title is not None
+        and _normalize_title_key(annotation.work_title) == target_key
+    ]
+    if matches:
+        return matches
+
+    available_titles = sorted(
+        {
+            annotation.work_title
+            for annotation in annotations
+            if annotation.work_title is not None and annotation.work_title.strip()
+        },
+        key=_normalize_title_key,
+    )
+    if not available_titles:
+        return annotations
+
+    available = ", ".join(available_titles) if available_titles else "(none)"
+    raise ValueError(
+        f'No annotations matched "{target_title}" in "{export_book_title}". '
+        f"Available work titles: {available}"
+    )
+
+
+def _target_work_title(note_path: str, explicit_work_title: str | None) -> str:
+    if explicit_work_title is not None and explicit_work_title.strip():
+        return explicit_work_title.strip()
+    return Path(note_path).stem
 
 
 def _render_podcast_note_lines(
@@ -193,15 +302,22 @@ def _ensure_highlights_reflections_sections(lines: list[str]) -> list[str]:
 
 def _render_book_annotation_tables(
     html_path: str,
-) -> tuple[list[str], int, int, str]:
+    *,
+    target_title: str,
+) -> tuple[list[str], int, int, str, str]:
     with open(html_path, "r", encoding="utf-8") as handle:
         html = handle.read()
 
     export = parse_kindle_notebook_html(html)
+    annotations = _select_target_annotations(
+        target_title,
+        export.book_title,
+        export.annotations,
+    )
     page_rows: list[list[str]] = []
     loc_rows: list[list[str]] = []
 
-    for annotation in export.annotations:
+    for annotation in annotations:
         row = [f"**{annotation.locator}**", escape_markdown_cell(annotation.quote)]
         if annotation.locator_kind == "page":
             page_rows.append(row)
@@ -223,7 +339,7 @@ def _render_book_annotation_tables(
             render_table(SimpleGridTableSpec(headers=["LOC.", "QUOTE"], rows=loc_rows))
         )
 
-    return rendered, len(page_rows), len(loc_rows), export.book_title
+    return rendered, len(page_rows), len(loc_rows), export.book_title, export.author
 
 
 def _replace_highlights_content(lines: list[str], new_content: list[str]) -> list[str]:
@@ -248,6 +364,8 @@ def _replace_highlights_content(lines: list[str], new_content: list[str]) -> lis
 def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
     html_path = args.html_path
     note_path = args.note
+    target_title = _target_work_title(note_path, getattr(args, "work", None))
+    template_path = _book_template_path()
 
     if not os.path.isabs(html_path):
         print(f"Error: HTML path must be absolute: {html_path}")
@@ -258,13 +376,20 @@ def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
     if not os.path.isfile(html_path):
         print(f"Error: HTML file not found: {html_path}")
         return 1
-    if not os.path.isfile(note_path):
-        print(f"Error: target note file not found: {note_path}")
+    if not os.path.isfile(note_path) and not os.path.isfile(template_path):
+        print(f"Error: required book template not found: {template_path}")
         return 1
 
     try:
-        table_lines, page_count, loc_count, book_title = _render_book_annotation_tables(
-            html_path
+        (
+            table_lines,
+            page_count,
+            loc_count,
+            book_title,
+            author,
+        ) = _render_book_annotation_tables(
+            html_path,
+            target_title=target_title,
         )
     except ValueError as exc:
         print(f"Error: {exc}")
@@ -275,11 +400,17 @@ def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
 
     try:
         with locked_note(note_path):
+            ensure_note(note_path, template_path)
             existing_lines = safe_read_file(note_path)
             if existing_lines is None:
                 print(f"Error: failed to read target note: {note_path}")
                 return 1
-            updated_lines = _replace_highlights_content(existing_lines, table_lines)
+            normalized_lines = _normalize_book_frontmatter(
+                existing_lines,
+                author=author or None,
+                completed_day=datetime.date.today(),
+            )
+            updated_lines = _replace_highlights_content(normalized_lines, table_lines)
             atomic_write_note(note_path, updated_lines)
     except TimeoutError as exc:
         print(f"Error: could not lock note for write: {exc}")
@@ -296,8 +427,11 @@ def cmd_media_book_annotations_import(args: argparse.Namespace) -> int:
 
     print("Imported Kindle annotations:")
     print(f"  Path: {note_path}")
-    if book_title:
-        print(f"  Book: {book_title}")
+    print(f"  Book: {target_title}")
+    if book_title and _normalize_title_key(book_title) != _normalize_title_key(
+        target_title
+    ):
+        print(f"  Source: {book_title}")
     print(f"  Rows: {page_count + loc_count} (PAGE: {page_count}, LOC.: {loc_count})")
     return 0
 

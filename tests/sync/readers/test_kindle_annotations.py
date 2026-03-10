@@ -11,6 +11,7 @@ def _wrap_body(*chunks: str) -> str:
 def test_parse_prefers_page_over_location() -> None:
     html = _wrap_body(
         '<div class="bookTitle">Memories Dreams Reflections</div>',
+        '<div class="authors">Carl Jung</div>',
         '<div class="noteHeading">Highlight - Page 293 · Location 3835</div>',
         '<div class="noteText">A quote</div>',
     )
@@ -18,11 +19,13 @@ def test_parse_prefers_page_over_location() -> None:
     export = parse_kindle_notebook_html(html)
 
     assert export.book_title == "Memories Dreams Reflections"
+    assert export.author == "Carl Jung"
     assert len(export.annotations) == 1
     row = export.annotations[0]
     assert row.locator_kind == "page"
     assert row.locator == "293"
     assert row.quote == "A quote"
+    assert row.work_title is None
 
 
 def test_parse_falls_back_to_location_when_page_is_missing() -> None:
@@ -70,6 +73,31 @@ def test_parse_handles_nested_heading_fragments() -> None:
     assert len(export.annotations) == 1
     assert export.annotations[0].locator_kind == "page"
     assert export.annotations[0].locator == "306"
+    assert export.annotations[0].work_title == "II. AMERICA"
+
+
+def test_parse_extracts_work_title_for_anthology_rows() -> None:
+    html = _wrap_body(
+        '<div class="bookTitle">Complete Works of Fyodor Dostoyevsky</div>',
+        '<div class="authors">Fyodor Dostoyevsky</div>',
+        (
+            '<div class="noteHeading">'
+            'Highlight(<span class="highlight_yellow">yellow</span>) - '
+            "THE BROTHERS KARAMAZOV > Location 73625"
+            "</div>"
+        ),
+        '<div class="noteText">Seek happiness in sorrow.</div>',
+    )
+
+    export = parse_kindle_notebook_html(html)
+
+    assert export.book_title == "Complete Works of Fyodor Dostoyevsky"
+    assert export.author == "Fyodor Dostoyevsky"
+    assert len(export.annotations) == 1
+    row = export.annotations[0]
+    assert row.locator_kind == "loc"
+    assert row.locator == "73625"
+    assert row.work_title == "THE BROTHERS KARAMAZOV"
 
 
 def test_parse_preserves_deterministic_source_order() -> None:
