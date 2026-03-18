@@ -92,7 +92,7 @@ def _expected_progress_cells(
             RENDER.progress_filled,
             RENDER.progress_empty,
         )
-        progress_cells[metric] = f"`{bar}` `{progress_pct}%`"
+        progress_cells[metric] = f"`{bar} {progress_pct}%`"
     return progress_cells
 
 

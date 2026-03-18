@@ -81,6 +81,18 @@ def _append_summary_row(
     )
 
 
+def _format_progress_cell(value: float, target: float) -> str:
+    """Render summary-table progress as one inline code span."""
+    bar, progress_pct = format_progress_bar(
+        value,
+        target,
+        RENDER.progress_bar_width,
+        RENDER.progress_filled,
+        RENDER.progress_empty,
+    )
+    return f"`{bar} {progress_pct}%`"
+
+
 def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     """Render markdown summary section and table."""
     current_metrics = spec.current_metrics
@@ -162,14 +174,10 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     if study_target_minutes is None:
         study_progress_cell = "`—`"
     else:
-        study_bar, study_progress_pct = format_progress_bar(
+        study_progress_cell = _format_progress_cell(
             curr_study_total,
             float(study_target_minutes),
-            RENDER.progress_bar_width,
-            RENDER.progress_filled,
-            RENDER.progress_empty,
         )
-        study_progress_cell = f"`{study_bar}` `{study_progress_pct}%`"
 
     _append_summary_row(
         lines,
@@ -197,14 +205,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
 
     sleep_pct_str = format_summary_change_label(curr_sleep_avg, prev_sleep_avg)
 
-    sleep_bar, sleep_progress_pct = format_progress_bar(
-        curr_sleep_avg,
-        sleep_target_minutes,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -214,7 +214,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=sleep_pct_str,
         ma_value=ma_sleep_str,
         target=sleep_target_label,
-        progress=f"`{sleep_bar}` `{sleep_progress_pct}%`",
+        progress=_format_progress_cell(curr_sleep_avg, sleep_target_minutes),
     )
 
     curr_meditation_count = _metric_int_or(current_metrics, "meditation_count", 0)
@@ -237,14 +237,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         curr_meditation_rate, prev_meditation_rate
     )
 
-    meditation_bar, meditation_progress_pct = format_progress_bar(
-        curr_meditation_count,
-        meditation_target,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -254,7 +246,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=meditation_pct_str,
         ma_value=ma_meditation_str,
         target=meditation_target_label,
-        progress=f"`{meditation_bar}` `{meditation_progress_pct}%`",
+        progress=_format_progress_cell(curr_meditation_count, meditation_target),
     )
 
     curr_workout_count = _metric_int_or(current_metrics, "workout_count", 0)
@@ -271,14 +263,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     prev_workout_rate = compute_pace(prev_workout_count, prev_days_for_avg)
     workout_pct_str = format_summary_change_label(curr_workout_rate, prev_workout_rate)
 
-    workout_bar, workout_progress_pct = format_progress_bar(
-        curr_workout_count,
-        workout_target,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -288,7 +272,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=workout_pct_str,
         ma_value=ma_workout_str,
         target=workout_target_label,
-        progress=f"`{workout_bar}` `{workout_progress_pct}%`",
+        progress=_format_progress_cell(curr_workout_count, workout_target),
     )
 
     curr_stretch_count = _metric_int_or(current_metrics, "stretch_count", 0)
@@ -305,14 +289,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     prev_stretch_rate = compute_pace(prev_stretch_count, prev_days_for_avg)
     stretch_pct_str = format_summary_change_label(curr_stretch_rate, prev_stretch_rate)
 
-    stretch_bar, stretch_progress_pct = format_progress_bar(
-        curr_stretch_count,
-        stretch_target,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -322,7 +298,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=stretch_pct_str,
         ma_value=ma_stretch_str,
         target=stretch_target_label,
-        progress=f"`{stretch_bar}` `{stretch_progress_pct}%`",
+        progress=_format_progress_cell(curr_stretch_count, stretch_target),
     )
 
     curr_mood_avg = _metric_float_or(current_metrics, "mood_avg", 0.0)
@@ -337,14 +313,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
 
     mood_pct_str = format_summary_change_label(curr_mood_avg, prev_mood_avg)
 
-    mood_bar, mood_progress_pct = format_progress_bar(
-        curr_mood_avg,
-        mood_target,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -354,7 +322,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=mood_pct_str,
         ma_value=ma_mood_str,
         target=mood_target_label,
-        progress=f"`{mood_bar}` `{mood_progress_pct}%`",
+        progress=_format_progress_cell(curr_mood_avg, mood_target),
     )
 
     lines.append("")
