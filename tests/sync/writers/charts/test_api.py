@@ -945,9 +945,9 @@ class TestGroupedGridRenderer:
             )
         )
         body = _fenced_body(lines)
-        assert any("MEDITATION:" in line for line in body)
-        assert any("WORKOUT:" in line for line in body)
-        assert any("STRETCH:" in line for line in body)
+        assert any("MEDITATION  " in line for line in body)
+        assert any("WORKOUT     " in line for line in body)
+        assert any("STRETCH     " in line for line in body)
         assert any("MON" in line for line in body)
         assert any("SUN" in line for line in body)
 
@@ -1165,7 +1165,7 @@ class TestGroupedGridRenderer:
             )
         )
         body = _fenced_body(lines)
-        assert body[0] == "┌               ↓"
+        assert body[0] == "┌              ↓"
 
     def test_weekly_training_out_of_range_current_date_has_plain_header(self):
         start = datetime.date(2025, 12, 1)
@@ -1196,10 +1196,10 @@ class TestGroupedGridRenderer:
             )
         )
         assert _fenced_body(lines) == [
-            "┌                                       ↓",
-            "│ MEDITATION:  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░   (2/7)",
-            "│ WORKOUT:     ░░░ ███ ░░░ ███ ███ ░░░ ░░░   (4/7)",
-            "│ STRETCH:     ░░░ ███ ███ ░░░ ███ ░░░ ░░░   (4/7)",
+            "┌                                      ↓",
+            "│ MEDITATION  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░   (2/7)",
+            "│ WORKOUT     ░░░ ███ ░░░ ███ ███ ░░░ ░░░   (4/7)",
+            "│ STRETCH     ░░░ ███ ███ ░░░ ███ ░░░ ░░░   (4/7)",
             "│              ─── ─── ─── ─── ─── ─── ───",
             "└              MON TUE WED THU FRI SAT SUN",
         ]

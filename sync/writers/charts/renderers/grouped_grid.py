@@ -305,7 +305,7 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
 
     def _prefix(label: str) -> str:
         padding = " " * (label_width - len(label) + 2)
-        return f"│ {label}:{padding}"
+        return f"│ {label}{padding}"
 
     prefix_meditation = _prefix("MEDITATION")
     prefix_workout = _prefix("WORKOUT")
