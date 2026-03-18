@@ -1198,10 +1198,10 @@ class TestGroupedGridRenderer:
         assert _fenced_body(lines) == [
             "┌                                       ↓",
             "│ MEDITATION:  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░   (2/7)",
-            "│ WORKOUT:  ░░░ ███ ░░░ ███ ███ ░░░ ░░░   (4/7)",
-            "│ STRETCH:  ░░░ ███ ███ ░░░ ███ ░░░ ░░░   (4/7)",
-            "│           ─── ─── ─── ─── ─── ─── ───",
-            "└           MON TUE WED THU FRI SAT SUN",
+            "│ WORKOUT:     ░░░ ███ ░░░ ███ ███ ░░░ ░░░   (4/7)",
+            "│ STRETCH:     ░░░ ███ ███ ░░░ ███ ░░░ ░░░   (4/7)",
+            "│              ─── ─── ─── ─── ─── ─── ───",
+            "└              MON TUE WED THU FRI SAT SUN",
         ]
 
     def test_weekly_study_exact_render_snapshot(

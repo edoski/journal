@@ -50,10 +50,10 @@
 ```
 ┌
 │ MEDITATION:  ███ ███ ░░░ ░░░ ███ ███ ░░░   (4/7)
-│ WORKOUT:  ███ ░░░ ░░░ ███ ░░░ ░░░ ███   (3/7)
-│ STRETCH:  ███ ░░░ ███ ░░░ ███ ░░░ ███   (4/7)
-│           ─── ─── ─── ─── ─── ─── ───
-└           MON TUE WED THU FRI SAT SUN
+│ WORKOUT:     ███ ░░░ ░░░ ███ ░░░ ░░░ ███   (3/7)
+│ STRETCH:     ███ ░░░ ███ ░░░ ███ ░░░ ███   (4/7)
+│              ─── ─── ─── ─── ─── ─── ───
+└              MON TUE WED THU FRI SAT SUN
 ```
 
 | TYPE | SESSIONS | DURATION | SCHEDULE |

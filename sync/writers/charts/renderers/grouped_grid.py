@@ -301,9 +301,15 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
         workout_symbols.append("███" if has_workout else "░░░")
         stretch_symbols.append("███" if has_stretch else "░░░")
 
-    prefix_meditation = "│ MEDITATION:  "
-    prefix_workout = "│ WORKOUT:  "
-    prefix_stretch = "│ STRETCH:  "
+    label_width = max(len("MEDITATION"), len("WORKOUT"), len("STRETCH"))
+
+    def _prefix(label: str) -> str:
+        padding = " " * (label_width - len(label) + 2)
+        return f"│ {label}:{padding}"
+
+    prefix_meditation = _prefix("MEDITATION")
+    prefix_workout = _prefix("WORKOUT")
+    prefix_stretch = _prefix("STRETCH")
 
     meditation_row = (
         prefix_meditation + " ".join(meditation_symbols) + f"   ({meditation_count}/7)"
@@ -325,7 +331,9 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     lines.append(meditation_row)
     lines.append(workout_row)
     lines.append(stretch_row)
-    lines.append("│           " + " ".join(["───"] * 7))
-    lines.append("└           " + " ".join(DAYS))
+    axis_prefix = "│ " + " " * (label_width + 3)
+    footer_prefix = "└ " + " " * (label_width + 3)
+    lines.append(axis_prefix + " ".join(["───"] * 7))
+    lines.append(footer_prefix + " ".join(DAYS))
 
     return lines
