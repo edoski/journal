@@ -357,11 +357,9 @@ class TestAggregateTrainingTypeSessionStats:
 
         assert len(rows) == 1
         assert rows[0]["type"] == "Functional Strength Training"
-        assert rows[0]["slot_index"] == 0
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 75.0
-        assert rows[0]["average_start_time"] == "18:30"
-        assert rows[0]["average_end_time"] == "19:45"
+        assert rows[0]["schedule_ranges"] == (("18:30", "19:45"),)
 
     def test_applies_bucket_mapping_for_target_denominator(self):
         dates = [
@@ -408,7 +406,9 @@ class TestAggregateTrainingTypeSessionStats:
         assert by_type["Cooldown"]["target"] == expected_stretch
         assert by_type["Functional Strength Training"]["target"] == expected_workout
 
-    def test_splits_multi_session_days_into_separate_slot_rows(self):
+    def test_renders_multi_session_days_as_one_row_with_exact_multi_range_schedule(
+        self,
+    ):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
             dates[0]: {
@@ -429,13 +429,14 @@ class TestAggregateTrainingTypeSessionStats:
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
-        assert len(rows) == 2
-        assert [row["type"] for row in rows] == ["Mind & Body", "Mind & Body"]
-        assert [row["slot_index"] for row in rows] == [0, 1]
-        assert [row["sessions"] for row in rows] == [2, 2]
-        assert [row["average_minutes"] for row in rows] == [11.0, 16.5]
-        assert [row["average_start_time"] for row in rows] == ["07:15", "20:55"]
-        assert [row["average_end_time"] for row in rows] == ["07:26", "21:12"]
+        assert len(rows) == 1
+        assert rows[0]["type"] == "Mind & Body"
+        assert rows[0]["sessions"] == 2
+        assert rows[0]["average_minutes"] == 13.75
+        assert rows[0]["schedule_ranges"] == (
+            ("07:15", "07:26"),
+            ("20:55", "21:12"),
+        )
 
     def test_scales_targets_with_period_days(self):
         dates = [
@@ -524,8 +525,7 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["type"] == "Stretching"
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 22.5
-        assert rows[0]["average_start_time"] == "19:02"
-        assert rows[0]["average_end_time"] == "19:22"
+        assert rows[0]["schedule_ranges"] == (("19:02", "19:22"),)
 
     def test_raises_when_schedule_samples_are_missing(self):
         dates = [datetime.date(2025, 1, 1)]
@@ -542,7 +542,7 @@ class TestAggregateTrainingTypeSessionStats:
         with pytest.raises(ValueError, match="sample count mismatch"):
             aggregate_training_type_session_stats(dates, daily_data)
 
-    def test_supports_uneven_slot_presence_across_days(self):
+    def test_clusters_uneven_slot_presence_by_time_of_day(self):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
             dates[0]: {
@@ -556,20 +556,21 @@ class TestAggregateTrainingTypeSessionStats:
                 "training_type_minutes": {"Mind & Body": 12.0},
                 "training_type_sessions": {"Mind & Body": 1},
                 "training_type_duration_minutes": {"Mind & Body": (12.0,)},
-                "training_type_start_minutes": {"Mind & Body": (450,)},
-                "training_type_end_minutes": {"Mind & Body": (462,)},
+                "training_type_start_minutes": {"Mind & Body": (1250,)},
+                "training_type_end_minutes": {"Mind & Body": (1262,)},
             },
         }
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
-        assert len(rows) == 2
+        assert len(rows) == 1
         assert rows[0]["type"] == "Mind & Body"
         assert rows[0]["sessions"] == 2
-        assert rows[0]["average_start_time"] == "07:15"
-        assert rows[1]["type"] == "Mind & Body"
-        assert rows[1]["sessions"] == 1
-        assert rows[1]["average_start_time"] == "21:00"
+        assert rows[0]["average_minutes"] == 14.0
+        assert rows[0]["schedule_ranges"] == (
+            ("07:00", "07:10"),
+            ("20:55", "21:11"),
+        )
 
 
 class TestLoadDailyData:

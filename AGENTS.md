@@ -220,7 +220,7 @@ journal/
   - `links_for_window(files, start, end) -> list[str]`
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
-  - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for per-slot period aggregation
+  - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation
 - Query snapshot contract is canonical across `sync/application` and CLI consumers:
   - `PeriodSnapshot` in `sync/contracts/query.py`
 - Reminder schedule parsing/formatting is canonical in:
@@ -235,7 +235,7 @@ journal/
 - Daily `TRAINING` rows with a positive `DURATION` are canonical only when `TIME` is `HH:MM - HH:MM` (24-hour); non-canonical values are rejected with explicit errors.
 - Periodic `TRAINING` type summary tables are canonical only when they include:
   - `| TYPE | SESSIONS | DURATION | SCHEDULE |`
-  - repeated `TYPE` labels are allowed when they represent distinct averaged daily slots for the same activity
+  - `SCHEDULE` renders one row per activity type and uses comma-separated exact averaged ranges when a type has multiple recurring windows
 - `PROTOCOL.md` `## SCHEDULE` is canonical only when it includes:
   - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
   - required `DEFAULT` row with full values

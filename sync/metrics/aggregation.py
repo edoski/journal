@@ -16,12 +16,19 @@ from sync.target_policy import training_type_target
 
 @dataclass
 class _TrainingAccumulator:
-    """Mutable accumulator for per-type/per-slot training aggregation."""
+    """Mutable accumulator for per-type training aggregation."""
 
     display_type: str
-    slot_index: int
-    sessions: int = 0
+    active_days: set[datetime.date] = field(default_factory=set)
+    total_sessions: int = 0
     total_minutes: float = 0.0
+
+
+@dataclass
+class _ScheduleRangeAccumulator:
+    """Mutable accumulator for one recurring schedule range within a training type."""
+
+    seen_days: set[datetime.date] = field(default_factory=set)
     start_minutes: list[int] = field(default_factory=list)
     end_minutes: list[int] = field(default_factory=list)
 
@@ -34,6 +41,8 @@ _TRAINING_BUCKET_BY_LABEL: dict[str, TrainingTargetBucket] = {
     "stretching": "stretch",
     "cooldown": "stretch",
 }
+
+_TRAINING_RANGE_CLUSTER_THRESHOLD_MINUTES = 6 * 60
 
 
 def compute_period_metrics(
@@ -224,23 +233,61 @@ def _hhmm_to_minutes(value: str) -> int:
     return int(hour) * 60 + int(minute)
 
 
+def _clock_distance_minutes(left: int, right: int) -> int:
+    """Return the shortest circular distance between two clock-minute values."""
+    diff = abs((left - right) % (24 * 60))
+    return min(diff, (24 * 60) - diff)
+
+
+def _cluster_schedule_samples(
+    day: datetime.date,
+    ordered_samples: tuple[tuple[int, int, float], ...],
+    clusters: list[_ScheduleRangeAccumulator],
+) -> None:
+    """Assign one day's ordered samples to recurring schedule-range clusters."""
+    for start, end, _duration in ordered_samples:
+        best_index: int | None = None
+        best_distance: int | None = None
+        for index, cluster in enumerate(clusters):
+            if day in cluster.seen_days:
+                continue
+            center = _average_clock_minutes(cluster.start_minutes)
+            distance = _clock_distance_minutes(start, center)
+            if best_distance is None or distance < best_distance:
+                best_index = index
+                best_distance = distance
+
+        if (
+            best_index is not None
+            and best_distance is not None
+            and best_distance <= _TRAINING_RANGE_CLUSTER_THRESHOLD_MINUTES
+        ):
+            cluster = clusters[best_index]
+        else:
+            cluster = _ScheduleRangeAccumulator()
+            clusters.append(cluster)
+
+        cluster.seen_days.add(day)
+        cluster.start_minutes.append(int(start))
+        cluster.end_minutes.append(int(end))
+
+
 def aggregate_training_type_session_stats(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
 ) -> list[TrainingTypeSessionStat]:
     """
-    Aggregate periodic training stats by activity type and daily slot.
+    Aggregate periodic training stats by activity type.
 
     Returns row dicts with:
       - type: display label (first seen)
-      - slot_index: zero-based daily slot index within the activity type
-      - sessions: raw session count for the slot
+      - sessions: number of days where the type appeared at least once
       - target: scaled target denominator for period
-      - average_minutes: average duration per slot session
-      - average_start_time: average slot start (HH:MM)
-      - average_end_time: average slot end (HH:MM)
+      - average_minutes: average duration across all sessions of the type
+      - schedule_ranges: averaged recurring schedule ranges as HH:MM pairs
     """
-    per_type_slot: dict[tuple[str, int], _TrainingAccumulator] = {}
+    per_type: dict[str, _TrainingAccumulator] = {}
+    schedule_clusters_by_type: dict[str, list[_ScheduleRangeAccumulator]] = {}
 
     for d in dates:
         daily = daily_data.get(d)
@@ -308,26 +355,21 @@ def aggregate_training_type_session_stats(
                     f"total={total_minutes}, sum={sum(duration_samples)}"
                 )
 
-            ordered_samples = sorted(
-                zip(start_samples, end_samples, duration_samples),
-                key=lambda sample: (sample[0], sample[1], sample[2]),
-            )
-            for slot_index, (start, end, duration) in enumerate(ordered_samples):
-                key = (norm, slot_index)
-                entry = per_type_slot.setdefault(
-                    key,
-                    _TrainingAccumulator(
-                        display_type=label,
-                        slot_index=slot_index,
-                    ),
+            ordered_samples = tuple(
+                sorted(
+                    zip(start_samples, end_samples, duration_samples),
+                    key=lambda sample: (sample[0], sample[1], sample[2]),
                 )
-                # Preserve source-case display label from first observed non-empty entry.
-                if not entry.display_type and label:
-                    entry.display_type = label
-                entry.sessions += 1
-                entry.total_minutes += float(duration)
-                entry.start_minutes.append(int(start))
-                entry.end_minutes.append(int(end))
+            )
+            entry = per_type.setdefault(norm, _TrainingAccumulator(display_type=label))
+            if not entry.display_type and label:
+                entry.display_type = label
+            entry.active_days.add(d)
+            entry.total_sessions += sessions
+            entry.total_minutes += total_minutes
+
+            clusters = schedule_clusters_by_type.setdefault(norm, [])
+            _cluster_schedule_samples(d, ordered_samples, clusters)
 
     total_days = len(dates)
     meditation_target = training_type_target(total_days, "meditation")
@@ -335,18 +377,25 @@ def aggregate_training_type_session_stats(
     stretch_target = training_type_target(total_days, "stretch")
 
     stats: list[TrainingTypeSessionStat] = []
-    for norm_slot, data in per_type_slot.items():
-        norm, slot_index = norm_slot
-        sessions = data.sessions
+    for norm, data in per_type.items():
+        sessions = len(data.active_days)
+        total_session_count = data.total_sessions
         total_minutes = data.total_minutes
-        if sessions <= 0 or total_minutes <= 0:
+        if sessions <= 0 or total_session_count <= 0 or total_minutes <= 0:
             continue
-        if len(data.start_minutes) != sessions or len(data.end_minutes) != sessions:
+
+        clusters = schedule_clusters_by_type.get(norm, [])
+        if not clusters:
+            raise ValueError(
+                "Training schedule sample count mismatch for "
+                f"{data.display_type or norm!r}: no schedule clusters were built"
+            )
+        sample_count = sum(len(cluster.start_minutes) for cluster in clusters)
+        if sample_count != total_session_count:
             raise ValueError(
                 "Training schedule sample count mismatch for "
                 f"{data.display_type or norm!r}: "
-                f"sessions={sessions}, starts={len(data.start_minutes)}, "
-                f"ends={len(data.end_minutes)}"
+                f"sessions={total_session_count}, starts={sample_count}"
             )
 
         bucket = _target_bucket_for_training_type(norm)
@@ -357,29 +406,37 @@ def aggregate_training_type_session_stats(
         else:
             target = workout_target
 
-        average_start_time = _minutes_to_hhmm(
-            _average_clock_minutes(data.start_minutes)
+        schedule_ranges = tuple(
+            sorted(
+                (
+                    (
+                        _minutes_to_hhmm(_average_clock_minutes(cluster.start_minutes)),
+                        _minutes_to_hhmm(_average_clock_minutes(cluster.end_minutes)),
+                    )
+                    for cluster in clusters
+                ),
+                key=lambda value: (
+                    _hhmm_to_minutes(value[0]),
+                    _hhmm_to_minutes(value[1]),
+                ),
+            )
         )
-        average_end_time = _minutes_to_hhmm(_average_clock_minutes(data.end_minutes))
 
         stats.append(
             TrainingTypeSessionStat(
                 type=data.display_type or norm,
-                slot_index=slot_index,
                 sessions=sessions,
                 target=target,
-                average_minutes=total_minutes / sessions,
-                average_start_time=average_start_time,
-                average_end_time=average_end_time,
+                average_minutes=total_minutes / total_session_count,
+                schedule_ranges=schedule_ranges,
             )
         )
 
     stats.sort(
         key=lambda row: (
-            _hhmm_to_minutes(row["average_start_time"]),
-            _hhmm_to_minutes(row["average_end_time"]),
+            _hhmm_to_minutes(row["schedule_ranges"][0][0]),
+            _hhmm_to_minutes(row["schedule_ranges"][0][1]),
             row["type"].casefold(),
-            row["slot_index"],
             -row["average_minutes"],
             -row["sessions"],
         )

@@ -117,7 +117,9 @@ def append_training_type_table(
             target = int(row["target"])
             avg_minutes = float(row["average_minutes"])
             avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
-            schedule_label = f"{row['average_start_time']} - {row['average_end_time']}"
+            schedule_label = ", ".join(
+                f"{start} - {end}" for start, end in row["schedule_ranges"]
+            )
             rows.append(
                 [
                     f"**{label}**",

@@ -44,15 +44,13 @@ class PeriodAggregate(TypedDict):
 
 
 class TrainingTypeSessionStat(TypedDict):
-    """Per-type/per-slot training summary row for periodic rendering."""
+    """Per-type training summary row for periodic rendering."""
 
     type: str
-    slot_index: int
     sessions: int
     target: int
     average_minutes: float
-    average_start_time: str
-    average_end_time: str
+    schedule_ranges: tuple[tuple[str, str], ...]
 
 
 class MovingAverageAggregate(TypedDict):
