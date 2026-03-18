@@ -78,6 +78,7 @@ def test_parse_daily_note_characterization(tmp_path):
         "planned_break_minutes": 25,
         "training_type_minutes": {},
         "training_type_sessions": {},
+        "training_type_duration_minutes": {},
         "training_type_start_minutes": {},
         "training_type_end_minutes": {},
         "screen_time_totals": {"YouTube": 90.0, "X": 30.0},
@@ -219,6 +220,11 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
         "Traditional Strength Training": 1,
         "Stretching": 1,
         "Meditation": 1,
+    }
+    assert parsed["training_type_duration_minutes"] == {
+        "Traditional Strength Training": (60.0,),
+        "Stretching": (30.0,),
+        "Meditation": (15.0,),
     }
     assert parsed["training_type_start_minutes"] == {
         "Traditional Strength Training": (420,),
@@ -606,6 +612,7 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
     assert parsed["activity_totals"] == {"coding": 75.0}
     assert parsed["training_type_minutes"] == {"Lift": 30.0}
     assert parsed["training_type_sessions"] == {"Lift": 2}
+    assert parsed["training_type_duration_minutes"] == {"Lift": (20.0, 10.0)}
     assert parsed["training_type_start_minutes"] == {"Lift": (420, 480)}
     assert parsed["training_type_end_minutes"] == {"Lift": (440, 490)}
     assert parsed["screen_time_totals"] == {"YouTube": 15.0}

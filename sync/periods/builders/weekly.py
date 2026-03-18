@@ -157,13 +157,13 @@ def build_weekly_metrics(
     # TRAINING section
     training_lines = ["### **TRAINING**"]
     current_week_date = today if start_date <= today <= end_date else None
-    mindful_days = current_metrics["mindful_count"]
+    meditation_days = current_metrics["meditation_count"]
     training_lines.extend(
         render_chart(
             WeeklyTrainingGridSpec(
                 dates=dates,
                 daily_data=daily_data,
-                mindful_count=mindful_days,
+                meditation_count=meditation_days,
                 workout_count=workout_days,
                 stretch_count=stretch_days,
                 current_date=current_week_date,

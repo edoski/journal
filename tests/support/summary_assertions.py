@@ -12,7 +12,7 @@ from sync.target_policy import summary_targets
 
 from tests.support.markdown_parse import split_markdown_row
 
-_SUMMARY_METRICS = ("STUDY", "SLEEP", "MINDFUL", "WORKOUT", "STRETCH", "MOOD")
+_SUMMARY_METRICS = ("STUDY", "SLEEP", "MEDITATION", "WORKOUT", "STRETCH", "MOOD")
 
 
 def _find_summary_table_start(lines: list[str]) -> int:
@@ -52,7 +52,7 @@ def _expected_target_labels(period_type: PeriodType, total_days: int) -> dict[st
     return {
         "STUDY": targets.study_label,
         "SLEEP": targets.sleep_label,
-        "MINDFUL": targets.training.mindful_label,
+        "MEDITATION": targets.training.meditation_label,
         "WORKOUT": targets.training.workout_label,
         "STRETCH": targets.training.stretch_label,
         "MOOD": targets.mood_label,
@@ -69,7 +69,7 @@ def _expected_progress_cells(
     current_values = {
         "STUDY": float(current_metrics.get("study_total_minutes") or 0.0),
         "SLEEP": float(current_metrics.get("sleep_avg_minutes") or 0.0),
-        "MINDFUL": float(current_metrics.get("mindful_count") or 0.0),
+        "MEDITATION": float(current_metrics.get("meditation_count") or 0.0),
         "WORKOUT": float(current_metrics.get("workout_count") or 0.0),
         "STRETCH": float(current_metrics.get("stretch_count") or 0.0),
         "MOOD": float(current_metrics.get("mood_avg") or 0.0),
@@ -77,7 +77,7 @@ def _expected_progress_cells(
     target_values = {
         "STUDY": float(targets.study_minutes),
         "SLEEP": float(targets.sleep_minutes),
-        "MINDFUL": float(targets.training.mindful),
+        "MEDITATION": float(targets.training.meditation),
         "WORKOUT": float(targets.training.workout),
         "STRETCH": float(targets.training.stretch),
         "MOOD": float(targets.mood),

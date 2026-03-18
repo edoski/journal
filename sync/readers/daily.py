@@ -193,11 +193,13 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
 
     training_type_minutes = defaultdict[str, float](float)
     training_type_sessions = defaultdict[str, int](int)
+    training_type_duration_minutes = defaultdict[str, list[float]](list)
     training_type_start_minutes = defaultdict[str, list[int]](list)
     training_type_end_minutes = defaultdict[str, list[int]](list)
     for activity, minutes, start_minutes, end_minutes in training_rows:
         training_type_minutes[activity] += minutes
         training_type_sessions[activity] += 1
+        training_type_duration_minutes[activity].append(minutes)
         training_type_start_minutes[activity].append(start_minutes)
         training_type_end_minutes[activity].append(end_minutes)
 
@@ -224,6 +226,10 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "planned_break_minutes": planned_break_total,
         "training_type_minutes": dict(training_type_minutes),
         "training_type_sessions": dict(training_type_sessions),
+        "training_type_duration_minutes": {
+            activity: tuple(values)
+            for activity, values in training_type_duration_minutes.items()
+        },
         "training_type_start_minutes": {
             activity: tuple(values)
             for activity, values in training_type_start_minutes.items()

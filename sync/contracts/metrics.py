@@ -24,6 +24,7 @@ class DailyAggregate(TypedDict):
     planned_break_minutes: float
     training_type_minutes: dict[str, float]
     training_type_sessions: dict[str, int]
+    training_type_duration_minutes: dict[str, tuple[float, ...]]
     training_type_start_minutes: dict[str, tuple[int, ...]]
     training_type_end_minutes: dict[str, tuple[int, ...]]
     screen_time_totals: dict[str, float]
@@ -37,15 +38,16 @@ class PeriodAggregate(TypedDict):
     mood_avg: float | None
     workout_count: int
     stretch_count: int
-    mindful_count: int
+    meditation_count: int
     total_days: int
     days_up_to_today: int
 
 
 class TrainingTypeSessionStat(TypedDict):
-    """Per-type training summary row for periodic rendering."""
+    """Per-type/per-slot training summary row for periodic rendering."""
 
     type: str
+    slot_index: int
     sessions: int
     target: int
     average_minutes: float
@@ -61,7 +63,7 @@ class MovingAverageAggregate(TypedDict):
     mood_avg: float | None
     workout_avg: float | None
     stretch_avg: float | None
-    mindful_avg: float | None
+    meditation_avg: float | None
 
 
 MetricValue: TypeAlias = float | int | None

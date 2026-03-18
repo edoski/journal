@@ -54,7 +54,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -64,7 +64,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -91,7 +91,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -101,7 +101,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -126,7 +126,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 1,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 2,
         }
@@ -136,7 +136,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 1,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 1,
         }
@@ -161,7 +161,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -171,7 +171,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -191,7 +191,7 @@ class TestSummaryMetricsTable:
             "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |",
             "| **STUDY** | `1h00m/day` | `0h50m/day` | `+20%` | `42h/wk` | `████░░░░░░░░░░░░░░░░░░░░░` `17%` |",
             "| **SLEEP** | `8h00m/night` | `7h30m/night` | `+7%` | `8h/night` | `█████████████████████████` `100%` |",
-            "| **MINDFUL** | `4/7` | `3/7` | `+33%` | `7/7` | `██████████████░░░░░░░░░░░` `57%` |",
+            "| **MEDITATION** | `4/7` | `3/7` | `+33%` | `7/7` | `██████████████░░░░░░░░░░░` `57%` |",
             "| **WORKOUT** | `5/7` | `4/7` | `+25%` | `7/7` | `██████████████████░░░░░░░` `71%` |",
             "| **STRETCH** | `3/7` | `4/7` | `-25%` | `7/7` | `███████████░░░░░░░░░░░░░░` `43%` |",
             "| **MOOD** | `7.5/10.0` | `7.0/10.0` | `+7%` | `6.0/10` | `█████████████████████████` `125%` |",
@@ -205,7 +205,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -215,14 +215,14 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }
         ma_metrics = {
             "study_avg_minutes": 360,
             "sleep_avg_minutes": 420,
-            "mindful_avg": 3.2,
+            "meditation_avg": 3.2,
             "workout_avg": 4.4,
             "stretch_avg": 2.5,
             "mood_avg": 7.2,
@@ -246,7 +246,7 @@ class TestSummaryMetricsTable:
             "| ------ | ------------- | ----------------------- | ------ | ---------- | ------ | -------- |",
             "| **STUDY** | `1h00m/day` | `0h50m/day` | `+20%` | `6h00m/day` | `42h/wk` | `████░░░░░░░░░░░░░░░░░░░░░` `17%` |",
             "| **SLEEP** | `8h00m/night` | `7h30m/night` | `+7%` | `7h00m/night` | `8h/night` | `█████████████████████████` `100%` |",
-            "| **MINDFUL** | `4/7` | `3/7` | `+33%` | `3.2/7` | `7/7` | `██████████████░░░░░░░░░░░` `57%` |",
+            "| **MEDITATION** | `4/7` | `3/7` | `+33%` | `3.2/7` | `7/7` | `██████████████░░░░░░░░░░░` `57%` |",
             "| **WORKOUT** | `5/7` | `4/7` | `+25%` | `4.4/7` | `7/7` | `██████████████████░░░░░░░` `71%` |",
             "| **STRETCH** | `3/7` | `4/7` | `-25%` | `2.5/7` | `7/7` | `███████████░░░░░░░░░░░░░░` `43%` |",
             "| **MOOD** | `7.5/10.0` | `7.0/10.0` | `+7%` | `7.2/10.0` | `6.0/10` | `█████████████████████████` `125%` |",
@@ -260,7 +260,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -270,7 +270,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -316,7 +316,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 1,
         }
@@ -326,7 +326,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 1,
         }
@@ -349,7 +349,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 3,
         }
         previous = {
@@ -358,7 +358,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 3,
         }
         lines = render_table(
@@ -380,7 +380,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
         }
         previous = {
             "study_total_minutes": 35,
@@ -388,7 +388,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -410,7 +410,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -420,7 +420,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -443,7 +443,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 3,
             "days_up_to_today": 3,
         }
@@ -453,7 +453,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 9,
         }
         lines = render_table(
@@ -475,7 +475,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -485,7 +485,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -508,7 +508,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -518,7 +518,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -535,12 +535,12 @@ class TestSummaryMetricsTable:
             )
         )
         sleep_line = next(line for line in lines if "**SLEEP**" in line)
-        mindful_line = next(line for line in lines if "**MINDFUL**" in line)
+        meditation_line = next(line for line in lines if "**MEDITATION**" in line)
         workout_line = next(line for line in lines if "**WORKOUT**" in line)
         stretch_line = next(line for line in lines if "**STRETCH**" in line)
         mood_line = next(line for line in lines if "**MOOD**" in line)
         assert "| `—` |" in sleep_line
-        assert "| `—` |" in mindful_line
+        assert "| `—` |" in meditation_line
         assert "| `—` |" in workout_line
         assert "| `—` |" in stretch_line
         assert "| `—` |" in mood_line
@@ -555,7 +555,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -565,7 +565,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -579,7 +579,7 @@ class TestSummaryMetricsTable:
             )
         )
         empty_bar = "." * custom_render.progress_bar_width
-        for metric in ("STUDY", "SLEEP", "MINDFUL", "WORKOUT", "STRETCH", "MOOD"):
+        for metric in ("STUDY", "SLEEP", "MEDITATION", "WORKOUT", "STRETCH", "MOOD"):
             metric_line = next(line for line in lines if f"**{metric}**" in line)
             assert empty_bar in metric_line
             assert "░" not in metric_line
@@ -600,14 +600,14 @@ class TestSummaryMetricsTable:
 
         study_line = next(line for line in lines if "**STUDY**" in line)
         sleep_line = next(line for line in lines if "**SLEEP**" in line)
-        mindful_line = next(line for line in lines if "**MINDFUL**" in line)
+        meditation_line = next(line for line in lines if "**MEDITATION**" in line)
         workout_line = next(line for line in lines if "**WORKOUT**" in line)
         stretch_line = next(line for line in lines if "**STRETCH**" in line)
         mood_line = next(line for line in lines if "**MOOD**" in line)
 
         assert "| `0h00m/day` | `0h00m/day` |" in study_line
         assert "| `0h00m/night` | `0h00m/night` |" in sleep_line
-        assert "| `0/1` | `0/7` |" in mindful_line
+        assert "| `0/1` | `0/7` |" in meditation_line
         assert "| `0/1` | `0/7` |" in workout_line
         assert "| `0/1` | `0/7` |" in stretch_line
         assert "| `0.0/10.0` | `0.0/10.0` |" in mood_line
@@ -615,14 +615,14 @@ class TestSummaryMetricsTable:
     def test_previous_days_fallback_defaults_to_seven_when_missing(self):
         current = {
             "study_total_minutes": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "workout_count": 0,
             "stretch_count": 0,
             "days_up_to_today": 1,
         }
         previous = {
             "study_total_minutes": 56,
-            "mindful_count": 7,
+            "meditation_count": 7,
             "workout_count": 7,
             "stretch_count": 7,
         }
@@ -638,12 +638,12 @@ class TestSummaryMetricsTable:
         )
 
         study_line = next(line for line in lines if "**STUDY**" in line)
-        mindful_line = next(line for line in lines if "**MINDFUL**" in line)
+        meditation_line = next(line for line in lines if "**MEDITATION**" in line)
         workout_line = next(line for line in lines if "**WORKOUT**" in line)
         stretch_line = next(line for line in lines if "**STRETCH**" in line)
 
         assert "| `0h00m/day` | `0h08m/day` |" in study_line
-        assert "| `0/1` | `7/7` |" in mindful_line
+        assert "| `0/1` | `7/7` |" in meditation_line
         assert "| `0/1` | `7/7` |" in workout_line
         assert "| `0/1` | `7/7` |" in stretch_line
 
@@ -654,7 +654,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -664,7 +664,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -681,7 +681,7 @@ class TestSummaryMetricsTable:
             )
         )
 
-        for metric in ("STUDY", "SLEEP", "MINDFUL", "WORKOUT", "STRETCH", "MOOD"):
+        for metric in ("STUDY", "SLEEP", "MEDITATION", "WORKOUT", "STRETCH", "MOOD"):
             metric_line = next(line for line in lines if f"**{metric}**" in line)
             cells = [cell.strip() for cell in metric_line.split("|")]
             # Columns: [empty, METRIC, CURRENT, PREVIOUS, CHANGE, MA, TARGET, PROGRESS, empty]
@@ -694,7 +694,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -704,7 +704,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 0,
             "workout_count": 0,
             "stretch_count": 0,
-            "mindful_count": 0,
+            "meditation_count": 0,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -732,7 +732,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -742,7 +742,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -766,7 +766,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.5,
             "workout_count": 5,
             "stretch_count": 3,
-            "mindful_count": 4,
+            "meditation_count": 4,
             "total_days": 7,
             "days_up_to_today": 7,
         }
@@ -776,7 +776,7 @@ class TestSummaryMetricsTable:
             "mood_avg": 7.0,
             "workout_count": 4,
             "stretch_count": 4,
-            "mindful_count": 3,
+            "meditation_count": 3,
             "total_days": 7,
             "days_up_to_today": 7,
         }

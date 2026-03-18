@@ -20,7 +20,7 @@ from sync.target_policy import (
 def test_training_type_target_scales_from_weekly_constant():
     assert training_type_target(7, "workout") == IDEAL.workout_days_weekly
     assert training_type_target(7, "stretch") == IDEAL.stretch_days_weekly
-    assert training_type_target(7, "mindful") == IDEAL.mindful_days_weekly
+    assert training_type_target(7, "meditation") == IDEAL.meditation_days_weekly
 
     # 31-day period should follow scaled-week math from production policy.
     expected_workout = round(IDEAL.workout_days_weekly * (31 / 7))

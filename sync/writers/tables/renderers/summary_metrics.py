@@ -100,7 +100,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
 
     targets = summary_targets(period_type, total_days)
     sleep_target_minutes = targets.sleep_minutes
-    mindful_target = targets.training.mindful
+    meditation_target = targets.training.meditation
     workout_target = targets.training.workout
     stretch_target = targets.training.stretch
     mood_target = targets.mood
@@ -108,7 +108,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     study_target_label = format_study_target_label(period_type, study_target_minutes)
     sleep_target_label = targets.sleep_label
     mood_target_label = targets.mood_label
-    mindful_target_label = targets.training.mindful_label
+    meditation_target_label = targets.training.meditation_label
     workout_target_label = targets.training.workout_label
     stretch_target_label = targets.training.stretch_label
 
@@ -217,23 +217,29 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         progress=f"`{sleep_bar}` `{sleep_progress_pct}%`",
     )
 
-    curr_mindful_count = _metric_int_or(current_metrics, "mindful_count", 0)
-    prev_mindful_count = _metric_int_or(previous_metrics, "mindful_count", 0)
-    curr_mindful = format_training_ratio(curr_mindful_count, curr_days_for_avg)
-    prev_mindful = format_training_ratio(prev_mindful_count, prev_total_days)
+    curr_meditation_count = _metric_int_or(current_metrics, "meditation_count", 0)
+    prev_meditation_count = _metric_int_or(previous_metrics, "meditation_count", 0)
+    curr_meditation = format_training_ratio(curr_meditation_count, curr_days_for_avg)
+    prev_meditation = format_training_ratio(prev_meditation_count, prev_total_days)
 
-    ma_mindful_str = "—"
-    ma_mindful_avg = _metric_float(ma_metrics, "mindful_avg") if ma_metrics else None
-    if show_ma and ma_mindful_avg is not None:
-        ma_mindful_str = format_ma_training_ratio(ma_mindful_avg, ma_training_unit)
+    ma_meditation_str = "—"
+    ma_meditation_avg = (
+        _metric_float(ma_metrics, "meditation_avg") if ma_metrics else None
+    )
+    if show_ma and ma_meditation_avg is not None:
+        ma_meditation_str = format_ma_training_ratio(
+            ma_meditation_avg, ma_training_unit
+        )
 
-    curr_mindful_rate = compute_pace(curr_mindful_count, curr_days_for_avg)
-    prev_mindful_rate = compute_pace(prev_mindful_count, prev_days_for_avg)
-    mindful_pct_str = format_summary_change_label(curr_mindful_rate, prev_mindful_rate)
+    curr_meditation_rate = compute_pace(curr_meditation_count, curr_days_for_avg)
+    prev_meditation_rate = compute_pace(prev_meditation_count, prev_days_for_avg)
+    meditation_pct_str = format_summary_change_label(
+        curr_meditation_rate, prev_meditation_rate
+    )
 
-    mindful_bar, mindful_progress_pct = format_progress_bar(
-        curr_mindful_count,
-        mindful_target,
+    meditation_bar, meditation_progress_pct = format_progress_bar(
+        curr_meditation_count,
+        meditation_target,
         RENDER.progress_bar_width,
         RENDER.progress_filled,
         RENDER.progress_empty,
@@ -242,13 +248,13 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     _append_summary_row(
         lines,
         show_ma=show_ma,
-        metric_label="MINDFUL",
-        current=curr_mindful,
-        previous=prev_mindful,
-        change=mindful_pct_str,
-        ma_value=ma_mindful_str,
-        target=mindful_target_label,
-        progress=f"`{mindful_bar}` `{mindful_progress_pct}%`",
+        metric_label="MEDITATION",
+        current=curr_meditation,
+        previous=prev_meditation,
+        change=meditation_pct_str,
+        ma_value=ma_meditation_str,
+        target=meditation_target_label,
+        progress=f"`{meditation_bar}` `{meditation_progress_pct}%`",
     )
 
     curr_workout_count = _metric_int_or(current_metrics, "workout_count", 0)

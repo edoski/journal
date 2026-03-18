@@ -159,13 +159,13 @@ class MonthlyTrainingGridSpec:
 
     week_ranges: Sequence[tuple[datetime.date, datetime.date]]
     daily_data: dict[datetime.date, DailyAggregate]
-    mindful_count: int
+    meditation_count: int
     workout_count: int
     stretch_count: int
     days_in_period: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
-    mindful_delta_labels: Sequence[str] | None = None
+    meditation_delta_labels: Sequence[str] | None = None
     workout_delta_labels: Sequence[str] | None = None
     stretch_delta_labels: Sequence[str] | None = None
     legend_line: str | None = None
@@ -177,7 +177,7 @@ class WeeklyTrainingGridSpec:
 
     dates: Sequence[datetime.date]
     daily_data: dict[datetime.date, DailyAggregate]
-    mindful_count: int
+    meditation_count: int
     workout_count: int
     stretch_count: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)

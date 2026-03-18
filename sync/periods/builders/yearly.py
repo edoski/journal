@@ -216,10 +216,10 @@ def build_yearly_metrics(
     # TRAINING (quarter rows)
     training_lines = ["### **TRAINING**"]
     quarter_labels = [f"Q{i + 1}" for i in range(4)]
-    mindful_counts = []
+    meditation_counts = []
     workout_counts = []
     stretch_counts = []
-    mindful_done_year = 0
+    meditation_done_year = 0
     workout_done_year = 0
     stretch_done_year = 0
     elapsed_year = 0
@@ -227,7 +227,7 @@ def build_yearly_metrics(
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         elapsed_days = sum(1 for d in days if d <= today)
-        mindful_done = sum(
+        meditation_done = sum(
             1
             for d in days
             if d <= today and training_done_for_day(daily_data, d, "meditate")
@@ -242,15 +242,15 @@ def build_yearly_metrics(
             for d in days
             if d <= today and training_done_for_day(daily_data, d, "stretch")
         )
-        mindful_counts.append((mindful_done, elapsed_days, start))
+        meditation_counts.append((meditation_done, elapsed_days, start))
         workout_counts.append((workout_done, elapsed_days, start))
         stretch_counts.append((stretch_done, elapsed_days, start))
-        mindful_done_year += mindful_done
+        meditation_done_year += meditation_done
         workout_done_year += workout_done
         stretch_done_year += stretch_done
         elapsed_year += elapsed_days
 
-    mindful_delta_labels = compute_bucket_deltas(
+    meditation_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: (
             1.0 if training_done_for_day(year_delta_data, d, "meditate") else 0.0
@@ -278,12 +278,12 @@ def build_yearly_metrics(
         today=today,
     )
 
-    mindful_bars = []
+    meditation_bars = []
     workout_bars = []
     stretch_bars = []
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
-        mindful_bars.append(
+        meditation_bars.append(
             compress_activity_time_order(
                 days,
                 lambda d: training_done_for_day(daily_data, d, "meditate"),
@@ -316,14 +316,14 @@ def build_yearly_metrics(
 
     training_sections = [
         TrainingSection(
-            title="MINDFUL",
-            total_done=mindful_done_year,
+            title="MEDITATION",
+            total_done=meditation_done_year,
             total_elapsed=elapsed_year,
             labels=quarter_labels,
-            counts=[(d, t) for d, t, _ in mindful_counts],
-            delta_labels=mindful_delta_labels,
+            counts=[(d, t) for d, t, _ in meditation_counts],
+            delta_labels=meditation_delta_labels,
             bar_width=YEARLY_TRAINING_BAR_WIDTH,
-            bars_override=mindful_bars,
+            bars_override=meditation_bars,
             fill_char="█",
             empty_char="·",
         ),

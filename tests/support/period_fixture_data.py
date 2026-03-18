@@ -39,6 +39,7 @@ def payload_for_date(day: datetime.date) -> dict:
 
     training_type_minutes: dict[str, float] = {}
     training_type_sessions: dict[str, int] = {}
+    training_type_duration_minutes: dict[str, tuple[float, ...]] = {}
     training_type_start_minutes: dict[str, tuple[int, ...]] = {}
     training_type_end_minutes: dict[str, tuple[int, ...]] = {}
 
@@ -47,6 +48,7 @@ def payload_for_date(day: datetime.date) -> dict:
         end_min = start_min + 12
         training_type_minutes["Mind & Body"] = 12.0
         training_type_sessions["Mind & Body"] = 1
+        training_type_duration_minutes["Mind & Body"] = (12.0,)
         training_type_start_minutes["Mind & Body"] = (start_min,)
         training_type_end_minutes["Mind & Body"] = (end_min,)
 
@@ -55,6 +57,7 @@ def payload_for_date(day: datetime.date) -> dict:
         end_min = start_min + 33
         training_type_minutes["Functional Strength Training"] = 33.0
         training_type_sessions["Functional Strength Training"] = 1
+        training_type_duration_minutes["Functional Strength Training"] = (33.0,)
         training_type_start_minutes["Functional Strength Training"] = (start_min,)
         training_type_end_minutes["Functional Strength Training"] = (end_min,)
 
@@ -63,6 +66,7 @@ def payload_for_date(day: datetime.date) -> dict:
         end_min = start_min + 26
         training_type_minutes["Cooldown"] = 26.0
         training_type_sessions["Cooldown"] = 1
+        training_type_duration_minutes["Cooldown"] = (26.0,)
         training_type_start_minutes["Cooldown"] = (start_min,)
         training_type_end_minutes["Cooldown"] = (end_min,)
 
@@ -85,6 +89,7 @@ def payload_for_date(day: datetime.date) -> dict:
         "planned_break_minutes": float(5 + (idx % 3) * 5),
         "training_type_minutes": training_type_minutes,
         "training_type_sessions": training_type_sessions,
+        "training_type_duration_minutes": training_type_duration_minutes,
         "training_type_start_minutes": training_type_start_minutes,
         "training_type_end_minutes": training_type_end_minutes,
         "screen_time_totals": {

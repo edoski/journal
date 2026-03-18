@@ -23,7 +23,7 @@ _PERIOD_SUFFIX_BY_TYPE: dict[str, str] = {
 }
 
 _TRAINING_WEEKLY_TARGET_BY_BUCKET: dict[TrainingTargetBucket, float] = {
-    "mindful": float(IDEAL.mindful_days_weekly),
+    "meditation": float(IDEAL.meditation_days_weekly),
     "workout": float(IDEAL.workout_days_weekly),
     "stretch": float(IDEAL.stretch_days_weekly),
 }
@@ -114,16 +114,16 @@ def summary_targets(period_type: PeriodType, total_days: int) -> SummaryTargets:
     sleep_minutes = IDEAL.sleep_minutes_nightly
     mood = IDEAL.mood_target
 
-    mindful = training_type_target(total_days, "mindful")
+    meditation = training_type_target(total_days, "meditation")
     workout = training_type_target(total_days, "workout")
     stretch = training_type_target(total_days, "stretch")
 
     if period_type == "week":
-        mindful_label = f"{mindful}/7"
+        meditation_label = f"{meditation}/7"
         workout_label = f"{workout}/7"
         stretch_label = f"{stretch}/7"
     else:
-        mindful_label = f"{mindful}/{suffix}"
+        meditation_label = f"{meditation}/{suffix}"
         workout_label = f"{workout}/{suffix}"
         stretch_label = f"{stretch}/{suffix}"
 
@@ -136,10 +136,10 @@ def summary_targets(period_type: PeriodType, total_days: int) -> SummaryTargets:
         sleep_minutes=sleep_minutes,
         mood=mood,
         training=TrainingTargets(
-            mindful=mindful,
+            meditation=meditation,
             workout=workout,
             stretch=stretch,
-            mindful_label=mindful_label,
+            meditation_label=meditation_label,
             workout_label=workout_label,
             stretch_label=stretch_label,
         ),
@@ -161,8 +161,8 @@ def target_for_metric(metric: str, days_total: int) -> float | None:
         return float(training_type_target(days_total, "workout"))
     if metric == "stretch_count":
         return float(training_type_target(days_total, "stretch"))
-    if metric == "mindful_count":
-        return float(training_type_target(days_total, "mindful"))
+    if metric == "meditation_count":
+        return float(training_type_target(days_total, "meditation"))
     if metric in {"interrupt_minutes", "overrun_minutes"}:
         return 0.0
     return None

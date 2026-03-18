@@ -10,18 +10,30 @@ from sync.contracts.metrics import (
     PeriodAggregate,
     TrainingTypeSessionStat,
 )
+from sync.contracts.targets import TrainingTargetBucket
 from sync.target_policy import training_type_target
 
 
 @dataclass
 class _TrainingAccumulator:
-    """Mutable accumulator for per-type training aggregation."""
+    """Mutable accumulator for per-type/per-slot training aggregation."""
 
     display_type: str
+    slot_index: int
     sessions: int = 0
     total_minutes: float = 0.0
     start_minutes: list[int] = field(default_factory=list)
     end_minutes: list[int] = field(default_factory=list)
+
+
+_TRAINING_BUCKET_BY_LABEL: dict[str, TrainingTargetBucket] = {
+    "meditation": "meditation",
+    "mind & body": "meditation",
+    "mind and body": "meditation",
+    "stretch": "stretch",
+    "stretching": "stretch",
+    "cooldown": "stretch",
+}
 
 
 def compute_period_metrics(
@@ -71,13 +83,13 @@ def compute_period_metrics(
         payload = daily_data.get(day)
         return bool(payload.get("stretch")) if payload is not None else False
 
-    def day_has_mindful(day: datetime.date) -> bool:
+    def day_has_meditation(day: datetime.date) -> bool:
         payload = daily_data.get(day)
         return bool(payload.get("meditate")) if payload is not None else False
 
     workout_count = sum(1 for day in dates if day_has_workout(day))
     stretch_count = sum(1 for day in dates if day_has_stretch(day))
-    mindful_count = sum(1 for day in dates if day_has_mindful(day))
+    meditation_count = sum(1 for day in dates if day_has_meditation(day))
 
     return PeriodAggregate(
         study_total_minutes=study_total,
@@ -85,7 +97,7 @@ def compute_period_metrics(
         mood_avg=mood_avg,
         workout_count=workout_count,
         stretch_count=stretch_count,
-        mindful_count=mindful_count,
+        meditation_count=meditation_count,
         total_days=len(dates),
         days_up_to_today=days_up_to_today,
     )
@@ -175,13 +187,11 @@ def _normalize_training_type_label(label: str) -> str:
     return " ".join(label.split()).strip().casefold()
 
 
-def _target_bucket_for_training_type(normalized_label: str) -> str:
+def _target_bucket_for_training_type(
+    normalized_label: str,
+) -> TrainingTargetBucket:
     """Map a normalized training type label to target bucket."""
-    if "meditat" in normalized_label:
-        return "mindful"
-    if "stretch" in normalized_label:
-        return "stretch"
-    return "workout"
+    return _TRAINING_BUCKET_BY_LABEL.get(normalized_label, "workout")
 
 
 def _average_clock_minutes(samples: list[int]) -> int:
@@ -219,17 +229,18 @@ def aggregate_training_type_session_stats(
     daily_data: dict[datetime.date, DailyAggregate],
 ) -> list[TrainingTypeSessionStat]:
     """
-    Aggregate periodic training stats by activity type.
+    Aggregate periodic training stats by activity type and daily slot.
 
     Returns row dicts with:
       - type: display label (first seen)
-      - sessions: raw session count
+      - slot_index: zero-based daily slot index within the activity type
+      - sessions: raw session count for the slot
       - target: scaled target denominator for period
-      - average_minutes: average duration per session
-      - average_start_time: average session start (HH:MM)
-      - average_end_time: average session end (HH:MM)
+      - average_minutes: average duration per slot session
+      - average_start_time: average slot start (HH:MM)
+      - average_end_time: average slot end (HH:MM)
     """
-    per_type: dict[str, _TrainingAccumulator] = {}
+    per_type_slot: dict[tuple[str, int], _TrainingAccumulator] = {}
 
     for d in dates:
         daily = daily_data.get(d)
@@ -238,6 +249,7 @@ def aggregate_training_type_session_stats(
         try:
             minutes_map = daily["training_type_minutes"]
             sessions_map = daily["training_type_sessions"]
+            duration_minutes_map = daily["training_type_duration_minutes"]
             start_minutes_map = daily["training_type_start_minutes"]
             end_minutes_map = daily["training_type_end_minutes"]
         except KeyError as exc:
@@ -250,6 +262,7 @@ def aggregate_training_type_session_stats(
         if (
             not minutes_map
             and not sessions_map
+            and not duration_minutes_map
             and not start_minutes_map
             and not end_minutes_map
         ):
@@ -258,6 +271,7 @@ def aggregate_training_type_session_stats(
         keys = (
             set(minutes_map.keys())
             | set(sessions_map.keys())
+            | set(duration_minutes_map.keys())
             | set(start_minutes_map.keys())
             | set(end_minutes_map.keys())
         )
@@ -274,30 +288,55 @@ def aggregate_training_type_session_stats(
 
             start_samples = tuple(start_minutes_map.get(raw_label, ()))
             end_samples = tuple(end_minutes_map.get(raw_label, ()))
-            if len(start_samples) != sessions or len(end_samples) != sessions:
+            duration_samples = tuple(duration_minutes_map.get(raw_label, ()))
+            if (
+                len(duration_samples) != sessions
+                or len(start_samples) != sessions
+                or len(end_samples) != sessions
+            ):
                 raise ValueError(
                     "Training schedule sample count mismatch for "
                     f"{label or norm!r} on {d.isoformat()}: "
-                    f"sessions={sessions}, starts={len(start_samples)}, "
+                    f"sessions={sessions}, durations={len(duration_samples)}, "
+                    f"starts={len(start_samples)}, "
                     f"ends={len(end_samples)}"
                 )
+            if abs(sum(duration_samples) - total_minutes) > 1e-6:
+                raise ValueError(
+                    "Training duration total mismatch for "
+                    f"{label or norm!r} on {d.isoformat()}: "
+                    f"total={total_minutes}, sum={sum(duration_samples)}"
+                )
 
-            entry = per_type.setdefault(norm, _TrainingAccumulator(display_type=label))
-            # Preserve source-case display label from first observed non-empty entry.
-            if not entry.display_type and label:
-                entry.display_type = label
-            entry.sessions += sessions
-            entry.total_minutes += total_minutes
-            entry.start_minutes.extend(int(sample) for sample in start_samples)
-            entry.end_minutes.extend(int(sample) for sample in end_samples)
+            ordered_samples = sorted(
+                zip(start_samples, end_samples, duration_samples),
+                key=lambda sample: (sample[0], sample[1], sample[2]),
+            )
+            for slot_index, (start, end, duration) in enumerate(ordered_samples):
+                key = (norm, slot_index)
+                entry = per_type_slot.setdefault(
+                    key,
+                    _TrainingAccumulator(
+                        display_type=label,
+                        slot_index=slot_index,
+                    ),
+                )
+                # Preserve source-case display label from first observed non-empty entry.
+                if not entry.display_type and label:
+                    entry.display_type = label
+                entry.sessions += 1
+                entry.total_minutes += float(duration)
+                entry.start_minutes.append(int(start))
+                entry.end_minutes.append(int(end))
 
     total_days = len(dates)
-    mindful_target = training_type_target(total_days, "mindful")
+    meditation_target = training_type_target(total_days, "meditation")
     workout_target = training_type_target(total_days, "workout")
     stretch_target = training_type_target(total_days, "stretch")
 
     stats: list[TrainingTypeSessionStat] = []
-    for norm, data in per_type.items():
+    for norm_slot, data in per_type_slot.items():
+        norm, slot_index = norm_slot
         sessions = data.sessions
         total_minutes = data.total_minutes
         if sessions <= 0 or total_minutes <= 0:
@@ -311,8 +350,8 @@ def aggregate_training_type_session_stats(
             )
 
         bucket = _target_bucket_for_training_type(norm)
-        if bucket == "mindful":
-            target = mindful_target
+        if bucket == "meditation":
+            target = meditation_target
         elif bucket == "stretch":
             target = stretch_target
         else:
@@ -326,6 +365,7 @@ def aggregate_training_type_session_stats(
         stats.append(
             TrainingTypeSessionStat(
                 type=data.display_type or norm,
+                slot_index=slot_index,
                 sessions=sessions,
                 target=target,
                 average_minutes=total_minutes / sessions,
@@ -338,9 +378,10 @@ def aggregate_training_type_session_stats(
         key=lambda row: (
             _hhmm_to_minutes(row["average_start_time"]),
             _hhmm_to_minutes(row["average_end_time"]),
+            row["type"].casefold(),
+            row["slot_index"],
             -row["average_minutes"],
             -row["sessions"],
-            row["type"].casefold(),
         )
     )
     return stats

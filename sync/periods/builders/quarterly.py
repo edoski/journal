@@ -206,10 +206,12 @@ def build_quarterly_metrics(
         )
         return done, elapsed, start
 
-    mindful_counts = [_month_count(rng, "meditate", daily_data) for rng in month_ranges]
+    meditation_counts = [
+        _month_count(rng, "meditate", daily_data) for rng in month_ranges
+    ]
     workout_counts = [_month_count(rng, "workout", daily_data) for rng in month_ranges]
     stretch_counts = [_month_count(rng, "stretch", daily_data) for rng in month_ranges]
-    mindful_delta_labels = compute_bucket_deltas(
+    meditation_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: (
             1.0 if training_done_for_day(quarter_delta_data, d, "meditate") else 0.0
@@ -257,12 +259,12 @@ def build_quarterly_metrics(
 
     training_sections = [
         TrainingSection(
-            title="MINDFUL",
-            total_done=sum(d for d, _, _ in mindful_counts),
-            total_elapsed=sum(e for _, e, _ in mindful_counts),
+            title="MEDITATION",
+            total_done=sum(d for d, _, _ in meditation_counts),
+            total_elapsed=sum(e for _, e, _ in meditation_counts),
             labels=month_labels,
-            counts=[(d, e) for d, e, _ in mindful_counts],
-            delta_labels=mindful_delta_labels,
+            counts=[(d, e) for d, e, _ in meditation_counts],
+            delta_labels=meditation_delta_labels,
             bars_override=_month_activity_bars("meditate"),
             fill_char="█",
             empty_char="·",

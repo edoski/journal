@@ -939,13 +939,13 @@ class TestGroupedGridRenderer:
             WeeklyTrainingGridSpec(
                 dates=sample_week_dates,
                 daily_data=sample_daily_data,
-                mindful_count=2,
+                meditation_count=2,
                 workout_count=3,
                 stretch_count=2,
             )
         )
         body = _fenced_body(lines)
-        assert any("MINDFUL:" in line for line in body)
+        assert any("MEDITATION:" in line for line in body)
         assert any("WORKOUT:" in line for line in body)
         assert any("STRETCH:" in line for line in body)
         assert any("MON" in line for line in body)
@@ -1092,14 +1092,14 @@ class TestGroupedGridRenderer:
             MonthlyTrainingGridSpec(
                 week_ranges=week_ranges,
                 daily_data=daily_data,
-                mindful_count=1,
+                meditation_count=1,
                 workout_count=1,
                 stretch_count=1,
                 days_in_period=14,
             )
         )
         body = _fenced_body(lines)
-        assert any("MINDFUL" in line for line in body)
+        assert any("MEDITATION" in line for line in body)
         assert any("WORKOUT" in line for line in body)
         assert any("STRETCH" in line for line in body)
         assert any("DEC" in line for line in body)
@@ -1110,7 +1110,7 @@ class TestGroupedGridRenderer:
             MonthlyTrainingGridSpec(
                 week_ranges=[(start, start + datetime.timedelta(days=1))],
                 daily_data={},
-                mindful_count=0,
+                meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
                 days_in_period=2,
@@ -1118,7 +1118,7 @@ class TestGroupedGridRenderer:
             )
         )
         body = _fenced_body(lines)
-        assert body[0] == "┌ MINDFUL"
+        assert body[0] == "┌ MEDITATION"
         assert body[1] == "│ ↓"
 
     def test_monthly_training_empty_ranges_snapshot(self):
@@ -1126,14 +1126,14 @@ class TestGroupedGridRenderer:
             MonthlyTrainingGridSpec(
                 week_ranges=[],
                 daily_data={},
-                mindful_count=0,
+                meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
                 days_in_period=0,
             )
         )
         assert _fenced_body(lines) == [
-            "┌ MINDFUL",
+            "┌ MEDITATION",
             "│",
             "│",
             "│",
@@ -1158,14 +1158,14 @@ class TestGroupedGridRenderer:
             WeeklyTrainingGridSpec(
                 dates=[start + datetime.timedelta(days=i) for i in range(7)],
                 daily_data={},
-                mindful_count=0,
+                meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
                 current_date=start,
             )
         )
         body = _fenced_body(lines)
-        assert body[0] == "┌            ↓"
+        assert body[0] == "┌               ↓"
 
     def test_weekly_training_out_of_range_current_date_has_plain_header(self):
         start = datetime.date(2025, 12, 1)
@@ -1173,7 +1173,7 @@ class TestGroupedGridRenderer:
             WeeklyTrainingGridSpec(
                 dates=[start + datetime.timedelta(days=i) for i in range(7)],
                 daily_data={},
-                mindful_count=0,
+                meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
                 current_date=start - datetime.timedelta(days=1),
@@ -1189,15 +1189,15 @@ class TestGroupedGridRenderer:
             WeeklyTrainingGridSpec(
                 dates=sample_week_dates,
                 daily_data=sample_daily_data,
-                mindful_count=2,
+                meditation_count=2,
                 workout_count=4,
                 stretch_count=4,
                 current_date=datetime.date(2025, 12, 28),
             )
         )
         assert _fenced_body(lines) == [
-            "┌                                    ↓",
-            "│ MINDFUL:  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░   (2/7)",
+            "┌                                       ↓",
+            "│ MEDITATION:  ░░░ ░░░ ░░░ ░░░ ░░░ ░░░ ░░░   (2/7)",
             "│ WORKOUT:  ░░░ ███ ░░░ ███ ███ ░░░ ░░░   (4/7)",
             "│ STRETCH:  ░░░ ███ ███ ░░░ ███ ░░░ ░░░   (4/7)",
             "│           ─── ─── ─── ─── ─── ─── ───",
@@ -1261,18 +1261,18 @@ class TestGroupedGridRenderer:
                     datetime.date(2025, 12, 1): {"workout": True, "stretch": False},
                     datetime.date(2025, 12, 2): {"workout": False, "stretch": True},
                 },
-                mindful_count=1,
+                meditation_count=1,
                 workout_count=1,
                 stretch_count=1,
                 days_in_period=14,
                 current_date=datetime.date(2025, 12, 14),
-                mindful_delta_labels=["+5%", "-5%"],
+                meditation_delta_labels=["+5%", "-5%"],
                 workout_delta_labels=["+7%", "-7%"],
                 stretch_delta_labels=["+9%", "-9%"],
             )
         )
         assert _fenced_body(lines) == [
-            "┌ MINDFUL",
+            "┌ MEDITATION",
             "│                             ↓",
             "│ · · · · · · ·   · · · · · · ·",
             "│ ─────────────   ─────────────",
@@ -1391,7 +1391,7 @@ class TestProgressRowsRenderer:
     def test_training_sections_fenced(self):
         sections = [
             TrainingSection(
-                title="MINDFUL",
+                title="MEDITATION",
                 total_done=10,
                 total_elapsed=20,
                 labels=["Q1", "Q2"],
@@ -1407,7 +1407,7 @@ class TestProgressRowsRenderer:
         ]
         lines = render_chart(TrainingSectionsRowsSpec(sections=sections))
         body = _fenced_body(lines)
-        assert any("┌ MINDFUL (10/20)" in line for line in body)
+        assert any("┌ MEDITATION (10/20)" in line for line in body)
         assert any("┌ WORKOUT (12/20)" in line for line in body)
 
     def test_quarterly_study_coverage(self):
@@ -1496,7 +1496,7 @@ class TestProgressRowsRenderer:
     def test_training_sections_exact_snapshot(self):
         sections = [
             TrainingSection(
-                title="MINDFUL",
+                title="MEDITATION",
                 total_done=6,
                 total_elapsed=14,
                 labels=["W1", "W2"],
@@ -1512,7 +1512,7 @@ class TestProgressRowsRenderer:
         ]
         lines = render_chart(TrainingSectionsRowsSpec(sections=sections))
         assert _fenced_body(lines) == [
-            "┌ MINDFUL (06/14)",
+            "┌ MEDITATION (06/14)",
             "│",
             "│ W1 ■■■■■■■■■■■■■■■■■············· (04/07)",
             "│ W2 ■■■■■■■■■····················· (02/07)",

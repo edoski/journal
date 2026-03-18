@@ -86,7 +86,7 @@ class IdealSchedule:
     sleep_minutes_nightly: int = 480  # 8h/night
     workout_days_weekly: int = 7  # 7/7
     stretch_days_weekly: int = 7  # 7/7
-    mindful_days_weekly: int = 7  # 7/7 daily meditation target
+    meditation_days_weekly: int = 7  # 7/7 daily meditation target
     mood_target: float = 6.0  # 6.0/10
 
 

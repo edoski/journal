@@ -207,7 +207,7 @@ def build_monthly_metrics(
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
-    mindful_delta_labels = compute_bucket_deltas(
+    meditation_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: (
             1.0 if training_done_for_day(month_delta_data, d, "meditate") else 0.0
@@ -235,16 +235,16 @@ def build_monthly_metrics(
         today=today,
     )
 
-    mindful_days = current_metrics["mindful_count"]
+    meditation_days = current_metrics["meditation_count"]
     training_grid = render_chart(
         MonthlyTrainingGridSpec(
             week_ranges=week_ranges,
             daily_data=daily_data,
-            mindful_count=mindful_days,
+            meditation_count=meditation_days,
             workout_count=workout_days,
             stretch_count=stretch_days,
             days_in_period=days_in_period,
-            mindful_delta_labels=mindful_delta_labels,
+            meditation_delta_labels=meditation_delta_labels,
             workout_delta_labels=workout_delta_labels,
             stretch_delta_labels=stretch_delta_labels,
             current_date=current_month_date,
@@ -254,9 +254,9 @@ def build_monthly_metrics(
     elapsed_days = current_metrics["days_up_to_today"] or days_in_period
     if training_grid:
         for idx, line in enumerate(training_grid):
-            if line.startswith("┌ MINDFUL"):
+            if line.startswith("┌ MEDITATION"):
                 training_grid[idx] = (
-                    f"┌ MINDFUL ({mindful_days:02d}/{elapsed_days:02d})"
+                    f"┌ MEDITATION ({meditation_days:02d}/{elapsed_days:02d})"
                 )
             if line.startswith("┌ WORKOUT"):
                 training_grid[idx] = (

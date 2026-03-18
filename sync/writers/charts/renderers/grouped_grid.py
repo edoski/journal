@@ -169,8 +169,8 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
     week_ranges = list(spec.week_ranges)
     daily_data = spec.daily_data
     current_date = spec.current_date
-    mindful_delta_labels = (
-        list(spec.mindful_delta_labels) if spec.mindful_delta_labels else None
+    meditation_delta_labels = (
+        list(spec.meditation_delta_labels) if spec.meditation_delta_labels else None
     )
     workout_delta_labels = (
         list(spec.workout_delta_labels) if spec.workout_delta_labels else None
@@ -181,7 +181,7 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
 
     lines: list[str] = []
 
-    mindful_symbols: list[str] = []
+    meditation_symbols: list[str] = []
     workout_symbols: list[str] = []
     stretch_symbols: list[str] = []
     week_labels: list[str] = []
@@ -194,13 +194,13 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
 
         for day in week_days:
             entry = _row_for_day(daily_data, day)
-            mindful_symbols.append("■" if entry and entry.get("meditate") else "·")
+            meditation_symbols.append("■" if entry and entry.get("meditate") else "·")
             workout_symbols.append("■" if entry and entry.get("workout") else "·")
             stretch_symbols.append("■" if entry and entry.get("stretch") else "·")
 
     if not week_day_counts:
         return [
-            "┌ MINDFUL",
+            "┌ MEDITATION",
             "│",
             "│",
             "│",
@@ -258,7 +258,11 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
         return block
 
     lines.extend(
-        _build_activity_block("MINDFUL", mindful_symbols, mindful_delta_labels)
+        _build_activity_block(
+            "MEDITATION",
+            meditation_symbols,
+            meditation_delta_labels,
+        )
     )
     lines.append("")
     lines.extend(
@@ -276,39 +280,41 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     """Render weekly training grouped grid body."""
     dates = list(spec.dates)
     daily_data = spec.daily_data
-    mindful_count = spec.mindful_count
+    meditation_count = spec.meditation_count
     workout_count = spec.workout_count
     stretch_count = spec.stretch_count
     current_date = spec.current_date
 
     lines: list[str] = []
 
-    mindful_symbols: list[str] = []
+    meditation_symbols: list[str] = []
     workout_symbols: list[str] = []
     stretch_symbols: list[str] = []
 
     for day in dates:
         entry = _row_for_day(daily_data, day)
-        has_mindful = bool(entry and entry.get("meditate"))
+        has_meditation = bool(entry and entry.get("meditate"))
         has_workout = bool(entry and entry.get("workout"))
         has_stretch = bool(entry and entry.get("stretch"))
 
-        mindful_symbols.append("███" if has_mindful else "░░░")
+        meditation_symbols.append("███" if has_meditation else "░░░")
         workout_symbols.append("███" if has_workout else "░░░")
         stretch_symbols.append("███" if has_stretch else "░░░")
 
-    prefix_mindful = "│ MINDFUL:  "
+    prefix_meditation = "│ MEDITATION:  "
     prefix_workout = "│ WORKOUT:  "
     prefix_stretch = "│ STRETCH:  "
 
-    mindful_row = prefix_mindful + " ".join(mindful_symbols) + f"   ({mindful_count}/7)"
+    meditation_row = (
+        prefix_meditation + " ".join(meditation_symbols) + f"   ({meditation_count}/7)"
+    )
     workout_row = prefix_workout + " ".join(workout_symbols) + f"   ({workout_count}/7)"
     stretch_row = prefix_stretch + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
 
     arrow_line: str | None = None
     if current_date and dates and dates[0] <= current_date <= dates[-1]:
         day_idx = (current_date - dates[0]).days
-        arrow_col = len(prefix_mindful) + day_idx * 4 + 1
+        arrow_col = len(prefix_meditation) + day_idx * 4 + 1
         arrow_line = "┌" + " " * (arrow_col - 1) + "↓"
 
     if arrow_line is not None:
@@ -316,7 +322,7 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     else:
         lines.append("┌")
 
-    lines.append(mindful_row)
+    lines.append(meditation_row)
     lines.append(workout_row)
     lines.append(stretch_row)
     lines.append("│           " + " ".join(["───"] * 7))

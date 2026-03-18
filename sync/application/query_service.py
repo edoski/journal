@@ -87,12 +87,12 @@ _METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         target=float(training_type_target(7, "stretch")),
     ),
     MetricDefinition(
-        key="mindful_count",
-        label="Mindful",
+        key="meditation_count",
+        label="Meditation",
         unit="count",
         precision=0,
         higher_is_better=True,
-        target=float(training_type_target(7, "mindful")),
+        target=float(training_type_target(7, "meditation")),
     ),
     MetricDefinition(
         key="interrupt_minutes",
@@ -303,7 +303,7 @@ class QueryService:
             "mood": period_metrics["mood_avg"],
             "workout_count": period_metrics["workout_count"],
             "stretch_count": period_metrics["stretch_count"],
-            "mindful_count": period_metrics["mindful_count"],
+            "meditation_count": period_metrics["meditation_count"],
             "interrupt_minutes": interrupt_total,
             "overrun_minutes": overrun_total,
             "screen_time_total": screen_time_total,
@@ -506,7 +506,7 @@ class QueryService:
             "mood",
             "workout_count",
             "stretch_count",
-            "mindful_count",
+            "meditation_count",
             "interrupt_minutes",
             "screen_time_total",
         )

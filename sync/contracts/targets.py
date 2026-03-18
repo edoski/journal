@@ -6,17 +6,17 @@ from dataclasses import dataclass
 from typing import Literal
 
 PeriodType = Literal["day", "week", "month", "quarter", "year"]
-TrainingTargetBucket = Literal["mindful", "workout", "stretch"]
+TrainingTargetBucket = Literal["meditation", "workout", "stretch"]
 
 
 @dataclass(frozen=True)
 class TrainingTargets:
     """Scaled training targets and labels for a period."""
 
-    mindful: int
+    meditation: int
     workout: int
     stretch: int
-    mindful_label: str
+    meditation_label: str
     workout_label: str
     stretch_label: str
 

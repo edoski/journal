@@ -65,7 +65,7 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
             "mood_avg": 7.2,
             "workout_count": 4,
             "stretch_count": 5,
-            "mindful_count": 6,
+            "meditation_count": 6,
             "total_days": 7,
             "days_up_to_today": 7,
         },
@@ -203,7 +203,7 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
 
     workout_target = float(training_type_target(7, "workout"))
     stretch_target = float(training_type_target(7, "stretch"))
-    mindful_target = float(training_type_target(7, "mindful"))
+    meditation_target = float(training_type_target(7, "meditation"))
 
     detail = PeriodDetailSnapshot(
         period="week",
@@ -235,13 +235,13 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
                 stretch_target,
             ),
             PeriodMetricRow(
-                "mindful_count",
-                "Mindful",
+                "meditation_count",
+                "Meditation",
                 5,
                 4,
                 25.0,
                 4.5,
-                mindful_target,
+                meditation_target,
             ),
             PeriodMetricRow(
                 "interrupt_minutes",
