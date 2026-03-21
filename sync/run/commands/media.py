@@ -34,6 +34,7 @@ HIGHLIGHTS_SECTION_TITLE = "Highlights"
 REFLECTIONS_SECTION_TITLE = "Reflections"
 REFLECTIONS_PLACEHOLDER = "_No reflections have been made yet._"
 _TITLE_KEY_RE = re.compile(r"[^0-9a-z]+")
+_OBSIDIAN_UNSAFE_TITLE_CHARS_RE = re.compile(r'[<>"|?*#\^\[\]\x00-\x1f]')
 
 logger = get_logger(__name__)
 
@@ -78,7 +79,7 @@ def _sanitize_podcast_title(raw_title: str) -> str:
     value = value.replace(":", " - ")
     value = value.replace("/", "-")
     value = value.replace("\\", "-")
-    value = re.sub(r'[<>"|?*\x00-\x1f]', "", value)
+    value = _OBSIDIAN_UNSAFE_TITLE_CHARS_RE.sub("", value)
     value = re.sub(r"\s+", " ", value)
     value = value.strip().rstrip(".").strip()
     if not value:

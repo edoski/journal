@@ -1113,6 +1113,33 @@ def test_media_podcast_add_creates_note_with_sanitized_filename(
     ]
 
 
+def test_media_podcast_add_strips_obsidian_unsafe_title_characters(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    podcasts_dir = _patch_media_paths(monkeypatch, tmp_path)
+    cache_store = _StubMediaCacheStore()
+    monkeypatch.setattr(cli, "JsonMediaDateCacheStore", lambda: cache_store)
+
+    rc = cli.cmd_media_podcast_add(
+        _media_add_args(
+            url="https://www.youtube.com/watch?v=unsafechars1",
+            date="2026-02-20",
+            title="Episode #7 ^ [Deep Dive] | Recap",
+            host="Lex Fridman",
+        )
+    )
+
+    assert rc == 0
+    note_path = podcasts_dir / "Episode 7 Deep Dive Recap.md"
+    assert note_path.exists()
+    assert cache_store.saved == [
+        {
+            "books": {"Book A": "2026-01-01"},
+            "podcasts": {"Episode 7 Deep Dive Recap": "2026-02-20"},
+        }
+    ]
+
+
 def test_media_podcast_add_fails_when_note_already_exists(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
