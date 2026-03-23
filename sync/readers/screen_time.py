@@ -14,6 +14,7 @@ from sync.constants import (
     PROCRASTINATION_TABLE_HEADER_RE,
 )
 from sync.contracts.screen_time import ScreenTimeEntry, DailyScreenTimeData
+from sync.formatting import normalize_screen_time_label
 from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
 
@@ -64,7 +65,7 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
         if parts is None or len(parts) < 2:
             continue
 
-        source = parts[0].strip().strip("*")  # Handle **TOTAL**
+        source = normalize_screen_time_label(parts[0].strip().strip("*"))
         duration_raw = parts[1].strip()
 
         # Skip TOTAL row and empty rows

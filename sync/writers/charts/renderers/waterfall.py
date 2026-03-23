@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
-from sync.formatting import format_minutes
+from sync.formatting import format_minutes, normalize_screen_time_label
 
 from ..specs import WaterfallSpec
 
 
 def render_waterfall(spec: WaterfallSpec) -> list[str]:
     """Render screen-time waterfall chart body."""
-    app_totals = spec.app_totals
+    app_totals: dict[str, float] = {}
+    for app, minutes in spec.app_totals.items():
+        label = normalize_screen_time_label(app)
+        if not label:
+            continue
+        app_totals[label] = app_totals.get(label, 0.0) + minutes
     profile = spec.profile
 
     if not app_totals:

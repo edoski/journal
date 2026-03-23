@@ -1624,6 +1624,20 @@ class TestWaterfallRenderer:
             "└ TOTAL   ████████████████████████████████████████  4h30m",
         ]
 
+    def test_waterfall_normalizes_hidden_label_marks(self):
+        lines = render_chart(
+            WaterfallSpec(
+                app_totals={
+                    "Miscellaneous": 10,
+                    "\u200eWhatsApp": 5,
+                    "WhatsApp": 7,
+                }
+            )
+        )
+        body = _fenced_body(lines)
+        assert all("\u200e" not in line for line in body)
+        assert any("WhatsApp" in line and "12m" in line for line in body)
+
 
 class TestCompressionHelpers:
     def test_compress_days_time_order(self):

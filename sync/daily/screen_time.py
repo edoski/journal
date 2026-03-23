@@ -14,6 +14,7 @@ from sync.constants import SCREEN_TIME
 from sync.contracts.deviation import DailyDeviationData
 from sync.contracts.screen_time import DailyScreenTimeData, ScreenTimeEntry
 from sync.contracts.status import ActivityPayload
+from sync.formatting import normalize_screen_time_label
 from sync.ports.cache import DailyScreenTimeCacheStore
 from sync.writers.tables import DailyProcrastinationTableSpec, render_table
 
@@ -68,11 +69,24 @@ def parse_activity_line(line: str) -> tuple[str, float] | None:
     if not match:
         return None
 
-    app_name = match.group(1).strip()
+    app_name = normalize_screen_time_label(match.group(1))
+    if not app_name:
+        return None
     duration_str = match.group(2).strip()
     minutes = parse_duration_string(duration_str)
 
     return (app_name, minutes)
+
+
+def _normalize_app_entries(entries: dict[str, float]) -> dict[str, float]:
+    """Normalize cached/raw app keys and coalesce equivalent labels."""
+    normalized: dict[str, float] = {}
+    for app, minutes in entries.items():
+        name = normalize_screen_time_label(app)
+        if not name:
+            continue
+        normalized[name] = max(normalized.get(name, 0.0), float(minutes))
+    return normalized
 
 
 def parse_activity_field(activity_str: str | None) -> dict[str, float]:
@@ -203,13 +217,16 @@ def load_screen_time_data(
             new_entries[app] = new_entries.get(app, 0) + minutes
 
     # Load cached entries
-    cache_entries = _load_screen_time_cache(today_str, screen_time_cache_store)
+    cache_entries = _normalize_app_entries(
+        _load_screen_time_cache(today_str, screen_time_cache_store)
+    )
 
     # Merge: new entries override cached (same app = replace, not add)
     merged: dict[str, float] = {}
     if new_entries:
         # New data available: merge with cache, cache the result
-        merged = {**cache_entries, **new_entries}
+        merged = {app: minutes for app, minutes in cache_entries.items() if app not in new_entries}
+        merged.update(new_entries)
         _save_screen_time_cache(today_str, merged, screen_time_cache_store)
     elif cache_entries:
         # No new data, use cache (shortcut may have run previously)

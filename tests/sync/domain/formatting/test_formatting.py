@@ -16,6 +16,7 @@ from sync.formatting import (
     format_progress_bar,
     format_summary_change_label,
     format_training_ratio,
+    normalize_screen_time_label,
     round_half_up,
 )
 
@@ -258,6 +259,14 @@ class TestFormatMaTrainingRatio:
 
     def test_other_units_show_decimal(self):
         assert format_ma_training_ratio(17.25, "mo") == "17.2/mo"
+
+
+class TestNormalizeScreenTimeLabel:
+    def test_removes_hidden_formatting_marks(self):
+        assert normalize_screen_time_label("\u200eWhatsApp") == "WhatsApp"
+
+    def test_collapses_internal_whitespace(self):
+        assert normalize_screen_time_label("  Brawl   Stars\t") == "Brawl Stars"
         assert format_ma_training_ratio(50.5, "qtr") == "50.5/qtr"
 
 

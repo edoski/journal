@@ -76,6 +76,12 @@ class TestParseActivityLine:
         assert result[0] == "WhatsApp"
         assert result[1] == pytest.approx(59 / 60, rel=0.01)
 
+    def test_hidden_direction_mark_is_removed(self):
+        result = parse_activity_line("\u200eWhatsApp (59s)")
+        assert result is not None
+        assert result[0] == "WhatsApp"
+        assert result[1] == pytest.approx(59 / 60, rel=0.01)
+
     def test_empty_line(self):
         assert parse_activity_line("") is None
         assert parse_activity_line("   ") is None

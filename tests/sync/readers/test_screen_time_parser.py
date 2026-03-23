@@ -165,3 +165,17 @@ class TestParseProcrastinationTable:
         )
         assert result is not None
         assert [(entry.app, entry.minutes) for entry in result.entries] == [("X", 1.0)]
+
+    def test_normalizes_hidden_formatting_marks_in_source_labels(self):
+        result = parse_procrastination_table(
+            [
+                "### **PROCRASTINATION**",
+                "| SOURCE | DURATION |",
+                "| ------ | -------- |",
+                "|\u200eWhatsApp | `5m` |",
+            ]
+        )
+        assert result is not None
+        assert [(entry.app, entry.minutes) for entry in result.entries] == [
+            ("WhatsApp", 5.0)
+        ]
