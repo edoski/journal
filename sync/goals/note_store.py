@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import datetime
 
-from sync.io import atomic_write_note, safe_read_file
 from sync.contracts.goals import Goal
 from sync.notes.sections import (
-    ensure_note,
     extract_subsection_tasks,
     goals_section_bounds,
     splice_goals_section,
@@ -30,12 +28,6 @@ def empty_subsection_lines(subsection: str) -> list[str]:
         subsection.upper(), "_No goals have been defined yet._"
     )
     return ["", message]
-
-
-def ensure_note_lines(path: str, template_path: str) -> list[str]:
-    """Ensure a note exists and return its lines."""
-    ensure_note(path, template_path)
-    return safe_read_file(path) or []
 
 
 def extract_goals(
@@ -75,21 +67,4 @@ def apply_goals_sections(
     updated = lines[:]
     new_block = build_goals_block(sections)
     splice_goals_section(updated, new_block, insert_if_missing=insert_if_missing)
-    return updated
-
-
-def write_goals_sections(
-    path: str,
-    lines: list[str],
-    sections: list[tuple[str, list[str]]],
-    *,
-    insert_if_missing: bool = True,
-) -> list[str]:
-    """Persist a rebuilt Goals block and return the written lines."""
-    updated = apply_goals_sections(
-        lines,
-        sections,
-        insert_if_missing=insert_if_missing,
-    )
-    atomic_write_note(path, updated)
     return updated

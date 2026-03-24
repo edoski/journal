@@ -193,6 +193,41 @@ def activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
     )
 
 
+def append_activity_summary(
+    lines: list[str],
+    activity_totals: dict[str, float],
+) -> None:
+    """Append canonical study-total summary lines for activity totals."""
+    lines.append(
+        f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
+    )
+    lines.append("")
+    lines.extend(activity_table_lines(activity_totals))
+    lines.append("")
+
+
+def compute_sleep_aux_averages(
+    dates: list[datetime.date],
+    daily_data: dict[datetime.date, DailyAggregate],
+) -> tuple[float | None, float | None]:
+    """Compute average awake minutes and awakenings for a date range."""
+    awake_values = [
+        value
+        for value in (awake_minutes_for_day(daily_data, day) for day in dates)
+        if value is not None
+    ]
+    awakening_values = [
+        value
+        for value in (awakenings_for_day(daily_data, day) for day in dates)
+        if value is not None
+    ]
+    avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
+    avg_awakenings = (
+        sum(awakening_values) / len(awakening_values) if awakening_values else None
+    )
+    return avg_awake, avg_awakenings
+
+
 def sleep_stats_table_lines(
     sleep_avg: float | None,
     avg_awake: float | None,

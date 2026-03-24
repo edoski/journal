@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from sync.io import atomic_write_note
 from sync.contracts.goals import GoalSection
 from sync.goals.note_store import (
     apply_goals_sections,
     extract_goals,
-    write_goals_sections,
 )
 from sync.contracts.goals import Goal
 from sync.ports.goals import GoalStore
@@ -43,9 +43,10 @@ class MarkdownGoalStore(GoalStore):
     ) -> list[str]:
         """Persist rebuilt goals sections and return written lines."""
         rendered_sections = [(item.section, item.lines) for item in sections]
-        return write_goals_sections(
-            path,
+        updated = apply_goals_sections(
             lines,
             rendered_sections,
             insert_if_missing=True,
         )
+        atomic_write_note(path, updated)
+        return updated

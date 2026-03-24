@@ -8,8 +8,8 @@ from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import RENDER, STUDY_TARGET_MIN
 from sync.dates import daterange, year_range
-from sync.formatting import format_minutes
 from sync.metrics import (
+    aggregate_activity_totals,
     aggregate_screen_time,
     compute_bucket_deltas,
     compute_moving_average,
@@ -18,11 +18,10 @@ from sync.metrics import (
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
-    activity_table_lines,
     activity_totals_for_day,
-    awake_minutes_for_day,
-    awakenings_for_day,
+    append_activity_summary,
     compute_avg_schedule,
+    compute_sleep_aux_averages,
     mood_for_day,
     sleep_minutes_for_day,
     sleep_stats_table_lines,
@@ -99,7 +98,9 @@ def build_yearly_metrics(
         total_days=days_in_year,
     )
 
-    quarter_day_lists = [list(daterange(start, end)) for start, end in quarter_ranges]
+    quarter_day_lists: list[list[datetime.date]] = [
+        list(daterange(start, end)) for start, end in quarter_ranges
+    ]
     prev_last_quarter_days = (
         list(daterange(prev_quarter_ranges[-1][0], prev_quarter_ranges[-1][1]))
         if prev_quarter_ranges
@@ -111,17 +112,15 @@ def build_yearly_metrics(
     study_lines = ["### **STUDY**"]
     q_labels = [f"Q{i + 1}" for i in range(4)]
 
-    activity_totals: dict[str, float] = {}
-    study_values_hours = []
-    study_value_labels = []
+    activity_totals = aggregate_activity_totals(dates, daily_data)
+    study_values_hours: list[float] = []
+    study_value_labels: list[str] = []
 
     for start, end in quarter_ranges:
-        total_min = 0.0
-        for d in daterange(start, end):
-            for activity, mins in activity_totals_for_day(daily_data, d).items():
-                minutes = float(mins or 0.0)
-                activity_totals[activity] = activity_totals.get(activity, 0.0) + minutes
-                total_min += minutes
+        total_min = sum(
+            sum(activity_totals_for_day(daily_data, day).values())
+            for day in daterange(start, end)
+        )
 
         study_values_hours.append(
             round((total_min / 60) * 2) / 2 if total_min else 0
@@ -150,27 +149,13 @@ def build_yearly_metrics(
             )
         )
     )
-    study_lines.append(
-        f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
-    )
-    study_lines.append("")
-
-    study_lines.extend(activity_table_lines(activity_totals))
-    study_lines.append("")
+    append_activity_summary(study_lines, activity_totals)
 
     # Compute per-quarter full-study day counts for rendering
-    study_counts = []
-    study_bars = []
+    study_bars: list[str] = []
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         elapsed_days = sum(1 for d in days if d <= today)
-        done = sum(
-            1
-            for d in days
-            if d <= today
-            and (study_minutes_for_day(daily_data, d) or 0) >= STUDY_TARGET_MIN
-        )
-        study_counts.append((done, elapsed_days, start))
         bar = compress_days_time_order(
             days,
             lambda d: (study_minutes_for_day(daily_data, d) or 0) >= STUDY_TARGET_MIN,
@@ -216,9 +201,9 @@ def build_yearly_metrics(
     # TRAINING (quarter rows)
     training_lines = ["### **TRAINING**"]
     quarter_labels = [f"Q{i + 1}" for i in range(4)]
-    meditation_counts = []
-    workout_counts = []
-    stretch_counts = []
+    meditation_counts: list[tuple[int, int, datetime.date]] = []
+    workout_counts: list[tuple[int, int, datetime.date]] = []
+    stretch_counts: list[tuple[int, int, datetime.date]] = []
     meditation_done_year = 0
     workout_done_year = 0
     stretch_done_year = 0
@@ -278,9 +263,9 @@ def build_yearly_metrics(
         today=today,
     )
 
-    meditation_bars = []
-    workout_bars = []
-    stretch_bars = []
+    meditation_bars: list[str] = []
+    workout_bars: list[str] = []
+    stretch_bars: list[str] = []
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         meditation_bars.append(
@@ -370,7 +355,7 @@ def build_yearly_metrics(
     if screen_time_totals:
         # Quarterly trend table with wikilinks to quarterly notes
         quarter_labels = [f"Q{i + 1}" for i in range(len(quarter_ranges))]
-        quarter_wikilinks = []
+        quarter_wikilinks: list[str] = []
         for i, _ in enumerate(quarter_ranges):
             quarter_wikilinks.append(f"[[{year}-Q{i + 1}\\|Q{i + 1}]]")
         procrastination_lines = build_procrastination_section(
@@ -390,9 +375,8 @@ def build_yearly_metrics(
 
     # SLEEP
     sleep_lines = ["### **SLEEP**"]
-    sleep_chart_vals = []
-    sleep_value_labels = []
-    sleep_delta_labels = []
+    sleep_chart_vals: list[float] = []
+    sleep_value_labels: list[str] = []
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
@@ -431,19 +415,7 @@ def build_yearly_metrics(
     )
     sleep_lines.append("")
 
-    awake_vals = [
-        awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awakenings_vals = [
-        awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awake_values: list[float] = [v for v in awake_vals if v is not None]
-    awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
-
-    avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
-    avg_awakenings = (
-        sum(awakening_values) / len(awakening_values) if awakening_values else None
-    )
+    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
     sleep_avg = current_metrics["sleep_avg_minutes"]
 
     sleep_lines.extend(
@@ -459,14 +431,13 @@ def build_yearly_metrics(
 
     # MOOD
     mood_lines = ["### **MOOD**"]
-    mood_chart_vals = []
-    mood_value_labels = []
-    mood_delta_labels = []
+    mood_chart_vals: list[float] = []
+    mood_value_labels: list[str] = []
 
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         vals = [mood_for_day(daily_data, d) for d in days if daily_data.get(d)]
-        vals_clean = [v for v in vals if v is not None]
+        vals_clean: list[float] = [v for v in vals if v is not None]
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)

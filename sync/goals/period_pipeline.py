@@ -7,17 +7,14 @@ from dataclasses import dataclass
 
 from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.goals.note_store import (
-    ensure_note_lines,
     extract_goals,
     render_goals_or_empty,
-    write_goals_sections,
 )
 from sync.goals.reconcile import (
     merge_mirror_goals,
     process_pierced_goals,
     reconcile_goal_lists,
 )
-from sync.io import safe_read_file
 from sync.contracts.goals import Goal
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.writers.goals import render_goal_lines
@@ -31,7 +28,7 @@ class CarryForwardConfig:
     horizon: str
     period_key: str
     current_id_key: str
-    previous_note_path: str | None = None
+    previous_lines: list[str] | None = None
     previous_id_key: str | None = None
 
 
@@ -52,15 +49,6 @@ class PiercingSyncConfig:
     note_path: str
     source_paths: tuple[str, ...]
     proximity_days: int
-
-
-@dataclass(frozen=True)
-class SourceWriteConfig:
-    """Configuration for writing source goals back to a note."""
-
-    path: str
-    template_path: str | None = None
-    insert_if_missing: bool = True
 
 
 @dataclass(frozen=True)
@@ -99,15 +87,13 @@ def load_source_tasks_with_carry_forward(
     )
 
     prev_tasks: list[Goal] = []
-    if config.previous_note_path:
-        prev_lines = safe_read_file(config.previous_note_path)
-        if prev_lines is not None:
-            prev_tasks = extract_goals(
-                prev_lines,
-                config.section,
-                horizon=config.horizon,
-                period_key=config.previous_id_key or config.current_id_key,
-            )
+    if config.previous_lines is not None:
+        prev_tasks = extract_goals(
+            config.previous_lines,
+            config.section,
+            horizon=config.horizon,
+            period_key=config.previous_id_key or config.current_id_key,
+        )
 
     current_tasks, _ = carry_forward_with_tombstones(
         prev_tasks,
@@ -188,26 +174,4 @@ def sync_pierced_source_section(
         source_lines=source_lines,
         updated_source_lists=updated_source_lists,
         source_changes=source_changes,
-    )
-
-
-def propagate_source_sections(
-    *,
-    config: SourceWriteConfig,
-    sections: list[tuple[str, list[str]]],
-    existing_lines: list[str] | None = None,
-) -> list[str]:
-    """Write canonical goal sections to a source note and return written lines."""
-    lines = existing_lines
-    if lines is None:
-        if config.template_path:
-            lines = ensure_note_lines(config.path, config.template_path)
-        else:
-            lines = safe_read_file(config.path) or []
-
-    return write_goals_sections(
-        config.path,
-        lines,
-        sections,
-        insert_if_missing=config.insert_if_missing,
     )

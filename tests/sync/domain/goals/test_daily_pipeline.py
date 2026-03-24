@@ -1,11 +1,11 @@
-"""Tests for daily goal pipeline helpers."""
+"""Tests for goal note gateway period-key handling."""
 
 from __future__ import annotations
 
 import datetime
 
+from sync.application.goal_note_gateway import GoalNoteGateway
 from sync.dates import iso_week_range
-from sync.goals.daily_pipeline import load_weekly_goals
 
 
 class _StubNoteStore:
@@ -18,6 +18,9 @@ class _StubNoteStore:
     def read_or_create(self, _path: str, _template_path: str) -> list[str]:
         return ["## Goals", "", "## Metrics", "---"]
 
+    def write(self, _path: str, _lines: list[str]) -> None:
+        raise AssertionError("write should not be called")
+
 
 class _CaptureGoalStore:
     def __init__(self) -> None:
@@ -29,23 +32,27 @@ class _CaptureGoalStore:
         section: str,
         horizon: str | None = None,
         period_key: str | None = None,
-    ):
+    ) -> list[object]:
         self.calls.append((section, horizon, period_key))
         return []
 
+    def apply(self, lines: list[str], _sections: list[object]) -> list[str]:
+        return lines
 
-def test_load_weekly_goals_uses_week_start_period_key():
+    def write(self, _path: str, lines: list[str], _sections: list[object]) -> list[str]:
+        return lines
+
+
+def test_load_daily_sources_uses_week_start_period_key() -> None:
     day = datetime.date(2026, 2, 6)
     week_start, _ = iso_week_range(day)
-    note_store = _StubNoteStore(weekly_lines=["## Goals"])
     goal_store = _CaptureGoalStore()
-
-    load_weekly_goals(
-        day,
-        note_store=note_store,
+    gateway = GoalNoteGateway(
+        note_store=_StubNoteStore(weekly_lines=["## Goals"]),
         goal_store=goal_store,
-        journal_dir="/tmp/journal",
     )
+
+    gateway.load_daily_sources(day)
 
     weekly_calls = [call for call in goal_store.calls if call[0] == "WEEKLY"]
     assert len(weekly_calls) == 1

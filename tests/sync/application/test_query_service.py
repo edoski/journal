@@ -58,25 +58,22 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
     service, _ = _service_with_data()
 
     monkeypatch.setattr(
-        "sync.application.query_service.compute_period_metrics",
+        "sync.application.query_service.build_metrics_map",
         lambda _dates, _data: {
             "study_total_minutes": 300,
-            "sleep_avg_minutes": 480,
-            "mood_avg": 7.2,
+            "study_minutes": 300,
+            "sleep_minutes": 480,
+            "mood": 7.2,
             "workout_count": 4,
             "stretch_count": 5,
             "meditation_count": 6,
-            "total_days": 7,
-            "days_up_to_today": 7,
+            "interrupt_minutes": 12.0,
+            "overrun_minutes": 8.0,
+            "screen_time_total": 45.0,
+            "training_sessions_total": 0,
+            "days_total": 7,
+            "days_elapsed": 7,
         },
-    )
-    monkeypatch.setattr(
-        "sync.application.query_service.aggregate_interrupt_overrun",
-        lambda _dates, _data: (12.0, 8.0, 1),
-    )
-    monkeypatch.setattr(
-        "sync.application.query_service.aggregate_screen_time",
-        lambda _dates, _data: {"YouTube": 30.0, "X": 15.0},
     )
 
     anchor = datetime.date(2026, 2, 1)

@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import datetime
 import sqlite3
+from dataclasses import dataclass
 from datetime import date, timedelta
+from collections.abc import Callable
 from typing import TypedDict
 
 from sync.adapters.flow_sessions import FlowStudySessionSource
@@ -30,6 +32,24 @@ class CliSession(TypedDict):
     interruptions_duration: float
 
 
+@dataclass(frozen=True)
+class SessionCommandDeps:
+    """Factory dependencies for Flow session mutation commands."""
+
+    session_source_factory: Callable[[], FlowStudySessionSource]
+    schedule_source_factory: Callable[[], ScheduleSource]
+    connection_factory: Callable[[bool], sqlite3.Connection]
+
+
+def default_session_command_deps() -> SessionCommandDeps:
+    """Return the default runtime dependencies for session commands."""
+    return SessionCommandDeps(
+        session_source_factory=FlowStudySessionSource,
+        schedule_source_factory=MarkdownScheduleSource,
+        connection_factory=lambda readonly: get_connection(readonly=readonly),
+    )
+
+
 def get_connection(readonly: bool = True) -> sqlite3.Connection:
     if readonly:
         uri = f"file:{DB_PATH}?mode=ro"
@@ -38,7 +58,7 @@ def get_connection(readonly: bool = True) -> sqlite3.Connection:
 
 
 def format_session(session: CliSession, include_pk: bool = False) -> str:
-    lines = []
+    lines: list[str] = []
     if include_pk:
         lines.append(f"  PK:       {session['pk']}")
     lines.append(f"  Phase:    {session['phase']}")
@@ -166,9 +186,14 @@ def _find_associated_break_sessions(
     return breaks
 
 
-def cmd_session_rename(args: argparse.Namespace) -> int:
-    session_source = FlowStudySessionSource()
-    schedule_source = MarkdownScheduleSource()
+def cmd_session_rename(
+    args: argparse.Namespace,
+    *,
+    deps: SessionCommandDeps | None = None,
+) -> int:
+    resolved = deps or default_session_command_deps()
+    session_source = resolved.session_source_factory()
+    schedule_source = resolved.schedule_source_factory()
     sessions = _load_recent_focus_sessions(
         session_source,
         schedule_source,
@@ -180,7 +205,7 @@ def cmd_session_rename(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        conn = get_connection(readonly=not args.confirm)
+        conn = resolved.connection_factory(not args.confirm)
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
@@ -207,9 +232,14 @@ def cmd_session_rename(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_session_undo(args: argparse.Namespace) -> int:
-    session_source = FlowStudySessionSource()
-    schedule_source = MarkdownScheduleSource()
+def cmd_session_undo(
+    args: argparse.Namespace,
+    *,
+    deps: SessionCommandDeps | None = None,
+) -> int:
+    resolved = deps or default_session_command_deps()
+    session_source = resolved.session_source_factory()
+    schedule_source = resolved.schedule_source_factory()
     sessions = _load_recent_focus_sessions(
         session_source,
         schedule_source,
@@ -221,7 +251,7 @@ def cmd_session_undo(args: argparse.Namespace) -> int:
         return 0
 
     try:
-        conn = get_connection(readonly=not args.confirm)
+        conn = resolved.connection_factory(not args.confirm)
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1

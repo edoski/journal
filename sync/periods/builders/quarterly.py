@@ -9,8 +9,8 @@ from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import MONTH_ABBR, STUDY_TARGET_MIN
 from sync.dates import daterange, quarter_id, quarter_months
-from sync.formatting import format_minutes
 from sync.metrics import (
+    aggregate_activity_totals,
     aggregate_screen_time,
     compute_bucket_deltas,
     compute_moving_average,
@@ -19,11 +19,10 @@ from sync.metrics import (
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
-    activity_table_lines,
+    append_activity_summary,
     activity_totals_for_day,
-    awake_minutes_for_day,
-    awakenings_for_day,
     compute_avg_schedule,
+    compute_sleep_aux_averages,
     mood_for_day,
     sleep_minutes_for_day,
     sleep_stats_table_lines,
@@ -105,25 +104,24 @@ def build_quarterly_metrics(
         else None
     )
     quarter_delta_data = {**prev_daily_data, **daily_data}
-    month_day_lists = [list(daterange(start, end)) for start, end in month_ranges]
+    month_day_lists: list[list[datetime.date]] = [
+        list(daterange(start, end)) for start, end in month_ranges
+    ]
 
     # STUDY
     study_lines = ["### **STUDY**"]
-    month_labels = []
-    study_chart_vals = []
-    study_value_labels = []
-    activity_totals: dict[str, float] = {}
+    month_labels: list[str] = []
+    study_chart_vals: list[float] = []
+    study_value_labels: list[str] = []
+    activity_totals = aggregate_activity_totals(dates, daily_data)
 
     for start, end in month_ranges:
         label = MONTH_ABBR[start.month - 1]
         month_labels.append(label)
         days = list(daterange(start, end))
-        total_min = 0.0
-        for d in days:
-            for activity, mins in activity_totals_for_day(daily_data, d).items():
-                minutes = float(mins or 0.0)
-                activity_totals[activity] = activity_totals.get(activity, 0.0) + minutes
-                total_min += minutes
+        total_min = sum(
+            sum(activity_totals_for_day(daily_data, day).values()) for day in days
+        )
         hours = round((total_min / 60) * 2) / 2  # Round to nearest 0.5h
         study_chart_vals.append(hours)
         if start > today:
@@ -152,13 +150,7 @@ def build_quarterly_metrics(
             )
         )
     )
-    study_lines.append(
-        f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
-    )
-    study_lines.append("")
-
-    study_lines.extend(activity_table_lines(activity_totals))
-    study_lines.append("")
+    append_activity_summary(study_lines, activity_totals)
 
     study_delta_labels = compute_bucket_deltas(
         month_day_lists,
@@ -206,11 +198,15 @@ def build_quarterly_metrics(
         )
         return done, elapsed, start
 
-    meditation_counts = [
+    meditation_counts: list[tuple[int, int, datetime.date]] = [
         _month_count(rng, "meditate", daily_data) for rng in month_ranges
     ]
-    workout_counts = [_month_count(rng, "workout", daily_data) for rng in month_ranges]
-    stretch_counts = [_month_count(rng, "stretch", daily_data) for rng in month_ranges]
+    workout_counts: list[tuple[int, int, datetime.date]] = [
+        _month_count(rng, "workout", daily_data) for rng in month_ranges
+    ]
+    stretch_counts: list[tuple[int, int, datetime.date]] = [
+        _month_count(rng, "stretch", daily_data) for rng in month_ranges
+    ]
     meditation_delta_labels = compute_bucket_deltas(
         month_day_lists,
         value_for_day=lambda d: (
@@ -311,7 +307,7 @@ def build_quarterly_metrics(
     if screen_time_totals:
         # Monthly trend table with wikilinks to monthly notes
         month_labels = [MONTH_ABBR[m[0].month - 1] for m in month_ranges]
-        month_wikilinks = []
+        month_wikilinks: list[str] = []
         for (start, _), label in zip(month_ranges, month_labels):
             month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
         procrastination_lines = build_procrastination_section(
@@ -331,11 +327,9 @@ def build_quarterly_metrics(
 
     # SLEEP
     sleep_lines = ["### **SLEEP**"]
-    sleep_labels = []
-    sleep_chart_vals = []
-    sleep_value_labels = []
-    awake_vals = []
-    awakenings_vals = []
+    sleep_labels: list[str] = []
+    sleep_chart_vals: list[float] = []
+    sleep_value_labels: list[str] = []
     for start, end in month_ranges:
         label = MONTH_ABBR[start.month - 1]
         sleep_labels.append(label)
@@ -353,13 +347,6 @@ def build_quarterly_metrics(
         else:
             sleep_chart_vals.append(0)
             sleep_value_labels.append("0h00m" if start <= today else "")
-
-        awake_vals.extend(
-            [awake_minutes_for_day(daily_data, d) for d in days if daily_data.get(d)]
-        )
-        awakenings_vals.extend(
-            [awakenings_for_day(daily_data, d) for d in days if daily_data.get(d)]
-        )
 
     sleep_delta_labels = compute_bucket_deltas(
         month_day_lists,
@@ -382,13 +369,8 @@ def build_quarterly_metrics(
     )
     sleep_lines.append("")
 
-    awake_values: list[float] = [v for v in awake_vals if v is not None]
-    awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
     sleep_avg = current_metrics["sleep_avg_minutes"]
-    avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
-    avg_awakenings = (
-        sum(awakening_values) / len(awakening_values) if awakening_values else None
-    )
+    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
 
     sleep_lines.extend(
         sleep_stats_table_lines(
@@ -403,15 +385,15 @@ def build_quarterly_metrics(
 
     # MOOD
     mood_lines = ["### **MOOD**"]
-    mood_labels = []
-    mood_chart_vals = []
-    mood_value_labels = []
+    mood_labels: list[str] = []
+    mood_chart_vals: list[float] = []
+    mood_value_labels: list[str] = []
     for start, end in month_ranges:
         label = MONTH_ABBR[start.month - 1]
         mood_labels.append(label)
         days = list(daterange(start, end))
         vals = [mood_for_day(daily_data, d) for d in days if daily_data.get(d)]
-        vals_clean = [v for v in vals if v is not None]
+        vals_clean: list[float] = [v for v in vals if v is not None]
         if vals_clean:
             avg_val = sum(vals_clean) / len(vals_clean)
             mood_chart_vals.append(avg_val)

@@ -225,7 +225,11 @@ def load_screen_time_data(
     merged: dict[str, float] = {}
     if new_entries:
         # New data available: merge with cache, cache the result
-        merged = {app: minutes for app, minutes in cache_entries.items() if app not in new_entries}
+        merged = {
+            app: minutes
+            for app, minutes in cache_entries.items()
+            if app not in new_entries
+        }
         merged.update(new_entries)
         _save_screen_time_cache(today_str, merged, screen_time_cache_store)
     elif cache_entries:

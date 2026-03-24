@@ -1,492 +1,56 @@
-"""
-Study-session database access and enrichment for daily sync.
-"""
+"""Study-session database access facade for daily sync."""
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sqlite3
 import datetime
 
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
-from sync.log import get_logger
-
-from sync.study.constants import (
-    DB_PATH,
-    BREAK_LINK_MAX_GAP_SECONDS,
-    FLOW_APP_DEFAULTS_DOMAIN,
-    FLOW_BREAK_DEFAULT_KEYS,
-    FLOW_BREAK_PHASES,
-    FLOW_PHASE_LONG_BREAK,
-    FLOW_PHASE_SHORT_BREAK,
-    FLOW_PHASE_STUDY,
-)
-from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
-from sync.study.breaks import (
-    get_expected_break_minutes,
-    compute_dynamic_lunch_window,
-    overlap_minutes_with_window,
-    clamp_next_study_within_day,
-    anchor_lunch_window,
+from sync.study.core_data_time import core_data_to_datetime
+from sync.study.enrichment import dedupe_sessions, enrich_sessions
+from sync.study.repository import (
+    fetch_sessions_for_day,
+    get_db_connection,
+    read_break_defaults,
 )
 
-logger = get_logger(__name__)
-
-
-def _read_break_defaults() -> dict[str, int | None]:
-    """
-    Read Flow's configured break lengths.
-    Returns a dict with keys 'shortBreak' and 'longBreak' (ints or None).
-    """
-    result: dict[str, int | None] = {
-        FLOW_PHASE_SHORT_BREAK: None,
-        FLOW_PHASE_LONG_BREAK: None,
-    }
-    for key in FLOW_BREAK_DEFAULT_KEYS:
-        try:
-            out = subprocess.check_output(
-                [
-                    "defaults",
-                    "read",
-                    FLOW_APP_DEFAULTS_DOMAIN,
-                    f"{key}.durationInMinutes",
-                ],
-                text=True,
-            )
-            val = int(out.strip())
-            if val > 0:
-                result[key] = val
-        except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
-            # Expected: defaults not set or command unavailable
-            continue
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to read Flow defaults for %s: %s", key, e)
-            continue
-    return result
-
-
-# Module-level cache of break defaults (read once at import time)
-BREAK_DEFAULTS = _read_break_defaults()
-
-
-def _select_linked_break(
-    break_sessions: list[StudySessionRecord],
-    *,
-    session_end: datetime.datetime,
-    next_study_start: datetime.datetime | None,
-) -> StudySessionRecord | None:
-    """Choose the nearest relevant break row for a study session."""
-    candidates: list[StudySessionRecord] = []
-    for break_session in break_sessions:
-        break_start = break_session["start"]
-        gap_seconds = (break_start - session_end).total_seconds()
-        if gap_seconds < 0:
-            continue
-        if gap_seconds > BREAK_LINK_MAX_GAP_SECONDS:
-            break
-        if next_study_start and break_start >= next_study_start:
-            break
-        if next_study_start and not break_session.get("completed_at"):
-            continue
-        candidates.append(break_session)
-
-    if not candidates:
-        return None
-
-    for candidate in candidates:
-        if candidate.get("completed_at"):
-            return candidate
-    return candidates[0]
-
-
-def get_db_connection() -> sqlite3.Connection:
-    """Get a read-only connection to the Flow database."""
-    if not os.path.exists(DB_PATH):
-        logger.error("Database not found at %s", DB_PATH)
-        raise FileNotFoundError(f"Flow database not found at {DB_PATH}")
-    # Open in read-only mode to avoid locking
-    return sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
-
-
-def dedupe_sessions(
-    sessions: list[StudySessionRecord],
-    start_tolerance_seconds: int = 60,
-) -> list[StudySessionRecord]:
-    """
-    Deduplicate sessions that represent the same work block.
-
-    Flow can emit twin rows for the same block (paused/resumed or stuck timers).
-    Group by phase/title within the tolerance and clamp the merged end to
-    completed rows if any exist so open twins cannot stretch to "now".
-
-    Args:
-        sessions: List of session dictionaries to deduplicate
-        start_tolerance_seconds: Max seconds between starts to consider same session
-
-    Returns:
-        Deduplicated list of sessions with merged metadata
-    """
-
-    def same_group(a: StudySessionRecord, b: StudySessionRecord) -> bool:
-        if a["phase"] != b["phase"]:
-            return False
-        if (a["title"] or "").strip() != (b["title"] or "").strip():
-            return False
-        return abs((a["start"] - b["start"]).total_seconds()) <= start_tolerance_seconds
-
-    groups: list[list[StudySessionRecord]] = []
-    for s in sorted(sessions, key=lambda x: x["start"]):
-        placed = False
-        for grp in groups:
-            if same_group(grp[0], s):
-                grp.append(s)
-                placed = True
-                break
-        if not placed:
-            groups.append([s])
-
-    merged: list[StudySessionRecord] = []
-    for grp in groups:
-
-        def score(entry: StudySessionRecord) -> tuple[int, float, float, float]:
-            completed = 1 if entry.get("completed_at") else 0
-            actual = entry.get("actual_elapsed", 0) or 0
-            end_ts = entry["end"].timestamp() if entry.get("end") else 0
-            planned = entry.get("planned_duration", 0) or 0
-            return (completed, actual, end_ts, planned)
-
-        canonical = max(grp, key=score)
-
-        starts = [g["start"] for g in grp if g.get("start")]
-        completed_entries = [g for g in grp if g.get("completed_at")]
-        if completed_entries:
-            end_candidates = [g["end"] for g in completed_entries if g.get("end")]
-        else:
-            end_candidates = [g["end"] for g in grp if g.get("end")]
-
-        # If a completed twin exists, anchor the start to the earliest
-        # completed row so cancelled/aborted open twins don't pull the
-        # block earlier than the session the user actually finished.
-        if completed_entries:
-            completed_starts = [g["start"] for g in completed_entries if g.get("start")]
-            merged_start = (
-                min(completed_starts) if completed_starts else canonical["start"]
-            )
-        else:
-            merged_start = min(starts) if starts else canonical["start"]
-
-        merged_end = max(end_candidates) if end_candidates else canonical["end"]
-
-        merged_entry = canonical.copy()
-        merged_entry["start"] = merged_start
-        merged_entry["end"] = merged_end
-        merged_pks = [
-            pk for g in grp for pk in g.get("pks", [g.get("pk")]) if isinstance(pk, int)
-        ]
-        merged_entry["pks"] = sorted(set(merged_pks))
-        # Interruptions should come from the anchored (completed) twin when present
-        if completed_entries:
-            interrupt_pks = [
-                pk
-                for g in completed_entries
-                for pk in g.get("pks", [g.get("pk")])
-                if isinstance(pk, int)
-            ]
-            merged_entry["interrupt_pks"] = sorted(set(interrupt_pks))
-        else:
-            merged_entry["interrupt_pks"] = merged_entry["pks"]
-
-        merged_entry["pk"] = (
-            merged_entry["pks"][0] if merged_entry["pks"] else canonical["pk"]
-        )
-        merged_entry["planned_duration"] = max(
-            g.get("planned_duration", 0) or 0 for g in grp
-        )
-        merged_entry["duration"] = merged_entry["planned_duration"]
-        merged_entry["is_open"] = not bool(completed_entries)
-        if merged_entry.get("end") and merged_entry.get("start"):
-            merged_entry["actual_elapsed"] = max(
-                0, (merged_entry["end"] - merged_entry["start"]).total_seconds() / 60
-            )
-        merged.append(merged_entry)
-
-    return merged
+BREAK_DEFAULTS = read_break_defaults()
 
 
 def get_sessions_for_day(
     day: datetime.date,
     day_schedule: DayScheduleProfile,
 ) -> list[StudySessionRecord]:
-    """
-    Fetch and process study sessions from the database for a specific day.
-
-    Returns a list of enriched session dictionaries with:
-    - Deduplicated study sessions
-    - Linked break information
-    - Interruption counts and durations
-    - Break overrun calculations
-    """
+    """Fetch and enrich study sessions from the Flow database for one day."""
     conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Calculate start and end of requested day (local time) for filtering
-    now = datetime.datetime.now()
-    start_of_day = datetime.datetime(day.year, day.month, day.day, 0, 0, 0)
-    end_of_day = datetime.datetime(day.year, day.month, day.day, 23, 59, 59)
-
-    # Convert to CoreData timestamps
-    cd_start = datetime_to_core_data(start_of_day)
-    cd_end = datetime_to_core_data(end_of_day)
-    if cd_start is None or cd_end is None:
-        return []
-
-    # Fetch SESSIONS
-    query = """
-    SELECT Z_PK, ZSTARTEDAT, ZDURATION, ZPHASE, ZTITLE, ZCOMPLETEDAT
-    FROM ZSESSION
-    WHERE ZSTARTEDAT >= ? AND ZSTARTEDAT <= ?
-    ORDER BY ZSTARTEDAT ASC
-    """
-    cursor.execute(query, (cd_start, cd_end))
-    rows = cursor.fetchall()
-
-    all_sessions: list[StudySessionRecord] = []
-    for row in rows:
-        pk, started_at, duration_planned, phase, title, completed_at = row
-        start_dt = core_data_to_datetime(started_at)
-        if start_dt is None:
-            continue  # Skip sessions without start time
-
-        completed_dt = core_data_to_datetime(completed_at) if completed_at else None
-        if completed_dt:
-            end_dt = completed_dt
-        else:
-            # In-progress session: treat "now" as the end so timestamps stay current.
-            end_dt = now
-            if end_dt < start_dt:
-                end_dt = start_dt
-
-        actual_duration_min = max(0.0, (end_dt - start_dt).total_seconds() / 60)
-
-        all_sessions.append(
-            {
-                "pk": pk,
-                "pks": [pk],  # keep originals so we can merge duplicates safely
-                "start": start_dt,
-                "end": end_dt,
-                "duration": duration_planned,  # planned focus duration
-                "planned_duration": duration_planned,
-                "actual_elapsed": actual_duration_min,
-                "completed_at": completed_dt,
-                "phase": phase,
-                "title": title,
-                "interruptions_count": 0,
-                "interruptions_duration": 0,
-                "break_duration": 0,
-            }
+    try:
+        all_sessions = fetch_sessions_for_day(
+            conn,
+            day,
+            now=datetime.datetime.now(),
         )
-
-    # Process sessions:
-    # 1. Filter for study-phase sessions only.
-    # 2. Enrich with interruptions and breaks.
-
-    study_sessions = [s for s in all_sessions if s["phase"] == FLOW_PHASE_STUDY]
-    break_sessions = [s for s in all_sessions if s["phase"] in FLOW_BREAK_PHASES]
-
-    study_sessions = dedupe_sessions(study_sessions)
-    study_sessions.sort(key=lambda x: x["start"])
-
-    def enrich_break(b: StudySessionRecord) -> StudySessionRecord:
-        completed_dt = b["completed_at"] if b.get("completed_at") else None
-        if completed_dt:
-            end_dt = completed_dt
-        else:
-            end_dt = now
-            if end_dt < b["start"]:
-                end_dt = b["start"]
-        b["actual_duration"] = max(0, (end_dt - b["start"]).total_seconds() / 60)
-        b["planned_duration"] = b.get("planned_duration") or b.get("duration") or 0
-        return b
-
-    break_sessions = [enrich_break(b) for b in dedupe_sessions(break_sessions)]
-    break_sessions.sort(key=lambda x: x["start"])
-
-    lunch_window = compute_dynamic_lunch_window(
-        study_sessions,
-        (day_schedule.lunch_start, day_schedule.lunch_end),
-        reference_date=day,
-    )
-    lunch_duration_minutes = 0
-    if lunch_window:
-        try:
-            lunch_start_t, lunch_end_t = lunch_window
-            lunch_start_dt = datetime.datetime.combine(day, lunch_start_t)
-            lunch_end_dt = datetime.datetime.combine(day, lunch_end_t)
-            if lunch_end_dt <= lunch_start_dt:
-                lunch_end_dt += datetime.timedelta(days=1)
-            lunch_duration_minutes = int(
-                round((lunch_end_dt - lunch_start_dt).total_seconds() / 60.0)
-            )
-        except (ValueError, TypeError) as e:
-            logger.debug("Failed to parse lunch window: %s", e)
-            lunch_duration_minutes = 0
-
-    for idx, session in enumerate(study_sessions):
-        next_study_start = (
-            study_sessions[idx + 1]["start"] if idx + 1 < len(study_sessions) else None
+        return enrich_sessions(
+            all_sessions,
+            day=day,
+            day_schedule=day_schedule,
+            cursor=conn.cursor(),
+            now=datetime.datetime.now(),
+            break_defaults=BREAK_DEFAULTS,
         )
-
-        # Fetch Interruptions for this session
-        pk_list = session.get("interrupt_pks") or session.get("pks") or [session["pk"]]
-        total_count = 0
-        total_duration = 0
-        for pk in pk_list:
-            cursor.execute(
-                "SELECT count(*), sum(ZFINISHEDAT - ZSTARTEDAT) FROM ZINTERRUPTION WHERE ZSESSION = ?",
-                (pk,),
-            )
-            int_row = cursor.fetchone()
-            if not int_row:
-                continue
-            count_val = int_row[0] if int_row[0] else 0
-            dur_val = int_row[1] if int_row[1] else 0
-            total_duration += dur_val
-            total_count += count_val
-
-        session["interruptions_count"] = total_count
-        session["interruptions_duration"] = total_duration
-
-        # Link only breaks that fit before the next focus block; stale open breaks
-        # left behind by undo/resume flows should not affect prior sessions.
-        best_break = _select_linked_break(
-            break_sessions,
-            session_end=session["end"],
-            next_study_start=next_study_start,
-        )
-
-        anchored = anchor_lunch_window(session["end"], lunch_window)
-        if anchored:
-            # Lunch takes precedence for display/expectation even if the app logged a shortBreak.
-            session["anchored_lunch_window"] = anchored
-            session["break_expected"] = lunch_duration_minutes or 60
-            session["break_duration"] = session["break_expected"]
-            session["break_missing"] = False
-            session["break_reason"] = "lunch"
-            if best_break:
-                session["linked_break_start"] = best_break["start"]
-        elif best_break:
-            session["break_expected"] = get_expected_break_minutes(
-                best_break, BREAK_DEFAULTS
-            )
-            session["break_duration"] = session["break_expected"]
-            session["linked_break_start"] = best_break["start"]
-            session["break_missing"] = False
-            session["break_reason"] = None
-            session["anchored_lunch_window"] = None
-        else:
-            session["anchored_lunch_window"] = None
-            session["break_expected"] = get_expected_break_minutes(None, BREAK_DEFAULTS)
-            session["break_duration"] = session["break_expected"]
-            session["break_missing"] = True
-            session["break_reason"] = None
-
-        # Overrun calculation: gap until next study block (or end of day),
-        # less lunch and less expected break.
-        if next_study_start is None:
-            # No future study block: do not accrue overrun past the final block
-            session["break_overrun"] = 0
-        else:
-            effective_lunch_window = (
-                session.get("anchored_lunch_window") or lunch_window
-            )
-            lunch_overlap = overlap_minutes_with_window(
-                session["end"], next_study_start, effective_lunch_window
-            )
-            if session.get("break_reason") == "lunch" and lunch_overlap < 30:
-                session["break_reason"] = None
-                session["anchored_lunch_window"] = None
-                effective_lunch_window = lunch_window
-                lunch_overlap = overlap_minutes_with_window(
-                    session["end"], next_study_start, effective_lunch_window
-                )
-
-            # If actual break (gap) is less than expected, overwrite expected with actual
-            actual_break_minutes = (
-                next_study_start - session["end"]
-            ).total_seconds() / 60
-            if actual_break_minutes < session.get("break_expected", 0):
-                session["break_expected"] = int(actual_break_minutes + 0.5)
-                session["break_duration"] = session["break_expected"]
-            effective_next_start = clamp_next_study_within_day(
-                session["end"], next_study_start, day_schedule.study_end
-            )
-            if not effective_next_start or effective_next_start <= session["end"]:
-                session["break_overrun"] = 0
-            else:
-                gap_minutes = (
-                    effective_next_start - session["end"]
-                ).total_seconds() / 60
-                lunch_overlap = overlap_minutes_with_window(
-                    session["end"], effective_next_start, effective_lunch_window
-                )
-                expected_break = session.get(
-                    "break_expected",
-                    get_expected_break_minutes(best_break, BREAK_DEFAULTS),
-                )
-                # If lunch covers the gap, only count overrun beyond lunch plus any remaining expected break.
-                expected_excl_lunch = max(0.0, expected_break - lunch_overlap)
-                overrun_minutes = max(
-                    0.0, gap_minutes - lunch_overlap - expected_excl_lunch
-                )
-                # Half-up to nearest minute to reflect clear lateness
-                overrun = int(overrun_minutes + 0.5)
-                session["break_overrun"] = overrun
-
-    # Retroactive lunch detection: if session N starts after lunch window,
-    # and session N-1 didn't get lunch but gap overlaps lunch significantly,
-    # retroactively assign lunch to session N-1.
-    if lunch_window:
-        lunch_end_dt = datetime.datetime.combine(day, lunch_window[1])
-        for idx in range(1, len(study_sessions)):
-            current = study_sessions[idx]
-            prev = study_sessions[idx - 1]
-
-            # Skip if previous already has lunch
-            if prev.get("break_reason") == "lunch":
-                continue
-
-            # Check if current session starts after lunch window ends
-            if current["start"] <= lunch_end_dt:
-                continue
-
-            # Check if gap between prev end and current start overlaps lunch window
-            gap_overlap = overlap_minutes_with_window(
-                prev["end"], current["start"], lunch_window
-            )
-            if gap_overlap < 30:  # Require significant overlap
-                continue
-
-            # Retroactively assign lunch to previous session
-            prev["break_expected"] = lunch_duration_minutes or 60
-            prev["break_duration"] = prev["break_expected"]
-            prev["break_reason"] = "lunch"
-            prev["break_missing"] = False
-
-            # Recalculate overrun for prev session
-            effective_next_start = clamp_next_study_within_day(
-                prev["end"], current["start"], day_schedule.study_end
-            )
-            if effective_next_start and effective_next_start > prev["end"]:
-                gap_minutes = (effective_next_start - prev["end"]).total_seconds() / 60
-                overrun = max(0, int(gap_minutes - prev["break_expected"] + 0.5))
-                prev["break_overrun"] = overrun
-
-    conn.close()
-    return study_sessions
+    finally:
+        conn.close()
 
 
 def get_todays_sessions(day_schedule: DayScheduleProfile) -> list[StudySessionRecord]:
     """Fetch and process study sessions for today."""
     return get_sessions_for_day(datetime.date.today(), day_schedule)
+
+
+__all__ = [
+    "BREAK_DEFAULTS",
+    "core_data_to_datetime",
+    "dedupe_sessions",
+    "get_db_connection",
+    "get_sessions_for_day",
+    "get_todays_sessions",
+]

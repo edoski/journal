@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 
 from sync.constants import GRADES_PATH
 from sync.grades.engine import compute_grades
@@ -12,8 +13,20 @@ from sync.readers.grades import load_grades
 from sync.writers.grades import render_grades_note
 
 
-def cmd_grades_sync(args: argparse.Namespace) -> int:
-    path = args.path or GRADES_PATH
+@dataclass(frozen=True)
+class GradesCommandConfig:
+    """Filesystem configuration for grades commands."""
+
+    grades_path: str = GRADES_PATH
+
+
+def cmd_grades_sync(
+    args: argparse.Namespace,
+    *,
+    config: GradesCommandConfig | None = None,
+) -> int:
+    resolved = config or GradesCommandConfig()
+    path = args.path or resolved.grades_path
     try:
         document = load_grades(path)
     except FileNotFoundError as exc:

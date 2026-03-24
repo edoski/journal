@@ -7,7 +7,6 @@ from calendar import monthrange
 from typing import TYPE_CHECKING
 
 from sync.goals.identity import generate_goal_id_for
-from sync.io import atomic_write_note, safe_read_file
 from sync.notes.markdown_tables import (
     render_divider_row,
     render_markdown_row,
@@ -39,12 +38,8 @@ WEEKDAY_INDEX = {
 }
 
 
-def load_reminder_rules(path: str) -> list[ReminderRule]:
-    """Load and validate reminder rules from REMINDERS.md."""
-    lines = safe_read_file(path)
-    if lines is None:
-        raise FileNotFoundError(f"Required reminder config not found: {path}")
-
+def parse_reminder_rules_lines(lines: list[str]) -> list[ReminderRule]:
+    """Parse and validate reminder rules from canonical markdown lines."""
     header_idx = -1
     for idx, line in enumerate(lines):
         if not line.strip().startswith("|"):
@@ -58,13 +53,11 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
             break
 
     if header_idx == -1:
-        raise ValueError(
-            f"{path} must contain a markdown table header: | SCHEDULE | BODY |"
-        )
+        raise ValueError("Reminder rules must contain | SCHEDULE | BODY |")
 
     divider_idx = header_idx + 1
     if divider_idx >= len(lines) or not lines[divider_idx].strip().startswith("|"):
-        raise ValueError(f"{path} is missing markdown table divider row")
+        raise ValueError("Reminder rules are missing the markdown table divider row")
 
     rules: list[ReminderRule] = []
     seen_keys: set[str] = set()
@@ -78,11 +71,14 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
 
         row = split_markdown_row(lines[idx])
         if row is None:
-            raise ValueError(f"REMINDERS.md line {idx + 1}: invalid markdown table row")
+            raise ValueError(
+                f"Reminder rules line {idx + 1}: invalid markdown table row"
+            )
         line_no = idx + 1
         if len(row) != len(TABLE_HEADERS):
             raise ValueError(
-                f"REMINDERS.md line {line_no}: expected {len(TABLE_HEADERS)} cells, got {len(row)}"
+                "Reminder rules line "
+                f"{line_no}: expected {len(TABLE_HEADERS)} cells, got {len(row)}"
             )
 
         schedule_raw, body = row
@@ -90,19 +86,21 @@ def load_reminder_rules(path: str) -> list[ReminderRule]:
 
         if "|" in body:
             raise ValueError(
-                f"REMINDERS.md line {line_no}: BODY cannot contain '|' in strict table mode"
+                "Reminder rules line "
+                f"{line_no}: BODY cannot contain '|' in strict table mode"
             )
 
         try:
             schedule = parse_schedule(schedule_raw)
         except ValueError as exc:
-            raise ValueError(f"REMINDERS.md line {line_no}: {exc}") from exc
+            raise ValueError(f"Reminder rules line {line_no}: {exc}") from exc
 
         # Ensure uniqueness based on schedule+body
         unique_key = f"{format_schedule(schedule)}|{body}"
         if unique_key in seen_keys:
             raise ValueError(
-                f"REMINDERS.md line {line_no}: duplicate rule (same schedule and body)"
+                "Reminder rules line "
+                f"{line_no}: duplicate rule (same schedule and body)"
             )
         seen_keys.add(unique_key)
 
@@ -219,8 +217,3 @@ def render_reminder_rules_markdown(rules: list[ReminderRule]) -> list[str]:
         lines.append(render_markdown_row([format_schedule(rule.schedule), rule.body]))
     lines.append("")
     return lines
-
-
-def save_reminder_rules(path: str, rules: list[ReminderRule]) -> None:
-    """Persist reminder rules to REMINDERS.md atomically."""
-    atomic_write_note(path, render_reminder_rules_markdown(rules))

@@ -12,6 +12,7 @@ from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     YEARLY_TEMPLATE_PATH,
 )
+from sync.application.study_targets import resolve_study_target_minutes
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import daterange
 from sync.metrics import compute_period_metrics
@@ -33,7 +34,6 @@ from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
 from sync.ports.schedule import ScheduleSource
 from sync.log import get_logger
-from sync.target_policy import study_target_minutes_for_dates
 
 from .goal_sync_service import GoalSyncService
 
@@ -81,20 +81,11 @@ class PeriodSyncService:
         self,
         dates: list[datetime.date],
     ) -> int | None:
-        if not dates:
-            return None
-        try:
-            return study_target_minutes_for_dates(
-                dates, self.schedule_source.resolve_day
-            )
-        except Exception as exc:
-            logger.warning(
-                "Study target unavailable for %s -> %s: %s",
-                dates[0].isoformat(),
-                dates[-1].isoformat(),
-                exc,
-            )
-            return None
+        return resolve_study_target_minutes(
+            dates,
+            schedule_resolver=self.schedule_source.resolve_day,
+            logger=logger,
+        )
 
     def sync_week(
         self,

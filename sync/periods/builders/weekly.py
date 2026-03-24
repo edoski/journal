@@ -7,7 +7,6 @@ import datetime
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import DAYS
-from sync.formatting import format_minutes
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_screen_time,
@@ -17,14 +16,13 @@ from sync.metrics import (
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
-    awake_minutes_for_day,
-    awakenings_for_day,
+    append_activity_summary,
+    compute_sleep_aux_averages,
     compute_avg_schedule,
     mood_for_day,
     sleep_minutes_for_day,
     sleep_stats_table_lines,
     study_minutes_for_day,
-    activity_table_lines,
 )
 from sync.periods.sections import (
     append_interrupts_table,
@@ -89,8 +87,6 @@ def build_weekly_metrics(
 
     # Calculate study total from activity tables (more accurate than frontmatter)
     activity_totals = aggregate_activity_totals(dates, daily_data)
-    study_total_from_activities = sum(activity_totals.values())
-
     sections: list[list[str]] = []
 
     # Summary with MA
@@ -113,7 +109,7 @@ def build_weekly_metrics(
     study_hours = [
         round((m / 60) * 2) / 2 if m is not None and m > 0 else 0 for m in study_minutes
     ]
-    study_values = []
+    study_values: list[str] = []
     for d, m in zip(dates, study_minutes):
         if d > today:
             study_values.append("")
@@ -129,14 +125,7 @@ def build_weekly_metrics(
             )
         )
     )
-    study_lines.append(
-        f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**"
-    )
-    study_lines.append("")
-
-    # Activity table (activity_totals already computed above)
-    study_lines.extend(activity_table_lines(activity_totals))
-    study_lines.append("")
+    append_activity_summary(study_lines, activity_totals)
 
     current_week_date = today if start_date <= today <= end_date else None
     study_lines.extend(
@@ -196,7 +185,7 @@ def build_weekly_metrics(
     sleep_hours = [
         round((m / 60) * 2) / 2 if m is not None else 0 for m in sleep_minutes
     ]
-    sleep_values = []
+    sleep_values: list[str] = []
     for d, m in zip(dates, sleep_minutes):
         if d > today:
             sleep_values.append("")
@@ -214,19 +203,7 @@ def build_weekly_metrics(
     )
     sleep_lines.append("")
 
-    awake_vals = [
-        awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awakenings_vals = [
-        awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awake_values: list[float] = [v for v in awake_vals if v is not None]
-    awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
-
-    avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
-    avg_awakenings = (
-        sum(awakening_values) / len(awakening_values) if awakening_values else None
-    )
+    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
 
     sleep_lines.extend(
         sleep_stats_table_lines(
@@ -241,8 +218,8 @@ def build_weekly_metrics(
 
     # MOOD section (values on top of bars, always show decimal)
     mood_lines = ["### **MOOD**"]
-    mood_chart_vals = [m if m is not None else 0 for m in mood_vals]
-    mood_value_labels = []
+    mood_chart_vals: list[float] = [m if m is not None else 0 for m in mood_vals]
+    mood_value_labels: list[str] = []
     for d, m in zip(dates, mood_vals):
         if d > today:
             mood_value_labels.append("")

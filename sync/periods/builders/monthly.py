@@ -8,7 +8,6 @@ from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import STUDY_TARGET_MIN
 from sync.dates import daterange, format_week_label, month_week_ranges, shift_month
-from sync.formatting import format_minutes
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_screen_time,
@@ -19,9 +18,8 @@ from sync.metrics import (
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
-    activity_table_lines,
-    awake_minutes_for_day,
-    awakenings_for_day,
+    append_activity_summary,
+    compute_sleep_aux_averages,
     compute_avg_schedule,
     mood_for_day,
     sleep_minutes_for_day,
@@ -90,8 +88,6 @@ def build_monthly_metrics(
 
     # Collect study total from activity tables (more accurate than frontmatter)
     activity_totals = aggregate_activity_totals(dates, daily_data)
-    study_total_from_activities = sum(activity_totals.values())
-
     sections: list[list[str]] = []
 
     # Summary with MA
@@ -113,10 +109,10 @@ def build_monthly_metrics(
     study_lines = ["### **STUDY**"]
 
     # Weekly TOTALS for study chart (0-40h scale, 8 visual rows, 6-char bars)
-    week_labels = []
-    week_day_lists = []
-    study_chart_vals = []
-    study_value_labels = []
+    week_labels: list[str] = []
+    week_day_lists: list[list[datetime.date]] = []
+    study_chart_vals: list[float] = []
+    study_value_labels: list[str] = []
 
     for start, end in week_ranges:
         label = format_week_label(start, end)
@@ -166,14 +162,7 @@ def build_monthly_metrics(
             )
         )
     )
-    study_lines.append(
-        f"**`SUM: {format_minutes(study_total_from_activities, always_show_both=True)}`**"
-    )
-    study_lines.append("")
-
-    # Activity table (activity_totals already computed above)
-    study_lines.extend(activity_table_lines(activity_totals))
-    study_lines.append("")
+    append_activity_summary(study_lines, activity_totals)
 
     # Full-study-day deltas per week (pace-normalized by days per bucket)
     study_grid_delta_labels = compute_bucket_deltas(
@@ -278,7 +267,7 @@ def build_monthly_metrics(
     if screen_time_totals:
         # Weekly trend table with wikilinks to weekly notes
         week_labels = [format_week_label(s, e) for s, e in week_ranges]
-        week_wikilinks = []
+        week_wikilinks: list[str] = []
         for (s, _), label in zip(week_ranges, week_labels):
             year, week_num, _ = s.isocalendar()
             week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
@@ -299,8 +288,8 @@ def build_monthly_metrics(
 
     # SLEEP section (5-char bars, weekly averages)
     sleep_lines = ["### **SLEEP**"]
-    sleep_chart_vals = []
-    sleep_value_labels = []
+    sleep_chart_vals: list[float] = []
+    sleep_value_labels: list[str] = []
     for week_days in week_day_lists:
         mins_raw = [sleep_minutes_for_day(daily_data, d) for d in week_days]
         sleep_mins: list[float] = [m for m in mins_raw if m is not None]
@@ -342,19 +331,7 @@ def build_monthly_metrics(
     )
     sleep_lines.append("")
 
-    awake_vals = [
-        awake_minutes_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awakenings_vals = [
-        awakenings_for_day(daily_data, d) for d in dates if daily_data.get(d)
-    ]
-    awake_values: list[float] = [v for v in awake_vals if v is not None]
-    awakening_values: list[int] = [v for v in awakenings_vals if v is not None]
-
-    avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
-    avg_awakenings = (
-        sum(awakening_values) / len(awakening_values) if awakening_values else None
-    )
+    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
 
     sleep_lines.extend(
         sleep_stats_table_lines(
@@ -369,11 +346,11 @@ def build_monthly_metrics(
 
     # MOOD section (5-char bars, weekly averages, always show decimal)
     mood_lines = ["### **MOOD**"]
-    mood_chart_vals = []
-    mood_value_labels = []
+    mood_chart_vals: list[float] = []
+    mood_value_labels: list[str] = []
     for week_days in week_day_lists:
         vals_raw = [mood_for_day(daily_data, d) for d in week_days]
-        vals = [v for v in vals_raw if v is not None]
+        vals: list[float] = [v for v in vals_raw if v is not None]
         start = week_days[0]
         if vals:
             avg_val = sum(vals) / len(vals)  # AVERAGE for mood

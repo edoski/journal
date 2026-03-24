@@ -43,6 +43,7 @@ journal/
       context.py
 
     adapters/                  # Concrete external integrations
+      json_cache_common.py     # Shared validated JSON cache base classes
       flow_sessions.py
       icloud_status.py
       markdown_notes.py
@@ -55,9 +56,15 @@ journal/
 
     application/               # Orchestration over ports/contracts
       daily_sync_service.py
+      goal_note_gateway.py
+      goal_sync_daily.py
+      goal_sync_period.py
       goal_sync_service.py
       period_sync_service.py
+      query_metrics.py
+      query_periods.py
       query_service.py
+      study_targets.py
 
     readers/                   # Markdown parsing (markdown -> contracts)
       schedule.py
@@ -94,7 +101,10 @@ journal/
       constants.py
       labels.py
       breaks.py
-      db.py
+      core_data_time.py
+      repository.py
+      enrichment.py
+      db.py                    # Thin public facade over repository + enrichment
       section.py
 
     goals/
@@ -137,8 +147,13 @@ journal/
     run/
       __main__.py              # Unified runtime composition root
       parser.py                # CLI parser wiring
+      runtime_deps.py          # Runtime dependency container
       wiring.py                # Runtime DI wiring + period runners
       commands/                # Command domain handlers
+        media_common.py
+        media_books.py
+        media_podcast.py
+        media.py               # Small command hub/re-export surface
 
   tests/
     sync/
@@ -182,11 +197,18 @@ journal/
 
 - `DailySyncService`: builds and writes daily note metrics/frontmatter, delegates goal orchestration to `GoalSyncService`.
 - `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation) using explicit target dates from inputs (no wall-clock coupling).
+  - `sync/application/goal_note_gateway.py` is the only application-layer note I/O gateway for goal flows.
+  - `sync/application/goal_sync_daily.py` owns daily goal-note orchestration.
+  - `sync/application/goal_sync_period.py` owns period goal-note orchestration.
+  - `sync/application/goal_sync_service.py` remains the façade injected into higher-level services.
 - `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
   - `sync/periods/engine.py` is a facade; period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
   - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
+  - period navigation lives in `sync/application/query_periods.py`.
+  - metric aggregation/metadata lives in `sync/application/query_metrics.py`.
+  - study-target resolution shared with period sync lives in `sync/application/study_targets.py`.
 
 ### Canonical rendering entrypoints
 
@@ -218,6 +240,10 @@ journal/
 - `ContextSource`:
   - `files_modified_on_date(day) -> list[VaultFileRecord]`
   - `links_for_window(files, start, end) -> list[str]`
+- Study DB access is split into:
+  - `sync/study/repository.py` for Flow SQL and raw row loading
+  - `sync/study/enrichment.py` for dedupe/break/lunch/overrun enrichment
+  - `sync/study/db.py` as the canonical public facade consumed outside `sync/study`
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
   - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation

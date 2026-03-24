@@ -6,7 +6,7 @@ import argparse
 import datetime
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from sync.constants import (
@@ -51,18 +51,37 @@ class GoalTarget:
     period_key: str
 
 
+@dataclass(frozen=True)
+class GoalCommandConfig:
+    """Static filesystem/template configuration for goals commands."""
+
+    journal_dir: str = field(default_factory=lambda: JOURNAL_DIR)
+    daily_template_path: str = field(default_factory=lambda: DAILY_TEMPLATE_PATH)
+    weekly_template_path: str = field(default_factory=lambda: WEEKLY_TEMPLATE_PATH)
+    monthly_template_path: str = field(default_factory=lambda: MONTHLY_TEMPLATE_PATH)
+    quarterly_template_path: str = field(
+        default_factory=lambda: QUARTERLY_TEMPLATE_PATH
+    )
+    yearly_template_path: str = field(default_factory=lambda: YEARLY_TEMPLATE_PATH)
+
+
 def _today() -> datetime.date:
     return datetime.date.today()
 
 
 def _resolve_target(
-    period: GoalPeriod, *, use_next: bool, today: datetime.date
+    period: GoalPeriod,
+    *,
+    use_next: bool,
+    today: datetime.date,
+    config: GoalCommandConfig | None = None,
 ) -> GoalTarget:
+    resolved = config or GoalCommandConfig()
     if period == "daily":
         day = today + datetime.timedelta(days=1 if use_next else 0)
         return GoalTarget(
-            note_path=os.path.join(JOURNAL_DIR, f"{day.isoformat()}.md"),
-            template_path=DAILY_TEMPLATE_PATH,
+            note_path=os.path.join(resolved.journal_dir, f"{day.isoformat()}.md"),
+            template_path=resolved.daily_template_path,
             section="DAILY",
             horizon="daily",
             period_key=day.isoformat(),
@@ -73,8 +92,8 @@ def _resolve_target(
         year, week_num, _ = anchor.isocalendar()
         week_start, _ = iso_week_range(anchor)
         return GoalTarget(
-            note_path=os.path.join(JOURNAL_DIR, f"{year}-W{week_num:02d}.md"),
-            template_path=WEEKLY_TEMPLATE_PATH,
+            note_path=os.path.join(resolved.journal_dir, f"{year}-W{week_num:02d}.md"),
+            template_path=resolved.weekly_template_path,
             section="WEEKLY",
             horizon="weekly",
             period_key=week_start.isoformat(),
@@ -88,8 +107,8 @@ def _resolve_target(
         )
         month_start = datetime.date(year, month, 1)
         return GoalTarget(
-            note_path=os.path.join(JOURNAL_DIR, f"{year}-{month:02d}.md"),
-            template_path=MONTHLY_TEMPLATE_PATH,
+            note_path=os.path.join(resolved.journal_dir, f"{year}-{month:02d}.md"),
+            template_path=resolved.monthly_template_path,
             section="MONTHLY",
             horizon="monthly",
             period_key=month_start.isoformat(),
@@ -101,8 +120,8 @@ def _resolve_target(
             year, quarter_num = shift_quarter(year, quarter_num, 1)
         qid = quarter_id(year, quarter_num)
         return GoalTarget(
-            note_path=os.path.join(JOURNAL_DIR, f"{qid}.md"),
-            template_path=QUARTERLY_TEMPLATE_PATH,
+            note_path=os.path.join(resolved.journal_dir, f"{qid}.md"),
+            template_path=resolved.quarterly_template_path,
             section="QUARTERLY",
             horizon="quarterly",
             period_key=qid,
@@ -111,8 +130,8 @@ def _resolve_target(
     if period == "yearly":
         year = today.year + (1 if use_next else 0)
         return GoalTarget(
-            note_path=os.path.join(JOURNAL_DIR, f"{year}.md"),
-            template_path=YEARLY_TEMPLATE_PATH,
+            note_path=os.path.join(resolved.journal_dir, f"{year}.md"),
+            template_path=resolved.yearly_template_path,
             section="YEARLY",
             horizon="yearly",
             period_key=str(year),
@@ -202,14 +221,24 @@ def _update_note_lines(
     return updated, goal_id, False
 
 
-def cmd_goals_add(args: argparse.Namespace) -> int:
+def cmd_goals_add(
+    args: argparse.Namespace,
+    *,
+    config: GoalCommandConfig | None = None,
+) -> int:
+    resolved = config or GoalCommandConfig()
     text = args.text.strip()
     if not text:
         print("Error: goal text cannot be empty.")
         return 1
 
     use_next = bool(args.next)
-    target = _resolve_target(args.period, use_next=use_next, today=_today())
+    target = _resolve_target(
+        args.period,
+        use_next=use_next,
+        today=_today(),
+        config=resolved,
+    )
     if not os.path.exists(target.note_path) and not os.path.exists(
         target.template_path
     ):
