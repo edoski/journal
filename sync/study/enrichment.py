@@ -253,7 +253,7 @@ def enrich_sessions(
                 next_study_start - session["end"]
             ).total_seconds() / 60
             if actual_break_minutes < session.get("break_expected", 0):
-                session["break_expected"] = int(actual_break_minutes + 0.5)
+                session["break_expected"] = max(0, int(actual_break_minutes + 0.5))
                 session["break_duration"] = session["break_expected"]
             effective_next_start = clamp_next_study_within_day(
                 session["end"],

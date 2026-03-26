@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import sqlite3
+import uuid
 
 import pytest
 
@@ -270,8 +271,9 @@ def _default_schedule() -> DayScheduleProfile:
     )
 
 
-def _make_flow_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(":memory:")
+def _make_flow_conn() -> tuple[sqlite3.Connection, str]:
+    uri = f"file:flow-db-{uuid.uuid4().hex}?mode=memory&cache=shared"
+    conn = sqlite3.connect(uri, uri=True)
     conn.execute(
         """
         CREATE TABLE ZSESSION (
@@ -294,7 +296,7 @@ def _make_flow_conn() -> sqlite3.Connection:
         """
     )
     conn.commit()
-    return conn
+    return conn, uri
 
 
 def _insert_session(
@@ -326,10 +328,13 @@ def _insert_session(
 
 def _load_day_sessions(
     monkeypatch: pytest.MonkeyPatch,
-    conn: sqlite3.Connection,
+    db_uri: str,
     day: datetime.date,
 ) -> list[dict[str, object]]:
-    monkeypatch.setattr("sync.study.db.get_db_connection", lambda: conn)
+    monkeypatch.setattr(
+        "sync.study.db.get_db_connection",
+        lambda readonly=True: sqlite3.connect(db_uri, uri=True),
+    )
     monkeypatch.setattr(
         "sync.study.db.BREAK_DEFAULTS",
         {"shortBreak": 30, "longBreak": 60},
@@ -347,7 +352,7 @@ def test_get_sessions_for_day_rounds_micro_break_gaps(
     expected_break_minutes: int,
 ) -> None:
     day = datetime.date(2025, 12, 27)
-    conn = _make_flow_conn()
+    conn, db_uri = _make_flow_conn()
     first_start = datetime.datetime(2025, 12, 27, 9, 0)
     first_end = datetime.datetime(2025, 12, 27, 10, 0)
     next_start = first_end + datetime.timedelta(seconds=gap_seconds)
@@ -380,18 +385,19 @@ def test_get_sessions_for_day_rounds_micro_break_gaps(
         completed_at=next_start + datetime.timedelta(minutes=60),
     )
 
-    sessions = _load_day_sessions(monkeypatch, conn, day)
+    sessions = _load_day_sessions(monkeypatch, db_uri, day)
 
     assert sessions[0]["break_reason"] is None
     assert sessions[0]["break_expected"] == expected_break_minutes
     assert sessions[0]["break_duration"] == expected_break_minutes
+    conn.close()
 
 
 def test_get_sessions_for_day_restores_lunch_after_micro_session_undo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     day = datetime.date(2025, 12, 27)
-    conn = _make_flow_conn()
+    conn, db_uri = _make_flow_conn()
     lunch_start = datetime.datetime(2025, 12, 27, 12, 30)
     lunch_end = datetime.datetime(2025, 12, 27, 13, 30)
 
@@ -423,18 +429,19 @@ def test_get_sessions_for_day_restores_lunch_after_micro_session_undo(
         completed_at=None,
     )
 
-    sessions = _load_day_sessions(monkeypatch, conn, day)
+    sessions = _load_day_sessions(monkeypatch, db_uri, day)
 
     assert len(sessions) == 1
     assert sessions[0]["break_reason"] == "lunch"
     assert sessions[0]["break_expected"] == 60
+    conn.close()
 
 
-def test_get_sessions_for_day_assigns_lunch_to_later_pre_lunch_session(
+def test_get_sessions_for_day_reuses_repaired_break_before_later_lunch_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     day = datetime.date(2025, 12, 27)
-    conn = _make_flow_conn()
+    conn, db_uri = _make_flow_conn()
     first_end = datetime.datetime(2025, 12, 27, 13, 30)
     second_start = datetime.datetime(2025, 12, 27, 13, 45)
     second_end = datetime.datetime(2025, 12, 27, 14, 0)
@@ -467,20 +474,21 @@ def test_get_sessions_for_day_assigns_lunch_to_later_pre_lunch_session(
         completed_at=second_end,
     )
 
-    sessions = _load_day_sessions(monkeypatch, conn, day)
+    sessions = _load_day_sessions(monkeypatch, db_uri, day)
 
     assert sessions[0]["break_reason"] is None
     assert sessions[0]["break_expected"] == 15
-    assert sessions[0].get("linked_break_start") is None
+    assert sessions[0].get("linked_break_start") == first_end
     assert sessions[1]["break_reason"] == "lunch"
     assert sessions[1]["break_expected"] == 60
+    conn.close()
 
 
-def test_get_sessions_for_day_ignores_open_breaks_before_later_focus(
+def test_get_sessions_for_day_uses_repaired_break_before_later_focus(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     day = datetime.date(2025, 12, 27)
-    conn = _make_flow_conn()
+    conn, db_uri = _make_flow_conn()
     first_end = datetime.datetime(2025, 12, 27, 10, 0)
     next_start = datetime.datetime(2025, 12, 27, 10, 3)
 
@@ -512,8 +520,156 @@ def test_get_sessions_for_day_ignores_open_breaks_before_later_focus(
         completed_at=next_start + datetime.timedelta(minutes=45),
     )
 
-    sessions = _load_day_sessions(monkeypatch, conn, day)
+    sessions = _load_day_sessions(monkeypatch, db_uri, day)
 
     assert sessions[0]["break_expected"] == 3
     assert sessions[0]["break_reason"] is None
-    assert sessions[0].get("linked_break_start") is None
+    assert sessions[0].get("linked_break_start") == first_end
+    conn.close()
+
+
+def test_get_sessions_for_day_clamps_overlapping_next_session_break_to_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn, db_uri = _make_flow_conn()
+    first_start = datetime.datetime(2025, 12, 27, 12, 0)
+    overlapping_start = datetime.datetime(2025, 12, 27, 12, 59)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=first_start,
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=overlapping_start,
+        duration=30,
+        phase="flow",
+        title="Study",
+        completed_at=None,
+    )
+
+    sessions = _load_day_sessions(monkeypatch, db_uri, day)
+
+    assert sessions[0]["break_expected"] == 0
+    assert sessions[0]["break_duration"] == 0
+    repaired_completed_at = conn.execute(
+        "SELECT ZCOMPLETEDAT FROM ZSESSION WHERE Z_PK = 1"
+    ).fetchone()
+    assert repaired_completed_at is not None
+    assert core_data_to_datetime(repaired_completed_at[0]) == overlapping_start
+    conn.close()
+
+
+def test_get_sessions_for_day_repairs_superseded_open_break_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn, db_uri = _make_flow_conn()
+    focus_end = datetime.datetime(2025, 12, 27, 10, 0)
+    next_start = datetime.datetime(2025, 12, 27, 10, 3)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=datetime.datetime(2025, 12, 27, 9, 0),
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=focus_end,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=focus_end,
+        duration=30,
+        phase="shortBreak",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=3,
+        start=next_start,
+        duration=45,
+        phase="flow",
+        title="Study",
+        completed_at=next_start + datetime.timedelta(minutes=45),
+    )
+
+    _load_day_sessions(monkeypatch, db_uri, day)
+
+    repaired_completed_at = conn.execute(
+        "SELECT ZCOMPLETEDAT FROM ZSESSION WHERE Z_PK = 2"
+    ).fetchone()
+    assert repaired_completed_at is not None
+    assert core_data_to_datetime(repaired_completed_at[0]) == next_start
+    conn.close()
+
+
+def test_get_sessions_for_day_leaves_latest_open_row_unrepaired(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn, db_uri = _make_flow_conn()
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=datetime.datetime(2025, 12, 27, 12, 0),
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=None,
+    )
+
+    _load_day_sessions(monkeypatch, db_uri, day)
+
+    repaired_completed_at = conn.execute(
+        "SELECT ZCOMPLETEDAT FROM ZSESSION WHERE Z_PK = 1"
+    ).fetchone()
+    assert repaired_completed_at is not None
+    assert repaired_completed_at[0] is None
+    conn.close()
+
+
+def test_get_sessions_for_day_does_not_repair_from_next_day_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    day = datetime.date(2025, 12, 27)
+    conn, db_uri = _make_flow_conn()
+    next_day_start = datetime.datetime(2025, 12, 28, 8, 0)
+
+    _insert_session(
+        conn,
+        pk=1,
+        start=datetime.datetime(2025, 12, 27, 23, 0),
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=None,
+    )
+    _insert_session(
+        conn,
+        pk=2,
+        start=next_day_start,
+        duration=60,
+        phase="flow",
+        title="Study",
+        completed_at=next_day_start + datetime.timedelta(minutes=60),
+    )
+
+    _load_day_sessions(monkeypatch, db_uri, day)
+
+    repaired_completed_at = conn.execute(
+        "SELECT ZCOMPLETEDAT FROM ZSESSION WHERE Z_PK = 1"
+    ).fetchone()
+    assert repaired_completed_at is not None
+    assert repaired_completed_at[0] is None
+    conn.close()

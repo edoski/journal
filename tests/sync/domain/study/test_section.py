@@ -117,3 +117,15 @@ def test_build_study_section_renders_explicit_zero_minute_break():
     lines, _ = build_study_section(sessions, {})
 
     assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `0m` | – | – |" in lines
+
+
+def test_build_study_section_renders_zero_minute_break_when_gap_is_known():
+    day = datetime.date(2026, 3, 2)
+    sessions = [_session_for(day, 9, 0, 10, 0)]
+    sessions[0]["break_expected"] = 0
+    sessions[0]["break_duration"] = 0
+    sessions[0]["break_missing"] = True
+
+    lines, _ = build_study_section(sessions, {})
+
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `0m` | – | – |" in lines

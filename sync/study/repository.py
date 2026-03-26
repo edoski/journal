@@ -48,12 +48,14 @@ def read_break_defaults() -> dict[str, int | None]:
     return result
 
 
-def get_db_connection() -> sqlite3.Connection:
-    """Open the Flow database in read-only mode."""
+def get_db_connection(readonly: bool = True) -> sqlite3.Connection:
+    """Open the Flow database in read-only or writable mode."""
     if not os.path.exists(DB_PATH):
         logger.error("Database not found at %s", DB_PATH)
         raise FileNotFoundError(f"Flow database not found at {DB_PATH}")
-    return sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    if readonly:
+        return sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    return sqlite3.connect(str(DB_PATH))
 
 
 def fetch_sessions_for_day(
