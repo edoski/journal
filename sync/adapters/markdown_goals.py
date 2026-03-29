@@ -30,16 +30,29 @@ class MarkdownGoalStore(GoalStore):
             period_key=period_key,
         )
 
-    def apply(self, lines: list[str], sections: list[GoalSection]) -> list[str]:
+    def apply(
+        self,
+        lines: list[str],
+        sections: list[GoalSection],
+        *,
+        insert_after_idx: int | None = None,
+    ) -> list[str]:
         """Return lines with rebuilt goals sections."""
         rendered_sections = [(item.section, item.lines) for item in sections]
-        return apply_goals_sections(lines, rendered_sections, insert_if_missing=True)
+        return apply_goals_sections(
+            lines,
+            rendered_sections,
+            insert_if_missing=True,
+            insert_after_idx=insert_after_idx,
+        )
 
     def write(
         self,
         path: str,
         lines: list[str],
         sections: list[GoalSection],
+        *,
+        insert_after_idx: int | None = None,
     ) -> list[str]:
         """Persist rebuilt goals sections and return written lines."""
         rendered_sections = [(item.section, item.lines) for item in sections]
@@ -47,6 +60,7 @@ class MarkdownGoalStore(GoalStore):
             lines,
             rendered_sections,
             insert_if_missing=True,
+            insert_after_idx=insert_after_idx,
         )
         atomic_write_note(path, updated)
         return updated

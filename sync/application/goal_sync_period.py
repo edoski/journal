@@ -9,6 +9,7 @@ from sync.application.goal_note_gateway import GoalNoteGateway
 from sync.constants import MONTHLY_TEMPLATE_PATH, QUARTERLY_TEMPLATE_PATH
 from sync.contracts.goals import Goal, GoalSection
 from sync.goals.carry_forward import carry_forward_with_tombstones
+from sync.goals.note_store import render_goals_or_empty
 from sync.goals.period_pipeline import (
     CarryForwardConfig,
     MirrorSyncConfig,
@@ -105,14 +106,14 @@ class PeriodGoalNoteSync:
                     [
                         GoalSection(
                             section="QUARTERLY",
-                            lines=self._render_goals_or_empty(
+                            lines=render_goals_or_empty(
                                 "QUARTERLY",
                                 existing_quarterly,
                             ),
                         ),
                         GoalSection(
                             section="MONTHLY",
-                            lines=self._render_goals_or_empty("MONTHLY", monthly_tasks),
+                            lines=render_goals_or_empty("MONTHLY", monthly_tasks),
                         ),
                     ],
                 )
@@ -148,11 +149,11 @@ class PeriodGoalNoteSync:
                     [
                         GoalSection(
                             section="YEARLY",
-                            lines=self._render_goals_or_empty("YEARLY", yearly_mirror),
+                            lines=render_goals_or_empty("YEARLY", yearly_mirror),
                         ),
                         GoalSection(
                             section="QUARTERLY",
-                            lines=self._render_goals_or_empty(
+                            lines=render_goals_or_empty(
                                 "QUARTERLY",
                                 quarterly_tasks,
                             ),
@@ -242,11 +243,11 @@ class PeriodGoalNoteSync:
                     [
                         GoalSection(
                             section="YEARLY",
-                            lines=self._render_goals_or_empty("YEARLY", yearly_mirror),
+                            lines=render_goals_or_empty("YEARLY", yearly_mirror),
                         ),
                         GoalSection(
                             section="QUARTERLY",
-                            lines=self._render_goals_or_empty(
+                            lines=render_goals_or_empty(
                                 "QUARTERLY",
                                 quarterly_tasks,
                             ),
@@ -298,7 +299,7 @@ class PeriodGoalNoteSync:
             period_key=str(window.year),
         )
 
-        today = window.end
+        today = window.target_date
         yearly_sync = sync_mirror_section(
             yearly_tasks,
             yearly_mirror,
@@ -323,7 +324,7 @@ class PeriodGoalNoteSync:
                     [
                         GoalSection(
                             section="YEARLY",
-                            lines=self._render_goals_or_empty("YEARLY", yearly_tasks),
+                            lines=render_goals_or_empty("YEARLY", yearly_tasks),
                         )
                     ],
                 )
@@ -334,7 +335,7 @@ class PeriodGoalNoteSync:
                 GoalSection(section="YEARLY", lines=yearly_sync.mirror_lines),
                 GoalSection(
                     section="QUARTERLY",
-                    lines=self._render_goals_or_empty("QUARTERLY", quarterly_tasks),
+                    lines=render_goals_or_empty("QUARTERLY", quarterly_tasks),
                 ),
             ],
         )
@@ -371,7 +372,7 @@ class PeriodGoalNoteSync:
             [
                 GoalSection(
                     section="YEARLY",
-                    lines=self._render_goals_or_empty("YEARLY", yearly_tasks),
+                    lines=render_goals_or_empty("YEARLY", yearly_tasks),
                 )
             ],
         )
@@ -380,9 +381,3 @@ class PeriodGoalNoteSync:
     def _quarter_key(day: datetime.date) -> str:
         quarter = ((day.month - 1) // 3) + 1
         return f"{day.year}-Q{quarter}"
-
-    @staticmethod
-    def _render_goals_or_empty(subsection: str, goals: list[Goal]) -> list[str]:
-        from sync.goals.note_store import render_goals_or_empty
-
-        return render_goals_or_empty(subsection, goals)

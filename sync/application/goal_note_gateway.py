@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import os
 from dataclasses import dataclass
 
 from sync.constants import (
@@ -10,8 +11,10 @@ from sync.constants import (
     QUARTERLY_TEMPLATE_PATH,
     WEEKLY_TEMPLATE_PATH,
 )
-from sync.contracts.goals import Goal, GoalSection
+from sync.contracts.goals import Goal, GoalAddResult, GoalSection, GoalWriteTarget
 from sync.dates import iso_week_range, quarter_id, quarter_of_date
+from sync.goals.note_store import add_goal_to_note, render_goals_or_empty
+from sync.notes.locking import locked_note
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
 from sync.periods.runtime import journal_path
@@ -46,6 +49,33 @@ class GoalNoteGateway:
 
     note_store: NoteStore
     goal_store: GoalStore
+
+    def add_goal(
+        self,
+        target: GoalWriteTarget,
+        goal_text: str,
+        *,
+        insert_after_idx: int | None = None,
+    ) -> GoalAddResult:
+        """Create a note if needed, insert a goal, and persist the update."""
+        if not os.path.exists(target.note_path) and not os.path.exists(
+            target.template_path
+        ):
+            raise FileNotFoundError(target.template_path)
+
+        with locked_note(target.note_path):
+            lines = self.note_store.read_or_create(
+                target.note_path, target.template_path
+            )
+            result = add_goal_to_note(
+                lines,
+                target=target,
+                goal_text=goal_text,
+                insert_after_idx=insert_after_idx,
+            )
+            if not result.duplicate:
+                self.note_store.write(target.note_path, result.updated_lines)
+            return result
 
     def load_daily_sources(self, day: datetime.date) -> DailyGoalSources:
         week_start, _ = iso_week_range(day)
@@ -126,11 +156,11 @@ class GoalNoteGateway:
             [
                 GoalSection(
                     section="MONTHLY",
-                    lines=self._render_or_empty("MONTHLY", existing_monthly),
+                    lines=render_goals_or_empty("MONTHLY", existing_monthly),
                 ),
                 GoalSection(
                     section="WEEKLY",
-                    lines=self._render_or_empty("WEEKLY", weekly_tasks),
+                    lines=render_goals_or_empty("WEEKLY", weekly_tasks),
                 ),
             ],
         )
@@ -151,11 +181,11 @@ class GoalNoteGateway:
                 [
                     GoalSection(
                         section="QUARTERLY",
-                        lines=self._render_or_empty("QUARTERLY", existing_quarterly),
+                        lines=render_goals_or_empty("QUARTERLY", existing_quarterly),
                     ),
                     GoalSection(
                         section="MONTHLY",
-                        lines=self._render_or_empty("MONTHLY", monthly_tasks),
+                        lines=render_goals_or_empty("MONTHLY", monthly_tasks),
                     ),
                 ],
             )
@@ -181,11 +211,11 @@ class GoalNoteGateway:
                 [
                     GoalSection(
                         section="YEARLY",
-                        lines=self._render_or_empty("YEARLY", resolved_yearly),
+                        lines=render_goals_or_empty("YEARLY", resolved_yearly),
                     ),
                     GoalSection(
                         section="QUARTERLY",
-                        lines=self._render_or_empty(
+                        lines=render_goals_or_empty(
                             "QUARTERLY",
                             resolved_quarterly,
                         ),
@@ -216,8 +246,3 @@ class GoalNoteGateway:
             path=path,
             lines=lines,
         )
-
-    def _render_or_empty(self, section: str, goals: list[Goal]) -> list[str]:
-        from sync.goals.note_store import render_goals_or_empty
-
-        return render_goals_or_empty(section, goals)

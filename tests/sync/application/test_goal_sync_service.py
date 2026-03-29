@@ -56,11 +56,13 @@ class _StubGoalStore:
         _ = horizon, period_key
         return []
 
-    def apply(self, lines: list[str], sections):
+    def apply(self, lines: list[str], sections, *, insert_after_idx=None):
+        _ = insert_after_idx
         self.last_sections = sections
         return lines
 
-    def write(self, _path: str, lines: list[str], _sections):
+    def write(self, _path: str, lines: list[str], _sections, *, insert_after_idx=None):
+        _ = insert_after_idx
         return lines
 
 
@@ -146,7 +148,7 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
         reconcile_cache_store=_StubReconcileCacheStore(),
     )
 
-    window = build_year_window(2026)
+    window = build_year_window(2026, target_date=datetime.date(2026, 6, 1))
     lines = ["## Goals", "", "## Metrics"]
 
     carry_calls = []
@@ -211,12 +213,58 @@ def test_sync_quarterly_note_renders_empty_quarterly_placeholder(tmp_path):
     updated = service.sync_quarterly_note(
         lines,
         note_path=str(tmp_path / "2026-Q1.md"),
-        window=build_quarter_window(2026, 1),
+        window=build_quarter_window(
+            2026,
+            1,
+            target_date=datetime.date(2026, 2, 15),
+        ),
     )
 
     updated_text = "\n".join(updated)
     assert "_No yearly goals have been defined yet._" in updated_text
     assert "_No quarterly goals have been defined yet._" in updated_text
+
+
+def test_sync_quarterly_note_uses_target_date_for_yearly_mirror(
+    monkeypatch,
+    tmp_path,
+):
+    note_store = _StubNoteStore()
+    goal_store = _StubGoalStore()
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=_StubCarryCacheStore(),
+        reconcile_cache_store=_StubReconcileCacheStore(),
+    )
+
+    mirror_today_calls: list[datetime.date] = []
+
+    def _mirror_stub(*_args, **kwargs):
+        mirror_today_calls.append(kwargs["today"])
+        return MirrorSyncResult([], [], False, ["mirror"])
+
+    monkeypatch.setattr(
+        "sync.application.goal_sync_period.load_source_tasks_with_carry_forward",
+        lambda *_a, **_kw: [],
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_period.sync_mirror_section",
+        _mirror_stub,
+    )
+
+    updated = service.sync_quarterly_note(
+        ["## Goals", "---", "### **YEARLY**", "", "### **QUARTERLY**", ""],
+        note_path=str(tmp_path / "2026-Q1.md"),
+        window=build_quarter_window(
+            2026,
+            1,
+            target_date=datetime.date(2026, 2, 11),
+        ),
+    )
+
+    assert updated == ["## Goals", "---", "### **YEARLY**", "", "### **QUARTERLY**", ""]
+    assert mirror_today_calls == [datetime.date(2026, 2, 11)]
 
 
 def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
@@ -394,6 +442,84 @@ def test_sync_daily_note_renders_empty_daily_placeholder(monkeypatch, tmp_path):
         reminder_rules=[],
     )
     assert updated_again == updated
+
+
+def test_sync_daily_note_inserts_goals_after_yaml(monkeypatch, tmp_path):
+    note_store = _StubNoteStore()
+    goal_store = MarkdownGoalStore()
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=JsonGoalCarryForwardCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+        reconcile_cache_store=JsonGoalReconcileCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+    )
+
+    day = datetime.date(2026, 2, 14)
+    lines = [
+        "---",
+        "date: 2026-02-14",
+        "---",
+        "## Metrics",
+        "---",
+    ]
+
+    monkeypatch.setattr(
+        "sync.application.goal_sync_daily.carry_forward_daily_tasks",
+        lambda _today, _yesterday, existing_daily_tasks, **_kwargs: (
+            existing_daily_tasks,
+            0,
+        ),
+    )
+    monkeypatch.setattr(
+        service.gateway,
+        "load_daily_sources",
+        lambda _day: DailyGoalSources(
+            weekly_tasks=[],
+            monthly_tasks=[],
+            quarterly_tasks=[],
+            yearly_tasks=[],
+            weekly_path="weekly.md",
+            monthly_path="monthly.md",
+            quarterly_path="quarterly.md",
+        ),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_daily.reconcile_goal_lists",
+        lambda *_a, **_kw: ([], [], False, False),
+    )
+    monkeypatch.setattr(
+        "sync.application.goal_sync_daily.process_pierced_goals",
+        lambda *_a, **kwargs: (
+            kwargs["existing_tasks"],
+            [],
+            kwargs["source_goal_lists"],
+        ),
+    )
+
+    updated = service.sync_daily_note(
+        lines,
+        day=day,
+        note_path=str(tmp_path / "2026-02-14.md"),
+        yaml_end_idx=2,
+        reminder_rules=[],
+    )
+
+    assert updated[:7] == [
+        "---",
+        "date: 2026-02-14",
+        "---",
+        "## Goals",
+        "---",
+        "### **WEEKLY**",
+        "",
+    ]
+    assert "## Metrics" in updated
 
 
 class _StubCarryCacheStore:

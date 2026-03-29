@@ -6,6 +6,8 @@ import datetime
 import re
 from dataclasses import dataclass, field
 
+from sync.contracts.cache import GoalHorizon
+
 
 def _canonical_goal_text(text: str) -> str:
     """Normalize goal text for comparison and deduplication."""
@@ -45,3 +47,23 @@ class GoalSection:
 
     section: str
     lines: list[str]
+
+
+@dataclass(frozen=True)
+class GoalWriteTarget:
+    """Resolved note metadata for a goal write operation."""
+
+    note_path: str
+    template_path: str
+    section: str
+    horizon: GoalHorizon
+    period_key: str
+
+
+@dataclass(frozen=True)
+class GoalAddResult:
+    """Result of inserting a goal into a note."""
+
+    updated_lines: list[str]
+    goal_id: str | None
+    duplicate: bool

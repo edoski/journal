@@ -243,11 +243,12 @@ def run_quarterly_sync(
             raise ValueError("Quarter must be in format YYYY-Qn")
         year = int(parts[0])
         quarter_num = int(parts[1])
+        today = datetime.date.today()
     else:
         today = datetime.date.today()
         year, quarter_num = quarter_of_date(today)
 
-    window = build_quarter_window(year, quarter_num)
+    window = build_quarter_window(year, quarter_num, target_date=today)
     note_path = resolve_note_path(window.filename)
 
     _build_period_sync_service(deps=resolved).sync_quarter(window, note_path)
@@ -263,10 +264,12 @@ def run_yearly_sync(
 
     if year_arg:
         year = int(year_arg)
+        today = datetime.date.today()
     else:
-        year = datetime.date.today().year
+        today = datetime.date.today()
+        year = today.year
 
-    window = build_year_window(year)
+    window = build_year_window(year, target_date=today)
     note_path = resolve_note_path(window.filename)
 
     _build_period_sync_service(deps=resolved).sync_year(window, note_path)

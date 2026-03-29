@@ -21,7 +21,13 @@ class GoalStore(Protocol):
         """Extract goals from a section."""
         ...
 
-    def apply(self, lines: list[str], sections: list[GoalSection]) -> list[str]:
+    def apply(
+        self,
+        lines: list[str],
+        sections: list[GoalSection],
+        *,
+        insert_after_idx: int | None = None,
+    ) -> list[str]:
         """Return lines with goals sections replaced."""
         ...
 
@@ -30,6 +36,8 @@ class GoalStore(Protocol):
         path: str,
         lines: list[str],
         sections: list[GoalSection],
+        *,
+        insert_after_idx: int | None = None,
     ) -> list[str]:
         """Persist and return updated lines."""
         ...

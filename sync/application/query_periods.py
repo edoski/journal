@@ -42,14 +42,18 @@ class PeriodNavigator:
             )
         if period == "quarter":
             year, quarter_num = quarter_of_date(anchor_date)
-            quarter_window = build_quarter_window(year, quarter_num)
+            quarter_window = build_quarter_window(
+                year,
+                quarter_num,
+                target_date=anchor_date,
+            )
             return (
                 quarter_window.start,
                 quarter_window.end,
                 f"{quarter_window.year}-Q{quarter_window.quarter}",
             )
         if period == "year":
-            year_window = build_year_window(anchor_date.year)
+            year_window = build_year_window(anchor_date.year, target_date=anchor_date)
             return year_window.start, year_window.end, f"{year_window.year}"
         raise ValueError(f"Unsupported period: {period}")
 
@@ -69,7 +73,14 @@ class PeriodNavigator:
         if period == "quarter":
             year, quarter_num = quarter_of_date(anchor_date)
             new_year, new_quarter = shift_quarter(year, quarter_num, delta)
-            return build_quarter_window(new_year, new_quarter).start
+            return build_quarter_window(
+                new_year,
+                new_quarter,
+                target_date=anchor_date,
+            ).start
         if period == "year":
-            return build_year_window(anchor_date.year + delta).start
+            return build_year_window(
+                anchor_date.year + delta,
+                target_date=anchor_date,
+            ).start
         raise ValueError(f"Unsupported period: {period}")

@@ -168,7 +168,7 @@ def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
         goal_sync_service=goal_sync_service,
     )
 
-    window = build_year_window(2026)
+    window = build_year_window(2026, target_date=datetime.date(2026, 6, 1))
     note_path = str(tmp_path / window.filename)
 
     monkeypatch.setattr(

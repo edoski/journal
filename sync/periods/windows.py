@@ -71,6 +71,7 @@ class MonthWindow:
 class QuarterWindow:
     """Window metadata for a quarterly sync run."""
 
+    target_date: datetime.date
     year: int
     quarter: int
     start: datetime.date
@@ -95,6 +96,7 @@ class QuarterWindow:
 class YearWindow:
     """Window metadata for a yearly sync run."""
 
+    target_date: datetime.date
     year: int
     start: datetime.date
     end: datetime.date
@@ -166,7 +168,12 @@ def build_month_window(target_date: datetime.date) -> MonthWindow:
     )
 
 
-def build_quarter_window(year: int, quarter: int) -> QuarterWindow:
+def build_quarter_window(
+    year: int,
+    quarter: int,
+    *,
+    target_date: datetime.date,
+) -> QuarterWindow:
     """Build quarter window metadata."""
     start, end = quarter_range(year, quarter)
     filename = f"{year}-Q{quarter}.md"
@@ -176,6 +183,7 @@ def build_quarter_window(year: int, quarter: int) -> QuarterWindow:
     previous_filename = f"{previous_year}-Q{previous_quarter_num}.md"
 
     return QuarterWindow(
+        target_date=target_date,
         year=year,
         quarter=quarter,
         start=start,
@@ -190,13 +198,14 @@ def build_quarter_window(year: int, quarter: int) -> QuarterWindow:
     )
 
 
-def build_year_window(year: int) -> YearWindow:
+def build_year_window(year: int, *, target_date: datetime.date) -> YearWindow:
     """Build year window metadata."""
     start, end = year_range(year)
     previous_year = year - 1
     previous_start, previous_end = year_range(previous_year)
 
     return YearWindow(
+        target_date=target_date,
         year=year,
         start=start,
         end=end,

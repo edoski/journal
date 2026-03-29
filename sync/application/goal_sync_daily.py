@@ -6,21 +6,20 @@ import datetime
 from dataclasses import dataclass
 
 from sync.application.goal_note_gateway import GoalNoteGateway
-from sync.contracts.goals import Goal
+from sync.contracts.goals import GoalSection
 from sync.contracts.reminders import ReminderRule
 from sync.goals.daily_pipeline import (
     carry_forward_daily_tasks,
     parse_daily_goal_subsections,
 )
+from sync.goals.note_store import render_goals_or_empty
 from sync.goals.identity import goal_id_kind
 from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
 from sync.goals.reminders import get_reminders_for_date
-from sync.notes.sections import goals_section_bounds
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
 from sync.readers.goals import filter_by_proximity
-from sync.writers.goals import build_goals_block
 
 
 @dataclass(frozen=True)
@@ -85,7 +84,7 @@ class DailyGoalNoteSync:
         )
 
         filtered_weekly = filter_by_proximity(updated_weekly_tasks, 7, day)
-        weekly_lines = self._render_goals_or_empty(
+        weekly_lines = render_goals_or_empty(
             "WEEKLY",
             filtered_weekly,
             today=day,
@@ -126,35 +125,17 @@ class DailyGoalNoteSync:
                 yearly_tasks=updated_yearly if yearly_changed else None,
             )
 
-        daily_source_lines = self._render_goals_or_empty(
+        daily_source_lines = render_goals_or_empty(
             "DAILY",
             [*original_daily, *final_pierced],
             today=day,
         )
 
-        goals_block = build_goals_block(
+        return self.goal_store.apply(
+            lines,
             [
-                ("WEEKLY", weekly_lines),
-                ("DAILY", daily_source_lines),
-            ]
+                GoalSection(section="WEEKLY", lines=weekly_lines),
+                GoalSection(section="DAILY", lines=daily_source_lines),
+            ],
+            insert_after_idx=yaml_end_idx,
         )
-
-        updated = lines[:]
-        g_start, g_end = goals_section_bounds(updated)
-        if g_start == -1:
-            insert_pos = yaml_end_idx + 1 if yaml_end_idx != -1 else 0
-            updated[insert_pos:insert_pos] = goals_block
-        else:
-            updated[g_start:g_end] = goals_block
-        return updated
-
-    @staticmethod
-    def _render_goals_or_empty(
-        subsection: str,
-        goals: list[Goal],
-        *,
-        today: datetime.date | None = None,
-    ) -> list[str]:
-        from sync.goals.note_store import render_goals_or_empty
-
-        return render_goals_or_empty(subsection, goals, today=today)

@@ -198,6 +198,7 @@ journal/
 - `DailySyncService`: builds and writes daily note metrics/frontmatter, delegates goal orchestration to `GoalSyncService`.
 - `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation) using explicit target dates from inputs (no wall-clock coupling).
   - `sync/application/goal_note_gateway.py` is the only application-layer note I/O gateway for goal flows.
+  - `GoalNoteGateway.add_goal(...)` is the canonical single-note goal insertion path used by CLI flows; do not reintroduce command-local note surgery.
   - `sync/application/goal_sync_daily.py` owns daily goal-note orchestration.
   - `sync/application/goal_sync_period.py` owns period goal-note orchestration.
   - `sync/application/goal_sync_service.py` remains the façade injected into higher-level services.
@@ -233,8 +234,11 @@ journal/
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `GoalStore`:
   - `extract(lines, section, horizon=None, period_key=None) -> list[Goal]`
-  - `apply(lines, sections) -> list[str]`
-  - `write(path, lines, sections) -> list[str]`
+  - `apply(lines, sections, insert_after_idx=None) -> list[str]`
+  - `write(path, lines, sections, insert_after_idx=None) -> list[str]`
+- Goal write contracts:
+  - `GoalWriteTarget` in `sync/contracts/goals.py` is the canonical resolved target payload for goal note edits.
+  - `GoalAddResult` in `sync/contracts/goals.py` is the canonical result payload for single-goal insertions.
 - `ReminderRuleStore.load()/save(rules)`
 - `MediaSource.scan(start, end) -> MediaBundle`
 - `ContextSource`:
@@ -252,6 +256,9 @@ journal/
 - Reminder schedule parsing/formatting is canonical in:
   - `sync/goals/reminder_codec.py`
   - `sync/contracts/reminders.py` stays typed contracts only
+- Quarter/year sync windows must carry explicit execution anchors:
+  - `QuarterWindow.target_date`
+  - `YearWindow.target_date`
 
 ## Canonical Markdown Schemas
 

@@ -242,6 +242,26 @@ class TestSpliceGoalsSection:
         assert result is True
         assert lines == ["## Goals", "- [ ] Task"]
 
+    def test_insert_if_missing_after_index(self):
+        lines = ["---", "date: 2026-02-14", "---", "## Metrics", "Content"]
+        new_block = ["## Goals", "- [ ] Task"]
+        result = splice_goals_section(
+            lines,
+            new_block,
+            insert_if_missing=True,
+            insert_after_idx=2,
+        )
+        assert result is True
+        assert lines == [
+            "---",
+            "date: 2026-02-14",
+            "---",
+            "## Goals",
+            "- [ ] Task",
+            "## Metrics",
+            "Content",
+        ]
+
 
 class TestExtractSubsectionTasks:
     """Tests for extract_subsection_tasks function."""

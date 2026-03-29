@@ -126,13 +126,19 @@ def splice_goals_section(
     lines: list[str],
     new_block: list[str],
     insert_if_missing: bool = False,
+    *,
+    insert_after_idx: int | None = None,
 ) -> bool:
     """Replace the Goals section in lines with new_block."""
     g_start, g_end = goals_section_bounds(lines)
     if g_start < 0:
         if insert_if_missing:
-            separator = [""] if lines and lines[0].strip() else []
-            lines[:] = new_block + separator + lines[:]
+            if insert_after_idx is not None:
+                insert_pos = max(0, min(insert_after_idx + 1, len(lines)))
+                lines[insert_pos:insert_pos] = new_block
+            else:
+                separator = [""] if lines and lines[0].strip() else []
+                lines[:] = new_block + separator + lines[:]
             return True
         return False
     lines[g_start:g_end] = new_block

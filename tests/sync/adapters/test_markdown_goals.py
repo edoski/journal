@@ -73,3 +73,27 @@ def test_write_persists_rebuilt_sections(tmp_path):
     assert "Weekly v2" in content
     assert "Daily v2" in content
     assert any("Weekly v2" in line for line in written)
+
+
+def test_apply_inserts_missing_goals_after_anchor():
+    store = MarkdownGoalStore()
+    lines = ["---", "date: 2026-02-14", "---", "## Metrics", "---"]
+
+    updated = store.apply(
+        lines,
+        sections=[
+            GoalSection(
+                section="DAILY",
+                lines=["- [ ] Daily task ^gid-mabc123456"],
+            )
+        ],
+        insert_after_idx=2,
+    )
+
+    assert updated[:5] == [
+        "---",
+        "date: 2026-02-14",
+        "---",
+        "## Goals",
+        "---",
+    ]
