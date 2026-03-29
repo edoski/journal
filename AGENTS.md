@@ -189,6 +189,9 @@ journal/
 - Markdown tables are rendered only via `sync/writers/tables/api.py::render_table(spec)`.
 - Markdown table parsing/row escaping is centralized in `sync/notes/markdown_tables.py`.
 - Chart/table specs should expose one canonical field type per value slot; normalize richer domain payloads at call sites instead of widening spec fields with unions.
+- Vertical bar charts are geometry-driven: placement of value labels, in-chart labels, and overflow/top rows must be derived from shared bar/anchor geometry rather than metric-specific special cases.
+- Every vertical-chart row above the axis is a chart-area row and must start with the chart y-axis glyph at column 0, including any overflow/top annotation rows.
+- Additional vertical-chart top rows are data-driven and should be emitted only when the current labels/values require them; avoid fixed extra headroom rows and metric-specific hacks.
 - Do not reintroduce legacy one-off chart/table helpers or compatibility shims.
 
 ## Canonical Services and Interfaces

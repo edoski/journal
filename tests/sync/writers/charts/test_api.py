@@ -13,7 +13,12 @@ from sync.writers.charts import (
     ColumnTrack,
     DECIMAL_ONE_LABEL,
     HAnchor,
+    MONTHLY_WEEK_METRIC,
+    MONTHLY_WEEK_MOOD,
     MONTHLY_WEEK_STUDY,
+    QUARTERLY_3MONTH_METRIC,
+    QUARTERLY_3MONTH_MOOD,
+    QUARTERLY_3MONTH_STUDY,
     QuarterlyStudyCoverageRowsSpec,
     TEST_CHART,
     TIME_LABEL_MIN2H,
@@ -24,11 +29,15 @@ from sync.writers.charts import (
     VerticalBarProfile,
     VerticalBarSpec,
     WEEKLY_7DAY_CHART,
+    WEEKLY_7DAY_MOOD,
     WaterfallSpec,
     WeeklyStudyGridSpec,
     WeeklyTrainingGridSpec,
     MonthlyStudyGridSpec,
     MonthlyTrainingGridSpec,
+    YEARLY_4QTR_METRIC,
+    YEARLY_4QTR_MOOD,
+    YEARLY_4QTR_STUDY,
     YearlyStudyCoverageRowsSpec,
     compress_activity_time_order,
     compress_days_time_order,
@@ -99,6 +108,7 @@ class TestVerticalBarRenderer:
             )
         )
         body = _fenced_body(lines)
+        assert body[0].startswith("│")
         assert "10h" in body[0]
 
     def test_overflow_row_for_half_block_at_chart_ceiling(self):
@@ -112,6 +122,7 @@ class TestVerticalBarRenderer:
         )
         body = _fenced_body(lines)
 
+        assert body[0].startswith("│")
         assert "9h36m" in body[0]
         assert "▄▄▄▄▄" in body[1]
 
@@ -383,7 +394,7 @@ class TestVerticalBarRenderer:
         filled_rows = sum(1 for line in bar_area if "█" in line)
         assert filled_rows == 1
 
-    def test_overflow_row_keeps_custom_prefix_and_renders_later_labels(self):
+    def test_overflow_row_uses_chart_rail_and_renders_later_labels(self):
         profile = VerticalBarProfile(
             height=3,
             y_max=3,
@@ -409,7 +420,7 @@ class TestVerticalBarRenderer:
             )
         )
         overflow = body[0]
-        assert overflow.startswith("  ")
+        assert overflow.startswith("│")
         assert "AB" in overflow
 
     def test_label_center_adjustment_applies_for_five_char_labels(self):
@@ -438,7 +449,7 @@ class TestVerticalBarRenderer:
             )
         )
         overflow = body[0]
-        assert overflow[1:3] == "VV"
+        assert overflow[2:4] == "VV"
 
     def test_ymax_one_scales_single_unit_to_full_height(self):
         profile = VerticalBarProfile(
@@ -490,7 +501,7 @@ class TestVerticalBarRenderer:
                 )
             )
         )
-        assert body[0].startswith("X")
+        assert body[0].startswith("│")
         assert "MAX" in body[0]
 
     def test_height_zero_does_not_render_overflow_labels(self):
@@ -545,7 +556,7 @@ class TestVerticalBarRenderer:
             )
         )
         assert body == [
-            "X  ABC",
+            "│  ABC",
             "│  ████",
             "│  ████",
             "│  ████",
@@ -696,7 +707,7 @@ class TestVerticalBarRenderer:
                 )
             )
         )
-        assert body[0] == "XABCDEFG"
+        assert body[0] == "│ABCDEFG"
 
     def test_overflow_long_label_with_start_anchor_keeps_right_clamp(self):
         profile = VerticalBarProfile(
@@ -723,7 +734,7 @@ class TestVerticalBarRenderer:
                 )
             )
         )
-        assert body[0] == "X ABCDEFG"
+        assert body[0] == "│ ABCDEFG"
 
     def test_zero_bar_bar_center_even_label_uses_center_adjustment(self):
         profile = VerticalBarProfile(
@@ -920,6 +931,68 @@ class TestVerticalBarRenderer:
         )
         row = next(line for line in body if "AB" in line)
         assert row.index("AB") == 2
+
+    def test_overlapping_top_labels_pack_into_multiple_rows(self):
+        profile = VerticalBarProfile(
+            height=2,
+            y_max=2,
+            track=ColumnTrack(
+                column_width=6,
+                bar_width=2,
+                bar_left_gutter=2,
+                x_label_prefix="",
+                delta_label_prefix="",
+                axis_trim=0,
+            ),
+            value_anchor_ref=AnchorRef.BAR,
+            value_anchor_h=HAnchor.START,
+        )
+        body = _fenced_body(
+            render_chart(
+                VerticalBarSpec(
+                    labels=["A", "B"],
+                    values=[2, 2],
+                    value_labels=["ABCDEFG", "HIJKLMN"],
+                    profile=profile,
+                )
+            )
+        )
+        assert body == [
+            "│ABCDEFG",
+            "│     HIJKLM",
+            "│  ██    ██",
+            "│  ██    ██",
+            "└────────────",
+            "A     B",
+        ]
+
+    def test_vertical_bar_rejects_mismatched_value_label_lengths(self):
+        with pytest.raises(ValueError) as excinfo:
+            render_chart(
+                VerticalBarSpec(
+                    labels=["A", "B"],
+                    values=[1, 2],
+                    value_labels=["1h"],
+                    profile=TEST_CHART,
+                )
+            )
+        assert (
+            str(excinfo.value)
+            == "labels, values, and value_labels must have the same length"
+        )
+
+    def test_vertical_bar_rejects_mismatched_delta_lengths(self):
+        with pytest.raises(ValueError) as excinfo:
+            render_chart(
+                VerticalBarSpec(
+                    labels=["A", "B"],
+                    values=[1, 2],
+                    value_labels=["1h", "2h"],
+                    profile=TEST_CHART,
+                    delta_labels=["+1%"],
+                )
+            )
+        assert str(excinfo.value) == "delta_labels must have the same length as labels"
 
 
 class TestGroupedGridRenderer:
@@ -1679,6 +1752,277 @@ class TestCompressionHelpers:
 
 
 class TestBarChartSnapshots:
+    @pytest.mark.parametrize(
+        ("profile", "labels", "values", "value_labels", "delta_labels", "expected"),
+        [
+            (
+                WEEKLY_7DAY_CHART,
+                ["MON", "TUE"],
+                [2, 5],
+                ["2h", "5h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│           5h",
+                    "│         █████",
+                    "│         █████",
+                    "│   2h    █████",
+                    "│ █████   █████",
+                    "│ █████   █████",
+                    "└──────────────",
+                    "   MON     TUE",
+                    "   +1%     -2%",
+                ],
+            ),
+            (
+                WEEKLY_7DAY_MOOD,
+                ["MON", "TUE"],
+                [2.0, 5.0],
+                ["2.0", "5.0"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│          5.0",
+                    "│         █████",
+                    "│         █████",
+                    "│  2.0    █████",
+                    "│ █████   █████",
+                    "│ █████   █████",
+                    "└──────────────",
+                    "   MON     TUE",
+                    "   +1%     -2%",
+                ],
+            ),
+            (
+                MONTHLY_WEEK_STUDY,
+                ["W1", "W2"],
+                [10, 20],
+                ["10h", "20h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│              20h",
+                    "│              ██████",
+                    "│  10h         ██████",
+                    "│  ▄▄▄▄▄▄      ██████",
+                    "│  ██████      ██████",
+                    "│  ██████      ██████",
+                    "└──────────────────────",
+                    " W1          W2",
+                    "     +1%         -2%",
+                ],
+            ),
+            (
+                MONTHLY_WEEK_METRIC,
+                ["W1", "W2"],
+                [2, 5],
+                ["2h", "5h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│              5h",
+                    "│              █████",
+                    "│              █████",
+                    "│  2h          █████",
+                    "│  █████       █████",
+                    "│  █████       █████",
+                    "└──────────────────────",
+                    " W1          W2",
+                    "+1%         -2%",
+                ],
+            ),
+            (
+                MONTHLY_WEEK_MOOD,
+                ["W1", "W2"],
+                [2.0, 5.0],
+                ["2.0", "5.0"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│               5.0",
+                    "│              █████",
+                    "│              █████",
+                    "│   2.0        █████",
+                    "│  █████       █████",
+                    "│  █████       █████",
+                    "└──────────────────────",
+                    " W1          W2",
+                    "+1%         -2%",
+                ],
+            ),
+            (
+                QUARTERLY_3MONTH_STUDY,
+                ["JAN", "FEB"],
+                [60, 120],
+                ["60h", "120h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│             120h",
+                    "│             ███████",
+                    "│             ███████",
+                    "│  60h        ███████",
+                    "│  ███████    ███████",
+                    "│  ███████    ███████",
+                    "│  ███████    ███████",
+                    "└────────────────────",
+                    "     JAN        FEB",
+                    "     +1%        -2%",
+                ],
+            ),
+            (
+                QUARTERLY_3MONTH_METRIC,
+                ["JAN", "FEB"],
+                [2, 5],
+                ["2h", "5h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│              5h",
+                    "│              █████",
+                    "│              █████",
+                    "│  2h          █████",
+                    "│  █████       █████",
+                    "│  █████       █████",
+                    "└───────────────────",
+                    "    JAN         FEB",
+                    "    +1%         -2%",
+                ],
+            ),
+            (
+                QUARTERLY_3MONTH_MOOD,
+                ["JAN", "FEB"],
+                [2.0, 5.0],
+                ["2.0", "5.0"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│               5.0",
+                    "│              █████",
+                    "│              █████",
+                    "│   2.0        █████",
+                    "│  █████       █████",
+                    "│  █████       █████",
+                    "└───────────────────",
+                    "    JAN         FEB",
+                    "    +1%         -2%",
+                ],
+            ),
+            (
+                YEARLY_4QTR_STUDY,
+                ["Q1", "Q2"],
+                [180, 360],
+                ["180h", "360h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│             360h",
+                    "│             ███████",
+                    "│             ███████",
+                    "│  180h       ███████",
+                    "│  ███████    ███████",
+                    "│  ███████    ███████",
+                    "│  ███████    ███████",
+                    "└────────────────────",
+                    "    Q1         Q2",
+                    "   +1%        -2%",
+                ],
+            ),
+            (
+                YEARLY_4QTR_METRIC,
+                ["Q1", "Q2"],
+                [2, 5],
+                ["2h", "5h"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│             5h",
+                    "│             █████",
+                    "│             █████",
+                    "│  2h         █████",
+                    "│  █████      █████",
+                    "│  █████      █████",
+                    "└──────────────────",
+                    "    Q1         Q2",
+                    "    +1%        -2%",
+                ],
+            ),
+            (
+                YEARLY_4QTR_MOOD,
+                ["Q1", "Q2"],
+                [2.0, 5.0],
+                ["2.0", "5.0"],
+                ["+1%", "-2%"],
+                [
+                    "│",
+                    "│",
+                    "│",
+                    "│",
+                    "│              5.0",
+                    "│             █████",
+                    "│             █████",
+                    "│   2.0       █████",
+                    "│  █████      █████",
+                    "│  █████      █████",
+                    "└──────────────────",
+                    "    Q1         Q2",
+                    "    +1%        -2%",
+                ],
+            ),
+        ],
+    )
+    def test_vertical_profile_snapshot_lock(
+        self,
+        profile,
+        labels,
+        values,
+        value_labels,
+        delta_labels,
+        expected,
+    ):
+        lines = render_chart(
+            VerticalBarSpec(
+                labels=labels,
+                values=values,
+                value_labels=value_labels,
+                profile=profile,
+                delta_labels=delta_labels,
+            )
+        )
+        assert _fenced_body(lines) == expected
+
     def test_weekly_study_chart_snapshot(self):
         lines = render_chart(
             VerticalBarSpec(
@@ -1696,7 +2040,7 @@ class TestBarChartSnapshots:
         assert "MON" in label_line
         assert "SUN" in label_line
         bar_rows = [row for row in body[:axis_idx] if "│" in row]
-        assert len(bar_rows) == 10
+        assert len(bar_rows) == 11
 
     def test_monthly_study_delta_alignment_snapshot(self):
         lines = render_chart(
