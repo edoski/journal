@@ -128,7 +128,10 @@ class GoalNoteGateway:
                     section="MONTHLY",
                     lines=self._render_or_empty("MONTHLY", existing_monthly),
                 ),
-                GoalSection(section="WEEKLY", lines=self._render_goals(weekly_tasks)),
+                GoalSection(
+                    section="WEEKLY",
+                    lines=self._render_or_empty("WEEKLY", weekly_tasks),
+                ),
             ],
         )
 
@@ -151,7 +154,8 @@ class GoalNoteGateway:
                         lines=self._render_or_empty("QUARTERLY", existing_quarterly),
                     ),
                     GoalSection(
-                        section="MONTHLY", lines=self._render_goals(monthly_tasks)
+                        section="MONTHLY",
+                        lines=self._render_or_empty("MONTHLY", monthly_tasks),
                     ),
                 ],
             )
@@ -167,18 +171,23 @@ class GoalNoteGateway:
             existing_quarterly_src = self.goal_store.extract(
                 quarterly_lines, "QUARTERLY"
             )
+            resolved_yearly = existing_yearly if yearly_tasks is None else yearly_tasks
+            resolved_quarterly = (
+                existing_quarterly_src if quarterly_tasks is None else quarterly_tasks
+            )
             self.goal_store.write(
                 quarter_path,
                 quarterly_lines,
                 [
                     GoalSection(
                         section="YEARLY",
-                        lines=self._render_goals(yearly_tasks or existing_yearly),
+                        lines=self._render_or_empty("YEARLY", resolved_yearly),
                     ),
                     GoalSection(
                         section="QUARTERLY",
-                        lines=self._render_goals(
-                            quarterly_tasks or existing_quarterly_src
+                        lines=self._render_or_empty(
+                            "QUARTERLY",
+                            resolved_quarterly,
                         ),
                     ),
                 ],
@@ -207,11 +216,6 @@ class GoalNoteGateway:
             path=path,
             lines=lines,
         )
-
-    def _render_goals(self, goals: list[Goal]) -> list[str]:
-        from sync.writers.goals import render_goal_lines
-
-        return render_goal_lines(goals)
 
     def _render_or_empty(self, section: str, goals: list[Goal]) -> list[str]:
         from sync.goals.note_store import render_goals_or_empty

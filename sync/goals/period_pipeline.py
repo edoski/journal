@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.goals.note_store import (
+    empty_subsection_lines,
     extract_goals,
     render_goals_or_empty,
 )
@@ -46,6 +47,7 @@ class MirrorSyncConfig:
 class PiercingSyncConfig:
     """Configuration for piercing parent goals into a source section."""
 
+    source_section: str
     note_path: str
     source_paths: tuple[str, ...]
     proximity_days: int
@@ -165,6 +167,8 @@ def sync_pierced_source_section(
     source_lines = render_goal_lines(original_tasks)
     if final_pierced:
         source_lines = source_lines + render_goal_lines(final_pierced, today=today)
+    if not source_lines:
+        source_lines = empty_subsection_lines(config.source_section)
 
     source_changes = [
         updated != original

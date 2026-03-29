@@ -101,6 +101,20 @@ class TestVerticalBarRenderer:
         body = _fenced_body(lines)
         assert "10h" in body[0]
 
+    def test_overflow_row_for_half_block_at_chart_ceiling(self):
+        lines = render_chart(
+            VerticalBarSpec(
+                labels=["MON", "TUE"],
+                values=[9.6, 5],
+                value_labels=["9h36m", "5h00m"],
+                profile=WEEKLY_7DAY_CHART,
+            )
+        )
+        body = _fenced_body(lines)
+
+        assert "9h36m" in body[0]
+        assert "▄▄▄▄▄" in body[1]
+
     def test_zero_value_label_at_bottom(self):
         lines = render_chart(
             VerticalBarSpec(

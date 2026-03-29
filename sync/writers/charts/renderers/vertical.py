@@ -116,6 +116,7 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
     scale = height / y_max if y_max > 0 else 1.0
     bar_heights: list[int] = []
     has_half_block: list[bool] = []
+    top_levels: list[int] = []
 
     for value in values:
         value_num = 0.0 if value is None else max(0.0, float(value))
@@ -124,7 +125,9 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
         fractional = scaled - full_height
         bar_height = min(height, max(0, full_height))
         bar_heights.append(bar_height)
-        has_half_block.append(fractional >= 0.5 and bar_height != height)
+        has_half = fractional >= 0.5 and bar_height != height
+        has_half_block.append(has_half)
+        top_levels.append(bar_height + 1 if has_half else bar_height)
 
     label_starts_overflow = _label_starts(
         labels, prefix_len=x_prefix_len, col_width=col_width
@@ -133,7 +136,11 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
     label_starts_d = _label_starts(labels, prefix_len=d_prefix_len, col_width=col_width)
 
     lines: list[str] = []
-    has_max_value = any(bar_h == height and bar_h > 0 for bar_h in bar_heights)
+    overflow_label_indexes = [
+        idx
+        for idx, (label, top_level) in enumerate(zip(value_labels, top_levels))
+        if height > 0 and label and top_level >= height
+    ]
 
     def _adjust_center_anchor(
         anchor_x: int,
@@ -161,15 +168,11 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
             return anchor_x - 1
         return anchor_x
 
-    if has_max_value:
+    if overflow_label_indexes:
         overflow = [" "] * width
         place_text(overflow, x_prefix, 0)
-        for idx, bar_h in enumerate(bar_heights):
-            if bar_h != height:
-                continue
+        for idx in overflow_label_indexes:
             label = value_labels[idx]
-            if not label:
-                continue
             anchor, clamp_left, clamp_right = _resolve_anchor(
                 ref=profile.value_anchor_ref,
                 h_anchor=profile.value_anchor_h,
@@ -205,7 +208,7 @@ def render_vertical_bar(spec: VerticalBarSpec) -> list[str]:
         for idx, bar_h in enumerate(bar_heights):
             label = value_labels[idx]
             has_half = has_half_block[idx]
-            top_level = bar_h + 1 if has_half else bar_h
+            top_level = top_levels[idx]
             draw_label_level = top_level + 1
 
             bar_start, _bar_end = bar_bounds(

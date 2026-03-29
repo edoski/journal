@@ -16,7 +16,11 @@ from sync.goals.reminders import get_reminders_for_date
 from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
 from sync.contracts.goals import Goal
 from sync.contracts.reminders import DailySchedule, ReminderRule
-from sync.periods.windows import build_week_window, build_year_window
+from sync.periods.windows import (
+    build_quarter_window,
+    build_week_window,
+    build_year_window,
+)
 
 
 class _StubNoteStore:
@@ -175,6 +179,44 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
     assert isinstance(carry_calls[0][4], _StubCarryCacheStore)
     assert len(goal_store.last_sections) == 1
     assert goal_store.last_sections[0].section == "YEARLY"
+
+
+def test_sync_quarterly_note_renders_empty_quarterly_placeholder(tmp_path):
+    note_store = _StubNoteStore()
+    goal_store = MarkdownGoalStore()
+    service = GoalSyncService(
+        note_store=note_store,
+        goal_store=goal_store,
+        carry_cache_store=JsonGoalCarryForwardCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+        reconcile_cache_store=JsonGoalReconcileCacheStore(
+            cache_dir=str(tmp_path / "cache" / "goals"),
+            lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        ),
+    )
+
+    lines = [
+        "## Goals",
+        "---",
+        "### **YEARLY**",
+        "",
+        "### **QUARTERLY**",
+        "",
+        "## Metrics",
+        "---",
+    ]
+
+    updated = service.sync_quarterly_note(
+        lines,
+        note_path=str(tmp_path / "2026-Q1.md"),
+        window=build_quarter_window(2026, 1),
+    )
+
+    updated_text = "\n".join(updated)
+    assert "_No yearly goals have been defined yet._" in updated_text
+    assert "_No quarterly goals have been defined yet._" in updated_text
 
 
 def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
