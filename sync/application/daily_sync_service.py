@@ -333,7 +333,7 @@ class DailySyncService:
             study_lines.extend(new_table_lines)
         else:
             study_lines.append("")
-            study_lines.append("_No study sessions completed today._")
+            study_lines.append("_No study sessions available._")
 
         training_lines, _ = build_training_section(
             training_status,

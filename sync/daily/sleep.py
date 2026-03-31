@@ -61,4 +61,4 @@ def build_sleep_section(
         return ["### **SLEEP**", "", *sleep_table]
     if existing_block:
         return existing_block
-    return ["### **SLEEP**", "", "_Sleep data not available._"]
+    return ["### **SLEEP**", "", "_No sleep data available._"]

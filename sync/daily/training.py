@@ -189,6 +189,6 @@ def build_training_section(
     if merged_rows:
         lines_out.extend(_render_training_rows(merged_rows))
     else:
-        lines_out.append("_No training sessions completed today._")
+        lines_out.append("_No training sessions available._")
 
     return lines_out, merged_rows
