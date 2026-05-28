@@ -203,7 +203,7 @@ def test_add_goal_replaces_empty_placeholder(tmp_path) -> None:
             template_path=str(template_path),
             section="MONTHLY",
             horizon="monthly",
-            period_key="2026-02-01",
+            period_key="2026-02",
         ),
         "Ship feature",
     )
@@ -240,7 +240,7 @@ def test_add_goal_detects_canonical_duplicate(tmp_path) -> None:
             template_path=str(template_path),
             section="MONTHLY",
             horizon="monthly",
-            period_key="2026-02-01",
+            period_key="2026-02",
         ),
         "ship feature!",
     )
@@ -276,7 +276,7 @@ def test_add_goal_appends_missing_subsection_without_rewriting_other_subsections
             template_path=str(template_path),
             section="MONTHLY",
             horizon="monthly",
-            period_key="2026-02-01",
+            period_key="2026-02",
         ),
         "New monthly task",
     )

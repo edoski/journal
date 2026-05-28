@@ -45,15 +45,16 @@ class _StubNoteStore:
 class _StubGoalStore:
     def __init__(self) -> None:
         self.last_sections = []
+        self.extract_calls = []
 
     def extract(
         self,
         _lines: list[str],
-        _section: str,
+        section: str,
         horizon: str | None = None,
         period_key: str | None = None,
     ):
-        _ = horizon, period_key
+        self.extract_calls.append((section, horizon, period_key))
         return []
 
     def apply(self, lines: list[str], sections, *, insert_after_idx=None):
@@ -134,6 +135,11 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
     assert goal_store.last_sections[0].lines == ["mirror"]
     assert goal_store.last_sections[1].section == "WEEKLY"
     assert goal_store.last_sections[1].lines == ["source"]
+    monthly_calls = [call for call in goal_store.extract_calls if call[0] == "MONTHLY"]
+    assert monthly_calls == [
+        ("MONTHLY", "monthly", "2026-02"),
+        ("MONTHLY", "monthly", "2026-02"),
+    ]
     assert mirror_today_calls == [window.target_date]
     assert pierce_today_calls == [window.target_date]
 

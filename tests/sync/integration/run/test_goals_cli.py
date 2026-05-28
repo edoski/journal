@@ -235,6 +235,7 @@ def test_goals_add_month_end_next_month_creates_target_note(
     target = goals_cmd._resolve_target("monthly", use_next=True, today=fixed_today)
     target_path = Path(target.note_path)
     assert not target_path.exists()
+    assert target.period_key == "2026-02"
 
     rc = goals_cmd.cmd_goals_add(
         _goals_add_args(period="monthly", next=True, text="Kick off February plan")

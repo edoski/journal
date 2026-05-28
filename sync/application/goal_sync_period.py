@@ -44,7 +44,8 @@ class PeriodGoalNoteSync:
         window: WeekWindow,
     ) -> list[str]:
         month_start = datetime.date(window.start.year, window.start.month, 1)
-        monthly_path = journal_path(f"{month_start.year}-{month_start.month:02d}.md")
+        month_key = f"{month_start.year}-{month_start.month:02d}"
+        monthly_path = journal_path(f"{month_key}.md")
         monthly_lines = self.note_store.read_or_create(
             monthly_path,
             MONTHLY_TEMPLATE_PATH,
@@ -53,7 +54,7 @@ class PeriodGoalNoteSync:
             monthly_lines,
             "MONTHLY",
             horizon="monthly",
-            period_key=month_start.isoformat(),
+            period_key=month_key,
         )
 
         quarterly_sources = self.gateway.load_quarterly_sources(month_start)
@@ -61,7 +62,7 @@ class PeriodGoalNoteSync:
             lines,
             "MONTHLY",
             horizon="monthly",
-            period_key=month_start.isoformat(),
+            period_key=month_key,
         )
         previous_lines = self.note_store.read(journal_path(window.previous_filename))
         weekly_tasks = load_source_tasks_with_carry_forward(
@@ -191,9 +192,9 @@ class PeriodGoalNoteSync:
                 section="MONTHLY",
                 horizon="monthly",
                 period_key=month_key,
-                current_id_key=month_start.isoformat(),
+                current_id_key=month_key,
                 previous_lines=previous_lines,
-                previous_id_key=window.previous_start.isoformat(),
+                previous_id_key=f"{window.previous_year}-{window.previous_month:02d}",
             ),
             carry_cache_store=self.carry_cache_store,
         )

@@ -85,13 +85,12 @@ def _resolve_target(
             if use_next
             else (today.year, today.month)
         )
-        month_start = datetime.date(year, month, 1)
         return GoalWriteTarget(
             note_path=os.path.join(resolved.journal_dir, f"{year}-{month:02d}.md"),
             template_path=resolved.monthly_template_path,
             section="MONTHLY",
             horizon="monthly",
-            period_key=month_start.isoformat(),
+            period_key=f"{year}-{month:02d}",
         )
 
     if period == "quarterly":

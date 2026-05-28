@@ -68,9 +68,6 @@ def test_merge_mirror_goals_restores_source_deadline_and_appends_new():
 
 def test_merge_mirror_goals_skips_far_future_source_goals():
     today = datetime.date(2025, 1, 1)
-    existing_mirror = [
-        _goal("gid-1", "Task A", done=False),
-    ]
     source_tasks = [
         _goal(
             "gid-2",
@@ -81,11 +78,32 @@ def test_merge_mirror_goals_skips_far_future_source_goals():
         )
     ]
 
+    merged = merge_mirror_goals([], source_tasks, proximity_days=30, today=today)
+
+    assert merged == []
+
+
+def test_merge_mirror_goals_drops_goals_deleted_from_source():
+    today = datetime.date(2025, 1, 1)
+    existing_mirror = [
+        _goal("gid-1", "Deleted source goal", done=False),
+        _goal("gid-2", "Task B", done=False),
+    ]
+    source_tasks = [
+        _goal(
+            "gid-2",
+            "Task B",
+            done=False,
+            date_str="2025-01-07",
+            deadline=datetime.date(2025, 1, 7),
+        )
+    ]
+
     merged = merge_mirror_goals(
         existing_mirror, source_tasks, proximity_days=30, today=today
     )
 
-    assert [g.id for g in merged] == ["gid-1"]
+    assert [g.id for g in merged] == ["gid-2"]
 
 
 def test_merge_mirror_goals_source_reopen_clears_mirror_when_source_changes(

@@ -221,6 +221,7 @@ def merge_mirror_goals(
     If source_path/mirror_path are provided, shared IDs are first reconciled via the
     goal sync cache so both completion and reopen actions can propagate. Deadline/
     date/reminder fields are always refreshed from source for stable countdown render.
+    Mirror-only goals are dropped because mirror sections are source-owned.
     """
     from dataclasses import replace
     from sync.readers.goals import filter_by_proximity
@@ -242,17 +243,16 @@ def merge_mirror_goals(
     restored_existing: list[Goal] = []
     for goal in existing_mirror:
         source = source_lookup.get(goal.id)
-        if source:
-            restored_existing.append(
-                replace(
-                    goal,
-                    done=source.done,
-                    deadline=source.deadline,
-                    date_str=source.date_str,
-                    reminder_offset=source.reminder_offset,
-                )
+        if source is None:
+            continue
+        restored_existing.append(
+            replace(
+                goal,
+                done=source.done,
+                deadline=source.deadline,
+                date_str=source.date_str,
+                reminder_offset=source.reminder_offset,
             )
-        else:
-            restored_existing.append(goal)
+        )
 
     return restored_existing + new_goals
