@@ -6,8 +6,9 @@ import datetime
 from contextlib import contextmanager
 
 from sync.goals.period_pipeline import (
+    PiercingSource,
     PiercingSyncConfig,
-    sync_pierced_source_section,
+    sync_pierced_sources,
 )
 
 
@@ -18,14 +19,13 @@ class _StubReconcileCacheStore:
         yield payload
 
 
-def test_sync_pierced_source_section_renders_empty_placeholder() -> None:
-    result = sync_pierced_source_section(
+def test_sync_pierced_sources_renders_empty_placeholder() -> None:
+    result = sync_pierced_sources(
         existing_tasks=[],
-        source_goal_lists=[[]],
+        sources=[PiercingSource("QUARTERLY", "quarterly.md", [])],
         config=PiercingSyncConfig(
             source_section="MONTHLY",
             note_path="monthly.md",
-            source_paths=("quarterly.md",),
             proximity_days=90,
         ),
         today=datetime.date(2026, 2, 1),

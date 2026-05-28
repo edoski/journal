@@ -136,9 +136,9 @@ class WeeklyStudyGridSpec:
 
     dates: Sequence[datetime.date]
     daily_data: dict[datetime.date, DailyAggregate]
+    today: datetime.date
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
-    today: datetime.date | None = None
 
 
 @dataclass(frozen=True)
@@ -147,9 +147,9 @@ class MonthlyStudyGridSpec:
 
     week_ranges: Sequence[tuple[datetime.date, datetime.date]]
     daily_data: dict[datetime.date, DailyAggregate]
+    today: datetime.date
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_date: datetime.date | None = None
-    today: datetime.date | None = None
     delta_labels: Sequence[str] | None = None
 
 
@@ -212,7 +212,7 @@ class QuarterlyStudyCoverageRowsSpec:
 
     month_ranges: Sequence[tuple[datetime.date, datetime.date]]
     daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date | None = None
+    today: datetime.date
     delta_labels: Sequence[str] | None = None
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 
@@ -223,7 +223,7 @@ class YearlyStudyCoverageRowsSpec:
 
     quarter_ranges: Sequence[tuple[datetime.date, datetime.date]]
     daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date | None = None
+    today: datetime.date
     bar_width: int = 30
     delta_labels: Sequence[str] | None = None
     bars_override: Sequence[str] | None = None

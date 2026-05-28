@@ -159,7 +159,7 @@ def render_quarterly_study_coverage_rows(
     month_ranges = list(spec.month_ranges)
     daily_data = spec.daily_data
     delta_labels = list(spec.delta_labels or [])
-    today = spec.today or datetime.date.today()
+    today = spec.today
 
     lines: list[str] = []
     bars: list[tuple[str, str, int, int]] = []
@@ -223,7 +223,7 @@ def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list
     quarter_ranges = list(spec.quarter_ranges)
     daily_data = spec.daily_data
     delta_labels = list(spec.delta_labels or [])
-    today = spec.today or datetime.date.today()
+    today = spec.today
     bar_width = spec.bar_width
     bars_override = list(spec.bars_override) if spec.bars_override else None
     legend_line = spec.legend_line or RENDER.study_legend

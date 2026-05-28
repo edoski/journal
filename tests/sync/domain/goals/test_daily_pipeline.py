@@ -7,6 +7,7 @@ import datetime
 from sync.application.goal_note_gateway import GoalNoteGateway
 from sync.contracts.goals import Goal, GoalSection, GoalWriteTarget
 from sync.dates import iso_week_range
+from sync.goals.targets import GoalPathConfig
 
 
 class _StubNoteStore:
@@ -136,27 +137,15 @@ def test_load_daily_sources_uses_week_start_period_key() -> None:
 
 
 def test_write_daily_sources_clears_quarterly_sections_when_given_empty_lists(
-    monkeypatch,
     tmp_path,
 ) -> None:
     day = datetime.date(2026, 2, 6)
     quarter_path = str(tmp_path / "2026-Q1.md")
-    weekly_path = str(tmp_path / "2026-W06.md")
     goal_store = _WriteCaptureGoalStore()
     gateway = GoalNoteGateway(
         note_store=_StubNoteStore(weekly_lines=None),
         goal_store=goal_store,
-    )
-
-    def _journal_path(filename: str) -> str:
-        if filename.endswith(".md") and "Q" in filename:
-            return quarter_path
-        if filename.endswith(".md") and "W" in filename:
-            return weekly_path
-        return str(tmp_path / filename)
-
-    monkeypatch.setattr(
-        "sync.application.goal_note_gateway.journal_path", _journal_path
+        path_config=GoalPathConfig(journal_dir=str(tmp_path)),
     )
 
     gateway.write_daily_sources(
@@ -243,6 +232,41 @@ def test_add_goal_detects_canonical_duplicate(tmp_path) -> None:
             period_key="2026-02",
         ),
         "ship feature!",
+    )
+
+    assert result.duplicate is True
+    assert note_store.written == {}
+
+
+def test_add_goal_detects_dated_duplicate(tmp_path) -> None:
+    note_path = str(tmp_path / "2026-02.md")
+    template_path = tmp_path / "template.md"
+    template_path.write_text("", encoding="utf-8")
+    note_store = _WritableNoteStore(
+        [
+            "## Goals",
+            "---",
+            "### **MONTHLY**",
+            "- [ ] Ship feature `2026-02-14` ^gid-m111111111",
+            "",
+            "## Metrics",
+            "---",
+        ]
+    )
+    gateway = GoalNoteGateway(
+        note_store=note_store,
+        goal_store=_CaptureGoalStore(),
+    )
+
+    result = gateway.add_goal(
+        GoalWriteTarget(
+            note_path=note_path,
+            template_path=str(template_path),
+            section="MONTHLY",
+            horizon="monthly",
+            period_key="2026-02",
+        ),
+        "Ship feature `2026-02-14`",
     )
 
     assert result.duplicate is True

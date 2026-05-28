@@ -30,6 +30,7 @@ def test_escape_markdown_cell_escapes_unescaped_pipes_only():
 
 def test_render_markdown_row_and_divider_row():
     assert render_markdown_row(["A", "B"]) == "| A | B |"
+    assert render_markdown_row(["a|b", "c"]) == "| a\\|b | c |"
     assert render_divider_row(2, divider_cells=["---", "----"]) == "| --- | ---- |"
 
 

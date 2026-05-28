@@ -1043,6 +1043,7 @@ class TestGroupedGridRenderer:
             WeeklyStudyGridSpec(
                 dates=sample_week_dates,
                 daily_data=sample_daily_data,
+                today=sample_week_dates[-1],
             )
         )
         body = _fenced_body(lines)
@@ -1097,6 +1098,7 @@ class TestGroupedGridRenderer:
             MonthlyStudyGridSpec(
                 week_ranges=week_ranges,
                 daily_data=daily_data,
+                today=datetime.date(2025, 12, 31),
             )
         )
         body = _fenced_body(lines)
@@ -1298,6 +1300,7 @@ class TestGroupedGridRenderer:
             WeeklyStudyGridSpec(
                 dates=sample_week_dates,
                 daily_data=sample_daily_data,
+                today=sample_week_dates[-1],
                 current_date=datetime.date(2025, 12, 28),
             )
         )
@@ -1322,6 +1325,7 @@ class TestGroupedGridRenderer:
                     datetime.date(2025, 12, 1): {"study_minutes": 400},
                     datetime.date(2025, 12, 2): {"study_minutes": 100},
                 },
+                today=datetime.date(2025, 12, 14),
                 current_date=datetime.date(2025, 12, 14),
                 delta_labels=["+10%", "-20%"],
             )

@@ -31,6 +31,7 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.periods.presentation import daily_screen_trend_rows
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     TIME_LABEL_STANDARD,
@@ -41,7 +42,7 @@ from sync.writers.charts import (
     WEEKLY_7DAY_MOOD,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendMode, ScreenTrendTableSpec, render_table
+from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 
 def build_weekly_metrics(
@@ -52,6 +53,7 @@ def build_weekly_metrics(
     prev_week_label: str,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_week_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -62,7 +64,7 @@ def build_weekly_metrics(
     prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
     """
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
-    today = datetime.date.today()
+    today = target_date
 
     # Compute metrics for current and previous week
     current_metrics = compute_period_metrics(dates, daily_data)
@@ -134,6 +136,7 @@ def build_weekly_metrics(
                 dates=dates,
                 daily_data=daily_data,
                 current_date=current_week_date,
+                today=today,
             )
         )
     )
@@ -170,10 +173,13 @@ def build_weekly_metrics(
         screen_time_totals,
         render_table(
             ScreenTrendTableSpec(
-                mode=ScreenTrendMode.DAILY,
                 period_label="DAY",
-                dates=dates,
-                daily_data=daily_data,
+                rows=daily_screen_trend_rows(
+                    dates,
+                    daily_data,
+                    today=today,
+                    period_label="DAY",
+                ),
             )
         ),
     )

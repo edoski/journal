@@ -12,12 +12,11 @@ import pytest
 from sync.contracts.deviation import DailyDeviationData
 from sync.contracts.screen_time import DailyScreenTimeData, ScreenTimeEntry
 import sync.writers.tables.api as tables_api_module
-import sync.writers.tables.renderers.screen_trend as screen_trend_renderer
 import sync.writers.tables.renderers.summary_metrics as summary_renderer
 from sync.constants import RENDER
+from sync.periods.presentation import daily_screen_trend_rows, period_screen_trend_rows
 from sync.writers.tables import (
     DailyProcrastinationTableSpec,
-    ScreenTrendMode,
     ScreenTrendTableSpec,
     SimpleGridTableSpec,
     SummaryMetricsTableSpec,
@@ -44,6 +43,26 @@ class TestSimpleGridTable:
     def test_renders_header_and_divider_when_rows_are_empty(self):
         lines = render_table(SimpleGridTableSpec(headers=["A"], rows=[]))
         assert lines == ["| A |", "| ---- |"]
+
+    def test_escapes_unescaped_pipes_in_cells(self):
+        lines = render_table(
+            SimpleGridTableSpec(headers=["A", "B"], rows=[["foo|bar", "[[x\\|y]]"]])
+        )
+        assert lines[2] == "| foo\\|bar | [[x\\|y]] |"
+
+    def test_rejects_rows_with_wrong_cell_count(self):
+        with pytest.raises(ValueError, match="row cell count"):
+            render_table(SimpleGridTableSpec(headers=["A", "B"], rows=[["only-one"]]))
+
+    def test_rejects_dividers_with_wrong_cell_count(self):
+        with pytest.raises(ValueError, match="divider cell count"):
+            render_table(
+                SimpleGridTableSpec(
+                    headers=["A", "B"],
+                    divider_cells=["---"],
+                    rows=[["1", "2"]],
+                )
+            )
 
 
 class TestSummaryMetricsTable:
@@ -584,7 +603,7 @@ class TestSummaryMetricsTable:
             assert empty_bar in metric_line
             assert "░" not in metric_line
 
-    def test_missing_current_defaults_are_visible_with_single_day_denominator(self):
+    def test_missing_current_defaults_preserve_unknown_sleep_and_mood(self):
         current = {"days_up_to_today": 1}
         previous = {"days_up_to_today": 1}
 
@@ -606,11 +625,11 @@ class TestSummaryMetricsTable:
         mood_line = next(line for line in lines if "**MOOD**" in line)
 
         assert "| `0h00m/day` | `0h00m/day` |" in study_line
-        assert "| `0h00m/night` | `0h00m/night` |" in sleep_line
+        assert "| `—` | `—` |" in sleep_line
         assert "| `0/1` | `0/7` |" in meditation_line
         assert "| `0/1` | `0/7` |" in workout_line
         assert "| `0/1` | `0/7` |" in stretch_line
-        assert "| `0.0/10.0` | `0.0/10.0` |" in mood_line
+        assert "| `—` | `—` |" in mood_line
 
     def test_previous_days_fallback_defaults_to_seven_when_missing(self):
         current = {
@@ -795,15 +814,7 @@ class TestSummaryMetricsTable:
 
 
 class TestScreenTrendTable:
-    class _FixedDate(datetime.date):
-        @classmethod
-        def today(cls) -> datetime.date:
-            return cls(2026, 2, 17)
-
-    def test_daily_rows_use_day_index_tokens_and_fallback_after_week_span(
-        self, monkeypatch
-    ):
-        monkeypatch.setattr(screen_trend_renderer.datetime, "date", self._FixedDate)
+    def test_daily_rows_use_day_index_tokens_and_fallback_after_week_span(self):
         dates = [
             datetime.date(2026, 2, 17),
             datetime.date(2026, 2, 18),
@@ -814,79 +825,60 @@ class TestScreenTrendTable:
             datetime.date(2026, 2, 23),
             datetime.date(2026, 2, 9),
         ]
-        spec = ScreenTrendTableSpec(
-            mode=ScreenTrendMode.DAILY,
-            period_label="DAY",
-            dates=dates,
-            daily_data={
+        rows = daily_screen_trend_rows(
+            dates,
+            {
                 dates[0]: {"screen_time_totals": {"YouTube": 1}},
                 dates[1]: {"screen_time_totals": {"YouTube": 20}},
                 dates[7]: {"screen_time_totals": {"X": 30}},
             },
-            include_total_row=True,
+            today=datetime.date(2026, 2, 17),
+            period_label="DAY",
         )
-
-        rows = screen_trend_renderer._daily_rows(spec)
 
         assert rows[0] == ["**[[2026-02-17\\|MON]]**", "`+1m`"]
         assert rows[1] == ["**[[2026-02-18\\|TUE]]**", "—"]
         assert rows[7] == ["**[[2026-02-09\\|MON]]**", "`+30m`"]
         assert rows[8] == ["**TOTAL**", "**`31m`**"]
 
-    def test_daily_rows_use_calendar_weekday_when_period_label_is_not_day(
-        self, monkeypatch
-    ):
-        monkeypatch.setattr(screen_trend_renderer.datetime, "date", self._FixedDate)
+    def test_daily_rows_use_calendar_weekday_when_period_label_is_not_day(self):
         day = datetime.date(2026, 2, 17)
-        rows = screen_trend_renderer._daily_rows(
-            ScreenTrendTableSpec(
-                mode=ScreenTrendMode.DAILY,
-                period_label="WEEK",
-                dates=[day],
-                daily_data={day: {"screen_time_totals": {"YouTube": 5}}},
-                include_total_row=False,
-            )
+        rows = daily_screen_trend_rows(
+            [day],
+            {day: {"screen_time_totals": {"YouTube": 5}}},
+            today=datetime.date(2026, 2, 17),
+            period_label="WEEK",
         )
-        assert rows == [["**[[2026-02-17\\|TUE]]**", "`+5m`"]]
+        assert rows[:1] == [["**[[2026-02-17\\|TUE]]**", "`+5m`"]]
 
-    def test_daily_rows_zero_minutes_render_zero_rows_and_zero_total(self, monkeypatch):
-        monkeypatch.setattr(screen_trend_renderer.datetime, "date", self._FixedDate)
+    def test_daily_rows_zero_minutes_render_zero_rows_and_zero_total(self):
         day = datetime.date(2026, 2, 16)
-        rows = screen_trend_renderer._daily_rows(
-            ScreenTrendTableSpec(
-                mode=ScreenTrendMode.DAILY,
-                period_label="DAY",
-                dates=[day],
-                daily_data={day: {"screen_time_totals": {}}},
-                include_total_row=True,
-            )
+        rows = daily_screen_trend_rows(
+            [day],
+            {day: {"screen_time_totals": {}}},
+            today=datetime.date(2026, 2, 17),
+            period_label="DAY",
         )
         assert rows == [["**[[2026-02-16\\|MON]]**", "`0m`"], ["**TOTAL**", "**`0m`**"]]
 
-    def test_period_rows_prefer_wikilinks_then_labels_then_week_fallback(
-        self, monkeypatch
-    ):
-        monkeypatch.setattr(screen_trend_renderer.datetime, "date", self._FixedDate)
+    def test_period_rows_prefer_wikilinks_then_labels_then_week_fallback(self):
         ranges = [
             (datetime.date(2026, 2, 10), datetime.date(2026, 2, 10)),
             (datetime.date(2026, 2, 17), datetime.date(2026, 2, 17)),
             (datetime.date(2026, 2, 18), datetime.date(2026, 2, 18)),
             (datetime.date(2026, 2, 11), datetime.date(2026, 2, 11)),
         ]
-        rows = screen_trend_renderer._period_rows(
-            ScreenTrendTableSpec(
-                mode=ScreenTrendMode.PERIOD,
-                period_label="WEEK",
-                period_ranges=ranges,
-                daily_data={
-                    datetime.date(2026, 2, 10): {"screen_time_totals": {"YouTube": 10}},
-                    datetime.date(2026, 2, 17): {"screen_time_totals": {"YouTube": 1}},
-                    datetime.date(2026, 2, 18): {"screen_time_totals": {"YouTube": 20}},
-                },
-                labels=["LBL1", "LBL2"],
-                wikilinks=["[[WK1]]"],
-                include_total_row=True,
-            )
+        rows = period_screen_trend_rows(
+            ranges,
+            {
+                datetime.date(2026, 2, 10): {"screen_time_totals": {"YouTube": 10}},
+                datetime.date(2026, 2, 17): {"screen_time_totals": {"YouTube": 1}},
+                datetime.date(2026, 2, 18): {"screen_time_totals": {"YouTube": 20}},
+            },
+            today=datetime.date(2026, 2, 17),
+            labels=["LBL1", "LBL2"],
+            wikilinks=["[[WK1]]"],
+            fallback_prefix="W",
         )
         assert rows == [
             ["**[[WK1]]**", "`+10m`"],
@@ -896,33 +888,22 @@ class TestScreenTrendTable:
             ["**TOTAL**", "**`11m`**"],
         ]
 
-    def test_period_rows_month_fallback_and_zero_total(self, monkeypatch):
-        monkeypatch.setattr(screen_trend_renderer.datetime, "date", self._FixedDate)
-        rows = screen_trend_renderer._period_rows(
-            ScreenTrendTableSpec(
-                mode=ScreenTrendMode.PERIOD,
-                period_label="MONTH",
-                period_ranges=[
-                    (datetime.date(2026, 2, 11), datetime.date(2026, 2, 11))
-                ],
-                daily_data={},
-                labels=None,
-                wikilinks=None,
-                include_total_row=True,
-            )
+    def test_period_rows_month_fallback_and_zero_total(self):
+        rows = period_screen_trend_rows(
+            [(datetime.date(2026, 2, 11), datetime.date(2026, 2, 11))],
+            {},
+            today=datetime.date(2026, 2, 17),
+            labels=[],
+            wikilinks=[],
+            fallback_prefix="M",
         )
         assert rows == [["**M1**", "`0m`"], ["**TOTAL**", "**`0m`**"]]
 
     def test_render_table_screen_trend_header_shape(self):
         lines = render_table(
             ScreenTrendTableSpec(
-                mode=ScreenTrendMode.PERIOD,
                 period_label="WEEK",
-                period_ranges=[
-                    (datetime.date(2026, 2, 10), datetime.date(2026, 2, 10))
-                ],
-                daily_data={},
-                include_total_row=False,
+                rows=[["**W1**", "`0m`"]],
             )
         )
         assert lines[0] == "| WEEK | SCREEN |"

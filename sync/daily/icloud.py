@@ -9,6 +9,7 @@ writing study times for iPad shortcut consumption.
 from __future__ import annotations
 
 import datetime
+import errno
 import glob
 import json
 import os
@@ -24,6 +25,27 @@ logger = get_logger(__name__)
 
 # iCloud path for study times JSON (read by iPad shortcut)
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
+_READ_ATTEMPTS = 60
+_READ_RETRY_SECONDS = 1.0
+_STABLE_READS_REQUIRED = 2
+StatusPayloadFile = tuple[object, str]
+_TRANSIENT_ERRNOS = {
+    errno.EAGAIN,
+    errno.EBUSY,
+    errno.EDEADLK,
+    errno.ETIMEDOUT,
+}
+
+
+def _is_transient_read_error(exc: Exception) -> bool:
+    return isinstance(exc, PermissionError) or (
+        isinstance(exc, OSError) and exc.errno in _TRANSIENT_ERRNOS
+    )
+
+
+def _invalid_status_candidates(path: str) -> list[str]:
+    candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
+    return sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
 
 
 def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
@@ -44,27 +66,34 @@ def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
         Tuple of (success, data, parsed_path) where parsed_path is the file that
         was successfully parsed and can later be finalized or quarantined.
     """
+    payloads = read_status_files(filename)
+    if not payloads:
+        return False, None, None
+    payload, parsed_path = payloads[0]
+    return True, payload, parsed_path
+
+
+def read_status_files(filename: str) -> list[StatusPayloadFile]:
+    """Read all parseable status files for a shortcut output filename."""
     path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
 
     def try_parse(target_path: str) -> tuple[bool, object | None, Exception | None]:
         last_size: int | None = None
         stable_count = 0
-        max_attempts = 60
-        stable_needed = 2
         last_err: Exception | None = None
 
-        for _ in range(max_attempts):
+        for _ in range(_READ_ATTEMPTS):
             try:
                 size = os.path.getsize(target_path)
             except FileNotFoundError:
                 last_err = FileNotFoundError("file disappeared while waiting")
-                time.sleep(1.0)
+                time.sleep(_READ_RETRY_SECONDS)
                 continue
 
             if size == 0:
                 last_err = ValueError("empty file (likely still syncing)")
                 stable_count = 0
-                time.sleep(1.0)
+                time.sleep(_READ_RETRY_SECONDS)
                 continue
 
             if last_size is not None and size == last_size:
@@ -73,8 +102,8 @@ def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
                 stable_count = 0
                 last_size = size
 
-            if stable_count < stable_needed:
-                time.sleep(1.0)
+            if stable_count < _STABLE_READS_REQUIRED:
+                time.sleep(_READ_RETRY_SECONDS)
                 continue
 
             try:
@@ -84,59 +113,45 @@ def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
                 return True, data, None
             except (json.JSONDecodeError, PermissionError, OSError) as e:
                 last_err = e
-                time.sleep(1.0)
+                time.sleep(_READ_RETRY_SECONDS)
 
         return False, None, last_err
 
-    # First try the primary path
     last_err: Exception | None = None
+    payloads: list[StatusPayloadFile] = []
     if os.path.exists(path):
         success, data, last_err = try_parse(path)
         if success:
-            return True, data, path
-        # Promote the failed file to an .invalid copy for inspection/retry.
-        backup_path = path + ".invalid"
-        try:
-            if os.path.exists(backup_path):
-                ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                backup_path = f"{path}.{ts}.invalid"
-            os.replace(path, backup_path)
-        except (PermissionError, OSError):
-            pass
-    else:
-        # Missing is expected most of the time; treat as no new data.
-        return False, None, None
+            payloads.append((data, path))
+        elif last_err and _is_transient_read_error(last_err):
+            logger.warning("Deferred parsing %s: %s", os.path.basename(path), last_err)
+        else:
+            # Promote the failed file to an .invalid copy for inspection/retry.
+            backup_path = path + ".invalid"
+            try:
+                if os.path.exists(backup_path):
+                    ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+                    backup_path = f"{path}.{ts}.invalid"
+                os.replace(path, backup_path)
+            except (PermissionError, OSError):
+                pass
 
-    # Fallback: reprocess any existing .invalid copies (most recent first)
-    candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
-    candidates = sorted(
-        set(candidates), key=lambda p: os.path.getmtime(p), reverse=True
-    )
+    candidates = _invalid_status_candidates(path)
     for cand in candidates:
         success, data, _ = try_parse(cand)
         if success:
-            return True, data, cand
+            payloads.append((data, cand))
 
-    if last_err:
+    if not payloads and last_err:
         logger.error("Failed to parse %s: %s", os.path.basename(path), last_err)
-    return False, None, None
+    return payloads
 
 
 def finalize_status_file(filename: str, parsed_path: str | None) -> None:
-    """Delete consumed status file and cleanup stale invalid copies."""
-    primary_path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
+    """Delete one consumed status file."""
     if parsed_path and os.path.exists(parsed_path):
         try:
             os.remove(parsed_path)
-        except (PermissionError, OSError):
-            pass
-
-    invalids = glob.glob(primary_path + ".invalid") + glob.glob(
-        primary_path + ".*.invalid"
-    )
-    for inv in invalids:
-        try:
-            os.remove(inv)
         except (PermissionError, OSError):
             pass
 

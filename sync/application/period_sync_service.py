@@ -120,6 +120,7 @@ class PeriodSyncService:
                 prev_daily_data,
                 window.previous_label,
                 media_bundle,
+                target_date=window.target_date,
                 study_target_minutes=study_target_minutes,
                 prior_week_metrics=prior_week_metrics,
             )
@@ -174,6 +175,7 @@ class PeriodSyncService:
                 window.current_label,
                 window.previous_label,
                 media_bundle,
+                target_date=window.target_date,
                 study_target_minutes=study_target_minutes,
                 prior_month_metrics=prior_month_metrics,
             )
@@ -216,6 +218,7 @@ class PeriodSyncService:
                 window.previous_year,
                 window.previous_quarter,
                 media_bundle,
+                target_date=window.target_date,
                 study_target_minutes=study_target_minutes,
                 prior_quarter_metrics=prior_quarter_metrics,
             )
@@ -252,6 +255,7 @@ class PeriodSyncService:
                 daily_data,
                 prev_daily_data,
                 media_bundle,
+                target_date=window.target_date,
                 study_target_minutes=study_target_minutes,
                 prior_year_metrics=prior_year_metrics,
             )

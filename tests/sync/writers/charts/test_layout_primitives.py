@@ -116,13 +116,13 @@ class TestCompressionHelpers:
 
     def test_compress_days_time_order_zero_width_and_empty_days(self):
         day = datetime.date(2025, 1, 1)
-        assert compress_days_time_order([day], lambda _: True, 0) == ""
-        assert compress_days_time_order([], lambda _: True, 3) == "···"
+        assert compress_days_time_order([day], lambda _: True, 0, today=day) == ""
+        assert compress_days_time_order([], lambda _: True, 3, today=day) == "···"
 
     def test_compress_days_time_order_negative_width_raises(self):
         day = datetime.date(2025, 1, 1)
         with pytest.raises(ValueError) as excinfo:
-            compress_days_time_order([day], lambda _: True, -1)
+            compress_days_time_order([day], lambda _: True, -1, today=day)
         assert str(excinfo.value) == "target_width must be non-negative"
 
     def test_compress_days_time_order_total_one_day_replicates_across_buckets(self):

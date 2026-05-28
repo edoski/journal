@@ -496,3 +496,21 @@ class TestReplaceMetricsBlock:
         ]
         result = replace_metrics_block(lines, ["New"])
         assert "New" in result
+
+    def test_replaces_decorated_metrics_header(self):
+        lines = [
+            "## **Metrics**",
+            "Old content",
+            "## **Reflections**",
+            "Reflection content",
+        ]
+        result = replace_metrics_block(lines, ["New"])
+
+        assert result == [
+            "## **Metrics**",
+            "---",
+            "New",
+            "",
+            "## **Reflections**",
+            "Reflection content",
+        ]

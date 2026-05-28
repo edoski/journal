@@ -64,7 +64,7 @@ def escape_markdown_cell(text: str) -> str:
 
 def render_markdown_row(cells: Sequence[str]) -> str:
     """Render markdown table row from cells."""
-    rendered = [str(cell) for cell in cells]
+    rendered = [escape_markdown_cell(str(cell)) for cell in cells]
     return f"| {' | '.join(rendered)} |"
 
 

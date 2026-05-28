@@ -24,6 +24,7 @@ def build_weekly_metrics(
     prev_week_label: str,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_week_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -34,6 +35,7 @@ def build_weekly_metrics(
         prev_daily_data,
         prev_week_label,
         media_bundle,
+        target_date=target_date,
         study_target_minutes=study_target_minutes,
         prior_week_metrics=prior_week_metrics,
     )
@@ -49,6 +51,7 @@ def build_monthly_metrics(
     prev_month_label: str,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_month_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -61,6 +64,7 @@ def build_monthly_metrics(
         current_month_label,
         prev_month_label,
         media_bundle,
+        target_date=target_date,
         study_target_minutes=study_target_minutes,
         prior_month_metrics=prior_month_metrics,
     )
@@ -76,6 +80,7 @@ def build_quarterly_metrics(
     prev_quarter: int,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_quarter_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -88,6 +93,7 @@ def build_quarterly_metrics(
         prev_year,
         prev_quarter,
         media_bundle,
+        target_date=target_date,
         study_target_minutes=study_target_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
@@ -103,6 +109,7 @@ def build_yearly_metrics(
     prev_daily_data: dict[datetime.date, DailyAggregate],
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_year_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -115,6 +122,7 @@ def build_yearly_metrics(
         daily_data,
         prev_daily_data,
         media_bundle,
+        target_date=target_date,
         study_target_minutes=study_target_minutes,
         prior_year_metrics=prior_year_metrics,
     )

@@ -67,6 +67,7 @@ def _weekly_metrics_artifact() -> RenderBaselineArtifact:
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
@@ -104,6 +105,7 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "month",
             len(list(daterange(start, end))),
@@ -144,6 +146,7 @@ def _quarterly_metrics_artifact() -> RenderBaselineArtifact:
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "quarter",
             len(list(daterange(start, end))),
@@ -187,6 +190,7 @@ def _yearly_metrics_artifact() -> RenderBaselineArtifact:
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "year",
             len(list(daterange(start, end))),

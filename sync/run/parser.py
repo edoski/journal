@@ -6,55 +6,19 @@ import argparse
 from collections.abc import Callable, Mapping
 
 from sync.log import add_logging_cli_args
-from sync.run.commands.grades import cmd_grades_sync
-from sync.run.commands.goals import cmd_goals_add
-from sync.run.commands.media import (
-    cmd_media_book_annotations_import,
-    cmd_media_podcast_add,
-)
-from sync.run.commands.period import (
-    cmd_period_all,
-    cmd_period_daily,
-    cmd_period_monthly,
-    cmd_period_quarterly,
-    cmd_period_weekly,
-    cmd_period_yearly,
-)
-from sync.run.commands.reminders import cmd_session_remind, cmd_session_skip
-from sync.run.commands.session import cmd_session_rename, cmd_session_undo
 
 CommandHandler = Callable[[argparse.Namespace], int]
 
 
-_DEFAULT_HANDLERS: dict[str, CommandHandler] = {
-    "period_all": cmd_period_all,
-    "period_daily": cmd_period_daily,
-    "period_weekly": cmd_period_weekly,
-    "period_monthly": cmd_period_monthly,
-    "period_quarterly": cmd_period_quarterly,
-    "period_yearly": cmd_period_yearly,
-    "session_rename": cmd_session_rename,
-    "session_undo": cmd_session_undo,
-    "session_skip": cmd_session_skip,
-    "session_remind": cmd_session_remind,
-    "grades_sync": cmd_grades_sync,
-    "goals_add": cmd_goals_add,
-    "media_podcast_add": cmd_media_podcast_add,
-    "media_book_annotations_import": cmd_media_book_annotations_import,
-}
-
-
 def _resolve_handler(
-    handlers: Mapping[str, CommandHandler] | None,
+    handlers: Mapping[str, CommandHandler],
     key: str,
 ) -> CommandHandler:
-    if handlers is not None and key in handlers:
-        return handlers[key]
-    return _DEFAULT_HANDLERS[key]
+    return handlers[key]
 
 
 def build_parser(
-    handlers: Mapping[str, CommandHandler] | None = None,
+    handlers: Mapping[str, CommandHandler],
 ) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     add_logging_cli_args(parser)

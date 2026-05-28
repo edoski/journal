@@ -14,6 +14,7 @@ from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.screen_time import DailyScreenTimeData
 from sync.contracts.status import TrainingEntryPayload, TrainingStatus
+from sync.daily.composer import build_deviation_data
 from sync.target_policy import effective_study_minutes
 
 
@@ -489,7 +490,7 @@ def test_sync_day_passes_schedule_cap_to_procrastination_section(monkeypatch, tm
         ]
 
     monkeypatch.setattr(
-        "sync.application.daily_sync_service.build_procrastination_section",
+        "sync.daily.composer.build_procrastination_section",
         _capture_procrastination_section,
     )
 
@@ -521,7 +522,7 @@ def test_build_deviation_data_accrues_full_study_window_without_sessions():
         is_off_day=False,
     )
 
-    deviation = DailySyncService._build_deviation_data(
+    deviation = build_deviation_data(
         day,
         schedule,
         [],
@@ -552,7 +553,7 @@ def test_build_deviation_data_uses_schedule_study_start_for_lateness():
         }
     ]
 
-    deviation = DailySyncService._build_deviation_data(
+    deviation = build_deviation_data(
         day,
         schedule,
         sessions,
@@ -584,7 +585,7 @@ def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
         )
     )
 
-    deviation = DailySyncService._build_deviation_data(
+    deviation = build_deviation_data(
         day,
         schedule,
         [],
@@ -615,13 +616,13 @@ def test_build_deviation_data_off_day_has_no_late_study_start_penalty():
         }
     ]
 
-    no_sessions_deviation = DailySyncService._build_deviation_data(
+    no_sessions_deviation = build_deviation_data(
         day,
         schedule,
         [],
         TrainingStatus(),
     )
-    with_sessions_deviation = DailySyncService._build_deviation_data(
+    with_sessions_deviation = build_deviation_data(
         day,
         schedule,
         sessions,

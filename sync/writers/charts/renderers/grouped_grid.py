@@ -38,7 +38,7 @@ def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
     dates = list(spec.dates)
     daily_data = spec.daily_data
     current_date = spec.current_date
-    today = spec.today or datetime.date.today()
+    today = spec.today
 
     lines: list[str] = []
 
@@ -81,7 +81,7 @@ def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
     week_ranges = list(spec.week_ranges)
     daily_data = spec.daily_data
     current_date = spec.current_date
-    today = spec.today or datetime.date.today()
+    today = spec.today
     delta_labels = list(spec.delta_labels) if spec.delta_labels else None
 
     lines: list[str] = []

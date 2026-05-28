@@ -32,6 +32,35 @@ def test_extract_reads_target_subsection():
     assert goals[0].id == "gid-mdef456789"
 
 
+def test_extract_assigns_stable_ids_when_period_context_is_available():
+    store = MarkdownGoalStore()
+    lines = [
+        "## Goals",
+        "---",
+        "### **WEEKLY**",
+        "- [ ] Task without id",
+        "",
+        "## Metrics",
+        "---",
+    ]
+
+    first = store.extract(
+        lines,
+        "WEEKLY",
+        horizon="weekly",
+        period_key="2026-05-25",
+    )
+    second = store.extract(
+        lines,
+        "WEEKLY",
+        horizon="weekly",
+        period_key="2026-05-25",
+    )
+
+    assert first[0].id == second[0].id
+    assert first[0].id.startswith("gid-m")
+
+
 def test_apply_rebuilds_goals_block():
     store = MarkdownGoalStore()
     lines = _base_note_lines()

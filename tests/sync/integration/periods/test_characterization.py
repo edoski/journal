@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime
 
 import sync.periods.engine as period_engine
+from sync.contracts.media import MediaBundle
 from sync.dates import (
     daterange,
     iso_week_range,
@@ -37,6 +38,21 @@ def _assert_common_structure(lines: list[str]) -> None:
     ]
 
 
+def _summary_line(lines: list[str], metric: str) -> str:
+    return next(line for line in lines if f"**{metric}**" in line)
+
+
+def _minimal_daily(study_minutes: float) -> dict:
+    return {
+        "study_minutes": study_minutes,
+        "sleep_minutes": None,
+        "mood": None,
+        "workout": False,
+        "stretch": False,
+        "meditate": False,
+    }
+
+
 def test_weekly_metrics_block_characterization(monkeypatch):
     _ = monkeypatch
 
@@ -61,6 +77,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
@@ -71,6 +88,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         prev_daily_data,
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
@@ -113,6 +131,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "month",
             len(list(daterange(start, end))),
@@ -128,6 +147,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         "THIS MONTH",
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "month",
             len(list(daterange(start, end))),
@@ -146,6 +166,26 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         total_days=len(dates),
         current_metrics=current_metrics,
     )
+
+
+def test_monthly_previous_summary_uses_full_previous_month_denominator():
+    start, end = month_range(2020, 5)
+    prev_start, _prev_end = month_range(2020, 4)
+
+    lines = period_engine.build_monthly_metrics(
+        start,
+        end,
+        month_week_ranges(2020, 5),
+        {},
+        {prev_start: _minimal_daily(60.0)},
+        "THIS MONTH",
+        "**[[2020-04\\|LAST MONTH]]**",
+        MediaBundle(books=[], podcasts=[]),
+        target_date=end,
+        study_target_minutes=summary_targets("month", 31).study_minutes,
+    )
+
+    assert "| `0h00m/day` | `0h02m/day` |" in _summary_line(lines, "STUDY")
 
 
 def test_quarterly_metrics_block_characterization(monkeypatch):
@@ -173,6 +213,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "quarter",
             len(list(daterange(start, end))),
@@ -188,6 +229,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         2020,
         2,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "quarter",
             len(list(daterange(start, end))),
@@ -206,6 +248,26 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         total_days=len(dates),
         current_metrics=current_metrics,
     )
+
+
+def test_quarterly_previous_summary_uses_full_previous_quarter_denominator():
+    start, end = quarter_range(2020, 3)
+    prev_start, _prev_end = quarter_range(2020, 2)
+
+    lines = period_engine.build_quarterly_metrics(
+        start,
+        end,
+        quarter_months(2020, 3),
+        {},
+        {prev_start: _minimal_daily(91.0)},
+        2020,
+        2,
+        MediaBundle(books=[], podcasts=[]),
+        target_date=end,
+        study_target_minutes=summary_targets("quarter", 92).study_minutes,
+    )
+
+    assert "| `0h00m/day` | `0h01m/day` |" in _summary_line(lines, "STUDY")
 
 
 def test_yearly_metrics_block_characterization(monkeypatch):
@@ -236,6 +298,7 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "year",
             len(list(daterange(start, end))),
@@ -251,6 +314,7 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
+        target_date=end,
         study_target_minutes=summary_targets(
             "year",
             len(list(daterange(start, end))),

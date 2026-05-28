@@ -8,7 +8,7 @@ import calendar
 import datetime
 import re
 
-from sync.goals.identity import generate_goal_id, generate_goal_id_for
+from sync.goals.identity import generate_goal_id_for
 from sync.contracts.goals import Goal
 
 
@@ -153,8 +153,6 @@ def parse_goal_tasks(lines: list[str]) -> list[Goal]:
         body = match.group("body").strip()
         done_state = state.lower() in {"x", "✓", "✔", "-"}
         goal_id = _extract_goal_id(line)
-        if goal_id is None:
-            goal_id = generate_goal_id(kind="manual")
 
         # Strip trailing gid marker from body if present
         body = _TRAILING_GID_MARKER_RE.sub("", body)
@@ -165,7 +163,7 @@ def parse_goal_tasks(lines: list[str]) -> list[Goal]:
 
         goals.append(
             Goal(
-                id=goal_id,
+                id=goal_id or "",
                 body=body_clean,
                 done=done_state,
                 date_str=date_str,

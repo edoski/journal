@@ -6,7 +6,6 @@ import datetime
 
 from sync.goals.identity import generate_goal_id_for
 from sync.contracts.goals import Goal
-import sync.readers.goals as goals_module
 from sync.readers.goals import (
     _extract_goal_id as extract_goal_id,
     ensure_goal_ids,
@@ -94,24 +93,10 @@ class TestParseGoalTasks:
         tasks = parse_goal_tasks(lines)
         assert len(tasks) == 1
 
-    def test_always_generates_id(self):
+    def test_missing_id_stays_empty(self):
         lines = ["- [x] Task without id"]
         tasks = parse_goal_tasks(lines)
-        assert tasks[0].id is not None
-        assert tasks[0].id.startswith("gid-m")
-
-    def test_missing_id_uses_manual_id_kind(self, monkeypatch):
-        called: dict[str, str] = {}
-
-        def _fake_generate_goal_id(*, kind: str) -> str:
-            called["kind"] = kind
-            return "gid-mmanual0000"
-
-        monkeypatch.setattr(goals_module, "generate_goal_id", _fake_generate_goal_id)
-
-        tasks = parse_goal_tasks(["- [ ] Task without id"])
-        assert tasks[0].id == "gid-mmanual0000"
-        assert called["kind"] == "manual"
+        assert tasks[0].id == ""
 
     def test_parses_date_and_reminder_offset(self):
         lines = ["- [ ] Ship feature `2025-03-15 !2w` ^gid-mabc123456"]

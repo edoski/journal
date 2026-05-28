@@ -207,22 +207,11 @@ def ensure_note(path: str, template_path: str) -> None:
 
 def replace_metrics_block(lines: list[str], new_block_lines: list[str]) -> list[str]:
     """Replace the ## Metrics section content with new lines."""
-    metrics_idx = None
-    for idx, line in enumerate(lines):
-        if line.strip().lower() == "## metrics":
-            metrics_idx = idx
-            break
-    if metrics_idx is None:
+    metrics_idx = find_header_idx(lines, "Metrics")
+    if metrics_idx == -1:
         return lines
 
-    end_idx = len(lines)
-    for idx in range(metrics_idx + 1, len(lines)):
-        if (
-            lines[idx].strip().startswith("## ")
-            and lines[idx].strip().lower() != "## metrics"
-        ):
-            end_idx = idx
-            break
+    _, end_idx = section_bounds(lines, metrics_idx, level=2)
 
     new_lines = lines[: metrics_idx + 1]
     new_lines.append("---")

@@ -35,6 +35,7 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.periods.presentation import period_screen_trend_rows
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     TIME_LABEL_STANDARD,
@@ -49,7 +50,7 @@ from sync.writers.charts import (
     compress_days_time_order,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendMode, ScreenTrendTableSpec, render_table
+from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 YEARLY_STUDY_BAR_WIDTH = 45
 YEARLY_TRAINING_BAR_WIDTH = 45
@@ -65,10 +66,11 @@ def build_yearly_metrics(
     prev_daily_data: dict[datetime.date, DailyAggregate],
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_year_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
-    today = datetime.date.today()
+    today = target_date
     sections: list[list[str]] = []
 
     dates = list(daterange(year_start, year_end))
@@ -362,12 +364,15 @@ def build_yearly_metrics(
             screen_time_totals,
             render_table(
                 ScreenTrendTableSpec(
-                    mode=ScreenTrendMode.PERIOD,
                     period_label="QTR",
-                    period_ranges=quarter_ranges,
-                    daily_data=daily_data,
-                    labels=quarter_labels,
-                    wikilinks=quarter_wikilinks,
+                    rows=period_screen_trend_rows(
+                        quarter_ranges,
+                        daily_data,
+                        today=today,
+                        labels=quarter_labels,
+                        wikilinks=quarter_wikilinks,
+                        fallback_prefix="Q",
+                    ),
                 )
             ),
         )

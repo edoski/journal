@@ -8,7 +8,7 @@ from sync.contracts.study import StudySessionRecord
 from sync.daily.icloud import (
     finalize_status_file,
     quarantine_status_file,
-    read_status_file,
+    read_status_files,
     write_study_times_to_icloud,
 )
 from sync.daily.screen_time import load_screen_time_data
@@ -119,27 +119,25 @@ class ICloudDailyStatusSource(DailyStatusSource):
         anchor_day: datetime.date,
         resolved_days: set[datetime.date],
     ) -> None:
-        success, payload, parsed_path = read_status_file(filename)
-        if not success or payload is None:
-            return
-        try:
-            entries = parse_training_payload(payload, source_kind)
-            for entry in entries:
-                payload_day = self._validate_payload_day(
-                    entry.date,
-                    filename=filename,
-                    anchor_day=anchor_day,
-                )
-                day_payload = self._training_by_day.setdefault(payload_day, {})
-                source_payload = day_payload.setdefault(source_kind, [])
-                source_payload.append(entry)
-                resolved_days.add(payload_day)
-        except ValueError as exc:
-            logger.error("%s: %s", filename, exc)
-            quarantine_status_file(filename, parsed_path)
-            return
+        for payload, parsed_path in read_status_files(filename):
+            try:
+                entries = parse_training_payload(payload, source_kind)
+                for entry in entries:
+                    payload_day = self._validate_payload_day(
+                        entry.date,
+                        filename=filename,
+                        anchor_day=anchor_day,
+                    )
+                    day_payload = self._training_by_day.setdefault(payload_day, {})
+                    source_payload = day_payload.setdefault(source_kind, [])
+                    source_payload.append(entry)
+                    resolved_days.add(payload_day)
+            except ValueError as exc:
+                logger.error("%s: %s", filename, exc)
+                quarantine_status_file(filename, parsed_path)
+                continue
 
-        finalize_status_file(filename, parsed_path)
+            finalize_status_file(filename, parsed_path)
 
     def _ingest_sleep_file(
         self,
@@ -148,25 +146,22 @@ class ICloudDailyStatusSource(DailyStatusSource):
         resolved_days: set[datetime.date],
     ) -> None:
         filename = "sleep_status.json"
-        success, payload, parsed_path = read_status_file(filename)
-        if not success or payload is None:
-            return
+        for payload, parsed_path in read_status_files(filename):
+            try:
+                parsed = parse_sleep_payload(payload)
+                payload_day = self._validate_payload_day(
+                    parsed.date,
+                    filename=filename,
+                    anchor_day=anchor_day,
+                )
+                self._sleep_by_day[payload_day] = parsed
+                resolved_days.add(payload_day)
+            except ValueError as exc:
+                logger.error("%s: %s", filename, exc)
+                quarantine_status_file(filename, parsed_path)
+                continue
 
-        try:
-            parsed = parse_sleep_payload(payload)
-            payload_day = self._validate_payload_day(
-                parsed.date,
-                filename=filename,
-                anchor_day=anchor_day,
-            )
-            self._sleep_by_day[payload_day] = parsed
-            resolved_days.add(payload_day)
-        except ValueError as exc:
-            logger.error("%s: %s", filename, exc)
-            quarantine_status_file(filename, parsed_path)
-            return
-
-        finalize_status_file(filename, parsed_path)
+            finalize_status_file(filename, parsed_path)
 
     def _ingest_activity_file(
         self,
@@ -175,25 +170,22 @@ class ICloudDailyStatusSource(DailyStatusSource):
         resolved_days: set[datetime.date],
     ) -> None:
         filename = "activity_status.json"
-        success, payload, parsed_path = read_status_file(filename)
-        if not success or payload is None:
-            return
+        for payload, parsed_path in read_status_files(filename):
+            try:
+                parsed = parse_activity_payload(payload)
+                payload_day = self._validate_payload_day(
+                    parsed.date,
+                    filename=filename,
+                    anchor_day=anchor_day,
+                )
+                self._activity_by_day[payload_day] = parsed
+                resolved_days.add(payload_day)
+            except ValueError as exc:
+                logger.error("%s: %s", filename, exc)
+                quarantine_status_file(filename, parsed_path)
+                continue
 
-        try:
-            parsed = parse_activity_payload(payload)
-            payload_day = self._validate_payload_day(
-                parsed.date,
-                filename=filename,
-                anchor_day=anchor_day,
-            )
-            self._activity_by_day[payload_day] = parsed
-            resolved_days.add(payload_day)
-        except ValueError as exc:
-            logger.error("%s: %s", filename, exc)
-            quarantine_status_file(filename, parsed_path)
-            return
-
-        finalize_status_file(filename, parsed_path)
+            finalize_status_file(filename, parsed_path)
 
     def load_training(self, day: datetime.date) -> TrainingStatus:
         """Load workout/stretch/meditation payloads for the day."""

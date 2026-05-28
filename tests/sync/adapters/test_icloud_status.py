@@ -31,6 +31,16 @@ def _default_schedule() -> DayScheduleProfile:
     )
 
 
+def _payload_files(payloads):
+    def fake_read_status_files(name: str):
+        success, payload, path = payloads[name]
+        if not success or payload is None or path is None:
+            return []
+        return [(payload, path)]
+
+    return fake_read_status_files
+
+
 def test_target_days_stages_payload_dates_and_anchor(monkeypatch, tmp_path):
     anchor_day = datetime.date(2026, 2, 13)
     payloads = {
@@ -69,13 +79,16 @@ def test_target_days_stages_payload_dates_and_anchor(monkeypatch, tmp_path):
     }
     read_calls: list[str] = []
 
-    def fake_read_status_file(name: str):
+    def fake_read_status_files(name: str):
         read_calls.append(name)
-        return payloads[name]
+        success, payload, path = payloads[name]
+        if not success or payload is None or path is None:
+            return []
+        return [(payload, path)]
 
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_file",
-        fake_read_status_file,
+        "sync.adapters.icloud_status.read_status_files",
+        fake_read_status_files,
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
@@ -143,8 +156,8 @@ def test_load_screen_time_routes_only_matching_payload_day(monkeypatch, tmp_path
         ),
     }
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_file",
-        lambda name: payloads[name],
+        "sync.adapters.icloud_status.read_status_files",
+        _payload_files(payloads),
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
@@ -203,8 +216,8 @@ def test_target_days_quarantines_future_dated_payload(monkeypatch, tmp_path):
         "activity_status.json": (False, None, None),
     }
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_file",
-        lambda name: payloads[name],
+        "sync.adapters.icloud_status.read_status_files",
+        _payload_files(payloads),
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
@@ -241,8 +254,8 @@ def test_target_days_quarantines_activity_payload_missing_date(monkeypatch, tmp_
         ),
     }
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_file",
-        lambda name: payloads[name],
+        "sync.adapters.icloud_status.read_status_files",
+        _payload_files(payloads),
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
@@ -294,13 +307,16 @@ def test_target_days_is_idempotent_per_anchor_day(monkeypatch, tmp_path):
     }
     read_calls: list[str] = []
 
-    def fake_read_status_file(name: str):
+    def fake_read_status_files(name: str):
         read_calls.append(name)
-        return payloads[name]
+        success, payload, path = payloads[name]
+        if not success or payload is None or path is None:
+            return []
+        return [(payload, path)]
 
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_file",
-        fake_read_status_file,
+        "sync.adapters.icloud_status.read_status_files",
+        fake_read_status_files,
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(

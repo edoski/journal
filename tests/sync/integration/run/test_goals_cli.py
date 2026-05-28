@@ -43,7 +43,7 @@ def _template_lines(target_section: str, mirror_section: str | None) -> list[str
     return lines
 
 
-def _configure_goal_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+def _configure_goal_paths(tmp_path: Path) -> goals_cmd.GoalCommandConfig:
     journal_dir = tmp_path / "journal"
     templates_dir = tmp_path / "templates"
     journal_dir.mkdir(parents=True, exist_ok=True)
@@ -76,13 +76,14 @@ def _configure_goal_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Pa
         encoding="utf-8",
     )
 
-    monkeypatch.setattr(goals_cmd, "JOURNAL_DIR", str(journal_dir))
-    monkeypatch.setattr(goals_cmd, "DAILY_TEMPLATE_PATH", str(daily_template))
-    monkeypatch.setattr(goals_cmd, "WEEKLY_TEMPLATE_PATH", str(weekly_template))
-    monkeypatch.setattr(goals_cmd, "MONTHLY_TEMPLATE_PATH", str(monthly_template))
-    monkeypatch.setattr(goals_cmd, "QUARTERLY_TEMPLATE_PATH", str(quarterly_template))
-    monkeypatch.setattr(goals_cmd, "YEARLY_TEMPLATE_PATH", str(yearly_template))
-    return journal_dir
+    return goals_cmd.GoalCommandConfig(
+        journal_dir=str(journal_dir),
+        daily_template_path=str(daily_template),
+        weekly_template_path=str(weekly_template),
+        monthly_template_path=str(monthly_template),
+        quarterly_template_path=str(quarterly_template),
+        yearly_template_path=str(yearly_template),
+    )
 
 
 @pytest.mark.parametrize(
@@ -101,16 +102,22 @@ def test_goals_add_appends_to_source_period_note(
     period: str,
     section: str,
 ) -> None:
-    _configure_goal_paths(monkeypatch, tmp_path)
+    config = _configure_goal_paths(tmp_path)
     fixed_today = datetime.date(2026, 2, 28)
     monkeypatch.setattr(goals_cmd, "_today", lambda: fixed_today)
 
     rc = goals_cmd.cmd_goals_add(
-        _goals_add_args(period=period, text="Plan focused work")
+        _goals_add_args(period=period, text="Plan focused work"),
+        config=config,
     )
 
     assert rc == 0
-    target = goals_cmd._resolve_target(period, use_next=False, today=fixed_today)
+    target = goals_cmd._resolve_target(
+        period,
+        use_next=False,
+        today=fixed_today,
+        config=config,
+    )
     target_path = Path(target.note_path)
     assert target_path.exists()
     lines = target_path.read_text(encoding="utf-8").splitlines()
@@ -126,12 +133,15 @@ def test_goals_add_preserves_untouched_mirror_subsection(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    _configure_goal_paths(monkeypatch, tmp_path)
+    config = _configure_goal_paths(tmp_path)
     fixed_today = datetime.date(2026, 2, 28)
     monkeypatch.setattr(goals_cmd, "_today", lambda: fixed_today)
 
     weekly_target = goals_cmd._resolve_target(
-        "weekly", use_next=False, today=fixed_today
+        "weekly",
+        use_next=False,
+        today=fixed_today,
+        config=config,
     )
     weekly_path = Path(weekly_target.note_path)
     weekly_path.parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +165,10 @@ def test_goals_add_preserves_untouched_mirror_subsection(
         encoding="utf-8",
     )
 
-    rc = goals_cmd.cmd_goals_add(_goals_add_args(period="weekly", text="Weekly review"))
+    rc = goals_cmd.cmd_goals_add(
+        _goals_add_args(period="weekly", text="Weekly review"),
+        config=config,
+    )
 
     assert rc == 0
     lines = weekly_path.read_text(encoding="utf-8").splitlines()
@@ -172,7 +185,7 @@ def test_goals_add_duplicate_canonical_is_no_op(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    _configure_goal_paths(monkeypatch, tmp_path)
+    config = _configure_goal_paths(tmp_path)
     fixed_today = datetime.date(2026, 2, 28)
     monkeypatch.setattr(goals_cmd, "_today", lambda: fixed_today)
 
@@ -180,6 +193,7 @@ def test_goals_add_duplicate_canonical_is_no_op(
         "monthly",
         use_next=False,
         today=fixed_today,
+        config=config,
     )
     monthly_path = Path(monthly_target.note_path)
     monthly_path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +210,8 @@ def test_goals_add_duplicate_canonical_is_no_op(
     before = monthly_path.read_text(encoding="utf-8")
 
     rc = goals_cmd.cmd_goals_add(
-        _goals_add_args(period="monthly", text="ship feature!")
+        _goals_add_args(period="monthly", text="ship feature!"),
+        config=config,
     )
     captured = capsys.readouterr()
 
@@ -209,11 +224,11 @@ def test_goals_add_month_end_next_month_creates_target_note(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    _configure_goal_paths(monkeypatch, tmp_path)
+    config = _configure_goal_paths(tmp_path)
     fixed_today = datetime.date(2026, 1, 31)
     monkeypatch.setattr(goals_cmd, "_today", lambda: fixed_today)
 
-    monthly_template = Path(goals_cmd.MONTHLY_TEMPLATE_PATH)
+    monthly_template = Path(config.monthly_template_path)
     monthly_template.write_text(
         "\n".join(
             [
@@ -232,13 +247,19 @@ def test_goals_add_month_end_next_month_creates_target_note(
         encoding="utf-8",
     )
 
-    target = goals_cmd._resolve_target("monthly", use_next=True, today=fixed_today)
+    target = goals_cmd._resolve_target(
+        "monthly",
+        use_next=True,
+        today=fixed_today,
+        config=config,
+    )
     target_path = Path(target.note_path)
     assert not target_path.exists()
     assert target.period_key == "2026-02"
 
     rc = goals_cmd.cmd_goals_add(
-        _goals_add_args(period="monthly", next=True, text="Kick off February plan")
+        _goals_add_args(period="monthly", next=True, text="Kick off February plan"),
+        config=config,
     )
 
     assert rc == 0

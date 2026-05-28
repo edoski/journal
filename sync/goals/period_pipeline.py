@@ -49,8 +49,26 @@ class PiercingSyncConfig:
 
     source_section: str
     note_path: str
-    source_paths: tuple[str, ...]
     proximity_days: int
+
+
+@dataclass(frozen=True)
+class PiercingSource:
+    """Named parent source used when piercing goals into a child source section."""
+
+    name: str
+    path: str
+    tasks: list[Goal]
+
+
+@dataclass(frozen=True)
+class PiercingSourceResult:
+    """Updated parent source after pierced-goal reconciliation."""
+
+    name: str
+    path: str
+    tasks: list[Goal]
+    changed: bool
 
 
 @dataclass(frozen=True)
@@ -68,8 +86,21 @@ class PiercingSyncResult:
     """Result of source-section piercing synchronization."""
 
     source_lines: list[str]
-    updated_source_lists: list[list[Goal]]
-    source_changes: list[bool]
+    sources: tuple[PiercingSourceResult, ...]
+
+    def updated_tasks(self, name: str) -> list[Goal]:
+        """Return updated tasks for a named pierced source."""
+        for source in self.sources:
+            if source.name == name:
+                return source.tasks
+        raise KeyError(name)
+
+    def changed(self, name: str) -> bool:
+        """Return whether a named pierced source changed."""
+        for source in self.sources:
+            if source.name == name:
+                return source.changed
+        raise KeyError(name)
 
 
 def load_source_tasks_with_carry_forward(
@@ -145,9 +176,9 @@ def sync_mirror_section(
     )
 
 
-def sync_pierced_source_section(
+def sync_pierced_sources(
     existing_tasks: list[Goal],
-    source_goal_lists: list[list[Goal]],
+    sources: list[PiercingSource],
     *,
     config: PiercingSyncConfig,
     today: datetime.date,
@@ -156,11 +187,11 @@ def sync_pierced_source_section(
     """Reconcile pierced goals and render source lines with countdown metadata."""
     original_tasks, final_pierced, updated_source_lists = process_pierced_goals(
         existing_tasks=existing_tasks,
-        source_goal_lists=source_goal_lists,
+        source_goal_lists=[source.tasks for source in sources],
         proximity_days=config.proximity_days,
         today=today,
         note_path=config.note_path,
-        source_paths=list(config.source_paths),
+        source_paths=[source.path for source in sources],
         reconcile_cache_store=reconcile_cache_store,
     )
 
@@ -170,12 +201,16 @@ def sync_pierced_source_section(
     if not source_lines:
         source_lines = empty_subsection_lines(config.source_section)
 
-    source_changes = [
-        updated != original
-        for updated, original in zip(updated_source_lists, source_goal_lists)
-    ]
+    source_results = tuple(
+        PiercingSourceResult(
+            name=source.name,
+            path=source.path,
+            tasks=updated,
+            changed=updated != source.tasks,
+        )
+        for source, updated in zip(sources, updated_source_lists)
+    )
     return PiercingSyncResult(
         source_lines=source_lines,
-        updated_source_lists=updated_source_lists,
-        source_changes=source_changes,
+        sources=source_results,
     )

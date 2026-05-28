@@ -8,7 +8,7 @@ from typing import Literal
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import MONTH_ABBR, STUDY_TARGET_MIN
-from sync.dates import daterange, quarter_id, quarter_months
+from sync.dates import daterange, quarter_id, quarter_months, quarter_range
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_screen_time,
@@ -36,6 +36,7 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.periods.presentation import period_screen_trend_rows
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     QUARTERLY_3MONTH_METRIC,
@@ -49,7 +50,7 @@ from sync.writers.charts import (
     compress_activity_time_order,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendMode, ScreenTrendTableSpec, render_table
+from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 
 def build_quarterly_metrics(
@@ -62,14 +63,15 @@ def build_quarterly_metrics(
     prev_quarter: int,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_quarter_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
-    today = datetime.date.today()
+    today = target_date
     sections: list[list[str]] = []
 
     dates = list(daterange(quarter_start, quarter_end))
-    prev_dates = list(prev_daily_data.keys())
+    prev_dates = list(daterange(*quarter_range(prev_year, prev_quarter)))
 
     # Summary with MA
     current_metrics = compute_period_metrics(dates, daily_data)
@@ -314,12 +316,15 @@ def build_quarterly_metrics(
             screen_time_totals,
             render_table(
                 ScreenTrendTableSpec(
-                    mode=ScreenTrendMode.PERIOD,
                     period_label="MONTH",
-                    period_ranges=month_ranges,
-                    daily_data=daily_data,
-                    labels=month_labels,
-                    wikilinks=month_wikilinks,
+                    rows=period_screen_trend_rows(
+                        month_ranges,
+                        daily_data,
+                        today=today,
+                        labels=month_labels,
+                        wikilinks=month_wikilinks,
+                        fallback_prefix="M",
+                    ),
                 )
             ),
         )

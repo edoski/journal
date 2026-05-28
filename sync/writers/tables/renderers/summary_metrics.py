@@ -93,6 +93,18 @@ def _format_progress_cell(value: float, target: float) -> str:
     return f"`{bar} {progress_pct}%`"
 
 
+def _format_optional_minutes_per_night(value: float | None) -> str:
+    if value is None:
+        return "—"
+    return format_minutes(value, always_show_both=True) + "/night"
+
+
+def _format_optional_mood(value: float | None) -> str:
+    if value is None:
+        return "—"
+    return format_mood_with_scale(value)
+
+
 def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     """Render markdown summary section and table."""
     current_metrics = spec.current_metrics
@@ -191,10 +203,10 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         progress=study_progress_cell,
     )
 
-    curr_sleep_avg = _metric_float_or(current_metrics, "sleep_avg_minutes", 0.0)
-    prev_sleep_avg = _metric_float_or(previous_metrics, "sleep_avg_minutes", 0.0)
-    curr_sleep = format_minutes(curr_sleep_avg, always_show_both=True) + "/night"
-    prev_sleep = format_minutes(prev_sleep_avg, always_show_both=True) + "/night"
+    curr_sleep_avg = _metric_float(current_metrics, "sleep_avg_minutes")
+    prev_sleep_avg = _metric_float(previous_metrics, "sleep_avg_minutes")
+    curr_sleep = _format_optional_minutes_per_night(curr_sleep_avg)
+    prev_sleep = _format_optional_minutes_per_night(prev_sleep_avg)
 
     ma_sleep_str = "—"
     ma_sleep_avg = (
@@ -214,7 +226,11 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=sleep_pct_str,
         ma_value=ma_sleep_str,
         target=sleep_target_label,
-        progress=_format_progress_cell(curr_sleep_avg, sleep_target_minutes),
+        progress=(
+            "`—`"
+            if curr_sleep_avg is None
+            else _format_progress_cell(curr_sleep_avg, sleep_target_minutes)
+        ),
     )
 
     curr_meditation_count = _metric_int_or(current_metrics, "meditation_count", 0)
@@ -301,10 +317,10 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         progress=_format_progress_cell(curr_stretch_count, stretch_target),
     )
 
-    curr_mood_avg = _metric_float_or(current_metrics, "mood_avg", 0.0)
-    prev_mood_avg = _metric_float_or(previous_metrics, "mood_avg", 0.0)
-    curr_mood = format_mood_with_scale(curr_mood_avg)
-    prev_mood = format_mood_with_scale(prev_mood_avg)
+    curr_mood_avg = _metric_float(current_metrics, "mood_avg")
+    prev_mood_avg = _metric_float(previous_metrics, "mood_avg")
+    curr_mood = _format_optional_mood(curr_mood_avg)
+    prev_mood = _format_optional_mood(prev_mood_avg)
 
     ma_mood_str = "—"
     ma_mood_avg = _metric_float(ma_metrics, "mood_avg") if ma_metrics else None
@@ -322,7 +338,11 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         change=mood_pct_str,
         ma_value=ma_mood_str,
         target=mood_target_label,
-        progress=_format_progress_cell(curr_mood_avg, mood_target),
+        progress=(
+            "`—`"
+            if curr_mood_avg is None
+            else _format_progress_cell(curr_mood_avg, mood_target)
+        ),
     )
 
     lines.append("")

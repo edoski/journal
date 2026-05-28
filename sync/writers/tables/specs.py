@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import datetime
 from collections.abc import Mapping
 from dataclasses import dataclass
-from enum import Enum
 from typing import Sequence
 
-from sync.contracts.metrics import (
-    DailyAggregate,
-    MetricValue,
-)
+from sync.contracts.metrics import MetricValue
 from sync.contracts.targets import PeriodType
 from sync.contracts.deviation import DailyDeviationData
 from sync.contracts.screen_time import DailyScreenTimeData
@@ -42,25 +37,12 @@ class SummaryMetricsTableSpec:
     total_days: int = 7
 
 
-class ScreenTrendMode(str, Enum):
-    """Screen trend table data shape."""
-
-    DAILY = "daily"
-    PERIOD = "period"
-
-
 @dataclass(frozen=True)
 class ScreenTrendTableSpec:
     """Spec for period screen-time trend markdown table."""
 
-    mode: ScreenTrendMode
     period_label: str
-    daily_data: dict[datetime.date, DailyAggregate]
-    dates: Sequence[datetime.date] | None = None
-    period_ranges: Sequence[tuple[datetime.date, datetime.date]] | None = None
-    labels: Sequence[str] | None = None
-    wikilinks: Sequence[str] | None = None
-    include_total_row: bool = True
+    rows: Sequence[Sequence[str]]
 
 
 @dataclass(frozen=True)

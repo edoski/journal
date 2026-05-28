@@ -14,7 +14,12 @@ from sync.goals.daily_pipeline import (
 )
 from sync.goals.note_store import render_goals_or_empty
 from sync.goals.identity import goal_id_kind
-from sync.goals.reconcile import process_pierced_goals, reconcile_goal_lists
+from sync.goals.period_pipeline import (
+    PiercingSource,
+    PiercingSyncConfig,
+    sync_pierced_sources,
+)
+from sync.goals.reconcile import reconcile_goal_lists
 from sync.goals.reminders import get_reminders_for_date
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.ports.goals import GoalStore
@@ -90,31 +95,32 @@ class DailyGoalNoteSync:
             today=day,
         )
 
-        (
-            original_daily,
-            final_pierced,
-            [updated_monthly, updated_quarterly, updated_yearly],
-        ) = process_pierced_goals(
+        source_sync = sync_pierced_sources(
             existing_tasks=existing_daily_tasks,
-            source_goal_lists=[
-                sources.monthly_tasks,
-                sources.quarterly_tasks,
-                sources.yearly_tasks,
+            sources=[
+                PiercingSource("MONTHLY", sources.monthly_path, sources.monthly_tasks),
+                PiercingSource(
+                    "QUARTERLY",
+                    sources.quarterly_path,
+                    sources.quarterly_tasks,
+                ),
+                PiercingSource("YEARLY", sources.quarterly_path, sources.yearly_tasks),
             ],
-            proximity_days=7,
+            config=PiercingSyncConfig(
+                source_section="DAILY",
+                note_path=note_path,
+                proximity_days=7,
+            ),
             today=day,
-            note_path=note_path,
-            source_paths=[
-                sources.monthly_path,
-                sources.quarterly_path,
-                sources.quarterly_path,
-            ],
             reconcile_cache_store=self.reconcile_cache_store,
         )
 
-        monthly_changed = updated_monthly != sources.monthly_tasks
-        quarterly_changed = updated_quarterly != sources.quarterly_tasks
-        yearly_changed = updated_yearly != sources.yearly_tasks
+        updated_monthly = source_sync.updated_tasks("MONTHLY")
+        updated_quarterly = source_sync.updated_tasks("QUARTERLY")
+        updated_yearly = source_sync.updated_tasks("YEARLY")
+        monthly_changed = source_sync.changed("MONTHLY")
+        quarterly_changed = source_sync.changed("QUARTERLY")
+        yearly_changed = source_sync.changed("YEARLY")
 
         if weekly_changed or monthly_changed or quarterly_changed or yearly_changed:
             self.gateway.write_daily_sources(
@@ -125,11 +131,7 @@ class DailyGoalNoteSync:
                 yearly_tasks=updated_yearly if yearly_changed else None,
             )
 
-        daily_source_lines = render_goals_or_empty(
-            "DAILY",
-            [*original_daily, *final_pierced],
-            today=day,
-        )
+        daily_source_lines = source_sync.source_lines
 
         return self.goal_store.apply(
             lines,

@@ -6,23 +6,21 @@ import datetime
 from dataclasses import dataclass
 
 from sync.application.goal_note_gateway import GoalNoteGateway
-from sync.constants import MONTHLY_TEMPLATE_PATH, QUARTERLY_TEMPLATE_PATH
 from sync.contracts.goals import Goal, GoalSection
 from sync.goals.carry_forward import carry_forward_with_tombstones
 from sync.goals.note_store import render_goals_or_empty
 from sync.goals.period_pipeline import (
     CarryForwardConfig,
     MirrorSyncConfig,
+    PiercingSource,
     PiercingSyncConfig,
     load_source_tasks_with_carry_forward,
     sync_mirror_section,
-    sync_pierced_source_section,
+    sync_pierced_sources,
 )
-from sync.notes.locking import locked_note
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
-from sync.periods.runtime import journal_path
 from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWindow
 
 
@@ -44,27 +42,18 @@ class PeriodGoalNoteSync:
         window: WeekWindow,
     ) -> list[str]:
         month_start = datetime.date(window.start.year, window.start.month, 1)
-        month_key = f"{month_start.year}-{month_start.month:02d}"
-        monthly_path = journal_path(f"{month_key}.md")
-        monthly_lines = self.note_store.read_or_create(
-            monthly_path,
-            MONTHLY_TEMPLATE_PATH,
-        )
-        monthly_tasks = self.goal_store.extract(
-            monthly_lines,
-            "MONTHLY",
-            horizon="monthly",
-            period_key=month_key,
-        )
+        monthly_target, monthly_tasks = self.gateway.load_monthly_source(month_start)
 
         quarterly_sources = self.gateway.load_quarterly_sources(month_start)
         monthly_mirror = self.goal_store.extract(
             lines,
             "MONTHLY",
             horizon="monthly",
-            period_key=month_key,
+            period_key=monthly_target.period_key,
         )
-        previous_lines = self.note_store.read(journal_path(window.previous_filename))
+        previous_lines = self.note_store.read(
+            self.gateway.note_path(window.previous_filename)
+        )
         weekly_tasks = load_source_tasks_with_carry_forward(
             lines,
             config=CarryForwardConfig(
@@ -84,7 +73,7 @@ class PeriodGoalNoteSync:
             monthly_mirror,
             config=MirrorSyncConfig(
                 mirror_section="MONTHLY",
-                source_path=monthly_path,
+                source_path=monthly_target.note_path,
                 mirror_path=note_path,
                 proximity_days=30,
             ),
@@ -95,72 +84,42 @@ class PeriodGoalNoteSync:
         monthly_changed = monthly_sync.source_changed
 
         if monthly_changed:
-            with locked_note(monthly_path):
-                monthly_lines = self.note_store.read_or_create(
-                    monthly_path,
-                    MONTHLY_TEMPLATE_PATH,
-                )
-                existing_quarterly = self.goal_store.extract(monthly_lines, "QUARTERLY")
-                self.goal_store.write(
-                    monthly_path,
-                    monthly_lines,
-                    [
-                        GoalSection(
-                            section="QUARTERLY",
-                            lines=render_goals_or_empty(
-                                "QUARTERLY",
-                                existing_quarterly,
-                            ),
-                        ),
-                        GoalSection(
-                            section="MONTHLY",
-                            lines=render_goals_or_empty("MONTHLY", monthly_tasks),
-                        ),
-                    ],
-                )
+            self.gateway.write_monthly_source(month_start, monthly_tasks)
 
-        source_sync = sync_pierced_source_section(
+        source_sync = sync_pierced_sources(
             existing_tasks=weekly_tasks,
-            source_goal_lists=[
-                quarterly_sources.quarterly_tasks,
-                quarterly_sources.yearly_mirror,
+            sources=[
+                PiercingSource(
+                    "QUARTERLY",
+                    quarterly_sources.path,
+                    quarterly_sources.quarterly_tasks,
+                ),
+                PiercingSource(
+                    "YEARLY",
+                    quarterly_sources.path,
+                    quarterly_sources.yearly_mirror,
+                ),
             ],
             config=PiercingSyncConfig(
                 source_section="WEEKLY",
                 note_path=note_path,
-                source_paths=(quarterly_sources.path, quarterly_sources.path),
                 proximity_days=30,
             ),
             today=today,
             reconcile_cache_store=self.reconcile_cache_store,
         )
         weekly_source_lines = source_sync.source_lines
-        quarterly_tasks, yearly_mirror = source_sync.updated_source_lists
-        quarterly_changed, yearly_changed = source_sync.source_changes
+        quarterly_tasks = source_sync.updated_tasks("QUARTERLY")
+        yearly_mirror = source_sync.updated_tasks("YEARLY")
+        quarterly_changed = source_sync.changed("QUARTERLY")
+        yearly_changed = source_sync.changed("YEARLY")
 
         if quarterly_changed or yearly_changed:
-            with locked_note(quarterly_sources.path):
-                quarterly_lines = self.note_store.read_or_create(
-                    quarterly_sources.path,
-                    QUARTERLY_TEMPLATE_PATH,
-                )
-                self.goal_store.write(
-                    quarterly_sources.path,
-                    quarterly_lines,
-                    [
-                        GoalSection(
-                            section="YEARLY",
-                            lines=render_goals_or_empty("YEARLY", yearly_mirror),
-                        ),
-                        GoalSection(
-                            section="QUARTERLY",
-                            lines=render_goals_or_empty(
-                                "QUARTERLY",
-                                quarterly_tasks,
-                            ),
-                        ),
-                    ],
-                )
+            self.gateway.write_quarterly_source(
+                month_start,
+                quarterly_tasks=quarterly_tasks if quarterly_changed else None,
+                yearly_tasks=yearly_mirror if yearly_changed else None,
+            )
 
         return self.goal_store.apply(
             lines,
@@ -179,7 +138,9 @@ class PeriodGoalNoteSync:
     ) -> list[str]:
         month_start = window.start
         month_key = f"{window.year}-{window.month:02d}"
-        previous_lines = self.note_store.read(journal_path(window.previous_filename))
+        previous_lines = self.note_store.read(
+            self.gateway.note_path(window.previous_filename)
+        )
         quarterly_mirror = self.goal_store.extract(
             lines,
             "QUARTERLY",
@@ -216,45 +177,33 @@ class PeriodGoalNoteSync:
         quarterly_tasks = quarterly_sync.source_tasks
         quarterly_changed = quarterly_sync.source_changed
 
-        source_sync = sync_pierced_source_section(
+        source_sync = sync_pierced_sources(
             existing_tasks=monthly_tasks,
-            source_goal_lists=[quarterly_sources.yearly_mirror],
+            sources=[
+                PiercingSource(
+                    "YEARLY",
+                    quarterly_sources.path,
+                    quarterly_sources.yearly_mirror,
+                )
+            ],
             config=PiercingSyncConfig(
                 source_section="MONTHLY",
                 note_path=note_path,
-                source_paths=(quarterly_sources.path,),
                 proximity_days=90,
             ),
             today=today,
             reconcile_cache_store=self.reconcile_cache_store,
         )
         monthly_source_lines = source_sync.source_lines
-        [yearly_mirror] = source_sync.updated_source_lists
-        [yearly_changed] = source_sync.source_changes
+        yearly_mirror = source_sync.updated_tasks("YEARLY")
+        yearly_changed = source_sync.changed("YEARLY")
 
         if quarterly_changed or yearly_changed:
-            with locked_note(quarterly_sources.path):
-                quarterly_lines = self.note_store.read_or_create(
-                    quarterly_sources.path,
-                    QUARTERLY_TEMPLATE_PATH,
-                )
-                self.goal_store.write(
-                    quarterly_sources.path,
-                    quarterly_lines,
-                    [
-                        GoalSection(
-                            section="YEARLY",
-                            lines=render_goals_or_empty("YEARLY", yearly_mirror),
-                        ),
-                        GoalSection(
-                            section="QUARTERLY",
-                            lines=render_goals_or_empty(
-                                "QUARTERLY",
-                                quarterly_tasks,
-                            ),
-                        ),
-                    ],
-                )
+            self.gateway.write_quarterly_source(
+                month_start,
+                quarterly_tasks=quarterly_tasks if quarterly_changed else None,
+                yearly_tasks=yearly_mirror if yearly_changed else None,
+            )
 
         return self.goal_store.apply(
             lines,
@@ -277,7 +226,9 @@ class PeriodGoalNoteSync:
             horizon="yearly",
             period_key=str(window.year),
         )
-        previous_lines = self.note_store.read(journal_path(window.previous_filename))
+        previous_lines = self.note_store.read(
+            self.gateway.note_path(window.previous_filename)
+        )
         quarterly_tasks = load_source_tasks_with_carry_forward(
             lines,
             config=CarryForwardConfig(
@@ -291,13 +242,8 @@ class PeriodGoalNoteSync:
             carry_cache_store=self.carry_cache_store,
         )
 
-        yearly_path = journal_path(f"{window.year}.md")
-        yearly_lines = self.note_store.read(yearly_path) or []
-        yearly_tasks = self.goal_store.extract(
-            yearly_lines,
-            "YEARLY",
-            horizon="yearly",
-            period_key=str(window.year),
+        yearly_target, _, yearly_tasks = self.gateway.load_yearly_source_for_year(
+            window.year
         )
 
         today = window.target_date
@@ -306,7 +252,7 @@ class PeriodGoalNoteSync:
             yearly_mirror,
             config=MirrorSyncConfig(
                 mirror_section="YEARLY",
-                source_path=yearly_path,
+                source_path=yearly_target.note_path,
                 mirror_path=note_path,
                 proximity_days=365,
             ),
@@ -317,18 +263,7 @@ class PeriodGoalNoteSync:
         yearly_changed = yearly_sync.source_changed
 
         if yearly_changed:
-            with locked_note(yearly_path):
-                latest_yearly_lines = self.note_store.read(yearly_path) or yearly_lines
-                self.goal_store.write(
-                    yearly_path,
-                    latest_yearly_lines,
-                    [
-                        GoalSection(
-                            section="YEARLY",
-                            lines=render_goals_or_empty("YEARLY", yearly_tasks),
-                        )
-                    ],
-                )
+            self.gateway.write_yearly_source(window.year, yearly_tasks)
 
         return self.goal_store.apply(
             lines,
@@ -350,7 +285,7 @@ class PeriodGoalNoteSync:
         )
 
         prev_tasks: list[Goal] = []
-        prev_note_path = journal_path(window.previous_filename)
+        prev_note_path = self.gateway.note_path(window.previous_filename)
         prev_lines = self.note_store.read(prev_note_path)
         if prev_lines is not None:
             prev_tasks = self.goal_store.extract(

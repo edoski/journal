@@ -7,7 +7,13 @@ import datetime
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.constants import STUDY_TARGET_MIN
-from sync.dates import daterange, format_week_label, month_week_ranges, shift_month
+from sync.dates import (
+    daterange,
+    format_week_label,
+    month_range,
+    month_week_ranges,
+    shift_month,
+)
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_screen_time,
@@ -34,6 +40,7 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
+from sync.periods.presentation import period_screen_trend_rows
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     MONTHLY_WEEK_METRIC,
@@ -46,7 +53,7 @@ from sync.writers.charts import (
     VerticalBarSpec,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendMode, ScreenTrendTableSpec, render_table
+from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 
 def build_monthly_metrics(
@@ -59,6 +66,7 @@ def build_monthly_metrics(
     prev_month_label: str,
     media_bundle: MediaBundle,
     *,
+    target_date: datetime.date,
     study_target_minutes: int | None,
     prior_month_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
@@ -71,11 +79,15 @@ def build_monthly_metrics(
     """
     days_in_period = (end_date - start_date).days + 1
     dates = list(daterange(start_date, end_date))
-    today = datetime.date.today()
+    today = target_date
+    prev_year, prev_month = shift_month(start_date.year, start_date.month, -1)
 
     # Compute metrics for current and previous month
     current_metrics = compute_period_metrics(dates, daily_data)
-    prev_metrics = compute_period_metrics(list(prev_daily_data.keys()), prev_daily_data)
+    prev_metrics = compute_period_metrics(
+        list(daterange(*month_range(prev_year, prev_month))),
+        prev_daily_data,
+    )
 
     # Compute 3-month moving average
     ma_metrics = None
@@ -131,7 +143,6 @@ def build_monthly_metrics(
         else:
             study_value_labels.append(TIME_LABEL_MIN2H.format(total_min))
 
-    prev_year, prev_month = shift_month(start_date.year, start_date.month, -1)
     prev_week_ranges = month_week_ranges(prev_year, prev_month)
     prev_baseline_week = (
         list(daterange(prev_week_ranges[-1][0], prev_week_ranges[-1][1]))
@@ -184,6 +195,7 @@ def build_monthly_metrics(
                 week_ranges=week_ranges,
                 daily_data=daily_data,
                 current_date=current_month_date,
+                today=today,
                 delta_labels=study_grid_delta_labels,
             )
         )
@@ -275,12 +287,15 @@ def build_monthly_metrics(
             screen_time_totals,
             render_table(
                 ScreenTrendTableSpec(
-                    mode=ScreenTrendMode.PERIOD,
                     period_label="WEEK",
-                    period_ranges=week_ranges,
-                    daily_data=daily_data,
-                    labels=week_labels,
-                    wikilinks=week_wikilinks,
+                    rows=period_screen_trend_rows(
+                        week_ranges,
+                        daily_data,
+                        today=today,
+                        labels=week_labels,
+                        wikilinks=week_wikilinks,
+                        fallback_prefix="W",
+                    ),
                 )
             ),
         )

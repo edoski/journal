@@ -128,10 +128,9 @@ def compress_days_time_order(
     fill_char: str = "█",
     partial_char: str = "░",
     empty_char: str = "·",
-    today: datetime.date | None = None,
+    today: datetime.date,
 ) -> str:
     """Compress time-ordered day flags into fixed width glyphs."""
-    anchor_day = today if today is not None else datetime.date.today()
     total = len(days)
     if target_width < 0:
         raise ValueError("target_width must be non-negative")
@@ -147,7 +146,7 @@ def compress_days_time_order(
         end = min(total, end)
         bucket = days[start:end]
 
-        observed = [day for day in bucket if day <= anchor_day]
+        observed = [day for day in bucket if day <= today]
         if not observed:
             symbols.append(empty_char)
             continue
@@ -170,7 +169,7 @@ def compress_activity_time_order(
     *,
     fill_char: str = "■",
     empty_char: str = "·",
-    today: datetime.date | None = None,
+    today: datetime.date,
 ) -> str:
     """Binary activity specialization for ``compress_days_time_order``."""
     return compress_days_time_order(

@@ -13,7 +13,12 @@ from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.application.goal_note_gateway import DailyGoalSources, QuarterlyGoalSources
 from sync.application.goal_sync_service import GoalSyncService
 from sync.goals.reminders import get_reminders_for_date
-from sync.goals.period_pipeline import MirrorSyncResult, PiercingSyncResult
+from sync.goals.period_pipeline import (
+    MirrorSyncResult,
+    PiercingSourceResult,
+    PiercingSyncResult,
+)
+from sync.goals.targets import GoalPathConfig
 from sync.contracts.goals import Goal
 from sync.contracts.reminders import DailySchedule, ReminderRule
 from sync.periods.windows import (
@@ -88,10 +93,7 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
 
     base_dir = tmp_path / "journal"
     base_dir.mkdir()
-    monkeypatch.setattr(
-        "sync.application.goal_sync_period.journal_path",
-        lambda filename: str(base_dir / filename),
-    )
+    service.gateway.path_config = GoalPathConfig(journal_dir=str(base_dir))
     monkeypatch.setattr(
         service.gateway,
         "load_quarterly_sources",
@@ -115,14 +117,22 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
 
     def _pierce_stub(*_args, **kwargs):
         pierce_today_calls.append(kwargs["today"])
-        return PiercingSyncResult(["source"], [[], []], [False, False])
+        return PiercingSyncResult(
+            ["source"],
+            (
+                PiercingSourceResult(
+                    "QUARTERLY", str(base_dir / "2026-Q1.md"), [], False
+                ),
+                PiercingSourceResult("YEARLY", str(base_dir / "2026-Q1.md"), [], False),
+            ),
+        )
 
     monkeypatch.setattr(
         "sync.application.goal_sync_period.sync_mirror_section",
         _mirror_stub,
     )
     monkeypatch.setattr(
-        "sync.application.goal_sync_period.sync_pierced_source_section",
+        "sync.application.goal_sync_period.sync_pierced_sources",
         _pierce_stub,
     )
 
@@ -334,14 +344,6 @@ def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
         "sync.application.goal_sync_daily.reconcile_goal_lists",
         lambda *_a, **_kw: ([], [], False, False),
     )
-    monkeypatch.setattr(
-        "sync.application.goal_sync_daily.process_pierced_goals",
-        lambda *_a, **kwargs: (
-            kwargs["existing_tasks"],
-            [],
-            kwargs["source_goal_lists"],
-        ),
-    )
 
     updated = service.sync_daily_note(
         lines,
@@ -420,14 +422,6 @@ def test_sync_daily_note_renders_empty_daily_placeholder(monkeypatch, tmp_path):
         "sync.application.goal_sync_daily.reconcile_goal_lists",
         lambda *_a, **_kw: ([], [], False, False),
     )
-    monkeypatch.setattr(
-        "sync.application.goal_sync_daily.process_pierced_goals",
-        lambda *_a, **kwargs: (
-            kwargs["existing_tasks"],
-            [],
-            kwargs["source_goal_lists"],
-        ),
-    )
 
     updated = service.sync_daily_note(
         lines,
@@ -498,14 +492,6 @@ def test_sync_daily_note_inserts_goals_after_yaml(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "sync.application.goal_sync_daily.reconcile_goal_lists",
         lambda *_a, **_kw: ([], [], False, False),
-    )
-    monkeypatch.setattr(
-        "sync.application.goal_sync_daily.process_pierced_goals",
-        lambda *_a, **kwargs: (
-            kwargs["existing_tasks"],
-            [],
-            kwargs["source_goal_lists"],
-        ),
     )
 
     updated = service.sync_daily_note(

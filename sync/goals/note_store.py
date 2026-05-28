@@ -13,7 +13,7 @@ from sync.notes.sections import (
     goals_section_bounds,
     splice_goals_section,
 )
-from sync.readers.goals import ensure_goal_ids, parse_goal_tasks
+from sync.readers.goals import ensure_goal_ids, parse_goal_date, parse_goal_tasks
 from sync.writers.goals import build_goals_block, render_goal_lines
 
 EMPTY_SUBSECTION_MESSAGES: dict[str, str] = {
@@ -93,7 +93,7 @@ def add_goal_to_note(
     """Insert a goal into one subsection while preserving untouched lines."""
     updated = lines[:]
     goal_id = generate_goal_id(kind="manual")
-    candidate_canonical = canonical_goal_text(goal_text)
+    candidate_canonical = _canonical_goal_input(goal_text)
     rendered_goal_line = render_goal_lines(
         [Goal(id=goal_id, body=goal_text, done=False)]
     )[0]
@@ -158,6 +158,12 @@ def _find_subsection_body_span(
                 break
         return idx + 1, body_end
     return None
+
+
+def _canonical_goal_input(text: str) -> str:
+    body = re.sub(r"\s*—\s*`(?:TODAY|LATE \+\d+d|\d+d)`\s*$", "", text)
+    body, _, _, _ = parse_goal_date(body)
+    return canonical_goal_text(body)
 
 
 def _subsection_is_effectively_empty(lines: list[str]) -> bool:
