@@ -7,8 +7,8 @@ import pytest
 from sync.readers.study import _strip_backticks, parse_study_table
 
 
-_HEADER = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
-_DIVIDER = "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |"
+_HEADER = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |"
+_DIVIDER = "| ---- | -------- | -------- | --------- | ----- |"
 
 
 def test_returns_empty_when_canonical_header_is_missing():
@@ -18,7 +18,7 @@ def test_returns_empty_when_canonical_header_is_missing():
             "",
             "| SOMETHING | ELSE |",
             "| --------- | ---- |",
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | ctx | notes |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` |",
             "",
         ]
     )
@@ -29,7 +29,7 @@ def test_no_header_with_immediately_parsable_row_still_returns_empty():
     sessions = parse_study_table(
         [
             "### **STUDY**",
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | ctx | notes |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` |",
             "",
         ]
     )
@@ -49,15 +49,15 @@ def test_rejects_non_canonical_header_with_exact_message():
             [
                 "### **STUDY**",
                 "",
-                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
                 "| ---- | -------- | -------- | --------- | ----- | ----- |",
-                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | extra |",
                 "",
             ]
         )
     assert str(excinfo.value) == (
         "Non-canonical STUDY table header. Expected "
-        "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |'"
+        "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |'"
     )
 
 
@@ -66,8 +66,8 @@ def test_skips_no_study_sessions_row_case_insensitively():
         [
             "### **STUDY**",
             "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
-            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+            "| ---- | -------- | -------- | --------- | ----- |",
             "| no study sessions today |",
             "| NO STUDY SESSIONS |",
             "",
@@ -81,11 +81,11 @@ def test_stops_parsing_at_first_non_table_line():
         [
             "### **STUDY**",
             "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
-            "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+05m` | `5m` | ctx | note |",
+            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+            "| ---- | -------- | -------- | --------- | ----- |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+05m` | `5m` |",
             "not-a-table-row",
-            "| 10:00 - 11:00 | `reading` | `1h00m` | `+05m` | `5m` | ctx | note |",
+            "| 10:00 - 11:00 | `reading` | `1h00m` | `+05m` | `5m` |",
             "",
         ]
     )
@@ -99,26 +99,25 @@ def test_rejects_short_row_with_exact_message():
             [
                 "### **STUDY**",
                 "",
-                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
-                "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+                "| ---- | -------- | -------- | --------- | ----- |",
                 "| 09:00 - 10:00 | `coding` |",
                 "",
             ]
         )
     assert str(excinfo.value) == (
-        "Invalid STUDY row: expected TIME/ACTIVITY/DURATION/"
-        "INTERRUPT/BREAK/CONTEXT/NOTES columns"
+        "Invalid STUDY row: expected TIME/ACTIVITY/DURATION/INTERRUPT/BREAK columns"
     )
 
 
-def test_parses_time_interrupt_break_context_and_notes():
+def test_parses_time_interrupt_and_break():
     sessions = parse_study_table(
         [
             "### **STUDY**",
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:15 - 11:00 | `coding` | `1h45m` | `+1h30m` | `20m (+15m)` | [[ctx.md]] | shipped |",
+            "| 09:15 - 11:00 | `coding` | `1h45m` | `+1h30m` | `20m (+15m)` |",
             "",
         ]
     )
@@ -132,8 +131,6 @@ def test_parses_time_interrupt_break_context_and_notes():
     assert session.interrupt_minutes == 90.0
     assert session.break_minutes == 20.0
     assert session.overrun_minutes == 15.0
-    assert session.context == "[[ctx.md]]"
-    assert session.notes == "shipped"
 
 
 def test_accepts_case_insensitive_canonical_header():
@@ -141,9 +138,9 @@ def test_accepts_case_insensitive_canonical_header():
         [
             "### **STUDY**",
             "",
-            "| time | activity | duration | interrupt | break | context | notes |",
+            "| time | activity | duration | interrupt | break |",
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `0m` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -154,8 +151,8 @@ def test_accepts_case_insensitive_canonical_header():
 @pytest.mark.parametrize(
     "header",
     [
-        "| TIME | ACTIVITY | FOCUS | PAUSE | BREAK | CONTEXT | NOTES |",
-        "| TIME | ACTIVITY | DURATION | PAUSE | BREAK | CONTEXT | NOTES |",
+        "| TIME | ACTIVITY | FOCUS | PAUSE | BREAK |",
+        "| TIME | ACTIVITY | DURATION | PAUSE | BREAK |",
     ],
 )
 def test_rejects_non_canonical_focus_pause_prefixes(header: str):
@@ -170,7 +167,7 @@ def test_parses_single_time_without_end_time():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:15 | `reading` | `45m` | `+0m` | `0m` | ctx | note |",
+            "| 09:15 | `reading` | `45m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -186,7 +183,7 @@ def test_invalid_time_shape_keeps_empty_start_and_end():
             "",
             _HEADER,
             _DIVIDER,
-            "| 9:15-10:00 | `reading` | `45m` | `+0m` | `0m` | ctx | note |",
+            "| 9:15-10:00 | `reading` | `45m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -202,7 +199,7 @@ def test_interrupt_minutes_prefer_hour_match_when_present():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+45m +1h30m` | `0m` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+45m +1h30m` | `0m` |",
             "",
         ]
     )
@@ -217,7 +214,7 @@ def test_break_overrun_defaults_to_zero_when_missing():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `15m` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `15m` |",
             "",
         ]
     )
@@ -233,9 +230,9 @@ def test_skips_rows_with_empty_activity_or_zero_duration():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `` | `1h00m` | `+0m` | `0m` | c | n |",
-            "| 10:00 - 11:00 | `coding` | `0m` | `+0m` | `0m` | c | n |",
-            "| 11:00 - 12:00 | `reading` | `30m` | `+0m` | `0m` | c | n |",
+            "| 09:00 - 10:00 | `` | `1h00m` | `+0m` | `0m` |",
+            "| 10:00 - 11:00 | `coding` | `0m` | `+0m` | `0m` |",
+            "| 11:00 - 12:00 | `reading` | `30m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -250,7 +247,7 @@ def test_no_study_sessions_row_does_not_stop_following_valid_rows():
             _HEADER,
             _DIVIDER,
             "| no study sessions |",
-            "| 09:00 - 09:30 | `coding` | `30m` | `+0m` | `0m` | c | n |",
+            "| 09:00 - 09:30 | `coding` | `30m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -265,7 +262,7 @@ def test_backtick_wrapped_time_is_parsed():
             "",
             _HEADER,
             _DIVIDER,
-            "| `09:15 - 10:00` | `coding` | `45m` | `+0m` | `0m` | c | n |",
+            "| `09:15 - 10:00` | `coding` | `45m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -281,7 +278,7 @@ def test_wrapped_time_with_non_backtick_edge_chars_is_not_sanitized():
             "",
             _HEADER,
             _DIVIDER,
-            "| `X09:15 - 10:00X` | `coding` | `45m` | `+0m` | `0m` | c | n |",
+            "| `X09:15 - 10:00X` | `coding` | `45m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -297,7 +294,7 @@ def test_activity_backtick_unwrap_keeps_non_backtick_edge_chars():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `XcodingX` | `1h00m` | `+0m` | `0m` | c | n |",
+            "| 09:00 - 10:00 | `XcodingX` | `1h00m` | `+0m` | `0m` |",
             "",
         ]
     )
@@ -312,7 +309,7 @@ def test_interrupt_hour_without_minute_defaults_to_zero_minute_component():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+1h` | `0m` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+1h` | `0m` |",
             "",
         ]
     )
@@ -327,7 +324,7 @@ def test_invalid_break_value_defaults_break_to_zero():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `bad` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `bad` |",
             "",
         ]
     )
@@ -342,7 +339,7 @@ def test_invalid_break_overrun_value_defaults_overrun_to_zero():
             "",
             _HEADER,
             _DIVIDER,
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `15m (+bad)` | c | n |",
+            "| 09:00 - 10:00 | `coding` | `1h00m` | `+0m` | `15m (+bad)` |",
             "",
         ]
     )

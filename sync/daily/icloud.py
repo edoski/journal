@@ -1,9 +1,8 @@
 """
 iCloud status file handling for daily sync.
 
-Provides resilient loading of status files from iCloud with retry logic,
-file size stabilization, and fallback to .invalid copies. Also handles
-writing study times for iPad shortcut consumption.
+Treats iCloud as a drop-file inbox: claim stable files into local cache,
+parse locally, then delete or archive the claimed copy.
 """
 
 from __future__ import annotations
@@ -15,19 +14,20 @@ import json
 import os
 import time
 
+from sync.config import PATHS
+from sync.contracts.schedule import DayScheduleProfile
+from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
-from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.study import StudySessionRecord
 
 logger = get_logger(__name__)
 
 # iCloud path for study times JSON (read by iPad shortcut)
 STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
-_READ_ATTEMPTS = 60
-_READ_RETRY_SECONDS = 1.0
-_STABLE_READS_REQUIRED = 2
+STATUS_STAGING_DIR = os.path.join(PATHS.daily_cache_dir, "status", "pending")
+STATUS_INVALID_DIR = os.path.join(PATHS.daily_cache_dir, "status", "invalid")
+_READ_RETRY_SECONDS = 0.25
 StatusPayloadFile = tuple[object, str]
 _TRANSIENT_ERRNOS = {
     errno.EAGAIN,
@@ -43,21 +43,79 @@ def _is_transient_read_error(exc: Exception) -> bool:
     )
 
 
-def _invalid_status_candidates(path: str) -> list[str]:
-    candidates = glob.glob(path + ".invalid") + glob.glob(path + ".*.invalid")
+def _status_file_label(filename: str) -> str:
+    return os.path.basename(filename).replace(os.sep, "_")
+
+
+def _pending_status_candidates(filename: str) -> list[str]:
+    label = _status_file_label(filename)
+    candidates = glob.glob(os.path.join(STATUS_STAGING_DIR, f"{label}.*.pending"))
     return sorted(set(candidates), key=lambda p: os.path.getmtime(p), reverse=True)
+
+
+def _is_stable_drop_file(target_path: str) -> tuple[bool, Exception | None]:
+    try:
+        first_size = os.path.getsize(target_path)
+    except FileNotFoundError:
+        return False, None
+    except OSError as exc:
+        return False, exc
+
+    if first_size == 0:
+        return False, ValueError("empty file (likely still syncing)")
+
+    time.sleep(_READ_RETRY_SECONDS)
+
+    try:
+        second_size = os.path.getsize(target_path)
+    except FileNotFoundError:
+        return False, None
+    except OSError as exc:
+        return False, exc
+
+    if second_size == first_size:
+        return True, None
+    return False, ValueError("file size changed while syncing")
+
+
+def _claim_status_file(
+    filename: str,
+    target_path: str,
+) -> tuple[str | None, Exception | None]:
+    stable, stable_err = _is_stable_drop_file(target_path)
+    if not stable:
+        return None, stable_err
+
+    os.makedirs(STATUS_STAGING_DIR, exist_ok=True)
+    label = _status_file_label(filename)
+    claimed_path = os.path.join(
+        STATUS_STAGING_DIR,
+        f"{label}.{time.time_ns()}.{os.getpid()}.pending",
+    )
+    try:
+        os.replace(target_path, claimed_path)
+    except FileNotFoundError:
+        return None, None
+    except (PermissionError, OSError) as exc:
+        return None, exc
+    return claimed_path, None
+
+
+def _parse_claimed_file(target_path: str) -> tuple[object | None, Exception | None]:
+    try:
+        with open(target_path, "r") as f:
+            raw = f.read()
+        return json.loads(raw), None
+    except (json.JSONDecodeError, PermissionError, OSError) as exc:
+        return None, exc
 
 
 def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
     """
     Read and JSON-parse a status file dropped in iCloud by Shortcuts.
 
-    Resilience features:
-    - Wait for the file size to stabilize (to avoid half-synced reads).
-    - Retry for up to ~60 seconds before giving up.
-    - Only delete the file after a successful parse.
-    - If parsing never succeeds, keep a `.invalid` copy for inspection
-      and return (False, None) without touching frontmatter.
+    Primary iCloud files are moved into local cache before parsing. Pending
+    local files from interrupted runs are retried first.
 
     Args:
         filename: Name of the status file (e.g., "workout_status.json")
@@ -76,74 +134,36 @@ def read_status_file(filename: str) -> tuple[bool, object | None, str | None]:
 def read_status_files(filename: str) -> list[StatusPayloadFile]:
     """Read all parseable status files for a shortcut output filename."""
     path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
+    claimed_paths: list[str] = []
 
-    def try_parse(target_path: str) -> tuple[bool, object | None, Exception | None]:
-        last_size: int | None = None
-        stable_count = 0
-        last_err: Exception | None = None
-
-        for _ in range(_READ_ATTEMPTS):
-            try:
-                size = os.path.getsize(target_path)
-            except FileNotFoundError:
-                last_err = FileNotFoundError("file disappeared while waiting")
-                time.sleep(_READ_RETRY_SECONDS)
-                continue
-
-            if size == 0:
-                last_err = ValueError("empty file (likely still syncing)")
-                stable_count = 0
-                time.sleep(_READ_RETRY_SECONDS)
-                continue
-
-            if last_size is not None and size == last_size:
-                stable_count += 1
-            else:
-                stable_count = 0
-                last_size = size
-
-            if stable_count < _STABLE_READS_REQUIRED:
-                time.sleep(_READ_RETRY_SECONDS)
-                continue
-
-            try:
-                with open(target_path, "r") as f:
-                    raw = f.read()
-                data = json.loads(raw)
-                return True, data, None
-            except (json.JSONDecodeError, PermissionError, OSError) as e:
-                last_err = e
-                time.sleep(_READ_RETRY_SECONDS)
-
-        return False, None, last_err
-
-    last_err: Exception | None = None
-    payloads: list[StatusPayloadFile] = []
     if os.path.exists(path):
-        success, data, last_err = try_parse(path)
-        if success:
-            payloads.append((data, path))
-        elif last_err and _is_transient_read_error(last_err):
-            logger.warning("Deferred parsing %s: %s", os.path.basename(path), last_err)
-        else:
-            # Promote the failed file to an .invalid copy for inspection/retry.
-            backup_path = path + ".invalid"
-            try:
-                if os.path.exists(backup_path):
-                    ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-                    backup_path = f"{path}.{ts}.invalid"
-                os.replace(path, backup_path)
-            except (PermissionError, OSError):
-                pass
+        claimed_path, claim_err = _claim_status_file(filename, path)
+        if claim_err and _is_transient_read_error(claim_err):
+            logger.warning(
+                "Deferred claiming %s: %s",
+                os.path.basename(path),
+                claim_err,
+            )
+        elif claim_err and not isinstance(claim_err, ValueError):
+            logger.error("Failed to claim %s: %s", os.path.basename(path), claim_err)
+        if claimed_path:
+            claimed_paths.append(claimed_path)
 
-    candidates = _invalid_status_candidates(path)
+    candidates = _pending_status_candidates(filename)
+    candidates.extend(claimed_paths)
+    candidates = sorted(set(candidates), key=lambda p: os.path.getmtime(p))
+    payloads: list[StatusPayloadFile] = []
+
     for cand in candidates:
-        success, data, _ = try_parse(cand)
-        if success:
+        data, parse_err = _parse_claimed_file(cand)
+        if parse_err is None:
             payloads.append((data, cand))
-
-    if not payloads and last_err:
-        logger.error("Failed to parse %s: %s", os.path.basename(path), last_err)
+            continue
+        if _is_transient_read_error(parse_err):
+            logger.warning("Deferred parsing %s: %s", os.path.basename(cand), parse_err)
+            continue
+        logger.error("Failed to parse %s: %s", os.path.basename(cand), parse_err)
+        quarantine_status_file(filename, cand)
     return payloads
 
 
@@ -160,14 +180,13 @@ def quarantine_status_file(filename: str, parsed_path: str | None) -> None:
     """Move parsed payload file to .invalid for later inspection."""
     if not parsed_path or not os.path.exists(parsed_path):
         return
-    if parsed_path.endswith(".invalid"):
-        return
-    primary_path = os.path.join(ICLOUD_JOURNALSYNC_DIR, filename)
-    backup_path = primary_path + ".invalid"
+    os.makedirs(STATUS_INVALID_DIR, exist_ok=True)
+    label = _status_file_label(filename)
+    backup_path = os.path.join(STATUS_INVALID_DIR, f"{label}.invalid")
     try:
         if os.path.exists(backup_path):
             ts = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-            backup_path = f"{primary_path}.{ts}.invalid"
+            backup_path = os.path.join(STATUS_INVALID_DIR, f"{label}.{ts}.invalid")
         os.replace(parsed_path, backup_path)
     except (PermissionError, OSError):
         pass

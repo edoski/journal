@@ -16,7 +16,7 @@ from sync.application.study_targets import resolve_study_target_minutes
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import daterange
 from sync.metrics import compute_period_metrics
-from sync.periods.engine import (
+from sync.periods.builders import (
     build_monthly_metrics,
     build_quarterly_metrics,
     build_weekly_metrics,

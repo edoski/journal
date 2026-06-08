@@ -40,14 +40,17 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.periods.presentation import period_screen_trend_rows
+from sync.periods.presentation import (
+    bucket_average_bar_spec,
+    monthly_study_grid_spec,
+    monthly_training_grid_spec,
+    period_screen_trend_rows,
+)
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     MONTHLY_WEEK_METRIC,
     MONTHLY_WEEK_MOOD,
     MONTHLY_WEEK_STUDY,
-    MonthlyStudyGridSpec,
-    MonthlyTrainingGridSpec,
     TIME_LABEL_MIN2H,
     TIME_LABEL_STANDARD,
     VerticalBarSpec,
@@ -191,7 +194,7 @@ def build_monthly_metrics(
     current_month_date = today if is_current_month else None
     study_lines.extend(
         render_chart(
-            MonthlyStudyGridSpec(
+            monthly_study_grid_spec(
                 week_ranges=week_ranges,
                 daily_data=daily_data,
                 current_date=current_month_date,
@@ -238,13 +241,9 @@ def build_monthly_metrics(
 
     meditation_days = current_metrics["meditation_count"]
     training_grid = render_chart(
-        MonthlyTrainingGridSpec(
+        monthly_training_grid_spec(
             week_ranges=week_ranges,
             daily_data=daily_data,
-            meditation_count=meditation_days,
-            workout_count=workout_days,
-            stretch_count=stretch_days,
-            days_in_period=days_in_period,
             meditation_delta_labels=meditation_delta_labels,
             workout_delta_labels=workout_delta_labels,
             stretch_delta_labels=stretch_delta_labels,
@@ -303,28 +302,6 @@ def build_monthly_metrics(
 
     # SLEEP section (5-char bars, weekly averages)
     sleep_lines = ["### **SLEEP**"]
-    sleep_chart_vals: list[float] = []
-    sleep_value_labels: list[str] = []
-    for week_days in week_day_lists:
-        mins_raw = [sleep_minutes_for_day(daily_data, d) for d in week_days]
-        sleep_mins: list[float] = [m for m in mins_raw if m is not None]
-        start = week_days[0]
-        if sleep_mins:
-            avg_min = sum(sleep_mins) / len(sleep_mins)  # AVERAGE for sleep
-            sleep_chart_vals.append(
-                round((avg_min / 60) * 2) / 2
-            )  # Round to nearest 0.5h
-            if start > today:
-                sleep_value_labels.append("")
-            else:
-                sleep_value_labels.append(TIME_LABEL_STANDARD.format(avg_min))
-        else:
-            sleep_chart_vals.append(0)
-            if start > today:
-                sleep_value_labels.append("")
-            else:
-                sleep_value_labels.append("0h00m")
-
     sleep_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: sleep_minutes_for_day(month_delta_data, d),
@@ -335,10 +312,14 @@ def build_monthly_metrics(
 
     sleep_lines.extend(
         render_chart(
-            VerticalBarSpec(
-                labels=week_labels,
-                values=sleep_chart_vals,
-                value_labels=sleep_value_labels,
+            bucket_average_bar_spec(
+                week_ranges,
+                week_labels,
+                today=today,
+                value_for_day=lambda d: sleep_minutes_for_day(daily_data, d),
+                chart_value=lambda avg: round((avg / 60) * 2) / 2,
+                value_label=TIME_LABEL_STANDARD.format,
+                zero_label="0h00m",
                 profile=MONTHLY_WEEK_METRIC,
                 delta_labels=sleep_delta_labels,
             )
@@ -361,27 +342,6 @@ def build_monthly_metrics(
 
     # MOOD section (5-char bars, weekly averages, always show decimal)
     mood_lines = ["### **MOOD**"]
-    mood_chart_vals: list[float] = []
-    mood_value_labels: list[str] = []
-    for week_days in week_day_lists:
-        vals_raw = [mood_for_day(daily_data, d) for d in week_days]
-        vals: list[float] = [v for v in vals_raw if v is not None]
-        start = week_days[0]
-        if vals:
-            avg_val = sum(vals) / len(vals)  # AVERAGE for mood
-            mood_chart_vals.append(avg_val)
-            # Always show one decimal for mood (e.g., 5.0, 6.0, 10.0)
-            if start > today:
-                mood_value_labels.append("")
-            else:
-                mood_value_labels.append(DECIMAL_ONE_LABEL.format(avg_val))
-        else:
-            mood_chart_vals.append(0)
-            if start > today:
-                mood_value_labels.append("")
-            else:
-                mood_value_labels.append("0.0")
-
     mood_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: mood_for_day(month_delta_data, d),
@@ -392,10 +352,14 @@ def build_monthly_metrics(
 
     mood_lines.extend(
         render_chart(
-            VerticalBarSpec(
-                labels=week_labels,
-                values=mood_chart_vals,
-                value_labels=mood_value_labels,
+            bucket_average_bar_spec(
+                week_ranges,
+                week_labels,
+                today=today,
+                value_for_day=lambda d: mood_for_day(daily_data, d),
+                chart_value=lambda avg: avg,
+                value_label=DECIMAL_ONE_LABEL.format,
+                zero_label="0.0",
                 profile=MONTHLY_WEEK_MOOD,
                 delta_labels=mood_delta_labels,
             )

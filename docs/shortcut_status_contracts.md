@@ -78,7 +78,13 @@ Example:
 ## Failure Semantics
 
 - Missing file: ignored.
-- Invalid JSON: file is quarantined as `.invalid`, source is skipped.
-- Invalid schema: file is quarantined as `.invalid`, source is skipped.
+- Stable iCloud files are first moved into local pending cache, then parsed from
+  there.
+- Transient iCloud claim/read errors: source is skipped for this run and retried
+  on a later run.
+- Invalid JSON: claimed file is archived under the local status invalid cache,
+  source is skipped.
+- Invalid schema: claimed file is archived under the local status invalid cache,
+  source is skipped.
 - Date mismatch: payload is ignored for that day and source continues normally.
 - One invalid source never aborts full daily sync.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Sequence
 
 
@@ -22,6 +23,9 @@ class ParsedMarkdownTable:
     headers: tuple[str, ...]
     divider: tuple[str, ...]
     rows: tuple[tuple[str, ...], ...]
+
+
+HeaderMatcher = Callable[[tuple[str, ...]], bool]
 
 
 def split_markdown_row(line: str) -> list[str] | None:
@@ -46,6 +50,17 @@ def split_markdown_row(line: str) -> list[str] | None:
 
     cells.append("".join(buf).strip())
     return cells
+
+
+def split_markdown_row_lenient(line: str) -> list[str] | None:
+    """Split a table row, accepting missing trailing pipes."""
+    row = split_markdown_row(line)
+    if row is not None:
+        return row
+    stripped = line.strip()
+    if stripped.startswith("|") and not stripped.endswith("|"):
+        return split_markdown_row(f"{stripped}|")
+    return None
 
 
 def escape_markdown_cell(text: str) -> str:
@@ -86,12 +101,14 @@ def parse_markdown_table(
     start_idx: int,
     *,
     schema: TableSchema | None = None,
+    lenient: bool = False,
 ) -> ParsedMarkdownTable:
     """Parse a markdown table block from lines starting at ``start_idx``."""
     if start_idx < 0 or start_idx >= len(lines):
         raise ValueError("Table start index is out of range")
 
-    header_cells = split_markdown_row(lines[start_idx])
+    split_row = split_markdown_row_lenient if lenient else split_markdown_row
+    header_cells = split_row(lines[start_idx])
     if header_cells is None:
         raise ValueError("Expected markdown table header row")
 
@@ -102,14 +119,14 @@ def parse_markdown_table(
     if divider_idx >= len(lines):
         raise ValueError("Markdown table is missing divider row")
 
-    divider_cells = split_markdown_row(lines[divider_idx])
+    divider_cells = split_row(lines[divider_idx])
     if divider_cells is None:
         raise ValueError("Markdown table divider row is invalid")
 
     rows: list[tuple[str, ...]] = []
     idx = divider_idx + 1
     while idx < len(lines):
-        row_cells = split_markdown_row(lines[idx])
+        row_cells = split_row(lines[idx])
         if row_cells is None:
             break
         rows.append(tuple(row_cells))
@@ -122,3 +139,25 @@ def parse_markdown_table(
         divider=tuple(divider_cells),
         rows=tuple(rows),
     )
+
+
+def find_markdown_table(
+    lines: Sequence[str],
+    *,
+    schema: TableSchema | None = None,
+    header_matches: HeaderMatcher | None = None,
+    lenient: bool = False,
+) -> ParsedMarkdownTable | None:
+    """Find and parse the first markdown table matching a schema or header matcher."""
+    split_row = split_markdown_row_lenient if lenient else split_markdown_row
+    for idx, line in enumerate(lines):
+        header_cells = split_row(line)
+        if header_cells is None:
+            continue
+        headers = tuple(header_cells)
+        if schema is not None and headers != schema.headers:
+            continue
+        if header_matches is not None and not header_matches(headers):
+            continue
+        return parse_markdown_table(lines, idx, schema=schema, lenient=lenient)
+    return None

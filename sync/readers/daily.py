@@ -10,11 +10,10 @@ from collections import defaultdict
 from sync.constants import (
     NO_TRAINING_SESSIONS_TOKEN,
     TRAINING_SECTION_HEADER,
-    TRAINING_TABLE_HEADER_RE,
 )
 from sync.contracts.metrics import DailyAggregate
 from sync.io import safe_read_file
-from sync.notes.markdown_tables import split_markdown_row
+from sync.notes.markdown_tables import find_markdown_table
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.screen_time import parse_procrastination_table
@@ -23,16 +22,6 @@ from sync.readers.study import parse_study_table
 
 _TRAINING_TIME_RE = re.compile(r"\d{2}:\d{2}")
 _TRAINING_TIME_RANGE_RE = re.compile(r"^(?P<start>\d{2}:\d{2}) - (?P<end>\d{2}:\d{2})$")
-
-
-def _split_row(line: str) -> list[str] | None:
-    row = split_markdown_row(line)
-    if row is not None:
-        return row
-    stripped = line.strip()
-    if stripped.startswith("|") and not stripped.endswith("|"):
-        return split_markdown_row(f"{stripped}|")
-    return None
 
 
 def _parse_bool(val: object) -> bool:
@@ -100,27 +89,25 @@ def _parse_training_table_rows(
     if not block:
         return []
 
-    header_idx = next(
-        (
-            i
-            for i, line in enumerate(block)
-            if re.search(TRAINING_TABLE_HEADER_RE, line, re.IGNORECASE)
+    table = find_markdown_table(
+        block,
+        header_matches=lambda cells: (
+            len(cells) >= 3
+            and cells[0].strip().lower() == "time"
+            and cells[1].strip().lower() == "activity"
+            and cells[2].strip().lower() == "duration"
         ),
-        None,
+        lenient=True,
     )
-    if header_idx is None:
+    if table is None:
         return []
 
     rows: list[tuple[str, float, int, int]] = []
-    for row_no, line in enumerate(block[header_idx + 2 :], start=header_idx + 3):
-        if not line.strip().startswith("|"):
-            break
-        line_lower = line.lower()
-        if NO_TRAINING_SESSIONS_TOKEN in line_lower:
+    for row_no, parts in enumerate(table.rows, start=table.start_idx + 3):
+        if NO_TRAINING_SESSIONS_TOKEN in " | ".join(parts).lower():
             continue
 
-        parts = _split_row(line)
-        if parts is None or len(parts) < 3:
+        if len(parts) < 3:
             continue
 
         activity = parts[1].strip().strip("`")

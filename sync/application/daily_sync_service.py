@@ -11,11 +11,9 @@ from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.daily.composer import DailyNoteComposer
 from sync.daily.constants import TEMPLATE_PATH
-from sync.daily.context import format_context_cell
 from sync.log import get_logger
 from sync.notes.locking import locked_note
 from sync.ports.cache import DailyTrainingCacheStore
-from sync.ports.context import ContextSource
 from sync.ports.notes import NoteStore
 from sync.ports.reminders import ReminderRuleStore
 from sync.ports.status import DailyStatusSource
@@ -33,7 +31,6 @@ class DailySyncService:
         *,
         note_store: NoteStore,
         status_source: DailyStatusSource,
-        context_source: ContextSource,
         reminder_store: ReminderRuleStore,
         goal_sync_service: GoalSyncService,
         training_cache_store: DailyTrainingCacheStore,
@@ -42,7 +39,6 @@ class DailySyncService:
     ) -> None:
         self.note_store = note_store
         self.status_source = status_source
-        self.context_source = context_source
         self.goal_sync_service = goal_sync_service
         self.training_cache_store = training_cache_store
         self.journal_dir = journal_dir
@@ -65,17 +61,6 @@ class DailySyncService:
         file_path = os.path.join(self.journal_dir, f"{today_str}.md")
         self.training_cache_store.prune(keep_days=14)
 
-        vault_files = self.context_source.files_modified_on_date(day)
-
-        def context_callback(
-            session_start: datetime.datetime,
-            session_end: datetime.datetime,
-        ) -> str:
-            wikilinks = self.context_source.links_for_window(
-                vault_files, session_start, session_end
-            )
-            return format_context_cell(wikilinks)
-
         # External side effect runs once per sync call.
         self.status_source.write_study_times(day, sessions, day_schedule)
 
@@ -90,7 +75,6 @@ class DailySyncService:
             sessions=sessions,
             day_schedule=day_schedule,
             file_path=file_path,
-            context_for_session=context_callback,
         )
         updated_lines = compose_result.updated_lines
 

@@ -31,13 +31,15 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.periods.presentation import daily_screen_trend_rows
+from sync.periods.presentation import (
+    daily_screen_trend_rows,
+    weekly_study_grid_spec,
+    weekly_training_grid_spec,
+)
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     TIME_LABEL_STANDARD,
     VerticalBarSpec,
-    WeeklyStudyGridSpec,
-    WeeklyTrainingGridSpec,
     WEEKLY_7DAY_CHART,
     WEEKLY_7DAY_MOOD,
     render_chart,
@@ -132,7 +134,7 @@ def build_weekly_metrics(
     current_week_date = today if start_date <= today <= end_date else None
     study_lines.extend(
         render_chart(
-            WeeklyStudyGridSpec(
+            weekly_study_grid_spec(
                 dates=dates,
                 daily_data=daily_data,
                 current_date=current_week_date,
@@ -152,7 +154,7 @@ def build_weekly_metrics(
     meditation_days = current_metrics["meditation_count"]
     training_lines.extend(
         render_chart(
-            WeeklyTrainingGridSpec(
+            weekly_training_grid_spec(
                 dates=dates,
                 daily_data=daily_data,
                 meditation_count=meditation_days,

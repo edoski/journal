@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import datetime
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Sequence
-
-from sync.contracts.metrics import DailyAggregate
 
 
 class HAnchor(str, Enum):
@@ -120,6 +117,17 @@ class TrainingSection:
 
 
 @dataclass(frozen=True)
+class StudyCoverageRow:
+    """One rendered study-coverage row."""
+
+    label: str
+    bar: str
+    done: int
+    elapsed: int
+    delta_label: str = ""
+
+
+@dataclass(frozen=True)
 class VerticalBarSpec:
     """Spec for a vertical bar chart."""
 
@@ -134,22 +142,25 @@ class VerticalBarSpec:
 class WeeklyStudyGridSpec:
     """Spec for weekly full-study-days grouped grid chart."""
 
-    dates: Sequence[datetime.date]
-    daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date
+    symbols: Sequence[str]
+    done_count: int
+    total_count: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_date: datetime.date | None = None
+    current_index: int | None = None
 
 
 @dataclass(frozen=True)
 class MonthlyStudyGridSpec:
     """Spec for monthly full-study-days grouped grid chart."""
 
-    week_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date
+    week_labels: Sequence[str]
+    week_day_counts: Sequence[int]
+    symbols: Sequence[str]
+    total_done: int
+    total_elapsed: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_date: datetime.date | None = None
+    current_week_index: int | None = None
+    current_day_index: int | None = None
     delta_labels: Sequence[str] | None = None
 
 
@@ -157,14 +168,14 @@ class MonthlyStudyGridSpec:
 class MonthlyTrainingGridSpec:
     """Spec for monthly training grouped grid chart."""
 
-    week_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict[datetime.date, DailyAggregate]
-    meditation_count: int
-    workout_count: int
-    stretch_count: int
-    days_in_period: int
+    week_labels: Sequence[str]
+    week_day_counts: Sequence[int]
+    meditation_symbols: Sequence[str]
+    workout_symbols: Sequence[str]
+    stretch_symbols: Sequence[str]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_date: datetime.date | None = None
+    current_week_index: int | None = None
+    current_day_index: int | None = None
     meditation_delta_labels: Sequence[str] | None = None
     workout_delta_labels: Sequence[str] | None = None
     stretch_delta_labels: Sequence[str] | None = None
@@ -175,13 +186,14 @@ class MonthlyTrainingGridSpec:
 class WeeklyTrainingGridSpec:
     """Spec for weekly training grouped grid chart."""
 
-    dates: Sequence[datetime.date]
-    daily_data: dict[datetime.date, DailyAggregate]
+    meditation_symbols: Sequence[str]
+    workout_symbols: Sequence[str]
+    stretch_symbols: Sequence[str]
     meditation_count: int
     workout_count: int
     stretch_count: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_date: datetime.date | None = None
+    current_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -210,10 +222,9 @@ class TrainingSectionsRowsSpec:
 class QuarterlyStudyCoverageRowsSpec:
     """Spec for quarterly study-coverage progress rows."""
 
-    month_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date
-    delta_labels: Sequence[str] | None = None
+    rows: Sequence[StudyCoverageRow]
+    total_done: int
+    total_elapsed: int
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 
 
@@ -221,12 +232,9 @@ class QuarterlyStudyCoverageRowsSpec:
 class YearlyStudyCoverageRowsSpec:
     """Spec for yearly study-coverage progress rows."""
 
-    quarter_ranges: Sequence[tuple[datetime.date, datetime.date]]
-    daily_data: dict[datetime.date, DailyAggregate]
-    today: datetime.date
-    bar_width: int = 30
-    delta_labels: Sequence[str] | None = None
-    bars_override: Sequence[str] | None = None
+    rows: Sequence[StudyCoverageRow]
+    total_done: int
+    total_elapsed: int
     legend_line: str | None = None
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 

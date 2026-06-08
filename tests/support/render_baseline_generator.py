@@ -6,7 +6,7 @@ import datetime
 from dataclasses import dataclass
 from pathlib import Path
 
-import sync.periods.engine as period_engine
+import sync.periods.builders as period_builders
 from sync.contracts.goals import Goal
 from sync.contracts.metrics import PeriodAggregate
 from sync.contracts.targets import PeriodType
@@ -60,7 +60,7 @@ def _weekly_metrics_artifact() -> RenderBaselineArtifact:
         p_dates = [p_start + datetime.timedelta(days=i) for i in range(7)]
         prior_week_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = period_engine.build_weekly_metrics(
+    lines = period_builders.build_weekly_metrics(
         start,
         end,
         daily_data,
@@ -96,7 +96,7 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
         p_dates = list(daterange(p_start, p_end))
         prior_month_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = period_engine.build_monthly_metrics(
+    lines = period_builders.build_monthly_metrics(
         start,
         end,
         week_ranges,
@@ -137,7 +137,7 @@ def _quarterly_metrics_artifact() -> RenderBaselineArtifact:
         p_dates = list(daterange(p_start, p_end))
         prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = period_engine.build_quarterly_metrics(
+    lines = period_builders.build_quarterly_metrics(
         start,
         end,
         month_ranges,
@@ -181,7 +181,7 @@ def _yearly_metrics_artifact() -> RenderBaselineArtifact:
         p_dates = list(daterange(p_start, p_end))
         prior_year_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    lines = period_engine.build_yearly_metrics(
+    lines = period_builders.build_yearly_metrics(
         year,
         start,
         end,

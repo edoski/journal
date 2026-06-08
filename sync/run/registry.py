@@ -8,7 +8,8 @@ from collections.abc import Callable
 from sync.run import wiring
 from sync.run.commands import grades as grades_cmd
 from sync.run.commands import goals as goals_cmd
-from sync.run.commands import media as media_cmd
+from sync.run.commands import media_books as media_books_cmd
+from sync.run.commands import media_podcast as media_podcast_cmd
 from sync.run.commands import reminders as reminders_cmd
 from sync.run.commands import session as session_cmd
 from sync.run.runtime_deps import RuntimeDeps
@@ -46,12 +47,12 @@ def build_command_handlers(deps: RuntimeDeps) -> dict[str, CommandHandler]:
             config=deps.grades,
         ),
         "goals_add": lambda args: goals_cmd.cmd_goals_add(args, config=deps.goals),
-        "media_podcast_add": lambda args: media_cmd.cmd_media_podcast_add(
+        "media_podcast_add": lambda args: media_podcast_cmd.cmd_media_podcast_add(
             args,
             deps=deps.media,
         ),
         "media_book_annotations_import": lambda args: (
-            media_cmd.cmd_media_book_annotations_import(args, deps=deps.media)
+            media_books_cmd.cmd_media_book_annotations_import(args, deps=deps.media)
         ),
     }
 

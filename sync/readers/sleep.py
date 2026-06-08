@@ -8,22 +8,12 @@ import re
 
 from sync.constants import SLEEP_SECTION_HEADER
 from sync.contracts.sleep import SleepEntry
-from sync.notes.markdown_tables import split_markdown_row
+from sync.notes.markdown_tables import find_markdown_table
 from .common import extract_block, parse_duration_to_minutes
 
 
 _SLEEP_HEADER_CELLS = ("time", "duration", "awake", "awakenings")
 _TIME_RANGE_RE = re.compile(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})")
-
-
-def _split_row(line: str) -> list[str] | None:
-    row = split_markdown_row(line)
-    if row is not None:
-        return row
-    stripped = line.strip()
-    if stripped.startswith("|") and not stripped.endswith("|"):
-        return split_markdown_row(f"{stripped}|")
-    return None
 
 
 def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
@@ -40,26 +30,19 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
     if not block:
         return []
 
-    header_idx: int | None = None
-    for i, line in enumerate(block):
-        cells = _split_row(line)
-        if (
-            cells is not None
-            and tuple(cell.lower() for cell in cells) == _SLEEP_HEADER_CELLS
-        ):
-            header_idx = i
-            break
-
-    if header_idx is None:
+    table = find_markdown_table(
+        block,
+        header_matches=lambda cells: (
+            tuple(cell.lower() for cell in cells) == _SLEEP_HEADER_CELLS
+        ),
+        lenient=True,
+    )
+    if table is None:
         return []
 
     entries: list[SleepEntry] = []
-    for line in block[header_idx + 2 :]:
-        if not line.strip().startswith("|"):
-            break
-
-        parts = _split_row(line)
-        if parts is None or len(parts) < 4:
+    for parts in table.rows:
+        if len(parts) < 4:
             continue
 
         # Parse time range from TIME column

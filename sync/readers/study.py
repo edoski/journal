@@ -10,7 +10,7 @@ from sync.notes.markdown_tables import split_markdown_row
 from .common import extract_block, parse_duration_to_minutes
 
 _CANONICAL_STUDY_HEADER_RE = re.compile(
-    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|\s*INTERRUPT\s*\|\s*BREAK\s*\|\s*CONTEXT\s*\|\s*NOTES\s*\|$",
+    r"^\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|\s*INTERRUPT\s*\|\s*BREAK\s*\|$",
     re.IGNORECASE,
 )
 
@@ -42,7 +42,7 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
         if _NON_CANONICAL_STUDY_PREFIX_RE.match(stripped):
             raise ValueError(
                 "Non-canonical STUDY table header. Expected "
-                "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |'"
+                "'| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |'"
             )
 
     if header_idx is None:
@@ -56,10 +56,10 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
             continue
 
         parts = split_markdown_row(line)
-        if parts is None or len(parts) < 7:
+        if parts is None or len(parts) != 5:
             raise ValueError(
                 "Invalid STUDY row: expected TIME/ACTIVITY/DURATION/"
-                "INTERRUPT/BREAK/CONTEXT/NOTES columns"
+                "INTERRUPT/BREAK columns"
             )
 
         time_raw = _strip_backticks(parts[0])
@@ -92,9 +92,6 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
         if overrun_match:
             overrun_min = parse_duration_to_minutes(overrun_match.group(1)) or 0.0
 
-        context = parts[5].strip()
-        notes = parts[6].strip()
-
         if activity and duration_min:
             sessions.append(
                 StudySession(
@@ -105,8 +102,6 @@ def parse_study_table(lines: list[str]) -> list[StudySession]:
                     interrupt_minutes=interrupt_min,
                     break_minutes=break_min,
                     overrun_minutes=overrun_min,
-                    context=context,
-                    notes=notes,
                 )
             )
 

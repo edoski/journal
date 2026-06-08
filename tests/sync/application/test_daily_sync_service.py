@@ -53,16 +53,6 @@ class _CountingStatusSource(_StubStatusSource):
         self.write_calls += 1
 
 
-class _StubContextSource:
-    def files_modified_on_date(self, _day: datetime.date):
-        return []
-
-    def links_for_window(
-        self, _files, _start: datetime.datetime, _end: datetime.datetime
-    ):
-        return []
-
-
 class _StubReminderStore:
     def load(self):
         return []
@@ -148,7 +138,6 @@ def _build_service(
     service = DailySyncService(
         note_store=note_store or MarkdownNoteStore(),
         status_source=status_source or _StubStatusSource(),
-        context_source=_StubContextSource(),
         reminder_store=reminder_store or _StubReminderStore(),
         goal_sync_service=_StubGoalSyncService(),
         training_cache_store=training_cache_store,
@@ -201,11 +190,8 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     assert "## Metrics" in content
     assert "## Reflections" in content
     assert "### **STUDY**" in content
-    assert (
-        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
-        in content
-    )
-    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in content
+    assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in content
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` |" in content
 
 
 def test_sync_day_is_idempotent(monkeypatch, tmp_path):
@@ -232,10 +218,8 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
     content = open(note_path, "r", encoding="utf-8").read()
     lines = content.splitlines()
 
-    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` | – | – |" in lines
-    assert (
-        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |" in lines
-    )
+    assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` |" in lines
+    assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in lines
 
     level_two_headers = [line for line in lines if line.startswith("## ")]
     assert level_two_headers[:3] == ["## Goals", "## Metrics", "## Reflections"]

@@ -26,7 +26,7 @@ from sync.notes.sections import (
 )
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.status import DailyStatusSource
-from sync.study.section import build_study_section, extract_existing_data
+from sync.study.section import build_study_section
 from sync.target_policy import effective_study_minutes
 
 _REFLECTIONS_HEADER_TITLE = "Reflections"
@@ -37,7 +37,6 @@ DailyGoalSync = Callable[
     [list[str], datetime.date, str, int, list[ReminderRule]],
     list[str],
 ]
-SessionContext = Callable[[datetime.datetime, datetime.datetime], str]
 
 
 @dataclass(frozen=True)
@@ -74,13 +73,10 @@ class DailyNoteComposer:
         sessions: list[StudySessionRecord],
         day_schedule: DayScheduleProfile,
         file_path: str,
-        context_for_session: SessionContext,
     ) -> DailyComposeResult:
         working_lines = list(lines)
         new_table_lines, study_str = self._build_study_data(
-            working_lines,
             sessions,
-            context_for_session,
         )
 
         yaml_end_idx = find_yaml_end(working_lines)
@@ -112,17 +108,9 @@ class DailyNoteComposer:
 
     @staticmethod
     def _build_study_data(
-        lines: list[str],
         sessions: list[StudySessionRecord],
-        context_for_session: SessionContext,
     ) -> tuple[list[str], str]:
-        existing_notes, existing_context = extract_existing_data(lines)
-        new_table_lines, total_focus_minutes = build_study_section(
-            sessions,
-            existing_notes,
-            context_for_session=context_for_session,
-            existing_context=existing_context,
-        )
+        new_table_lines, total_focus_minutes = build_study_section(sessions)
         study_str = format_minutes(total_focus_minutes, always_show_both=True)
         return new_table_lines, study_str
 

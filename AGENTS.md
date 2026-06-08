@@ -29,7 +29,6 @@ journal/
       query.py
       goals.py
       media.py
-      notes.py
 
     ports/                     # Stable Protocol interfaces
       sessions.py
@@ -40,7 +39,6 @@ journal/
       goals.py
       reminders.py
       media.py
-      context.py
 
     adapters/                  # Concrete external integrations
       json_cache_common.py     # Shared validated JSON cache base classes
@@ -52,7 +50,6 @@ journal/
       markdown_reminders.py
       markdown_schedule.py
       obsidian_media.py
-      vault_context.py
 
     application/               # Orchestration over ports/contracts
       daily_sync_service.py
@@ -87,7 +84,6 @@ journal/
     daily/
       __main__.py              # Daily composition root
       constants.py
-      context.py
       icloud.py
       screen_time.py
       sleep.py
@@ -244,9 +240,6 @@ journal/
   - `GoalAddResult` in `sync/contracts/goals.py` is the canonical result payload for single-goal insertions.
 - `ReminderRuleStore.load()/save(rules)`
 - `MediaSource.scan(start, end) -> MediaBundle`
-- `ContextSource`:
-  - `files_modified_on_date(day) -> list[VaultFileRecord]`
-  - `links_for_window(files, start, end) -> list[str]`
 - Study DB access is split into:
   - `sync/study/repository.py` for Flow SQL and raw row loading
   - `sync/study/enrichment.py` for dedupe/break/lunch/overrun enrichment
@@ -266,8 +259,7 @@ journal/
 ## Canonical Markdown Schemas
 
 - Daily `STUDY` tables are canonical only when they include:
-  - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |`
-- Legacy `STUDY` tables without `CONTEXT` are rejected with explicit errors.
+  - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |`
 - Daily `TRAINING` rows with a positive `DURATION` are canonical only when `TIME` is `HH:MM - HH:MM` (24-hour); non-canonical values are rejected with explicit errors.
 - Periodic `TRAINING` type summary tables are canonical only when they include:
   - `| TYPE | SESSIONS | DURATION | SCHEDULE |`
@@ -447,6 +439,8 @@ Move checklist (repo relocation):
 - goal-sync state cache: `~/.cache/journal/goals/reconcile_state.json`
 - media cache: `~/.cache/journal/media/dates.json`
 - flow reminder state cache: `~/.cache/journal/flow_reminder_state.json`
+- shortcut status pending cache: `~/.cache/journal/daily/status/pending/`
+- shortcut status invalid cache: `~/.cache/journal/daily/status/invalid/`
 - training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
 - screen-time cache: `~/.cache/journal/daily/screen_time/YYYY-MM-DD.json`
 - note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`

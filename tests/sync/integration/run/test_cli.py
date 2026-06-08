@@ -12,23 +12,16 @@ from sync.config import PATHS
 from sync.contracts.schedule import DayScheduleProfile
 from sync.run import wiring
 from sync.run.commands import grades as grades_cmd
-from sync.run.commands import media as media_cmd
+from sync.run.commands import media_books as media_books_cmd
+from sync.run.commands import media_common as media_common_cmd
 from sync.run.commands import media_podcast as media_podcast_cmd
-from sync.run.commands import reminders as reminders_cmd
+from sync.study import flow_automation
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
 FLOW_GET_TIME = 'tell application "Flow" to getTime'
 FLOW_SKIP = 'tell application "Flow" to skip'
 FLOW_START = 'tell application "Flow" to start'
 FLOW_SHOW = 'tell application "Flow" to show'
-
-
-def _skip_args(state: str | None = None) -> argparse.Namespace:
-    return argparse.Namespace(state=state)
-
-
-def _remind_args(state: str | None = None) -> argparse.Namespace:
-    return argparse.Namespace(state=state)
 
 
 def _media_add_args(
@@ -112,20 +105,22 @@ def _reminder_deps(
     run_applescript=None,
     connection_factory=None,
     now=None,
-) -> reminders_cmd.ReminderCommandDeps:
+) -> flow_automation.FlowAutomationDeps:
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
-    return reminders_cmd.ReminderCommandDeps(
+    return flow_automation.FlowAutomationDeps(
         paths=replace(PATHS, journal_cache_dir=str(cache_dir)),
-        skip_launchd_label=reminders_cmd.SKIP_LAUNCHD_LABEL,
-        skip_launchd_domain=reminders_cmd.SKIP_LAUNCHD_DOMAIN,
-        skip_launchd_target=reminders_cmd.SKIP_LAUNCHD_TARGET,
-        remind_launchd_label=reminders_cmd.REMIND_LAUNCHD_LABEL,
-        remind_launchd_domain=reminders_cmd.REMIND_LAUNCHD_DOMAIN,
-        remind_launchd_target=reminders_cmd.REMIND_LAUNCHD_TARGET,
-        flow_reminder_state_filename=reminders_cmd.FLOW_REMINDER_STATE_FILENAME,
-        flow_reminder_cooldown_seconds=reminders_cmd.FLOW_REMINDER_COOLDOWN_SECONDS,
-        flow_reminder_stagnant_threshold=reminders_cmd.FLOW_REMINDER_STAGNANT_THRESHOLD,
+        skip_launchd_label=flow_automation.SKIP_LAUNCHD_LABEL,
+        skip_launchd_domain=flow_automation.SKIP_LAUNCHD_DOMAIN,
+        skip_launchd_target=flow_automation.SKIP_LAUNCHD_TARGET,
+        remind_launchd_label=flow_automation.REMIND_LAUNCHD_LABEL,
+        remind_launchd_domain=flow_automation.REMIND_LAUNCHD_DOMAIN,
+        remind_launchd_target=flow_automation.REMIND_LAUNCHD_TARGET,
+        flow_reminder_state_filename=flow_automation.FLOW_REMINDER_STATE_FILENAME,
+        flow_reminder_cooldown_seconds=flow_automation.FLOW_REMINDER_COOLDOWN_SECONDS,
+        flow_reminder_stagnant_threshold=(
+            flow_automation.FLOW_REMINDER_STAGNANT_THRESHOLD
+        ),
         connection_factory=connection_factory
         or (lambda _readonly: _make_session_conn()),
         run_launchctl=run_launchctl or (lambda _args: (0, "", "")),
@@ -147,7 +142,6 @@ def _wiring_deps(
         note_store_factory=lambda: object(),
         training_cache_store_factory=lambda: object(),
         screen_time_cache_store_factory=lambda: object(),
-        context_source_factory=lambda: object(),
         reminder_store_factory=lambda: object(),
         goal_store_factory=lambda: object(),
         carry_cache_store_factory=lambda: object(),
@@ -216,7 +210,7 @@ def _media_deps(
     *,
     today: date | None = None,
     cache_store: _StubMediaCacheStore | None = None,
-) -> tuple[media_cmd.MediaCommandDeps, Path]:
+) -> tuple[media_common_cmd.MediaCommandDeps, Path]:
     vault_dir = tmp_path / "vault"
     templates_dir = vault_dir / "notes" / "templates"
     podcasts_dir = vault_dir / "notes" / "podcasts"
@@ -224,7 +218,7 @@ def _media_deps(
     podcasts_dir.mkdir(parents=True, exist_ok=True)
     _write_book_template(templates_dir / "book.md")
     _write_podcast_template(templates_dir / "podcast.md")
-    deps = media_cmd.MediaCommandDeps(
+    deps = media_common_cmd.MediaCommandDeps(
         paths=replace(
             PATHS,
             vault_dir=str(vault_dir),
@@ -547,14 +541,14 @@ def test_latest_row_is_open_flow_true_for_open_flow() -> None:
     conn = _make_session_conn()
     _insert_session_row(conn, phase="shortBreak", completed_at=None, started_at=1.0)
     _insert_session_row(conn, phase="flow", completed_at=None, started_at=2.0)
-    assert reminders_cmd._latest_row_is_open_flow(conn) is True
+    assert flow_automation._latest_row_is_open_flow(conn) is True
     conn.close()
 
 
 def test_latest_row_is_open_flow_false_for_completed_flow() -> None:
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=1234.0)
-    assert reminders_cmd._latest_row_is_open_flow(conn) is False
+    assert flow_automation._latest_row_is_open_flow(conn) is False
     conn.close()
 
 
@@ -565,7 +559,7 @@ def test_session_skip_noops_when_disabled(tmp_path: Path) -> None:
             0,
             _print_disabled_output(
                 disabled=True,
-                label=reminders_cmd.SKIP_LAUNCHD_LABEL,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -576,7 +570,7 @@ def test_session_skip_noops_when_disabled(tmp_path: Path) -> None:
             AssertionError("DB should not be opened when skip is disabled")
         ),
     )
-    assert reminders_cmd.cmd_session_skip(_skip_args(), deps=deps) == 0
+    assert flow_automation.run_session_skip(deps=deps) == 0
 
 
 def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
@@ -598,7 +592,7 @@ def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
             0,
             _print_disabled_output(
                 disabled=False,
-                label=reminders_cmd.SKIP_LAUNCHD_LABEL,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -606,7 +600,7 @@ def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
         connection_factory=lambda _readonly: conn,
     )
 
-    assert reminders_cmd.cmd_session_skip(_skip_args(), deps=deps) == 0
+    assert flow_automation.run_session_skip(deps=deps) == 0
     assert calls == [FLOW_GET_PHASE, FLOW_SKIP, FLOW_START, FLOW_SHOW]
 
 
@@ -620,7 +614,7 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
             0,
             _print_disabled_output(
                 disabled=False,
-                label=reminders_cmd.SKIP_LAUNCHD_LABEL,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -629,7 +623,7 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
             0,
             _print_disabled_output(
                 disabled=True,
-                label=reminders_cmd.SKIP_LAUNCHD_LABEL,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -640,13 +634,13 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
         return responses[len(calls) - 1]
 
     deps = _reminder_deps(tmp_path, run_launchctl=_fake_launchctl)
-    rc = reminders_cmd.cmd_session_skip(_skip_args("toggle"), deps=deps)
+    rc = flow_automation.run_session_skip("toggle", deps=deps)
 
     assert rc == 0
     assert calls == [
-        ["print-disabled", reminders_cmd.SKIP_LAUNCHD_DOMAIN],
-        ["disable", reminders_cmd.SKIP_LAUNCHD_TARGET],
-        ["print-disabled", reminders_cmd.SKIP_LAUNCHD_DOMAIN],
+        ["print-disabled", flow_automation.SKIP_LAUNCHD_DOMAIN],
+        ["disable", flow_automation.SKIP_LAUNCHD_TARGET],
+        ["print-disabled", flow_automation.SKIP_LAUNCHD_DOMAIN],
     ]
     assert "Skip automation: DISABLED" in capsys.readouterr().out
 
@@ -668,7 +662,7 @@ def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
             0,
             _print_disabled_output(
                 disabled=False,
-                label=reminders_cmd.REMIND_LAUNCHD_LABEL,
+                label=flow_automation.REMIND_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -678,7 +672,7 @@ def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
         ),
     )
 
-    reminders_cmd._save_flow_reminder_state(
+    flow_automation._save_flow_reminder_state(
         {
             "open_session_started_at": 1.0,
             "remaining_time": "25:00",
@@ -687,10 +681,10 @@ def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
         },
         deps,
     )
-    state_path = Path(reminders_cmd._flow_reminder_state_path(deps))
+    state_path = Path(flow_automation._flow_reminder_state_path(deps))
     assert state_path.exists()
 
-    assert reminders_cmd.cmd_session_remind(_remind_args(), deps=deps) == 0
+    assert flow_automation.run_session_remind(deps=deps) == 0
     assert calls == [FLOW_GET_PHASE]
     assert not state_path.exists()
 
@@ -714,7 +708,7 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
             0,
             _print_disabled_output(
                 disabled=False,
-                label=reminders_cmd.REMIND_LAUNCHD_LABEL,
+                label=flow_automation.REMIND_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -723,8 +717,8 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
         now=lambda: datetime(2026, 2, 27, 12, 0, 0),
     )
 
-    first_rc = reminders_cmd.cmd_session_remind(_remind_args(), deps=deps)
-    second_rc = reminders_cmd.cmd_session_remind(_remind_args(), deps=deps)
+    first_rc = flow_automation.run_session_remind(deps=deps)
+    second_rc = flow_automation.run_session_remind(deps=deps)
 
     assert first_rc == 0
     assert second_rc == 0
@@ -735,7 +729,7 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
         FLOW_GET_TIME,
         FLOW_SHOW,
     ]
-    assert reminders_cmd._load_flow_reminder_state(deps) == {
+    assert flow_automation._load_flow_reminder_state(deps) == {
         "open_session_started_at": 10.0,
         "remaining_time": "25:00",
         "stagnant_checks": 1,
@@ -757,7 +751,7 @@ def test_session_remind_respects_cooldown(tmp_path: Path) -> None:
             0,
             _print_disabled_output(
                 disabled=False,
-                label=reminders_cmd.REMIND_LAUNCHD_LABEL,
+                label=flow_automation.REMIND_LAUNCHD_LABEL,
             ),
             "",
         ),
@@ -765,7 +759,7 @@ def test_session_remind_respects_cooldown(tmp_path: Path) -> None:
         connection_factory=lambda _readonly: _make_open_flow_conn(started_at=10.0),
         now=lambda: datetime.fromtimestamp(1060.0),
     )
-    reminders_cmd._save_flow_reminder_state(
+    flow_automation._save_flow_reminder_state(
         {
             "open_session_started_at": 10.0,
             "remaining_time": "25:00",
@@ -775,8 +769,8 @@ def test_session_remind_respects_cooldown(tmp_path: Path) -> None:
         deps,
     )
 
-    assert reminders_cmd.cmd_session_remind(_remind_args(), deps=deps) == 0
-    state = reminders_cmd._load_flow_reminder_state(deps)
+    assert flow_automation.run_session_remind(deps=deps) == 0
+    state = flow_automation._load_flow_reminder_state(deps)
     assert state["stagnant_checks"] == 2
     assert state["last_reminded_epoch"] == 1000.0
 
@@ -797,7 +791,7 @@ def test_media_podcast_add_creates_note_with_sanitized_filename(
         lambda _url: ("2017 Personality 01: Introduction", "Jordan B Peterson"),
     )
 
-    rc = media_cmd.cmd_media_podcast_add(
+    rc = media_podcast_cmd.cmd_media_podcast_add(
         _media_add_args(url="https://www.youtube.com/watch?v=kYYJlNbV1OM"),
         deps=deps,
     )
@@ -836,7 +830,7 @@ def test_media_podcast_add_fails_when_note_already_exists(
         lambda _url: ("Existing Episode", "Jordan B Peterson"),
     )
 
-    rc = media_cmd.cmd_media_podcast_add(
+    rc = media_podcast_cmd.cmd_media_podcast_add(
         _media_add_args(url="https://www.youtube.com/watch?v=dup1"),
         deps=deps,
     )
@@ -855,7 +849,7 @@ def test_media_book_annotations_import_replaces_highlights_and_keeps_reflections
     _write_kindle_export(html_path)
     _write_book_note(note_path)
 
-    rc = media_cmd.cmd_media_book_annotations_import(
+    rc = media_books_cmd.cmd_media_book_annotations_import(
         _media_book_annotations_import_args(
             html_path=str(html_path),
             note=str(note_path),
@@ -882,7 +876,7 @@ def test_media_book_annotations_import_creates_missing_note_from_template(
     note_path = tmp_path / "The Brothers Karamazov.md"
     _write_anthology_kindle_export(html_path)
 
-    rc = media_cmd.cmd_media_book_annotations_import(
+    rc = media_books_cmd.cmd_media_book_annotations_import(
         _media_book_annotations_import_args(
             html_path=str(html_path),
             note=str(note_path),

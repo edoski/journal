@@ -18,8 +18,6 @@ class StudySession:
     interrupt_minutes: float
     break_minutes: float
     overrun_minutes: float
-    context: str
-    notes: str
 
 
 class StudySessionRecord(TypedDict, total=False):

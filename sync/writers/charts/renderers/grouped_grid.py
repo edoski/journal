@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import datetime
-
-from sync.contracts.metrics import DailyAggregate
-from sync.constants import DAYS, RENDER, STUDY_TARGET_MIN
-from sync.dates import daterange, format_week_label
+from sync.constants import DAYS, RENDER
 
 from ..grid import GridRowBuilder
-from .common import row_for_day, study_intensity_symbol
 from ..specs import (
     MonthlyStudyGridSpec,
     MonthlyTrainingGridSpec,
@@ -18,57 +13,24 @@ from ..specs import (
 )
 
 
-def _study_intensity_symbol(minutes: float | None) -> str:
-    return study_intensity_symbol(
-        minutes,
-        deep_symbol=RENDER.study_symbol_deep,
-        none_symbol=RENDER.study_symbol_none,
-    )
-
-
-def _row_for_day(
-    daily_data: dict[datetime.date, DailyAggregate],
-    day: datetime.date,
-) -> DailyAggregate | None:
-    return row_for_day(daily_data, day)
-
-
 def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
     """Render weekly full-study-days grouped grid body."""
-    dates = list(spec.dates)
-    daily_data = spec.daily_data
-    current_date = spec.current_date
-    today = spec.today
+    study_symbols = list(spec.symbols)
+    current_index = spec.current_index
 
     lines: list[str] = []
 
-    met_symbol = "███"
-    none_symbol = "░░░"
-
-    study_symbols: list[str] = []
-    for day in dates:
-        entry = _row_for_day(daily_data, day)
-        minutes = entry["study_minutes"] if entry is not None else None
-        if day > today:
-            study_symbols.append(none_symbol)
-        else:
-            study_symbols.append(
-                met_symbol if minutes and minutes >= STUDY_TARGET_MIN else none_symbol
-            )
-
-    study_done = sum(1 for sym in study_symbols if sym == met_symbol)
-    study_total = len(dates)
-
     lines.append("┌ FULL STUDY DAYS")
 
-    if current_date and dates and dates[0] <= current_date <= dates[-1]:
-        day_idx = (current_date - dates[0]).days
-        arrow_col = 3 + day_idx * 4
+    if current_index is not None and 0 <= current_index < len(study_symbols):
+        arrow_col = 3 + current_index * 4
         lines.append("│" + " " * (arrow_col - 1) + "↓")
     else:
         lines.append("│")
 
-    lines.append("│ " + " ".join(study_symbols) + f"   ({study_done}/{study_total})")
+    lines.append(
+        "│ " + " ".join(study_symbols) + f"   ({spec.done_count}/{spec.total_count})"
+    )
     lines.append("│ " + " ".join(["───"] * 7))
     lines.append("└ " + " ".join(DAYS))
     lines.append("")
@@ -78,37 +40,12 @@ def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
 
 def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
     """Render monthly full-study-days grouped grid body."""
-    week_ranges = list(spec.week_ranges)
-    daily_data = spec.daily_data
-    current_date = spec.current_date
-    today = spec.today
+    week_labels = list(spec.week_labels)
+    week_day_counts = list(spec.week_day_counts)
+    symbols = list(spec.symbols)
     delta_labels = list(spec.delta_labels) if spec.delta_labels else None
 
     lines: list[str] = []
-
-    symbols: list[str] = []
-    week_labels: list[str] = []
-    week_day_counts: list[int] = []
-    total_done = 0
-    total_elapsed = 0
-
-    for start, end in week_ranges:
-        week_days = list(daterange(start, end))
-        week_day_counts.append(len(week_days))
-        week_labels.append(format_week_label(start, end))
-
-        for day in week_days:
-            if day > today:
-                symbols.append(RENDER.study_symbol_none)
-            else:
-                entry = _row_for_day(daily_data, day)
-                symbol = _study_intensity_symbol(
-                    entry["study_minutes"] if entry is not None else None
-                )
-                symbols.append(symbol)
-                total_elapsed += 1
-                if symbol == RENDER.study_symbol_deep:
-                    total_done += 1
 
     if not week_day_counts:
         lines.append("┌ FULL STUDY DAYS (00/00)")
@@ -131,12 +68,12 @@ def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
     )
 
     arrow_col = None
-    if current_date:
-        for w_idx, (start, end) in enumerate(week_ranges):
-            if start <= current_date <= end:
-                day_idx = (current_date - start).days
-                arrow_col = len("│ ") + w_idx * (week_width + 3) + day_idx * 2
-                break
+    if spec.current_week_index is not None and spec.current_day_index is not None:
+        arrow_col = (
+            len("│ ")
+            + spec.current_week_index * (week_width + 3)
+            + spec.current_day_index * 2
+        )
 
     symbol_row = grid.build_symbol_row(symbols)
     separator_row = grid.build_separator_row()
@@ -144,7 +81,9 @@ def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
     delta_row = grid.build_delta_row(delta_labels)
 
     header_suffix = (
-        f" ({total_done:02d}/{total_elapsed:02d})" if total_elapsed else " (00/00)"
+        f" ({spec.total_done:02d}/{spec.total_elapsed:02d})"
+        if spec.total_elapsed
+        else " (00/00)"
     )
     lines.append(f"┌ FULL STUDY DAYS{header_suffix}")
     if arrow_col is not None:
@@ -166,9 +105,11 @@ def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
 
 def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
     """Render monthly training grouped grid body."""
-    week_ranges = list(spec.week_ranges)
-    daily_data = spec.daily_data
-    current_date = spec.current_date
+    week_labels = list(spec.week_labels)
+    week_day_counts = list(spec.week_day_counts)
+    meditation_symbols = list(spec.meditation_symbols)
+    workout_symbols = list(spec.workout_symbols)
+    stretch_symbols = list(spec.stretch_symbols)
     meditation_delta_labels = (
         list(spec.meditation_delta_labels) if spec.meditation_delta_labels else None
     )
@@ -180,23 +121,6 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
     )
 
     lines: list[str] = []
-
-    meditation_symbols: list[str] = []
-    workout_symbols: list[str] = []
-    stretch_symbols: list[str] = []
-    week_labels: list[str] = []
-    week_day_counts: list[int] = []
-
-    for start, end in week_ranges:
-        week_days = list(daterange(start, end))
-        week_day_counts.append(len(week_days))
-        week_labels.append(format_week_label(start, end))
-
-        for day in week_days:
-            entry = _row_for_day(daily_data, day)
-            meditation_symbols.append("■" if entry and entry.get("meditate") else "·")
-            workout_symbols.append("■" if entry and entry.get("workout") else "·")
-            stretch_symbols.append("■" if entry and entry.get("stretch") else "·")
 
     if not week_day_counts:
         return [
@@ -229,12 +153,12 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
     )
 
     arrow_col = None
-    if current_date:
-        for w_idx, (start, end) in enumerate(week_ranges):
-            if start <= current_date <= end:
-                day_idx = (current_date - start).days
-                arrow_col = len("│ ") + w_idx * (week_width + 3) + day_idx * 2
-                break
+    if spec.current_week_index is not None and spec.current_day_index is not None:
+        arrow_col = (
+            len("│ ")
+            + spec.current_week_index * (week_width + 3)
+            + spec.current_day_index * 2
+        )
 
     def _build_activity_block(
         title: str, symbols: list[str], deltas: list[str] | None
@@ -278,28 +202,15 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
 
 def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     """Render weekly training grouped grid body."""
-    dates = list(spec.dates)
-    daily_data = spec.daily_data
+    meditation_symbols = list(spec.meditation_symbols)
+    workout_symbols = list(spec.workout_symbols)
+    stretch_symbols = list(spec.stretch_symbols)
     meditation_count = spec.meditation_count
     workout_count = spec.workout_count
     stretch_count = spec.stretch_count
-    current_date = spec.current_date
+    current_index = spec.current_index
 
     lines: list[str] = []
-
-    meditation_symbols: list[str] = []
-    workout_symbols: list[str] = []
-    stretch_symbols: list[str] = []
-
-    for day in dates:
-        entry = _row_for_day(daily_data, day)
-        has_meditation = bool(entry and entry.get("meditate"))
-        has_workout = bool(entry and entry.get("workout"))
-        has_stretch = bool(entry and entry.get("stretch"))
-
-        meditation_symbols.append("███" if has_meditation else "░░░")
-        workout_symbols.append("███" if has_workout else "░░░")
-        stretch_symbols.append("███" if has_stretch else "░░░")
 
     label_width = max(len("MEDITATION"), len("WORKOUT"), len("STRETCH"))
 
@@ -318,9 +229,8 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     stretch_row = prefix_stretch + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
 
     arrow_line: str | None = None
-    if current_date and dates and dates[0] <= current_date <= dates[-1]:
-        day_idx = (current_date - dates[0]).days
-        arrow_col = len(prefix_meditation) + day_idx * 4 + 1
+    if current_index is not None and 0 <= current_index < len(meditation_symbols):
+        arrow_col = len(prefix_meditation) + current_index * 4 + 1
         arrow_line = "┌" + " " * (arrow_col - 1) + "↓"
 
     if arrow_line is not None:

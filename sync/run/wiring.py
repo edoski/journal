@@ -24,7 +24,6 @@ from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
 from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.adapters.obsidian_media import ObsidianMediaSource
-from sync.adapters.vault_context import VaultContextSource
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
@@ -42,7 +41,6 @@ from sync.ports.cache import (
     GoalCarryForwardCacheStore,
     GoalReconcileCacheStore,
 )
-from sync.ports.context import ContextSource
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.goals import GoalStore
 from sync.ports.media import MediaSource
@@ -63,7 +61,6 @@ class WiringDeps:
     note_store_factory: Callable[[], NoteStore]
     training_cache_store_factory: Callable[[], DailyTrainingCacheStore]
     screen_time_cache_store_factory: Callable[[], DailyScreenTimeCacheStore]
-    context_source_factory: Callable[[], ContextSource]
     reminder_store_factory: Callable[[], ReminderRuleStore]
     goal_store_factory: Callable[[], GoalStore]
     carry_cache_store_factory: Callable[[], GoalCarryForwardCacheStore]
@@ -84,7 +81,6 @@ def default_wiring_deps() -> WiringDeps:
         note_store_factory=MarkdownNoteStore,
         training_cache_store_factory=JsonDailyTrainingCacheStore,
         screen_time_cache_store_factory=JsonDailyScreenTimeCacheStore,
-        context_source_factory=VaultContextSource,
         reminder_store_factory=MarkdownReminderRuleStore,
         goal_store_factory=MarkdownGoalStore,
         carry_cache_store_factory=JsonGoalCarryForwardCacheStore,
@@ -139,7 +135,6 @@ def run_daily_sync(*, deps: WiringDeps | None = None) -> None:
     service = DailySyncService(
         note_store=note_store,
         status_source=status_source,
-        context_source=resolved.context_source_factory(),
         reminder_store=resolved.reminder_store_factory(),
         goal_sync_service=_build_goal_sync_service(note_store, deps=resolved),
         training_cache_store=training_cache_store,

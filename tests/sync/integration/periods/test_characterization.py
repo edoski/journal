@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-import sync.periods.engine as period_engine
+import sync.periods.builders as period_builders
 from sync.contracts.media import MediaBundle
 from sync.dates import (
     daterange,
@@ -70,7 +70,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         p_dates = [p_start + datetime.timedelta(days=i) for i in range(7)]
         prior_week_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    first_lines = period_engine.build_weekly_metrics(
+    first_lines = period_builders.build_weekly_metrics(
         start,
         end,
         daily_data,
@@ -81,7 +81,7 @@ def test_weekly_metrics_block_characterization(monkeypatch):
         study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
-    second_lines = period_engine.build_weekly_metrics(
+    second_lines = period_builders.build_weekly_metrics(
         start,
         end,
         daily_data,
@@ -122,7 +122,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_month_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    first_lines = period_engine.build_monthly_metrics(
+    first_lines = period_builders.build_monthly_metrics(
         start,
         end,
         week_ranges,
@@ -138,7 +138,7 @@ def test_monthly_metrics_block_characterization(monkeypatch):
         ).study_minutes,
         prior_month_metrics=prior_month_metrics,
     )
-    second_lines = period_engine.build_monthly_metrics(
+    second_lines = period_builders.build_monthly_metrics(
         start,
         end,
         week_ranges,
@@ -172,7 +172,7 @@ def test_monthly_previous_summary_uses_full_previous_month_denominator():
     start, end = month_range(2020, 5)
     prev_start, _prev_end = month_range(2020, 4)
 
-    lines = period_engine.build_monthly_metrics(
+    lines = period_builders.build_monthly_metrics(
         start,
         end,
         month_week_ranges(2020, 5),
@@ -204,7 +204,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    first_lines = period_engine.build_quarterly_metrics(
+    first_lines = period_builders.build_quarterly_metrics(
         start,
         end,
         month_ranges,
@@ -220,7 +220,7 @@ def test_quarterly_metrics_block_characterization(monkeypatch):
         ).study_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
-    second_lines = period_engine.build_quarterly_metrics(
+    second_lines = period_builders.build_quarterly_metrics(
         start,
         end,
         month_ranges,
@@ -254,7 +254,7 @@ def test_quarterly_previous_summary_uses_full_previous_quarter_denominator():
     start, end = quarter_range(2020, 3)
     prev_start, _prev_end = quarter_range(2020, 2)
 
-    lines = period_engine.build_quarterly_metrics(
+    lines = period_builders.build_quarterly_metrics(
         start,
         end,
         quarter_months(2020, 3),
@@ -289,7 +289,7 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         p_dates = list(daterange(p_start, p_end))
         prior_year_metrics.append(compute_period_metrics(p_dates, p_data))
 
-    first_lines = period_engine.build_yearly_metrics(
+    first_lines = period_builders.build_yearly_metrics(
         year,
         start,
         end,
@@ -305,7 +305,7 @@ def test_yearly_metrics_block_characterization(monkeypatch):
         ).study_minutes,
         prior_year_metrics=prior_year_metrics,
     )
-    second_lines = period_engine.build_yearly_metrics(
+    second_lines = period_builders.build_yearly_metrics(
         year,
         start,
         end,

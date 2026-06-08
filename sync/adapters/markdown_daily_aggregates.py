@@ -10,9 +10,7 @@ from sync.contracts.metrics import DailyAggregate
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.readers.daily import parse_daily_note
 
-_CANONICAL_STUDY_HEADER = (
-    "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
-)
+_CANONICAL_STUDY_HEADER = "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |"
 
 
 def _raise_window_schema_error(

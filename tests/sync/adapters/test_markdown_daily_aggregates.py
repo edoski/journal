@@ -27,9 +27,9 @@ def test_load_for_dates_parses_existing_daily_notes(tmp_path):
                 "---",
                 "### **STUDY**",
                 "",
-                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
-                "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
-                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | – | – |",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+                "| ---- | -------- | -------- | --------- | ----- |",
+                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` |",
                 "",
             ]
         ),
@@ -69,9 +69,9 @@ def test_load_for_dates_raises_for_non_canonical_study_header(tmp_path):
                 "---",
                 "### **STUDY**",
                 "",
-                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
                 "| ---- | -------- | -------- | --------- | ----- | ----- |",
-                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | extra |",
                 "",
             ]
         ),
@@ -101,9 +101,9 @@ def test_load_for_dates_aggregates_non_canonical_study_header_errors(tmp_path):
         "---",
         "### **STUDY**",
         "",
-        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
         "| ---- | -------- | -------- | --------- | ----- | ----- |",
-        "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+        "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | extra |",
         "",
     ]
     (tmp_path / f"{day_one:%Y-%m-%d}.md").write_text(
@@ -128,10 +128,7 @@ def test_load_for_dates_aggregates_non_canonical_study_header_errors(tmp_path):
         f"- {day_two.isoformat()} | {tmp_path / f'{day_two:%Y-%m-%d}.md'} |" in message
     )
     assert "Required canonical STUDY header:" in message
-    assert (
-        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |"
-        in message
-    )
+    assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in message
     assert "Non-canonical STUDY table header" in message
 
 
@@ -153,9 +150,9 @@ def test_load_for_dates_raises_for_non_canonical_study_header_reason(tmp_path):
                 "---",
                 "### **STUDY**",
                 "",
-                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | NOTES |",
+                "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
                 "| ---- | -------- | -------- | --------- | ----- | ----- |",
-                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | note |",
+                "| 09:00 - 10:00 | `coding` | `1h00m` | `+10m` | `5m` | extra |",
                 "",
             ]
         ),

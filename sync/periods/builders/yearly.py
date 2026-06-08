@@ -35,7 +35,11 @@ from sync.periods.sections import (
     append_training_type_table,
     build_procrastination_section,
 )
-from sync.periods.presentation import period_screen_trend_rows
+from sync.periods.presentation import (
+    bucket_average_bar_spec,
+    period_screen_trend_rows,
+    yearly_study_coverage_spec,
+)
 from sync.writers.charts import (
     DECIMAL_ONE_LABEL,
     TIME_LABEL_STANDARD,
@@ -45,7 +49,6 @@ from sync.writers.charts import (
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
     YEARLY_4QTR_STUDY,
-    YearlyStudyCoverageRowsSpec,
     compress_activity_time_order,
     compress_days_time_order,
     render_chart,
@@ -184,7 +187,7 @@ def build_yearly_metrics(
 
     study_lines.extend(
         render_chart(
-            YearlyStudyCoverageRowsSpec(
+            yearly_study_coverage_spec(
                 quarter_ranges=quarter_ranges,
                 daily_data=daily_data,
                 today=today,
@@ -380,25 +383,6 @@ def build_yearly_metrics(
 
     # SLEEP
     sleep_lines = ["### **SLEEP**"]
-    sleep_chart_vals: list[float] = []
-    sleep_value_labels: list[str] = []
-
-    for start, end in quarter_ranges:
-        days = list(daterange(start, end))
-        sleep_mins_raw = [
-            sleep_minutes_for_day(daily_data, d) for d in days if daily_data.get(d)
-        ]
-        sleep_mins: list[float] = [m for m in sleep_mins_raw if m is not None]
-        if sleep_mins:
-            avg_min = sum(sleep_mins) / len(sleep_mins)
-            sleep_chart_vals.append(
-                round((avg_min / 60) * 2) / 2
-            )  # Round to nearest 0.5h
-            sleep_value_labels.append(TIME_LABEL_STANDARD.format(avg_min))
-        else:
-            sleep_chart_vals.append(0)
-            sleep_value_labels.append("" if start > today else "0h00m")
-
     sleep_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: sleep_minutes_for_day(year_delta_data, d),
@@ -409,10 +393,14 @@ def build_yearly_metrics(
 
     sleep_lines.extend(
         render_chart(
-            VerticalBarSpec(
-                labels=q_labels,
-                values=sleep_chart_vals,
-                value_labels=sleep_value_labels,
+            bucket_average_bar_spec(
+                quarter_ranges,
+                q_labels,
+                today=today,
+                value_for_day=lambda d: sleep_minutes_for_day(daily_data, d),
+                chart_value=lambda avg: round((avg / 60) * 2) / 2,
+                value_label=TIME_LABEL_STANDARD.format,
+                zero_label="0h00m",
                 profile=YEARLY_4QTR_METRIC,
                 delta_labels=sleep_delta_labels,
             )
@@ -436,21 +424,6 @@ def build_yearly_metrics(
 
     # MOOD
     mood_lines = ["### **MOOD**"]
-    mood_chart_vals: list[float] = []
-    mood_value_labels: list[str] = []
-
-    for start, end in quarter_ranges:
-        days = list(daterange(start, end))
-        vals = [mood_for_day(daily_data, d) for d in days if daily_data.get(d)]
-        vals_clean: list[float] = [v for v in vals if v is not None]
-        if vals_clean:
-            avg_val = sum(vals_clean) / len(vals_clean)
-            mood_chart_vals.append(avg_val)
-            mood_value_labels.append(DECIMAL_ONE_LABEL.format(avg_val))
-        else:
-            mood_chart_vals.append(0)
-            mood_value_labels.append("" if start > today else "0.0")
-
     mood_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: mood_for_day(year_delta_data, d),
@@ -461,10 +434,14 @@ def build_yearly_metrics(
 
     mood_lines.extend(
         render_chart(
-            VerticalBarSpec(
-                labels=q_labels,
-                values=mood_chart_vals,
-                value_labels=mood_value_labels,
+            bucket_average_bar_spec(
+                quarter_ranges,
+                q_labels,
+                today=today,
+                value_for_day=lambda d: mood_for_day(daily_data, d),
+                chart_value=lambda avg: avg,
+                value_label=DECIMAL_ONE_LABEL.format,
+                zero_label="0.0",
                 profile=YEARLY_4QTR_MOOD,
                 delta_labels=mood_delta_labels,
             )

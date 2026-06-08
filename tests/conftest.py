@@ -146,10 +146,10 @@ def sample_study_table_lines() -> list[str]:
     return [
         "### **STUDY**",
         "",
-        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | CONTEXT | NOTES |",
-        "| ---- | -------- | -------- | --------- | ----- | ------- | ----- |",
-        "| 09:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` | [[coding.md]] | note |",
-        "| 14:00 | `reading` | `1h30m` | `` | `10m` | – | – |",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+        "| ---- | -------- | -------- | --------- | ----- |",
+        "| 09:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` |",
+        "| 14:00 | `reading` | `1h30m` | `` | `10m` |",
         "",
     ]
 

@@ -7,6 +7,14 @@ import datetime
 import pytest
 
 from sync.constants import DAYS, RENDER, STUDY_TARGET_MIN
+from sync.periods.presentation import (
+    monthly_study_grid_spec,
+    monthly_training_grid_spec,
+    quarterly_study_coverage_spec,
+    weekly_study_grid_spec,
+    weekly_training_grid_spec,
+    yearly_study_coverage_spec,
+)
 import sync.writers.charts.api as charts_api_module
 from sync.writers.charts import (
     AnchorRef,
@@ -19,7 +27,6 @@ from sync.writers.charts import (
     QUARTERLY_3MONTH_METRIC,
     QUARTERLY_3MONTH_MOOD,
     QUARTERLY_3MONTH_STUDY,
-    QuarterlyStudyCoverageRowsSpec,
     TEST_CHART,
     TIME_LABEL_MIN2H,
     TIME_LABEL_STANDARD,
@@ -31,29 +38,13 @@ from sync.writers.charts import (
     WEEKLY_7DAY_CHART,
     WEEKLY_7DAY_MOOD,
     WaterfallSpec,
-    WeeklyStudyGridSpec,
-    WeeklyTrainingGridSpec,
-    MonthlyStudyGridSpec,
-    MonthlyTrainingGridSpec,
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_MOOD,
     YEARLY_4QTR_STUDY,
-    YearlyStudyCoverageRowsSpec,
     compress_activity_time_order,
     compress_days_time_order,
     render_chart,
 )
-from sync.writers.charts.renderers.progress_rows import (
-    _compress_symbols,
-    _row_for_day,
-    _study_intensity_symbol,
-)
-from sync.writers.charts.renderers.grouped_grid import (
-    _row_for_day as _grouped_row_for_day,
-    _study_intensity_symbol as _grouped_study_intensity_symbol,
-)
-from sync.writers.charts.renderers import progress_rows as progress_rows_module
-from sync.writers.charts.renderers import grouped_grid as grouped_grid_module
 from sync.writers.charts.renderers import vertical as vertical_module
 from sync.writers.charts.specs import WaterfallProfile
 
@@ -996,39 +987,15 @@ class TestVerticalBarRenderer:
 
 
 class TestGroupedGridRenderer:
-    def test_grouped_study_intensity_symbol_threshold(self):
-        assert _grouped_study_intensity_symbol(None) == RENDER.study_symbol_none
-        assert (
-            _grouped_study_intensity_symbol(STUDY_TARGET_MIN - 1)
-            == RENDER.study_symbol_none
-        )
-        assert (
-            _grouped_study_intensity_symbol(STUDY_TARGET_MIN)
-            == RENDER.study_symbol_deep
-        )
-
-    def test_grouped_study_intensity_symbol_none_with_low_threshold(self, monkeypatch):
-        monkeypatch.setattr(grouped_grid_module, "STUDY_TARGET_MIN", 1)
-        assert _grouped_study_intensity_symbol(None) == RENDER.study_symbol_none
-
-    def test_grouped_row_for_day_returns_payload_or_none(self):
-        day = datetime.date(2025, 1, 5)
-        payload = {"study_minutes": 360}
-        daily_data = {day: payload}
-
-        assert _grouped_row_for_day(daily_data, day) is payload
-        assert (
-            _grouped_row_for_day(daily_data, day + datetime.timedelta(days=1)) is None
-        )
-
     def test_weekly_training_structure(self, sample_week_dates, sample_daily_data):
         lines = render_chart(
-            WeeklyTrainingGridSpec(
-                dates=sample_week_dates,
-                daily_data=sample_daily_data,
+            weekly_training_grid_spec(
+                sample_week_dates,
+                sample_daily_data,
                 meditation_count=2,
                 workout_count=3,
                 stretch_count=2,
+                current_date=None,
             )
         )
         body = _fenced_body(lines)
@@ -1040,10 +1007,11 @@ class TestGroupedGridRenderer:
 
     def test_weekly_study_structure(self, sample_week_dates, sample_daily_data):
         lines = render_chart(
-            WeeklyStudyGridSpec(
-                dates=sample_week_dates,
-                daily_data=sample_daily_data,
+            weekly_study_grid_spec(
+                sample_week_dates,
+                sample_daily_data,
                 today=sample_week_dates[-1],
+                current_date=None,
             )
         )
         body = _fenced_body(lines)
@@ -1054,9 +1022,9 @@ class TestGroupedGridRenderer:
     def test_weekly_study_today_override_current_day_counts(self):
         today = datetime.date(2025, 2, 17)
         lines = render_chart(
-            WeeklyStudyGridSpec(
-                dates=[today],
-                daily_data={today: {"study_minutes": STUDY_TARGET_MIN}},
+            weekly_study_grid_spec(
+                [today],
+                {today: {"study_minutes": STUDY_TARGET_MIN}},
                 current_date=today,
                 today=today,
             )
@@ -1075,10 +1043,11 @@ class TestGroupedGridRenderer:
         today = datetime.date(2025, 2, 17)
         future = today + datetime.timedelta(days=1)
         lines = render_chart(
-            WeeklyStudyGridSpec(
-                dates=[future],
-                daily_data={future: {"study_minutes": STUDY_TARGET_MIN}},
+            weekly_study_grid_spec(
+                [future],
+                {future: {"study_minutes": STUDY_TARGET_MIN}},
                 today=today,
+                current_date=None,
             )
         )
         body = _fenced_body(lines)
@@ -1095,10 +1064,11 @@ class TestGroupedGridRenderer:
         }
 
         lines = render_chart(
-            MonthlyStudyGridSpec(
-                week_ranges=week_ranges,
-                daily_data=daily_data,
+            monthly_study_grid_spec(
+                week_ranges,
+                daily_data,
                 today=datetime.date(2025, 12, 31),
+                current_date=None,
             )
         )
         body = _fenced_body(lines)
@@ -1108,9 +1078,9 @@ class TestGroupedGridRenderer:
     def test_monthly_study_today_override_future_days(self):
         today = datetime.date(2025, 2, 17)
         lines = render_chart(
-            MonthlyStudyGridSpec(
-                week_ranges=[(today, today + datetime.timedelta(days=1))],
-                daily_data={today: {"study_minutes": STUDY_TARGET_MIN}},
+            monthly_study_grid_spec(
+                [(today, today + datetime.timedelta(days=1))],
+                {today: {"study_minutes": STUDY_TARGET_MIN}},
                 current_date=today,
                 today=today,
                 delta_labels=["+1%"],
@@ -1129,10 +1099,11 @@ class TestGroupedGridRenderer:
 
     def test_monthly_study_empty_ranges_snapshot(self):
         lines = render_chart(
-            MonthlyStudyGridSpec(
-                week_ranges=[],
-                daily_data={},
+            monthly_study_grid_spec(
+                [],
+                {},
                 today=datetime.date(2025, 1, 1),
+                current_date=None,
             )
         )
         assert _fenced_body(lines) == [
@@ -1148,12 +1119,13 @@ class TestGroupedGridRenderer:
 
     def test_monthly_study_future_only_snapshot_without_deltas(self):
         lines = render_chart(
-            MonthlyStudyGridSpec(
-                week_ranges=[
+            monthly_study_grid_spec(
+                [
                     (datetime.date(2025, 1, 2), datetime.date(2025, 1, 3)),
                 ],
-                daily_data={},
+                {},
                 today=datetime.date(2025, 1, 1),
+                current_date=None,
             )
         )
         assert _fenced_body(lines) == [
@@ -1178,13 +1150,10 @@ class TestGroupedGridRenderer:
         }
 
         lines = render_chart(
-            MonthlyTrainingGridSpec(
-                week_ranges=week_ranges,
-                daily_data=daily_data,
-                meditation_count=1,
-                workout_count=1,
-                stretch_count=1,
-                days_in_period=14,
+            monthly_training_grid_spec(
+                week_ranges,
+                daily_data,
+                current_date=None,
             )
         )
         body = _fenced_body(lines)
@@ -1196,13 +1165,9 @@ class TestGroupedGridRenderer:
     def test_monthly_training_arrow_on_first_day(self):
         start = datetime.date(2025, 12, 1)
         lines = render_chart(
-            MonthlyTrainingGridSpec(
-                week_ranges=[(start, start + datetime.timedelta(days=1))],
-                daily_data={},
-                meditation_count=0,
-                workout_count=0,
-                stretch_count=0,
-                days_in_period=2,
+            monthly_training_grid_spec(
+                [(start, start + datetime.timedelta(days=1))],
+                {},
                 current_date=start,
             )
         )
@@ -1212,13 +1177,10 @@ class TestGroupedGridRenderer:
 
     def test_monthly_training_empty_ranges_snapshot(self):
         lines = render_chart(
-            MonthlyTrainingGridSpec(
-                week_ranges=[],
-                daily_data={},
-                meditation_count=0,
-                workout_count=0,
-                stretch_count=0,
-                days_in_period=0,
+            monthly_training_grid_spec(
+                [],
+                {},
+                current_date=None,
             )
         )
         assert _fenced_body(lines) == [
@@ -1244,9 +1206,9 @@ class TestGroupedGridRenderer:
     def test_weekly_training_arrow_on_first_day(self):
         start = datetime.date(2025, 12, 1)
         lines = render_chart(
-            WeeklyTrainingGridSpec(
-                dates=[start + datetime.timedelta(days=i) for i in range(7)],
-                daily_data={},
+            weekly_training_grid_spec(
+                [start + datetime.timedelta(days=i) for i in range(7)],
+                {},
                 meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
@@ -1259,9 +1221,9 @@ class TestGroupedGridRenderer:
     def test_weekly_training_out_of_range_current_date_has_plain_header(self):
         start = datetime.date(2025, 12, 1)
         lines = render_chart(
-            WeeklyTrainingGridSpec(
-                dates=[start + datetime.timedelta(days=i) for i in range(7)],
-                daily_data={},
+            weekly_training_grid_spec(
+                [start + datetime.timedelta(days=i) for i in range(7)],
+                {},
                 meditation_count=0,
                 workout_count=0,
                 stretch_count=0,
@@ -1275,9 +1237,9 @@ class TestGroupedGridRenderer:
         self, sample_week_dates, sample_daily_data
     ):
         lines = render_chart(
-            WeeklyTrainingGridSpec(
-                dates=sample_week_dates,
-                daily_data=sample_daily_data,
+            weekly_training_grid_spec(
+                sample_week_dates,
+                sample_daily_data,
                 meditation_count=2,
                 workout_count=4,
                 stretch_count=4,
@@ -1297,9 +1259,9 @@ class TestGroupedGridRenderer:
         self, sample_week_dates, sample_daily_data
     ):
         lines = render_chart(
-            WeeklyStudyGridSpec(
-                dates=sample_week_dates,
-                daily_data=sample_daily_data,
+            weekly_study_grid_spec(
+                sample_week_dates,
+                sample_daily_data,
                 today=sample_week_dates[-1],
                 current_date=datetime.date(2025, 12, 28),
             )
@@ -1316,12 +1278,12 @@ class TestGroupedGridRenderer:
 
     def test_monthly_study_exact_render_snapshot(self):
         lines = render_chart(
-            MonthlyStudyGridSpec(
-                week_ranges=[
+            monthly_study_grid_spec(
+                [
                     (datetime.date(2025, 12, 1), datetime.date(2025, 12, 7)),
                     (datetime.date(2025, 12, 8), datetime.date(2025, 12, 14)),
                 ],
-                daily_data={
+                {
                     datetime.date(2025, 12, 1): {"study_minutes": 400},
                     datetime.date(2025, 12, 2): {"study_minutes": 100},
                 },
@@ -1343,19 +1305,15 @@ class TestGroupedGridRenderer:
 
     def test_monthly_training_exact_render_snapshot(self):
         lines = render_chart(
-            MonthlyTrainingGridSpec(
-                week_ranges=[
+            monthly_training_grid_spec(
+                [
                     (datetime.date(2025, 12, 1), datetime.date(2025, 12, 7)),
                     (datetime.date(2025, 12, 8), datetime.date(2025, 12, 14)),
                 ],
-                daily_data={
+                {
                     datetime.date(2025, 12, 1): {"workout": True, "stretch": False},
                     datetime.date(2025, 12, 2): {"workout": False, "stretch": True},
                 },
-                meditation_count=1,
-                workout_count=1,
-                stretch_count=1,
-                days_in_period=14,
                 current_date=datetime.date(2025, 12, 14),
                 meditation_delta_labels=["+5%", "-5%"],
                 workout_delta_labels=["+7%", "-7%"],
@@ -1384,60 +1342,6 @@ class TestGroupedGridRenderer:
             "│   DEC 01-07       DEC 08-14",
             "└      +9%             -9%",
         ]
-
-
-class TestProgressRowsInternals:
-    def test_study_intensity_symbol_threshold(self):
-        assert _study_intensity_symbol(None) == RENDER.study_symbol_none
-        assert _study_intensity_symbol(STUDY_TARGET_MIN - 1) == RENDER.study_symbol_none
-        assert _study_intensity_symbol(STUDY_TARGET_MIN) == RENDER.study_symbol_deep
-
-    def test_study_intensity_symbol_none_with_low_threshold(self, monkeypatch):
-        monkeypatch.setattr(progress_rows_module, "STUDY_TARGET_MIN", 1)
-        assert _study_intensity_symbol(None) == RENDER.study_symbol_none
-
-    def test_row_for_day_returns_payload_or_none(self):
-        day = datetime.date(2025, 1, 5)
-        payload = {"study_minutes": 360}
-        daily_data = {day: payload}
-
-        assert _row_for_day(daily_data, day) is payload
-        assert _row_for_day(daily_data, day + datetime.timedelta(days=1)) is None
-
-    def test_compress_symbols_edge_cases(self):
-        deep = RENDER.study_symbol_deep
-        none = RENDER.study_symbol_none
-
-        assert _compress_symbols([], 0) == ""
-        assert _compress_symbols([], 3) == none * 3
-        assert _compress_symbols([deep, none], 4) == f"{deep}{none}{none}{none}"
-        assert _compress_symbols([deep, none, deep], 4) == f"{deep}{none}{deep}{none}"
-        assert _compress_symbols([deep], 1) == deep
-        assert _compress_symbols([deep, none], 2) == f"{deep}{none}"
-
-    def test_compress_symbols_bucket_prefers_deep_symbol(self):
-        deep = RENDER.study_symbol_deep
-        none = RENDER.study_symbol_none
-        symbols = [none, deep, none, none]
-        assert _compress_symbols(symbols, 2) == f"{deep}{none}"
-
-    def test_compress_symbols_non_integer_bucket_boundaries(self):
-        deep = RENDER.study_symbol_deep
-        none = RENDER.study_symbol_none
-        symbols = [none, none, deep, none, deep]
-        assert _compress_symbols(symbols, 3) == f"{none}{deep}{deep}"
-
-    def test_compress_symbols_one_over_target_is_compressed(self):
-        deep = RENDER.study_symbol_deep
-        none = RENDER.study_symbol_none
-        symbols = [deep, none, none, deep, none]
-        assert _compress_symbols(symbols, 4) == f"{deep}{none}{deep}{deep}"
-
-    def test_compress_symbols_integer_bucket_boundaries(self):
-        deep = RENDER.study_symbol_deep
-        none = RENDER.study_symbol_none
-        symbols = [none, none, deep, none]
-        assert _compress_symbols(symbols, 2) == f"{none}{deep}"
 
 
 class TestProgressRowsRenderer:
@@ -1508,9 +1412,9 @@ class TestProgressRowsRenderer:
             (datetime.date(2025, 12, 1), datetime.date(2025, 12, 31)),
         ]
         lines = render_chart(
-            QuarterlyStudyCoverageRowsSpec(
-                month_ranges=month_ranges,
-                daily_data={},
+            quarterly_study_coverage_spec(
+                month_ranges,
+                {},
                 today=datetime.date(2025, 12, 26),
             )
         )
@@ -1522,13 +1426,13 @@ class TestProgressRowsRenderer:
 
     def test_quarterly_study_coverage_snapshot_with_future_days(self):
         lines = render_chart(
-            QuarterlyStudyCoverageRowsSpec(
-                month_ranges=[
+            quarterly_study_coverage_spec(
+                [
                     (datetime.date(2025, 10, 1), datetime.date(2025, 10, 3)),
                     (datetime.date(2025, 11, 1), datetime.date(2025, 11, 3)),
                     (datetime.date(2025, 12, 1), datetime.date(2025, 12, 3)),
                 ],
-                daily_data={
+                {
                     datetime.date(2025, 10, 1): {"study_minutes": 360},
                     datetime.date(2025, 10, 3): {"study_minutes": 360},
                     datetime.date(2025, 11, 2): {"study_minutes": 360},
@@ -1557,10 +1461,11 @@ class TestProgressRowsRenderer:
             (datetime.date(2025, 10, 1), datetime.date(2025, 12, 31)),
         ]
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=quarter_ranges,
-                daily_data={},
+            yearly_study_coverage_spec(
+                quarter_ranges,
+                {},
                 today=datetime.date(2025, 12, 26),
+                bar_width=30,
                 delta_labels=["+1%", "+2%", "-3%", "+4%"],
             )
         )
@@ -1624,9 +1529,9 @@ class TestProgressRowsRenderer:
             (datetime.date(2025, 10, 1), datetime.date(2025, 12, 31)),
         ]
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=quarter_ranges,
-                daily_data={},
+            yearly_study_coverage_spec(
+                quarter_ranges,
+                {},
                 today=datetime.date(2025, 12, 26),
                 bars_override=["█████░░░░░", "███░░░░░░░", "██░░░░░░░░", "█░░░░░░░░░"],
                 delta_labels=["+1%", "+2%", "-3%", "+4%"],
@@ -1647,14 +1552,14 @@ class TestProgressRowsRenderer:
 
     def test_yearly_study_coverage_without_override_exact_snapshot(self):
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=[
+            yearly_study_coverage_spec(
+                [
                     (datetime.date(2025, 1, 1), datetime.date(2025, 1, 3)),
                     (datetime.date(2025, 4, 1), datetime.date(2025, 4, 3)),
                     (datetime.date(2025, 7, 1), datetime.date(2025, 7, 3)),
                     (datetime.date(2025, 10, 1), datetime.date(2025, 10, 3)),
                 ],
-                daily_data={
+                {
                     datetime.date(2025, 1, 1): {"study_minutes": 360},
                     datetime.date(2025, 1, 2): {"study_minutes": 120},
                     datetime.date(2025, 1, 3): {"study_minutes": 360},
@@ -2152,21 +2057,6 @@ class TestProgressRowsRegression:
             str(excinfo.value) == "bars_override and counts must have the same length"
         )
 
-    def test_progress_compress_symbols_negative_width_raises_exact_message(self):
-        with pytest.raises(ValueError) as excinfo:
-            _compress_symbols([], -1)
-        assert str(excinfo.value) == "target_width must be non-negative"
-
-    def test_progress_compress_symbols_bucket_edges_keep_deep_signal(self):
-        symbols = [
-            RENDER.study_symbol_none,
-            RENDER.study_symbol_none,
-            RENDER.study_symbol_none,
-            RENDER.study_symbol_deep,
-            RENDER.study_symbol_none,
-        ]
-        assert _compress_symbols(symbols, 3) == "·██"
-
     def test_training_block_rows_elapsed_one_can_fill_entire_bar(self):
         body = _fenced_body(
             render_chart(
@@ -2224,13 +2114,13 @@ class TestProgressRowsRegression:
 
     def test_quarterly_study_coverage_no_elapsed_uses_canonical_header(self):
         lines = render_chart(
-            QuarterlyStudyCoverageRowsSpec(
-                month_ranges=[
+            quarterly_study_coverage_spec(
+                [
                     (datetime.date(2026, 1, 1), datetime.date(2026, 1, 2)),
                     (datetime.date(2026, 2, 1), datetime.date(2026, 2, 2)),
                     (datetime.date(2026, 3, 1), datetime.date(2026, 3, 2)),
                 ],
-                daily_data={},
+                {},
                 today=datetime.date(2025, 12, 31),
                 delta_labels=[],
             )
@@ -2239,9 +2129,9 @@ class TestProgressRowsRegression:
 
     def test_quarterly_study_coverage_empty_ranges_snapshot(self):
         lines = render_chart(
-            QuarterlyStudyCoverageRowsSpec(
-                month_ranges=[],
-                daily_data={},
+            quarterly_study_coverage_spec(
+                [],
+                {},
                 today=datetime.date(2026, 1, 1),
                 delta_labels=[],
             )
@@ -2256,13 +2146,13 @@ class TestProgressRowsRegression:
 
     def test_quarterly_study_coverage_short_delta_list_adds_no_placeholders(self):
         lines = render_chart(
-            QuarterlyStudyCoverageRowsSpec(
-                month_ranges=[
+            quarterly_study_coverage_spec(
+                [
                     (datetime.date(2026, 1, 1), datetime.date(2026, 1, 1)),
                     (datetime.date(2026, 2, 1), datetime.date(2026, 2, 1)),
                     (datetime.date(2026, 3, 1), datetime.date(2026, 3, 1)),
                 ],
-                daily_data={},
+                {},
                 today=datetime.date(2026, 3, 1),
                 delta_labels=["+1%"],
             )
@@ -2273,9 +2163,9 @@ class TestProgressRowsRegression:
     def test_yearly_override_counts_include_today(self):
         day = datetime.date(2026, 1, 1)
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=[(day, day)],
-                daily_data={day: {"study_minutes": 360}},
+            yearly_study_coverage_spec(
+                [(day, day)],
+                {day: {"study_minutes": 360}},
                 today=day,
                 bars_override=["█"],
                 delta_labels=[],
@@ -2288,12 +2178,12 @@ class TestProgressRowsRegression:
 
     def test_yearly_short_delta_list_adds_no_placeholders(self):
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=[
+            yearly_study_coverage_spec(
+                [
                     (datetime.date(2026, 1, 1), datetime.date(2026, 1, 1)),
                     (datetime.date(2026, 4, 1), datetime.date(2026, 4, 1)),
                 ],
-                daily_data={},
+                {},
                 today=datetime.date(2026, 12, 31),
                 bars_override=["█", "·"],
                 delta_labels=["+1%"],
@@ -2305,9 +2195,9 @@ class TestProgressRowsRegression:
 
     def test_yearly_study_coverage_empty_ranges_snapshot(self):
         lines = render_chart(
-            YearlyStudyCoverageRowsSpec(
-                quarter_ranges=[],
-                daily_data={},
+            yearly_study_coverage_spec(
+                [],
+                {},
                 today=datetime.date(2026, 1, 1),
                 delta_labels=[],
                 bar_width=30,

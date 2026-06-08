@@ -6,27 +6,14 @@ Parses PROCRASTINATION table from daily notes to extract screen time data.
 
 from __future__ import annotations
 
-import re
-
 from sync.constants import (
     NO_SCREEN_TIME_TOKEN,
     PROCRASTINATION_SECTION_HEADER,
-    PROCRASTINATION_TABLE_HEADER_RE,
 )
 from sync.contracts.screen_time import ScreenTimeEntry, DailyScreenTimeData
 from sync.formatting import normalize_screen_time_label
-from sync.notes.markdown_tables import split_markdown_row
+from sync.notes.markdown_tables import find_markdown_table
 from .common import extract_block, parse_duration_to_minutes
-
-
-def _split_row(line: str) -> list[str] | None:
-    row = split_markdown_row(line)
-    if row is not None:
-        return row
-    stripped = line.strip()
-    if stripped.startswith("|") and not stripped.endswith("|"):
-        return split_markdown_row(f"{stripped}|")
-    return None
 
 
 def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
@@ -43,26 +30,21 @@ def parse_procrastination_table(lines: list[str]) -> DailyScreenTimeData | None:
     if not block:
         return None
 
-    # Find table header
-    header_idx = next(
-        (
-            i
-            for i, line in enumerate(block)
-            if re.search(PROCRASTINATION_TABLE_HEADER_RE, line, re.IGNORECASE)
+    table = find_markdown_table(
+        block,
+        header_matches=lambda cells: (
+            len(cells) >= 2
+            and cells[0].strip().lower() == "source"
+            and cells[1].strip().lower() == "duration"
         ),
-        None,
+        lenient=True,
     )
-
-    if header_idx is None:
+    if table is None:
         return None
 
     entries: list[ScreenTimeEntry] = []
-    for line in block[header_idx + 2 :]:  # Skip header and separator
-        if not line.strip().startswith("|"):
-            break
-
-        parts = _split_row(line)
-        if parts is None or len(parts) < 2:
+    for parts in table.rows:
+        if len(parts) < 2:
             continue
 
         source = normalize_screen_time_label(parts[0].strip().strip("*"))
