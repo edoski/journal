@@ -63,7 +63,7 @@ def append_training_type_table(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
 ) -> None:
-    """Render and append the TYPE/SESSIONS/DURATION/SCHEDULE table."""
+    """Render and append the TYPE/SESSIONS/DURATION/TIME table."""
     training_stats = aggregate_training_type_session_stats(dates, daily_data)
 
     rows: list[list[str]] = []
@@ -90,7 +90,7 @@ def append_training_type_table(
 
     table_lines = render_table(
         SimpleGridTableSpec(
-            headers=["TYPE", "SESSIONS", "DURATION", "SCHEDULE"],
+            headers=["TYPE", "SESSIONS", "DURATION", "TIME"],
             divider_cells=["----", "--------", "--------", "--------"],
             rows=rows,
         )

@@ -262,8 +262,8 @@ journal/
   - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |`
 - Daily `TRAINING` rows with a positive `DURATION` are canonical only when `TIME` is `HH:MM - HH:MM` (24-hour); non-canonical values are rejected with explicit errors.
 - Periodic `TRAINING` type summary tables are canonical only when they include:
-  - `| TYPE | SESSIONS | DURATION | SCHEDULE |`
-  - `SCHEDULE` renders one row per activity type and uses slash-separated exact averaged ranges when a type has multiple recurring windows
+  - `| TYPE | SESSIONS | DURATION | TIME |`
+  - `TIME` renders one row per activity type and uses slash-separated exact averaged ranges when a type has multiple recurring windows
 - `PROTOCOL.md` `## SCHEDULE` is canonical only when it includes:
   - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
   - required `DEFAULT` row with full values

@@ -60,7 +60,7 @@
 └
 ```
 
-| TYPE | SESSIONS | DURATION | SCHEDULE |
+| TYPE | SESSIONS | DURATION | TIME |
 | ---- | -------- | -------- | -------- |
 | **Mind & Body** | `183/366` | `12m/session` | `07:25 - 07:37` |
 | **Functional Strength Training** | `122/366` | `33m/session` | `18:09 - 18:42` |
