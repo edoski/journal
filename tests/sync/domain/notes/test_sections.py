@@ -395,7 +395,7 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE |",
+            "| TIME | ASLEEP | AWAKE |",
             "| ---- | -------- | ----- |",
             "| 23:00-07:00 | `8h00m` | `20m` |",
             "not a table row",
@@ -410,7 +410,7 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE |",
+            "| TIME | ASLEEP | AWAKE |",
             "| ---- | -------- | ----- |",
             "| only | two |",
             "| 23:00-07:00 | `8h00m` | `20m` |",
@@ -423,7 +423,7 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE |",
+            "| TIME | ASLEEP | AWAKE |",
             "| ---- | -------- | ----- |",
             "| 23:00-07:00 | `` | `20m` |",
         ]
@@ -436,7 +436,7 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE |",
+            "| TIME | ASLEEP | AWAKE |",
             "| ---- | -------- | ----- |",
             "| 09:00-10:00 | `1h00m` | `` |",
         ]

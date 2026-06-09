@@ -12,7 +12,7 @@ from sync.notes.markdown_tables import find_markdown_table
 from .common import extract_block, parse_duration_to_minutes
 
 
-_SLEEP_HEADER_CELLS = ("time", "duration", "awake")
+_SLEEP_HEADER_CELLS = ("time", "asleep", "awake")
 _TIME_RANGE_RE = re.compile(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})")
 
 

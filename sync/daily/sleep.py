@@ -43,8 +43,8 @@ def _build_sleep_table(data: SleepPayload | None) -> list[str]:
 
     return render_table(
         SimpleGridTableSpec(
-            headers=["TIME", "DURATION", "AWAKE"],
-            divider_cells=["----", "--------", "-----"],
+            headers=["TIME", "ASLEEP", "AWAKE"],
+            divider_cells=["----", "------", "-----"],
             rows=[[time_cell, duration_cell, awake_cell]],
         )
     )

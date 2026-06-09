@@ -5,7 +5,7 @@ from __future__ import annotations
 from sync.readers.sleep import parse_sleep_table
 
 
-_HEADER = "| TIME | DURATION | AWAKE |"
+_HEADER = "| TIME | ASLEEP | AWAKE |"
 _DIVIDER = "| ---- | -------- | ----- |"
 
 
@@ -32,7 +32,7 @@ def test_parses_case_insensitive_header():
         [
             "### **SLEEP**",
             "",
-            "| time | duration | awake |",
+            "| time | asleep | awake |",
             _DIVIDER,
             "| 23:00-07:00 | `8h00m` | `20m` |",
             "",

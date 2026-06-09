@@ -147,7 +147,7 @@ def sample_sleep_table_lines() -> list[str]:
     return [
         "### **SLEEP**",
         "",
-        "| TIME | DURATION | AWAKE |",
+        "| TIME | ASLEEP | AWAKE |",
         "| ---- | -------- | ----- |",
         "| 23:00-07:00 | `8h00m` | `20m` |",
         "",

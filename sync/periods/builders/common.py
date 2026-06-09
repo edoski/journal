@@ -207,7 +207,7 @@ def sleep_stats_table_lines(
 ) -> list[str]:
     rows = [
         [
-            "**SCHEDULE**  ",
+            "**TIME**      ",
             f"`{avg_schedule}`" if avg_schedule else "",
         ],
         [
