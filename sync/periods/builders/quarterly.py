@@ -7,15 +7,13 @@ from typing import Literal
 
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
-from sync.constants import MONTH_ABBR, STUDY_TARGET_MIN
+from sync.constants import MONTH_ABBR
 from sync.dates import daterange, quarter_id, quarter_months, quarter_range
 from sync.metrics import (
     aggregate_activity_totals,
-    aggregate_screen_time,
     compute_bucket_deltas,
     compute_moving_average,
     compute_period_metrics,
-    group_screen_time_by_percent,
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
@@ -23,28 +21,21 @@ from sync.periods.builders.common import (
     activity_totals_for_day,
     compute_avg_schedule,
     compute_sleep_aux_averages,
-    mood_for_day,
     sleep_minutes_for_day,
     sleep_stats_table_lines,
     study_minutes_for_day,
     training_done_for_day,
 )
 from sync.periods.sections import (
-    append_interrupts_table,
     append_media_section,
     append_summary_section,
     append_training_type_table,
-    build_procrastination_section,
 )
 from sync.periods.presentation import (
     bucket_average_bar_spec,
-    period_screen_trend_rows,
-    quarterly_study_coverage_spec,
 )
 from sync.writers.charts import (
-    DECIMAL_ONE_LABEL,
     QUARTERLY_3MONTH_METRIC,
-    QUARTERLY_3MONTH_MOOD,
     QUARTERLY_3MONTH_STUDY,
     TIME_LABEL_STANDARD,
     TrainingSection,
@@ -53,7 +44,6 @@ from sync.writers.charts import (
     compress_activity_time_order,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 
 def build_quarterly_metrics(
@@ -67,7 +57,6 @@ def build_quarterly_metrics(
     media_bundle: MediaBundle,
     *,
     target_date: datetime.date,
-    study_target_minutes: int | None,
     prior_quarter_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     today = target_date
@@ -86,19 +75,15 @@ def build_quarterly_metrics(
         ma_metrics = compute_moving_average(prior_quarter_metrics, 4)
 
     prev_label = f"**[[{quarter_id(prev_year, prev_quarter)}\\|LAST QUARTER]]**"
-    days_in_quarter = (quarter_end - quarter_start).days + 1
     append_summary_section(
         sections,
         current_metrics,
         prev_metrics,
         "THIS QUARTER",
         prev_label,
-        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="4-QTR AVG" if ma_metrics else None,
         ma_training_unit="qtr",
-        period_type="quarter",
-        total_days=days_in_quarter,
     )
 
     prev_month_ranges = quarter_months(prev_year, prev_quarter)
@@ -157,31 +142,6 @@ def build_quarterly_metrics(
     )
     append_activity_summary(study_lines, activity_totals)
 
-    study_delta_labels = compute_bucket_deltas(
-        month_day_lists,
-        value_for_day=lambda d: (
-            1.0
-            if (study_minutes_for_day(quarter_delta_data, d) or 0) >= STUDY_TARGET_MIN
-            else 0.0
-        ),
-        baseline_bucket=prev_last_month_days,
-        mode="pace",
-        today=today,
-    )
-
-    study_lines.extend(
-        render_chart(
-            quarterly_study_coverage_spec(
-                month_ranges=month_ranges,
-                daily_data=daily_data,
-                today=today,
-                delta_labels=study_delta_labels,
-            )
-        )
-    )
-    study_lines.append("")
-
-    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING
@@ -306,33 +266,6 @@ def build_quarterly_metrics(
 
     sections.append(trim_blank_lines(training_lines))
 
-    # PROCRASTINATION section (screen time waterfall + trend table)
-    screen_time_totals = aggregate_screen_time(dates, daily_data)
-    screen_time_totals = group_screen_time_by_percent(screen_time_totals)
-    if screen_time_totals:
-        # Monthly trend table with wikilinks to monthly notes
-        month_labels = [MONTH_ABBR[m[0].month - 1] for m in month_ranges]
-        month_wikilinks: list[str] = []
-        for (start, _), label in zip(month_ranges, month_labels):
-            month_wikilinks.append(f"[[{start.year}-{start.month:02d}\\|{label}]]")
-        procrastination_lines = build_procrastination_section(
-            screen_time_totals,
-            render_table(
-                ScreenTrendTableSpec(
-                    period_label="MONTH",
-                    rows=period_screen_trend_rows(
-                        month_ranges,
-                        daily_data,
-                        today=today,
-                        labels=month_labels,
-                        wikilinks=month_wikilinks,
-                        fallback_prefix="M",
-                    ),
-                )
-            ),
-        )
-        sections.append(trim_blank_lines(procrastination_lines))
-
     # SLEEP
     sleep_lines = ["### **SLEEP**"]
     sleep_delta_labels = compute_bucket_deltas(
@@ -361,45 +294,17 @@ def build_quarterly_metrics(
     sleep_lines.append("")
 
     sleep_avg = current_metrics["sleep_avg_minutes"]
-    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
+    avg_awake = compute_sleep_aux_averages(dates, daily_data)
 
     sleep_lines.extend(
         sleep_stats_table_lines(
             sleep_avg,
             avg_awake,
-            avg_awakenings,
             avg_schedule=compute_avg_schedule(dates, daily_data),
         )
     )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
-
-    # MOOD
-    mood_lines = ["### **MOOD**"]
-    mood_delta_labels = compute_bucket_deltas(
-        month_day_lists,
-        value_for_day=lambda d: mood_for_day(quarter_delta_data, d),
-        baseline_bucket=prev_last_month_days,
-        mode="average",
-        today=today,
-    )
-
-    mood_lines.extend(
-        render_chart(
-            bucket_average_bar_spec(
-                month_ranges,
-                month_labels,
-                today=today,
-                value_for_day=lambda d: mood_for_day(daily_data, d),
-                chart_value=lambda avg: avg,
-                value_label=DECIMAL_ONE_LABEL.format,
-                zero_label="0.0",
-                profile=QUARTERLY_3MONTH_MOOD,
-                delta_labels=mood_delta_labels,
-            )
-        )
-    )
-    sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
     append_media_section(sections, media_bundle)

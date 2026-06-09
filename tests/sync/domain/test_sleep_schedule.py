@@ -50,12 +50,10 @@ class TestComputeAvgSchedule:
             datetime.date(2020, 1, 1): {
                 "study_minutes": 0,
                 "sleep_minutes": 480,
-                "mood": 7.0,
                 "workout": False,
                 "stretch": False,
                 "meditate": False,
                 "awake_minutes": None,
-                "awakenings": None,
                 "sleep_asleep_time": None,
                 "sleep_awake_time": None,
                 "activity_totals": {},
@@ -66,7 +64,6 @@ class TestComputeAvgSchedule:
                 "training_type_sessions": {},
                 "training_type_start_minutes": {},
                 "training_type_end_minutes": {},
-                "screen_time_totals": {},
             }
         }
         result = compute_avg_schedule([datetime.date(2020, 1, 1)], data)
@@ -77,12 +74,10 @@ class TestComputeAvgSchedule:
             datetime.date(2020, 1, 1): {
                 "study_minutes": 0,
                 "sleep_minutes": 480,
-                "mood": 7.0,
                 "workout": False,
                 "stretch": False,
                 "meditate": False,
                 "awake_minutes": None,
-                "awakenings": None,
                 "sleep_asleep_time": "22:00",
                 "sleep_awake_time": "06:00",
                 "activity_totals": {},
@@ -93,17 +88,14 @@ class TestComputeAvgSchedule:
                 "training_type_sessions": {},
                 "training_type_start_minutes": {},
                 "training_type_end_minutes": {},
-                "screen_time_totals": {},
             },
             datetime.date(2020, 1, 2): {
                 "study_minutes": 0,
                 "sleep_minutes": 480,
-                "mood": 7.0,
                 "workout": False,
                 "stretch": False,
                 "meditate": False,
                 "awake_minutes": None,
-                "awakenings": None,
                 "sleep_asleep_time": "23:00",
                 "sleep_awake_time": "07:00",
                 "activity_totals": {},
@@ -114,7 +106,6 @@ class TestComputeAvgSchedule:
                 "training_type_sessions": {},
                 "training_type_start_minutes": {},
                 "training_type_end_minutes": {},
-                "screen_time_totals": {},
             },
         }
         dates = [datetime.date(2020, 1, 1), datetime.date(2020, 1, 2)]

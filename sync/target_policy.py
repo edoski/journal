@@ -7,36 +7,13 @@ from collections.abc import Callable, Iterable
 
 from sync.constants import IDEAL, STUDY_CADENCE, STUDY_TARGET_MIN
 from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.targets import (
-    PeriodType,
-    SummaryTargets,
-    TrainingTargetBucket,
-    TrainingTargets,
-)
-from sync.formatting import format_minutes
-
-_PERIOD_SUFFIX_BY_TYPE: dict[str, str] = {
-    "week": "wk",
-    "month": "mo",
-    "quarter": "qtr",
-    "year": "yr",
-}
+from sync.contracts.targets import TrainingTargetBucket
 
 _TRAINING_WEEKLY_TARGET_BY_BUCKET: dict[TrainingTargetBucket, float] = {
     "meditation": float(IDEAL.meditation_days_weekly),
     "workout": float(IDEAL.workout_days_weekly),
     "stretch": float(IDEAL.stretch_days_weekly),
 }
-
-
-def _period_suffix(period_type: PeriodType) -> str:
-    return _PERIOD_SUFFIX_BY_TYPE.get(period_type, "wk")
-
-
-def _sleep_target_label(sleep_minutes: int) -> str:
-    if sleep_minutes % 60 == 0:
-        return f"{sleep_minutes // 60}h/night"
-    return f"{format_minutes(sleep_minutes, always_show_both=True)}/night"
 
 
 def scaled_weekly_target(total_days: int, weekly_target: float) -> int:
@@ -88,65 +65,10 @@ def study_target_minutes_for_dates(
     return total
 
 
-def study_target_label(
-    period_type: PeriodType,
-    study_target_minutes: int | None,
-) -> str:
-    """Format the schedule-derived study target label for summary table rendering."""
-    if study_target_minutes is None:
-        return "—"
-    suffix = _period_suffix(period_type)
-    if study_target_minutes % 60 == 0:
-        return f"{study_target_minutes // 60}h/{suffix}"
-    return f"{format_minutes(study_target_minutes, always_show_both=True)}/{suffix}"
-
-
 def training_type_target(total_days: int, bucket: TrainingTargetBucket) -> int:
     """Resolve scaled training target for one training bucket."""
     weekly_target = _TRAINING_WEEKLY_TARGET_BY_BUCKET[bucket]
     return scaled_weekly_target(total_days, weekly_target)
-
-
-def summary_targets(period_type: PeriodType, total_days: int) -> SummaryTargets:
-    """Compute summary-table target values and labels for a period."""
-    suffix = _period_suffix(period_type)
-    study_minutes = IDEAL.study_minutes_daily * total_days
-    sleep_minutes = IDEAL.sleep_minutes_nightly
-    mood = IDEAL.mood_target
-
-    meditation = training_type_target(total_days, "meditation")
-    workout = training_type_target(total_days, "workout")
-    stretch = training_type_target(total_days, "stretch")
-
-    if period_type == "week":
-        meditation_label = f"{meditation}/7"
-        workout_label = f"{workout}/7"
-        stretch_label = f"{stretch}/7"
-    else:
-        meditation_label = f"{meditation}/{suffix}"
-        workout_label = f"{workout}/{suffix}"
-        stretch_label = f"{stretch}/{suffix}"
-
-    study_label = study_target_label(period_type, study_minutes)
-    sleep_label = _sleep_target_label(sleep_minutes)
-    mood_label = f"{mood:.1f}/10"
-
-    return SummaryTargets(
-        study_minutes=study_minutes,
-        sleep_minutes=sleep_minutes,
-        mood=mood,
-        training=TrainingTargets(
-            meditation=meditation,
-            workout=workout,
-            stretch=stretch,
-            meditation_label=meditation_label,
-            workout_label=workout_label,
-            stretch_label=stretch_label,
-        ),
-        study_label=study_label,
-        sleep_label=sleep_label,
-        mood_label=mood_label,
-    )
 
 
 def target_for_metric(metric: str, days_total: int) -> float | None:
@@ -155,8 +77,6 @@ def target_for_metric(metric: str, days_total: int) -> float | None:
         return float(STUDY_TARGET_MIN * max(1, days_total))
     if metric == "sleep_minutes":
         return float(IDEAL.sleep_minutes_nightly)
-    if metric == "mood":
-        return float(IDEAL.mood_target)
     if metric == "workout_count":
         return float(training_type_target(days_total, "workout"))
     if metric == "stretch_count":

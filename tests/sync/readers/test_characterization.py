@@ -7,7 +7,6 @@ from __future__ import annotations
 import pytest
 
 from sync.readers.daily import (
-    _parse_optional_mood,
     _parse_training_table_rows,
     parse_daily_note,
 )
@@ -26,7 +25,6 @@ def test_parse_daily_note_characterization(tmp_path):
         [
             "---",
             "sleep: 7h15m",
-            "mood: 7.5",
             "workout: true",
             "stretch: false",
             "meditate: true",
@@ -43,18 +41,10 @@ def test_parse_daily_note_characterization(tmp_path):
             "",
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
-            "| 07:30-08:30 | `1h00m` | `5m` | `1` |",
-            "",
-            "### **PROCRASTINATION**",
-            "",
-            "| SOURCE | DURATION |",
-            "| ------ | -------- |",
-            "| YouTube | `1h30m` |",
-            "| X | `30m` |",
-            "| **TOTAL** | `2h00m` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
+            "| 07:30-08:30 | `1h00m` | `5m` |",
             "",
         ],
     )
@@ -64,12 +54,10 @@ def test_parse_daily_note_characterization(tmp_path):
     assert parsed == {
         "study_minutes": 210.0,
         "sleep_minutes": 435.0,  # frontmatter overrides sleep table sum
-        "mood": 7.5,
         "workout": True,
         "stretch": False,
         "meditate": True,
         "awake_minutes": 25.0,
-        "awakenings": 3,
         "sleep_asleep_time": "23:00",
         "sleep_awake_time": "07:00",
         "activity_totals": {"coding": 120.0, "reading": 90.0},
@@ -81,7 +69,6 @@ def test_parse_daily_note_characterization(tmp_path):
         "training_type_duration_minutes": {},
         "training_type_start_minutes": {},
         "training_type_end_minutes": {},
-        "screen_time_totals": {"YouTube": 90.0, "X": 30.0},
     }
 
 
@@ -125,7 +112,6 @@ def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
         [
             "---",
             "sleep: 7h",
-            "mood: 7",
             "workout: false",
             "stretch: false",
             "meditate: false",
@@ -156,39 +142,12 @@ def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
     assert parse_daily_note(str(missing)) is None
 
 
-def test_parse_daily_note_leaves_mood_none_when_frontmatter_mood_missing(tmp_path):
-    note_path = _write_note(
-        tmp_path,
-        [
-            "---",
-            "sleep: 7h00m",
-            "workout: false",
-            "stretch: false",
-            "meditate: false",
-            "---",
-            "",
-        ],
-    )
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
-    assert parsed["mood"] is None
-
-
-def test_parse_optional_mood_characterization():
-    assert _parse_optional_mood(None) is None
-    assert _parse_optional_mood("7.5") == 7.5
-    assert _parse_optional_mood("mood: 7.5") == 7.5
-    assert _parse_optional_mood("N/A") is None
-    assert _parse_optional_mood("--7") is None
-
-
 def test_parse_daily_note_training_type_aggregates(tmp_path):
     note_path = _write_note(
         tmp_path,
         [
             "---",
             "sleep: 7h",
-            "mood: 7.0",
             "workout: true",
             "stretch: true",
             "meditate: true",
@@ -247,7 +206,6 @@ def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
         [
             "---",
             "sleep: 7h",
-            "mood: 7.0",
             "workout: true",
             "stretch: false",
             "meditate: false",
@@ -419,7 +377,6 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_pa
         tmp_path,
         [
             "---",
-            "mood: 8.0",
             "workout: false",
             "stretch: false",
             "meditate: false",
@@ -429,10 +386,10 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_pa
             "---",
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-07:00 | `8h00m` | `15m` | `1` |",
-            "| 08:00-09:00 | `1h00m` | `` | `` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 23:00-07:00 | `8h00m` | `15m` |",
+            "| 08:00-09:00 | `1h00m` | `` |",
         ],
     )
 
@@ -440,15 +397,13 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_pa
     assert parsed is not None
     assert parsed["sleep_minutes"] == 540.0
     assert parsed["awake_minutes"] == 15.0
-    assert parsed["awakenings"] == 1
 
 
-def test_parse_daily_note_mood_invalid_and_sleep_absent_defaults(tmp_path):
+def test_parse_daily_note_sleep_absent_defaults(tmp_path):
     note_path = _write_note(
         tmp_path,
         [
             "---",
-            "mood: not-a-number",
             "workout: no",
             "stretch: yes",
             "meditate: true",
@@ -467,84 +422,11 @@ def test_parse_daily_note_mood_invalid_and_sleep_absent_defaults(tmp_path):
 
     parsed = parse_daily_note(note_path)
     assert parsed is not None
-    assert parsed["mood"] is None
     assert parsed["sleep_minutes"] == 0
     assert parsed["awake_minutes"] is None
-    assert parsed["awakenings"] is None
     assert parsed["workout"] is False
     assert parsed["stretch"] is False
     assert parsed["meditate"] is True
-
-
-def test_parse_daily_note_ignores_empty_procrastination_rows(tmp_path):
-    note_path = _write_note(
-        tmp_path,
-        [
-            "---",
-            "sleep: 7h00m",
-            "mood: 7.0",
-            "workout: false",
-            "stretch: false",
-            "meditate: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **PROCRASTINATION**",
-            "",
-            "| SOURCE | DURATION |",
-            "| ------ | -------- |",
-            "| **TOTAL** | `0m` |",
-            "| no screen time today | `0m` |",
-        ],
-        name="2025-03-02.md",
-    )
-
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
-    assert parsed["screen_time_totals"] == {}
-
-
-def test_parse_daily_note_empty_mood_is_none(tmp_path):
-    note_path = _write_note(
-        tmp_path,
-        [
-            "---",
-            "mood:",
-            "workout: false",
-            "stretch: false",
-            "meditate: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-        ],
-        name="2025-03-03.md",
-    )
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
-    assert parsed["mood"] is None
-
-
-def test_parse_daily_note_mood_sanitizes_symbolic_input(tmp_path):
-    note_path = _write_note(
-        tmp_path,
-        [
-            "---",
-            "mood: 7.5/10",
-            "workout: false",
-            "stretch: false",
-            "meditate: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-        ],
-        name="2025-03-04.md",
-    )
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
-    assert parsed["mood"] == 7.51
 
 
 def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
@@ -561,9 +443,9 @@ def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
             "---",
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-23:00 | `` | `` | `` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 23:00-23:00 | `` | `` |",
         ],
         name="2025-03-05.md",
     )
@@ -578,7 +460,6 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
         [
             "---",
             "sleep: 6h00m",
-            "mood: 7",
             "workout: true",
             "stretch: true",
             "meditate: true",
@@ -598,12 +479,6 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
             "| ---- | -------- | -------- | --------- |",
             "| `07:00 - 07:20` | Lift | `20m` | `+00m` |",
             "| `08:00 - 08:10` | Lift | `10m` | `+00m` |",
-            "",
-            "### **PROCRASTINATION**",
-            "| SOURCE | DURATION |",
-            "| ------ | -------- |",
-            "| YouTube | `5m` |",
-            "| YouTube | `10m` |",
         ],
         name="2025-03-06.md",
     )
@@ -615,4 +490,3 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
     assert parsed["training_type_duration_minutes"] == {"Lift": (20.0, 10.0)}
     assert parsed["training_type_start_minutes"] == {"Lift": (420, 480)}
     assert parsed["training_type_end_minutes"] == {"Lift": (440, 490)}
-    assert parsed["screen_time_totals"] == {"YouTube": 15.0}

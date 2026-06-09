@@ -21,7 +21,6 @@ def isolate_cache_dirs(tmp_path, monkeypatch):
     goal_cache_dir = cache_root / "goals"
     media_cache_dir = cache_root / "media"
     training_cache_dir = cache_root / "daily" / "training"
-    screen_cache_dir = cache_root / "daily" / "screen_time"
     note_lock_dir = cache_root / "locks" / "notes"
     state_lock_dir = cache_root / "locks" / "state"
 
@@ -41,9 +40,6 @@ def isolate_cache_dirs(tmp_path, monkeypatch):
         "sync.adapters.json_daily_cache.TRAINING_CACHE_DIR", str(training_cache_dir)
     )
     monkeypatch.setattr(
-        "sync.adapters.json_daily_cache.SCREEN_TIME_CACHE_DIR", str(screen_cache_dir)
-    )
-    monkeypatch.setattr(
         "sync.adapters.json_daily_cache.STATE_LOCK_DIR", str(state_lock_dir)
     )
     monkeypatch.setattr("sync.notes.locking.NOTE_LOCK_DIR", str(note_lock_dir))
@@ -59,11 +55,9 @@ def sample_daily_data() -> dict[datetime.date, dict[str, Any]]:
         datetime.date(2025, 12, 23): {
             "study_minutes": 420,  # 7 hours - meets target
             "sleep_minutes": 480,  # 8 hours
-            "mood": 7.5,
             "workout": True,
             "stretch": True,
             "awake_minutes": 15,
-            "awakenings": 2,
             "sleep_asleep_time": "22:30",
             "sleep_awake_time": "06:30",
             "activity_totals": {"coding": 300, "reading": 120},
@@ -73,11 +67,9 @@ def sample_daily_data() -> dict[datetime.date, dict[str, Any]]:
         datetime.date(2025, 12, 24): {
             "study_minutes": 180,  # 3 hours - below target
             "sleep_minutes": 420,  # 7 hours
-            "mood": 6.0,
             "workout": False,
             "stretch": True,
             "awake_minutes": 20,
-            "awakenings": 3,
             "sleep_asleep_time": "23:00",
             "sleep_awake_time": "07:00",
             "activity_totals": {"coding": 180},
@@ -87,11 +79,9 @@ def sample_daily_data() -> dict[datetime.date, dict[str, Any]]:
         datetime.date(2025, 12, 25): {
             "study_minutes": 0,  # No study
             "sleep_minutes": 540,  # 9 hours
-            "mood": 8.0,
             "workout": True,
             "stretch": False,
             "awake_minutes": 10,
-            "awakenings": 1,
             "sleep_asleep_time": "22:00",
             "sleep_awake_time": "07:00",
             "activity_totals": {},
@@ -101,11 +91,9 @@ def sample_daily_data() -> dict[datetime.date, dict[str, Any]]:
         datetime.date(2025, 12, 26): {
             "study_minutes": 360,  # 6 hours - meets target exactly
             "sleep_minutes": 450,  # 7.5 hours
-            "mood": 7.0,
             "workout": True,
             "stretch": True,
             "awake_minutes": 25,
-            "awakenings": 4,
             "sleep_asleep_time": "23:15",
             "sleep_awake_time": "06:45",
             "activity_totals": {"coding": 200, "writing": 160},
@@ -127,7 +115,6 @@ def sample_frontmatter_lines() -> list[str]:
     return [
         "---",
         "date: 2025-12-26",
-        "mood: 7.5",
         "workout: true",
         "stretch: false",
         "sleep: 7h30m",
@@ -160,9 +147,9 @@ def sample_sleep_table_lines() -> list[str]:
     return [
         "### **SLEEP**",
         "",
-        "| TIME | DURATION | AWAKE | AWAKENINGS |",
-        "| ---- | -------- | ----- | ---------- |",
-        "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+        "| TIME | DURATION | AWAKE |",
+        "| ---- | -------- | ----- |",
+        "| 23:00-07:00 | `8h00m` | `20m` |",
         "",
     ]
 

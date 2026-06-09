@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from sync.adapters.status_parsers import (
-    parse_activity_payload,
     parse_sleep_payload,
     parse_training_payload,
 )
@@ -18,11 +17,10 @@ def test_parse_sleep_payload_accepts_canonical_payload() -> None:
         "end": "2026-02-07T06:30:00+0000",
         "sleep_min": 420,
         "awake_min": 15,
-        "awake_count": 2,
     }
     parsed = parse_sleep_payload(payload)
     assert parsed.sleep_min == 420
-    assert parsed.awake_count == 2
+    assert parsed.awake_min == 15
 
 
 def test_parse_sleep_payload_rejects_missing_keys() -> None:
@@ -38,7 +36,6 @@ def test_parse_sleep_payload_rejects_invalid_date() -> None:
         "end": "y",
         "sleep_min": 420,
         "awake_min": 15,
-        "awake_count": 2,
     }
     with pytest.raises(ValueError, match="date must be YYYY-MM-DD"):
         parse_sleep_payload(payload)
@@ -80,30 +77,3 @@ def test_parse_training_payload_rejects_missing_or_invalid_date() -> None:
         parse_training_payload({"duration": 20}, "workout")
     with pytest.raises(ValueError, match="date must be YYYY-MM-DD"):
         parse_training_payload({"date": "2026-02-99", "duration": 20}, "workout")
-
-
-def test_parse_activity_payload_validates_date_and_shape() -> None:
-    payload = {
-        "date": "2026-02-07",
-        "activity_ipad": "YouTube (30m)",
-        "activity_iphone": "Instagram (12m)",
-    }
-    parsed = parse_activity_payload(payload)
-    assert parsed.activity_ipad.startswith("YouTube")
-
-    with pytest.raises(ValueError, match="expected JSON object"):
-        parse_activity_payload([])
-
-    with pytest.raises(ValueError, match="date must be a non-empty YYYY-MM-DD string"):
-        parse_activity_payload(
-            {"activity_ipad": "YouTube (30m)", "activity_iphone": ""}
-        )
-
-    with pytest.raises(ValueError, match="date must be YYYY-MM-DD"):
-        parse_activity_payload(
-            {
-                "date": "2026-14-02",
-                "activity_ipad": "YouTube (30m)",
-                "activity_iphone": "",
-            }
-        )

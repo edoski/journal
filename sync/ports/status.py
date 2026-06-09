@@ -7,12 +7,11 @@ from typing import Protocol
 
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
-from sync.contracts.screen_time import DailyScreenTimeData
 from sync.contracts.status import SleepPayload, TrainingStatus
 
 
 class DailyStatusSource(Protocol):
-    """Loads daily training/sleep/screen-time status payloads."""
+    """Loads daily training and sleep status payloads."""
 
     def target_days(self, anchor_day: datetime.date) -> tuple[datetime.date, ...]:
         """Resolve all days that should be synced for this run."""
@@ -22,9 +21,6 @@ class DailyStatusSource(Protocol):
 
     def load_sleep(self, day: datetime.date) -> SleepPayload | None:
         """Load sleep payload for a day if available."""
-
-    def load_screen_time(self, day: datetime.date) -> DailyScreenTimeData | None:
-        """Load grouped screen-time payload for a day if available."""
 
     def write_study_times(
         self,

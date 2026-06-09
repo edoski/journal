@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from sync.constants import RENDER
 from sync.formatting import round_half_up
 
 from ..specs import (
-    QuarterlyStudyCoverageRowsSpec,
     TrainingBlockRowsSpec,
     TrainingSectionsRowsSpec,
-    YearlyStudyCoverageRowsSpec,
 )
 
 
@@ -111,73 +108,4 @@ def render_training_sections_rows(spec: TrainingSectionsRowsSpec) -> list[str]:
         lines.append("└")
         if idx < len(sections) - 1:
             lines.append("")
-    return lines
-
-
-def render_quarterly_study_coverage_rows(
-    spec: QuarterlyStudyCoverageRowsSpec,
-) -> list[str]:
-    """Render quarterly study-coverage rows body."""
-    rows = list(spec.rows)
-
-    lines: list[str] = []
-
-    if not rows:
-        return ["┌ FULL STUDY DAYS (00/00)", "│", "└", "", RENDER.study_legend]
-
-    max_bar_len = max(len(row.bar) for row in rows)
-
-    header = (
-        f"┌ FULL STUDY DAYS ({spec.total_done:02d}/{spec.total_elapsed:02d})"
-        if spec.total_elapsed
-        else "┌ FULL STUDY DAYS (00/00)"
-    )
-    lines.append(header)
-    lines.append("│")
-
-    for row in rows:
-        count_str = f"({row.done:02d}/{row.elapsed:02d})" if row.elapsed else "(00/00)"
-        pad_between = (max_bar_len - len(row.bar)) + 1
-        delta = row.delta_label
-        delta_str = delta.rjust(4) if delta else ""
-        line = f"│ {row.label} {row.bar}{' ' * pad_between}{count_str}"
-        if delta_str:
-            line += f"   {delta_str}"
-        lines.append(line)
-
-    lines.append("└")
-    lines.append("")
-    lines.append(RENDER.study_legend)
-    return lines
-
-
-def render_yearly_study_coverage_rows(spec: YearlyStudyCoverageRowsSpec) -> list[str]:
-    """Render yearly study-coverage rows body."""
-    rows = list(spec.rows)
-    legend_line = spec.legend_line or RENDER.study_legend
-
-    lines: list[str] = []
-
-    if not rows:
-        return ["┌ FULL STUDY DAYS (00/00)", "│", "└", "", legend_line]
-
-    max_bar_len = max(len(row.bar) for row in rows)
-
-    header = f"┌ FULL STUDY DAYS ({spec.total_done:02d}/{spec.total_elapsed:02d})"
-    lines.append(header)
-    lines.append("│")
-
-    for row in rows:
-        count_str = f"({row.done:02d}/{row.elapsed:02d})" if row.elapsed else "(00/00)"
-        pad_between = (max_bar_len - len(row.bar)) + 1
-        delta = row.delta_label
-        delta_str = delta.rjust(4) if delta else ""
-        line = f"│ {row.label} {row.bar}{' ' * pad_between}{count_str}"
-        if delta_str:
-            line += f"   {delta_str}"
-        lines.append(line)
-
-    lines.append("└")
-    lines.append("")
-    lines.append(legend_line)
     return lines

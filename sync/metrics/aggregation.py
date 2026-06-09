@@ -57,7 +57,7 @@ def compute_period_metrics(
         daily_data: Dict mapping dates to parsed daily note data.
 
     Returns:
-        Dict with keys: study_total_minutes, sleep_avg_minutes, mood_avg,
+        Dict with keys: study_total_minutes, sleep_avg_minutes,
         workout_count, stretch_count, total_days, days_up_to_today.
     """
     today = datetime.date.today()
@@ -66,23 +66,18 @@ def compute_period_metrics(
 
     study_minutes: list[float | None] = []
     sleep_minutes: list[float | None] = []
-    mood_vals: list[float | None] = []
     for day in dates:
         payload = daily_data.get(day)
         if payload is None:
             study_minutes.append(None)
             sleep_minutes.append(None)
-            mood_vals.append(None)
             continue
         study_minutes.append(payload.get("study_minutes"))
         sleep_minutes.append(payload.get("sleep_minutes"))
-        mood_vals.append(payload.get("mood"))
 
     study_total = sum((m for m in study_minutes if m is not None), 0)
     sleep_vals = [m for m in sleep_minutes if m is not None]
     sleep_avg = sum(sleep_vals) / len(sleep_vals) if sleep_vals else None
-    mood_vals_clean = [m for m in mood_vals if m is not None]
-    mood_avg = sum(mood_vals_clean) / len(mood_vals_clean) if mood_vals_clean else None
 
     def day_has_workout(day: datetime.date) -> bool:
         payload = daily_data.get(day)
@@ -103,7 +98,6 @@ def compute_period_metrics(
     return PeriodAggregate(
         study_total_minutes=study_total,
         sleep_avg_minutes=sleep_avg,
-        mood_avg=mood_avg,
         workout_count=workout_count,
         stretch_count=stretch_count,
         meditation_count=meditation_count,
@@ -164,31 +158,6 @@ def aggregate_interrupt_overrun(
         if study_minutes > 0:
             study_day_count += 1
     return total_interrupts, total_overruns, study_day_count
-
-
-def aggregate_screen_time(
-    dates: list[datetime.date],
-    daily_data: dict[datetime.date, DailyAggregate],
-) -> dict[str, float]:
-    """
-    Aggregate screen time totals across a date range.
-
-    Args:
-        dates: List of date objects to aggregate.
-        daily_data: Dict mapping dates to parsed daily note data.
-
-    Returns:
-        Dict mapping app names to total minutes.
-    """
-    app_totals: dict[str, float] = {}
-    for d in dates:
-        daily = daily_data.get(d)
-        if daily is None:
-            continue
-        screen_time = daily.get("screen_time_totals", {})
-        for app, minutes in screen_time.items():
-            app_totals[app] = app_totals.get(app, 0) + minutes
-    return app_totals
 
 
 def _normalize_training_type_label(label: str) -> str:

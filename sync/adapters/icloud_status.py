@@ -11,21 +11,16 @@ from sync.daily.icloud import (
     read_status_files,
     write_study_times_to_icloud,
 )
-from sync.daily.screen_time import load_screen_time_data
 from sync.log import get_logger
 from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.screen_time import DailyScreenTimeData
 from sync.contracts.status import (
-    ActivityPayload,
     SleepPayload,
     TrainingEntryPayload,
     TrainingStatus,
 )
-from sync.ports.cache import DailyScreenTimeCacheStore
 from sync.ports.status import DailyStatusSource
 
 from .status_parsers import (
-    parse_activity_payload,
     parse_sleep_payload,
     parse_training_payload,
 )
@@ -36,8 +31,7 @@ logger = get_logger(__name__)
 class ICloudDailyStatusSource(DailyStatusSource):
     """Load daily shortcut payloads from iCloud drop files."""
 
-    def __init__(self, *, screen_time_cache_store: DailyScreenTimeCacheStore) -> None:
-        self.screen_time_cache_store = screen_time_cache_store
+    def __init__(self) -> None:
         self._anchor_day: datetime.date | None = None
         self._resolved_days: tuple[datetime.date, ...] = ()
         self._training_by_day: dict[
@@ -45,7 +39,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
             dict[str, list[TrainingEntryPayload]],
         ] = {}
         self._sleep_by_day: dict[datetime.date, SleepPayload] = {}
-        self._activity_by_day: dict[datetime.date, ActivityPayload] = {}
 
     def target_days(self, anchor_day: datetime.date) -> tuple[datetime.date, ...]:
         """Resolve all shortcut-targeted days for this run."""
@@ -53,7 +46,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
             return self._resolved_days
 
         self._reset_staging(anchor_day)
-        self.screen_time_cache_store.prune(keep_days=14)
         resolved_days: set[datetime.date] = {anchor_day}
 
         self._ingest_training_file(
@@ -75,7 +67,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
             resolved_days=resolved_days,
         )
         self._ingest_sleep_file(anchor_day=anchor_day, resolved_days=resolved_days)
-        self._ingest_activity_file(anchor_day=anchor_day, resolved_days=resolved_days)
         self._resolved_days = tuple(sorted(resolved_days))
         return self._resolved_days
 
@@ -84,7 +75,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
         self._resolved_days = (anchor_day,)
         self._training_by_day = {}
         self._sleep_by_day = {}
-        self._activity_by_day = {}
 
     def _ensure_ingested(self, anchor_day: datetime.date) -> None:
         if self._anchor_day is None:
@@ -163,30 +153,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
 
             finalize_status_file(filename, parsed_path)
 
-    def _ingest_activity_file(
-        self,
-        *,
-        anchor_day: datetime.date,
-        resolved_days: set[datetime.date],
-    ) -> None:
-        filename = "activity_status.json"
-        for payload, parsed_path in read_status_files(filename):
-            try:
-                parsed = parse_activity_payload(payload)
-                payload_day = self._validate_payload_day(
-                    parsed.date,
-                    filename=filename,
-                    anchor_day=anchor_day,
-                )
-                self._activity_by_day[payload_day] = parsed
-                resolved_days.add(payload_day)
-            except ValueError as exc:
-                logger.error("%s: %s", filename, exc)
-                quarantine_status_file(filename, parsed_path)
-                continue
-
-            finalize_status_file(filename, parsed_path)
-
     def load_training(self, day: datetime.date) -> TrainingStatus:
         """Load workout/stretch/meditation payloads for the day."""
         self._ensure_ingested(day)
@@ -204,15 +170,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
         """Load sleep payload for the day if available."""
         self._ensure_ingested(day)
         return self._sleep_by_day.get(day)
-
-    def load_screen_time(self, day: datetime.date) -> DailyScreenTimeData | None:
-        """Load grouped screen-time payload for the day."""
-        self._ensure_ingested(day)
-        return load_screen_time_data(
-            day.isoformat(),
-            activity_payload=self._activity_by_day.get(day),
-            screen_time_cache_store=self.screen_time_cache_store,
-        )
 
     def write_study_times(
         self,

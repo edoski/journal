@@ -380,7 +380,6 @@ class TestParseSleepTable:
 
         assert entries[0].duration_minutes == 480.0  # 8h00m = 480 minutes
         assert entries[0].awake_minutes == 20.0  # 20m
-        assert entries[0].awakenings == 2
 
     def test_empty_when_no_table(self):
         lines = ["### **SLEEP**", "", "No table"]
@@ -396,26 +395,25 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "not a table row",
-            "| 07:00-08:00 | `1h00m` | `5m` | `1` |",
+            "| 07:00-08:00 | `1h00m` | `5m` |",
         ]
         entries = parse_sleep_table(lines)
         assert len(entries) == 1
         assert entries[0].duration_minutes == 480.0
         assert entries[0].awake_minutes == 20.0
-        assert entries[0].awakenings == 2
 
     def test_skips_rows_with_missing_columns(self):
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
             "| only | two |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
         ]
         entries = parse_sleep_table(lines)
         assert len(entries) == 1
@@ -425,31 +423,26 @@ class TestParseSleepTable:
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-07:00 | `` | `20m` | `2` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 23:00-07:00 | `` | `20m` |",
         ]
         entries = parse_sleep_table(lines)
         assert len(entries) == 1
         assert entries[0].duration_minutes == 0.0
         assert entries[0].awake_minutes == 20.0
 
-    def test_parses_awakenings_digits_or_none(self):
+    def test_empty_awake_cell_stays_none(self):
         lines = [
             "### **SLEEP**",
             "",
-            "| TIME | DURATION | AWAKE | AWAKENINGS |",
-            "| ---- | -------- | ----- | ---------- |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2x` |",
-            "| 08:00-09:00 | `1h00m` | `5m` | `none` |",
-            "| 09:00-10:00 | `1h00m` | `` | `` |",
+            "| TIME | DURATION | AWAKE |",
+            "| ---- | -------- | ----- |",
+            "| 09:00-10:00 | `1h00m` | `` |",
         ]
         entries = parse_sleep_table(lines)
-        assert len(entries) == 3
-        assert entries[0].awakenings == 2
-        assert entries[1].awakenings is None
-        assert entries[2].awakenings is None
-        assert entries[2].awake_minutes is None
+        assert len(entries) == 1
+        assert entries[0].awake_minutes is None
 
 
 class TestReplaceMetricsBlock:

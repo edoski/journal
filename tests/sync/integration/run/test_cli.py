@@ -141,7 +141,6 @@ def _wiring_deps(
         status_source_factory=status_source_factory,
         note_store_factory=lambda: object(),
         training_cache_store_factory=lambda: object(),
-        screen_time_cache_store_factory=lambda: object(),
         reminder_store_factory=lambda: object(),
         goal_store_factory=lambda: object(),
         carry_cache_store_factory=lambda: object(),
@@ -396,7 +395,7 @@ def test_run_daily_sync_non_today_days_first_then_today(
 
     deps = _wiring_deps(
         session_source_factory=_FakeSessionSource,
-        status_source_factory=lambda _cache: _FakeStatusSource(),
+        status_source_factory=lambda: _FakeStatusSource(),
         schedule_source_factory=_FakeScheduleSource,
     )
     wiring.run_daily_sync(deps=deps)
@@ -463,7 +462,7 @@ def test_run_daily_sync_today_only_when_no_backfill_targets(
 
     deps = _wiring_deps(
         session_source_factory=_FakeSessionSource,
-        status_source_factory=lambda _cache: _FakeStatusSource(),
+        status_source_factory=lambda: _FakeStatusSource(),
         schedule_source_factory=_FakeScheduleSource,
     )
     wiring.run_daily_sync(deps=deps)

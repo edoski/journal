@@ -48,10 +48,16 @@ def _service_with_data() -> tuple[QueryService, _StubAggregateSource]:
 def test_metric_definitions_expose_expected_keys():
     service, _ = _service_with_data()
     keys = [item.key for item in service.metric_definitions()]
-    assert "study_minutes" in keys
-    assert "sleep_minutes" in keys
-    assert "mood" in keys
-    assert "screen_time_total" in keys
+    assert keys == [
+        "study_minutes",
+        "sleep_minutes",
+        "workout_count",
+        "stretch_count",
+        "meditation_count",
+        "interrupt_minutes",
+        "overrun_minutes",
+        "training_sessions_total",
+    ]
 
 
 def test_query_by_metric_matches_period_snapshot(monkeypatch):
@@ -63,13 +69,11 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
             "study_total_minutes": 300,
             "study_minutes": 300,
             "sleep_minutes": 480,
-            "mood": 7.2,
             "workout_count": 4,
             "stretch_count": 5,
             "meditation_count": 6,
             "interrupt_minutes": 12.0,
             "overrun_minutes": 8.0,
-            "screen_time_total": 45.0,
             "training_sessions_total": 0,
             "days_total": 7,
             "days_elapsed": 7,
@@ -93,19 +97,16 @@ def test_query_period_detail_contains_sorted_breakdowns():
     source.by_day[anchor] = {
         "study_minutes": 420.0,
         "sleep_minutes": 470.0,
-        "mood": 6.5,
         "workout": True,
         "stretch": False,
         "meditate": True,
         "awake_minutes": 18.0,
-        "awakenings": 1,
         "activity_totals": {"Writing": 180.0, "Reading": 90.0},
         "interrupt_minutes": 15.0,
         "overrun_minutes": 10.0,
         "planned_break_minutes": 30.0,
         "training_type_minutes": {"Workout": 50.0, "Stretch": 20.0},
         "training_type_sessions": {"Workout": 2, "Stretch": 1},
-        "screen_time_totals": {"YouTube": 40.0, "X": 12.0},
     }
 
     detail = service.query_period_detail("week", anchor)
@@ -118,7 +119,6 @@ def test_query_period_detail_contains_sorted_breakdowns():
     assert study_row.target == 2520.0
     assert detail.activity_breakdown[0].label == "Writing"
     assert detail.training_breakdown[0].label == "Workout"
-    assert detail.screen_time_breakdown[0].label == "YouTube"
 
 
 def test_query_period_detail_sets_study_target_none_when_schedule_fails():
@@ -135,19 +135,16 @@ def test_query_period_detail_sets_study_target_none_when_schedule_fails():
     source.by_day[anchor] = {
         "study_minutes": 420.0,
         "sleep_minutes": 470.0,
-        "mood": 6.5,
         "workout": True,
         "stretch": False,
         "meditate": True,
         "awake_minutes": 18.0,
-        "awakenings": 1,
         "activity_totals": {"Writing": 180.0},
         "interrupt_minutes": 15.0,
         "overrun_minutes": 10.0,
         "planned_break_minutes": 30.0,
         "training_type_minutes": {"Workout": 50.0},
         "training_type_sessions": {"Workout": 2},
-        "screen_time_totals": {"YouTube": 40.0},
     }
 
     detail = service.query_period_detail("week", anchor)
@@ -212,7 +209,6 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
                 "study_minutes", "Study", 300.0, 250.0, 20.0, 280.0, 2520.0
             ),
             PeriodMetricRow("sleep_minutes", "Sleep", 470.0, 460.0, 2.0, 465.0, 480.0),
-            PeriodMetricRow("mood", "Mood", 6.0, 6.5, -8.0, 6.2, 6.0),
             PeriodMetricRow(
                 "workout_count",
                 "Workout",
@@ -249,19 +245,9 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
                 35.0,
                 0.0,
             ),
-            PeriodMetricRow(
-                "screen_time_total",
-                "Screen Time",
-                140.0,
-                130.0,
-                8.0,
-                135.0,
-                None,
-            ),
         ),
         activity_breakdown=tuple(),
         training_breakdown=tuple(),
-        screen_time_breakdown=tuple(),
         days_total=7,
         days_with_data=0,
     )

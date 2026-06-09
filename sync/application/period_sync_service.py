@@ -12,7 +12,6 @@ from sync.constants import (
     WEEKLY_TEMPLATE_PATH,
     YEARLY_TEMPLATE_PATH,
 )
-from sync.application.study_targets import resolve_study_target_minutes
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import daterange
 from sync.metrics import compute_period_metrics
@@ -32,12 +31,8 @@ from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWin
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
-from sync.ports.schedule import ScheduleSource
-from sync.log import get_logger
 
 from .goal_sync_service import GoalSyncService
-
-logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -47,7 +42,6 @@ class PeriodSyncService:
     note_store: NoteStore
     aggregate_source: DailyAggregateSource
     media_source: MediaSource
-    schedule_source: ScheduleSource
     goal_sync_service: GoalSyncService
 
     def _load_range(
@@ -77,16 +71,6 @@ class PeriodSyncService:
             metrics_list.append(compute_period_metrics(dates, daily_data))
         return metrics_list
 
-    def _resolve_study_target_minutes(
-        self,
-        dates: list[datetime.date],
-    ) -> int | None:
-        return resolve_study_target_minutes(
-            dates,
-            schedule_resolver=self.schedule_source.resolve_day,
-            logger=logger,
-        )
-
     def sync_week(
         self,
         window: WeekWindow,
@@ -111,7 +95,6 @@ class PeriodSyncService:
                 window.prior_bounds,
             )
             media_bundle = self.media_source.scan(window.start, window.end)
-            study_target_minutes = self._resolve_study_target_minutes(week_dates)
 
             metrics_block = build_weekly_metrics(
                 window.start,
@@ -121,7 +104,6 @@ class PeriodSyncService:
                 window.previous_label,
                 media_bundle,
                 target_date=window.target_date,
-                study_target_minutes=study_target_minutes,
                 prior_week_metrics=prior_week_metrics,
             )
 
@@ -164,7 +146,6 @@ class PeriodSyncService:
                 window.prior_bounds,
             )
             media_bundle = self.media_source.scan(month_start, month_end)
-            study_target_minutes = self._resolve_study_target_minutes(month_dates)
 
             metrics_block = build_monthly_metrics(
                 month_start,
@@ -176,7 +157,6 @@ class PeriodSyncService:
                 window.previous_label,
                 media_bundle,
                 target_date=window.target_date,
-                study_target_minutes=study_target_minutes,
                 prior_month_metrics=prior_month_metrics,
             )
 
@@ -207,7 +187,6 @@ class PeriodSyncService:
                 window.prior_bounds,
             )
             media_bundle = self.media_source.scan(window.start, window.end)
-            study_target_minutes = self._resolve_study_target_minutes(quarter_dates)
 
             metrics_block = build_quarterly_metrics(
                 window.start,
@@ -219,7 +198,6 @@ class PeriodSyncService:
                 window.previous_quarter,
                 media_bundle,
                 target_date=window.target_date,
-                study_target_minutes=study_target_minutes,
                 prior_quarter_metrics=prior_quarter_metrics,
             )
 
@@ -244,7 +222,6 @@ class PeriodSyncService:
                 window.prior_bounds,
             )
             media_bundle = self.media_source.scan(window.start, window.end)
-            study_target_minutes = self._resolve_study_target_minutes(year_dates)
 
             metrics_block = build_yearly_metrics(
                 window.year,
@@ -256,7 +233,6 @@ class PeriodSyncService:
                 prev_daily_data,
                 media_bundle,
                 target_date=window.target_date,
-                study_target_minutes=study_target_minutes,
                 prior_year_metrics=prior_year_metrics,
             )
 

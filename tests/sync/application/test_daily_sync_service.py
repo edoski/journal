@@ -12,10 +12,7 @@ from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.screen_time import DailyScreenTimeData
-from sync.contracts.status import TrainingEntryPayload, TrainingStatus
-from sync.daily.composer import build_deviation_data
-from sync.target_policy import effective_study_minutes
+from sync.contracts.status import TrainingStatus
 
 
 class _StubStatusSource:
@@ -26,9 +23,6 @@ class _StubStatusSource:
         return TrainingStatus()
 
     def load_sleep(self, _day: datetime.date):
-        return None
-
-    def load_screen_time(self, _day: datetime.date) -> DailyScreenTimeData | None:
         return None
 
     def write_study_times(
@@ -128,7 +122,7 @@ def _build_service(
     journal_dir = tmp_path / "journal"
     journal_dir.mkdir()
     template_path = tmp_path / "daily_template.md"
-    template_path.write_text("---\nmood: 6.0\n---\n", encoding="utf-8")
+    template_path.write_text("---\nsleep: 7h30m\n---\n", encoding="utf-8")
     _ = monkeypatch
     training_cache_store = JsonDailyTrainingCacheStore(
         cache_dir=str(tmp_path / "cache" / "daily" / "training"),
@@ -156,7 +150,7 @@ def _seed_daily_note(
     note_path = Path(journal_dir) / f"{day:%Y-%m-%d}.md"
     lines = [
         "---",
-        "mood: 6.0",
+        "sleep: 7h30m",
         "---",
         "## Goals",
         "---",
@@ -455,165 +449,3 @@ def test_sync_day_reflections_header_normalization_is_idempotent(monkeypatch, tm
     assert normalized[0] == "| TIME | ENTRY |"
     assert normalized[1] == "| ---- | ----- |"
     assert normalized[2] == "| `08:3 collapsed reflection content | |"
-
-
-def test_sync_day_passes_schedule_cap_to_procrastination_section(monkeypatch, tmp_path):
-    captured_max_total: dict[str, float | None] = {"value": None}
-
-    def _capture_procrastination_section(
-        screen_time_data,
-        deviation_data=None,
-        max_total_minutes=None,
-    ) -> list[str]:
-        _ = screen_time_data, deviation_data
-        captured_max_total["value"] = max_total_minutes
-        return [
-            "### **PROCRASTINATION**",
-            "",
-            "_No screen time data available._",
-        ]
-
-    monkeypatch.setattr(
-        "sync.daily.composer.build_procrastination_section",
-        _capture_procrastination_section,
-    )
-
-    day = datetime.date(2026, 2, 19)
-    schedule = DayScheduleProfile(
-        study_start=datetime.time(15, 0),
-        study_end=datetime.time(22, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(22, 0),
-        is_off_day=False,
-    )
-
-    service, _ = _build_service(monkeypatch, tmp_path)
-    changed = service.sync_day(day, [], schedule)
-
-    assert changed is True
-    assert captured_max_total["value"] == float(effective_study_minutes(schedule))
-
-
-def test_build_deviation_data_accrues_full_study_window_without_sessions():
-    day = datetime.date(2026, 2, 18)
-    schedule = DayScheduleProfile(
-        study_start=datetime.time(14, 30),
-        study_end=datetime.time(18, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(18, 0),
-        is_off_day=False,
-    )
-
-    deviation = build_deviation_data(
-        day,
-        schedule,
-        [],
-        TrainingStatus(),
-    )
-
-    assert deviation.late_study_start_minutes == 210.0
-
-
-def test_build_deviation_data_uses_schedule_study_start_for_lateness():
-    day = datetime.date(2026, 2, 19)
-    schedule = DayScheduleProfile(
-        study_start=datetime.time(14, 30),
-        study_end=datetime.time(18, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(18, 0),
-        is_off_day=False,
-    )
-    session_start = datetime.datetime.combine(day, datetime.time(15, 0))
-    session_end = datetime.datetime.combine(day, datetime.time(16, 0))
-    sessions = [
-        {
-            "start": session_start,
-            "end": session_end,
-            "interruptions_duration": 0,
-            "break_overrun": 0,
-        }
-    ]
-
-    deviation = build_deviation_data(
-        day,
-        schedule,
-        sessions,
-        TrainingStatus(),
-    )
-
-    assert deviation.late_study_start_minutes == 30.0
-
-
-def test_build_deviation_data_uses_schedule_workout_start_for_lateness():
-    day = datetime.date(2026, 2, 20)
-    schedule = DayScheduleProfile(
-        study_start=datetime.time(8, 0),
-        study_end=datetime.time(18, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(19, 0),
-        is_off_day=False,
-    )
-    training = TrainingStatus(
-        workout_entries=(
-            TrainingEntryPayload(
-                date=day.isoformat(),
-                start="19:15",
-                end="20:00",
-                duration=45.0,
-                type="Workout",
-            ),
-        )
-    )
-
-    deviation = build_deviation_data(
-        day,
-        schedule,
-        [],
-        training,
-    )
-
-    assert deviation.late_workout_start_minutes == 15.0
-
-
-def test_build_deviation_data_off_day_has_no_late_study_start_penalty():
-    day = datetime.date(2026, 2, 21)
-    schedule = DayScheduleProfile(
-        study_start=datetime.time(8, 0),
-        study_end=datetime.time(18, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(19, 0),
-        is_off_day=True,
-    )
-    session_start = datetime.datetime.combine(day, datetime.time(15, 0))
-    session_end = datetime.datetime.combine(day, datetime.time(16, 0))
-    sessions = [
-        {
-            "start": session_start,
-            "end": session_end,
-            "interruptions_duration": 30,
-            "break_overrun": 5,
-        }
-    ]
-
-    no_sessions_deviation = build_deviation_data(
-        day,
-        schedule,
-        [],
-        TrainingStatus(),
-    )
-    with_sessions_deviation = build_deviation_data(
-        day,
-        schedule,
-        sessions,
-        TrainingStatus(),
-    )
-
-    assert no_sessions_deviation.late_study_start_minutes == 0.0
-    assert with_sessions_deviation.late_study_start_minutes == 0.0
-    assert with_sessions_deviation.interrupt_minutes == 0.5
-    assert with_sessions_deviation.overrun_minutes == 5

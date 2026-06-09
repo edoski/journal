@@ -12,7 +12,6 @@ Single JSON object with required keys:
 - `end`: timestamp string
 - `sleep_min`: numeric minutes
 - `awake_min`: numeric minutes
-- `awake_count`: integer
 
 Example:
 
@@ -22,8 +21,7 @@ Example:
   "start": "2026-02-06T23:30:00+0000",
   "end": "2026-02-07T06:45:00+0000",
   "sleep_min": 435,
-  "awake_min": 12,
-  "awake_count": 2
+  "awake_min": 12
 }
 ```
 
@@ -56,23 +54,6 @@ Example array:
     "type": "Traditional Strength Training"
   }
 ]
-```
-
-### `activity_status.json`
-Single JSON object:
-
-- `date`: `YYYY-MM-DD` or empty
-- `activity_ipad`: newline/comma separated app duration entries
-- `activity_iphone`: newline/comma separated app duration entries
-
-Example:
-
-```json
-{
-  "date": "2026-02-07",
-  "activity_ipad": "YouTube (45m)\nSafari (20m)",
-  "activity_iphone": "Instagram (12m)"
-}
 ```
 
 ## Failure Semantics

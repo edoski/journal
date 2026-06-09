@@ -15,12 +15,12 @@ def test_read_or_create_bootstraps_from_template(tmp_path):
     store = MarkdownNoteStore()
     note_path = tmp_path / "daily.md"
     template_path = tmp_path / "template.md"
-    template_path.write_text("---\nmood: 6.0\n---\n", encoding="utf-8")
+    template_path.write_text("---\nsleep: 7h30m\n---\n", encoding="utf-8")
 
     lines = store.read_or_create(str(note_path), str(template_path))
 
     assert note_path.exists()
-    assert lines[:3] == ["---", "mood: 6.0", "---"]
+    assert lines[:3] == ["---", "sleep: 7h30m", "---"]
 
 
 def test_write_persists_lines_atomically(tmp_path):

@@ -186,3 +186,29 @@ def test_daily_pierced_source_reopen_clears_child(tmp_path):
 
     assert updated_sources[0][0].done is False
     assert final_pierced[0].done is False
+
+
+def test_deleted_pierced_source_goal_is_dropped_from_child(tmp_path):
+    store = _store(tmp_path)
+    source_path = tmp_path / "2026-02.md"
+    note_path = tmp_path / "2026-02-06.md"
+    source_path.write_text("source", encoding="utf-8")
+    note_path.write_text("daily", encoding="utf-8")
+
+    _seed_pair_state(store, "gid-6", str(source_path), False, str(note_path), False)
+
+    existing_daily = [_goal("gid-6", False)]
+
+    original_tasks, final_pierced, updated_sources = process_pierced_goals(
+        existing_tasks=existing_daily,
+        source_goal_lists=[[]],
+        proximity_days=7,
+        today=datetime.date(2026, 2, 6),
+        note_path=str(note_path),
+        source_paths=[str(source_path)],
+        reconcile_cache_store=store,
+    )
+
+    assert original_tasks == []
+    assert final_pierced == []
+    assert updated_sources == [[]]

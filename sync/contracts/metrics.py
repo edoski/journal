@@ -10,12 +10,10 @@ class DailyAggregate(TypedDict):
 
     study_minutes: float
     sleep_minutes: float | None
-    mood: float | None
     workout: bool
     stretch: bool
     meditate: bool
     awake_minutes: float | None
-    awakenings: int | None
     sleep_asleep_time: str | None
     sleep_awake_time: str | None
     activity_totals: dict[str, float]
@@ -27,7 +25,6 @@ class DailyAggregate(TypedDict):
     training_type_duration_minutes: dict[str, tuple[float, ...]]
     training_type_start_minutes: dict[str, tuple[int, ...]]
     training_type_end_minutes: dict[str, tuple[int, ...]]
-    screen_time_totals: dict[str, float]
 
 
 class PeriodAggregate(TypedDict):
@@ -35,7 +32,6 @@ class PeriodAggregate(TypedDict):
 
     study_total_minutes: float
     sleep_avg_minutes: float | None
-    mood_avg: float | None
     workout_count: int
     stretch_count: int
     meditation_count: int
@@ -58,7 +54,6 @@ class MovingAverageAggregate(TypedDict):
 
     study_avg_minutes: float | None
     sleep_avg_minutes: float | None
-    mood_avg: float | None
     workout_avg: float | None
     stretch_avg: float | None
     meditation_avg: float | None

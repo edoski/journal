@@ -73,12 +73,10 @@ def payload_for_date(day: datetime.date) -> dict:
     return {
         "study_minutes": study,
         "sleep_minutes": float(390 + (idx % 7) * 15),
-        "mood": float(4.5 + (idx % 11) * 0.5),
         "workout": workout,
         "stretch": stretch,
         "meditate": meditate,
         "awake_minutes": float(10 + (idx % 5) * 5),
-        "awakenings": int((idx % 4) + 1),
         "sleep_asleep_time": f"{22 + (idx % 3)}:{(idx % 4) * 15:02d}",
         "sleep_awake_time": f"{6 + (idx % 3)}:{(idx % 4) * 15:02d}",
         "activity_totals": (
@@ -92,11 +90,6 @@ def payload_for_date(day: datetime.date) -> dict:
         "training_type_duration_minutes": training_type_duration_minutes,
         "training_type_start_minutes": training_type_start_minutes,
         "training_type_end_minutes": training_type_end_minutes,
-        "screen_time_totals": {
-            "YouTube": float((idx % 4) * 12),
-            "X": float((idx % 3) * 7),
-            "Netflix": float(20 if idx % 5 == 0 else 0),
-        },
     }
 
 

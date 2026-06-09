@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from .api import render_table
 from .specs import (
-    DailyProcrastinationTableSpec,
-    ScreenTrendTableSpec,
     SimpleGridTableSpec,
     SummaryMetricsTableSpec,
     TableSpec,
@@ -16,6 +14,4 @@ __all__ = [
     "TableSpec",
     "SimpleGridTableSpec",
     "SummaryMetricsTableSpec",
-    "ScreenTrendTableSpec",
-    "DailyProcrastinationTableSpec",
 ]

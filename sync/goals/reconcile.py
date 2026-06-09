@@ -17,6 +17,7 @@ from sync.goals.state import (
 from sync.ports.cache import GoalReconcileCacheStore
 
 if TYPE_CHECKING:
+    from sync.contracts.cache import GoalReconcileCacheState
     from sync.contracts.goals import Goal
 
 
@@ -134,17 +135,26 @@ def process_pierced_goals(
             if g.id:
                 pierced_ids.add(g.id)
 
-    # Separate original from existing pierced goals
-    original_tasks = [g for g in existing_tasks if g.id not in pierced_ids]
-    existing_pierced = [g for g in existing_tasks if g.id in pierced_ids]
-    existing_pierced_ids = {g.id for g in existing_pierced}
-    existing_lookup = {g.id: g for g in existing_pierced if g.id}
-
     # Reconcile done status between each source and the current note's pierced copy.
     updated_source_lists: list[list[Goal]] = []
     all_updated_sources: list[Goal] = []
 
     with reconcile_cache_store.locked_state() as state:
+        stale_pierced_ids = _stale_pierced_child_ids(
+            state,
+            existing_tasks,
+            current_source_ids=pierced_ids,
+            source_paths=source_paths,
+            note_path=note_path,
+        )
+        active_existing_tasks = [
+            g for g in existing_tasks if g.id not in stale_pierced_ids
+        ]
+        original_tasks = [g for g in active_existing_tasks if g.id not in pierced_ids]
+        existing_pierced = [g for g in active_existing_tasks if g.id in pierced_ids]
+        existing_pierced_ids = {g.id for g in existing_pierced}
+        existing_lookup = {g.id: g for g in existing_pierced if g.id}
+
         for source_list, source_path in zip(source_goal_lists, source_paths):
             updated_list: list[Goal] = []
             for g in source_list:
@@ -204,6 +214,28 @@ def process_pierced_goals(
     final_pierced = restored_existing_pierced + new_pierced
 
     return original_tasks, final_pierced, updated_source_lists
+
+
+def _stale_pierced_child_ids(
+    state: GoalReconcileCacheState,
+    existing_tasks: list[Goal],
+    *,
+    current_source_ids: set[str],
+    source_paths: list[str],
+    note_path: str,
+) -> set[str]:
+    source_path_set = set(source_paths)
+    stale_ids: set[str] = set()
+    for goal in existing_tasks:
+        if not goal.id or goal.id in current_source_ids:
+            continue
+        entry = state["goals"].get(goal.id)
+        if entry is None:
+            continue
+        notes = entry["notes"]
+        if note_path in notes and source_path_set & set(notes):
+            stale_ids.add(goal.id)
+    return stale_ids
 
 
 def merge_mirror_goals(

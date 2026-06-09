@@ -5,7 +5,6 @@ import json
 import pytest
 
 from sync.adapters.json_daily_cache import (
-    JsonDailyScreenTimeCacheStore,
     JsonDailyTrainingCacheStore,
 )
 from sync.adapters.json_goal_cache import (
@@ -77,22 +76,6 @@ def test_daily_training_cache_load_raises_on_date_mismatch(tmp_path):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps({"date": "2026-02-09", "entries": []}),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError, match="Fix command: rm"):
-        store.load_for_date("2026-02-10")
-
-
-def test_daily_screen_time_cache_load_raises_on_non_numeric_minutes(tmp_path):
-    store = JsonDailyScreenTimeCacheStore(
-        cache_dir=str(tmp_path / "cache" / "daily" / "screen_time"),
-        lock_root=str(tmp_path / "cache" / "locks" / "state"),
-    )
-    path = tmp_path / "cache" / "daily" / "screen_time" / "2026-02-10.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"date": "2026-02-10", "entries": {"X": "a lot"}}),
         encoding="utf-8",
     )
 

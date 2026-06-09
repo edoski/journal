@@ -17,7 +17,6 @@ def bootstrap_cache_layout(*, paths: PathConfig = PATHS) -> None:
         os.path.join(paths.daily_cache_dir, "status", "pending"),
         os.path.join(paths.daily_cache_dir, "status", "invalid"),
         paths.daily_training_cache_dir,
-        paths.daily_screen_time_cache_dir,
         paths.lock_dir,
         paths.note_lock_dir,
         paths.state_lock_dir,

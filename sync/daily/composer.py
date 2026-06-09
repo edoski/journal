@@ -6,14 +6,12 @@ import datetime
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sync.contracts.deviation import DailyDeviationData
 from sync.contracts.reminders import ReminderRule
 from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.status import SleepPayload, TrainingEntryPayload, TrainingStatus
+from sync.contracts.status import SleepPayload
 from sync.contracts.study import StudySessionRecord
 from sync.daily.orchestrator.frontmatter import update_frontmatter
 from sync.daily.orchestrator.note_io import ensure_daily_sections, find_yaml_end
-from sync.daily.screen_time import build_procrastination_section
 from sync.daily.sleep import build_sleep_section
 from sync.daily.training import build_training_section
 from sync.formatting import format_minutes
@@ -27,7 +25,6 @@ from sync.notes.sections import (
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.status import DailyStatusSource
 from sync.study.section import build_study_section
-from sync.target_policy import effective_study_minutes
 
 _REFLECTIONS_HEADER_TITLE = "Reflections"
 _REFLECTIONS_TABLE_HEADER = "| TIME | ENTRY |"
@@ -169,24 +166,10 @@ class DailyNoteComposer:
             training_cache_store=self.training_cache_store,
         )
         sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
-        screen_time_data = self.status_source.load_screen_time(day)
-        deviation_data = build_deviation_data(
-            day,
-            day_schedule,
-            sessions,
-            training_status,
-        )
-        procrastination_lines = build_procrastination_section(
-            screen_time_data,
-            deviation_data,
-            max_total_minutes=float(effective_study_minutes(day_schedule)),
-        )
-
         metrics_lines: list[str] = []
         for section in [
             study_lines,
             training_lines,
-            procrastination_lines,
             sleep_lines,
         ]:
             if not section:
@@ -258,66 +241,3 @@ def normalize_reflections_table_header(lines: list[str]) -> list[str]:
         changed = True
 
     return updated if changed else lines
-
-
-def build_deviation_data(
-    day: datetime.date,
-    day_schedule: DayScheduleProfile,
-    sessions: list[StudySessionRecord],
-    training_status: TrainingStatus,
-) -> DailyDeviationData:
-    """Build daily deviation data from schedule, sessions, and training status."""
-    deviation_data = DailyDeviationData()
-
-    study_window_minutes = 0.0
-    day_study_start = datetime.datetime.combine(day, day_schedule.study_start)
-    day_study_end = datetime.datetime.combine(day, day_schedule.study_end)
-    if not day_schedule.is_off_day and day_study_end > day_study_start:
-        study_window_minutes = (day_study_end - day_study_start).total_seconds() / 60
-
-    if sessions:
-        if not day_schedule.is_off_day:
-            first_start = sessions[0]["start"]
-            effective_first_start = min(first_start, day_study_end)
-            if effective_first_start > day_study_start:
-                deviation_data.late_study_start_minutes = (
-                    effective_first_start - day_study_start
-                ).total_seconds() / 60
-
-        deviation_data.interrupt_minutes = sum(
-            (session.get("interruptions_duration", 0) or 0) / 60 for session in sessions
-        )
-        deviation_data.overrun_minutes = sum(
-            session.get("break_overrun", 0) or 0 for session in sessions
-        )
-    else:
-        deviation_data.late_study_start_minutes = study_window_minutes
-
-    if training_status.workout_entries:
-        workout_entries: tuple[TrainingEntryPayload, ...] = (
-            training_status.workout_entries
-        )
-        earliest_workout_start = None
-        for entry in workout_entries:
-            start_str = (entry.start or "").strip()
-            if start_str and entry.type.lower() != "stretching":
-                try:
-                    h, m = map(int, start_str.split(":"))
-                except (ValueError, AttributeError):
-                    continue
-                start_minutes = h * 60 + m
-                if (
-                    earliest_workout_start is None
-                    or start_minutes < earliest_workout_start
-                ):
-                    earliest_workout_start = start_minutes
-        if earliest_workout_start is not None:
-            ideal_workout_minutes = (
-                day_schedule.workout_start.hour * 60 + day_schedule.workout_start.minute
-            )
-            if earliest_workout_start > ideal_workout_minutes:
-                deviation_data.late_workout_start_minutes = (
-                    earliest_workout_start - ideal_workout_minutes
-                )
-
-    return deviation_data

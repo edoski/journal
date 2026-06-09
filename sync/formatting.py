@@ -8,7 +8,6 @@ for display in markdown tables and charts.
 from __future__ import annotations
 
 import math
-import unicodedata
 from collections.abc import Sequence
 
 
@@ -140,13 +139,6 @@ def format_training_ratio(count: int, total_days: int) -> str:
     return f"{count}/{total_days}"
 
 
-def format_mood_with_scale(val: float | None) -> str:
-    """Format mood value with /10.0 suffix, always showing one decimal (e.g., 5.0/10.0)."""
-    if val is None:
-        return "0.0/10.0"
-    return f"{val:.1f}/10.0"
-
-
 def format_ma_training_ratio(avg_count: float | None, unit: str) -> str:
     """
     Format moving average training count with unit suffix.
@@ -193,11 +185,3 @@ def format_progress_bar(
     filled_count = min(width, int(round((current / target) * width)))
     bar = filled_char * filled_count + empty_char * (width - filled_count)
     return bar, percent
-
-
-def normalize_screen_time_label(label: str) -> str:
-    """Normalize screen-time labels for stable rendering and aggregation."""
-    filtered = "".join(
-        ch for ch in label if unicodedata.category(ch) not in {"Cc", "Cf", "Cs"}
-    )
-    return " ".join(filtered.split())

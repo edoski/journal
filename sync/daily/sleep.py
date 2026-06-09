@@ -40,13 +40,12 @@ def _build_sleep_table(data: SleepPayload | None) -> list[str]:
     )
     duration_cell = f"`{format_minutes_seconds(data.sleep_min)}`"
     awake_cell = f"`{int(round(data.awake_min))}m`"
-    wakes_cell = f"`{data.awake_count} times`"
 
     return render_table(
         SimpleGridTableSpec(
-            headers=["TIME", "DURATION", "AWAKE", "AWAKENINGS"],
-            divider_cells=["----", "--------", "-----", "----------"],
-            rows=[[time_cell, duration_cell, awake_cell, wakes_cell]],
+            headers=["TIME", "DURATION", "AWAKE"],
+            divider_cells=["----", "--------", "-----"],
+            rows=[[time_cell, duration_cell, awake_cell]],
         )
     )
 

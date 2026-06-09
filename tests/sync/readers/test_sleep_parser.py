@@ -5,8 +5,8 @@ from __future__ import annotations
 from sync.readers.sleep import parse_sleep_table
 
 
-_HEADER = "| TIME | DURATION | AWAKE | AWAKENINGS |"
-_DIVIDER = "| ---- | -------- | ----- | ---------- |"
+_HEADER = "| TIME | DURATION | AWAKE |"
+_DIVIDER = "| ---- | -------- | ----- |"
 
 
 def test_returns_empty_when_sleep_block_is_missing():
@@ -27,14 +27,14 @@ def test_returns_empty_when_header_is_missing():
     assert entries == []
 
 
-def test_parses_case_insensitive_header_and_numeric_awakenings():
+def test_parses_case_insensitive_header():
     entries = parse_sleep_table(
         [
             "### **SLEEP**",
             "",
-            "| time | duration | awake | awakenings |",
+            "| time | duration | awake |",
             _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "",
         ]
     )
@@ -42,7 +42,6 @@ def test_parses_case_insensitive_header_and_numeric_awakenings():
     entry = entries[0]
     assert entry.duration_minutes == 480.0
     assert entry.awake_minutes == 20.0
-    assert entry.awakenings == 2
     assert entry.asleep_time == "23:00"
     assert entry.awake_time == "07:00"
 
@@ -54,7 +53,7 @@ def test_parses_backtick_wrapped_time_range():
             "",
             _HEADER,
             _DIVIDER,
-            "| `22:30 - 06:45` | `8h15m` | `15m` | `1` |",
+            "| `22:30 - 06:45` | `8h15m` | `15m` |",
             "",
         ]
     )
@@ -70,7 +69,7 @@ def test_no_time_range_sets_none():
             "",
             _HEADER,
             _DIVIDER,
-            "| N/A | `8h00m` | `20m` | `2` |",
+            "| N/A | `8h00m` | `20m` |",
             "",
         ]
     )
@@ -86,9 +85,9 @@ def test_stops_at_first_non_table_line():
             "",
             _HEADER,
             _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "not a table row",
-            "| 07:30-08:00 | `30m` | `5m` | `1` |",
+            "| 07:30-08:00 | `30m` | `5m` |",
             "",
         ]
     )
@@ -104,7 +103,7 @@ def test_ignores_short_rows_and_keeps_valid_rows():
             _HEADER,
             _DIVIDER,
             "| short | row |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "",
         ]
     )
@@ -112,14 +111,14 @@ def test_ignores_short_rows_and_keeps_valid_rows():
     assert entries[0].duration_minutes == 480.0
 
 
-def test_duration_defaults_to_zero_and_awakenings_extract_digits():
+def test_duration_defaults_to_zero_and_invalid_awake_defaults_to_zero():
     entries = parse_sleep_table(
         [
             "### **SLEEP**",
             "",
             _HEADER,
             _DIVIDER,
-            "| 23:00-07:00 | `` | `bad` | `#3x` |",
+            "| 23:00-07:00 | `` | `bad` |",
             "",
         ]
     )
@@ -127,22 +126,6 @@ def test_duration_defaults_to_zero_and_awakenings_extract_digits():
     entry = entries[0]
     assert entry.duration_minutes == 0.0
     assert entry.awake_minutes == 0.0
-    assert entry.awakenings == 3
-
-
-def test_awakenings_invalid_digits_sets_none():
-    entries = parse_sleep_table(
-        [
-            "### **SLEEP**",
-            "",
-            _HEADER,
-            _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` | `none` |",
-            "",
-        ]
-    )
-    assert len(entries) == 1
-    assert entries[0].awakenings is None
 
 
 def test_header_after_preface_line_is_still_detected():
@@ -153,7 +136,7 @@ def test_header_after_preface_line_is_still_detected():
             "Preface line",
             _HEADER,
             _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "",
         ]
     )
@@ -168,18 +151,7 @@ def test_no_header_does_not_parse_pipe_rows():
             "",
             "| SOMETHING | ELSE |",
             "| --- | --- |",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
-            "",
-        ]
-    )
-    assert entries == []
-
-
-def test_no_header_with_immediately_parsable_row_still_returns_empty():
-    entries = parse_sleep_table(
-        [
-            "### **SLEEP**",
-            "| 23:00-07:00 | `8h00m` | `20m` | `2` |",
+            "| 23:00-07:00 | `8h00m` | `20m` |",
             "",
         ]
     )
@@ -193,26 +165,10 @@ def test_valid_row_without_trailing_pipe_is_accepted():
             "",
             _HEADER,
             _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` | `2`",
+            "| 23:00-07:00 | `8h00m` | `20m`",
             "",
         ]
     )
     assert len(entries) == 1
     assert entries[0].duration_minutes == 480.0
     assert entries[0].awake_minutes == 20.0
-    assert entries[0].awakenings == 2
-
-
-def test_empty_awakenings_cell_keeps_none():
-    entries = parse_sleep_table(
-        [
-            "### **SLEEP**",
-            "",
-            _HEADER,
-            _DIVIDER,
-            "| 23:00-07:00 | `8h00m` | `20m` |  |",
-            "",
-        ]
-    )
-    assert len(entries) == 1
-    assert entries[0].awakenings is None

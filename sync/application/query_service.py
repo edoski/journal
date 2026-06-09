@@ -32,7 +32,7 @@ from sync.dates import daterange
 from sync.log import get_logger
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.schedule import ScheduleSource
-from sync.application.query_metrics import screen_time_breakdown, training_breakdown
+from sync.application.query_metrics import training_breakdown
 
 logger = get_logger(__name__)
 
@@ -156,7 +156,6 @@ class QueryService:
             rows=rows,
             activity_breakdown=activity_breakdown(dates, daily_data),
             training_breakdown=training_breakdown(daily_data),
-            screen_time_breakdown=screen_time_breakdown(dates, daily_data),
             days_total=days_total,
             days_with_data=len(daily_data),
         )
@@ -211,12 +210,10 @@ class QueryService:
         card_keys = (
             "study_minutes",
             "sleep_minutes",
-            "mood",
             "workout_count",
             "stretch_count",
             "meditation_count",
             "interrupt_minutes",
-            "screen_time_total",
         )
         cards = tuple(
             DashboardCard(
@@ -249,12 +246,6 @@ class QueryService:
                 anchor_date,
                 METRIC_LAB_LOOKBACK[trend_period],
             ).points,
-            trend_mood=self.query_metric_history(
-                "mood",
-                trend_period,
-                anchor_date,
-                METRIC_LAB_LOOKBACK[trend_period],
-            ).points,
         )
 
     def _build_dashboard_alerts(self, anchor_date: datetime.date) -> list[str]:
@@ -265,11 +256,10 @@ class QueryService:
             return alerts
 
         sleep_minutes = day_data.get("sleep_minutes")
-        mood = day_data.get("mood")
         study_minutes = float(day_data.get("study_minutes") or 0)
 
-        if sleep_minutes is None or mood is None:
-            alerts.append(f"Missing sleep or mood data for {anchor_date.isoformat()}.")
+        if sleep_minutes is None:
+            alerts.append(f"Missing sleep data for {anchor_date.isoformat()}.")
         if study_minutes < STUDY_TARGET_MIN:
             alerts.append(
                 f"Study below target ({int(study_minutes)} < {STUDY_TARGET_MIN} min)."
@@ -279,6 +269,4 @@ class QueryService:
                 "Sleep below target "
                 f"({int(sleep_minutes)} < {IDEAL.sleep_minutes_nightly} min)."
             )
-        if mood is not None and mood < IDEAL.mood_target:
-            alerts.append(f"Mood below target ({mood:.1f} < {IDEAL.mood_target:.1f}).")
         return alerts

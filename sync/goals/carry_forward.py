@@ -58,6 +58,8 @@ def carry_forward_with_tombstones(
         previously_offered = get_carried_ids(cache, horizon, period_key)
         existing_ids = {task.id for task in current_tasks if task.id}
         deleted_ids = get_deleted_ids(cache, horizon)
+        open_prev_ids = {task.id for task in open_prev if task.id}
+        existing_carried_ids = existing_ids & open_prev_ids
 
         # Goals previously offered but missing now were intentionally deleted.
         deleted_now = previously_offered - existing_ids
@@ -93,6 +95,6 @@ def carry_forward_with_tombstones(
             cache,
             horizon,
             period_key,
-            list(previously_offered) + newly_offered,
+            list(previously_offered | existing_carried_ids) + newly_offered,
         )
         return current_tasks, added

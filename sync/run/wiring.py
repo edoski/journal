@@ -9,10 +9,7 @@ from dataclasses import dataclass
 from sync.adapters.cache_bootstrap import bootstrap_cache_layout
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.icloud_status import ICloudDailyStatusSource
-from sync.adapters.json_daily_cache import (
-    JsonDailyScreenTimeCacheStore,
-    JsonDailyTrainingCacheStore,
-)
+from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.json_goal_cache import (
     JsonGoalCarryForwardCacheStore,
     JsonGoalReconcileCacheStore,
@@ -36,7 +33,6 @@ from sync.periods.windows import (
     build_year_window,
 )
 from sync.ports.cache import (
-    DailyScreenTimeCacheStore,
     DailyTrainingCacheStore,
     GoalCarryForwardCacheStore,
     GoalReconcileCacheStore,
@@ -57,10 +53,9 @@ class WiringDeps:
 
     bootstrap_cache_layout: Callable[[], None]
     session_source_factory: Callable[[], StudySessionSource]
-    status_source_factory: Callable[[DailyScreenTimeCacheStore], DailyStatusSource]
+    status_source_factory: Callable[[], DailyStatusSource]
     note_store_factory: Callable[[], NoteStore]
     training_cache_store_factory: Callable[[], DailyTrainingCacheStore]
-    screen_time_cache_store_factory: Callable[[], DailyScreenTimeCacheStore]
     reminder_store_factory: Callable[[], ReminderRuleStore]
     goal_store_factory: Callable[[], GoalStore]
     carry_cache_store_factory: Callable[[], GoalCarryForwardCacheStore]
@@ -75,12 +70,9 @@ def default_wiring_deps() -> WiringDeps:
     return WiringDeps(
         bootstrap_cache_layout=bootstrap_cache_layout,
         session_source_factory=FlowStudySessionSource,
-        status_source_factory=lambda cache_store: ICloudDailyStatusSource(
-            screen_time_cache_store=cache_store
-        ),
+        status_source_factory=ICloudDailyStatusSource,
         note_store_factory=MarkdownNoteStore,
         training_cache_store_factory=JsonDailyTrainingCacheStore,
-        screen_time_cache_store_factory=JsonDailyScreenTimeCacheStore,
         reminder_store_factory=MarkdownReminderRuleStore,
         goal_store_factory=MarkdownGoalStore,
         carry_cache_store_factory=JsonGoalCarryForwardCacheStore,
@@ -117,7 +109,6 @@ def _build_period_sync_service(*, deps: WiringDeps | None = None) -> PeriodSyncS
         note_store=note_store,
         aggregate_source=resolved.aggregate_source_factory(),
         media_source=resolved.media_source_factory(),
-        schedule_source=resolved.schedule_source_factory(),
         goal_sync_service=_build_goal_sync_service(note_store, deps=resolved),
     )
 
@@ -130,8 +121,7 @@ def run_daily_sync(*, deps: WiringDeps | None = None) -> None:
     session_source = resolved.session_source_factory()
     note_store = resolved.note_store_factory()
     training_cache_store = resolved.training_cache_store_factory()
-    screen_time_cache_store = resolved.screen_time_cache_store_factory()
-    status_source = resolved.status_source_factory(screen_time_cache_store)
+    status_source = resolved.status_source_factory()
     service = DailySyncService(
         note_store=note_store,
         status_source=status_source,

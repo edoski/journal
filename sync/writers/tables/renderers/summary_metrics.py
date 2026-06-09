@@ -4,19 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sync.constants import RENDER
 from sync.contracts.metrics import MetricValue
 from sync.formatting import (
     compute_pace,
     format_ma_training_ratio,
     format_summary_change_label,
     format_minutes,
-    format_mood_with_scale,
-    format_progress_bar,
     format_training_ratio,
 )
-from sync.target_policy import study_target_label as format_study_target_label
-from sync.target_policy import summary_targets
 
 from ..specs import SummaryMetricsTableSpec
 
@@ -67,42 +62,20 @@ def _append_summary_row(
     current: str,
     previous: str,
     change: str,
-    target: str,
-    progress: str,
     ma_value: str = "—",
 ) -> None:
     if show_ma:
         lines.append(
-            f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` | `{ma_value}` | `{target}` | {progress} |"
+            f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` | `{ma_value}` |"
         )
         return
-    lines.append(
-        f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` | `{target}` | {progress} |"
-    )
-
-
-def _format_progress_cell(value: float, target: float) -> str:
-    """Render summary-table progress as one inline code span."""
-    bar, progress_pct = format_progress_bar(
-        value,
-        target,
-        RENDER.progress_bar_width,
-        RENDER.progress_filled,
-        RENDER.progress_empty,
-    )
-    return f"`{bar} {progress_pct}%`"
+    lines.append(f"| **{metric_label}** | `{current}` | `{previous}` | `{change}` |")
 
 
 def _format_optional_minutes_per_night(value: float | None) -> str:
     if value is None:
         return "—"
     return format_minutes(value, always_show_both=True) + "/night"
-
-
-def _format_optional_mood(value: float | None) -> str:
-    if value is None:
-        return "—"
-    return format_mood_with_scale(value)
 
 
 def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
@@ -114,42 +87,21 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     ma_metrics = spec.ma_metrics
     ma_label = spec.ma_label
     ma_training_unit = spec.ma_training_unit
-    period_type = spec.period_type
-    total_days = spec.total_days
-    study_target_minutes = spec.study_target_minutes
 
     lines = ["### **SUMMARY**", ""]
 
     show_ma = ma_metrics is not None and ma_label is not None
 
-    targets = summary_targets(period_type, total_days)
-    sleep_target_minutes = targets.sleep_minutes
-    meditation_target = targets.training.meditation
-    workout_target = targets.training.workout
-    stretch_target = targets.training.stretch
-    mood_target = targets.mood
-
-    study_target_label = format_study_target_label(period_type, study_target_minutes)
-    sleep_target_label = targets.sleep_label
-    mood_target_label = targets.mood_label
-    meditation_target_label = targets.training.meditation_label
-    workout_target_label = targets.training.workout_label
-    stretch_target_label = targets.training.stretch_label
-
     if show_ma:
         lines.append(
-            f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} | TARGET | PROGRESS |"
+            f"| METRIC | {current_label} | {previous_label} | CHANGE | {ma_label} |"
         )
         lines.append(
-            "| ------ | ------------- | ----------------------- | ------ | ---------- | ------ | -------- |"
+            "| ------ | ------------- | ----------------------- | ------ | ---------- |"
         )
     else:
-        lines.append(
-            f"| METRIC | {current_label} | {previous_label} | CHANGE | TARGET | PROGRESS |"
-        )
-        lines.append(
-            "| ------ | ------------- | ----------------------- | ------ | ------ | -------- |"
-        )
+        lines.append(f"| METRIC | {current_label} | {previous_label} | CHANGE |")
+        lines.append("| ------ | ------------- | ----------------------- | ------ |")
 
     curr_study_total = _metric_float_or(current_metrics, "study_total_minutes", 0.0)
     prev_study_total = _metric_float_or(previous_metrics, "study_total_minutes", 0.0)
@@ -183,14 +135,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         curr_study_avg_mins, prev_study_avg_mins
     )
 
-    if study_target_minutes is None:
-        study_progress_cell = "`—`"
-    else:
-        study_progress_cell = _format_progress_cell(
-            curr_study_total,
-            float(study_target_minutes),
-        )
-
     _append_summary_row(
         lines,
         show_ma=show_ma,
@@ -199,8 +143,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_study_avg,
         change=study_pct_str,
         ma_value=ma_study_str,
-        target=study_target_label,
-        progress=study_progress_cell,
     )
 
     curr_sleep_avg = _metric_float(current_metrics, "sleep_avg_minutes")
@@ -225,12 +167,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_sleep,
         change=sleep_pct_str,
         ma_value=ma_sleep_str,
-        target=sleep_target_label,
-        progress=(
-            "`—`"
-            if curr_sleep_avg is None
-            else _format_progress_cell(curr_sleep_avg, sleep_target_minutes)
-        ),
     )
 
     curr_meditation_count = _metric_int_or(current_metrics, "meditation_count", 0)
@@ -261,8 +197,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_meditation,
         change=meditation_pct_str,
         ma_value=ma_meditation_str,
-        target=meditation_target_label,
-        progress=_format_progress_cell(curr_meditation_count, meditation_target),
     )
 
     curr_workout_count = _metric_int_or(current_metrics, "workout_count", 0)
@@ -287,8 +221,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_workout,
         change=workout_pct_str,
         ma_value=ma_workout_str,
-        target=workout_target_label,
-        progress=_format_progress_cell(curr_workout_count, workout_target),
     )
 
     curr_stretch_count = _metric_int_or(current_metrics, "stretch_count", 0)
@@ -313,36 +245,6 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_stretch,
         change=stretch_pct_str,
         ma_value=ma_stretch_str,
-        target=stretch_target_label,
-        progress=_format_progress_cell(curr_stretch_count, stretch_target),
-    )
-
-    curr_mood_avg = _metric_float(current_metrics, "mood_avg")
-    prev_mood_avg = _metric_float(previous_metrics, "mood_avg")
-    curr_mood = _format_optional_mood(curr_mood_avg)
-    prev_mood = _format_optional_mood(prev_mood_avg)
-
-    ma_mood_str = "—"
-    ma_mood_avg = _metric_float(ma_metrics, "mood_avg") if ma_metrics else None
-    if show_ma and ma_mood_avg is not None:
-        ma_mood_str = format_mood_with_scale(ma_mood_avg)
-
-    mood_pct_str = format_summary_change_label(curr_mood_avg, prev_mood_avg)
-
-    _append_summary_row(
-        lines,
-        show_ma=show_ma,
-        metric_label="MOOD",
-        current=curr_mood,
-        previous=prev_mood,
-        change=mood_pct_str,
-        ma_value=ma_mood_str,
-        target=mood_target_label,
-        progress=(
-            "`—`"
-            if curr_mood_avg is None
-            else _format_progress_cell(curr_mood_avg, mood_target)
-        ),
     )
 
     lines.append("")

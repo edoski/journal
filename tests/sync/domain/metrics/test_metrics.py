@@ -44,14 +44,6 @@ class TestComputePeriodMetrics:
         expected_avg = sum(sleep_values) / len(sleep_values)
         assert result["sleep_avg_minutes"] == expected_avg
 
-    def test_computes_mood_average(self, sample_daily_data):
-        dates = list(sample_daily_data.keys())
-        result = compute_period_metrics(dates, sample_daily_data)
-
-        mood_values = [d["mood"] for d in sample_daily_data.values()]
-        expected_avg = sum(mood_values) / len(mood_values)
-        assert result["mood_avg"] == expected_avg
-
     def test_counts_workout_days(self, sample_daily_data):
         dates = list(sample_daily_data.keys())
         result = compute_period_metrics(dates, sample_daily_data)
@@ -87,13 +79,11 @@ class TestComputePeriodMetrics:
             datetime.date(2025, 1, 1): {
                 "study_minutes": None,
                 "sleep_minutes": None,
-                "mood": None,
             },
         }
         result = compute_period_metrics(dates, daily_data)
         assert result["study_total_minutes"] == 0
         assert result["sleep_avg_minutes"] is None
-        assert result["mood_avg"] is None
 
 
 class TestAggregateActivityTotals:
@@ -618,7 +608,6 @@ class TestLoadPriorPeriodMetrics:
                 d: {
                     "study_minutes": 60,
                     "sleep_minutes": 480,
-                    "mood": 7.0,
                     "workout": False,
                     "stretch": False,
                     "meditate": False,

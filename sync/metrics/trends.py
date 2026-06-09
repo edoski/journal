@@ -92,7 +92,6 @@ def compute_moving_average(
         period_metrics: List of period metric dicts (oldest first), each containing:
             - study_avg_minutes: daily average study in minutes
             - sleep_avg_minutes: average sleep in minutes
-            - mood_avg: average mood
             - workout_count: number of workout days
             - stretch_count: number of stretch days
             - total_days: number of days in period
@@ -105,7 +104,6 @@ def compute_moving_average(
     empty_result = MovingAverageAggregate(
         study_avg_minutes=None,
         sleep_avg_minutes=None,
-        mood_avg=None,
         workout_avg=None,
         stretch_avg=None,
         meditation_avg=None,
@@ -133,14 +131,6 @@ def compute_moving_average(
         else None
     )
 
-    # Mood: average of averages
-    mood_vals = [period.get("mood_avg") for period in recent]
-    mood_ma = (
-        compute_non_none_average(mood_vals)
-        if any(v is not None for v in mood_vals)
-        else None
-    )
-
     # Workout: average count per period
     workout_counts = [period.get("workout_count", 0) for period in recent]
     workout_ma = sum(workout_counts) / len(workout_counts) if workout_counts else None
@@ -158,7 +148,6 @@ def compute_moving_average(
     return MovingAverageAggregate(
         study_avg_minutes=study_ma,
         sleep_avg_minutes=sleep_ma,
-        mood_avg=mood_ma,
         workout_avg=workout_ma,
         stretch_avg=stretch_ma,
         meditation_avg=meditation_ma,

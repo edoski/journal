@@ -16,7 +16,6 @@ from sync.io import safe_read_file
 from sync.notes.markdown_tables import find_markdown_table
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
-from sync.readers.screen_time import parse_procrastination_table
 from sync.readers.sleep import parse_sleep_table
 from sync.readers.study import parse_study_table
 
@@ -31,18 +30,6 @@ def _parse_bool(val: object) -> bool:
     if val is None:
         return False
     return str(val).strip().lower() == "true"
-
-
-def _parse_optional_mood(value: object) -> float | None:
-    """Parse a frontmatter mood value into a float when possible."""
-    if value is None:
-        return None
-    mood_clean = re.sub(r"[^0-9.\-]", "", str(value))
-    if not mood_clean:
-        return None
-    if re.fullmatch(r"-?\d+(?:\.\d+)?", mood_clean) is None:
-        return None
-    return float(mood_clean)
 
 
 def _parse_hhmm_to_minutes(value: str) -> int | None:
@@ -145,8 +132,6 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         else sum(entry.duration_minutes or 0 for entry in sleep_rows)
     )
 
-    mood_val = _parse_optional_mood(fm.get("mood"))
-
     workout = _parse_bool(fm.get("workout"))
     stretch = _parse_bool(fm.get("stretch"))
     meditate = _parse_bool(fm.get("meditate"))
@@ -154,14 +139,6 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
     awake_total = (
         sum(entry.awake_minutes or 0 for entry in sleep_rows) if sleep_rows else None
     )
-    awakenings_total = None
-    if sleep_rows:
-        awak_counts = [
-            entry.awakenings for entry in sleep_rows if entry.awakenings is not None
-        ]
-        if awak_counts:
-            awakenings_total = sum(awak_counts)
-
     # Extract sleep schedule times from first entry (one sleep session per day)
     sleep_asleep_time = sleep_rows[0].asleep_time if sleep_rows else None
     sleep_awake_time = sleep_rows[0].awake_time if sleep_rows else None
@@ -190,21 +167,13 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         training_type_start_minutes[activity].append(start_minutes)
         training_type_end_minutes[activity].append(end_minutes)
 
-    screen_time_data = parse_procrastination_table(lines)
-    screen_time_totals = defaultdict[str, float](float)
-    if screen_time_data and screen_time_data.entries:
-        for entry in screen_time_data.entries:
-            screen_time_totals[entry.app] += entry.minutes
-
     return {
         "study_minutes": study_total,
         "sleep_minutes": sleep_total,
-        "mood": mood_val,
         "workout": workout,
         "stretch": stretch,
         "meditate": meditate,
         "awake_minutes": awake_total,
-        "awakenings": awakenings_total,
         "sleep_asleep_time": sleep_asleep_time,
         "sleep_awake_time": sleep_awake_time,
         "activity_totals": dict(activity_totals),
@@ -225,5 +194,4 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
             activity: tuple(values)
             for activity, values in training_type_end_minutes.items()
         },
-        "screen_time_totals": dict(screen_time_totals),
     }

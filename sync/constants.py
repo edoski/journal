@@ -35,7 +35,6 @@ GOAL_CACHE_DIR = PATHS.goal_cache_dir
 MEDIA_CACHE_DIR = PATHS.media_cache_dir
 DAILY_CACHE_DIR = PATHS.daily_cache_dir
 TRAINING_CACHE_DIR = PATHS.daily_training_cache_dir
-SCREEN_TIME_CACHE_DIR = PATHS.daily_screen_time_cache_dir
 
 # Lock directories
 LOCK_DIR = PATHS.lock_dir
@@ -68,9 +67,6 @@ STUDY_SECTION_HEADER = "### **STUDY**"
 SLEEP_SECTION_HEADER = "### **SLEEP**"
 TRAINING_TABLE_HEADER_RE = r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|"
 NO_TRAINING_SESSIONS_TOKEN = "no training sessions"
-PROCRASTINATION_SECTION_HEADER = "### **PROCRASTINATION**"
-PROCRASTINATION_TABLE_HEADER_RE = r"\|\s*SOURCE\s*\|\s*DURATION\s*\|"
-NO_SCREEN_TIME_TOKEN = "no screen time"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,7 +83,6 @@ class IdealSchedule:
     workout_days_weekly: int = 7  # 7/7
     stretch_days_weekly: int = 7  # 7/7
     meditation_days_weekly: int = 7  # 7/7 daily meditation target
-    mood_target: float = 6.0  # 6.0/10
 
 
 @dataclass(frozen=True)
@@ -98,32 +93,6 @@ class StudyCadenceConfig:
     break_min: int = 30
 
 
-@dataclass(frozen=True)
-class RenderConfig:
-    """Rendering symbols and progress bar settings."""
-
-    progress_bar_width: int = 25
-    progress_filled: str = "█"
-    progress_empty: str = "░"
-    study_symbol_deep: str = "█"  # target met
-    study_symbol_none: str = "·"  # target not met
-    study_legend: str = "1 POMODORO = 90m | █ ≥ 4 POM. | · < 4 POM."
-    yearly_study_legend: str = (
-        "1 POMODORO = 90m | █ all days ≥ 4 POM | ░ some days | · none"
-    )
-
-
-@dataclass(frozen=True)
-class ScreenTimeConfig:
-    """Screen time grouping thresholds."""
-
-    min_minutes: int = 10  # Apps < 10 min → Miscellaneous
-    percent_threshold: float = 0.05  # Apps ≤ 5% → Miscellaneous
-    misc_label: str = "Miscellaneous"
-
-
 # Singleton instances
 IDEAL = IdealSchedule()
 STUDY_CADENCE = StudyCadenceConfig()
-RENDER = RenderConfig()
-SCREEN_TIME = ScreenTimeConfig()

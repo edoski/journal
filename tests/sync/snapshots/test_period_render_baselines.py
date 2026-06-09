@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tests.support.summary_assertions import assert_summary_targets_and_progress
 from tests.support.render_baseline_generator import (
     SNAPSHOT_DIR,
     RenderBaselineArtifact,
@@ -28,46 +27,23 @@ def _assert_snapshot(artifact: RenderBaselineArtifact) -> None:
     assert actual_raw == expected_raw, f"Content mismatch for snapshot {path}"
 
 
-def _assert_period_policy(artifact: RenderBaselineArtifact) -> None:
-    assert artifact.period_type is not None, (
-        f"Missing period_type metadata for {artifact.name}"
-    )
-    assert artifact.total_days is not None, (
-        f"Missing total_days metadata for {artifact.name}"
-    )
-    assert artifact.current_metrics is not None, (
-        f"Missing current_metrics metadata for {artifact.name}"
-    )
-
-    assert_summary_targets_and_progress(
-        list(artifact.lines),
-        period_type=artifact.period_type,
-        total_days=artifact.total_days,
-        current_metrics=artifact.current_metrics,
-    )
-
-
 def test_weekly_metrics_snapshot() -> None:
     artifact = _artifact("weekly_metrics.txt")
-    _assert_period_policy(artifact)
     _assert_snapshot(artifact)
 
 
 def test_monthly_metrics_snapshot() -> None:
     artifact = _artifact("monthly_metrics.txt")
-    _assert_period_policy(artifact)
     _assert_snapshot(artifact)
 
 
 def test_quarterly_metrics_snapshot() -> None:
     artifact = _artifact("quarterly_metrics.txt")
-    _assert_period_policy(artifact)
     _assert_snapshot(artifact)
 
 
 def test_yearly_metrics_snapshot() -> None:
     artifact = _artifact("yearly_metrics.txt")
-    _assert_period_policy(artifact)
     _assert_snapshot(artifact)
 
 

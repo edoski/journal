@@ -6,7 +6,6 @@ import datetime
 from collections.abc import Mapping
 
 from sync.contracts.status import (
-    ActivityPayload,
     SleepPayload,
     TrainingEntryPayload,
 )
@@ -17,7 +16,6 @@ _SLEEP_REQUIRED_KEYS = (
     "end",
     "sleep_min",
     "awake_min",
-    "awake_count",
 )
 
 _TRAINING_DEFAULT_TYPE = {
@@ -81,21 +79,6 @@ def _required_float(payload: Mapping[str, object], key: str) -> float:
         raise ValueError(f"Invalid payload: {key} must be numeric") from exc
 
 
-def _required_int(payload: Mapping[str, object], key: str) -> int:
-    value = payload.get(key)
-    if value is None:
-        raise ValueError(f"Invalid payload: {key} must be an integer")
-    if not isinstance(value, (str, int, float)):
-        raise ValueError(f"Invalid payload: {key} must be an integer")
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Invalid payload: {key} must be an integer") from exc
-    if not parsed.is_integer():
-        raise ValueError(f"Invalid payload: {key} must be an integer")
-    return int(parsed)
-
-
 def parse_sleep_payload(
     raw_payload: object,
 ) -> SleepPayload:
@@ -114,7 +97,6 @@ def parse_sleep_payload(
         end=_required_non_empty_str(payload, "end"),
         sleep_min=_required_float(payload, "sleep_min"),
         awake_min=_required_float(payload, "awake_min"),
-        awake_count=_required_int(payload, "awake_count"),
     )
 
 
@@ -153,20 +135,3 @@ def parse_training_payload(
         )
 
     return parsed_entries
-
-
-def parse_activity_payload(
-    raw_payload: object,
-) -> ActivityPayload:
-    """Parse and validate screen-time payload for one day."""
-    if not isinstance(raw_payload, dict):
-        raise ValueError("Invalid activity payload: expected JSON object")
-
-    payload = dict(raw_payload)
-    date_str = _required_iso_date(payload, "date")
-
-    return ActivityPayload(
-        date=date_str,
-        activity_ipad=_optional_str(payload, "activity_ipad"),
-        activity_iphone=_optional_str(payload, "activity_iphone"),
-    )

@@ -15,7 +15,6 @@ from sync.formatting import compute_percent_change
 from sync.metrics import (
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
-    aggregate_screen_time,
     compute_period_metrics,
 )
 from sync.target_policy import (
@@ -39,14 +38,6 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         precision=0,
         higher_is_better=True,
         target=float(IDEAL.sleep_minutes_nightly),
-    ),
-    MetricDefinition(
-        key="mood",
-        label="Mood",
-        unit="score",
-        precision=1,
-        higher_is_better=True,
-        target=float(IDEAL.mood_target),
     ),
     MetricDefinition(
         key="workout_count",
@@ -87,14 +78,6 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         precision=0,
         higher_is_better=False,
         target=0.0,
-    ),
-    MetricDefinition(
-        key="screen_time_total",
-        label="Screen Time",
-        unit="min",
-        precision=0,
-        higher_is_better=False,
-        target=None,
     ),
     MetricDefinition(
         key="training_sessions_total",
@@ -190,8 +173,6 @@ def build_metrics_map(
     """Build the canonical query metric map for a date span."""
     period_metrics = compute_period_metrics(dates, daily_data)
     interrupt_total, overrun_total, _ = aggregate_interrupt_overrun(dates, daily_data)
-    screen_time_total = sum(aggregate_screen_time(dates, daily_data).values())
-
     training_sessions_total = 0
     for payload in daily_data.values():
         sessions_map = payload.get("training_type_sessions", {})
@@ -202,13 +183,11 @@ def build_metrics_map(
     return {
         "study_minutes": period_metrics["study_total_minutes"],
         "sleep_minutes": period_metrics["sleep_avg_minutes"],
-        "mood": period_metrics["mood_avg"],
         "workout_count": period_metrics["workout_count"],
         "stretch_count": period_metrics["stretch_count"],
         "meditation_count": period_metrics["meditation_count"],
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
-        "screen_time_total": screen_time_total,
         "training_sessions_total": training_sessions_total,
         "days_total": period_metrics["total_days"],
         "days_elapsed": period_metrics["days_up_to_today"],
@@ -269,11 +248,3 @@ def training_breakdown(
 ) -> tuple[BreakdownRow, ...]:
     """Build training-type breakdown rows."""
     return build_breakdown_rows(training_totals_by_type(daily_data))
-
-
-def screen_time_breakdown(
-    dates: list[datetime.date],
-    daily_data: dict[datetime.date, DailyAggregate],
-) -> tuple[BreakdownRow, ...]:
-    """Build screen-time breakdown rows."""
-    return build_breakdown_rows(aggregate_screen_time(dates, daily_data))

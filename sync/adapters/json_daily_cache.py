@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import cast
 
-from sync.constants import SCREEN_TIME_CACHE_DIR, STATE_LOCK_DIR, TRAINING_CACHE_DIR
+from sync.constants import STATE_LOCK_DIR, TRAINING_CACHE_DIR
 from sync.contracts.cache import DailyTrainingCacheRow
-from sync.ports.cache import DailyScreenTimeCacheStore, DailyTrainingCacheStore
+from sync.ports.cache import DailyTrainingCacheStore
 
 from .json_cache_common import (
     JsonValidatedPerDateStore,
@@ -98,36 +98,6 @@ def _validate_training_payload(
     return typed_entries
 
 
-def _validate_screen_time_payload(
-    raw: object,
-    *,
-    path: str,
-    date_str: str,
-) -> dict[str, float]:
-    if not isinstance(raw, dict):
-        raise schema_error(path, "root payload must be an object")
-    payload = cast(dict[str, object], raw)
-    if set(payload) != {"date", "entries"}:
-        raise schema_error(path, "root must contain exactly ['date', 'entries']")
-
-    if payload.get("date") != date_str:
-        raise schema_error(path, f"date must equal '{date_str}'")
-
-    entries = payload.get("entries")
-    if not isinstance(entries, dict):
-        raise schema_error(path, "entries must be an object")
-
-    normalized: dict[str, float] = {}
-    for app, minutes in cast(dict[str, object], entries).items():
-        if not app:
-            raise schema_error(path, "entries contains invalid app key")
-        if not isinstance(minutes, (int, float)):
-            raise schema_error(path, f"entries.{app} must be numeric")
-        normalized[app] = float(minutes)
-
-    return normalized
-
-
 class JsonDailyTrainingCacheStore(
     JsonValidatedPerDateStore[list[DailyTrainingCacheRow]],
     DailyTrainingCacheStore,
@@ -145,24 +115,4 @@ class JsonDailyTrainingCacheStore(
             lock_root=lock_root or STATE_LOCK_DIR,
             empty_entries=list,
             validator=_validate_training_payload,
-        )
-
-
-class JsonDailyScreenTimeCacheStore(
-    JsonValidatedPerDateStore[dict[str, float]],
-    DailyScreenTimeCacheStore,
-):
-    """Filesystem-backed per-day screen-time cache store."""
-
-    def __init__(
-        self,
-        *,
-        cache_dir: str | None = None,
-        lock_root: str | None = None,
-    ) -> None:
-        super().__init__(
-            cache_dir=cache_dir or SCREEN_TIME_CACHE_DIR,
-            lock_root=lock_root or STATE_LOCK_DIR,
-            empty_entries=dict,
-            validator=_validate_screen_time_payload,
         )

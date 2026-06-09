@@ -2,105 +2,13 @@
 
 from __future__ import annotations
 
-from sync.constants import DAYS, RENDER
+from sync.constants import DAYS
 
 from ..grid import GridRowBuilder
 from ..specs import (
-    MonthlyStudyGridSpec,
     MonthlyTrainingGridSpec,
-    WeeklyStudyGridSpec,
     WeeklyTrainingGridSpec,
 )
-
-
-def render_weekly_study_grid(spec: WeeklyStudyGridSpec) -> list[str]:
-    """Render weekly full-study-days grouped grid body."""
-    study_symbols = list(spec.symbols)
-    current_index = spec.current_index
-
-    lines: list[str] = []
-
-    lines.append("┌ FULL STUDY DAYS")
-
-    if current_index is not None and 0 <= current_index < len(study_symbols):
-        arrow_col = 3 + current_index * 4
-        lines.append("│" + " " * (arrow_col - 1) + "↓")
-    else:
-        lines.append("│")
-
-    lines.append(
-        "│ " + " ".join(study_symbols) + f"   ({spec.done_count}/{spec.total_count})"
-    )
-    lines.append("│ " + " ".join(["───"] * 7))
-    lines.append("└ " + " ".join(DAYS))
-    lines.append("")
-    lines.append(RENDER.study_legend.replace("█", "███").replace("·", "░░░"))
-    return lines
-
-
-def render_monthly_study_grid(spec: MonthlyStudyGridSpec) -> list[str]:
-    """Render monthly full-study-days grouped grid body."""
-    week_labels = list(spec.week_labels)
-    week_day_counts = list(spec.week_day_counts)
-    symbols = list(spec.symbols)
-    delta_labels = list(spec.delta_labels) if spec.delta_labels else None
-
-    lines: list[str] = []
-
-    if not week_day_counts:
-        lines.append("┌ FULL STUDY DAYS (00/00)")
-        lines.append("│")
-        lines.append("│")
-        lines.append("│")
-        lines.append("│")
-        lines.append("└")
-        lines.append("")
-        lines.append(RENDER.study_legend)
-        return lines
-
-    max_days = max(week_day_counts)
-    week_width = max_days * 2 - 1
-
-    grid = GridRowBuilder(
-        week_day_counts=week_day_counts,
-        week_width=week_width,
-        week_labels=week_labels,
-    )
-
-    arrow_col = None
-    if spec.current_week_index is not None and spec.current_day_index is not None:
-        arrow_col = (
-            len("│ ")
-            + spec.current_week_index * (week_width + 3)
-            + spec.current_day_index * 2
-        )
-
-    symbol_row = grid.build_symbol_row(symbols)
-    separator_row = grid.build_separator_row()
-    label_row = grid.build_label_row()
-    delta_row = grid.build_delta_row(delta_labels)
-
-    header_suffix = (
-        f" ({spec.total_done:02d}/{spec.total_elapsed:02d})"
-        if spec.total_elapsed
-        else " (00/00)"
-    )
-    lines.append(f"┌ FULL STUDY DAYS{header_suffix}")
-    if arrow_col is not None:
-        lines.append("│" + " " * (arrow_col - 1) + "↓")
-    else:
-        lines.append("│")
-
-    lines.append(symbol_row)
-    lines.append(separator_row)
-    lines.append(label_row)
-    if delta_row:
-        lines.append(f"└ {delta_row[2:]}" if delta_row.startswith("│ ") else delta_row)
-    else:
-        lines.append("└")
-    lines.append("")
-    lines.append(RENDER.study_legend)
-    return lines
 
 
 def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:

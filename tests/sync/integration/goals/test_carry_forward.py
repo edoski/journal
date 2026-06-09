@@ -162,6 +162,34 @@ class TestCacheIntegration:
         assert added == 0
         assert march_tasks == []
 
+    def test_weekly_existing_carried_goal_with_empty_cache_can_be_deleted(
+        self, tmp_path
+    ):
+        store = _carry_store(tmp_path)
+        prev_tasks = [_goal("gid-weekly", "Weekly Goal", done=False)]
+        current_tasks = [_goal("gid-weekly", "Weekly Goal", done=False)]
+
+        carried_view, added = carry_forward_with_tombstones(
+            prev_tasks,
+            current_tasks,
+            "2026-W24",
+            "weekly",
+            cache_store=store,
+        )
+        assert added == 0
+        assert {goal.id for goal in carried_view} == {"gid-weekly"}
+
+        deleted_view, added = carry_forward_with_tombstones(
+            prev_tasks,
+            [],
+            "2026-W24",
+            "weekly",
+            cache_store=store,
+        )
+        assert added == 0
+        assert deleted_view == []
+        assert get_deleted_ids(_cache_snapshot(store), "weekly") == {"gid-weekly"}
+
     def test_deleted_goal_not_re_added_across_year_boundary(self, tmp_path):
         store = _carry_store(tmp_path)
         prev_tasks = [_goal("gid-yearly", "Year Goal", done=False)]

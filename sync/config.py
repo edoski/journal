@@ -27,7 +27,6 @@ class PathConfig:
     media_cache_dir: str
     daily_cache_dir: str
     daily_training_cache_dir: str
-    daily_screen_time_cache_dir: str
     lock_dir: str
     note_lock_dir: str
     state_lock_dir: str
@@ -139,10 +138,6 @@ def _build_paths() -> PathConfig:
         daily_training_cache_dir=_env_path(
             "TRAINING_CACHE_DIR",
             os.path.join(journal_cache_dir, "daily", "training"),
-        ),
-        daily_screen_time_cache_dir=_env_path(
-            "SCREEN_TIME_CACHE_DIR",
-            os.path.join(journal_cache_dir, "daily", "screen_time"),
         ),
         lock_dir=lock_dir,
         note_lock_dir=_env_path(

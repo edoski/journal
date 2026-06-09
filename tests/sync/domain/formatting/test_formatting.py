@@ -11,12 +11,10 @@ from sync.formatting import (
     format_ma_training_ratio,
     format_minutes,
     format_minutes_seconds,
-    format_mood_with_scale,
     format_percent_change,
     format_progress_bar,
     format_summary_change_label,
     format_training_ratio,
-    normalize_screen_time_label,
     round_half_up,
 )
 
@@ -231,22 +229,6 @@ class TestFormatTrainingRatio:
         assert format_training_ratio(3, 8) == "03/8"
 
 
-class TestFormatMoodWithScale:
-    def test_decimal_value(self):
-        assert format_mood_with_scale(7.5) == "7.5/10.0"
-        assert format_mood_with_scale(5.0) == "5.0/10.0"
-
-    def test_whole_number(self):
-        assert format_mood_with_scale(8) == "8.0/10.0"
-        assert format_mood_with_scale(10) == "10.0/10.0"
-
-    def test_none_returns_zero(self):
-        assert format_mood_with_scale(None) == "0.0/10.0"
-
-    def test_zero(self):
-        assert format_mood_with_scale(0) == "0.0/10.0"
-
-
 class TestFormatMaTrainingRatio:
     def test_none_returns_emdash(self):
         assert format_ma_training_ratio(None, "7") == "—"
@@ -259,14 +241,6 @@ class TestFormatMaTrainingRatio:
 
     def test_other_units_show_decimal(self):
         assert format_ma_training_ratio(17.25, "mo") == "17.2/mo"
-
-
-class TestNormalizeScreenTimeLabel:
-    def test_removes_hidden_formatting_marks(self):
-        assert normalize_screen_time_label("\u200eWhatsApp") == "WhatsApp"
-
-    def test_collapses_internal_whitespace(self):
-        assert normalize_screen_time_label("  Brawl   Stars\t") == "Brawl Stars"
         assert format_ma_training_ratio(50.5, "qtr") == "50.5/qtr"
 
 

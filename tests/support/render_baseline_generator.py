@@ -21,7 +21,6 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
-from sync.target_policy import summary_targets
 from sync.writers.goals import build_goals_block, render_goal_lines
 
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
@@ -68,7 +67,6 @@ def _weekly_metrics_artifact() -> RenderBaselineArtifact:
         "**[[2020-W19\\|LAST WEEK]]**",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
-        study_target_minutes=summary_targets("week", 7).study_minutes,
         prior_week_metrics=prior_week_metrics,
     )
     dates = [start + datetime.timedelta(days=i) for i in range(7)]
@@ -106,10 +104,6 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
         "**[[2020-04\\|LAST MONTH]]**",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
-        study_target_minutes=summary_targets(
-            "month",
-            len(list(daterange(start, end))),
-        ).study_minutes,
         prior_month_metrics=prior_month_metrics,
     )
     dates = list(daterange(start, end))
@@ -147,10 +141,6 @@ def _quarterly_metrics_artifact() -> RenderBaselineArtifact:
         2,
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
-        study_target_minutes=summary_targets(
-            "quarter",
-            len(list(daterange(start, end))),
-        ).study_minutes,
         prior_quarter_metrics=prior_quarter_metrics,
     )
     dates = list(daterange(start, end))
@@ -191,10 +181,6 @@ def _yearly_metrics_artifact() -> RenderBaselineArtifact:
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
-        study_target_minutes=summary_targets(
-            "year",
-            len(list(daterange(start, end))),
-        ).study_minutes,
         prior_year_metrics=prior_year_metrics,
     )
     dates = list(daterange(start, end))

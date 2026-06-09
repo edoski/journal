@@ -1,6 +1,6 @@
 # Journal Domain Context
 
-This repository syncs focus, training, sleep, screen-time, media, reminders, and goals into Obsidian journal notes.
+This repository syncs focus, training, sleep, media, reminders, and goals into Obsidian journal notes.
 
 ## Core Terms
 
@@ -22,7 +22,7 @@ This repository syncs focus, training, sleep, screen-time, media, reminders, and
 
 **Period Window**: The date range and neighboring-period metadata for a period sync. Period windows define current bounds, previous bounds, target date, labels, and filenames.
 
-**Period Presentation**: The prepared chart/table payloads for period metrics. It turns daily aggregates into study, training, sleep, mood, procrastination, media, and summary sections.
+**Period Presentation**: The prepared chart/table payloads for period metrics. It turns daily aggregates into study, training, sleep, media, and summary sections.
 
 **Metric Snapshot**: A read-only query result for a period or metric history. It is consumed by exploration/dashboard views and should stay independent from note rendering.
 

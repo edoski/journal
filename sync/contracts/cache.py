@@ -65,13 +65,6 @@ class DailyTrainingCacheEntry(TypedDict):
     entries: list[DailyTrainingCacheRow]
 
 
-class DailyScreenTimeCacheEntry(TypedDict):
-    """Per-day screen-time cache payload."""
-
-    date: str
-    entries: dict[str, float]
-
-
 class DailyTrainingCacheRow(TypedDict):
     """Canonical row stored in per-day training cache."""
 

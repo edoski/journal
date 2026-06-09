@@ -11,6 +11,5 @@ class SleepEntry:
 
     duration_minutes: float
     awake_minutes: float | None = None
-    awakenings: int | None = None
     asleep_time: str | None = None
     awake_time: str | None = None

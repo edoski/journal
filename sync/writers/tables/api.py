@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-from .renderers.daily_procrastination import render_daily_procrastination
-from .renderers.screen_trend import render_screen_trend
 from .renderers.simple_grid import render_simple_grid
 from .renderers.summary_metrics import render_summary_metrics
 from .specs import (
-    DailyProcrastinationTableSpec,
-    ScreenTrendTableSpec,
     SimpleGridTableSpec,
     SummaryMetricsTableSpec,
     TableSpec,
@@ -20,10 +16,6 @@ _RENDERERS: dict[type[object], Renderer] = {
     SimpleGridTableSpec: typed_renderer(SimpleGridTableSpec, render_simple_grid),
     SummaryMetricsTableSpec: typed_renderer(
         SummaryMetricsTableSpec, render_summary_metrics
-    ),
-    ScreenTrendTableSpec: typed_renderer(ScreenTrendTableSpec, render_screen_trend),
-    DailyProcrastinationTableSpec: typed_renderer(
-        DailyProcrastinationTableSpec, render_daily_procrastination
     ),
 }
 

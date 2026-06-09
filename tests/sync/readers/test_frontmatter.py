@@ -14,7 +14,6 @@ class TestParseFrontmatter:
         result = parse_frontmatter(sample_frontmatter_lines)
         assert isinstance(result, OrderedDict)
         assert result["date"] == "2025-12-26"
-        assert result["mood"] == "7.5"
         assert result["workout"] == "true"
         assert result["stretch"] == "false"
         assert result["sleep"] == "7h30m"

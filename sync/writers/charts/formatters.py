@@ -31,16 +31,5 @@ class TimeLabelMin2HourDigits:
         return f"{hours.zfill(2)}h{remainder}"
 
 
-@dataclass(frozen=True)
-class DecimalOneLabel:
-    """Numeric label style with one decimal place."""
-
-    def format(self, value: float | None) -> str:
-        if value is None:
-            return ""
-        return f"{value:.1f}"
-
-
 TIME_LABEL_STANDARD = TimeLabelStandard()
 TIME_LABEL_MIN2H = TimeLabelMin2HourDigits()
-DECIMAL_ONE_LABEL = DecimalOneLabel()

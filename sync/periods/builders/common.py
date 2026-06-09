@@ -37,16 +37,6 @@ def sleep_minutes_for_day(
     return payload["sleep_minutes"]
 
 
-def mood_for_day(
-    daily_data: dict[datetime.date, DailyAggregate],
-    day: datetime.date,
-) -> float | None:
-    payload = _day_values(daily_data, day)
-    if payload is None:
-        return None
-    return payload["mood"]
-
-
 def awake_minutes_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
@@ -55,16 +45,6 @@ def awake_minutes_for_day(
     if payload is None:
         return None
     return payload["awake_minutes"]
-
-
-def awakenings_for_day(
-    daily_data: dict[datetime.date, DailyAggregate],
-    day: datetime.date,
-) -> int | None:
-    payload = _day_values(daily_data, day)
-    if payload is None:
-        return None
-    return payload["awakenings"]
 
 
 def _sleep_asleep_time_for_day(
@@ -209,40 +189,22 @@ def append_activity_summary(
 def compute_sleep_aux_averages(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
-) -> tuple[float | None, float | None]:
-    """Compute average awake minutes and awakenings for a date range."""
+) -> float | None:
+    """Compute average awake minutes for a date range."""
     awake_values = [
         value
         for value in (awake_minutes_for_day(daily_data, day) for day in dates)
         if value is not None
     ]
-    awakening_values = [
-        value
-        for value in (awakenings_for_day(daily_data, day) for day in dates)
-        if value is not None
-    ]
     avg_awake = sum(awake_values) / len(awake_values) if awake_values else None
-    avg_awakenings = (
-        sum(awakening_values) / len(awakening_values) if awakening_values else None
-    )
-    return avg_awake, avg_awakenings
+    return avg_awake
 
 
 def sleep_stats_table_lines(
     sleep_avg: float | None,
     avg_awake: float | None,
-    avg_awakenings: float | None,
     avg_schedule: str | None = None,
 ) -> list[str]:
-    if avg_awakenings is not None:
-        awaken_val = (
-            f"{avg_awakenings:.1f}"
-            if abs(avg_awakenings - round(avg_awakenings)) >= 0.05
-            else str(int(round(avg_awakenings)))
-        )
-    else:
-        awaken_val = ""
-
     rows = [
         [
             "**SCHEDULE**  ",
@@ -256,7 +218,6 @@ def sleep_stats_table_lines(
             "**AWAKE**     ",
             f"`{format_minutes(avg_awake)}`" if avg_awake is not None else "",
         ],
-        ["**AWAKENINGS**", f"`{awaken_val}`" if awaken_val else ""],
     ]
 
     return render_table(

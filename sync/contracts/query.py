@@ -46,7 +46,7 @@ class PeriodMetricRow:
 
 @dataclass(frozen=True)
 class BreakdownRow:
-    """Breakdown entry for activity/training/screen-time side panels."""
+    """Breakdown entry for activity/training side panels."""
 
     label: str
     value: float
@@ -64,7 +64,6 @@ class PeriodDetailSnapshot:
     rows: tuple[PeriodMetricRow, ...]
     activity_breakdown: tuple[BreakdownRow, ...]
     training_breakdown: tuple[BreakdownRow, ...]
-    screen_time_breakdown: tuple[BreakdownRow, ...]
     days_total: int
     days_with_data: int
 
@@ -115,4 +114,3 @@ class DashboardSnapshot:
     alerts: tuple[str, ...]
     trend_study: tuple[MetricHistoryPoint, ...]
     trend_sleep: tuple[MetricHistoryPoint, ...]
-    trend_mood: tuple[MetricHistoryPoint, ...]

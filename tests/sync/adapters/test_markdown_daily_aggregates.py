@@ -17,7 +17,6 @@ def test_load_for_dates_parses_existing_daily_notes(tmp_path):
             [
                 "---",
                 "sleep: 7h00m",
-                "mood: 7.0",
                 "workout: true",
                 "stretch: false",
                 "meditate: false",
@@ -59,7 +58,6 @@ def test_load_for_dates_raises_for_non_canonical_study_header(tmp_path):
             [
                 "---",
                 "sleep: 7h00m",
-                "mood: 7.0",
                 "workout: true",
                 "stretch: false",
                 "meditate: false",
@@ -91,7 +89,6 @@ def test_load_for_dates_aggregates_non_canonical_study_header_errors(tmp_path):
     shared_lines = [
         "---",
         "sleep: 7h00m",
-        "mood: 7.0",
         "workout: true",
         "stretch: false",
         "meditate: false",
@@ -140,7 +137,6 @@ def test_load_for_dates_raises_for_non_canonical_study_header_reason(tmp_path):
             [
                 "---",
                 "sleep: 7h00m",
-                "mood: 7.0",
                 "workout: true",
                 "stretch: false",
                 "meditate: false",

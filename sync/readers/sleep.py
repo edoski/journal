@@ -12,7 +12,7 @@ from sync.notes.markdown_tables import find_markdown_table
 from .common import extract_block, parse_duration_to_minutes
 
 
-_SLEEP_HEADER_CELLS = ("time", "duration", "awake", "awakenings")
+_SLEEP_HEADER_CELLS = ("time", "duration", "awake")
 _TIME_RANGE_RE = re.compile(r"(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})")
 
 
@@ -33,7 +33,7 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
     table = find_markdown_table(
         block,
         header_matches=lambda cells: (
-            tuple(cell.lower() for cell in cells) == _SLEEP_HEADER_CELLS
+            tuple(cell.lower() for cell in cells[:3]) == _SLEEP_HEADER_CELLS
         ),
         lenient=True,
     )
@@ -42,7 +42,7 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
 
     entries: list[SleepEntry] = []
     for parts in table.rows:
-        if len(parts) < 4:
+        if len(parts) < 3:
             continue
 
         # Parse time range from TIME column
@@ -57,18 +57,10 @@ def parse_sleep_table(lines: list[str]) -> list[SleepEntry]:
         duration_min = parse_duration_to_minutes(parts[1])
         awake_min = parse_duration_to_minutes(parts[2])
 
-        awakenings: int | None = None
-        if parts[3]:
-            try:
-                awakenings = int(re.sub(r"[^0-9]", "", parts[3]))
-            except ValueError:
-                awakenings = None
-
         entries.append(
             SleepEntry(
                 duration_minutes=duration_min or 0.0,
                 awake_minutes=awake_min,
-                awakenings=awakenings,
                 asleep_time=asleep_time,
                 awake_time=awake_time,
             )

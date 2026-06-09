@@ -14,7 +14,6 @@ class SleepPayload:
     end: str
     sleep_min: float
     awake_min: float
-    awake_count: int
 
 
 @dataclass(frozen=True)
@@ -47,15 +46,6 @@ class TrainingStatus:
     @property
     def meditate_done(self) -> bool:
         return bool(self.meditation_entries)
-
-
-@dataclass(frozen=True)
-class ActivityPayload:
-    """Validated screen-time payload used by daily sync internals."""
-
-    date: str
-    activity_ipad: str
-    activity_iphone: str
 
 
 @dataclass(frozen=True)

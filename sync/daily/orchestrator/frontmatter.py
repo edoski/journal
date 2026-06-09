@@ -105,8 +105,8 @@ def update_frontmatter(
         sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
         set_value("sleep", sleep_str)
 
-    # Enforce canonical order: sleep, study, mood, meditate, workout, stretch, then rest
-    canonical_order = ["sleep", "study", "mood", "meditate", "workout", "stretch"]
+    # Enforce canonical order: sleep, study, meditate, workout, stretch, then rest
+    canonical_order = ["sleep", "study", "meditate", "workout", "stretch"]
     ordered_keys = [k for k in canonical_order if k in fm_order]
     ordered_keys += [k for k in fm_order if k not in canonical_order]
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in ordered_keys]

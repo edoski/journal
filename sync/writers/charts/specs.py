@@ -90,17 +90,6 @@ class ProgressRowsProfile:
 
 
 @dataclass(frozen=True)
-class WaterfallProfile:
-    """Rendering policy for waterfall charts."""
-
-    bar_width: int = 40
-    fill_char: str = "█"
-    header_prefix: str = "┌"
-    row_prefix: str = "│ "
-    footer_prefix: str = "└ "
-
-
-@dataclass(frozen=True)
 class TrainingSection:
     """One titled section for multi-block training charts."""
 
@@ -117,17 +106,6 @@ class TrainingSection:
 
 
 @dataclass(frozen=True)
-class StudyCoverageRow:
-    """One rendered study-coverage row."""
-
-    label: str
-    bar: str
-    done: int
-    elapsed: int
-    delta_label: str = ""
-
-
-@dataclass(frozen=True)
 class VerticalBarSpec:
     """Spec for a vertical bar chart."""
 
@@ -135,32 +113,6 @@ class VerticalBarSpec:
     values: Sequence[float | None]
     value_labels: Sequence[str]
     profile: VerticalBarProfile
-    delta_labels: Sequence[str] | None = None
-
-
-@dataclass(frozen=True)
-class WeeklyStudyGridSpec:
-    """Spec for weekly full-study-days grouped grid chart."""
-
-    symbols: Sequence[str]
-    done_count: int
-    total_count: int
-    profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_index: int | None = None
-
-
-@dataclass(frozen=True)
-class MonthlyStudyGridSpec:
-    """Spec for monthly full-study-days grouped grid chart."""
-
-    week_labels: Sequence[str]
-    week_day_counts: Sequence[int]
-    symbols: Sequence[str]
-    total_done: int
-    total_elapsed: int
-    profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
-    current_week_index: int | None = None
-    current_day_index: int | None = None
     delta_labels: Sequence[str] | None = None
 
 
@@ -218,44 +170,10 @@ class TrainingSectionsRowsSpec:
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 
 
-@dataclass(frozen=True)
-class QuarterlyStudyCoverageRowsSpec:
-    """Spec for quarterly study-coverage progress rows."""
-
-    rows: Sequence[StudyCoverageRow]
-    total_done: int
-    total_elapsed: int
-    profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-
-
-@dataclass(frozen=True)
-class YearlyStudyCoverageRowsSpec:
-    """Spec for yearly study-coverage progress rows."""
-
-    rows: Sequence[StudyCoverageRow]
-    total_done: int
-    total_elapsed: int
-    legend_line: str | None = None
-    profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-
-
-@dataclass(frozen=True)
-class WaterfallSpec:
-    """Spec for waterfall charts."""
-
-    app_totals: dict[str, float]
-    profile: WaterfallProfile = field(default_factory=WaterfallProfile)
-
-
 ChartSpec = (
     VerticalBarSpec
-    | WeeklyStudyGridSpec
-    | MonthlyStudyGridSpec
     | MonthlyTrainingGridSpec
     | WeeklyTrainingGridSpec
     | TrainingBlockRowsSpec
     | TrainingSectionsRowsSpec
-    | QuarterlyStudyCoverageRowsSpec
-    | YearlyStudyCoverageRowsSpec
-    | WaterfallSpec
 )

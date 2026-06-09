@@ -72,19 +72,3 @@ class DailyTrainingCacheStore(Protocol):
     def prune(self, *, keep_days: int) -> None:
         """Prune old per-day cache files."""
         ...
-
-
-class DailyScreenTimeCacheStore(Protocol):
-    """Per-day screen-time cache API."""
-
-    def load_for_date(self, date_str: str) -> dict[str, float]:
-        """Load screen-time entries for a given day."""
-        ...
-
-    def save_for_date(self, date_str: str, entries: dict[str, float]) -> None:
-        """Persist screen-time entries for a given day."""
-        ...
-
-    def prune(self, *, keep_days: int) -> None:
-        """Prune old per-day cache files."""
-        ...

@@ -6,7 +6,6 @@ import datetime
 
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
-from sync.constants import STUDY_TARGET_MIN
 from sync.dates import (
     daterange,
     format_week_label,
@@ -16,47 +15,37 @@ from sync.dates import (
 )
 from sync.metrics import (
     aggregate_activity_totals,
-    aggregate_screen_time,
     compute_bucket_deltas,
     compute_moving_average,
     compute_period_metrics,
-    group_screen_time_by_percent,
 )
 from sync.notes.sections import join_sections, trim_blank_lines
 from sync.periods.builders.common import (
     append_activity_summary,
     compute_sleep_aux_averages,
     compute_avg_schedule,
-    mood_for_day,
     sleep_minutes_for_day,
     sleep_stats_table_lines,
     study_minutes_for_day,
     training_done_for_day,
 )
 from sync.periods.sections import (
-    append_interrupts_table,
     append_media_section,
     append_summary_section,
     append_training_type_table,
-    build_procrastination_section,
 )
 from sync.periods.presentation import (
     bucket_average_bar_spec,
-    monthly_study_grid_spec,
     monthly_training_grid_spec,
-    period_screen_trend_rows,
 )
 from sync.writers.charts import (
-    DECIMAL_ONE_LABEL,
     MONTHLY_WEEK_METRIC,
-    MONTHLY_WEEK_MOOD,
     MONTHLY_WEEK_STUDY,
     TIME_LABEL_MIN2H,
     TIME_LABEL_STANDARD,
     VerticalBarSpec,
     render_chart,
 )
-from sync.writers.tables import ScreenTrendTableSpec, render_table
 
 
 def build_monthly_metrics(
@@ -70,7 +59,6 @@ def build_monthly_metrics(
     media_bundle: MediaBundle,
     *,
     target_date: datetime.date,
-    study_target_minutes: int | None,
     prior_month_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
     """
@@ -112,12 +100,9 @@ def build_monthly_metrics(
         prev_metrics,
         current_month_label,
         prev_month_label,
-        study_target_minutes,
         ma_metrics=ma_metrics,
         ma_label="3-MO AVG" if ma_metrics else None,
         ma_training_unit="mo",
-        period_type="month",
-        total_days=days_in_period,
     )
 
     # STUDY section (using activity totals for accuracy)
@@ -178,35 +163,8 @@ def build_monthly_metrics(
     )
     append_activity_summary(study_lines, activity_totals)
 
-    # Full-study-day deltas per week (pace-normalized by days per bucket)
-    study_grid_delta_labels = compute_bucket_deltas(
-        week_day_lists,
-        value_for_day=lambda d: (
-            1.0
-            if (study_minutes_for_day(month_delta_data, d) or 0) >= STUDY_TARGET_MIN
-            else 0.0
-        ),
-        baseline_bucket=prev_baseline_week,
-        mode="pace",
-        today=today,
-    )
-
     current_month_date = today if is_current_month else None
-    study_lines.extend(
-        render_chart(
-            monthly_study_grid_spec(
-                week_ranges=week_ranges,
-                daily_data=daily_data,
-                current_date=current_month_date,
-                today=today,
-                delta_labels=study_grid_delta_labels,
-            )
-        )
-    )
-    study_lines.append("")
 
-    # INTERRUPTIONS table
-    append_interrupts_table(study_lines, dates, daily_data)
     sections.append(trim_blank_lines(study_lines))
 
     # TRAINING section
@@ -272,34 +230,6 @@ def build_monthly_metrics(
     append_training_type_table(training_lines, dates, daily_data)
     sections.append(trim_blank_lines(training_lines))
 
-    # PROCRASTINATION section (screen time waterfall + trend table)
-    screen_time_totals = aggregate_screen_time(dates, daily_data)
-    screen_time_totals = group_screen_time_by_percent(screen_time_totals)
-    if screen_time_totals:
-        # Weekly trend table with wikilinks to weekly notes
-        week_labels = [format_week_label(s, e) for s, e in week_ranges]
-        week_wikilinks: list[str] = []
-        for (s, _), label in zip(week_ranges, week_labels):
-            year, week_num, _ = s.isocalendar()
-            week_wikilinks.append(f"[[{year}-W{week_num:02d}\\|{label}]]")
-        procrastination_lines = build_procrastination_section(
-            screen_time_totals,
-            render_table(
-                ScreenTrendTableSpec(
-                    period_label="WEEK",
-                    rows=period_screen_trend_rows(
-                        week_ranges,
-                        daily_data,
-                        today=today,
-                        labels=week_labels,
-                        wikilinks=week_wikilinks,
-                        fallback_prefix="W",
-                    ),
-                )
-            ),
-        )
-        sections.append(trim_blank_lines(procrastination_lines))
-
     # SLEEP section (5-char bars, weekly averages)
     sleep_lines = ["### **SLEEP**"]
     sleep_delta_labels = compute_bucket_deltas(
@@ -327,45 +257,17 @@ def build_monthly_metrics(
     )
     sleep_lines.append("")
 
-    avg_awake, avg_awakenings = compute_sleep_aux_averages(dates, daily_data)
+    avg_awake = compute_sleep_aux_averages(dates, daily_data)
 
     sleep_lines.extend(
         sleep_stats_table_lines(
             sleep_avg,
             avg_awake,
-            avg_awakenings,
             avg_schedule=compute_avg_schedule(dates, daily_data),
         )
     )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
-
-    # MOOD section (5-char bars, weekly averages, always show decimal)
-    mood_lines = ["### **MOOD**"]
-    mood_delta_labels = compute_bucket_deltas(
-        week_day_lists,
-        value_for_day=lambda d: mood_for_day(month_delta_data, d),
-        baseline_bucket=prev_baseline_week,
-        mode="average",
-        today=today,
-    )
-
-    mood_lines.extend(
-        render_chart(
-            bucket_average_bar_spec(
-                week_ranges,
-                week_labels,
-                today=today,
-                value_for_day=lambda d: mood_for_day(daily_data, d),
-                chart_value=lambda avg: avg,
-                value_label=DECIMAL_ONE_LABEL.format,
-                zero_label="0.0",
-                profile=MONTHLY_WEEK_MOOD,
-                delta_labels=mood_delta_labels,
-            )
-        )
-    )
-    sections.append(trim_blank_lines(mood_lines))
 
     # MEDIA section
     append_media_section(sections, media_bundle)
