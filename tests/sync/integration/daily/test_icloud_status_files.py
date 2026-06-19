@@ -1,4 +1,3 @@
-import builtins
 import datetime
 import errno
 import json
@@ -29,7 +28,7 @@ def test_read_status_file_reprocesses_existing_pending_without_primary(
     assert parsed_path == str(pending_path)
 
 
-def test_read_status_file_claims_primary_before_reading(monkeypatch, tmp_path):
+def test_read_status_file_claims_primary_after_hydrating(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
     monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
@@ -40,14 +39,46 @@ def test_read_status_file_claims_primary_before_reading(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    original_open = builtins.open
+    replaced: list[tuple[str, str]] = []
+    original_replace = icloud.os.replace
 
-    def locked_open(target, *args, **kwargs):
-        if target == str(path):
+    def tracking_replace(source, target):
+        if source == str(path):
+            replaced.append((source, target))
+        return original_replace(source, target)
+
+    monkeypatch.setattr(icloud.os, "replace", tracking_replace)
+
+    success, payload, parsed_path = icloud.read_status_file("workout_status.json")
+
+    assert success is True
+    assert payload == {"date": "2026-05-22", "duration": 30}
+    assert parsed_path is not None
+    assert parsed_path.startswith(str(tmp_path / "cache"))
+    assert replaced == [(str(path), parsed_path)]
+    assert not path.exists()
+    assert not (tmp_path / "workout_status.json.invalid").exists()
+
+
+def test_read_status_file_copies_when_icloud_replace_deadlocks(monkeypatch, tmp_path):
+    monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
+    monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
+
+    path = tmp_path / "workout_status.json"
+    path.write_text(
+        json.dumps({"date": "2026-05-22", "duration": 30}),
+        encoding="utf-8",
+    )
+
+    original_replace = icloud.os.replace
+
+    def deadlocked_primary_replace(source, target):
+        if source == str(path):
             raise OSError(errno.EDEADLK, "Resource deadlock avoided")
-        return original_open(target, *args, **kwargs)
+        return original_replace(source, target)
 
-    monkeypatch.setattr(builtins, "open", locked_open)
+    monkeypatch.setattr(icloud.os, "replace", deadlocked_primary_replace)
 
     success, payload, parsed_path = icloud.read_status_file("workout_status.json")
 
@@ -56,7 +87,54 @@ def test_read_status_file_claims_primary_before_reading(monkeypatch, tmp_path):
     assert parsed_path is not None
     assert parsed_path.startswith(str(tmp_path / "cache"))
     assert not path.exists()
-    assert not (tmp_path / "workout_status.json.invalid").exists()
+
+
+def test_read_status_file_defers_stale_icloud_handle(monkeypatch, tmp_path):
+    monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
+    monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
+    monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
+
+    path = tmp_path / "sleep_status.json"
+    path.write_text(json.dumps({"date": "2026-06-07"}), encoding="utf-8")
+
+    def stale_replace(source, target):
+        if source == str(path):
+            raise OSError(errno.ESTALE, "Stale NFS file handle")
+        return None
+
+    original_remove = icloud.os.remove
+
+    def stale_remove(target):
+        if target == str(path):
+            raise OSError(errno.ESTALE, "Stale NFS file handle")
+        original_remove(target)
+
+    monkeypatch.setattr(icloud.os, "replace", stale_replace)
+    monkeypatch.setattr(icloud.os, "remove", stale_remove)
+
+    warnings: list[tuple[str, tuple[object, ...]]] = []
+    errors: list[tuple[str, tuple[object, ...]]] = []
+
+    def capture_warning(message: str, *args: object) -> None:
+        warnings.append((message, args))
+
+    def capture_error(message: str, *args: object) -> None:
+        errors.append((message, args))
+
+    monkeypatch.setattr(icloud.logger, "warning", capture_warning)
+    monkeypatch.setattr(icloud.logger, "error", capture_error)
+
+    success, payload, parsed_path = icloud.read_status_file("sleep_status.json")
+
+    assert success is False
+    assert payload is None
+    assert parsed_path is None
+    assert warnings
+    warning_message, warning_args = warnings[0]
+    assert warning_message == "Deferred claiming %s: %s"
+    assert warning_args[0] == "sleep_status.json"
+    assert not errors
+    assert not list((tmp_path / "cache").glob("*.pending"))
 
 
 def test_sleep_status_file_is_claimed_and_loaded(monkeypatch, tmp_path):

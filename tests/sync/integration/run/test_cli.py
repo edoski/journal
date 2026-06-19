@@ -472,6 +472,63 @@ def test_run_daily_sync_today_only_when_no_backfill_targets(
     assert synced_days == [anchor_day]
 
 
+def test_monthly_sync_default_anchors_window_to_today(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 6, 19)
+
+    captured: list[date] = []
+
+    class _FakePeriodSyncService:
+        def sync_month(
+            self,
+            window,
+            note_path,
+            *,
+            cleanup_previous,
+            cleanup_previous_runner,
+        ) -> None:
+            _ = note_path, cleanup_previous, cleanup_previous_runner
+            captured.append(window.target_date)
+
+    monkeypatch.setattr(wiring.datetime, "date", _FrozenDate)
+    monkeypatch.setattr(
+        wiring,
+        "_build_period_sync_service",
+        lambda *, deps=None: _FakePeriodSyncService(),
+    )
+    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+
+    deps = _wiring_deps(
+        session_source_factory=lambda: object(),
+        status_source_factory=lambda: object(),
+        schedule_source_factory=lambda: object(),
+    )
+    wiring.run_monthly_sync(month_arg=None, no_cleanup=True, deps=deps)
+
+    assert captured == [date(2026, 6, 19)]
+
+
+def test_monthly_sync_target_date_uses_today_for_explicit_current_month() -> None:
+    target = wiring._resolve_month_target_date("2026-06", today=date(2026, 6, 19))
+
+    assert target == date(2026, 6, 19)
+
+
+def test_monthly_sync_target_date_uses_month_end_for_other_months() -> None:
+    today = date(2026, 6, 19)
+
+    assert wiring._resolve_month_target_date("2026-05", today=today) == date(
+        2026, 5, 31
+    )
+    assert wiring._resolve_month_target_date("2026-07", today=today) == date(
+        2026, 7, 31
+    )
+
+
 def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(

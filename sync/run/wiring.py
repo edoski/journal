@@ -24,7 +24,7 @@ from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
-from sync.dates import quarter_of_date
+from sync.dates import month_range, quarter_of_date
 from sync.periods.runtime import resolve_note_path
 from sync.periods.windows import (
     build_month_window,
@@ -177,6 +177,21 @@ def run_weekly_sync(
     )
 
 
+def _resolve_month_target_date(
+    month_arg: str | None,
+    *,
+    today: datetime.date,
+) -> datetime.date:
+    if month_arg is None:
+        return today
+
+    year, month = map(int, month_arg.split("-"))
+    if year == today.year and month == today.month:
+        return today
+    _start, end = month_range(year, month)
+    return end
+
+
 def run_monthly_sync(
     *,
     month_arg: str | None,
@@ -186,12 +201,10 @@ def run_monthly_sync(
     resolved = deps or default_wiring_deps()
     resolved.bootstrap_cache_layout()
 
-    if month_arg:
-        year, month = map(int, month_arg.split("-"))
-        target_date = datetime.date(year, month, 1)
-    else:
-        today = datetime.date.today()
-        target_date = datetime.date(today.year, today.month, 1)
+    target_date = _resolve_month_target_date(
+        month_arg,
+        today=datetime.date.today(),
+    )
 
     window = build_month_window(target_date)
     note_path = resolve_note_path(window.filename)

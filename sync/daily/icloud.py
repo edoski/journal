@@ -12,6 +12,7 @@ import errno
 import glob
 import json
 import os
+import tempfile
 import time
 
 from sync.config import PATHS
@@ -33,6 +34,7 @@ _TRANSIENT_ERRNOS = {
     errno.EAGAIN,
     errno.EBUSY,
     errno.EDEADLK,
+    errno.ESTALE,
     errno.ETIMEDOUT,
 }
 
@@ -78,6 +80,39 @@ def _is_stable_drop_file(target_path: str) -> tuple[bool, Exception | None]:
     return False, ValueError("file size changed while syncing")
 
 
+def _read_drop_file_bytes(target_path: str) -> tuple[bytes | None, Exception | None]:
+    try:
+        with open(target_path, "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        return None, None
+    except (PermissionError, OSError) as exc:
+        return None, exc
+    if not raw:
+        return None, ValueError("empty file (likely still syncing)")
+    return raw, None
+
+
+def _write_claimed_bytes(claimed_path: str, raw: bytes) -> Exception | None:
+    staging_dir = os.path.dirname(claimed_path)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{os.path.basename(claimed_path)}.",
+        suffix=".tmp",
+        dir=staging_dir,
+    )
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        os.replace(tmp_path, claimed_path)
+    except (PermissionError, OSError) as exc:
+        try:
+            os.unlink(tmp_path)
+        except (FileNotFoundError, PermissionError, OSError):
+            pass
+        return exc
+    return None
+
+
 def _claim_status_file(
     filename: str,
     target_path: str,
@@ -85,6 +120,10 @@ def _claim_status_file(
     stable, stable_err = _is_stable_drop_file(target_path)
     if not stable:
         return None, stable_err
+
+    raw, read_err = _read_drop_file_bytes(target_path)
+    if read_err or raw is None:
+        return None, read_err
 
     os.makedirs(STATUS_STAGING_DIR, exist_ok=True)
     label = _status_file_label(filename)
@@ -97,7 +136,17 @@ def _claim_status_file(
     except FileNotFoundError:
         return None, None
     except (PermissionError, OSError) as exc:
-        return None, exc
+        write_err = _write_claimed_bytes(claimed_path, raw)
+        if write_err:
+            return None, write_err
+        try:
+            os.remove(target_path)
+        except FileNotFoundError:
+            return claimed_path, None
+        except (PermissionError, OSError):
+            finalize_status_file(filename, claimed_path)
+            return None, exc
+        return claimed_path, None
     return claimed_path, None
 
 
