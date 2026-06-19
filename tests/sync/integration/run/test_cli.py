@@ -550,11 +550,6 @@ def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> N
     )
     monkeypatch.setattr(
         wiring,
-        "run_quarterly_sync",
-        lambda *, quarter_arg, deps=None: calls.append(f"quarterly:{quarter_arg}"),
-    )
-    monkeypatch.setattr(
-        wiring,
         "run_yearly_sync",
         lambda *, year_arg, deps=None: calls.append(f"yearly:{year_arg}"),
     )
@@ -566,7 +561,6 @@ def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> N
         "daily",
         "weekly:None:False",
         "monthly:None:False",
-        "quarterly:None",
         "yearly:None",
     ]
 

@@ -1,4 +1,4 @@
-"""Port-driven service for weekly/monthly/quarterly/yearly sync."""
+"""Port-driven service for weekly/monthly/yearly sync."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from collections.abc import Callable
 
 from sync.constants import (
     MONTHLY_TEMPLATE_PATH,
-    QUARTERLY_TEMPLATE_PATH,
     WEEKLY_TEMPLATE_PATH,
     YEARLY_TEMPLATE_PATH,
 )
@@ -17,7 +16,6 @@ from sync.dates import daterange
 from sync.metrics import compute_period_metrics
 from sync.periods.builders import (
     build_monthly_metrics,
-    build_quarterly_metrics,
     build_weekly_metrics,
     build_yearly_metrics,
 )
@@ -27,7 +25,7 @@ from sync.periods.runtime import (
     open_period_note,
     write_note_metrics,
 )
-from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWindow
+from sync.periods.windows import MonthWindow, WeekWindow, YearWindow
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
@@ -172,41 +170,6 @@ class PeriodSyncService:
             previous_note_path=journal_path(window.previous_filename),
             rerun=cleanup_previous_runner,
         )
-
-    def sync_quarter(self, window: QuarterWindow, note_path: str) -> None:
-        with open_period_note(
-            note_path, QUARTERLY_TEMPLATE_PATH, self.note_store
-        ) as lines:
-            quarter_dates = list(daterange(window.start, window.end))
-            daily_data = self._load_dates(quarter_dates)
-            prev_daily_data = self._load_range(
-                window.previous_start, window.previous_end
-            )
-            prior_quarter_metrics = self._load_prior_metrics(
-                range(4, 0, -1),
-                window.prior_bounds,
-            )
-            media_bundle = self.media_source.scan(window.start, window.end)
-
-            metrics_block = build_quarterly_metrics(
-                window.start,
-                window.end,
-                window.month_ranges,
-                daily_data,
-                prev_daily_data,
-                window.previous_year,
-                window.previous_quarter,
-                media_bundle,
-                target_date=window.target_date,
-                prior_quarter_metrics=prior_quarter_metrics,
-            )
-
-            lines = self.goal_sync_service.sync_quarterly_note(
-                lines,
-                note_path=note_path,
-                window=window,
-            )
-            write_note_metrics(note_path, lines, metrics_block, self.note_store)
 
     def sync_year(self, window: YearWindow, note_path: str) -> None:
         with open_period_note(

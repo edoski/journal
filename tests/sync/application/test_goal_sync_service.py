@@ -10,7 +10,7 @@ from sync.adapters.json_goal_cache import (
     JsonGoalReconcileCacheStore,
 )
 from sync.adapters.markdown_goals import MarkdownGoalStore
-from sync.application.goal_note_gateway import DailyGoalSources, QuarterlyGoalSources
+from sync.application.goal_note_gateway import DailyGoalSources
 from sync.application.goal_sync_service import GoalSyncService
 from sync.goals.reminders import get_reminders_for_date
 from sync.goals.period_pipeline import (
@@ -22,7 +22,6 @@ from sync.goals.targets import GoalPathConfig
 from sync.contracts.goals import Goal
 from sync.contracts.reminders import DailySchedule, ReminderRule
 from sync.periods.windows import (
-    build_quarter_window,
     build_week_window,
     build_year_window,
 )
@@ -96,12 +95,15 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
     service.gateway.path_config = GoalPathConfig(journal_dir=str(base_dir))
     monkeypatch.setattr(
         service.gateway,
-        "load_quarterly_sources",
-        lambda _month_start: QuarterlyGoalSources(
-            yearly_mirror=[],
-            quarterly_tasks=[],
-            path=str(base_dir / "2026-Q1.md"),
-            lines=[],
+        "load_yearly_source_for_year",
+        lambda _year, create=False: (
+            type(
+                "Target",
+                (),
+                {"note_path": str(base_dir / "2026.md")},
+            )(),
+            [],
+            [],
         ),
     )
     monkeypatch.setattr(
@@ -119,12 +121,7 @@ def test_sync_weekly_note_builds_monthly_and_weekly_sections(monkeypatch, tmp_pa
         pierce_today_calls.append(kwargs["today"])
         return PiercingSyncResult(
             ["source"],
-            (
-                PiercingSourceResult(
-                    "QUARTERLY", str(base_dir / "2026-Q1.md"), [], False
-                ),
-                PiercingSourceResult("YEARLY", str(base_dir / "2026-Q1.md"), [], False),
-            ),
+            (PiercingSourceResult("YEARLY", str(base_dir / "2026.md"), [], False),),
         )
 
     monkeypatch.setattr(
@@ -199,90 +196,6 @@ def test_sync_yearly_note_uses_carry_forward(monkeypatch):
     assert goal_store.last_sections[0].section == "YEARLY"
 
 
-def test_sync_quarterly_note_renders_empty_quarterly_placeholder(tmp_path):
-    note_store = _StubNoteStore()
-    goal_store = MarkdownGoalStore()
-    service = GoalSyncService(
-        note_store=note_store,
-        goal_store=goal_store,
-        carry_cache_store=JsonGoalCarryForwardCacheStore(
-            cache_dir=str(tmp_path / "cache" / "goals"),
-            lock_root=str(tmp_path / "cache" / "locks" / "state"),
-        ),
-        reconcile_cache_store=JsonGoalReconcileCacheStore(
-            cache_dir=str(tmp_path / "cache" / "goals"),
-            lock_root=str(tmp_path / "cache" / "locks" / "state"),
-        ),
-    )
-
-    lines = [
-        "## Goals",
-        "---",
-        "### **YEARLY**",
-        "",
-        "### **QUARTERLY**",
-        "",
-        "## Metrics",
-        "---",
-    ]
-
-    updated = service.sync_quarterly_note(
-        lines,
-        note_path=str(tmp_path / "2026-Q1.md"),
-        window=build_quarter_window(
-            2026,
-            1,
-            target_date=datetime.date(2026, 2, 15),
-        ),
-    )
-
-    updated_text = "\n".join(updated)
-    assert "_No yearly goals have been defined yet._" in updated_text
-    assert "_No quarterly goals have been defined yet._" in updated_text
-
-
-def test_sync_quarterly_note_uses_target_date_for_yearly_mirror(
-    monkeypatch,
-    tmp_path,
-):
-    note_store = _StubNoteStore()
-    goal_store = _StubGoalStore()
-    service = GoalSyncService(
-        note_store=note_store,
-        goal_store=goal_store,
-        carry_cache_store=_StubCarryCacheStore(),
-        reconcile_cache_store=_StubReconcileCacheStore(),
-    )
-
-    mirror_today_calls: list[datetime.date] = []
-
-    def _mirror_stub(*_args, **kwargs):
-        mirror_today_calls.append(kwargs["today"])
-        return MirrorSyncResult([], [], False, ["mirror"])
-
-    monkeypatch.setattr(
-        "sync.application.goal_sync_period.load_source_tasks_with_carry_forward",
-        lambda *_a, **_kw: [],
-    )
-    monkeypatch.setattr(
-        "sync.application.goal_sync_period.sync_mirror_section",
-        _mirror_stub,
-    )
-
-    updated = service.sync_quarterly_note(
-        ["## Goals", "---", "### **YEARLY**", "", "### **QUARTERLY**", ""],
-        note_path=str(tmp_path / "2026-Q1.md"),
-        window=build_quarter_window(
-            2026,
-            1,
-            target_date=datetime.date(2026, 2, 11),
-        ),
-    )
-
-    assert updated == ["## Goals", "---", "### **YEARLY**", "", "### **QUARTERLY**", ""]
-    assert mirror_today_calls == [datetime.date(2026, 2, 11)]
-
-
 def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
     goal_store = MarkdownGoalStore()
@@ -333,11 +246,10 @@ def test_sync_daily_note_removes_stale_reminder_ids(monkeypatch, tmp_path):
         lambda _day: DailyGoalSources(
             weekly_tasks=[],
             monthly_tasks=[],
-            quarterly_tasks=[],
             yearly_tasks=[],
             weekly_path="weekly.md",
             monthly_path="monthly.md",
-            quarterly_path="quarterly.md",
+            yearly_path="yearly.md",
         ),
     )
     monkeypatch.setattr(
@@ -411,11 +323,10 @@ def test_sync_daily_note_renders_empty_daily_placeholder(monkeypatch, tmp_path):
         lambda _day: DailyGoalSources(
             weekly_tasks=[],
             monthly_tasks=[],
-            quarterly_tasks=[],
             yearly_tasks=[],
             weekly_path="weekly.md",
             monthly_path="monthly.md",
-            quarterly_path="quarterly.md",
+            yearly_path="yearly.md",
         ),
     )
     monkeypatch.setattr(
@@ -482,11 +393,10 @@ def test_sync_daily_note_inserts_goals_after_yaml(monkeypatch, tmp_path):
         lambda _day: DailyGoalSources(
             weekly_tasks=[],
             monthly_tasks=[],
-            quarterly_tasks=[],
             yearly_tasks=[],
             weekly_path="weekly.md",
             monthly_path="monthly.md",
-            quarterly_path="quarterly.md",
+            yearly_path="yearly.md",
         ),
     )
     monkeypatch.setattr(

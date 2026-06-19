@@ -12,7 +12,7 @@ from sync.contracts.reminders import ReminderRule
 from sync.ports.cache import GoalCarryForwardCacheStore, GoalReconcileCacheStore
 from sync.ports.goals import GoalStore
 from sync.ports.notes import NoteStore
-from sync.periods.windows import MonthWindow, QuarterWindow, WeekWindow, YearWindow
+from sync.periods.windows import MonthWindow, WeekWindow, YearWindow
 
 
 @dataclass
@@ -86,19 +86,6 @@ class GoalSyncService:
         window: MonthWindow,
     ) -> list[str]:
         return self.period_flow.sync_monthly_note(
-            lines,
-            note_path=note_path,
-            window=window,
-        )
-
-    def sync_quarterly_note(
-        self,
-        lines: list[str],
-        *,
-        note_path: str,
-        window: QuarterWindow,
-    ) -> list[str]:
-        return self.period_flow.sync_quarterly_note(
             lines,
             note_path=note_path,
             window=window,

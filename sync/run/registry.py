@@ -24,7 +24,6 @@ def build_command_handlers(deps: RuntimeDeps) -> dict[str, CommandHandler]:
         "period_daily": lambda _args: _run_period_daily(deps),
         "period_weekly": lambda args: _run_period_weekly(args, deps),
         "period_monthly": lambda args: _run_period_monthly(args, deps),
-        "period_quarterly": lambda args: _run_period_quarterly(args, deps),
         "period_yearly": lambda args: _run_period_yearly(args, deps),
         "session_rename": lambda args: session_cmd.cmd_session_rename(
             args,
@@ -61,7 +60,6 @@ def _run_period_all(deps: RuntimeDeps) -> int:
     wiring.run_daily_sync(deps=deps.wiring)
     wiring.run_weekly_sync(date_arg=None, no_cleanup=False, deps=deps.wiring)
     wiring.run_monthly_sync(month_arg=None, no_cleanup=False, deps=deps.wiring)
-    wiring.run_quarterly_sync(quarter_arg=None, deps=deps.wiring)
     wiring.run_yearly_sync(year_arg=None, deps=deps.wiring)
     return 0
 
@@ -86,11 +84,6 @@ def _run_period_monthly(args: argparse.Namespace, deps: RuntimeDeps) -> int:
         no_cleanup=args.no_cleanup,
         deps=deps.wiring,
     )
-    return 0
-
-
-def _run_period_quarterly(args: argparse.Namespace, deps: RuntimeDeps) -> int:
-    wiring.run_quarterly_sync(quarter_arg=args.quarter, deps=deps.wiring)
     return 0
 
 

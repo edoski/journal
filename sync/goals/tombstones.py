@@ -12,10 +12,9 @@ DELETED_RETENTION_PERIODS = {
     "daily": 120,
     "weekly": 52,
     "monthly": 36,
-    "quarterly": 20,
     "yearly": 12,
 }
-_HORIZONS = ("daily", "weekly", "monthly", "quarterly", "yearly")
+_HORIZONS = ("daily", "weekly", "monthly", "yearly")
 
 
 def get_prior_period_key(period_type: str, current_key: str) -> str | None:
@@ -26,7 +25,7 @@ def get_prior_period_key(period_type: str, current_key: str) -> str | None:
     so that carry-forward can check if goals were already offered.
 
     Args:
-        period_type: One of "daily", "weekly", "monthly", "quarterly", "yearly"
+        period_type: One of "daily", "weekly", "monthly", "yearly"
         current_key: Current period identifier (e.g., "2026-02", "2026-W06")
 
     Returns:
@@ -52,12 +51,6 @@ def get_prior_period_key(period_type: str, current_key: str) -> str | None:
             if month == 1:
                 return f"{year - 1}-12"
             return f"{year}-{month - 1:02d}"
-
-        if period_type == "quarterly":
-            year, quarter = int(current_key[:4]), int(current_key[-1])
-            if quarter == 1:
-                return f"{year - 1}-Q4"
-            return f"{year}-Q{quarter - 1}"
 
         if period_type == "yearly":
             year = int(current_key)

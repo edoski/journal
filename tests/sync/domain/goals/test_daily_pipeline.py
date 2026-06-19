@@ -74,8 +74,6 @@ class _WriteCaptureGoalStore:
         _ = horizon, period_key
         if section == "YEARLY":
             return [Goal(id="gid-m111111111", body="Year Goal", done=False)]
-        if section == "QUARTERLY":
-            return [Goal(id="gid-m222222222", body="Quarter Goal", done=False)]
         return []
 
     def apply(
@@ -136,11 +134,11 @@ def test_load_daily_sources_uses_week_start_period_key() -> None:
     assert period_key != day.isoformat()
 
 
-def test_write_daily_sources_clears_quarterly_sections_when_given_empty_lists(
+def test_write_daily_sources_writes_yearly_source_when_given_empty_list(
     tmp_path,
 ) -> None:
     day = datetime.date(2026, 2, 6)
-    quarter_path = str(tmp_path / "2026-Q1.md")
+    year_path = str(tmp_path / "2026.md")
     goal_store = _WriteCaptureGoalStore()
     gateway = GoalNoteGateway(
         note_store=_StubNoteStore(weekly_lines=None),
@@ -151,18 +149,12 @@ def test_write_daily_sources_clears_quarterly_sections_when_given_empty_lists(
     gateway.write_daily_sources(
         day,
         weekly_tasks=[],
-        quarterly_tasks=[],
         yearly_tasks=[],
     )
 
-    quarter_sections = goal_store.sections_by_path[quarter_path]
-    assert quarter_sections[0].section == "YEARLY"
-    assert quarter_sections[0].lines == ["", "_No yearly goals have been defined yet._"]
-    assert quarter_sections[1].section == "QUARTERLY"
-    assert quarter_sections[1].lines == [
-        "",
-        "_No quarterly goals have been defined yet._",
-    ]
+    year_sections = goal_store.sections_by_path[year_path]
+    assert year_sections[0].section == "YEARLY"
+    assert year_sections[0].lines == ["", "_No yearly goals have been defined yet._"]
 
 
 def test_add_goal_replaces_empty_placeholder(tmp_path) -> None:
@@ -282,7 +274,7 @@ def test_add_goal_appends_missing_subsection_without_rewriting_other_subsections
     original_lines = [
         "## Goals",
         "---",
-        "### **QUARTERLY**",
+        "### **YEARLY**",
         "- [ ] Mirror line — `12d` ^gid-m111111111",
         "",
         "## Metrics",

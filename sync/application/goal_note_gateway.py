@@ -13,7 +13,6 @@ from sync.goals.targets import (
     GoalPathConfig,
     goal_note_path,
     monthly_goal_target,
-    quarterly_goal_target,
     weekly_goal_target,
     yearly_goal_target_for_year,
 )
@@ -28,21 +27,10 @@ class DailyGoalSources:
 
     weekly_tasks: list[Goal]
     monthly_tasks: list[Goal]
-    quarterly_tasks: list[Goal]
     yearly_tasks: list[Goal]
     weekly_path: str
     monthly_path: str
-    quarterly_path: str
-
-
-@dataclass(frozen=True)
-class QuarterlyGoalSources:
-    """Resolved quarterly note content used by weekly/monthly sync."""
-
-    yearly_mirror: list[Goal]
-    quarterly_tasks: list[Goal]
-    path: str
-    lines: list[str]
+    yearly_path: str
 
 
 @dataclass
@@ -118,7 +106,6 @@ class GoalNoteGateway:
     def load_daily_sources(self, day: datetime.date) -> DailyGoalSources:
         weekly_target = weekly_goal_target(day, self.path_config)
         monthly_target = monthly_goal_target(day, self.path_config)
-        quarterly_target = quarterly_goal_target(day, self.path_config)
         yearly_target = yearly_goal_target_for_year(day.year, self.path_config)
 
         weekly_lines = self.read_target(weekly_target)
@@ -129,16 +116,15 @@ class GoalNoteGateway:
         )
 
         monthly_lines = self.read_or_create_target(monthly_target)
-        quarterly_lines = self.read_or_create_target(quarterly_target)
+        yearly_lines = self.read_or_create_target(yearly_target)
 
         return DailyGoalSources(
             weekly_tasks=weekly_tasks,
             monthly_tasks=self.extract_target(monthly_lines, monthly_target),
-            quarterly_tasks=self.extract_target(quarterly_lines, quarterly_target),
-            yearly_tasks=self.extract_target(quarterly_lines, yearly_target),
+            yearly_tasks=self.extract_target(yearly_lines, yearly_target),
             weekly_path=weekly_target.note_path,
             monthly_path=monthly_target.note_path,
-            quarterly_path=quarterly_target.note_path,
+            yearly_path=yearly_target.note_path,
         )
 
     def write_daily_sources(
@@ -147,7 +133,6 @@ class GoalNoteGateway:
         *,
         weekly_tasks: list[Goal],
         monthly_tasks: list[Goal] | None = None,
-        quarterly_tasks: list[Goal] | None = None,
         yearly_tasks: list[Goal] | None = None,
     ) -> None:
         weekly_target = weekly_goal_target(day, self.path_config)
@@ -170,25 +155,8 @@ class GoalNoteGateway:
         if monthly_tasks is not None:
             self.write_monthly_source(day, monthly_tasks)
 
-        if quarterly_tasks is not None or yearly_tasks is not None:
-            self.write_quarterly_source(
-                day,
-                quarterly_tasks=quarterly_tasks,
-                yearly_tasks=yearly_tasks,
-            )
-
-    def load_quarterly_sources(
-        self, month_start: datetime.date
-    ) -> QuarterlyGoalSources:
-        target = quarterly_goal_target(month_start, self.path_config)
-        yearly_target = yearly_goal_target_for_year(month_start.year, self.path_config)
-        lines = self.read_or_create_target(target)
-        return QuarterlyGoalSources(
-            yearly_mirror=self.extract_target(lines, yearly_target),
-            quarterly_tasks=self.extract_target(lines, target),
-            path=target.note_path,
-            lines=lines,
-        )
+        if yearly_tasks is not None:
+            self.write_yearly_source(day.year, yearly_tasks)
 
     def load_monthly_source(
         self, day: datetime.date
@@ -217,54 +185,22 @@ class GoalNoteGateway:
         day: datetime.date,
         monthly_tasks: list[Goal],
     ) -> list[str]:
-        """Persist MONTHLY source tasks while preserving the QUARTERLY mirror."""
+        """Persist MONTHLY source tasks while preserving the YEARLY mirror."""
         target = monthly_goal_target(day, self.path_config)
         with locked_note(target.note_path):
             lines = self.read_or_create_target(target)
-            existing_quarterly = self.goal_store.extract(lines, "QUARTERLY")
-            return self.goal_store.write(
-                target.note_path,
-                lines,
-                [
-                    GoalSection(
-                        section="QUARTERLY",
-                        lines=render_goals_or_empty("QUARTERLY", existing_quarterly),
-                    ),
-                    GoalSection(
-                        section="MONTHLY",
-                        lines=render_goals_or_empty("MONTHLY", monthly_tasks),
-                    ),
-                ],
-            )
-
-    def write_quarterly_source(
-        self,
-        day: datetime.date,
-        *,
-        quarterly_tasks: list[Goal] | None = None,
-        yearly_tasks: list[Goal] | None = None,
-    ) -> list[str]:
-        """Persist QUARTERLY/YEARLY sections in a quarterly note."""
-        target = quarterly_goal_target(day, self.path_config)
-        with locked_note(target.note_path):
-            lines = self.read_or_create_target(target)
             existing_yearly = self.goal_store.extract(lines, "YEARLY")
-            existing_quarterly = self.goal_store.extract(lines, "QUARTERLY")
-            resolved_yearly = existing_yearly if yearly_tasks is None else yearly_tasks
-            resolved_quarterly = (
-                existing_quarterly if quarterly_tasks is None else quarterly_tasks
-            )
             return self.goal_store.write(
                 target.note_path,
                 lines,
                 [
                     GoalSection(
                         section="YEARLY",
-                        lines=render_goals_or_empty("YEARLY", resolved_yearly),
+                        lines=render_goals_or_empty("YEARLY", existing_yearly),
                     ),
                     GoalSection(
-                        section="QUARTERLY",
-                        lines=render_goals_or_empty("QUARTERLY", resolved_quarterly),
+                        section="MONTHLY",
+                        lines=render_goals_or_empty("MONTHLY", monthly_tasks),
                     ),
                 ],
             )

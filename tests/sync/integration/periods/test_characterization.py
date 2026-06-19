@@ -11,8 +11,6 @@ from sync.dates import (
     iso_week_range,
     month_range,
     month_week_ranges,
-    quarter_months,
-    quarter_range,
     year_quarters,
     year_range,
 )
@@ -152,68 +150,6 @@ def test_monthly_previous_summary_uses_full_previous_month_denominator():
     )
 
     assert "| `0h00m/day` | `0h02m/day` |" in _summary_line(lines, "STUDY")
-
-
-def test_quarterly_metrics_block_characterization():
-    start, end = quarter_range(2020, 3)
-    month_ranges = quarter_months(2020, 3)
-    daily_data = range_data(start, end)
-    prev_start, prev_end = quarter_range(2020, 2)
-    prev_daily_data = range_data(prev_start, prev_end)
-
-    prior_quarter_metrics = []
-    for year_num, quarter_num in ((2019, 3), (2019, 4), (2020, 1), (2020, 2)):
-        p_start, p_end = quarter_range(year_num, quarter_num)
-        p_data = range_data(p_start, p_end)
-        p_dates = list(daterange(p_start, p_end))
-        prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
-
-    first_lines = period_builders.build_quarterly_metrics(
-        start,
-        end,
-        month_ranges,
-        daily_data,
-        prev_daily_data,
-        2020,
-        2,
-        FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
-        prior_quarter_metrics=prior_quarter_metrics,
-    )
-    second_lines = period_builders.build_quarterly_metrics(
-        start,
-        end,
-        month_ranges,
-        daily_data,
-        prev_daily_data,
-        2020,
-        2,
-        FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
-        prior_quarter_metrics=prior_quarter_metrics,
-    )
-
-    assert first_lines == second_lines
-    _assert_common_structure(first_lines)
-
-
-def test_quarterly_previous_summary_uses_full_previous_quarter_denominator():
-    start, end = quarter_range(2020, 3)
-    prev_start, _prev_end = quarter_range(2020, 2)
-
-    lines = period_builders.build_quarterly_metrics(
-        start,
-        end,
-        quarter_months(2020, 3),
-        {},
-        {prev_start: _minimal_daily(91.0)},
-        2020,
-        2,
-        MediaBundle(books=[], podcasts=[]),
-        target_date=end,
-    )
-
-    assert "| `0h00m/day` | `0h01m/day` |" in _summary_line(lines, "STUDY")
 
 
 def test_yearly_metrics_block_characterization():

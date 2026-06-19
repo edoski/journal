@@ -69,7 +69,7 @@ class MonthWindow:
 
 @dataclass(frozen=True)
 class QuarterWindow:
-    """Window metadata for a quarterly sync run."""
+    """Window metadata for quarter-sized query ranges."""
 
     target_date: datetime.date
     year: int

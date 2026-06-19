@@ -1,5 +1,5 @@
 """
-Shared section assembly helpers for weekly/monthly/quarterly/yearly notes.
+Shared section assembly helpers for weekly/monthly/yearly notes.
 """
 
 from __future__ import annotations

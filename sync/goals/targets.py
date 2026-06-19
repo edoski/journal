@@ -11,16 +11,14 @@ from sync.constants import (
     DAILY_TEMPLATE_PATH,
     JOURNAL_DIR,
     MONTHLY_TEMPLATE_PATH,
-    QUARTERLY_TEMPLATE_PATH,
     WEEKLY_TEMPLATE_PATH,
     YEARLY_TEMPLATE_PATH,
 )
 from sync.contracts.cache import GoalHorizon
 from sync.contracts.goals import GoalWriteTarget
-from sync.dates import iso_week_range, quarter_id, quarter_of_date, shift_month
-from sync.dates import shift_quarter as shift_quarter_value
+from sync.dates import iso_week_range, shift_month
 
-GoalPeriod = Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
+GoalPeriod = Literal["daily", "weekly", "monthly", "yearly"]
 
 
 @dataclass(frozen=True)
@@ -31,9 +29,6 @@ class GoalPathConfig:
     daily_template_path: str = field(default_factory=lambda: DAILY_TEMPLATE_PATH)
     weekly_template_path: str = field(default_factory=lambda: WEEKLY_TEMPLATE_PATH)
     monthly_template_path: str = field(default_factory=lambda: MONTHLY_TEMPLATE_PATH)
-    quarterly_template_path: str = field(
-        default_factory=lambda: QUARTERLY_TEMPLATE_PATH
-    )
     yearly_template_path: str = field(default_factory=lambda: YEARLY_TEMPLATE_PATH)
 
 
@@ -119,19 +114,6 @@ def monthly_goal_target(day: datetime.date, config: GoalPathConfig) -> GoalNoteT
     )
 
 
-def quarterly_goal_target(day: datetime.date, config: GoalPathConfig) -> GoalNoteTarget:
-    year, quarter_num = quarter_of_date(day)
-    qid = quarter_id(year, quarter_num)
-    return _target(
-        filename=f"{qid}.md",
-        template_path=config.quarterly_template_path,
-        section="QUARTERLY",
-        horizon="quarterly",
-        period_key=qid,
-        config=config,
-    )
-
-
 def yearly_goal_target(day: datetime.date, config: GoalPathConfig) -> GoalNoteTarget:
     return yearly_goal_target_for_year(day.year, config)
 
@@ -173,15 +155,6 @@ def resolve_goal_write_target(
             else (today.year, today.month)
         )
         return monthly_goal_target(
-            datetime.date(year, month, 1), config
-        ).as_write_target()
-
-    if period == "quarterly":
-        year, quarter_num = quarter_of_date(today)
-        if use_next:
-            year, quarter_num = shift_quarter_value(year, quarter_num, 1)
-        month = (quarter_num - 1) * 3 + 1
-        return quarterly_goal_target(
             datetime.date(year, month, 1), config
         ).as_write_target()
 

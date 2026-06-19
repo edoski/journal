@@ -99,10 +99,10 @@ def test_weekly_mirror_checked_sets_monthly_source_checked(tmp_path):
     assert source_changed is True
 
 
-def test_quarterly_yearly_bidirectional_reconcile(tmp_path):
+def test_monthly_yearly_bidirectional_reconcile(tmp_path):
     store = _store(tmp_path)
     source_path = tmp_path / "2026.md"
-    mirror_path = tmp_path / "2026-Q1.md"
+    mirror_path = tmp_path / "2026-02.md"
     source_path.write_text("source", encoding="utf-8")
     mirror_path.write_text("mirror", encoding="utf-8")
 

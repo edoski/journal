@@ -1,7 +1,7 @@
 """
 Unified sync package for journal note generation.
 
-Contains sync logic for all periods (daily, weekly, monthly, quarterly, yearly).
+Contains sync logic for daily, weekly, monthly, and yearly notes.
 """
 
 from __future__ import annotations

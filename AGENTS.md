@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/quarterly/yearly metrics with goal carry-forward and reconciliation.
+This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/yearly metrics with goal carry-forward and reconciliation.
 
 ## Project Structure
 
@@ -137,7 +137,6 @@ journal/
       cleanup.py
       weekly/                  # Package
       monthly/                 # Package
-      quarterly/               # Package
       yearly/                  # Package
 
     run/
@@ -201,7 +200,7 @@ journal/
   - `sync/application/goal_sync_daily.py` owns daily goal-note orchestration.
   - `sync/application/goal_sync_period.py` owns period goal-note orchestration.
   - `sync/application/goal_sync_service.py` remains the façade injected into higher-level services.
-- `PeriodSyncService`: period orchestration for weekly/monthly/quarterly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
+- `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
   - `sync/periods/engine.py` is a facade; period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
@@ -252,8 +251,7 @@ journal/
 - Reminder schedule parsing/formatting is canonical in:
   - `sync/goals/reminder_codec.py`
   - `sync/contracts/reminders.py` stays typed contracts only
-- Quarter/year sync windows must carry explicit execution anchors:
-  - `QuarterWindow.target_date`
+- Year sync windows must carry explicit execution anchors:
   - `YearWindow.target_date`
 
 ## Canonical Markdown Schemas
@@ -292,10 +290,9 @@ python -m sync.run period all
 python -m sync.run period daily
 python -m sync.run period weekly [--date YYYY-MM-DD] [--no-cleanup]
 python -m sync.run period monthly [--month YYYY-MM] [--no-cleanup]
-python -m sync.run period quarterly [--quarter YYYY-Q#]
 python -m sync.run period yearly [--year YYYY]
 python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
-python -m sync.run goals add --period {daily|weekly|monthly|quarterly|yearly} [--current|--next] "goal text"
+python -m sync.run goals add --period {daily|weekly|monthly|yearly} [--current|--next] "goal text"
 python -m sync.run media book annotations import /abs/path/to/export.html --note /abs/path/to/book.md
 ```
 
@@ -392,7 +389,7 @@ Validate:
 - period rendering snapshots: strict line-for-line invariance against deterministic fixture generators; regenerate via `python tools/regenerate_baselines.py` when changes are intentional.
 - goal reconciliation: source/mirror reopen+completion behavior remains correct.
 - parsing edge cases: open sessions, malformed shortcut payloads, missing files.
-- period historical flags (`--date`, `--month`, `--quarter`, `--year`).
+- period historical flags (`--date`, `--month`, `--year`).
 - architecture-layer test taxonomy under `tests/sync/`:
   - `architecture/`, `adapters/`, `application/`, `readers/`, `writers/`,
     `domain/`, `integration/`, `snapshots/`
@@ -404,7 +401,7 @@ Central path/env resolution lives in `sync/config.py` (`PATHS`).
 Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
-- `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `QUARTERLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
+- `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
 - `REMINDERS_PATH`, `SCHEDULE_PATH`, `GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
 - `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`

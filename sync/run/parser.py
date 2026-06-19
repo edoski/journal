@@ -53,10 +53,6 @@ def build_parser(
     )
     period_monthly.set_defaults(func=_resolve_handler(handlers, "period_monthly"))
 
-    period_quarterly = period_sub.add_parser("quarterly", help="Run quarterly sync")
-    period_quarterly.add_argument("--quarter", help="Quarter (YYYY-Qn)")
-    period_quarterly.set_defaults(func=_resolve_handler(handlers, "period_quarterly"))
-
     period_yearly = period_sub.add_parser("yearly", help="Run yearly sync")
     period_yearly.add_argument("--year", help="Year (YYYY)")
     period_yearly.set_defaults(func=_resolve_handler(handlers, "period_yearly"))
@@ -115,7 +111,7 @@ def build_parser(
     goals_add = goals_sub.add_parser("add", help="Add a goal to a source period note")
     goals_add.add_argument(
         "--period",
-        choices=["daily", "weekly", "monthly", "quarterly", "yearly"],
+        choices=["daily", "weekly", "monthly", "yearly"],
         required=True,
         help="Goal source period",
     )

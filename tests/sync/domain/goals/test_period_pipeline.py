@@ -22,7 +22,7 @@ class _StubReconcileCacheStore:
 def test_sync_pierced_sources_renders_empty_placeholder() -> None:
     result = sync_pierced_sources(
         existing_tasks=[],
-        sources=[PiercingSource("QUARTERLY", "quarterly.md", [])],
+        sources=[PiercingSource("YEARLY", "yearly.md", [])],
         config=PiercingSyncConfig(
             source_section="MONTHLY",
             note_path="monthly.md",

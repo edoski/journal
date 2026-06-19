@@ -99,12 +99,7 @@ class DailyGoalNoteSync:
             existing_tasks=existing_daily_tasks,
             sources=[
                 PiercingSource("MONTHLY", sources.monthly_path, sources.monthly_tasks),
-                PiercingSource(
-                    "QUARTERLY",
-                    sources.quarterly_path,
-                    sources.quarterly_tasks,
-                ),
-                PiercingSource("YEARLY", sources.quarterly_path, sources.yearly_tasks),
+                PiercingSource("YEARLY", sources.yearly_path, sources.yearly_tasks),
             ],
             config=PiercingSyncConfig(
                 source_section="DAILY",
@@ -116,18 +111,15 @@ class DailyGoalNoteSync:
         )
 
         updated_monthly = source_sync.updated_tasks("MONTHLY")
-        updated_quarterly = source_sync.updated_tasks("QUARTERLY")
         updated_yearly = source_sync.updated_tasks("YEARLY")
         monthly_changed = source_sync.changed("MONTHLY")
-        quarterly_changed = source_sync.changed("QUARTERLY")
         yearly_changed = source_sync.changed("YEARLY")
 
-        if weekly_changed or monthly_changed or quarterly_changed or yearly_changed:
+        if weekly_changed or monthly_changed or yearly_changed:
             self.gateway.write_daily_sources(
                 day,
                 weekly_tasks=updated_weekly_tasks,
                 monthly_tasks=updated_monthly if monthly_changed else None,
-                quarterly_tasks=updated_quarterly if quarterly_changed else None,
                 yearly_tasks=updated_yearly if yearly_changed else None,
             )
 

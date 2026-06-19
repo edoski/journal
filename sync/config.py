@@ -17,7 +17,6 @@ class PathConfig:
     daily_template_path: str
     weekly_template_path: str
     monthly_template_path: str
-    quarterly_template_path: str
     yearly_template_path: str
     reminders_path: str
     schedule_path: str
@@ -101,10 +100,6 @@ def _build_paths() -> PathConfig:
         monthly_template_path=_env_path(
             "MONTHLY_TEMPLATE_PATH",
             os.path.join(templates_dir, "monthly.md"),
-        ),
-        quarterly_template_path=_env_path(
-            "QUARTERLY_TEMPLATE_PATH",
-            os.path.join(templates_dir, "quarterly.md"),
         ),
         yearly_template_path=_env_path(
             "YEARLY_TEMPLATE_PATH",

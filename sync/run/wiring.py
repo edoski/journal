@@ -24,11 +24,10 @@ from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
-from sync.dates import month_range, quarter_of_date
+from sync.dates import month_range
 from sync.periods.runtime import resolve_note_path
 from sync.periods.windows import (
     build_month_window,
-    build_quarter_window,
     build_week_window,
     build_year_window,
 )
@@ -225,31 +224,6 @@ def run_monthly_sync(
         cleanup_previous=not no_cleanup,
         cleanup_previous_runner=cleanup_previous_runner,
     )
-
-
-def run_quarterly_sync(
-    *,
-    quarter_arg: str | None,
-    deps: WiringDeps | None = None,
-) -> None:
-    resolved = deps or default_wiring_deps()
-    resolved.bootstrap_cache_layout()
-
-    if quarter_arg:
-        parts = quarter_arg.upper().split("-Q")
-        if len(parts) != 2:
-            raise ValueError("Quarter must be in format YYYY-Qn")
-        year = int(parts[0])
-        quarter_num = int(parts[1])
-        today = datetime.date.today()
-    else:
-        today = datetime.date.today()
-        year, quarter_num = quarter_of_date(today)
-
-    window = build_quarter_window(year, quarter_num, target_date=today)
-    note_path = resolve_note_path(window.filename)
-
-    _build_period_sync_service(deps=resolved).sync_quarter(window, note_path)
 
 
 def run_yearly_sync(

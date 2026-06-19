@@ -64,40 +64,6 @@ MONTHLY_WEEK_METRIC = VerticalBarProfile(
     delta_anchor_h=HAnchor.CENTER,
 )
 
-QUARTERLY_3MONTH_STUDY = VerticalBarProfile(
-    height=12,
-    y_max=240,
-    track=ColumnTrack(
-        column_width=11,
-        bar_width=7,
-        bar_left_gutter=2,
-        x_label_prefix="     ",
-        delta_label_prefix="     ",
-        axis_trim=2,
-    ),
-    value_anchor_ref=AnchorRef.BAR,
-    value_anchor_h=HAnchor.START,
-    delta_anchor_ref=AnchorRef.LABEL,
-    delta_anchor_h=HAnchor.CENTER,
-)
-
-QUARTERLY_3MONTH_METRIC = VerticalBarProfile(
-    height=10,
-    y_max=10,
-    track=ColumnTrack(
-        column_width=12,
-        bar_width=5,
-        bar_left_gutter=2,
-        x_label_prefix="    ",
-        delta_label_prefix="    ",
-        axis_trim=5,
-    ),
-    value_anchor_ref=AnchorRef.BAR,
-    value_anchor_h=HAnchor.START,
-    delta_anchor_ref=AnchorRef.LABEL,
-    delta_anchor_h=HAnchor.CENTER,
-)
-
 YEARLY_4QTR_STUDY = VerticalBarProfile(
     height=12,
     y_max=720,

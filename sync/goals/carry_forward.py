@@ -40,7 +40,7 @@ def carry_forward_with_tombstones(
         prev_tasks: Tasks from previous period/note (must have IDs assigned)
         current_tasks: Existing tasks in current period/note (modified in place)
         period_key: Current period identifier (for example, ``2026-W06``)
-        horizon: One of ``daily``, ``weekly``, ``monthly``, ``quarterly``
+        horizon: One of ``daily``, ``weekly``, ``monthly``, ``yearly``
 
     Returns:
         Tuple of (updated_tasks, added_count)

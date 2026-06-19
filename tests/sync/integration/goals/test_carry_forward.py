@@ -80,14 +80,6 @@ class TestGetPriorPeriodKey:
     def test_monthly_year_boundary(self):
         assert get_prior_period_key("monthly", "2026-01") == "2025-12"
 
-    def test_quarterly_simple(self):
-        assert get_prior_period_key("quarterly", "2026-Q2") == "2026-Q1"
-        assert get_prior_period_key("quarterly", "2026-Q3") == "2026-Q2"
-        assert get_prior_period_key("quarterly", "2026-Q4") == "2026-Q3"
-
-    def test_quarterly_year_boundary(self):
-        assert get_prior_period_key("quarterly", "2026-Q1") == "2025-Q4"
-
     def test_yearly_simple(self):
         assert get_prior_period_key("yearly", "2026") == "2025"
 

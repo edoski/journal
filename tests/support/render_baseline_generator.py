@@ -15,8 +15,6 @@ from sync.dates import (
     iso_week_range,
     month_range,
     month_week_ranges,
-    quarter_months,
-    quarter_range,
     year_quarters,
     year_range,
 )
@@ -117,43 +115,6 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
     )
 
 
-def _quarterly_metrics_artifact() -> RenderBaselineArtifact:
-    start, end = quarter_range(2020, 3)
-    month_ranges = quarter_months(2020, 3)
-    daily_data = range_data(start, end)
-    prev_start, prev_end = quarter_range(2020, 2)
-    prev_daily_data = range_data(prev_start, prev_end)
-
-    prior_quarter_metrics = []
-    for year_num, quarter_num in ((2019, 3), (2019, 4), (2020, 1), (2020, 2)):
-        p_start, p_end = quarter_range(year_num, quarter_num)
-        p_data = range_data(p_start, p_end)
-        p_dates = list(daterange(p_start, p_end))
-        prior_quarter_metrics.append(compute_period_metrics(p_dates, p_data))
-
-    lines = period_builders.build_quarterly_metrics(
-        start,
-        end,
-        month_ranges,
-        daily_data,
-        prev_daily_data,
-        2020,
-        2,
-        FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
-        prior_quarter_metrics=prior_quarter_metrics,
-    )
-    dates = list(daterange(start, end))
-    current_metrics = compute_period_metrics(dates, daily_data)
-    return RenderBaselineArtifact(
-        name="quarterly_metrics.txt",
-        lines=tuple(lines),
-        period_type="quarter",
-        total_days=len(dates),
-        current_metrics=current_metrics,
-    )
-
-
 def _yearly_metrics_artifact() -> RenderBaselineArtifact:
     year = 2020
     start, end = year_range(year)
@@ -199,7 +160,7 @@ def _goal_lines_artifact() -> RenderBaselineArtifact:
     goals = [
         Goal(
             id="gid-aaa1111111",
-            body="Quarterly planning",
+            body="Yearly planning",
             done=False,
             date_str="2026-02-20",
             deadline=datetime.date(2026, 2, 20),
@@ -226,7 +187,7 @@ def _goals_block_artifact() -> RenderBaselineArtifact:
     weekly_goals = [
         Goal(
             id="gid-aaa1111111",
-            body="Quarterly planning",
+            body="Yearly planning",
             done=False,
             date_str="2026-02-20",
             deadline=datetime.date(2026, 2, 20),
@@ -258,7 +219,6 @@ def generate_render_baseline_artifacts() -> tuple[RenderBaselineArtifact, ...]:
     return (
         _weekly_metrics_artifact(),
         _monthly_metrics_artifact(),
-        _quarterly_metrics_artifact(),
         _yearly_metrics_artifact(),
         _goal_lines_artifact(),
         _goals_block_artifact(),

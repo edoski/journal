@@ -21,7 +21,6 @@ _HORIZONS: Final[tuple[str, ...]] = (
     "daily",
     "weekly",
     "monthly",
-    "quarterly",
     "yearly",
 )
 

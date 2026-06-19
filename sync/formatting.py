@@ -145,10 +145,10 @@ def format_ma_training_ratio(avg_count: float | None, unit: str) -> str:
 
     Args:
         avg_count: Average count across periods (e.g., 4.5 workouts/week)
-        unit: Unit suffix - "7" for weekly, "mo" for monthly, "qtr" for quarterly, "yr" for yearly
+        unit: Unit suffix - "7" for weekly, "mo" for monthly, "yr" for yearly
 
     Returns:
-        Formatted string like "4.5/7", "17.3/mo", "50.5/qtr", "168/yr"
+        Formatted string like "4.5/7", "17.3/mo", "168/yr"
         Returns "—" if avg_count is None.
     """
     if avg_count is None:

@@ -52,7 +52,6 @@ def _configure_goal_paths(tmp_path: Path) -> goals_cmd.GoalCommandConfig:
     daily_template = templates_dir / "daily.md"
     weekly_template = templates_dir / "weekly.md"
     monthly_template = templates_dir / "monthly.md"
-    quarterly_template = templates_dir / "quarterly.md"
     yearly_template = templates_dir / "yearly.md"
 
     daily_template.write_text(
@@ -64,11 +63,7 @@ def _configure_goal_paths(tmp_path: Path) -> goals_cmd.GoalCommandConfig:
         encoding="utf-8",
     )
     monthly_template.write_text(
-        "\n".join(_template_lines("MONTHLY", "QUARTERLY")) + "\n",
-        encoding="utf-8",
-    )
-    quarterly_template.write_text(
-        "\n".join(_template_lines("QUARTERLY", "YEARLY")) + "\n",
+        "\n".join(_template_lines("MONTHLY", "YEARLY")) + "\n",
         encoding="utf-8",
     )
     yearly_template.write_text(
@@ -81,7 +76,6 @@ def _configure_goal_paths(tmp_path: Path) -> goals_cmd.GoalCommandConfig:
         daily_template_path=str(daily_template),
         weekly_template_path=str(weekly_template),
         monthly_template_path=str(monthly_template),
-        quarterly_template_path=str(quarterly_template),
         yearly_template_path=str(yearly_template),
     )
 
@@ -92,7 +86,6 @@ def _configure_goal_paths(tmp_path: Path) -> goals_cmd.GoalCommandConfig:
         ("daily", "DAILY"),
         ("weekly", "WEEKLY"),
         ("monthly", "MONTHLY"),
-        ("quarterly", "QUARTERLY"),
         ("yearly", "YEARLY"),
     ],
 )
@@ -151,7 +144,7 @@ def test_goals_add_preserves_untouched_mirror_subsection(
                 "## Goals",
                 "---",
                 "### **MONTHLY**",
-                "- [ ] Quarterly prep — `12d` ^gid-m111111111",
+                "- [ ] Monthly prep — `12d` ^gid-m111111111",
                 "",
                 "### **WEEKLY**",
                 "",
@@ -172,7 +165,7 @@ def test_goals_add_preserves_untouched_mirror_subsection(
 
     assert rc == 0
     lines = weekly_path.read_text(encoding="utf-8").splitlines()
-    mirror_line = "- [ ] Quarterly prep — `12d` ^gid-m111111111"
+    mirror_line = "- [ ] Monthly prep — `12d` ^gid-m111111111"
     assert lines.count(mirror_line) == 1
     assert any(
         re.fullmatch(r"- \[ \] Weekly review \^gid-m[0-9a-f]{9}", line)

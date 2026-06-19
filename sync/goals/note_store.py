@@ -20,7 +20,6 @@ EMPTY_SUBSECTION_MESSAGES: dict[str, str] = {
     "DAILY": "_No daily goals have been defined yet._",
     "WEEKLY": "_No weekly goals have been defined yet._",
     "MONTHLY": "_No monthly goals have been defined yet._",
-    "QUARTERLY": "_No quarterly goals have been defined yet._",
     "YEARLY": "_No yearly goals have been defined yet._",
 }
 _EMPTY_GOALS_RE = re.compile(

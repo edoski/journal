@@ -1,5 +1,5 @@
 """
-Period sync package (weekly, monthly, quarterly, yearly).
+Period sync package (weekly, monthly, yearly).
 """
 
 from __future__ import annotations

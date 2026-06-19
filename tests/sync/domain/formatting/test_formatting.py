@@ -241,7 +241,6 @@ class TestFormatMaTrainingRatio:
 
     def test_other_units_show_decimal(self):
         assert format_ma_training_ratio(17.25, "mo") == "17.2/mo"
-        assert format_ma_training_ratio(50.5, "qtr") == "50.5/qtr"
 
 
 class TestFormatProgressBar:

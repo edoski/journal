@@ -1,7 +1,7 @@
 """
 Shared base patterns for periodic sync modules.
 
-Provides common functionality used across weekly, monthly, quarterly, and yearly sync:
+Provides common functionality used across weekly, monthly, and yearly sync:
 - Bidirectional goal status reconciliation between source/mirror notes
 """
 
@@ -110,7 +110,7 @@ def process_pierced_goals(
 
     Args:
         existing_tasks: Goals parsed from the current note (mix of original + pierced)
-        source_goal_lists: List of source goal lists to pierce from (e.g., [monthly, quarterly, yearly])
+        source_goal_lists: List of source goal lists to pierce from (e.g., [monthly, yearly])
         proximity_days: Number of days for proximity filtering (e.g., 7 for daily, 30 for weekly)
         today: Reference date for filtering
         note_path: Path to the current (child) note being rendered

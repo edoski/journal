@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias, TypedDict
 
-GoalHorizon: TypeAlias = Literal["daily", "weekly", "monthly", "quarterly", "yearly"]
+GoalHorizon: TypeAlias = Literal["daily", "weekly", "monthly", "yearly"]
 GoalIdsByPeriod: TypeAlias = dict[str, list[str]]
 DeletedGoalIdsByPeriod: TypeAlias = dict[str, str]
 
@@ -15,7 +15,6 @@ class CarryForwardDeletedBuckets(TypedDict, total=False):
     daily: DeletedGoalIdsByPeriod
     weekly: DeletedGoalIdsByPeriod
     monthly: DeletedGoalIdsByPeriod
-    quarterly: DeletedGoalIdsByPeriod
     yearly: DeletedGoalIdsByPeriod
 
 
@@ -25,7 +24,6 @@ class CarryForwardCacheState(TypedDict, total=False):
     daily: GoalIdsByPeriod
     weekly: GoalIdsByPeriod
     monthly: GoalIdsByPeriod
-    quarterly: GoalIdsByPeriod
     yearly: GoalIdsByPeriod
     _deleted: CarryForwardDeletedBuckets
 

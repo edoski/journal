@@ -37,11 +37,6 @@ def test_monthly_metrics_snapshot() -> None:
     _assert_snapshot(artifact)
 
 
-def test_quarterly_metrics_snapshot() -> None:
-    artifact = _artifact("quarterly_metrics.txt")
-    _assert_snapshot(artifact)
-
-
 def test_yearly_metrics_snapshot() -> None:
     artifact = _artifact("yearly_metrics.txt")
     _assert_snapshot(artifact)

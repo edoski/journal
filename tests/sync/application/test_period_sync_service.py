@@ -37,7 +37,6 @@ class _StubGoalSyncService:
     def __init__(self) -> None:
         self.week_calls = 0
         self.month_calls = 0
-        self.quarter_calls = 0
         self.year_calls = 0
 
     def sync_weekly_note(self, lines, *, note_path, window):
@@ -48,11 +47,6 @@ class _StubGoalSyncService:
     def sync_monthly_note(self, lines, *, note_path, window):
         _ = note_path, window
         self.month_calls += 1
-        return lines
-
-    def sync_quarterly_note(self, lines, *, note_path, window):
-        _ = note_path, window
-        self.quarter_calls += 1
         return lines
 
     def sync_yearly_note(self, lines, *, window):

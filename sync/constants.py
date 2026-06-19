@@ -21,7 +21,6 @@ PODCASTS_DIR = PATHS.podcasts_dir
 DAILY_TEMPLATE_PATH = PATHS.daily_template_path
 WEEKLY_TEMPLATE_PATH = PATHS.weekly_template_path
 MONTHLY_TEMPLATE_PATH = PATHS.monthly_template_path
-QUARTERLY_TEMPLATE_PATH = PATHS.quarterly_template_path
 YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 
 # Reminder rules markdown path (required, user-managed)
