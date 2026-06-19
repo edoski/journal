@@ -10,12 +10,13 @@ from collections.abc import Callable
 from sync.log import get_logger
 
 logger = get_logger(__name__)
+CLEANUP_MARKER = "↓"
 
 
 def resync_if_marker(
     previous_note_path: str,
     rerun: Callable[[], None],
-    marker: str = "↓",
+    marker: str = CLEANUP_MARKER,
 ) -> bool:
     """
     Re-sync a prior period note if it contains marker text.
@@ -34,7 +35,8 @@ def resync_if_marker(
 
     try:
         with open(previous_note_path, "r") as f:
-            if marker not in f.read():
+            has_marker = any(line.strip() == marker for line in f)
+            if not has_marker:
                 logger.debug(
                     "Cleanup marker not present; cleanup skipped: %s",
                     previous_note_path,

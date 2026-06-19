@@ -149,8 +149,8 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     lines.append(meditation_row)
     lines.append(workout_row)
     lines.append(stretch_row)
-    axis_prefix = "│ " + " " * (label_width + 3)
-    footer_prefix = "└ " + " " * (label_width + 3)
+    axis_prefix = "│ " + " " * (label_width + 2)
+    footer_prefix = "└ " + " " * (label_width + 2)
     lines.append(axis_prefix + " ".join(["───"] * 7))
     lines.append(footer_prefix + " ".join(DAYS))
 

@@ -13,7 +13,6 @@ FIXTURE_MEDIA_BUNDLE = MediaBundle(
         Book(
             title="Fixture Book",
             author="Fixture Author",
-            started=datetime.date(2019, 12, 1),
             completed=datetime.date(2020, 1, 1),
             rating=None,
         )

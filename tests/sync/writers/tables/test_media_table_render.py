@@ -31,7 +31,6 @@ class TestRenderMediaTable:
             Book(
                 title="Deep Work",
                 author="Cal Newport",
-                started=datetime.date(2025, 1, 5),
                 completed=datetime.date(2025, 1, 22),
                 rating=None,
             )
@@ -63,7 +62,6 @@ class TestRenderMediaTable:
             Book(
                 title="Test Book",
                 author="Author",
-                started=None,
                 completed=datetime.date(2025, 1, 15),
                 rating=None,
             )

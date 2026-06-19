@@ -28,9 +28,9 @@ def test_vertical_bar_chart_renders_fenced_chart():
 def test_weekly_training_grid_renders_current_marker():
     lines = render_chart(
         WeeklyTrainingGridSpec(
-            meditation_symbols=("■", "·", "·"),
-            workout_symbols=("·", "■", "·"),
-            stretch_symbols=("·", "·", "■"),
+            meditation_symbols=("███", "░░░", "░░░", "░░░", "░░░", "░░░", "░░░"),
+            workout_symbols=("░░░", "███", "░░░", "░░░", "░░░", "░░░", "░░░"),
+            stretch_symbols=("░░░", "░░░", "███", "░░░", "░░░", "░░░", "░░░"),
             meditation_count=1,
             workout_count=1,
             stretch_count=1,
@@ -38,10 +38,8 @@ def test_weekly_training_grid_renders_current_marker():
         )
     )
 
-    text = "\n".join(lines)
-    assert "MEDITATION" in text
-    assert "WORKOUT" in text
-    assert "STRETCH" in text
+    assert lines[5] == "│             ─── ─── ─── ─── ─── ─── ───"
+    assert lines[6] == "└             MON TUE WED THU FRI SAT SUN"
 
 
 def test_training_block_rows_renders_counts_without_full_study_day_specs():

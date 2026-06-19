@@ -22,7 +22,6 @@ class TestAppendMediaSection:
                 Book(
                     title="Deep Work",
                     author="Cal Newport",
-                    started=datetime.date(2025, 1, 5),
                     completed=datetime.date(2025, 1, 22),
                     rating=None,
                 )

@@ -12,7 +12,7 @@ from sync.ports.cache import MediaDateCacheStore
 YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
 BOOK_TEMPLATE_FILENAME = "book.md"
 PODCAST_TEMPLATE_FILENAME = "podcast.md"
-BOOK_FRONTMATTER_KEYS = ("author", "started", "completed", "rating")
+BOOK_FRONTMATTER_KEYS = ("author", "completed", "rating")
 HIGHLIGHTS_SECTION_TITLE = "Highlights"
 REFLECTIONS_SECTION_TITLE = "Reflections"
 REFLECTIONS_PLACEHOLDER = "_No reflections have been made yet._"

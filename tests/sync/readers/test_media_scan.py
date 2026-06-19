@@ -292,7 +292,6 @@ class TestScanBooks:
         book_file.write_text(
             """---
 author: Test Author
-started: "[[2025-01-01]]"
 completed: "[[2025-01-15]]"
 rating: 8.5
 ---
@@ -309,7 +308,6 @@ rating: 8.5
         assert len(books) == 1
         assert books[0].title == "Test Book"
         assert books[0].author == "Test Author"
-        assert books[0].started == datetime.date(2025, 1, 1)
         assert books[0].completed == datetime.date(2025, 1, 15)
         assert books[0].rating == 8.5
 
@@ -320,7 +318,6 @@ rating: 8.5
         book_file.write_text(
             """---
 author: Old Author
-started: "[[2024-01-01]]"
 completed: "[[2024-01-15]]"
 ---
 """,
@@ -341,7 +338,6 @@ completed: "[[2024-01-15]]"
         book_file.write_text(
             """---
 author: Some Author
-started: "[[2025-01-01]]"
 completed:
 ---
 """,

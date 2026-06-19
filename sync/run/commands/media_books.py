@@ -30,6 +30,7 @@ from .media_common import (
 )
 
 _TITLE_KEY_RE = re.compile(r"[^0-9a-z]+")
+_TEMPLATER_EXPR_RE = re.compile(r"<%.*%>")
 
 
 def _book_template_path(*, deps: MediaCommandDeps | None = None) -> str:
@@ -91,7 +92,7 @@ def _normalize_book_frontmatter(
 
     if not values["author"] and author:
         values["author"] = author
-    if not values["completed"]:
+    if not values["completed"] or _TEMPLATER_EXPR_RE.search(values["completed"]):
         values["completed"] = completed_day.isoformat()
 
     return _render_frontmatter_block(lines, values)

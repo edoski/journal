@@ -13,7 +13,6 @@ class Book:
 
     title: str
     author: str
-    started: datetime.date | None
     completed: datetime.date
     rating: float | None
 

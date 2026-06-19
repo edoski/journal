@@ -179,16 +179,12 @@ def scan_books(
         if not (start_date <= completed_date <= end_date):
             continue
 
-        # Parse other fields
-        started_str = _frontmatter_text(frontmatter, "started")
-        started_date = _parse_date_link(started_str)
         rating = _parse_rating(_frontmatter_text(frontmatter, "rating"))
 
         books.append(
             Book(
                 title=title,
                 author=_frontmatter_text(frontmatter, "author"),
-                started=started_date,
                 completed=completed_date,
                 rating=rating,
             )
