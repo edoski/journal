@@ -31,6 +31,7 @@ class _ScheduleRangeAccumulator:
     seen_days: set[datetime.date] = field(default_factory=set)
     start_minutes: list[int] = field(default_factory=list)
     end_minutes: list[int] = field(default_factory=list)
+    total_duration_minutes: float = 0.0
 
 
 _TRAINING_BUCKET_BY_LABEL: dict[str, TrainingTargetBucket] = {
@@ -214,7 +215,7 @@ def _cluster_schedule_samples(
     clusters: list[_ScheduleRangeAccumulator],
 ) -> None:
     """Assign one day's ordered samples to recurring schedule-range clusters."""
-    for start, end, _duration in ordered_samples:
+    for start, end, duration in ordered_samples:
         best_index: int | None = None
         best_distance: int | None = None
         for index, cluster in enumerate(clusters):
@@ -239,6 +240,31 @@ def _cluster_schedule_samples(
         cluster.seen_days.add(day)
         cluster.start_minutes.append(int(start))
         cluster.end_minutes.append(int(end))
+        cluster.total_duration_minutes += float(duration)
+
+
+def _schedule_range(cluster: _ScheduleRangeAccumulator) -> tuple[str, str]:
+    """Return one averaged HH:MM schedule range for a cluster."""
+    return (
+        _minutes_to_hhmm(_average_clock_minutes(cluster.start_minutes)),
+        _minutes_to_hhmm(_average_clock_minutes(cluster.end_minutes)),
+    )
+
+
+def _dominant_schedule_range(
+    clusters: list[_ScheduleRangeAccumulator],
+) -> tuple[str, str]:
+    """Select the most recurring schedule cluster and average only that cluster."""
+    cluster = max(
+        clusters,
+        key=lambda candidate: (
+            len(candidate.start_minutes),
+            candidate.total_duration_minutes,
+            -_average_clock_minutes(candidate.start_minutes),
+            -_average_clock_minutes(candidate.end_minutes),
+        ),
+    )
+    return _schedule_range(cluster)
 
 
 def aggregate_training_type_session_stats(
@@ -253,7 +279,7 @@ def aggregate_training_type_session_stats(
       - sessions: number of days where the type appeared at least once
       - target: scaled target denominator for period
       - average_minutes: average duration across all sessions of the type
-      - schedule_ranges: averaged recurring schedule ranges as HH:MM pairs
+      - schedule_range: dominant averaged recurring schedule range as an HH:MM pair
     """
     per_type: dict[str, _TrainingAccumulator] = {}
     schedule_clusters_by_type: dict[str, list[_ScheduleRangeAccumulator]] = {}
@@ -375,21 +401,7 @@ def aggregate_training_type_session_stats(
         else:
             target = workout_target
 
-        schedule_ranges = tuple(
-            sorted(
-                (
-                    (
-                        _minutes_to_hhmm(_average_clock_minutes(cluster.start_minutes)),
-                        _minutes_to_hhmm(_average_clock_minutes(cluster.end_minutes)),
-                    )
-                    for cluster in clusters
-                ),
-                key=lambda value: (
-                    _hhmm_to_minutes(value[0]),
-                    _hhmm_to_minutes(value[1]),
-                ),
-            )
-        )
+        schedule_range = _dominant_schedule_range(clusters)
 
         stats.append(
             TrainingTypeSessionStat(
@@ -397,14 +409,14 @@ def aggregate_training_type_session_stats(
                 sessions=sessions,
                 target=target,
                 average_minutes=total_minutes / total_session_count,
-                schedule_ranges=schedule_ranges,
+                schedule_range=schedule_range,
             )
         )
 
     stats.sort(
         key=lambda row: (
-            _hhmm_to_minutes(row["schedule_ranges"][0][0]),
-            _hhmm_to_minutes(row["schedule_ranges"][0][1]),
+            _hhmm_to_minutes(row["schedule_range"][0]),
+            _hhmm_to_minutes(row["schedule_range"][1]),
             row["type"].casefold(),
             -row["average_minutes"],
             -row["sessions"],

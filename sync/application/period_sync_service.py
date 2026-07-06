@@ -30,8 +30,6 @@ from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
 
-from .goal_sync_service import GoalSyncService
-
 
 @dataclass(frozen=True)
 class PeriodSyncService:
@@ -40,7 +38,6 @@ class PeriodSyncService:
     note_store: NoteStore
     aggregate_source: DailyAggregateSource
     media_source: MediaSource
-    goal_sync_service: GoalSyncService
 
     def _load_range(
         self,
@@ -105,11 +102,6 @@ class PeriodSyncService:
                 prior_week_metrics=prior_week_metrics,
             )
 
-            lines = self.goal_sync_service.sync_weekly_note(
-                lines,
-                note_path=note_path,
-                window=window,
-            )
             write_note_metrics(note_path, lines, metrics_block, self.note_store)
 
         maybe_cleanup_previous(
@@ -158,11 +150,6 @@ class PeriodSyncService:
                 prior_month_metrics=prior_month_metrics,
             )
 
-            lines = self.goal_sync_service.sync_monthly_note(
-                lines,
-                note_path=note_path,
-                window=window,
-            )
             write_note_metrics(note_path, lines, metrics_block, self.note_store)
 
         maybe_cleanup_previous(
@@ -199,5 +186,4 @@ class PeriodSyncService:
                 prior_year_metrics=prior_year_metrics,
             )
 
-            lines = self.goal_sync_service.sync_yearly_note(lines, window=window)
             write_note_metrics(note_path, lines, metrics_block, self.note_store)

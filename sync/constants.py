@@ -23,14 +23,11 @@ WEEKLY_TEMPLATE_PATH = PATHS.weekly_template_path
 MONTHLY_TEMPLATE_PATH = PATHS.monthly_template_path
 YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 
-# Reminder rules markdown path (required, user-managed)
-REMINDERS_PATH = PATHS.reminders_path
 SCHEDULE_PATH = PATHS.schedule_path
 GRADES_PATH = PATHS.grades_path
 
 # Cache directories
 JOURNAL_CACHE_DIR = PATHS.journal_cache_dir
-GOAL_CACHE_DIR = PATHS.goal_cache_dir
 MEDIA_CACHE_DIR = PATHS.media_cache_dir
 DAILY_CACHE_DIR = PATHS.daily_cache_dir
 TRAINING_CACHE_DIR = PATHS.daily_training_cache_dir

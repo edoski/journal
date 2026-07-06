@@ -4,13 +4,8 @@ Markdown section extraction and manipulation for note files.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from sync.notes.markdown import extract_block as _extract_block
 from sync.notes.markdown import normalize_header as _normalize_header
-
-if TYPE_CHECKING:
-    from sync.contracts.goals import Goal
 
 
 def _find_subheader_idx(
@@ -111,63 +106,6 @@ def ensure_section_with_divider(
         lines.insert(divider_idx, "---")
 
     return header_idx, divider_idx
-
-
-def goals_section_bounds(lines: list[str]) -> tuple[int, int]:
-    """Return (start, end) indices for the ## Goals section."""
-    goals_idx = find_header_idx(lines, "Goals", level=2)
-    if goals_idx == -1:
-        return -1, -1
-    _, end = section_bounds(lines, goals_idx, level=2)
-    return goals_idx, end
-
-
-def splice_goals_section(
-    lines: list[str],
-    new_block: list[str],
-    insert_if_missing: bool = False,
-    *,
-    insert_after_idx: int | None = None,
-) -> bool:
-    """Replace the Goals section in lines with new_block."""
-    g_start, g_end = goals_section_bounds(lines)
-    if g_start < 0:
-        if insert_if_missing:
-            if insert_after_idx is not None:
-                insert_pos = max(0, min(insert_after_idx + 1, len(lines)))
-                lines[insert_pos:insert_pos] = new_block
-            else:
-                separator = [""] if lines and lines[0].strip() else []
-                lines[:] = new_block + separator + lines[:]
-            return True
-        return False
-    lines[g_start:g_end] = new_block
-    return True
-
-
-def extract_subsection_tasks(
-    lines: list[str],
-    parent_start: int,
-    parent_end: int,
-    sub_title: str,
-) -> list["Goal"]:
-    """Extract checkbox tasks from a ### subsection within a parent block."""
-    from sync.readers.goals import parse_goal_tasks
-
-    sub_idx = _find_subheader_idx(
-        lines,
-        sub_title,
-        start=parent_start,
-        end=parent_end,
-        level=3,
-    )
-    if sub_idx == -1:
-        return []
-    _, sub_end = subsection_bounds(lines, sub_idx, parent_end)
-    body_start = sub_idx + 1
-    while body_start < sub_end and lines[body_start].strip() == "":
-        body_start += 1
-    return parse_goal_tasks(lines[body_start:sub_end])
 
 
 def trim_blank_lines(lines: list[str]) -> list[str]:

@@ -10,19 +10,12 @@ from sync.adapters.cache_bootstrap import bootstrap_cache_layout
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
-from sync.adapters.json_goal_cache import (
-    JsonGoalCarryForwardCacheStore,
-    JsonGoalReconcileCacheStore,
-)
 from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
-from sync.adapters.markdown_goals import MarkdownGoalStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
-from sync.adapters.markdown_reminders import MarkdownReminderRuleStore
 from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.application.daily_sync_service import DailySyncService
-from sync.application.goal_sync_service import GoalSyncService
 from sync.application.period_sync_service import PeriodSyncService
 from sync.dates import month_range
 from sync.periods.runtime import resolve_note_path
@@ -33,14 +26,10 @@ from sync.periods.windows import (
 )
 from sync.ports.cache import (
     DailyTrainingCacheStore,
-    GoalCarryForwardCacheStore,
-    GoalReconcileCacheStore,
 )
 from sync.ports.daily_aggregates import DailyAggregateSource
-from sync.ports.goals import GoalStore
 from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
-from sync.ports.reminders import ReminderRuleStore
 from sync.ports.schedule import ScheduleSource
 from sync.ports.sessions import StudySessionSource
 from sync.ports.status import DailyStatusSource
@@ -55,10 +44,6 @@ class WiringDeps:
     status_source_factory: Callable[[], DailyStatusSource]
     note_store_factory: Callable[[], NoteStore]
     training_cache_store_factory: Callable[[], DailyTrainingCacheStore]
-    reminder_store_factory: Callable[[], ReminderRuleStore]
-    goal_store_factory: Callable[[], GoalStore]
-    carry_cache_store_factory: Callable[[], GoalCarryForwardCacheStore]
-    reconcile_cache_store_factory: Callable[[], GoalReconcileCacheStore]
     aggregate_source_factory: Callable[[], DailyAggregateSource]
     media_source_factory: Callable[[], MediaSource]
     schedule_source_factory: Callable[[], ScheduleSource]
@@ -72,32 +57,11 @@ def default_wiring_deps() -> WiringDeps:
         status_source_factory=ICloudDailyStatusSource,
         note_store_factory=MarkdownNoteStore,
         training_cache_store_factory=JsonDailyTrainingCacheStore,
-        reminder_store_factory=MarkdownReminderRuleStore,
-        goal_store_factory=MarkdownGoalStore,
-        carry_cache_store_factory=JsonGoalCarryForwardCacheStore,
-        reconcile_cache_store_factory=JsonGoalReconcileCacheStore,
         aggregate_source_factory=MarkdownDailyAggregateSource,
         media_source_factory=lambda: ObsidianMediaSource(
             media_cache_store=JsonMediaDateCacheStore()
         ),
         schedule_source_factory=MarkdownScheduleSource,
-    )
-
-
-def _build_goal_sync_service(
-    note_store: NoteStore,
-    *,
-    deps: WiringDeps | None = None,
-) -> GoalSyncService:
-    resolved = deps or default_wiring_deps()
-    goal_store = resolved.goal_store_factory()
-    carry_cache_store = resolved.carry_cache_store_factory()
-    reconcile_cache_store = resolved.reconcile_cache_store_factory()
-    return GoalSyncService(
-        note_store=note_store,
-        goal_store=goal_store,
-        carry_cache_store=carry_cache_store,
-        reconcile_cache_store=reconcile_cache_store,
     )
 
 
@@ -108,7 +72,6 @@ def _build_period_sync_service(*, deps: WiringDeps | None = None) -> PeriodSyncS
         note_store=note_store,
         aggregate_source=resolved.aggregate_source_factory(),
         media_source=resolved.media_source_factory(),
-        goal_sync_service=_build_goal_sync_service(note_store, deps=resolved),
     )
 
 
@@ -124,8 +87,6 @@ def run_daily_sync(*, deps: WiringDeps | None = None) -> None:
     service = DailySyncService(
         note_store=note_store,
         status_source=status_source,
-        reminder_store=resolved.reminder_store_factory(),
-        goal_sync_service=_build_goal_sync_service(note_store, deps=resolved),
         training_cache_store=training_cache_store,
     )
 

@@ -64,11 +64,3 @@ source_modules =
     sync.periods
 forbidden_modules =
     sync.run
-
-[importlinter:goals_no_adapters]
-name = Goals domain must not depend on adapters
-type = forbidden
-source_modules =
-    sync.goals
-forbidden_modules =
-    sync.adapters

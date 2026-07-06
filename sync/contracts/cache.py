@@ -2,51 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal, TypeAlias, TypedDict
-
-GoalHorizon: TypeAlias = Literal["daily", "weekly", "monthly", "yearly"]
-GoalIdsByPeriod: TypeAlias = dict[str, list[str]]
-DeletedGoalIdsByPeriod: TypeAlias = dict[str, str]
-
-
-class CarryForwardDeletedBuckets(TypedDict, total=False):
-    """Deleted goal tombstones grouped by horizon."""
-
-    daily: DeletedGoalIdsByPeriod
-    weekly: DeletedGoalIdsByPeriod
-    monthly: DeletedGoalIdsByPeriod
-    yearly: DeletedGoalIdsByPeriod
-
-
-class CarryForwardCacheState(TypedDict, total=False):
-    """Carry-forward offer + tombstone cache payload."""
-
-    daily: GoalIdsByPeriod
-    weekly: GoalIdsByPeriod
-    monthly: GoalIdsByPeriod
-    yearly: GoalIdsByPeriod
-    _deleted: CarryForwardDeletedBuckets
-
-
-class GoalReconcileNoteState(TypedDict):
-    """Last observed goal state in a single note path."""
-
-    done: bool
-
-
-class GoalReconcileGoalState(TypedDict):
-    """Cached reconciliation state for one goal id."""
-
-    last_value: bool
-    last_updated_at: str
-    last_updated_by: str
-    notes: dict[str, GoalReconcileNoteState]
-
-
-class GoalReconcileCacheState(TypedDict):
-    """Root reconciliation cache payload."""
-
-    goals: dict[str, GoalReconcileGoalState]
+from typing import TypedDict
 
 
 class MediaDateCacheState(TypedDict):

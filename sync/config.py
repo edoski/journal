@@ -18,11 +18,9 @@ class PathConfig:
     weekly_template_path: str
     monthly_template_path: str
     yearly_template_path: str
-    reminders_path: str
     schedule_path: str
     grades_path: str
     journal_cache_dir: str
-    goal_cache_dir: str
     media_cache_dir: str
     daily_cache_dir: str
     daily_training_cache_dir: str
@@ -105,10 +103,6 @@ def _build_paths() -> PathConfig:
             "YEARLY_TEMPLATE_PATH",
             os.path.join(templates_dir, "yearly.md"),
         ),
-        reminders_path=_env_path(
-            "REMINDERS_PATH",
-            os.path.join(journal_dir, "REMINDERS.md"),
-        ),
         schedule_path=_env_path(
             "SCHEDULE_PATH",
             os.path.join(journal_dir, "PROTOCOL.md"),
@@ -118,10 +112,6 @@ def _build_paths() -> PathConfig:
             os.path.join(vault_dir, "university", "GRADES.md"),
         ),
         journal_cache_dir=journal_cache_dir,
-        goal_cache_dir=_env_path(
-            "GOAL_CACHE_DIR",
-            os.path.join(journal_cache_dir, "goals"),
-        ),
         media_cache_dir=_env_path(
             "MEDIA_CACHE_DIR",
             os.path.join(journal_cache_dir, "media"),

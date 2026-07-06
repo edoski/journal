@@ -18,18 +18,11 @@ def isolate_cache_dirs(tmp_path, monkeypatch):
     module-level constants keeps every test sandboxed under tmp_path.
     """
     cache_root = tmp_path / "cache"
-    goal_cache_dir = cache_root / "goals"
     media_cache_dir = cache_root / "media"
     training_cache_dir = cache_root / "daily" / "training"
     note_lock_dir = cache_root / "locks" / "notes"
     state_lock_dir = cache_root / "locks" / "state"
 
-    monkeypatch.setattr(
-        "sync.adapters.json_goal_cache.GOAL_CACHE_DIR", str(goal_cache_dir)
-    )
-    monkeypatch.setattr(
-        "sync.adapters.json_goal_cache.STATE_LOCK_DIR", str(state_lock_dir)
-    )
     monkeypatch.setattr(
         "sync.adapters.json_media_cache.MEDIA_CACHE_DIR", str(media_cache_dir)
     )
@@ -150,22 +143,6 @@ def sample_sleep_table_lines() -> list[str]:
         "| TIME | ASLEEP | AWAKE |",
         "| ---- | -------- | ----- |",
         "| 23:00-07:00 | `8h00m` | `20m` |",
-        "",
-    ]
-
-
-@pytest.fixture
-def sample_goals_section_lines() -> list[str]:
-    """Sample Goals section with subsections."""
-    return [
-        "## Goals",
-        "---",
-        "### **STUDY**",
-        "- [x] Complete chapter 5 ^gid-abc1234567",
-        "- [ ] Review notes ^gid-def1234567",
-        "",
-        "### **HEALTH**",
-        "- [x] Morning workout ^gid-ghi1234567",
         "",
     ]
 

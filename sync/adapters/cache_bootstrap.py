@@ -11,7 +11,6 @@ def bootstrap_cache_layout(*, paths: PathConfig = PATHS) -> None:
     """Ensure canonical cache and lock directories exist."""
     for path in (
         paths.journal_cache_dir,
-        paths.goal_cache_dir,
         paths.media_cache_dir,
         paths.daily_cache_dir,
         os.path.join(paths.daily_cache_dir, "status", "pending"),

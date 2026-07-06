@@ -40,11 +40,3 @@ def test_monthly_metrics_snapshot() -> None:
 def test_yearly_metrics_snapshot() -> None:
     artifact = _artifact("yearly_metrics.txt")
     _assert_snapshot(artifact)
-
-
-def test_goal_lines_snapshot() -> None:
-    _assert_snapshot(_artifact("goal_lines.txt"))
-
-
-def test_goals_block_snapshot() -> None:
-    _assert_snapshot(_artifact("goals_block.txt"))

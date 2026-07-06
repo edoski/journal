@@ -2,46 +2,12 @@
 
 from __future__ import annotations
 
-from typing import ContextManager, Protocol
+from typing import Protocol
 
 from sync.contracts.cache import (
-    CarryForwardCacheState,
     DailyTrainingCacheRow,
-    GoalReconcileCacheState,
     MediaDateCacheState,
 )
-
-
-class GoalCarryForwardCacheStore(Protocol):
-    """Read/write API for carried-goal + tombstone cache state."""
-
-    def load(self) -> CarryForwardCacheState:
-        """Load carried-goal cache state."""
-        ...
-
-    def save(self, state: CarryForwardCacheState) -> None:
-        """Persist carried-goal cache state."""
-        ...
-
-    def locked_state(self) -> ContextManager[CarryForwardCacheState]:
-        """Open cache state under an advisory lock and persist on exit."""
-        ...
-
-
-class GoalReconcileCacheStore(Protocol):
-    """Read/write API for goal reconciliation cache state."""
-
-    def load(self) -> GoalReconcileCacheState:
-        """Load reconcile cache state."""
-        ...
-
-    def save(self, state: GoalReconcileCacheState) -> None:
-        """Persist reconcile cache state."""
-        ...
-
-    def locked_state(self) -> ContextManager[GoalReconcileCacheState]:
-        """Open cache state under an advisory lock and persist on exit."""
-        ...
 
 
 class MediaDateCacheStore(Protocol):

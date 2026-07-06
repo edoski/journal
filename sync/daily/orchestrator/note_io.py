@@ -10,33 +10,17 @@ logger = get_logger(__name__)
 
 def ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
     """
-    Guarantee Goals, Metrics, Reflections sections exist with required dividers.
+    Guarantee Metrics and Reflections sections exist with required dividers.
 
     Args:
         lines: Note lines (modified in place)
         yaml_end_idx: Index of the closing YAML delimiter
     """
-    # Goals immediately after YAML (or start of file)
-    goals_header_idx, _ = ensure_section_with_divider(
-        lines,
-        "Goals",
-        level=2,
-        insert_pos=(yaml_end_idx + 1) if yaml_end_idx != -1 else 0,
-    )
-
-    # Metrics after Goals
-    _, goals_end = (
-        section_bounds(lines, goals_header_idx, level=2)
-        if goals_header_idx != -1
-        else (-1, -1)
-    )
     metrics_header_idx, _ = ensure_section_with_divider(
         lines,
         "Metrics",
         level=2,
-        insert_pos=goals_end
-        if goals_end != -1
-        else (yaml_end_idx + 1 if yaml_end_idx != -1 else 0),
+        insert_pos=(yaml_end_idx + 1) if yaml_end_idx != -1 else 0,
     )
 
     # Reflections after Metrics

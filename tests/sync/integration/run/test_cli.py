@@ -98,7 +98,7 @@ def _print_disabled_output(disabled: bool, *, label: str) -> str:
     return f'{{\n  "{label}" => {value}\n}}'
 
 
-def _reminder_deps(
+def _flow_automation_deps(
     tmp_path: Path,
     *,
     run_launchctl=None,
@@ -141,10 +141,6 @@ def _wiring_deps(
         status_source_factory=status_source_factory,
         note_store_factory=lambda: object(),
         training_cache_store_factory=lambda: object(),
-        reminder_store_factory=lambda: object(),
-        goal_store_factory=lambda: object(),
-        carry_cache_store_factory=lambda: object(),
-        reconcile_cache_store_factory=lambda: object(),
         aggregate_source_factory=lambda: object(),
         media_source_factory=lambda: object(),
         schedule_source_factory=schedule_source_factory,
@@ -385,11 +381,6 @@ def test_run_daily_sync_non_today_days_first_then_today(
             return _default_schedule()
 
     monkeypatch.setattr(wiring, "DailySyncService", _FakeDailySyncService)
-    monkeypatch.setattr(
-        wiring,
-        "_build_goal_sync_service",
-        lambda note_store, *, deps=None: object(),
-    )
 
     deps = _wiring_deps(
         session_source_factory=_FakeSessionSource,
@@ -452,11 +443,6 @@ def test_run_daily_sync_today_only_when_no_backfill_targets(
             return _default_schedule()
 
     monkeypatch.setattr(wiring, "DailySyncService", _FakeDailySyncService)
-    monkeypatch.setattr(
-        wiring,
-        "_build_goal_sync_service",
-        lambda note_store, *, deps=None: object(),
-    )
 
     deps = _wiring_deps(
         session_source_factory=_FakeSessionSource,
@@ -601,7 +587,7 @@ def test_latest_row_is_open_flow_false_for_completed_flow() -> None:
 
 
 def test_session_skip_noops_when_disabled(tmp_path: Path) -> None:
-    deps = _reminder_deps(
+    deps = _flow_automation_deps(
         tmp_path,
         run_launchctl=lambda args: (
             0,
@@ -634,7 +620,7 @@ def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
             return "Flow"
         return "ok"
 
-    deps = _reminder_deps(
+    deps = _flow_automation_deps(
         tmp_path,
         run_launchctl=lambda args: (
             0,
@@ -681,7 +667,7 @@ def test_session_skip_state_toggle_calls_launchctl_disable(
         calls.append(args)
         return responses[len(calls) - 1]
 
-    deps = _reminder_deps(tmp_path, run_launchctl=_fake_launchctl)
+    deps = _flow_automation_deps(tmp_path, run_launchctl=_fake_launchctl)
     rc = flow_automation.run_session_skip("toggle", deps=deps)
 
     assert rc == 0
@@ -704,7 +690,7 @@ def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
             return "Break"
         return "ok"
 
-    deps = _reminder_deps(
+    deps = _flow_automation_deps(
         tmp_path,
         run_launchctl=lambda args: (
             0,
@@ -750,7 +736,7 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
             return "Flow"
         return "ok"
 
-    deps = _reminder_deps(
+    deps = _flow_automation_deps(
         tmp_path,
         run_launchctl=lambda args: (
             0,
@@ -793,7 +779,7 @@ def test_session_remind_respects_cooldown(tmp_path: Path) -> None:
             return "25:00"
         raise AssertionError("Flow show should not run while cooldown is active")
 
-    deps = _reminder_deps(
+    deps = _flow_automation_deps(
         tmp_path,
         run_launchctl=lambda args: (
             0,

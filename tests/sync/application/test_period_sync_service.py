@@ -20,7 +20,7 @@ class _StubNoteStore:
     def read_or_create(self, path: str, _template_path: str) -> list[str]:
         lines = self._notes.get(path)
         if lines is None:
-            lines = ["## Goals", "", "## Metrics", "---", "", "## Reflections", ""]
+            lines = ["## Metrics", "---", "", "## Reflections", ""]
             self._notes[path] = lines
         return lines[:]
 
@@ -33,28 +33,6 @@ class _StubAggregateSource:
         return {day: {} for day in dates}
 
 
-class _StubGoalSyncService:
-    def __init__(self) -> None:
-        self.week_calls = 0
-        self.month_calls = 0
-        self.year_calls = 0
-
-    def sync_weekly_note(self, lines, *, note_path, window):
-        _ = note_path, window
-        self.week_calls += 1
-        return lines
-
-    def sync_monthly_note(self, lines, *, note_path, window):
-        _ = note_path, window
-        self.month_calls += 1
-        return lines
-
-    def sync_yearly_note(self, lines, *, window):
-        _ = window
-        self.year_calls += 1
-        return lines
-
-
 class _StubMediaSource:
     def __init__(self) -> None:
         self.calls: list[tuple[datetime.date, datetime.date]] = []
@@ -64,15 +42,13 @@ class _StubMediaSource:
         return MediaBundle(books=[], podcasts=[])
 
 
-def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
+def test_sync_week_writes_metrics_and_runs_cleanup(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
-    goal_sync_service = _StubGoalSyncService()
     media_source = _StubMediaSource()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
-        goal_sync_service=goal_sync_service,
     )
 
     day = datetime.date(2026, 2, 6)
@@ -125,7 +101,6 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     written = note_store.read(note_path)
     assert written is not None
     assert written[-1] == "week"
-    assert goal_sync_service.week_calls == 1
     assert cleanup_calls
     enabled, _prev_path, rerun = cleanup_calls[0]
     assert enabled is True
@@ -133,15 +108,13 @@ def test_sync_week_uses_goal_service_and_cleanup(monkeypatch, tmp_path):
     assert media_source.calls == [(window.start, window.end)]
 
 
-def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
+def test_sync_year_writes_metrics(monkeypatch, tmp_path):
     note_store = _StubNoteStore()
-    goal_sync_service = _StubGoalSyncService()
     media_source = _StubMediaSource()
     service = PeriodSyncService(
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
-        goal_sync_service=goal_sync_service,
     )
 
     window = build_year_window(2026, target_date=datetime.date(2026, 6, 1))
@@ -163,5 +136,4 @@ def test_sync_year_uses_goal_service(monkeypatch, tmp_path):
     written = note_store.read(note_path)
     assert written is not None
     assert written[-1] == "year"
-    assert goal_sync_service.year_calls == 1
     assert media_source.calls == [(window.start, window.end)]

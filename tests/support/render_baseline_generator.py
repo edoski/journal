@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import sync.periods.builders as period_builders
-from sync.contracts.goals import Goal
 from sync.contracts.metrics import PeriodAggregate
 from sync.contracts.targets import PeriodType
 from sync.dates import (
@@ -19,7 +18,6 @@ from sync.dates import (
     year_range,
 )
 from sync.metrics import compute_period_metrics
-from sync.writers.goals import build_goals_block, render_goal_lines
 
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 
@@ -155,73 +153,12 @@ def _yearly_metrics_artifact() -> RenderBaselineArtifact:
     )
 
 
-def _goal_lines_artifact() -> RenderBaselineArtifact:
-    today = datetime.date(2026, 2, 6)
-    goals = [
-        Goal(
-            id="gid-aaa1111111",
-            body="Yearly planning",
-            done=False,
-            date_str="2026-02-20",
-            deadline=datetime.date(2026, 2, 20),
-            reminder_offset=7,
-        ),
-        Goal(
-            id="gid-bbb2222222",
-            body="Retrospective",
-            done=True,
-            date_str="2026-02-05",
-            deadline=datetime.date(2026, 2, 5),
-            reminder_offset=0,
-        ),
-    ]
-
-    return RenderBaselineArtifact(
-        name="goal_lines.txt",
-        lines=tuple(render_goal_lines(goals, today=today)),
-    )
-
-
-def _goals_block_artifact() -> RenderBaselineArtifact:
-    today = datetime.date(2026, 2, 6)
-    weekly_goals = [
-        Goal(
-            id="gid-aaa1111111",
-            body="Yearly planning",
-            done=False,
-            date_str="2026-02-20",
-            deadline=datetime.date(2026, 2, 20),
-            reminder_offset=7,
-        )
-    ]
-    daily_goals = [
-        Goal(
-            id="gid-ccc3333333",
-            body="Deep work block",
-            done=False,
-            date_str="2026-02-06",
-            deadline=datetime.date(2026, 2, 6),
-            reminder_offset=0,
-        )
-    ]
-
-    weekly_lines = render_goal_lines(weekly_goals, today=today)
-    daily_lines = render_goal_lines(daily_goals, today=today)
-    block = build_goals_block([("WEEKLY", weekly_lines), ("DAILY", daily_lines)])
-    return RenderBaselineArtifact(
-        name="goals_block.txt",
-        lines=tuple(block),
-    )
-
-
 def generate_render_baseline_artifacts() -> tuple[RenderBaselineArtifact, ...]:
     """Generate all deterministic render-baseline artifacts in canonical order."""
     return (
         _weekly_metrics_artifact(),
         _monthly_metrics_artifact(),
         _yearly_metrics_artifact(),
-        _goal_lines_artifact(),
-        _goals_block_artifact(),
     )
 
 

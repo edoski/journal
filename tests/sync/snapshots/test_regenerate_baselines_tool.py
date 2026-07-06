@@ -23,7 +23,6 @@ def _write_fixture(output_dir: Path, name: str) -> None:
 def test_check_returns_zero_when_no_drift(tmp_path, monkeypatch, capsys) -> None:
     output_dir = tmp_path / "render_baseline"
     _write_fixture(output_dir, "weekly_metrics.txt")
-    _write_fixture(output_dir, "goal_lines.txt")
     monkeypatch.setattr(regenerate_baselines, "SNAPSHOT_DIR", output_dir)
 
     exit_code = regenerate_baselines.main(
@@ -31,8 +30,6 @@ def test_check_returns_zero_when_no_drift(tmp_path, monkeypatch, capsys) -> None
             "--check",
             "--only",
             "weekly_metrics.txt",
-            "--only",
-            "goal_lines.txt",
         ]
     )
     captured = capsys.readouterr()
@@ -40,7 +37,6 @@ def test_check_returns_zero_when_no_drift(tmp_path, monkeypatch, capsys) -> None
     assert exit_code == 0
     assert "UNCHANGED" in captured.out
     assert "weekly_metrics.txt" in captured.out
-    assert "goal_lines.txt" in captured.out
 
 
 def test_check_returns_non_zero_on_drift(tmp_path, monkeypatch, capsys) -> None:

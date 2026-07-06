@@ -24,14 +24,14 @@ class TestNormalizeHeader:
         assert _normalize_header("### STUDY") == "### study"
 
     def test_preserves_spaces(self):
-        result = _normalize_header("### My Goal")
-        assert "my goal" in result
+        result = _normalize_header("### My Section")
+        assert "my section" in result
 
 
 class TestFindSubheaderIdx:
     def test_finds_subheader(self):
         lines = [
-            "## Goals",
+            "## Metrics",
             "---",
             "### **STUDY**",
             "- [x] Task",

@@ -14,9 +14,6 @@ from sync.notes.sections import (
     subsection_bounds,
     extract_block,
     ensure_section_with_divider,
-    goals_section_bounds,
-    splice_goals_section,
-    extract_subsection_tasks,
     trim_blank_lines,
     join_sections,
     replace_metrics_block,
@@ -171,118 +168,6 @@ class TestEnsureSectionWithDivider:
         )
         assert header_idx == -1
         assert divider_idx == -1
-
-
-class TestGoalsSectionBounds:
-    """Tests for goals_section_bounds function."""
-
-    def test_finds_goals_section(self, sample_goals_section_lines):
-        start, end = goals_section_bounds(sample_goals_section_lines)
-        assert start == 0
-        assert end == len(sample_goals_section_lines)
-
-    def test_returns_negative_when_missing(self):
-        lines = ["## Metrics", "Content"]
-        start, end = goals_section_bounds(lines)
-        assert start == -1
-        assert end == -1
-
-
-class TestSpliceGoalsSection:
-    """Tests for splice_goals_section function."""
-
-    def test_replaces_existing_section(self):
-        lines = [
-            "## Goals",
-            "### WEEKLY",
-            "- [ ] Old task",
-            "## Metrics",
-            "Content",
-        ]
-        new_block = ["## Goals", "### WEEKLY", "- [ ] New task"]
-        result = splice_goals_section(lines, new_block)
-        assert result is True
-        assert lines == [
-            "## Goals",
-            "### WEEKLY",
-            "- [ ] New task",
-            "## Metrics",
-            "Content",
-        ]
-
-    def test_returns_false_when_missing(self):
-        lines = ["## Metrics", "Content"]
-        new_block = ["## Goals", "- [ ] Task"]
-        result = splice_goals_section(lines, new_block)
-        assert result is False
-        assert lines == ["## Metrics", "Content"]  # unchanged
-
-    def test_insert_if_missing_prepends(self):
-        lines = ["## Metrics", "Content"]
-        new_block = ["## Goals", "- [ ] Task"]
-        result = splice_goals_section(lines, new_block, insert_if_missing=True)
-        assert result is True
-        assert lines == ["## Goals", "- [ ] Task", "", "## Metrics", "Content"]
-
-    def test_insert_if_missing_with_existing_replaces(self):
-        lines = [
-            "## Goals",
-            "- [ ] Old task",
-            "## Metrics",
-        ]
-        new_block = ["## Goals", "- [ ] New task"]
-        result = splice_goals_section(lines, new_block, insert_if_missing=True)
-        assert result is True
-        assert lines == ["## Goals", "- [ ] New task", "## Metrics"]
-
-    def test_prepend_no_separator_on_empty(self):
-        lines = []
-        new_block = ["## Goals", "- [ ] Task"]
-        result = splice_goals_section(lines, new_block, insert_if_missing=True)
-        assert result is True
-        assert lines == ["## Goals", "- [ ] Task"]
-
-    def test_insert_if_missing_after_index(self):
-        lines = ["---", "date: 2026-02-14", "---", "## Metrics", "Content"]
-        new_block = ["## Goals", "- [ ] Task"]
-        result = splice_goals_section(
-            lines,
-            new_block,
-            insert_if_missing=True,
-            insert_after_idx=2,
-        )
-        assert result is True
-        assert lines == [
-            "---",
-            "date: 2026-02-14",
-            "---",
-            "## Goals",
-            "- [ ] Task",
-            "## Metrics",
-            "Content",
-        ]
-
-
-class TestExtractSubsectionTasks:
-    """Tests for extract_subsection_tasks function."""
-
-    def test_extracts_tasks(self, sample_goals_section_lines):
-        start, end = goals_section_bounds(sample_goals_section_lines)
-        tasks = extract_subsection_tasks(
-            sample_goals_section_lines, start, end, "STUDY"
-        )
-        assert len(tasks) == 2
-        assert tasks[0].body == "Complete chapter 5"
-        assert tasks[0].done is True
-        assert tasks[1].body == "Review notes"
-        assert tasks[1].done is False
-
-    def test_empty_when_subsection_missing(self, sample_goals_section_lines):
-        start, end = goals_section_bounds(sample_goals_section_lines)
-        tasks = extract_subsection_tasks(
-            sample_goals_section_lines, start, end, "MISSING"
-        )
-        assert tasks == []
 
 
 class TestTrimBlankLines:
@@ -469,13 +354,13 @@ class TestReplaceMetricsBlock:
         lines = [
             "## Metrics",
             "Old",
-            "## Goals",
-            "Goal content",
+            "## Reflections",
+            "Reflection content",
         ]
         result = replace_metrics_block(lines, ["New"])
 
-        goals_idx = result.index("## Goals")
-        assert "Goal content" in result[goals_idx + 1 :]
+        reflections_idx = result.index("## Reflections")
+        assert "Reflection content" in result[reflections_idx + 1 :]
 
     def test_returns_unchanged_if_no_metrics(self):
         lines = ["## Other", "Content"]

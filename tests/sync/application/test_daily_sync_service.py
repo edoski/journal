@@ -6,8 +6,6 @@ import datetime
 import logging
 from pathlib import Path
 
-import pytest
-
 from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
@@ -45,28 +43,6 @@ class _CountingStatusSource(_StubStatusSource):
         _day_schedule: DayScheduleProfile,
     ) -> None:
         self.write_calls += 1
-
-
-class _StubReminderStore:
-    def load(self):
-        return []
-
-    def save(self, _rules):
-        return None
-
-
-class _StubGoalSyncService:
-    def sync_daily_note(
-        self,
-        lines,
-        *,
-        day,
-        note_path,
-        yaml_end_idx,
-        reminder_rules,
-    ):
-        _ = day, note_path, yaml_end_idx, reminder_rules
-        return lines
 
 
 class _ConflictNoteStore(MarkdownNoteStore):
@@ -115,7 +91,6 @@ def _default_schedule() -> DayScheduleProfile:
 def _build_service(
     monkeypatch,
     tmp_path,
-    reminder_store=None,
     status_source=None,
     note_store=None,
 ) -> tuple[DailySyncService, str]:
@@ -132,8 +107,6 @@ def _build_service(
     service = DailySyncService(
         note_store=note_store or MarkdownNoteStore(),
         status_source=status_source or _StubStatusSource(),
-        reminder_store=reminder_store or _StubReminderStore(),
-        goal_sync_service=_StubGoalSyncService(),
         training_cache_store=training_cache_store,
         journal_dir=str(journal_dir),
         template_path=str(template_path),
@@ -152,9 +125,6 @@ def _seed_daily_note(
         "---",
         "sleep: 7h30m",
         "---",
-        "## Goals",
-        "---",
-        "",
         "## Metrics",
         "---",
         "",
@@ -180,7 +150,6 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     assert "workout: false" in content
     assert "stretch: false" in content
     assert "meditate: false" in content
-    assert "## Goals" in content
     assert "## Metrics" in content
     assert "## Reflections" in content
     assert "### **STUDY**" in content
@@ -216,24 +185,10 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
     assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in lines
 
     level_two_headers = [line for line in lines if line.startswith("## ")]
-    assert level_two_headers[:3] == ["## Goals", "## Metrics", "## Reflections"]
+    assert level_two_headers[:2] == ["## Metrics", "## Reflections"]
 
     level_three_headers = [line for line in lines if line.startswith("### **")]
     assert "### **STUDY**" in level_three_headers
-
-
-def test_sync_day_fails_without_reminders_config(monkeypatch, tmp_path):
-    class _MissingReminderStore(_StubReminderStore):
-        def load(self):
-            raise FileNotFoundError("Required reminder config not found")
-
-    day = datetime.date.today()
-    service, _ = _build_service(
-        monkeypatch, tmp_path, reminder_store=_MissingReminderStore()
-    )
-
-    with pytest.raises(FileNotFoundError, match="Required reminder config not found"):
-        service.sync_day(day, [_session_for_day(day)], _default_schedule())
 
 
 def test_sync_day_tolerates_missing_sleep_payload(monkeypatch, tmp_path):

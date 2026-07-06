@@ -105,30 +105,6 @@ def build_parser(
     )
     grades_sync.set_defaults(func=_resolve_handler(handlers, "grades_sync"))
 
-    goals = domain.add_parser("goals", help="Run goal note operations")
-    goals_sub = goals.add_subparsers(dest="goals_command", required=True)
-
-    goals_add = goals_sub.add_parser("add", help="Add a goal to a source period note")
-    goals_add.add_argument(
-        "--period",
-        choices=["daily", "weekly", "monthly", "yearly"],
-        required=True,
-        help="Goal source period",
-    )
-    goals_time = goals_add.add_mutually_exclusive_group()
-    goals_time.add_argument(
-        "--current",
-        action="store_true",
-        help="Target current period (default)",
-    )
-    goals_time.add_argument(
-        "--next",
-        action="store_true",
-        help="Target next period",
-    )
-    goals_add.add_argument("text", help="Goal text")
-    goals_add.set_defaults(func=_resolve_handler(handlers, "goals_add"))
-
     media = domain.add_parser("media", help="Run media note operations")
     media_sub = media.add_subparsers(dest="media_command", required=True)
 

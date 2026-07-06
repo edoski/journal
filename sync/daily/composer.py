@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import datetime
-from collections.abc import Callable
 from dataclasses import dataclass
 
-from sync.contracts.reminders import ReminderRule
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.status import SleepPayload
 from sync.contracts.study import StudySessionRecord
@@ -29,11 +27,6 @@ from sync.study.section import build_study_section
 _REFLECTIONS_HEADER_TITLE = "Reflections"
 _REFLECTIONS_TABLE_HEADER = "| TIME | ENTRY |"
 _REFLECTIONS_TABLE_DIVIDER = "| ---- | ----- |"
-
-DailyGoalSync = Callable[
-    [list[str], datetime.date, str, int, list[ReminderRule]],
-    list[str],
-]
 
 
 @dataclass(frozen=True)
@@ -59,8 +52,6 @@ class DailyNoteComposer:
 
     status_source: DailyStatusSource
     training_cache_store: DailyTrainingCacheStore
-    load_reminder_rules: Callable[[], list[ReminderRule]]
-    sync_goals: DailyGoalSync
 
     def compose(
         self,
@@ -69,7 +60,6 @@ class DailyNoteComposer:
         day: datetime.date,
         sessions: list[StudySessionRecord],
         day_schedule: DayScheduleProfile,
-        file_path: str,
     ) -> DailyComposeResult:
         working_lines = list(lines)
         new_table_lines, study_str = self._build_study_data(
@@ -78,14 +68,8 @@ class DailyNoteComposer:
 
         yaml_end_idx = find_yaml_end(working_lines)
         ensure_daily_sections(working_lines, yaml_end_idx)
-        lines_with_goals = self._apply_goals_section(
-            working_lines,
-            day,
-            file_path,
-            yaml_end_idx,
-        )
         metrics_result = self._apply_metrics_block(
-            lines_with_goals,
+            working_lines,
             sessions,
             day,
             day_schedule,
@@ -110,21 +94,6 @@ class DailyNoteComposer:
         new_table_lines, total_focus_minutes = build_study_section(sessions)
         study_str = format_minutes(total_focus_minutes, always_show_both=True)
         return new_table_lines, study_str
-
-    def _apply_goals_section(
-        self,
-        lines: list[str],
-        day: datetime.date,
-        file_path: str,
-        yaml_end_idx: int,
-    ) -> list[str]:
-        return self.sync_goals(
-            lines,
-            day,
-            file_path,
-            yaml_end_idx,
-            self.load_reminder_rules(),
-        )
 
     def _apply_metrics_block(
         self,

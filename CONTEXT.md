@@ -1,24 +1,12 @@
 # Journal Domain Context
 
-This repository syncs focus, training, sleep, media, reminders, and goals into Obsidian journal notes.
+This repository syncs focus, training, sleep, and media into Obsidian journal notes.
 
 ## Core Terms
 
-**Daily Note**: One journal note for a calendar day. It owns daily metrics, frontmatter, reflections, context links, daily goals, weekly goal mirrors, reminders, and study-session detail.
+**Daily Note**: One journal note for a calendar day. It owns daily metrics, frontmatter, reflections, context links, and study-session detail.
 
-**Period Note**: A weekly, monthly, quarterly, or yearly journal note. It owns period metrics plus goal source and mirror sections for that period horizon.
-
-**Goal Horizon**: The planning horizon of a goal: daily, weekly, monthly, quarterly, or yearly. The horizon determines the goal section, period key, note filename, template, carry-forward behavior, and piercing range.
-
-**Goal Source Section**: The canonical section where goals for a horizon are authored and persisted. Examples: WEEKLY goals in a weekly note, MONTHLY goals in a monthly note, YEARLY goals in a yearly note.
-
-**Goal Mirror Section**: A copied view of parent goals inside a child period note. Mirror sections reconcile completion and reopening back to their source goals.
-
-**Pierced Goal**: A parent-horizon goal shown inside a child source section because its deadline or reminder offset makes it relevant soon. Pierced goals preserve source identity and propagate done-state changes.
-
-**Goal Note Target**: The resolved write destination for adding or updating goals: note path, template path, section, horizon, and period key.
-
-**Goal Note Graph**: The relationship between daily, weekly, monthly, quarterly, and yearly notes for goal loading, mirroring, piercing, carry-forward, and source writes.
+**Period Note**: A weekly, monthly, quarterly, or yearly journal note. It owns period metrics, media summaries, and reflections for that period.
 
 **Period Window**: The date range and neighboring-period metadata for a period sync. Period windows define current bounds, previous bounds, target date, labels, and filenames.
 

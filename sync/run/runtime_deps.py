@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from sync.run import wiring
 from sync.run.commands.grades import GradesCommandConfig
-from sync.run.commands.goals import GoalCommandConfig
 from sync.run.commands.media_common import (
     MediaCommandDeps,
     default_media_command_deps,
@@ -27,9 +26,8 @@ class RuntimeDeps:
 
     wiring: wiring.WiringDeps
     grades: GradesCommandConfig
-    goals: GoalCommandConfig
     media: MediaCommandDeps
-    reminders: FlowAutomationDeps
+    flow_automation: FlowAutomationDeps
     session: SessionCommandDeps
 
 
@@ -38,8 +36,7 @@ def build_runtime_deps() -> RuntimeDeps:
     return RuntimeDeps(
         wiring=wiring.default_wiring_deps(),
         grades=GradesCommandConfig(),
-        goals=GoalCommandConfig(),
         media=default_media_command_deps(),
-        reminders=default_flow_automation_deps(),
+        flow_automation=default_flow_automation_deps(),
         session=default_session_command_deps(),
     )

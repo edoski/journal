@@ -46,7 +46,7 @@ class TrainingTypeSessionStat(TypedDict):
     sessions: int
     target: int
     average_minutes: float
-    schedule_ranges: tuple[tuple[str, str], ...]
+    schedule_range: tuple[str, str]
 
 
 class MovingAverageAggregate(TypedDict):

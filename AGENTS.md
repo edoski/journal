@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/yearly metrics with goal carry-forward and reconciliation.
+This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/yearly metrics.
 
 ## Project Structure
 
@@ -20,14 +20,11 @@ journal/
       study.py
       sleep.py
       training.py
-      screen_time.py
       status.py
-      reminders.py
       deviation.py
       schedule.py
       metrics.py
       query.py
-      goals.py
       media.py
 
     ports/                     # Stable Protocol interfaces
@@ -36,8 +33,6 @@ journal/
       schedule.py
       notes.py
       daily_aggregates.py
-      goals.py
-      reminders.py
       media.py
 
     adapters/                  # Concrete external integrations
@@ -46,17 +41,11 @@ journal/
       icloud_status.py
       markdown_notes.py
       markdown_daily_aggregates.py
-      markdown_goals.py
-      markdown_reminders.py
       markdown_schedule.py
       obsidian_media.py
 
     application/               # Orchestration over ports/contracts
       daily_sync_service.py
-      goal_note_gateway.py
-      goal_sync_daily.py
-      goal_sync_period.py
-      goal_sync_service.py
       period_sync_service.py
       query_metrics.py
       query_periods.py
@@ -67,7 +56,6 @@ journal/
       schedule.py
     writers/                   # Rendering (contracts -> markdown)
       __init__.py
-      goals.py
       charts/                  # Unified chart API (typed specs + renderers)
         api.py                 # render_chart(spec) -> list[str]
         specs.py
@@ -85,7 +73,6 @@ journal/
       __main__.py              # Daily composition root
       constants.py
       icloud.py
-      screen_time.py
       sleep.py
       training.py
       orchestrator/
@@ -103,23 +90,10 @@ journal/
       db.py                    # Thin public facade over repository + enrichment
       section.py
 
-    goals/
-      daily_pipeline.py        # Daily goal orchestration helpers (domain-owned)
-      identity.py
-      reminder_codec.py        # Reminder schedule parse/format codecs
-      tombstones.py
-      carry_forward.py
-      state.py
-      reconcile.py
-      note_store.py
-      period_pipeline.py
-      reminders.py
-
     metrics/
       loading.py
       aggregation.py
       trends.py
-      screen_time.py
 
     notes/
       locking.py
@@ -175,7 +149,6 @@ journal/
 - Non-composition modules outside `sync/run/*` must not import `sync/application` or `sync/adapters`.
 - `sync/readers` must stay parse-only (no `sync/application`, `sync/adapters`, `sync/writers`, or `sync/run` imports).
 - `sync/periods` must not import `sync/run`.
-- `sync/goals` must not import `sync/adapters`.
 - No cross-module private (`_name`) imports in `sync/`.
 
 ### Rendering architecture
@@ -193,14 +166,8 @@ journal/
 
 ### Application services
 
-- `DailySyncService`: builds and writes daily note metrics/frontmatter, delegates goal orchestration to `GoalSyncService`.
-- `GoalSyncService`: canonical goal orchestration for daily + period notes (carry-forward, mirror/source reconciliation, piercing, source propagation) using explicit target dates from inputs (no wall-clock coupling).
-  - `sync/application/goal_note_gateway.py` is the only application-layer note I/O gateway for goal flows.
-  - `GoalNoteGateway.add_goal(...)` is the canonical single-note goal insertion path used by CLI flows; do not reintroduce command-local note surgery.
-  - `sync/application/goal_sync_daily.py` owns daily goal-note orchestration.
-  - `sync/application/goal_sync_period.py` owns period goal-note orchestration.
-  - `sync/application/goal_sync_service.py` remains the façade injected into higher-level services.
-- `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes, delegates goal flows to `GoalSyncService`, renders metrics through `sync/periods/engine.py`.
+- `DailySyncService`: builds and writes daily note metrics/frontmatter.
+- `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes, renders metrics through `sync/periods/engine.py`.
   - `sync/periods/engine.py` is a facade; period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
 - `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
@@ -222,7 +189,6 @@ journal/
   - `target_days(anchor_day) -> tuple[date, ...]`
   - `load_training(day) -> TrainingStatus`
   - `load_sleep(day) -> SleepPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
-  - `load_screen_time(day) -> DailyScreenTimeData | None`
   - `write_study_times(day, sessions, day_schedule) -> None`
 - `ScheduleSource.resolve_day(day) -> DayScheduleProfile`
 - `NoteStore`:
@@ -230,14 +196,6 @@ journal/
   - `read_or_create(path, template_path) -> list[str]`
   - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
-- `GoalStore`:
-  - `extract(lines, section, horizon=None, period_key=None) -> list[Goal]`
-  - `apply(lines, sections, insert_after_idx=None) -> list[str]`
-  - `write(path, lines, sections, insert_after_idx=None) -> list[str]`
-- Goal write contracts:
-  - `GoalWriteTarget` in `sync/contracts/goals.py` is the canonical resolved target payload for goal note edits.
-  - `GoalAddResult` in `sync/contracts/goals.py` is the canonical result payload for single-goal insertions.
-- `ReminderRuleStore.load()/save(rules)`
 - `MediaSource.scan(start, end) -> MediaBundle`
 - Study DB access is split into:
   - `sync/study/repository.py` for Flow SQL and raw row loading
@@ -248,9 +206,6 @@ journal/
   - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation
 - Query snapshot contract is canonical across `sync/application` and CLI consumers:
   - `PeriodSnapshot` in `sync/contracts/query.py`
-- Reminder schedule parsing/formatting is canonical in:
-  - `sync/goals/reminder_codec.py`
-  - `sync/contracts/reminders.py` stays typed contracts only
 - Year sync windows must carry explicit execution anchors:
   - `YearWindow.target_date`
 
@@ -292,7 +247,6 @@ python -m sync.run period weekly [--date YYYY-MM-DD] [--no-cleanup]
 python -m sync.run period monthly [--month YYYY-MM] [--no-cleanup]
 python -m sync.run period yearly [--year YYYY]
 python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
-python -m sync.run goals add --period {daily|weekly|monthly|yearly} [--current|--next] "goal text"
 python -m sync.run media book annotations import /abs/path/to/export.html --note /abs/path/to/book.md
 ```
 
@@ -387,7 +341,6 @@ Validate:
 
 - idempotency: repeated sync runs produce stable output.
 - period rendering snapshots: strict line-for-line invariance against deterministic fixture generators; regenerate via `python tools/regenerate_baselines.py` when changes are intentional.
-- goal reconciliation: source/mirror reopen+completion behavior remains correct.
 - parsing edge cases: open sessions, malformed shortcut payloads, missing files.
 - period historical flags (`--date`, `--month`, `--year`).
 - architecture-layer test taxonomy under `tests/sync/`:
@@ -402,9 +355,9 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `REMINDERS_PATH`, `SCHEDULE_PATH`, `GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
-- `GOAL_CACHE_DIR`, `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
-- `TRAINING_CACHE_DIR`, `SCREEN_TIME_CACHE_DIR`
+- `SCHEDULE_PATH`, `GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
+- `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
+- `TRAINING_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
 
 ## Runtime Configuration
@@ -432,14 +385,11 @@ Move checklist (repo relocation):
 
 ## Data and Cache Files
 
-- carried-goals cache: `~/.cache/journal/goals/carry_forward.json`
-- goal-sync state cache: `~/.cache/journal/goals/reconcile_state.json`
 - media cache: `~/.cache/journal/media/dates.json`
 - flow reminder state cache: `~/.cache/journal/flow_reminder_state.json`
 - shortcut status pending cache: `~/.cache/journal/daily/status/pending/`
 - shortcut status invalid cache: `~/.cache/journal/daily/status/invalid/`
 - training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
-- screen-time cache: `~/.cache/journal/daily/screen_time/YYYY-MM-DD.json`
 - note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`
 - state locks: `~/.cache/journal/locks/state/<shard>/<sha1>.lock`
 
