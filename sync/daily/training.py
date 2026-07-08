@@ -171,11 +171,9 @@ def build_training_section(
     """
     Build TRAINING section lines from canonical training status data.
     """
-    new_rows = (
-        _rows_from_canonical_entries(training_status.workout_entries)
-        + _rows_from_canonical_entries(training_status.stretch_entries)
-        + _rows_from_canonical_entries(training_status.meditation_entries)
-    )
+    new_rows = _rows_from_canonical_entries(
+        training_status.workout_entries
+    ) + _rows_from_canonical_entries(training_status.stretch_entries)
 
     cache_rows = _load_training_cache(today_str, training_cache_store)
     merged_rows: list[TrainingTableRow] = []

@@ -16,7 +16,6 @@ def update_frontmatter(
     study_str: str,
     workout_done: bool,
     stretch_done: bool,
-    meditate_done: bool,
     sleep_data: SleepPayload | None,
 ) -> tuple[list[str], dict[str, str]]:
     """
@@ -27,7 +26,6 @@ def update_frontmatter(
         study_str: Formatted study time string
         workout_done: Whether workout was completed
         stretch_done: Whether stretch was completed
-        meditate_done: Whether meditation was completed
         sleep_data: Sleep data dict or None
 
     Returns:
@@ -80,12 +78,6 @@ def update_frontmatter(
 
     set_value("study", study_str)
 
-    if meditate_done:
-        set_value("meditate", "true")
-    else:
-        current = fm_data.get("meditate", "")
-        set_value("meditate", current if current else "false")
-
     if workout_done:
         set_value("workout", "true")
     else:
@@ -105,8 +97,8 @@ def update_frontmatter(
         sleep_str = f"{hours}h{mins:02d}m" if mins else f"{hours}h"
         set_value("sleep", sleep_str)
 
-    # Enforce canonical order: sleep, study, meditate, workout, stretch, then rest
-    canonical_order = ["sleep", "study", "meditate", "workout", "stretch"]
+    # Enforce canonical order: study, sleep, workout, stretch, then rest
+    canonical_order = ["study", "sleep", "workout", "stretch"]
     ordered_keys = [k for k in canonical_order if k in fm_order]
     ordered_keys += [k for k in fm_order if k not in canonical_order]
     new_fm_lines = [f"{key}: {fm_data.get(key, '')}".rstrip() for key in ordered_keys]

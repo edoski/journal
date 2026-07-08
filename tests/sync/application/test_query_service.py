@@ -53,7 +53,6 @@ def test_metric_definitions_expose_expected_keys():
         "sleep_minutes",
         "workout_count",
         "stretch_count",
-        "meditation_count",
         "interrupt_minutes",
         "overrun_minutes",
         "training_sessions_total",
@@ -71,7 +70,6 @@ def test_query_by_metric_matches_period_snapshot(monkeypatch):
             "sleep_minutes": 480,
             "workout_count": 4,
             "stretch_count": 5,
-            "meditation_count": 6,
             "interrupt_minutes": 12.0,
             "overrun_minutes": 8.0,
             "training_sessions_total": 0,
@@ -99,7 +97,6 @@ def test_query_period_detail_contains_sorted_breakdowns():
         "sleep_minutes": 470.0,
         "workout": True,
         "stretch": False,
-        "meditate": True,
         "awake_minutes": 18.0,
         "activity_totals": {"Writing": 180.0, "Reading": 90.0},
         "interrupt_minutes": 15.0,
@@ -137,7 +134,6 @@ def test_query_period_detail_sets_study_target_none_when_schedule_fails():
         "sleep_minutes": 470.0,
         "workout": True,
         "stretch": False,
-        "meditate": True,
         "awake_minutes": 18.0,
         "activity_totals": {"Writing": 180.0},
         "interrupt_minutes": 15.0,
@@ -197,7 +193,6 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
 
     workout_target = float(training_type_target(7, "workout"))
     stretch_target = float(training_type_target(7, "stretch"))
-    meditation_target = float(training_type_target(7, "meditation"))
 
     detail = PeriodDetailSnapshot(
         period="week",
@@ -226,15 +221,6 @@ def test_query_dashboard_emits_missing_note_alert(monkeypatch):
                 -20.0,
                 4.5,
                 stretch_target,
-            ),
-            PeriodMetricRow(
-                "meditation_count",
-                "Meditation",
-                5,
-                4,
-                25.0,
-                4.5,
-                meditation_target,
             ),
             PeriodMetricRow(
                 "interrupt_minutes",
@@ -300,5 +286,4 @@ def test_shift_anchor_supports_all_periods():
     assert service.shift_anchor("day", anchor, 1) == datetime.date(2026, 2, 7)
     assert service.shift_anchor("week", anchor, -1) == datetime.date(2026, 1, 30)
     assert service.shift_anchor("month", anchor, 1) == datetime.date(2026, 3, 1)
-    assert service.shift_anchor("quarter", anchor, 1) == datetime.date(2026, 4, 1)
     assert service.shift_anchor("year", anchor, 1) == datetime.date(2027, 1, 1)

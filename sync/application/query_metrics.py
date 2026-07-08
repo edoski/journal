@@ -56,14 +56,6 @@ METRIC_DEFINITIONS: tuple[MetricDefinition, ...] = (
         target=float(training_type_target(7, "stretch")),
     ),
     MetricDefinition(
-        key="meditation_count",
-        label="Meditation",
-        unit="count",
-        precision=0,
-        higher_is_better=True,
-        target=float(training_type_target(7, "meditation")),
-    ),
-    MetricDefinition(
         key="interrupt_minutes",
         label="Interruptions",
         unit="min",
@@ -93,7 +85,6 @@ MOVING_AVG_LOOKBACK = {
     "day": 7,
     "week": 4,
     "month": 3,
-    "quarter": 4,
     "year": 3,
 }
 
@@ -101,7 +92,6 @@ METRIC_LAB_LOOKBACK = {
     "day": 14,
     "week": 12,
     "month": 12,
-    "quarter": 8,
     "year": 5,
 }
 
@@ -185,7 +175,6 @@ def build_metrics_map(
         "sleep_minutes": period_metrics["sleep_avg_minutes"],
         "workout_count": period_metrics["workout_count"],
         "stretch_count": period_metrics["stretch_count"],
-        "meditation_count": period_metrics["meditation_count"],
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
         "training_sessions_total": training_sessions_total,

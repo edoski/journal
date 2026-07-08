@@ -6,6 +6,7 @@ from .renderers.grouped_grid import (
     render_monthly_training_grid,
     render_weekly_training_grid,
 )
+from .renderers.calendar_columns import render_training_calendar_columns
 from .renderers.progress_rows import (
     render_training_block_rows,
     render_training_sections_rows,
@@ -15,6 +16,7 @@ from .specs import (
     ChartSpec,
     MonthlyTrainingGridSpec,
     TrainingBlockRowsSpec,
+    TrainingCalendarColumnsSpec,
     TrainingSectionsRowsSpec,
     VerticalBarSpec,
     WeeklyTrainingGridSpec,
@@ -41,6 +43,9 @@ _RENDERERS: dict[type[object], Renderer] = {
     ),
     TrainingSectionsRowsSpec: typed_renderer(
         TrainingSectionsRowsSpec, render_training_sections_rows
+    ),
+    TrainingCalendarColumnsSpec: typed_renderer(
+        TrainingCalendarColumnsSpec, render_training_calendar_columns
     ),
 }
 

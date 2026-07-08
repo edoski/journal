@@ -40,13 +40,18 @@ def _summary_line(lines: list[str], metric: str) -> str:
     return next(line for line in lines if f"**{metric}**" in line)
 
 
+def _section_text(lines: list[str], start_header: str, end_header: str) -> str:
+    start_index = lines.index(start_header)
+    end_index = lines.index(end_header)
+    return "\n".join(lines[start_index:end_index])
+
+
 def _minimal_daily(study_minutes: float) -> dict:
     return {
         "study_minutes": study_minutes,
         "sleep_minutes": None,
         "workout": False,
         "stretch": False,
-        "meditate": False,
     }
 
 
@@ -70,7 +75,7 @@ def test_weekly_metrics_block_characterization():
         end,
         daily_data,
         prev_daily_data,
-        "**[[2020-W19\\|LAST WEEK]]**",
+        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
         prior_week_metrics=prior_week_metrics,
@@ -80,7 +85,7 @@ def test_weekly_metrics_block_characterization():
         end,
         daily_data,
         prev_daily_data,
-        "**[[2020-W19\\|LAST WEEK]]**",
+        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
         prior_week_metrics=prior_week_metrics,
@@ -88,6 +93,32 @@ def test_weekly_metrics_block_characterization():
 
     assert first_lines == second_lines
     _assert_common_structure(first_lines)
+
+
+def test_yearly_training_calendar_stops_at_current_month():
+    year = 2020
+    start, end = year_range(year)
+    prev_start, prev_end = year_range(year - 1)
+    target_date = datetime.date(2020, 7, 8)
+
+    lines = period_builders.build_yearly_metrics(
+        year,
+        start,
+        end,
+        year_quarters(year),
+        year_quarters(year - 1),
+        range_data(start, end),
+        range_data(prev_start, prev_end),
+        FIXTURE_MEDIA_BUNDLE,
+        target_date=target_date,
+    )
+
+    training_text = _section_text(lines, "### **TRAINING**", "### **SLEEP**")
+    assert "┌ Q3" in training_text
+    assert "│ JUL" in training_text
+    assert "│ AUG" not in training_text
+    assert "│ SEP" not in training_text
+    assert "┌ Q4" not in training_text
 
 
 def test_monthly_metrics_block_characterization():
@@ -110,8 +141,8 @@ def test_monthly_metrics_block_characterization():
         week_ranges,
         daily_data,
         prev_daily_data,
-        "THIS MONTH",
-        "**[[2020-04\\|LAST MONTH]]**",
+        "CURRENT",
+        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
         prior_month_metrics=prior_month_metrics,
@@ -122,8 +153,8 @@ def test_monthly_metrics_block_characterization():
         week_ranges,
         daily_data,
         prev_daily_data,
-        "THIS MONTH",
-        "**[[2020-04\\|LAST MONTH]]**",
+        "CURRENT",
+        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
         target_date=end,
         prior_month_metrics=prior_month_metrics,
@@ -143,8 +174,8 @@ def test_monthly_previous_summary_uses_full_previous_month_denominator():
         month_week_ranges(2020, 5),
         {},
         {prev_start: _minimal_daily(60.0)},
-        "THIS MONTH",
-        "**[[2020-04\\|LAST MONTH]]**",
+        "CURRENT",
+        "PREVIOUS",
         MediaBundle(books=[], podcasts=[]),
         target_date=end,
     )

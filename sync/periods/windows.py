@@ -9,11 +9,7 @@ from sync.dates import (
     iso_week_range,
     month_range,
     month_week_ranges,
-    previous_quarter as previous_quarter_value,
-    quarter_months,
-    quarter_range,
     shift_month,
-    shift_quarter,
     year_quarters,
     year_range,
 )
@@ -31,8 +27,6 @@ class WeekWindow:
     filename: str
     previous_start: datetime.date
     previous_end: datetime.date
-    previous_year: int
-    previous_week_num: int
     previous_filename: str
     previous_label: str
 
@@ -68,31 +62,6 @@ class MonthWindow:
 
 
 @dataclass(frozen=True)
-class QuarterWindow:
-    """Window metadata for quarter-sized query ranges."""
-
-    target_date: datetime.date
-    year: int
-    quarter: int
-    start: datetime.date
-    end: datetime.date
-    filename: str
-    month_ranges: list[tuple[datetime.date, datetime.date]]
-    previous_year: int
-    previous_quarter: int
-    previous_start: datetime.date
-    previous_end: datetime.date
-    previous_filename: str
-
-    def prior_bounds(self, quarters_ago: int) -> tuple[datetime.date, datetime.date]:
-        """Return date bounds for a prior quarter offset."""
-        prior_year, prior_quarter = shift_quarter(
-            self.year, self.quarter, -quarters_ago
-        )
-        return quarter_range(prior_year, prior_quarter)
-
-
-@dataclass(frozen=True)
 class YearWindow:
     """Window metadata for a yearly sync run."""
 
@@ -102,10 +71,8 @@ class YearWindow:
     end: datetime.date
     filename: str
     quarter_ranges: list[tuple[datetime.date, datetime.date]]
-    previous_year: int
     previous_start: datetime.date
     previous_end: datetime.date
-    previous_filename: str
     previous_quarter_ranges: list[tuple[datetime.date, datetime.date]]
 
     def prior_bounds(self, years_ago: int) -> tuple[datetime.date, datetime.date]:
@@ -123,7 +90,6 @@ def build_week_window(target_date: datetime.date) -> WeekWindow:
     previous_end = end - datetime.timedelta(days=7)
     previous_year, previous_week_num, _ = previous_start.isocalendar()
     previous_filename = f"{previous_year}-W{previous_week_num:02d}.md"
-    previous_label = f"**[[{previous_year}-W{previous_week_num:02d}\\|LAST WEEK]]**"
 
     return WeekWindow(
         target_date=target_date,
@@ -134,10 +100,8 @@ def build_week_window(target_date: datetime.date) -> WeekWindow:
         filename=filename,
         previous_start=previous_start,
         previous_end=previous_end,
-        previous_year=previous_year,
-        previous_week_num=previous_week_num,
         previous_filename=previous_filename,
-        previous_label=previous_label,
+        previous_label="PREVIOUS",
     )
 
 
@@ -163,38 +127,8 @@ def build_month_window(target_date: datetime.date) -> MonthWindow:
         previous_start=previous_start,
         previous_end=previous_end,
         previous_filename=previous_filename,
-        previous_label=f"**[[{previous_year}-{previous_month:02d}\\|LAST MONTH]]**",
-        current_label="THIS MONTH",
-    )
-
-
-def build_quarter_window(
-    year: int,
-    quarter: int,
-    *,
-    target_date: datetime.date,
-) -> QuarterWindow:
-    """Build quarter window metadata."""
-    start, end = quarter_range(year, quarter)
-    filename = f"{year}-Q{quarter}.md"
-
-    previous_year, previous_quarter_num = previous_quarter_value(year, quarter)
-    previous_start, previous_end = quarter_range(previous_year, previous_quarter_num)
-    previous_filename = f"{previous_year}-Q{previous_quarter_num}.md"
-
-    return QuarterWindow(
-        target_date=target_date,
-        year=year,
-        quarter=quarter,
-        start=start,
-        end=end,
-        filename=filename,
-        month_ranges=quarter_months(year, quarter),
-        previous_year=previous_year,
-        previous_quarter=previous_quarter_num,
-        previous_start=previous_start,
-        previous_end=previous_end,
-        previous_filename=previous_filename,
+        previous_label="PREVIOUS",
+        current_label="CURRENT",
     )
 
 
@@ -211,9 +145,7 @@ def build_year_window(year: int, *, target_date: datetime.date) -> YearWindow:
         end=end,
         filename=f"{year}.md",
         quarter_ranges=year_quarters(year),
-        previous_year=previous_year,
         previous_start=previous_start,
         previous_end=previous_end,
-        previous_filename=f"{previous_year}.md",
         previous_quarter_ranges=year_quarters(previous_year),
     )

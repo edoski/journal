@@ -27,7 +27,6 @@ def test_parse_daily_note_characterization(tmp_path):
             "sleep: 7h15m",
             "workout: true",
             "stretch: false",
-            "meditate: true",
             "---",
             "",
             "## Metrics",
@@ -56,7 +55,6 @@ def test_parse_daily_note_characterization(tmp_path):
         "sleep_minutes": 435.0,  # frontmatter overrides sleep table sum
         "workout": True,
         "stretch": False,
-        "meditate": True,
         "awake_minutes": 25.0,
         "sleep_asleep_time": "23:00",
         "sleep_awake_time": "07:00",
@@ -67,6 +65,7 @@ def test_parse_daily_note_characterization(tmp_path):
         "training_type_minutes": {},
         "training_type_sessions": {},
         "training_type_duration_minutes": {},
+        "training_type_interrupt_minutes": {},
         "training_type_start_minutes": {},
         "training_type_end_minutes": {},
     }
@@ -114,7 +113,6 @@ def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
             "sleep: 7h",
             "workout: false",
             "stretch: false",
-            "meditate: false",
             "---",
             "",
             "## Metrics",
@@ -150,7 +148,6 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
             "sleep: 7h",
             "workout: true",
             "stretch: true",
-            "meditate: true",
             "---",
             "",
             "## Metrics",
@@ -159,9 +156,8 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
             "",
             "| TIME | ACTIVITY | DURATION | INTERRUPT |",
             "| ---- | -------- | -------- | --------- |",
-            "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+00m` |",
+            "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+05m` |",
             "| `18:00 - 18:30` | Stretching | `30m` | `+00m` |",
-            "| `21:00 - 21:15` | Meditation | `15m` | `+00m` |",
             "| `22:00 - 22:00` | Traditional Strength Training | `` | `+00m` |",
             "",
         ],
@@ -173,31 +169,29 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
     assert parsed["training_type_minutes"] == {
         "Traditional Strength Training": 60.0,
         "Stretching": 30.0,
-        "Meditation": 15.0,
     }
     assert parsed["training_type_sessions"] == {
         "Traditional Strength Training": 1,
         "Stretching": 1,
-        "Meditation": 1,
     }
     assert parsed["training_type_duration_minutes"] == {
         "Traditional Strength Training": (60.0,),
         "Stretching": (30.0,),
-        "Meditation": (15.0,),
+    }
+    assert parsed["training_type_interrupt_minutes"] == {
+        "Traditional Strength Training": (5.0,),
+        "Stretching": (0.0,),
     }
     assert parsed["training_type_start_minutes"] == {
         "Traditional Strength Training": (420,),
         "Stretching": (1080,),
-        "Meditation": (1260,),
     }
     assert parsed["training_type_end_minutes"] == {
         "Traditional Strength Training": (480,),
         "Stretching": (1110,),
-        "Meditation": (1275,),
     }
     assert parsed["workout"] is True
     assert parsed["stretch"] is True
-    assert parsed["meditate"] is True
 
 
 def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
@@ -208,7 +202,6 @@ def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
             "sleep: 7h",
             "workout: true",
             "stretch: false",
-            "meditate: false",
             "---",
             "",
             "## Metrics",
@@ -379,7 +372,6 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_pa
             "---",
             "workout: false",
             "stretch: false",
-            "meditate: false",
             "---",
             "",
             "## Metrics",
@@ -406,7 +398,6 @@ def test_parse_daily_note_sleep_absent_defaults(tmp_path):
             "---",
             "workout: no",
             "stretch: yes",
-            "meditate: true",
             "---",
             "",
             "## Metrics",
@@ -426,7 +417,6 @@ def test_parse_daily_note_sleep_absent_defaults(tmp_path):
     assert parsed["awake_minutes"] is None
     assert parsed["workout"] is False
     assert parsed["stretch"] is False
-    assert parsed["meditate"] is True
 
 
 def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
@@ -436,7 +426,6 @@ def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
             "---",
             "workout: false",
             "stretch: false",
-            "meditate: false",
             "---",
             "",
             "## Metrics",
@@ -462,7 +451,6 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
             "sleep: 6h00m",
             "workout: true",
             "stretch: true",
-            "meditate: true",
             "---",
             "",
             "## Metrics",
@@ -488,5 +476,6 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
     assert parsed["training_type_minutes"] == {"Lift": 30.0}
     assert parsed["training_type_sessions"] == {"Lift": 2}
     assert parsed["training_type_duration_minutes"] == {"Lift": (20.0, 10.0)}
+    assert parsed["training_type_interrupt_minutes"] == {"Lift": (0.0, 0.0)}
     assert parsed["training_type_start_minutes"] == {"Lift": (420, 480)}
     assert parsed["training_type_end_minutes"] == {"Lift": (440, 490)}

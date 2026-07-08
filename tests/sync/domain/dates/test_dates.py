@@ -16,15 +16,10 @@ from sync.dates import (
     shift_month,
     previous_month,
     quarter_range,
-    shift_quarter,
-    previous_quarter,
-    quarter_months,
-    quarter_of_date,
     year_range,
     year_quarters,
     month_week_ranges,
     format_week_label,
-    quarter_id,
 )
 
 
@@ -165,65 +160,6 @@ class TestQuarterRange:
             quarter_range(2025, 5)
 
 
-class TestQuarterMonths:
-    """Tests for quarter_months function."""
-
-    def test_q1_months(self):
-        months = quarter_months(2025, 1)
-        assert len(months) == 3
-        assert months[0] == (datetime.date(2025, 1, 1), datetime.date(2025, 1, 31))
-        assert months[1] == (datetime.date(2025, 2, 1), datetime.date(2025, 2, 28))
-        assert months[2] == (datetime.date(2025, 3, 1), datetime.date(2025, 3, 31))
-
-    def test_q4_months(self):
-        months = quarter_months(2025, 4)
-        assert len(months) == 3
-        assert months[0] == (datetime.date(2025, 10, 1), datetime.date(2025, 10, 31))
-        assert months[1] == (datetime.date(2025, 11, 1), datetime.date(2025, 11, 30))
-        assert months[2] == (datetime.date(2025, 12, 1), datetime.date(2025, 12, 31))
-
-
-class TestShiftQuarter:
-    """Tests for quarter shifting helpers."""
-
-    def test_shift_quarter_backward(self):
-        assert shift_quarter(2025, 1, -1) == (2024, 4)
-
-    def test_shift_quarter_forward(self):
-        assert shift_quarter(2025, 4, 1) == (2026, 1)
-
-    def test_previous_quarter(self):
-        assert previous_quarter(2025, 1) == (2024, 4)
-        assert previous_quarter(2025, 3) == (2025, 2)
-
-    def test_shift_quarter_invalid(self):
-        with pytest.raises(ValueError):
-            shift_quarter(2025, 0, 1)
-
-
-class TestQuarterOfDate:
-    """Tests for quarter_of_date function."""
-
-    def test_q1_start(self):
-        assert quarter_of_date(datetime.date(2025, 1, 1)) == (2025, 1)
-
-    def test_q1_end(self):
-        assert quarter_of_date(datetime.date(2025, 3, 31)) == (2025, 1)
-
-    def test_q2(self):
-        assert quarter_of_date(datetime.date(2025, 5, 15)) == (2025, 2)
-
-    def test_q3(self):
-        assert quarter_of_date(datetime.date(2025, 8, 1)) == (2025, 3)
-
-    def test_q4(self):
-        assert quarter_of_date(datetime.date(2025, 12, 31)) == (2025, 4)
-
-    def test_boundary_march_april(self):
-        assert quarter_of_date(datetime.date(2025, 3, 31)) == (2025, 1)
-        assert quarter_of_date(datetime.date(2025, 4, 1)) == (2025, 2)
-
-
 class TestYearRange:
     """Tests for year_range function."""
 
@@ -291,14 +227,3 @@ class TestFormatWeekLabel:
         end = datetime.date(2025, 6, 8)
         assert format_week_label(start, end) == "JUN 02-08"
 
-
-class TestQuarterId:
-    """Tests for quarter_id function."""
-
-    def test_format(self):
-        assert quarter_id(2025, 1) == "2025-Q1"
-        assert quarter_id(2025, 4) == "2025-Q4"
-
-    def test_different_years(self):
-        assert quarter_id(2024, 3) == "2024-Q3"
-        assert quarter_id(2026, 2) == "2026-Q2"

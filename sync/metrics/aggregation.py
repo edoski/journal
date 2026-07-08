@@ -10,8 +10,14 @@ from sync.contracts.metrics import (
     PeriodAggregate,
     TrainingTypeSessionStat,
 )
-from sync.contracts.targets import TrainingTargetBucket
-from sync.target_policy import training_type_target
+
+
+def _date_set() -> set[datetime.date]:
+    return set()
+
+
+def _int_list() -> list[int]:
+    return []
 
 
 @dataclass
@@ -19,29 +25,21 @@ class _TrainingAccumulator:
     """Mutable accumulator for per-type training aggregation."""
 
     display_type: str
-    active_days: set[datetime.date] = field(default_factory=set)
+    active_days: set[datetime.date] = field(default_factory=_date_set)
     total_sessions: int = 0
     total_minutes: float = 0.0
+    total_interrupt_minutes: float = 0.0
 
 
 @dataclass
 class _ScheduleRangeAccumulator:
     """Mutable accumulator for one recurring schedule range within a training type."""
 
-    seen_days: set[datetime.date] = field(default_factory=set)
-    start_minutes: list[int] = field(default_factory=list)
-    end_minutes: list[int] = field(default_factory=list)
+    seen_days: set[datetime.date] = field(default_factory=_date_set)
+    start_minutes: list[int] = field(default_factory=_int_list)
+    end_minutes: list[int] = field(default_factory=_int_list)
     total_duration_minutes: float = 0.0
 
-
-_TRAINING_BUCKET_BY_LABEL: dict[str, TrainingTargetBucket] = {
-    "meditation": "meditation",
-    "mind & body": "meditation",
-    "mind and body": "meditation",
-    "stretch": "stretch",
-    "stretching": "stretch",
-    "cooldown": "stretch",
-}
 
 _TRAINING_RANGE_CLUSTER_THRESHOLD_MINUTES = 6 * 60
 
@@ -88,20 +86,14 @@ def compute_period_metrics(
         payload = daily_data.get(day)
         return bool(payload.get("stretch")) if payload is not None else False
 
-    def day_has_meditation(day: datetime.date) -> bool:
-        payload = daily_data.get(day)
-        return bool(payload.get("meditate")) if payload is not None else False
-
     workout_count = sum(1 for day in dates if day_has_workout(day))
     stretch_count = sum(1 for day in dates if day_has_stretch(day))
-    meditation_count = sum(1 for day in dates if day_has_meditation(day))
 
     return PeriodAggregate(
         study_total_minutes=study_total,
         sleep_avg_minutes=sleep_avg,
         workout_count=workout_count,
         stretch_count=stretch_count,
-        meditation_count=meditation_count,
         total_days=len(dates),
         days_up_to_today=days_up_to_today,
     )
@@ -164,13 +156,6 @@ def aggregate_interrupt_overrun(
 def _normalize_training_type_label(label: str) -> str:
     """Normalize a training type label for stable aggregation."""
     return " ".join(label.split()).strip().casefold()
-
-
-def _target_bucket_for_training_type(
-    normalized_label: str,
-) -> TrainingTargetBucket:
-    """Map a normalized training type label to target bucket."""
-    return _TRAINING_BUCKET_BY_LABEL.get(normalized_label, "workout")
 
 
 def _average_clock_minutes(samples: list[int]) -> int:
@@ -279,6 +264,7 @@ def aggregate_training_type_session_stats(
       - sessions: number of days where the type appeared at least once
       - target: scaled target denominator for period
       - average_minutes: average duration across all sessions of the type
+      - average_interrupt_minutes: average interrupt across all sessions of the type
       - schedule_range: dominant averaged recurring schedule range as an HH:MM pair
     """
     per_type: dict[str, _TrainingAccumulator] = {}
@@ -292,6 +278,7 @@ def aggregate_training_type_session_stats(
             minutes_map = daily["training_type_minutes"]
             sessions_map = daily["training_type_sessions"]
             duration_minutes_map = daily["training_type_duration_minutes"]
+            interrupt_minutes_map = daily["training_type_interrupt_minutes"]
             start_minutes_map = daily["training_type_start_minutes"]
             end_minutes_map = daily["training_type_end_minutes"]
         except KeyError as exc:
@@ -305,6 +292,7 @@ def aggregate_training_type_session_stats(
             not minutes_map
             and not sessions_map
             and not duration_minutes_map
+            and not interrupt_minutes_map
             and not start_minutes_map
             and not end_minutes_map
         ):
@@ -314,6 +302,7 @@ def aggregate_training_type_session_stats(
             set(minutes_map.keys())
             | set(sessions_map.keys())
             | set(duration_minutes_map.keys())
+            | set(interrupt_minutes_map.keys())
             | set(start_minutes_map.keys())
             | set(end_minutes_map.keys())
         )
@@ -331,8 +320,10 @@ def aggregate_training_type_session_stats(
             start_samples = tuple(start_minutes_map.get(raw_label, ()))
             end_samples = tuple(end_minutes_map.get(raw_label, ()))
             duration_samples = tuple(duration_minutes_map.get(raw_label, ()))
+            interrupt_samples = tuple(interrupt_minutes_map.get(raw_label, ()))
             if (
                 len(duration_samples) != sessions
+                or len(interrupt_samples) != sessions
                 or len(start_samples) != sessions
                 or len(end_samples) != sessions
             ):
@@ -340,6 +331,7 @@ def aggregate_training_type_session_stats(
                     "Training schedule sample count mismatch for "
                     f"{label or norm!r} on {d.isoformat()}: "
                     f"sessions={sessions}, durations={len(duration_samples)}, "
+                    f"interrupts={len(interrupt_samples)}, "
                     f"starts={len(start_samples)}, "
                     f"ends={len(end_samples)}"
                 )
@@ -362,14 +354,12 @@ def aggregate_training_type_session_stats(
             entry.active_days.add(d)
             entry.total_sessions += sessions
             entry.total_minutes += total_minutes
+            entry.total_interrupt_minutes += sum(interrupt_samples)
 
             clusters = schedule_clusters_by_type.setdefault(norm, [])
             _cluster_schedule_samples(d, ordered_samples, clusters)
 
     total_days = len(dates)
-    meditation_target = training_type_target(total_days, "meditation")
-    workout_target = training_type_target(total_days, "workout")
-    stretch_target = training_type_target(total_days, "stretch")
 
     stats: list[TrainingTypeSessionStat] = []
     for norm, data in per_type.items():
@@ -393,22 +383,17 @@ def aggregate_training_type_session_stats(
                 f"sessions={total_session_count}, starts={sample_count}"
             )
 
-        bucket = _target_bucket_for_training_type(norm)
-        if bucket == "meditation":
-            target = meditation_target
-        elif bucket == "stretch":
-            target = stretch_target
-        else:
-            target = workout_target
-
         schedule_range = _dominant_schedule_range(clusters)
 
         stats.append(
             TrainingTypeSessionStat(
                 type=data.display_type or norm,
                 sessions=sessions,
-                target=target,
+                target=total_days,
                 average_minutes=total_minutes / total_session_count,
+                average_interrupt_minutes=(
+                    data.total_interrupt_minutes / total_session_count
+                ),
                 schedule_range=schedule_range,
             )
         )

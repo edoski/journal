@@ -12,7 +12,6 @@ class DailyAggregate(TypedDict):
     sleep_minutes: float | None
     workout: bool
     stretch: bool
-    meditate: bool
     awake_minutes: float | None
     sleep_asleep_time: str | None
     sleep_awake_time: str | None
@@ -23,6 +22,7 @@ class DailyAggregate(TypedDict):
     training_type_minutes: dict[str, float]
     training_type_sessions: dict[str, int]
     training_type_duration_minutes: dict[str, tuple[float, ...]]
+    training_type_interrupt_minutes: dict[str, tuple[float, ...]]
     training_type_start_minutes: dict[str, tuple[int, ...]]
     training_type_end_minutes: dict[str, tuple[int, ...]]
 
@@ -34,7 +34,6 @@ class PeriodAggregate(TypedDict):
     sleep_avg_minutes: float | None
     workout_count: int
     stretch_count: int
-    meditation_count: int
     total_days: int
     days_up_to_today: int
 
@@ -46,6 +45,7 @@ class TrainingTypeSessionStat(TypedDict):
     sessions: int
     target: int
     average_minutes: float
+    average_interrupt_minutes: float
     schedule_range: tuple[str, str]
 
 
@@ -56,7 +56,6 @@ class MovingAverageAggregate(TypedDict):
     sleep_avg_minutes: float | None
     workout_avg: float | None
     stretch_avg: float | None
-    meditation_avg: float | None
 
 
 MetricValue: TypeAlias = float | int | None

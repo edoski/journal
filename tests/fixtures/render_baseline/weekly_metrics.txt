@@ -1,12 +1,11 @@
 ### **SUMMARY**
 
-| METRIC | THIS WEEK | **[[2020-W19\|LAST WEEK]]** | CHANGE | 4-WK AVG |
-| ------ | ------------- | ----------------------- | ------ | ---------- |
-| **STUDY** | `3h34m/day` | `3h26m/day` | `+4%` | `3h13m/day` |
-| **SLEEP** | `7h15m/night` | `7h15m/night` | `+0%` | `7h15m/night` |
-| **MEDITATION** | `4/7` | `3/7` | `+33%` | `3.5/7` |
-| **WORKOUT** | `3/7` | `2/7` | `+50%` | `2.2/7` |
-| **STRETCH** | `4/7` | `3/7` | `+33%` | `3.5/7` |
+| METRIC | CURRENT | PREVIOUS | 4-WEEK |
+| ------ | ------------- | ----------------------- | ---------- |
+| **STUDY** | `3h34m/day` | `3h26m/day` | `3h13m/day` |
+| **SLEEP** | `7h15m` | `7h15m` | `7h15m` |
+| **WORKOUT** | `3/7` | `2/7` | `2.2/7` |
+| **STRETCH** | `4/7` | `3/7` | `3.5/7` |
 
 ### **STUDY**
 ```
@@ -25,26 +24,24 @@
 ```
 **`SUM: 25h00m`**
 
-| ACTIVITY | TIME | SHARE |
+| ACTIVITY | DURATION | SHARE |
 | -------- | ---- | ----- |
 | **coding** | `16h15m` | `65%` |
 | **reading** | `8h45m` | `35%` |
 
 ### **TRAINING**
 ```
-┌                                      ↓
-│ MEDITATION  ███ ███ ░░░ ░░░ ███ ███ ░░░   (4/7)
-│ WORKOUT     ███ ░░░ ░░░ ███ ░░░ ░░░ ███   (3/7)
-│ STRETCH     ███ ░░░ ███ ░░░ ███ ░░░ ███   (4/7)
-│             ─── ─── ─── ─── ─── ─── ───
-└             MON TUE WED THU FRI SAT SUN
+┌                                   ↓
+│ WORKOUT  ███ ░░░ ░░░ ███ ░░░ ░░░ ███   (3/7)
+│ STRETCH  ███ ░░░ ███ ░░░ ███ ░░░ ███   (4/7)
+│          ─── ─── ─── ─── ─── ─── ───
+└          MON TUE WED THU FRI SAT SUN
 ```
 
-| TYPE | SESSIONS | DURATION | TIME |
-| ---- | -------- | -------- | -------- |
-| **Mind & Body** | `4/7` | `12m/session` | `07:24 - 07:36` |
-| **Functional Strength Training** | `3/7` | `33m/session` | `18:12 - 18:45` |
-| **Cooldown** | `4/7` | `26m/session` | `19:09 - 19:35` |
+| TIME | ACTIVITY | DURATION | INTERRUPT |
+| ---- | -------- | -------- | --------- |
+| `18:12 - 18:48` | Functional Strength Training | `33m/session` | `+02m/session` |
+| `19:09 - 19:36` | Cooldown | `26m/session` | `+01m/session` |
 
 ### **SLEEP**
 ```
@@ -62,11 +59,9 @@
    MON     TUE     WED     THU     FRI     SAT     SUN
 ```
 
-| ACTIVITY | AVERAGE |
-| -------- | ------- |
-| **TIME**       | `23:11 - 07:11` |
-| **ASLEEP**     | `7h15m` |
-| **AWAKE**      | `19m` |
+| TIME | ASLEEP | AWAKE |
+| ---- | ------ | ----- |
+| `23:11 - 07:11` | `7h15m` | `19m` |
 
 ### **MEDIA**
 

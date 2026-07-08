@@ -42,7 +42,6 @@ class _MetricsSectionResult:
     updated_lines: list[str]
     workout_done: bool
     stretch_done: bool
-    meditate_done: bool
     sleep_data: SleepPayload | None
 
 
@@ -81,7 +80,6 @@ class DailyNoteComposer:
             study_str,
             metrics_result.workout_done,
             metrics_result.stretch_done,
-            metrics_result.meditate_done,
             metrics_result.sleep_data,
         )
         updated_lines = normalize_reflections_table_header(updated_lines)
@@ -151,7 +149,6 @@ class DailyNoteComposer:
             updated_lines=replace_metrics_block(lines, metrics_lines),
             workout_done=training_status.workout_done,
             stretch_done=training_status.stretch_done,
-            meditate_done=training_status.meditate_done,
             sleep_data=sleep_data,
         )
 

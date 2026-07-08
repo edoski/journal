@@ -21,7 +21,6 @@ _SLEEP_REQUIRED_KEYS = (
 _TRAINING_DEFAULT_TYPE = {
     "workout": "Workout",
     "stretching": "Stretching",
-    "meditation": "Meditation",
 }
 
 
@@ -104,7 +103,7 @@ def parse_training_payload(
     raw_payload: object,
     source_kind: str,
 ) -> list[TrainingEntryPayload]:
-    """Parse workout/stretching/meditation payload into canonical entries."""
+    """Parse workout/stretching payload into canonical entries."""
     if raw_payload is None:
         return []
     if isinstance(raw_payload, dict):

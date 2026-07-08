@@ -106,7 +106,6 @@ def compute_moving_average(
         sleep_avg_minutes=None,
         workout_avg=None,
         stretch_avg=None,
-        meditation_avg=None,
     )
 
     if len(period_metrics) < n_periods:
@@ -139,16 +138,9 @@ def compute_moving_average(
     stretch_counts = [period.get("stretch_count", 0) for period in recent]
     stretch_ma = sum(stretch_counts) / len(stretch_counts) if stretch_counts else None
 
-    # Meditation: average count per period
-    meditation_counts = [period.get("meditation_count", 0) for period in recent]
-    meditation_ma = (
-        sum(meditation_counts) / len(meditation_counts) if meditation_counts else None
-    )
-
     return MovingAverageAggregate(
         study_avg_minutes=study_ma,
         sleep_avg_minutes=sleep_ma,
         workout_avg=workout_ma,
         stretch_avg=stretch_ma,
-        meditation_avg=meditation_ma,
     )

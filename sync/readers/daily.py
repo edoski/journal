@@ -70,7 +70,7 @@ def _parse_training_time_range(raw: str, *, line_no: int) -> tuple[int, int]:
 
 def _parse_training_table_rows(
     lines: list[str],
-) -> list[tuple[str, float, int, int]]:
+) -> list[tuple[str, float, float, int, int]]:
     """Parse the TRAINING table into session rows."""
     block = extract_block(lines, TRAINING_SECTION_HEADER)
     if not block:
@@ -79,22 +79,23 @@ def _parse_training_table_rows(
     table = find_markdown_table(
         block,
         header_matches=lambda cells: (
-            len(cells) >= 3
+            len(cells) >= 4
             and cells[0].strip().lower() == "time"
             and cells[1].strip().lower() == "activity"
             and cells[2].strip().lower() == "duration"
+            and cells[3].strip().lower() == "interrupt"
         ),
         lenient=True,
     )
     if table is None:
         return []
 
-    rows: list[tuple[str, float, int, int]] = []
+    rows: list[tuple[str, float, float, int, int]] = []
     for row_no, parts in enumerate(table.rows, start=table.start_idx + 3):
         if NO_TRAINING_SESSIONS_TOKEN in " | ".join(parts).lower():
             continue
 
-        if len(parts) < 3:
+        if len(parts) < 4:
             continue
 
         activity = parts[1].strip().strip("`")
@@ -103,7 +104,10 @@ def _parse_training_table_rows(
             start_minutes, end_minutes = _parse_training_time_range(
                 parts[0], line_no=row_no
             )
-            rows.append((activity, duration_min, start_minutes, end_minutes))
+            interrupt_min = parse_duration_to_minutes(parts[3]) or 0.0
+            rows.append(
+                (activity, duration_min, interrupt_min, start_minutes, end_minutes)
+            )
 
     return rows
 
@@ -134,7 +138,6 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
 
     workout = _parse_bool(fm.get("workout"))
     stretch = _parse_bool(fm.get("stretch"))
-    meditate = _parse_bool(fm.get("meditate"))
 
     awake_total = (
         sum(entry.awake_minutes or 0 for entry in sleep_rows) if sleep_rows else None
@@ -158,12 +161,20 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
     training_type_minutes = defaultdict[str, float](float)
     training_type_sessions = defaultdict[str, int](int)
     training_type_duration_minutes = defaultdict[str, list[float]](list)
+    training_type_interrupt_minutes = defaultdict[str, list[float]](list)
     training_type_start_minutes = defaultdict[str, list[int]](list)
     training_type_end_minutes = defaultdict[str, list[int]](list)
-    for activity, minutes, start_minutes, end_minutes in training_rows:
+    for (
+        activity,
+        minutes,
+        interrupt_minutes,
+        start_minutes,
+        end_minutes,
+    ) in training_rows:
         training_type_minutes[activity] += minutes
         training_type_sessions[activity] += 1
         training_type_duration_minutes[activity].append(minutes)
+        training_type_interrupt_minutes[activity].append(interrupt_minutes)
         training_type_start_minutes[activity].append(start_minutes)
         training_type_end_minutes[activity].append(end_minutes)
 
@@ -172,7 +183,6 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "sleep_minutes": sleep_total,
         "workout": workout,
         "stretch": stretch,
-        "meditate": meditate,
         "awake_minutes": awake_total,
         "sleep_asleep_time": sleep_asleep_time,
         "sleep_awake_time": sleep_awake_time,
@@ -185,6 +195,10 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "training_type_duration_minutes": {
             activity: tuple(values)
             for activity, values in training_type_duration_minutes.items()
+        },
+        "training_type_interrupt_minutes": {
+            activity: tuple(values)
+            for activity, values in training_type_interrupt_minutes.items()
         },
         "training_type_start_minutes": {
             activity: tuple(values)

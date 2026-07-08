@@ -4,5 +4,5 @@ from __future__ import annotations
 
 from typing import Literal
 
-PeriodType = Literal["day", "week", "month", "quarter", "year"]
-TrainingTargetBucket = Literal["meditation", "workout", "stretch"]
+PeriodType = Literal["day", "week", "month", "year"]
+TrainingTargetBucket = Literal["workout", "stretch"]

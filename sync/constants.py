@@ -78,7 +78,6 @@ class IdealSchedule:
     sleep_minutes_nightly: int = 480  # 8h/night
     workout_days_weekly: int = 7  # 7/7
     stretch_days_weekly: int = 7  # 7/7
-    meditation_days_weekly: int = 7  # 7/7 daily meditation target
 
 
 @dataclass(frozen=True)

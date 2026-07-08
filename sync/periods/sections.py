@@ -63,34 +63,33 @@ def append_training_type_table(
     dates: list[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
 ) -> None:
-    """Render and append the TYPE/SESSIONS/DURATION/TIME table."""
+    """Render and append the TIME/ACTIVITY/DURATION/INTERRUPT table."""
     training_stats = aggregate_training_type_session_stats(dates, daily_data)
+    if not training_stats:
+        return
 
     rows: list[list[str]] = []
-    if training_stats:
-        for row in training_stats:
-            label = row["type"].strip()
-            sessions = int(row["sessions"])
-            target = int(row["target"])
-            avg_minutes = float(row["average_minutes"])
-            avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
-            start, end = row["schedule_range"]
-            schedule_label = f"{start} - {end}"
-            rows.append(
-                [
-                    f"**{label}**",
-                    f"`{sessions}/{target}`",
-                    f"`{avg_label}`",
-                    f"`{schedule_label}`",
-                ]
-            )
-    else:
-        rows.append(["", "", "", ""])
+    for row in training_stats:
+        label = row["type"].strip()
+        avg_minutes = float(row["average_minutes"])
+        avg_label = f"{format_minutes(avg_minutes, pad_minutes=True)}/session"
+        interrupt_minutes = float(row["average_interrupt_minutes"])
+        interrupt_label = f"+{format_minutes(interrupt_minutes, pad_minutes=True)}"
+        start, end = row["schedule_range"]
+        schedule_label = f"{start} - {end}"
+        rows.append(
+            [
+                f"`{schedule_label}`",
+                label,
+                f"`{avg_label}`",
+                f"`{interrupt_label}/session`",
+            ]
+        )
 
     table_lines = render_table(
         SimpleGridTableSpec(
-            headers=["TYPE", "SESSIONS", "DURATION", "TIME"],
-            divider_cells=["----", "--------", "--------", "--------"],
+            headers=["TIME", "ACTIVITY", "DURATION", "INTERRUPT"],
+            divider_cells=["----", "--------", "--------", "---------"],
             rows=rows,
         )
     )

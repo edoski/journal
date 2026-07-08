@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import datetime
 
+from sync.constants import MONTH_ABBR
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
-from sync.dates import daterange, year_range
+from sync.dates import daterange, month_range, year_range
 from sync.metrics import (
     aggregate_activity_totals,
     compute_bucket_deltas,
@@ -34,16 +35,108 @@ from sync.periods.presentation import (
 )
 from sync.writers.charts import (
     TIME_LABEL_STANDARD,
-    TrainingSection,
-    TrainingSectionsRowsSpec,
+    TrainingCalendarColumn,
+    TrainingCalendarColumnsSpec,
+    TrainingCalendarMonth,
+    TrainingCalendarQuarter,
     VerticalBarSpec,
     YEARLY_4QTR_METRIC,
     YEARLY_4QTR_STUDY,
-    compress_activity_time_order,
     render_chart,
 )
 
-YEARLY_TRAINING_BAR_WIDTH = 45
+YEARLY_TRAINING_MONTH_WIDTH = 31
+
+
+def _quarter_month_ranges(
+    quarter_start: datetime.date,
+    quarter_end: datetime.date,
+) -> list[tuple[datetime.date, datetime.date]]:
+    return [
+        month_range(quarter_start.year, month)
+        for month in range(quarter_start.month, quarter_end.month + 1)
+    ]
+
+
+def _training_calendar_month(
+    start: datetime.date,
+    end: datetime.date,
+    daily_data: dict[datetime.date, DailyAggregate],
+    *,
+    today: datetime.date,
+    bucket: str,
+) -> TrainingCalendarMonth:
+    symbols: list[str] = []
+    done = 0
+    elapsed = 0
+
+    for day in daterange(start, end):
+        if day > today:
+            symbols.append(" ")
+            continue
+        elapsed += 1
+        if training_done_for_day(daily_data, day, bucket):
+            done += 1
+            symbols.append("█")
+        else:
+            symbols.append("·")
+
+    return TrainingCalendarMonth(
+        label=MONTH_ABBR[start.month - 1],
+        symbols="".join(symbols),
+        done=done,
+        elapsed=elapsed,
+    )
+
+
+def _training_calendar_column(
+    *,
+    title: str,
+    bucket: str,
+    total_done: int,
+    total_elapsed: int,
+    quarter_ranges: list[tuple[datetime.date, datetime.date]],
+    quarter_counts: list[tuple[int, int]],
+    quarter_delta_labels: list[str],
+    daily_data: dict[datetime.date, DailyAggregate],
+    today: datetime.date,
+) -> TrainingCalendarColumn:
+    quarters: list[TrainingCalendarQuarter] = []
+
+    for index, (start, end) in enumerate(quarter_ranges):
+        if start > today:
+            continue
+        done, elapsed = quarter_counts[index]
+        months = [
+            _training_calendar_month(
+                month_start,
+                month_end,
+                daily_data,
+                today=today,
+                bucket=bucket,
+            )
+            for month_start, month_end in _quarter_month_ranges(start, end)
+            if month_start <= today
+        ]
+        delta_label = (
+            quarter_delta_labels[index] if index < len(quarter_delta_labels) else ""
+        )
+        quarters.append(
+            TrainingCalendarQuarter(
+                label=f"Q{index + 1}",
+                done=done,
+                elapsed=elapsed,
+                delta_label=delta_label,
+                months=tuple(months),
+            )
+        )
+
+    return TrainingCalendarColumn(
+        title=title,
+        total_done=total_done,
+        total_elapsed=total_elapsed,
+        quarters=tuple(quarters),
+    )
 
 
 def build_yearly_metrics(
@@ -78,10 +171,10 @@ def build_yearly_metrics(
         sections,
         current_metrics,
         prev_metrics,
-        "THIS YEAR",
-        f"**[[{year - 1}\\|LAST YEAR]]**",
+        "CURRENT",
+        "PREVIOUS",
         ma_metrics=ma_metrics,
-        ma_label="3-YR AVG" if ma_metrics else None,
+        ma_label="3-YEAR" if ma_metrics else None,
         ma_training_unit="yr",
     )
 
@@ -142,11 +235,8 @@ def build_yearly_metrics(
 
     # TRAINING (quarter rows)
     training_lines = ["### **TRAINING**"]
-    quarter_labels = [f"Q{i + 1}" for i in range(4)]
-    meditation_counts: list[tuple[int, int, datetime.date]] = []
-    workout_counts: list[tuple[int, int, datetime.date]] = []
-    stretch_counts: list[tuple[int, int, datetime.date]] = []
-    meditation_done_year = 0
+    workout_counts: list[tuple[int, int]] = []
+    stretch_counts: list[tuple[int, int]] = []
     workout_done_year = 0
     stretch_done_year = 0
     elapsed_year = 0
@@ -154,11 +244,6 @@ def build_yearly_metrics(
     for start, end in quarter_ranges:
         days = list(daterange(start, end))
         elapsed_days = sum(1 for d in days if d <= today)
-        meditation_done = sum(
-            1
-            for d in days
-            if d <= today and training_done_for_day(daily_data, d, "meditate")
-        )
         workout_done = sum(
             1
             for d in days
@@ -169,23 +254,12 @@ def build_yearly_metrics(
             for d in days
             if d <= today and training_done_for_day(daily_data, d, "stretch")
         )
-        meditation_counts.append((meditation_done, elapsed_days, start))
-        workout_counts.append((workout_done, elapsed_days, start))
-        stretch_counts.append((stretch_done, elapsed_days, start))
-        meditation_done_year += meditation_done
+        workout_counts.append((workout_done, elapsed_days))
+        stretch_counts.append((stretch_done, elapsed_days))
         workout_done_year += workout_done
         stretch_done_year += stretch_done
         elapsed_year += elapsed_days
 
-    meditation_delta_labels = compute_bucket_deltas(
-        quarter_day_lists,
-        value_for_day=lambda d: (
-            1.0 if training_done_for_day(year_delta_data, d, "meditate") else 0.0
-        ),
-        baseline_bucket=prev_last_quarter_days,
-        mode="pace",
-        today=today,
-    )
     workout_delta_labels = compute_bucket_deltas(
         quarter_day_lists,
         value_for_day=lambda d: (
@@ -205,85 +279,35 @@ def build_yearly_metrics(
         today=today,
     )
 
-    meditation_bars: list[str] = []
-    workout_bars: list[str] = []
-    stretch_bars: list[str] = []
-    for start, end in quarter_ranges:
-        days = list(daterange(start, end))
-        meditation_bars.append(
-            compress_activity_time_order(
-                days,
-                lambda d: training_done_for_day(daily_data, d, "meditate"),
-                YEARLY_TRAINING_BAR_WIDTH,
-                fill_char="█",
-                empty_char="·",
-                today=today,
-            )
-        )
-        workout_bars.append(
-            compress_activity_time_order(
-                days,
-                lambda d: training_done_for_day(daily_data, d, "workout"),
-                YEARLY_TRAINING_BAR_WIDTH,
-                fill_char="█",
-                empty_char="·",
-                today=today,
-            )
-        )
-        stretch_bars.append(
-            compress_activity_time_order(
-                days,
-                lambda d: training_done_for_day(daily_data, d, "stretch"),
-                YEARLY_TRAINING_BAR_WIDTH,
-                fill_char="█",
-                empty_char="·",
-                today=today,
-            )
-        )
-
-    training_sections = [
-        TrainingSection(
-            title="MEDITATION",
-            total_done=meditation_done_year,
-            total_elapsed=elapsed_year,
-            labels=quarter_labels,
-            counts=[(d, t) for d, t, _ in meditation_counts],
-            delta_labels=meditation_delta_labels,
-            bar_width=YEARLY_TRAINING_BAR_WIDTH,
-            bars_override=meditation_bars,
-            fill_char="█",
-            empty_char="·",
-        ),
-        TrainingSection(
+    training_columns = [
+        _training_calendar_column(
             title="WORKOUT",
+            bucket="workout",
             total_done=workout_done_year,
             total_elapsed=elapsed_year,
-            labels=quarter_labels,
-            counts=[(d, t) for d, t, _ in workout_counts],
-            delta_labels=workout_delta_labels,
-            bar_width=YEARLY_TRAINING_BAR_WIDTH,
-            bars_override=workout_bars,
-            fill_char="█",
-            empty_char="·",
+            quarter_ranges=quarter_ranges,
+            quarter_counts=workout_counts,
+            quarter_delta_labels=workout_delta_labels,
+            daily_data=daily_data,
+            today=today,
         ),
-        TrainingSection(
+        _training_calendar_column(
             title="STRETCH",
+            bucket="stretch",
             total_done=stretch_done_year,
             total_elapsed=elapsed_year,
-            labels=quarter_labels,
-            counts=[(d, t) for d, t, _ in stretch_counts],
-            delta_labels=stretch_delta_labels,
-            bar_width=YEARLY_TRAINING_BAR_WIDTH,
-            bars_override=stretch_bars,
-            fill_char="█",
-            empty_char="·",
+            quarter_ranges=quarter_ranges,
+            quarter_counts=stretch_counts,
+            quarter_delta_labels=stretch_delta_labels,
+            daily_data=daily_data,
+            today=today,
         ),
     ]
-    # Render all three titled training blocks as one fenced chart.
     training_lines.extend(
         render_chart(
-            TrainingSectionsRowsSpec(
-                sections=training_sections,
+            TrainingCalendarColumnsSpec(
+                columns=training_columns,
+                month_width=YEARLY_TRAINING_MONTH_WIDTH,
             )
         )
     )

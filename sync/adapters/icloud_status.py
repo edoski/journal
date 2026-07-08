@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import datetime
 
-from sync.contracts.study import StudySessionRecord
 from sync.daily.icloud import (
     finalize_status_file,
     quarantine_status_file,
     read_status_files,
-    write_study_times_to_icloud,
 )
 from sync.log import get_logger
-from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.status import (
     SleepPayload,
     TrainingEntryPayload,
@@ -57,12 +54,6 @@ class ICloudDailyStatusSource(DailyStatusSource):
         self._ingest_training_file(
             "stretching_status.json",
             "stretching",
-            anchor_day=anchor_day,
-            resolved_days=resolved_days,
-        )
-        self._ingest_training_file(
-            "meditation_status.json",
-            "meditation",
             anchor_day=anchor_day,
             resolved_days=resolved_days,
         )
@@ -154,28 +145,17 @@ class ICloudDailyStatusSource(DailyStatusSource):
             finalize_status_file(filename, parsed_path)
 
     def load_training(self, day: datetime.date) -> TrainingStatus:
-        """Load workout/stretch/meditation payloads for the day."""
+        """Load workout/stretch payloads for the day."""
         self._ensure_ingested(day)
         day_entries = self._training_by_day.get(day, {})
         workout_entries = day_entries.get("workout", [])
         stretch_entries = day_entries.get("stretching", [])
-        meditation_entries = day_entries.get("meditation", [])
         return TrainingStatus(
             workout_entries=tuple(workout_entries),
             stretch_entries=tuple(stretch_entries),
-            meditation_entries=tuple(meditation_entries),
         )
 
     def load_sleep(self, day: datetime.date) -> SleepPayload | None:
         """Load sleep payload for the day if available."""
         self._ensure_ingested(day)
         return self._sleep_by_day.get(day)
-
-    def write_study_times(
-        self,
-        day: datetime.date,
-        sessions: list[StudySessionRecord],
-        day_schedule: DayScheduleProfile,
-    ) -> None:
-        """Persist study times for iPad shortcut consumption."""
-        write_study_times_to_icloud(sessions, day.isoformat(), day_schedule)

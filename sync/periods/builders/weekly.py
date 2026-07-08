@@ -51,7 +51,7 @@ def build_weekly_metrics(
     """
     Build the metrics block for a weekly note.
 
-    prev_week_label: wiki link like "[[2025-W50|LAST WEEK]]"
+    prev_week_label: label for the previous week summary column
     prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
     """
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
@@ -86,10 +86,10 @@ def build_weekly_metrics(
         sections,
         current_metrics,
         prev_metrics,
-        "THIS WEEK",
+        "CURRENT",
         prev_week_label,
         ma_metrics=ma_metrics,
-        ma_label="4-WK AVG" if ma_metrics else None,
+        ma_label="4-WEEK" if ma_metrics else None,
         ma_training_unit="7",
     )
 
@@ -121,13 +121,11 @@ def build_weekly_metrics(
     # TRAINING section
     training_lines = ["### **TRAINING**"]
     current_week_date = today if start_date <= today <= end_date else None
-    meditation_days = current_metrics["meditation_count"]
     training_lines.extend(
         render_chart(
             weekly_training_grid_spec(
                 dates=dates,
                 daily_data=daily_data,
-                meditation_count=meditation_days,
                 workout_count=workout_days,
                 stretch_count=stretch_days,
                 current_date=current_week_date,

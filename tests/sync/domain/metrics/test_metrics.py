@@ -20,7 +20,21 @@ from sync.metrics import (
     load_daily_data_for_dates,
     load_prior_period_metrics,
 )
-from sync.target_policy import training_type_target
+
+
+def _add_training_interrupts(
+    daily_data: dict[datetime.date, dict],
+    *,
+    overrides: dict[datetime.date, dict[str, tuple[float, ...]]] | None = None,
+) -> None:
+    overrides = overrides or {}
+    for day, payload in daily_data.items():
+        durations = payload["training_type_duration_minutes"]
+        interrupts = {
+            label: tuple(0.0 for _ in samples) for label, samples in durations.items()
+        }
+        interrupts.update(overrides.get(day, {}))
+        payload["training_type_interrupt_minutes"] = interrupts
 
 
 class TestComputePeriodMetrics:
@@ -342,6 +356,13 @@ class TestAggregateTrainingTypeSessionStats:
                 "training_type_end_minutes": {"Functional Strength Training": (1230,)},
             },
         }
+        _add_training_interrupts(
+            daily_data,
+            overrides={
+                dates[0]: {"Functional Strength Training": (5.0,)},
+                dates[1]: {"Functional Strength Training": (15.0,)},
+            },
+        )
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -349,52 +370,50 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["type"] == "Functional Strength Training"
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 75.0
+        assert rows[0]["average_interrupt_minutes"] == 10.0
         assert rows[0]["schedule_range"] == ("18:30", "19:45")
 
-    def test_applies_bucket_mapping_for_target_denominator(self):
+    def test_uses_period_day_count_for_type_target_denominator(self):
         dates = [
             datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
         ]
         daily_data = {
             dates[0]: {
                 "training_type_minutes": {
-                    "Mind & Body": 10.0,
+                    "Yoga": 10.0,
                     "Cooldown": 20.0,
                     "Functional Strength Training": 60.0,
                 },
                 "training_type_sessions": {
-                    "Mind & Body": 1,
+                    "Yoga": 1,
                     "Cooldown": 1,
                     "Functional Strength Training": 1,
                 },
                 "training_type_duration_minutes": {
-                    "Mind & Body": (10.0,),
+                    "Yoga": (10.0,),
                     "Cooldown": (20.0,),
                     "Functional Strength Training": (60.0,),
                 },
                 "training_type_start_minutes": {
-                    "Mind & Body": (430,),
+                    "Yoga": (430,),
                     "Cooldown": (1140,),
                     "Functional Strength Training": (1080,),
                 },
                 "training_type_end_minutes": {
-                    "Mind & Body": (440,),
+                    "Yoga": (440,),
                     "Cooldown": (1160,),
                     "Functional Strength Training": (1140,),
                 },
             }
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
         by_type = {row["type"]: row for row in rows}
 
-        expected_meditation = training_type_target(len(dates), "meditation")
-        expected_stretch = training_type_target(len(dates), "stretch")
-        expected_workout = training_type_target(len(dates), "workout")
-
-        assert by_type["Mind & Body"]["target"] == expected_meditation
-        assert by_type["Cooldown"]["target"] == expected_stretch
-        assert by_type["Functional Strength Training"]["target"] == expected_workout
+        assert by_type["Yoga"]["target"] == len(dates)
+        assert by_type["Cooldown"]["target"] == len(dates)
+        assert by_type["Functional Strength Training"]["target"] == len(dates)
 
     def test_selects_most_recurring_schedule_range_without_cross_slot_average(
         self,
@@ -405,25 +424,34 @@ class TestAggregateTrainingTypeSessionStats:
         ]
         daily_data = {
             dates[0]: {
-                "training_type_minutes": {"Mind & Body": 30.0},
-                "training_type_sessions": {"Mind & Body": 2},
-                "training_type_duration_minutes": {"Mind & Body": (10.0, 20.0)},
-                "training_type_start_minutes": {"Mind & Body": (420, 1260)},
-                "training_type_end_minutes": {"Mind & Body": (430, 1280)},
+                "training_type_minutes": {"Functional Strength Training": 30.0},
+                "training_type_sessions": {"Functional Strength Training": 2},
+                "training_type_duration_minutes": {
+                    "Functional Strength Training": (10.0, 20.0)
+                },
+                "training_type_start_minutes": {
+                    "Functional Strength Training": (420, 1260)
+                },
+                "training_type_end_minutes": {
+                    "Functional Strength Training": (430, 1280)
+                },
             },
             dates[1]: {
-                "training_type_minutes": {"Mind & Body": 12.0},
-                "training_type_sessions": {"Mind & Body": 1},
-                "training_type_duration_minutes": {"Mind & Body": (12.0,)},
-                "training_type_start_minutes": {"Mind & Body": (450,)},
-                "training_type_end_minutes": {"Mind & Body": (462,)},
+                "training_type_minutes": {"Functional Strength Training": 12.0},
+                "training_type_sessions": {"Functional Strength Training": 1},
+                "training_type_duration_minutes": {
+                    "Functional Strength Training": (12.0,)
+                },
+                "training_type_start_minutes": {"Functional Strength Training": (450,)},
+                "training_type_end_minutes": {"Functional Strength Training": (462,)},
             },
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
         assert len(rows) == 1
-        assert rows[0]["type"] == "Mind & Body"
+        assert rows[0]["type"] == "Functional Strength Training"
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 14.0
         assert rows[0]["schedule_range"] == ("07:15", "07:26")
@@ -445,11 +473,12 @@ class TestAggregateTrainingTypeSessionStats:
                 "training_type_end_minutes": {"Functional Strength Training": (1140,)},
             }
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
         assert len(rows) == 1
-        assert rows[0]["target"] == training_type_target(len(dates), "workout")
+        assert rows[0]["target"] == len(dates)
 
     def test_sorts_by_average_start_then_end_then_duration(self):
         dates = [
@@ -484,6 +513,7 @@ class TestAggregateTrainingTypeSessionStats:
                 },
             }
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
         labels = [row["type"] for row in rows]
@@ -508,6 +538,7 @@ class TestAggregateTrainingTypeSessionStats:
                 "training_type_end_minutes": {"stretching": (1165,)},
             },
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -528,6 +559,7 @@ class TestAggregateTrainingTypeSessionStats:
                 "training_type_end_minutes": {},
             }
         }
+        _add_training_interrupts(daily_data)
 
         with pytest.raises(ValueError, match="sample count mismatch"):
             aggregate_training_type_session_stats(dates, daily_data)
@@ -536,25 +568,38 @@ class TestAggregateTrainingTypeSessionStats:
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
             dates[0]: {
-                "training_type_minutes": {"Mind & Body": 30.0},
-                "training_type_sessions": {"Mind & Body": 2},
-                "training_type_duration_minutes": {"Mind & Body": (10.0, 20.0)},
-                "training_type_start_minutes": {"Mind & Body": (420, 1260)},
-                "training_type_end_minutes": {"Mind & Body": (430, 1280)},
+                "training_type_minutes": {"Functional Strength Training": 30.0},
+                "training_type_sessions": {"Functional Strength Training": 2},
+                "training_type_duration_minutes": {
+                    "Functional Strength Training": (10.0, 20.0)
+                },
+                "training_type_start_minutes": {
+                    "Functional Strength Training": (420, 1260)
+                },
+                "training_type_end_minutes": {
+                    "Functional Strength Training": (430, 1280)
+                },
             },
             dates[1]: {
-                "training_type_minutes": {"Mind & Body": 25.0},
-                "training_type_sessions": {"Mind & Body": 2},
-                "training_type_duration_minutes": {"Mind & Body": (12.0, 13.0)},
-                "training_type_start_minutes": {"Mind & Body": (450, 1250)},
-                "training_type_end_minutes": {"Mind & Body": (462, 1263)},
+                "training_type_minutes": {"Functional Strength Training": 25.0},
+                "training_type_sessions": {"Functional Strength Training": 2},
+                "training_type_duration_minutes": {
+                    "Functional Strength Training": (12.0, 13.0)
+                },
+                "training_type_start_minutes": {
+                    "Functional Strength Training": (450, 1250)
+                },
+                "training_type_end_minutes": {
+                    "Functional Strength Training": (462, 1263)
+                },
             },
         }
+        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
         assert len(rows) == 1
-        assert rows[0]["type"] == "Mind & Body"
+        assert rows[0]["type"] == "Functional Strength Training"
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 13.75
         assert rows[0]["schedule_range"] == ("20:55", "21:12")
@@ -607,7 +652,6 @@ class TestLoadPriorPeriodMetrics:
                     "sleep_minutes": 480,
                     "workout": False,
                     "stretch": False,
-                    "meditate": False,
                 }
                 for d in date_list
             }

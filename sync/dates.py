@@ -65,38 +65,6 @@ def quarter_range(year: int, quarter: int) -> tuple[datetime.date, datetime.date
     return start, end
 
 
-def shift_quarter(year: int, quarter: int, delta: int) -> tuple[int, int]:
-    """Shift a year/quarter pair by delta quarters and return (year, quarter)."""
-    if quarter < 1 or quarter > 4:
-        raise ValueError("quarter must be in 1..4")
-    total_quarters = (year * 4) + (quarter - 1) + delta
-    return total_quarters // 4, (total_quarters % 4) + 1
-
-
-def previous_quarter(year: int, quarter: int) -> tuple[int, int]:
-    """Return (year, quarter) for the previous quarter."""
-    return shift_quarter(year, quarter, -1)
-
-
-def quarter_months(
-    year: int, quarter: int
-) -> list[tuple[datetime.date, datetime.date]]:
-    """
-    Return a list of (month_start, month_end) tuples for the quarter.
-    """
-    start_month = 3 * (quarter - 1) + 1
-    months = []
-    for m in range(start_month, start_month + 3):
-        months.append(month_range(year, m))
-    return months
-
-
-def quarter_of_date(date_obj: datetime.date) -> tuple[int, int]:
-    """Return (year, quarter_number) for a given date."""
-    q = (date_obj.month - 1) // 3 + 1
-    return date_obj.year, q
-
-
 def year_range(year: int) -> tuple[datetime.date, datetime.date]:
     """Return (start_date, end_date) for a calendar year."""
     start = datetime.date(year, 1, 1)
@@ -136,7 +104,3 @@ def format_week_label(start_date: datetime.date, end_date: datetime.date) -> str
     month = MONTH_ABBR[start_date.month - 1]
     return f"{month} {start_date.day:02d}-{end_date.day:02d}"
 
-
-def quarter_id(year: int, quarter_num: int) -> str:
-    """Return quarter identifier like '2025-Q4'."""
-    return f"{year}-Q{quarter_num}"

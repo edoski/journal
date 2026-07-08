@@ -212,7 +212,6 @@ class QueryService:
             "sleep_minutes",
             "workout_count",
             "stretch_count",
-            "meditation_count",
             "interrupt_minutes",
         )
         cards = tuple(

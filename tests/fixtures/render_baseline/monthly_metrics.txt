@@ -1,12 +1,11 @@
 ### **SUMMARY**
 
-| METRIC | THIS MONTH | **[[2020-04\|LAST MONTH]]** | CHANGE | 3-MO AVG |
-| ------ | ------------- | ----------------------- | ------ | ---------- |
-| **STUDY** | `3h35m/day` | `3h34m/day` | `+0%` | `3h26m/day` |
-| **SLEEP** | `7h16m/night` | `7h16m/night` | `+0%` | `7h15m/night` |
-| **MEDITATION** | `15/31` | `16/30` | `-9%` | `15.3/mo` |
-| **WORKOUT** | `10/31` | `10/30` | `-3%` | `10.0/mo` |
-| **STRETCH** | `16/31` | `15/30` | `+3%` | `15.0/mo` |
+| METRIC | CURRENT | PREVIOUS | 3-MONTH |
+| ------ | ------------- | ----------------------- | ---------- |
+| **STUDY** | `3h35m/day` | `3h34m/day` | `3h26m/day` |
+| **SLEEP** | `7h16m` | `7h16m` | `7h15m` |
+| **WORKOUT** | `10/31` | `10/30` | `10.0/mo` |
+| **STRETCH** | `16/31` | `15/30` | `15.0/mo` |
 
 ### **STUDY**
 ```
@@ -26,20 +25,13 @@
 ```
 **`SUM: 111h00m`**
 
-| ACTIVITY | TIME | SHARE |
+| ACTIVITY | DURATION | SHARE |
 | -------- | ---- | ----- |
 | **coding** | `72h09m` | `65%` |
 | **reading** | `38h51m` | `35%` |
 
 ### **TRAINING**
 ```
-┌ MEDITATION (15/31)
-│                                                                             ↓
-│ · · ■           ■ · · ■ ■ · ·   ■ ■ · · ■ ■ ·   · ■ ■ · · ■ ■   · · ■ ■ · · ■
-│ ─────────────   ─────────────   ─────────────   ─────────────   ─────────────
-│   MAY 01-03       MAY 04-10       MAY 11-17       MAY 18-24       MAY 25-31
-└     -33%            +29%            +33%             +0%            -25%
-
 ┌ WORKOUT (10/31)
 │                                                                             ↓
 │ · ■ ·           · ■ · · ■ · ·   ■ · · ■ · · ■   · · ■ · · ■ ·   · ■ · · ■ · ·
@@ -55,11 +47,10 @@
 └     +33%            -36%            +33%            -25%            +33%
 ```
 
-| TYPE | SESSIONS | DURATION | TIME |
-| ---- | -------- | -------- | -------- |
-| **Mind & Body** | `15/31` | `12m/session` | `07:25 - 07:37` |
-| **Functional Strength Training** | `10/31` | `33m/session` | `18:10 - 18:44` |
-| **Cooldown** | `16/31` | `26m/session` | `19:07 - 19:33` |
+| TIME | ACTIVITY | DURATION | INTERRUPT |
+| ---- | -------- | -------- | --------- |
+| `18:10 - 18:46` | Functional Strength Training | `33m/session` | `+02m/session` |
+| `19:07 - 19:34` | Cooldown | `26m/session` | `+01m/session` |
 
 ### **SLEEP**
 ```
@@ -78,11 +69,9 @@
     +4%         -2%         +0%         +0%         +0%
 ```
 
-| ACTIVITY | AVERAGE |
-| -------- | ------- |
-| **TIME**       | `23:25 - 07:25` |
-| **ASLEEP**     | `7h16m` |
-| **AWAKE**      | `20m` |
+| TIME | ASLEEP | AWAKE |
+| ---- | ------ | ----- |
+| `23:25 - 07:25` | `7h16m` | `20m` |
 
 ### **MEDIA**
 

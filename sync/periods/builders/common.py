@@ -134,39 +134,36 @@ def activity_totals_for_day(
 def training_done_for_day(
     daily_data: dict[datetime.date, DailyAggregate],
     day: datetime.date,
-    key: Literal["meditate", "workout", "stretch"],
+    key: Literal["workout", "stretch"],
 ) -> bool:
     payload = _day_values(daily_data, day)
     if payload is None:
         return False
-    if key == "meditate":
-        return payload["meditate"]
     if key == "workout":
         return payload["workout"]
     return payload["stretch"]
 
 
 def activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
-    total_activity = sum(activity_totals.values())
+    positive_activity_totals = {
+        activity: mins for activity, mins in activity_totals.items() if mins > 0
+    }
+    total_activity = sum(positive_activity_totals.values())
+    if not positive_activity_totals or total_activity <= 0:
+        return []
+
     rows: list[list[str]] = []
-    if activity_totals:
-        for activity, mins in sorted(
-            activity_totals.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        ):
-            share = (
-                f"{int(round((mins / total_activity) * 100))}%"
-                if total_activity
-                else "0%"
-            )
-            rows.append([f"**{activity}**", f"`{format_minutes(mins)}`", f"`{share}`"])
-    else:
-        rows.append(["", "", ""])
+    for activity, mins in sorted(
+        positive_activity_totals.items(),
+        key=lambda item: item[1],
+        reverse=True,
+    ):
+        share = f"{int(round((mins / total_activity) * 100))}%"
+        rows.append([f"**{activity}**", f"`{format_minutes(mins)}`", f"`{share}`"])
 
     return render_table(
         SimpleGridTableSpec(
-            headers=["ACTIVITY", "TIME", "SHARE"],
+            headers=["ACTIVITY", "DURATION", "SHARE"],
             divider_cells=["--------", "----", "-----"],
             rows=rows,
         )
@@ -181,9 +178,11 @@ def append_activity_summary(
     lines.append(
         f"**`SUM: {format_minutes(sum(activity_totals.values()), always_show_both=True)}`**"
     )
-    lines.append("")
-    lines.extend(activity_table_lines(activity_totals))
-    lines.append("")
+    table_lines = activity_table_lines(activity_totals)
+    if table_lines:
+        lines.append("")
+        lines.extend(table_lines)
+        lines.append("")
 
 
 def compute_sleep_aux_averages(
@@ -205,25 +204,21 @@ def sleep_stats_table_lines(
     avg_awake: float | None,
     avg_schedule: str | None = None,
 ) -> list[str]:
+    if sleep_avg is None:
+        return []
+
     rows = [
         [
-            "**TIME**      ",
             f"`{avg_schedule}`" if avg_schedule else "",
-        ],
-        [
-            "**ASLEEP**    ",
             f"`{format_minutes(sleep_avg)}`" if sleep_avg is not None else "",
-        ],
-        [
-            "**AWAKE**     ",
             f"`{format_minutes(avg_awake)}`" if avg_awake is not None else "",
         ],
     ]
 
     return render_table(
         SimpleGridTableSpec(
-            headers=["ACTIVITY", "AVERAGE"],
-            divider_cells=["--------", "-------"],
+            headers=["TIME", "ASLEEP", "AWAKE"],
+            divider_cells=["----", "------", "-----"],
             rows=rows,
         )
     )

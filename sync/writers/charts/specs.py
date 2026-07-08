@@ -106,6 +106,37 @@ class TrainingSection:
 
 
 @dataclass(frozen=True)
+class TrainingCalendarMonth:
+    """One month row for a calendar-density training chart."""
+
+    label: str
+    symbols: str
+    done: int
+    elapsed: int
+
+
+@dataclass(frozen=True)
+class TrainingCalendarQuarter:
+    """One quarter group for a calendar-density training chart."""
+
+    label: str
+    done: int
+    elapsed: int
+    months: Sequence[TrainingCalendarMonth]
+    delta_label: str = ""
+
+
+@dataclass(frozen=True)
+class TrainingCalendarColumn:
+    """One activity column for a calendar-density training chart."""
+
+    title: str
+    total_done: int
+    total_elapsed: int
+    quarters: Sequence[TrainingCalendarQuarter]
+
+
+@dataclass(frozen=True)
 class VerticalBarSpec:
     """Spec for a vertical bar chart."""
 
@@ -122,13 +153,11 @@ class MonthlyTrainingGridSpec:
 
     week_labels: Sequence[str]
     week_day_counts: Sequence[int]
-    meditation_symbols: Sequence[str]
     workout_symbols: Sequence[str]
     stretch_symbols: Sequence[str]
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_week_index: int | None = None
     current_day_index: int | None = None
-    meditation_delta_labels: Sequence[str] | None = None
     workout_delta_labels: Sequence[str] | None = None
     stretch_delta_labels: Sequence[str] | None = None
     legend_line: str | None = None
@@ -138,10 +167,8 @@ class MonthlyTrainingGridSpec:
 class WeeklyTrainingGridSpec:
     """Spec for weekly training grouped grid chart."""
 
-    meditation_symbols: Sequence[str]
     workout_symbols: Sequence[str]
     stretch_symbols: Sequence[str]
-    meditation_count: int
     workout_count: int
     stretch_count: int
     profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
@@ -170,10 +197,21 @@ class TrainingSectionsRowsSpec:
     profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 
 
+@dataclass(frozen=True)
+class TrainingCalendarColumnsSpec:
+    """Spec for side-by-side calendar-density training columns."""
+
+    columns: Sequence[TrainingCalendarColumn]
+    month_width: int = 31
+    column_gap: str = "    "
+    rule_char: str = "─"
+
+
 ChartSpec = (
     VerticalBarSpec
     | MonthlyTrainingGridSpec
     | WeeklyTrainingGridSpec
     | TrainingBlockRowsSpec
     | TrainingSectionsRowsSpec
+    | TrainingCalendarColumnsSpec
 )

@@ -10,7 +10,6 @@ from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.targets import TrainingTargetBucket
 
 _TRAINING_WEEKLY_TARGET_BY_BUCKET: dict[TrainingTargetBucket, float] = {
-    "meditation": float(IDEAL.meditation_days_weekly),
     "workout": float(IDEAL.workout_days_weekly),
     "stretch": float(IDEAL.stretch_days_weekly),
 }
@@ -81,8 +80,6 @@ def target_for_metric(metric: str, days_total: int) -> float | None:
         return float(training_type_target(days_total, "workout"))
     if metric == "stretch_count":
         return float(training_type_target(days_total, "stretch"))
-    if metric == "meditation_count":
-        return float(training_type_target(days_total, "meditation"))
     if metric in {"interrupt_minutes", "overrun_minutes"}:
         return 0.0
     return None

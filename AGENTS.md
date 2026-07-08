@@ -189,7 +189,6 @@ journal/
   - `target_days(anchor_day) -> tuple[date, ...]`
   - `load_training(day) -> TrainingStatus`
   - `load_sleep(day) -> SleepPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
-  - `write_study_times(day, sessions, day_schedule) -> None`
 - `ScheduleSource.resolve_day(day) -> DayScheduleProfile`
 - `NoteStore`:
   - `read(path) -> list[str] | None`

@@ -52,9 +52,6 @@ class DailySyncService:
         file_path = os.path.join(self.journal_dir, f"{today_str}.md")
         self.training_cache_store.prune(keep_days=14)
 
-        # External side effect runs once per sync call.
-        self.status_source.write_study_times(day, sessions, day_schedule)
-
         with locked_note(file_path):
             base_lines = self.note_store.read_or_create(file_path, self.template_path)
         if not base_lines:
@@ -89,8 +86,8 @@ class DailySyncService:
     @staticmethod
     def _log_frontmatter_changes(today_str: str, fm_changes: dict[str, str]) -> None:
         if fm_changes:
-            parts = []
-            for key in ("study", "meditate", "workout", "stretch", "sleep"):
+            parts: list[str] = []
+            for key in ("study", "workout", "stretch", "sleep"):
                 if key not in fm_changes:
                     continue
                 val = fm_changes[key]

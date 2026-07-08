@@ -88,19 +88,14 @@ def weekly_training_grid_spec(
     dates: Sequence[datetime.date],
     daily_data: dict[datetime.date, DailyAggregate],
     *,
-    meditation_count: int,
     workout_count: int,
     stretch_count: int,
     current_date: datetime.date | None,
 ) -> WeeklyTrainingGridSpec:
-    meditation_symbols: list[str] = []
     workout_symbols: list[str] = []
     stretch_symbols: list[str] = []
     for day in dates:
         payload = daily_data.get(day)
-        meditation_symbols.append(
-            "███" if payload and payload.get("meditate") else "░░░"
-        )
         workout_symbols.append("███" if payload and payload.get("workout") else "░░░")
         stretch_symbols.append("███" if payload and payload.get("stretch") else "░░░")
 
@@ -114,10 +109,8 @@ def weekly_training_grid_spec(
         current_index = (current_date - date_list[0]).days
 
     return WeeklyTrainingGridSpec(
-        meditation_symbols=meditation_symbols,
         workout_symbols=workout_symbols,
         stretch_symbols=stretch_symbols,
-        meditation_count=meditation_count,
         workout_count=workout_count,
         stretch_count=stretch_count,
         current_index=current_index,
@@ -129,13 +122,11 @@ def monthly_training_grid_spec(
     daily_data: dict[datetime.date, DailyAggregate],
     *,
     current_date: datetime.date | None,
-    meditation_delta_labels: Sequence[str] | None = None,
     workout_delta_labels: Sequence[str] | None = None,
     stretch_delta_labels: Sequence[str] | None = None,
 ) -> MonthlyTrainingGridSpec:
     week_labels: list[str] = []
     week_day_counts: list[int] = []
-    meditation_symbols: list[str] = []
     workout_symbols: list[str] = []
     stretch_symbols: list[str] = []
 
@@ -145,9 +136,6 @@ def monthly_training_grid_spec(
         week_labels.append(format_week_label(start, end))
         for day in days:
             payload = daily_data.get(day)
-            meditation_symbols.append(
-                "■" if payload and payload.get("meditate") else "·"
-            )
             workout_symbols.append("■" if payload and payload.get("workout") else "·")
             stretch_symbols.append("■" if payload and payload.get("stretch") else "·")
 
@@ -155,12 +143,10 @@ def monthly_training_grid_spec(
     return MonthlyTrainingGridSpec(
         week_labels=week_labels,
         week_day_counts=week_day_counts,
-        meditation_symbols=meditation_symbols,
         workout_symbols=workout_symbols,
         stretch_symbols=stretch_symbols,
         current_week_index=current_week_idx,
         current_day_index=current_day_idx,
-        meditation_delta_labels=meditation_delta_labels,
         workout_delta_labels=workout_delta_labels,
         stretch_delta_labels=stretch_delta_labels,
     )

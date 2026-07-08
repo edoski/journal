@@ -16,16 +16,12 @@ import tempfile
 import time
 
 from sync.config import PATHS
-from sync.contracts.schedule import DayScheduleProfile
-from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 
 from .constants import ICLOUD_JOURNALSYNC_DIR
 
 logger = get_logger(__name__)
 
-# iCloud path for study times JSON (read by iPad shortcut)
-STUDY_TIMES_ICLOUD_PATH = os.path.join(ICLOUD_JOURNALSYNC_DIR, "study_times.json")
 STATUS_STAGING_DIR = os.path.join(PATHS.daily_cache_dir, "status", "pending")
 STATUS_INVALID_DIR = os.path.join(PATHS.daily_cache_dir, "status", "invalid")
 _READ_RETRY_SECONDS = 0.25
@@ -239,138 +235,3 @@ def quarantine_status_file(filename: str, parsed_path: str | None) -> None:
         os.replace(parsed_path, backup_path)
     except (PermissionError, OSError):
         pass
-
-
-def write_study_times_to_icloud(
-    sessions: list[StudySessionRecord],
-    today_str: str,
-    day_schedule: DayScheduleProfile,
-) -> None:
-    """
-    Write study session times to iCloud for iPad shortcut to read.
-
-    Args:
-        sessions: List of study session dicts
-        today_str: Today's date string (YYYY-MM-DD)
-        day_schedule: Resolved daily schedule profile
-    """
-    # All calculations anchor to the note date to keep fallbacks deterministic
-    note_date = datetime.date.fromisoformat(today_str)
-    minute = datetime.timedelta(minutes=1)
-
-    # Default schedule used when actual times would create invalid ranges
-    default_morning = datetime.datetime.combine(note_date, day_schedule.study_start)
-    default_lunch = datetime.datetime.combine(note_date, day_schedule.lunch_start)
-    default_afternoon = datetime.datetime.combine(note_date, day_schedule.lunch_end)
-    default_afternoon_end = datetime.datetime.combine(note_date, day_schedule.study_end)
-
-    def _normalize_study_times(
-        morning: datetime.datetime,
-        lunch: datetime.datetime | None,
-        afternoon: datetime.datetime | None,
-        end: datetime.datetime | None,
-    ) -> tuple[
-        datetime.datetime, datetime.datetime, datetime.datetime, datetime.datetime
-    ]:
-        """Clamp times to a safe, monotonic schedule for the Shortcut.
-
-        Ensures: morning <= lunch <= afternoon <= end, with minimal defaults when
-        real data would violate ordering. Equal times are nudged forward by 1 minute
-        to keep the Shortcut's "between" action happy with positive windows.
-        """
-
-        m_start = morning or default_morning
-        l_start = lunch or default_lunch
-        a_start = afternoon or default_afternoon
-        a_end = end or default_afternoon_end
-
-        # If the first session starts after (or exactly at) lunch, fall back to the
-        # canonical schedule to avoid an inverted window.
-        if m_start >= l_start:
-            m_start = default_morning
-            l_start = default_lunch
-
-        # Keep lunch before/at afternoon
-        if l_start > a_start:
-            a_start = max(l_start, default_afternoon)
-
-        # Keep afternoon before/at end
-        if a_start > a_end:
-            a_end = max(a_start, default_afternoon_end)
-
-        # Nudge equalities to keep strictly increasing ranges
-        if m_start == l_start:
-            l_start = l_start + minute
-        if l_start == a_start:
-            a_start = a_start + minute
-        if a_start == a_end:
-            a_end = a_end + minute
-
-        return m_start, l_start, a_start, a_end
-
-    if default_morning >= default_lunch:
-        # Inverted schedules (e.g. 15:00 study start, 13:30 lunch start) are
-        # remapped to minimal valid boundaries for the Shortcut's two blocks.
-        m_start = default_morning
-        l_start = m_start + minute
-        a_start = l_start
-        a_end = max(default_afternoon_end, a_start + minute)
-    else:
-        first_start = sessions[0]["start"] if sessions else default_morning
-        last_end = sessions[-1]["end"] if sessions else default_afternoon_end
-
-        # Find last session ending near lunch to preserve dynamic afternoon anchoring.
-        lunch_duration = default_afternoon - default_lunch
-        if lunch_duration <= datetime.timedelta(0):
-            lunch_duration = datetime.timedelta(hours=1)
-        lunch_window_start = default_lunch - datetime.timedelta(minutes=90)
-        lunch_window_end = default_afternoon + datetime.timedelta(minutes=30)
-
-        lunch_start: datetime.datetime | None = None
-        for session in sessions:
-            end_time = session["end"]
-            if lunch_window_start <= end_time < lunch_window_end:
-                lunch_start = end_time
-
-        # Compute afternoon start (configured lunch duration after lunch start)
-        afternoon_start = (
-            lunch_start + lunch_duration if lunch_start else default_afternoon
-        )
-        afternoon_end = (
-            last_end if last_end >= afternoon_start else default_afternoon_end
-        )
-        m_start, l_start, a_start, a_end = _normalize_study_times(
-            first_start,
-            lunch_start,
-            afternoon_start,
-            afternoon_end,
-        )
-
-    data = {
-        "date": today_str,
-        "morning_start": m_start.strftime("%H:%M"),
-        "lunch_start": l_start.strftime("%H:%M"),
-        "afternoon_start": a_start.strftime("%H:%M"),
-        "afternoon_end": a_end.strftime("%H:%M"),
-    }
-
-    try:
-        # Skip write if content unchanged (avoids triggering file watcher)
-        if os.path.exists(STUDY_TIMES_ICLOUD_PATH):
-            with open(STUDY_TIMES_ICLOUD_PATH, "r") as f:
-                existing = json.load(f)
-            if existing == data:
-                return  # No change, skip write
-
-        os.makedirs(os.path.dirname(STUDY_TIMES_ICLOUD_PATH), exist_ok=True)
-        with open(STUDY_TIMES_ICLOUD_PATH, "w") as f:
-            json.dump(data, f, indent=2)
-    except (PermissionError, OSError) as e:
-        logger.warning("Failed to write study_times.json: %s", e)
-    except json.JSONDecodeError:
-        # Existing file is corrupt, overwrite it
-        try:
-            with open(STUDY_TIMES_ICLOUD_PATH, "w") as f:
-                json.dump(data, f, indent=2)
-        except (PermissionError, OSError) as e:
-            logger.warning("Failed to write study_times.json: %s", e)

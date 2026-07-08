@@ -33,7 +33,6 @@ class TrainingStatus:
 
     workout_entries: tuple[TrainingEntryPayload, ...] = ()
     stretch_entries: tuple[TrainingEntryPayload, ...] = ()
-    meditation_entries: tuple[TrainingEntryPayload, ...] = ()
 
     @property
     def workout_done(self) -> bool:
@@ -42,10 +41,6 @@ class TrainingStatus:
     @property
     def stretch_done(self) -> bool:
         return bool(self.stretch_entries)
-
-    @property
-    def meditate_done(self) -> bool:
-        return bool(self.meditation_entries)
 
 
 @dataclass(frozen=True)

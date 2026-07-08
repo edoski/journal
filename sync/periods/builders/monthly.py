@@ -65,7 +65,7 @@ def build_monthly_metrics(
     Build the metrics block for a monthly note.
 
     current_month_label: e.g., "DEC"
-    prev_month_label: wiki link like "[[2025-11|NOV]]"
+    prev_month_label: label for the previous month summary column
     prior_month_metrics: list of metrics dicts for prior 3 months (oldest first)
     """
     days_in_period = (end_date - start_date).days + 1
@@ -101,7 +101,7 @@ def build_monthly_metrics(
         current_month_label,
         prev_month_label,
         ma_metrics=ma_metrics,
-        ma_label="3-MO AVG" if ma_metrics else None,
+        ma_label="3-MONTH" if ma_metrics else None,
         ma_training_unit="mo",
     )
 
@@ -169,15 +169,6 @@ def build_monthly_metrics(
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
-    meditation_delta_labels = compute_bucket_deltas(
-        week_day_lists,
-        value_for_day=lambda d: (
-            1.0 if training_done_for_day(month_delta_data, d, "meditate") else 0.0
-        ),
-        baseline_bucket=prev_baseline_week,
-        mode="pace",
-        today=today,
-    )
     workout_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: (
@@ -197,12 +188,10 @@ def build_monthly_metrics(
         today=today,
     )
 
-    meditation_days = current_metrics["meditation_count"]
     training_grid = render_chart(
         monthly_training_grid_spec(
             week_ranges=week_ranges,
             daily_data=daily_data,
-            meditation_delta_labels=meditation_delta_labels,
             workout_delta_labels=workout_delta_labels,
             stretch_delta_labels=stretch_delta_labels,
             current_date=current_month_date,
@@ -212,10 +201,6 @@ def build_monthly_metrics(
     elapsed_days = current_metrics["days_up_to_today"] or days_in_period
     if training_grid:
         for idx, line in enumerate(training_grid):
-            if line.startswith("┌ MEDITATION"):
-                training_grid[idx] = (
-                    f"┌ MEDITATION ({meditation_days:02d}/{elapsed_days:02d})"
-                )
             if line.startswith("┌ WORKOUT"):
                 training_grid[idx] = (
                     f"┌ WORKOUT ({workout_days:02d}/{elapsed_days:02d})"

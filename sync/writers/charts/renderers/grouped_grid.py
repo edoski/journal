@@ -15,12 +15,8 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
     """Render monthly training grouped grid body."""
     week_labels = list(spec.week_labels)
     week_day_counts = list(spec.week_day_counts)
-    meditation_symbols = list(spec.meditation_symbols)
     workout_symbols = list(spec.workout_symbols)
     stretch_symbols = list(spec.stretch_symbols)
-    meditation_delta_labels = (
-        list(spec.meditation_delta_labels) if spec.meditation_delta_labels else None
-    )
     workout_delta_labels = (
         list(spec.workout_delta_labels) if spec.workout_delta_labels else None
     )
@@ -32,12 +28,6 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
 
     if not week_day_counts:
         return [
-            "┌ MEDITATION",
-            "│",
-            "│",
-            "│",
-            "│",
-            "",
             "┌ WORKOUT",
             "│",
             "│",
@@ -90,14 +80,6 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
         return block
 
     lines.extend(
-        _build_activity_block(
-            "MEDITATION",
-            meditation_symbols,
-            meditation_delta_labels,
-        )
-    )
-    lines.append("")
-    lines.extend(
         _build_activity_block("WORKOUT", workout_symbols, workout_delta_labels)
     )
     lines.append("")
@@ -110,35 +92,29 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
 
 def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     """Render weekly training grouped grid body."""
-    meditation_symbols = list(spec.meditation_symbols)
     workout_symbols = list(spec.workout_symbols)
     stretch_symbols = list(spec.stretch_symbols)
-    meditation_count = spec.meditation_count
     workout_count = spec.workout_count
     stretch_count = spec.stretch_count
     current_index = spec.current_index
 
     lines: list[str] = []
 
-    label_width = max(len("MEDITATION"), len("WORKOUT"), len("STRETCH"))
+    label_width = max(len("WORKOUT"), len("STRETCH"))
 
     def _prefix(label: str) -> str:
         padding = " " * (label_width - len(label) + 2)
         return f"│ {label}{padding}"
 
-    prefix_meditation = _prefix("MEDITATION")
     prefix_workout = _prefix("WORKOUT")
     prefix_stretch = _prefix("STRETCH")
 
-    meditation_row = (
-        prefix_meditation + " ".join(meditation_symbols) + f"   ({meditation_count}/7)"
-    )
     workout_row = prefix_workout + " ".join(workout_symbols) + f"   ({workout_count}/7)"
     stretch_row = prefix_stretch + " ".join(stretch_symbols) + f"   ({stretch_count}/7)"
 
     arrow_line: str | None = None
-    if current_index is not None and 0 <= current_index < len(meditation_symbols):
-        arrow_col = len(prefix_meditation) + current_index * 4 + 1
+    if current_index is not None and 0 <= current_index < len(workout_symbols):
+        arrow_col = len(prefix_workout) + current_index * 4 + 1
         arrow_line = "┌" + " " * (arrow_col - 1) + "↓"
 
     if arrow_line is not None:
@@ -146,7 +122,6 @@ def render_weekly_training_grid(spec: WeeklyTrainingGridSpec) -> list[str]:
     else:
         lines.append("┌")
 
-    lines.append(meditation_row)
     lines.append(workout_row)
     lines.append(stretch_row)
     axis_prefix = "│ " + " " * (label_width + 2)

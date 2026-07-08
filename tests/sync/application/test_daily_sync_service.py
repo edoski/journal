@@ -23,27 +23,6 @@ class _StubStatusSource:
     def load_sleep(self, _day: datetime.date):
         return None
 
-    def write_study_times(
-        self,
-        _day: datetime.date,
-        _sessions,
-        _day_schedule: DayScheduleProfile,
-    ) -> None:
-        return None
-
-
-class _CountingStatusSource(_StubStatusSource):
-    def __init__(self) -> None:
-        self.write_calls = 0
-
-    def write_study_times(
-        self,
-        _day: datetime.date,
-        _sessions,
-        _day_schedule: DayScheduleProfile,
-    ) -> None:
-        self.write_calls += 1
-
 
 class _ConflictNoteStore(MarkdownNoteStore):
     def __init__(self, *, mutate_on_reads: int) -> None:
@@ -149,7 +128,6 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     assert "study: 1h00m" in content
     assert "workout: false" in content
     assert "stretch: false" in content
-    assert "meditate: false" in content
     assert "## Metrics" in content
     assert "## Reflections" in content
     assert "### **STUDY**" in content
@@ -205,11 +183,9 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     monkeypatch, tmp_path, caplog
 ):
     day = datetime.date(2025, 1, 15)
-    status_source = _CountingStatusSource()
     service, journal_dir = _build_service(
         monkeypatch,
         tmp_path,
-        status_source=status_source,
         note_store=_ConflictNoteStore(mutate_on_reads=1),
     )
 
@@ -225,7 +201,6 @@ def test_sync_day_skips_write_when_note_changes_before_write(
         journal_logger.setLevel(prior_level)
 
     assert changed is False
-    assert status_source.write_calls == 1
     assert any("skipped write" in rec.getMessage() for rec in caplog.records)
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "<!-- external-change-1 -->" in content

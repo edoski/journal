@@ -34,38 +34,35 @@ def payload_for_date(day: datetime.date) -> dict:
     reading = float(max(0.0, study - coding))
     workout = idx % 3 == 0
     stretch = idx % 2 == 0
-    meditate = idx % 4 in {0, 1}
 
     training_type_minutes: dict[str, float] = {}
     training_type_sessions: dict[str, int] = {}
     training_type_duration_minutes: dict[str, tuple[float, ...]] = {}
+    training_type_interrupt_minutes: dict[str, tuple[float, ...]] = {}
     training_type_start_minutes: dict[str, tuple[int, ...]] = {}
     training_type_end_minutes: dict[str, tuple[int, ...]] = {}
 
-    if meditate:
-        start_min = _clock_to_minutes(7, 20 + (idx % 10))
-        end_min = start_min + 12
-        training_type_minutes["Mind & Body"] = 12.0
-        training_type_sessions["Mind & Body"] = 1
-        training_type_duration_minutes["Mind & Body"] = (12.0,)
-        training_type_start_minutes["Mind & Body"] = (start_min,)
-        training_type_end_minutes["Mind & Body"] = (end_min,)
-
     if workout:
         start_min = _clock_to_minutes(18, 0 + (idx % 20))
-        end_min = start_min + 33
+        interrupt_min = float(idx % 5)
+        end_min = start_min + 33 + int(interrupt_min)
         training_type_minutes["Functional Strength Training"] = 33.0
         training_type_sessions["Functional Strength Training"] = 1
         training_type_duration_minutes["Functional Strength Training"] = (33.0,)
+        training_type_interrupt_minutes["Functional Strength Training"] = (
+            interrupt_min,
+        )
         training_type_start_minutes["Functional Strength Training"] = (start_min,)
         training_type_end_minutes["Functional Strength Training"] = (end_min,)
 
     if stretch:
         start_min = _clock_to_minutes(19, 0 + (idx % 15))
-        end_min = start_min + 26
+        interrupt_min = float(idx % 3)
+        end_min = start_min + 26 + int(interrupt_min)
         training_type_minutes["Cooldown"] = 26.0
         training_type_sessions["Cooldown"] = 1
         training_type_duration_minutes["Cooldown"] = (26.0,)
+        training_type_interrupt_minutes["Cooldown"] = (interrupt_min,)
         training_type_start_minutes["Cooldown"] = (start_min,)
         training_type_end_minutes["Cooldown"] = (end_min,)
 
@@ -74,7 +71,6 @@ def payload_for_date(day: datetime.date) -> dict:
         "sleep_minutes": float(390 + (idx % 7) * 15),
         "workout": workout,
         "stretch": stretch,
-        "meditate": meditate,
         "awake_minutes": float(10 + (idx % 5) * 5),
         "sleep_asleep_time": f"{22 + (idx % 3)}:{(idx % 4) * 15:02d}",
         "sleep_awake_time": f"{6 + (idx % 3)}:{(idx % 4) * 15:02d}",
@@ -87,6 +83,7 @@ def payload_for_date(day: datetime.date) -> dict:
         "training_type_minutes": training_type_minutes,
         "training_type_sessions": training_type_sessions,
         "training_type_duration_minutes": training_type_duration_minutes,
+        "training_type_interrupt_minutes": training_type_interrupt_minutes,
         "training_type_start_minutes": training_type_start_minutes,
         "training_type_end_minutes": training_type_end_minutes,
     }
