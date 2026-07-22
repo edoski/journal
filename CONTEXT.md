@@ -4,7 +4,7 @@ This repository syncs focus, training, sleep, and media into Obsidian journal no
 
 ## Core Terms
 
-**Daily Note**: One journal note for a calendar day. It owns daily metrics, frontmatter, reflections, context links, and study-session detail.
+**Daily Note**: One journal note for a calendar day. It owns daily metrics, frontmatter, context links, and study-session detail.
 
 **Period Note**: A weekly, monthly, quarterly, or yearly journal note. It owns period metrics, media summaries, and reflections for that period.
 

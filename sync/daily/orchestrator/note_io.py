@@ -2,38 +2,21 @@
 
 from __future__ import annotations
 
-from sync.log import get_logger
-from sync.notes.sections import ensure_section_with_divider, section_bounds
-
-logger = get_logger(__name__)
+from sync.notes.sections import ensure_section_with_divider
 
 
-def ensure_daily_sections(lines: list[str], yaml_end_idx: int) -> None:
-    """
-    Guarantee Metrics and Reflections sections exist with required dividers.
+def ensure_metrics_section(lines: list[str], yaml_end_idx: int) -> None:
+    """Guarantee the daily Metrics section exists with its divider.
 
     Args:
         lines: Note lines (modified in place)
         yaml_end_idx: Index of the closing YAML delimiter
     """
-    metrics_header_idx, _ = ensure_section_with_divider(
+    ensure_section_with_divider(
         lines,
         "Metrics",
         level=2,
         insert_pos=(yaml_end_idx + 1) if yaml_end_idx != -1 else 0,
-    )
-
-    # Reflections after Metrics
-    _, metrics_end = (
-        section_bounds(lines, metrics_header_idx, level=2)
-        if metrics_header_idx != -1
-        else (-1, -1)
-    )
-    ensure_section_with_divider(
-        lines,
-        "Reflections",
-        level=2,
-        insert_pos=metrics_end if metrics_end != -1 else len(lines),
     )
 
 

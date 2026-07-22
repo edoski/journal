@@ -93,30 +93,6 @@ def _build_service(
     return service, str(journal_dir)
 
 
-def _seed_daily_note(
-    *,
-    journal_dir: str,
-    day: datetime.date,
-    reflections_lines: list[str],
-) -> Path:
-    note_path = Path(journal_dir) / f"{day:%Y-%m-%d}.md"
-    lines = [
-        "---",
-        "sleep: 7h30m",
-        "---",
-        "## Metrics",
-        "---",
-        "",
-        "## Reflections",
-        "---",
-        "",
-        *reflections_lines,
-        "",
-    ]
-    note_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return note_path
-
-
 def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     day = datetime.date.today()
     service, journal_dir = _build_service(monkeypatch, tmp_path)
@@ -129,7 +105,6 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     assert "workout: false" in content
     assert "stretch: false" in content
     assert "## Metrics" in content
-    assert "## Reflections" in content
     assert "### **STUDY**" in content
     assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in content
     assert "| `09:00 - 10:00` | Study | `1h00m` | `+00m` | `5m` |" in content
@@ -163,7 +138,7 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
     assert "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |" in lines
 
     level_two_headers = [line for line in lines if line.startswith("## ")]
-    assert level_two_headers[:2] == ["## Metrics", "## Reflections"]
+    assert level_two_headers == ["## Metrics"]
 
     level_three_headers = [line for line in lines if line.startswith("### **")]
     assert "### **STUDY**" in level_three_headers
@@ -204,178 +179,3 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     assert any("skipped write" in rec.getMessage() for rec in caplog.records)
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "<!-- external-change-1 -->" in content
-
-
-def _extract_reflections_lines(note_path: Path) -> list[str]:
-    lines = note_path.read_text(encoding="utf-8").splitlines()
-    reflections_idx = lines.index("## Reflections")
-    start = reflections_idx + 2
-    if start < len(lines) and lines[start] == "":
-        start += 1
-
-    end = len(lines)
-    for idx in range(start, len(lines)):
-        if lines[idx].startswith("## "):
-            end = idx
-            break
-
-    while end > start and lines[end - 1] == "":
-        end -= 1
-    return lines[start:end]
-
-
-def test_sync_day_normalizes_reflections_header_and_colon_divider(
-    monkeypatch, tmp_path
-):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    reflections_lines = [
-        "| TIME    | ENTRY                                                                 |",
-        "| :------- | -------: |",
-        "| `7:18` | keep timestamp exactly as typed |",
-    ]
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=reflections_lines,
-    )
-
-    changed = service.sync_day(day, [], _default_schedule())
-    assert changed is True
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized[0] == "| TIME | ENTRY |"
-    assert normalized[1] == "| ---- | ----- |"
-    assert ":" not in normalized[1]
-    assert normalized[2:] == reflections_lines[2:]
-
-
-def test_sync_day_normalizes_reflections_long_dash_divider(monkeypatch, tmp_path):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    reflections_lines = [
-        "| TIME | ENTRY |",
-        "| ----------- | ------------------------------------------------ |",
-        "| `08:43` | long entry that should remain untouched |",
-    ]
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=reflections_lines,
-    )
-
-    changed = service.sync_day(day, [], _default_schedule())
-    assert changed is True
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized[0] == "| TIME | ENTRY |"
-    assert normalized[1] == "| ---- | ----- |"
-    assert normalized[2:] == reflections_lines[2:]
-
-
-def test_sync_day_inserts_missing_reflections_divider_before_first_row(
-    monkeypatch, tmp_path
-):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    reflections_lines = [
-        "| TIME | ENTRY |",
-        "| `08:43` | long reflection entry that should be preserved |",
-    ]
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=reflections_lines,
-    )
-
-    changed = service.sync_day(day, [], _default_schedule())
-    assert changed is True
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized == [
-        "| TIME | ENTRY |",
-        "| ---- | ----- |",
-        "| `08:43` | long reflection entry that should be preserved |",
-    ]
-
-
-def test_sync_day_preserves_reflections_rows_verbatim_after_header_normalization(
-    monkeypatch, tmp_path
-):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    reflections_lines = [
-        "| TIME    | ENTRY                                                                 |",
-        "| ----------- | ------------------------------------------------ |",
-        "| `7:18` | keep timestamp exactly as typed |",
-        "| `08:43` | part one | part two |",
-        "| broken time text | |",
-    ]
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=reflections_lines,
-    )
-
-    changed = service.sync_day(day, [], _default_schedule())
-    assert changed is True
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized[0] == "| TIME | ENTRY |"
-    assert normalized[1] == "| ---- | ----- |"
-    assert normalized[2:] == reflections_lines[2:]
-
-
-def test_sync_day_does_not_emit_reflections_repair_warnings(
-    monkeypatch, tmp_path, caplog
-):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=[
-            "| TIME is corrupted text | ENTRY |",
-            "| :------- | -------: |",
-            "| broken time text | |",
-        ],
-    )
-
-    caplog.set_level(logging.WARNING)
-    journal_logger = logging.getLogger("journal")
-    prior_level = journal_logger.level
-    journal_logger.setLevel(logging.WARNING)
-    journal_logger.addHandler(caplog.handler)
-    try:
-        changed = service.sync_day(day, [], _default_schedule())
-    finally:
-        journal_logger.removeHandler(caplog.handler)
-        journal_logger.setLevel(prior_level)
-
-    assert changed is True
-    note_path = Path(journal_dir, f"{day:%Y-%m-%d}.md")
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized[0] == "| TIME | ENTRY |"
-    assert normalized[1] == "| ---- | ----- |"
-    assert ":" not in normalized[1]
-    assert not any("Repaired Reflections" in rec.getMessage() for rec in caplog.records)
-
-
-def test_sync_day_reflections_header_normalization_is_idempotent(monkeypatch, tmp_path):
-    day = datetime.date(2025, 1, 15)
-    service, journal_dir = _build_service(monkeypatch, tmp_path)
-    note_path = _seed_daily_note(
-        journal_dir=journal_dir,
-        day=day,
-        reflections_lines=[
-            "| TIME is corrupted text | ENTRY |",
-            "| :------- | -------: |",
-            "| `08:3 collapsed reflection content | |",
-        ],
-    )
-
-    first = service.sync_day(day, [], _default_schedule())
-    second = service.sync_day(day, [], _default_schedule())
-
-    assert first is True
-    assert second is False
-    normalized = _extract_reflections_lines(note_path)
-    assert normalized[0] == "| TIME | ENTRY |"
-    assert normalized[1] == "| ---- | ----- |"
-    assert normalized[2] == "| `08:3 collapsed reflection content | |"
