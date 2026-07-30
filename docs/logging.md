@@ -29,4 +29,4 @@ CLI overrides are available on `sync.run`:
 ## Logger Names
 
 Use module logger names via `get_logger(__name__)`.
-Names are mapped to the `journal.*` namespace (for example, `journal.sync.study.db`).
+Names are mapped to the `journal.*` namespace (for example, `journal.sync.study.repository`).

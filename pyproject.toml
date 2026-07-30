@@ -52,6 +52,7 @@ do_not_mutate = [
 ]
 also_copy = [
     "sync",
+    "tools",
 ]
 pytest_add_cli_args = [
     "-o",

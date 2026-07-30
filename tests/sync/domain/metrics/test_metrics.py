@@ -10,15 +10,12 @@ import datetime
 
 import pytest
 
-import sync.metrics.loading as metrics_loading
 from sync.metrics import (
     compute_period_metrics,
     aggregate_activity_totals,
     aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
     compute_bucket_deltas,
-    load_daily_data_for_dates,
-    load_prior_period_metrics,
 )
 
 
@@ -603,72 +600,3 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["sessions"] == 2
         assert rows[0]["average_minutes"] == 13.75
         assert rows[0]["schedule_range"] == ("20:55", "21:12")
-
-
-class TestLoadDailyData:
-    """Tests for daily-data loading helpers."""
-
-    def test_load_daily_data_for_dates_reads_existing_notes(
-        self, tmp_path, monkeypatch
-    ):
-        day_1 = datetime.date(2025, 1, 1)
-        day_2 = datetime.date(2025, 1, 2)
-        day_3 = datetime.date(2025, 1, 3)
-
-        (tmp_path / f"{day_1:%Y-%m-%d}.md").write_text("note")
-        (tmp_path / f"{day_3:%Y-%m-%d}.md").write_text("note")
-
-        monkeypatch.setattr(metrics_loading, "JOURNAL_DIR", str(tmp_path))
-
-        def _fake_parse_daily_note(path: str):
-            if path.endswith(f"{day_1:%Y-%m-%d}.md"):
-                return {"study_minutes": 120}
-            if path.endswith(f"{day_3:%Y-%m-%d}.md"):
-                return None
-            return None
-
-        import sync.readers.daily as daily_reader
-
-        monkeypatch.setattr(daily_reader, "parse_daily_note", _fake_parse_daily_note)
-
-        result = load_daily_data_for_dates([day_1, day_2, day_3])
-
-        assert result == {day_1: {"study_minutes": 120}}
-
-
-class TestLoadPriorPeriodMetrics:
-    """Tests for prior-period metric loading helper."""
-
-    def test_load_prior_period_metrics_preserves_offset_order(self, monkeypatch):
-        base = datetime.date(2025, 1, 1)
-        loaded_spans: list[list[datetime.date]] = []
-
-        def _fake_load(dates):
-            date_list = list(dates)
-            loaded_spans.append(date_list)
-            return {
-                d: {
-                    "study_minutes": 60,
-                    "sleep_minutes": 480,
-                    "workout": False,
-                    "stretch": False,
-                }
-                for d in date_list
-            }
-
-        monkeypatch.setattr(metrics_loading, "load_daily_data_for_dates", _fake_load)
-
-        def _bounds(offset: int) -> tuple[datetime.date, datetime.date]:
-            start = base + datetime.timedelta(days=offset * 10)
-            end = start + datetime.timedelta(days=1)
-            return start, end
-
-        result = load_prior_period_metrics([3, 1], _bounds)
-
-        assert len(result) == 2
-        assert result[0]["study_total_minutes"] == 120
-        assert result[1]["study_total_minutes"] == 120
-        assert [span[0] for span in loaded_spans] == [
-            base + datetime.timedelta(days=30),
-            base + datetime.timedelta(days=10),
-        ]

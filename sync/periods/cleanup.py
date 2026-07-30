@@ -35,7 +35,7 @@ def resync_if_marker(
 
     try:
         with open(previous_note_path, "r") as f:
-            has_marker = any(line.strip() == marker for line in f)
+            has_marker = any(marker in line for line in f)
             if not has_marker:
                 logger.debug(
                     "Cleanup marker not present; cleanup skipped: %s",

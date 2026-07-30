@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import Literal
 
 from sync.constants import MONTH_ABBR
 from sync.contracts.media import MediaBundle
@@ -25,6 +26,7 @@ from sync.periods.builders.common import (
     study_minutes_for_day,
     training_done_for_day,
 )
+from sync.periods.windows import YearWindow
 from sync.periods.sections import (
     append_media_section,
     append_summary_section,
@@ -64,7 +66,7 @@ def _training_calendar_month(
     daily_data: dict[datetime.date, DailyAggregate],
     *,
     today: datetime.date,
-    bucket: str,
+    bucket: Literal["workout", "stretch"],
 ) -> TrainingCalendarMonth:
     symbols: list[str] = []
     done = 0
@@ -92,7 +94,7 @@ def _training_calendar_month(
 def _training_calendar_column(
     *,
     title: str,
-    bucket: str,
+    bucket: Literal["workout", "stretch"],
     total_done: int,
     total_elapsed: int,
     quarter_ranges: list[tuple[datetime.date, datetime.date]],
@@ -140,19 +142,19 @@ def _training_calendar_column(
 
 
 def build_yearly_metrics(
-    year: int,
-    year_start: datetime.date,
-    year_end: datetime.date,
-    quarter_ranges: list[tuple[datetime.date, datetime.date]],
-    prev_quarter_ranges: list[tuple[datetime.date, datetime.date]],
+    window: YearWindow,
     daily_data: dict[datetime.date, DailyAggregate],
     prev_daily_data: dict[datetime.date, DailyAggregate],
     media_bundle: MediaBundle,
     *,
-    target_date: datetime.date,
     prior_year_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
-    today = target_date
+    year = window.year
+    year_start = window.start
+    year_end = window.end
+    quarter_ranges = window.quarter_ranges
+    prev_quarter_ranges = window.previous_quarter_ranges
+    today = window.target_date
     sections: list[list[str]] = []
 
     dates = list(daterange(year_start, year_end))

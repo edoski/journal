@@ -19,7 +19,8 @@ class PathConfig:
     monthly_template_path: str
     yearly_template_path: str
     schedule_path: str
-    grades_path: str
+    bsc_grades_path: str
+    msc_grades_path: str
     journal_cache_dir: str
     media_cache_dir: str
     daily_cache_dir: str
@@ -107,9 +108,13 @@ def _build_paths() -> PathConfig:
             "SCHEDULE_PATH",
             os.path.join(journal_dir, "PROTOCOL.md"),
         ),
-        grades_path=_env_path(
-            "GRADES_PATH",
-            os.path.join(vault_dir, "university", "GRADES.md"),
+        bsc_grades_path=_env_path(
+            "BSC_GRADES_PATH",
+            os.path.join(vault_dir, "university", "bsc", "GRADES.md"),
+        ),
+        msc_grades_path=_env_path(
+            "MSC_GRADES_PATH",
+            os.path.join(vault_dir, "university", "msc", "GRADES.md"),
         ),
         journal_cache_dir=journal_cache_dir,
         media_cache_dir=_env_path(

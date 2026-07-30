@@ -92,13 +92,10 @@ class PeriodSyncService:
             media_bundle = self.media_source.scan(window.start, window.end)
 
             metrics_block = build_weekly_metrics(
-                window.start,
-                window.end,
+                window,
                 daily_data,
                 prev_daily_data,
-                window.previous_label,
                 media_bundle,
-                target_date=window.target_date,
                 prior_week_metrics=prior_week_metrics,
             )
 
@@ -138,15 +135,10 @@ class PeriodSyncService:
             media_bundle = self.media_source.scan(month_start, month_end)
 
             metrics_block = build_monthly_metrics(
-                month_start,
-                month_end,
-                window.week_ranges,
+                window,
                 daily_data,
                 prev_daily_data,
-                window.current_label,
-                window.previous_label,
                 media_bundle,
-                target_date=window.target_date,
                 prior_month_metrics=prior_month_metrics,
             )
 
@@ -174,15 +166,10 @@ class PeriodSyncService:
             media_bundle = self.media_source.scan(window.start, window.end)
 
             metrics_block = build_yearly_metrics(
-                window.year,
-                window.start,
-                window.end,
-                window.quarter_ranges,
-                window.previous_quarter_ranges,
+                window,
                 daily_data,
                 prev_daily_data,
                 media_bundle,
-                target_date=window.target_date,
                 prior_year_metrics=prior_year_metrics,
             )
 

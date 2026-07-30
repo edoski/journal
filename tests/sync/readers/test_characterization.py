@@ -238,7 +238,7 @@ def test_parse_training_table_rows_handles_edge_cases():
         ]
     )
 
-    assert rows == [("Lift", 60.0, 420, 480)]
+    assert rows == [("Lift", 60.0, 0.0, 420, 480)]
 
 
 def test_parse_training_table_rows_returns_empty_when_header_missing():
@@ -288,7 +288,7 @@ def test_parse_training_table_rows_skips_no_training_message_case_insensitively(
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0, 420, 421)]
+    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_is_valid():
@@ -301,7 +301,7 @@ def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_i
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0, 420, 421)]
+    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars():
@@ -313,7 +313,7 @@ def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars(
             "| `07:00 - 08:00` | `XLiftX` | `1h00m` | `+00m` |",
         ]
     )
-    assert rows == [("XLiftX", 60.0, 420, 480)]
+    assert rows == [("XLiftX", 60.0, 0.0, 420, 480)]
 
 
 def test_parse_training_table_rows_header_match_is_case_insensitive():
@@ -325,7 +325,7 @@ def test_parse_training_table_rows_header_match_is_case_insensitive():
             "| `07:00 - 07:10` | Lift | `10m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 10.0, 420, 430)]
+    assert rows == [("Lift", 10.0, 0.0, 420, 430)]
 
 
 def test_parse_training_table_rows_short_row_does_not_break_following_rows():
@@ -338,7 +338,7 @@ def test_parse_training_table_rows_short_row_does_not_break_following_rows():
             "| `07:00 - 07:05` | Lift | `5m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 5.0, 420, 425)]
+    assert rows == [("Lift", 5.0, 0.0, 420, 425)]
 
 
 def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
@@ -350,7 +350,7 @@ def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
             "| `07:00 - 07:01` | Lift | `1m` | `+00m`",
         ]
     )
-    assert rows == [("Lift", 1.0, 420, 421)]
+    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_rejects_non_canonical_time_range():

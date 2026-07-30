@@ -12,13 +12,6 @@ class MediaDateCacheState(TypedDict):
     books: dict[str, str]
 
 
-class DailyTrainingCacheEntry(TypedDict):
-    """Per-day training cache payload."""
-
-    date: str
-    entries: list[DailyTrainingCacheRow]
-
-
 class DailyTrainingCacheRow(TypedDict):
     """Canonical row stored in per-day training cache."""
 

@@ -1,13 +1,10 @@
 """
 Constants for the journal sync system.
 
-Contains directory paths, template paths, study intensity thresholds,
-symbols for rendering, and chart dimension constants.
+Contains directory paths, template paths, and rendering labels.
 """
 
 from __future__ import annotations
-
-from dataclasses import dataclass
 
 from sync.config import PATHS
 
@@ -24,7 +21,8 @@ MONTHLY_TEMPLATE_PATH = PATHS.monthly_template_path
 YEARLY_TEMPLATE_PATH = PATHS.yearly_template_path
 
 SCHEDULE_PATH = PATHS.schedule_path
-GRADES_PATH = PATHS.grades_path
+BSC_GRADES_PATH = PATHS.bsc_grades_path
+MSC_GRADES_PATH = PATHS.msc_grades_path
 
 # Cache directories
 JOURNAL_CACHE_DIR = PATHS.journal_cache_dir
@@ -54,40 +52,9 @@ MONTH_ABBR = [
     "DEC",
 ]
 
-# Study intensity thresholds (minutes)
-STUDY_TARGET_MIN = 360  # 4 pomodoros (4 * 90m) – daily target threshold
-
 # Reader table/section markers
 TRAINING_SECTION_HEADER = "### **TRAINING**"
 STUDY_SECTION_HEADER = "### **STUDY**"
 SLEEP_SECTION_HEADER = "### **SLEEP**"
 TRAINING_TABLE_HEADER_RE = r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|"
 NO_TRAINING_SESSIONS_TOKEN = "no training sessions"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Configuration Dataclasses
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class IdealSchedule:
-    """Ideal daily/weekly targets for tracking schedule adherence."""
-
-    study_minutes_daily: int = 360  # 6h/day
-    sleep_minutes_nightly: int = 480  # 8h/night
-    workout_days_weekly: int = 7  # 7/7
-    stretch_days_weekly: int = 7  # 7/7
-
-
-@dataclass(frozen=True)
-class StudyCadenceConfig:
-    """Canonical planned study cadence used for period target calculations."""
-
-    study_block_min: int = 90
-    break_min: int = 30
-
-
-# Singleton instances
-IDEAL = IdealSchedule()
-STUDY_CADENCE = StudyCadenceConfig()

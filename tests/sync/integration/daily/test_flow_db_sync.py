@@ -1,8 +1,4 @@
-"""
-Tests for sync.study.db module.
-
-Tests session deduplication and timestamp conversion.
-"""
+"""Flow session ingestion and enrichment tests."""
 
 from __future__ import annotations
 
@@ -12,10 +8,11 @@ import uuid
 
 import pytest
 
+from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.contracts.schedule import DayScheduleProfile
-from sync.study.core_data_time import datetime_to_core_data
-from sync.study.db import dedupe_sessions, get_sessions_for_day, core_data_to_datetime
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET
+from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
+from sync.study.enrichment import dedupe_sessions
 
 
 class TestCoreDataToDatetime:
@@ -327,19 +324,15 @@ def _insert_session(
 
 
 def _load_day_sessions(
-    monkeypatch: pytest.MonkeyPatch,
+    _monkeypatch: pytest.MonkeyPatch,
     db_uri: str,
     day: datetime.date,
 ) -> list[dict[str, object]]:
-    monkeypatch.setattr(
-        "sync.study.db.get_db_connection",
-        lambda readonly=True: sqlite3.connect(db_uri, uri=True),
+    source = FlowStudySessionSource(
+        connection_factory=lambda _readonly: sqlite3.connect(db_uri, uri=True),
+        break_defaults={"shortBreak": 30, "longBreak": 60},
     )
-    monkeypatch.setattr(
-        "sync.study.db.BREAK_DEFAULTS",
-        {"shortBreak": 30, "longBreak": 60},
-    )
-    return get_sessions_for_day(day, _default_schedule())
+    return source.load_sessions(day, _default_schedule())
 
 
 @pytest.mark.parametrize(

@@ -11,7 +11,6 @@ from sync.dates import (
     format_week_label,
     month_range,
     month_week_ranges,
-    shift_month,
 )
 from sync.metrics import (
     aggregate_activity_totals,
@@ -29,6 +28,7 @@ from sync.periods.builders.common import (
     study_minutes_for_day,
     training_done_for_day,
 )
+from sync.periods.windows import MonthWindow
 from sync.periods.sections import (
     append_media_section,
     append_summary_section,
@@ -49,29 +49,21 @@ from sync.writers.charts import (
 
 
 def build_monthly_metrics(
-    start_date: datetime.date,
-    end_date: datetime.date,
-    week_ranges: list[tuple[datetime.date, datetime.date]],
+    window: MonthWindow,
     daily_data: dict[datetime.date, DailyAggregate],
     prev_daily_data: dict[datetime.date, DailyAggregate],
-    current_month_label: str,
-    prev_month_label: str,
     media_bundle: MediaBundle,
     *,
-    target_date: datetime.date,
     prior_month_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
-    """
-    Build the metrics block for a monthly note.
-
-    current_month_label: e.g., "DEC"
-    prev_month_label: label for the previous month summary column
-    prior_month_metrics: list of metrics dicts for prior 3 months (oldest first)
-    """
+    """Build the metrics block for a resolved monthly window."""
+    start_date = window.start
+    end_date = window.end
+    week_ranges = window.week_ranges
     days_in_period = (end_date - start_date).days + 1
     dates = list(daterange(start_date, end_date))
-    today = target_date
-    prev_year, prev_month = shift_month(start_date.year, start_date.month, -1)
+    today = window.target_date
+    prev_year, prev_month = window.previous_year, window.previous_month
 
     # Compute metrics for current and previous month
     current_metrics = compute_period_metrics(dates, daily_data)
@@ -98,8 +90,8 @@ def build_monthly_metrics(
         sections,
         current_metrics,
         prev_metrics,
-        current_month_label,
-        prev_month_label,
+        window.current_label,
+        window.previous_label,
         ma_metrics=ma_metrics,
         ma_label="3-MONTH" if ma_metrics else None,
         ma_training_unit="mo",
@@ -139,7 +131,6 @@ def build_monthly_metrics(
     )
     month_delta_data = {**prev_daily_data, **daily_data}
 
-    is_current_month = start_date.year == today.year and start_date.month == today.month
     study_delta_labels = compute_bucket_deltas(
         week_day_lists,
         value_for_day=lambda d: float(
@@ -163,7 +154,12 @@ def build_monthly_metrics(
     )
     append_activity_summary(study_lines, activity_totals)
 
-    current_month_date = today if is_current_month else None
+    current_month_date = (
+        window.current_date
+        if window.current_date is not None
+        and start_date <= window.current_date <= end_date
+        else None
+    )
 
     sections.append(trim_blank_lines(study_lines))
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-import sqlite3
+from collections.abc import Mapping
 
 from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
@@ -20,7 +20,6 @@ from sync.study.constants import (
     FLOW_BREAK_PHASES,
     FLOW_PHASE_STUDY,
 )
-from sync.study.repository import load_interruptions
 
 logger = get_logger(__name__)
 
@@ -148,7 +147,7 @@ def enrich_sessions(
     *,
     day: datetime.date,
     day_schedule: DayScheduleProfile,
-    cursor: sqlite3.Cursor,
+    interruption_totals: Mapping[int, tuple[int, float]],
     now: datetime.datetime,
     break_defaults: dict[str, int | None],
 ) -> list[StudySessionRecord]:
@@ -192,7 +191,9 @@ def enrich_sessions(
         session_pks = (
             session.get("interrupt_pks") or session.get("pks") or [session["pk"]]
         )
-        total_count, total_duration = load_interruptions(cursor, session_pks)
+        totals = [interruption_totals.get(pk, (0, 0.0)) for pk in session_pks]
+        total_count = sum(count for count, _duration in totals)
+        total_duration = sum(duration for _count, duration in totals)
         session["interruptions_count"] = total_count
         session["interruptions_duration"] = total_duration
 

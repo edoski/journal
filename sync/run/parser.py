@@ -100,8 +100,9 @@ def build_parser(
         "sync", help="Recompute OVERALL summary values in GRADES.md"
     )
     grades_sync.add_argument(
-        "--path",
-        help="Override grades note path",
+        "degree",
+        choices=["bsc", "msc"],
+        help="Degree whose grades note should be synchronized",
     )
     grades_sync.set_defaults(func=_resolve_handler(handlers, "grades_sync"))
 

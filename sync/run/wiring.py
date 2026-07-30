@@ -17,12 +17,11 @@ from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.application.daily_sync_service import DailySyncService
 from sync.application.period_sync_service import PeriodSyncService
-from sync.dates import month_range
 from sync.periods.runtime import resolve_note_path
 from sync.periods.windows import (
-    build_month_window,
-    build_week_window,
     build_year_window,
+    resolve_month_window,
+    resolve_week_window,
 )
 from sync.ports.cache import (
     DailyTrainingCacheStore,
@@ -111,12 +110,13 @@ def run_weekly_sync(
     resolved = deps or default_wiring_deps()
     resolved.bootstrap_cache_layout()
 
+    today = datetime.date.today()
     if date_arg:
         target_date = datetime.datetime.strptime(date_arg, "%Y-%m-%d").date()
     else:
-        target_date = datetime.date.today()
+        target_date = today
 
-    window = build_week_window(target_date)
+    window = resolve_week_window(target_date, execution_date=today)
     note_path = resolve_note_path(window.filename)
 
     service = _build_period_sync_service(deps=resolved)
@@ -137,21 +137,6 @@ def run_weekly_sync(
     )
 
 
-def _resolve_month_target_date(
-    month_arg: str | None,
-    *,
-    today: datetime.date,
-) -> datetime.date:
-    if month_arg is None:
-        return today
-
-    year, month = map(int, month_arg.split("-"))
-    if year == today.year and month == today.month:
-        return today
-    _start, end = month_range(year, month)
-    return end
-
-
 def run_monthly_sync(
     *,
     month_arg: str | None,
@@ -161,12 +146,13 @@ def run_monthly_sync(
     resolved = deps or default_wiring_deps()
     resolved.bootstrap_cache_layout()
 
-    target_date = _resolve_month_target_date(
-        month_arg,
-        today=datetime.date.today(),
+    today = datetime.date.today()
+    year, month = (
+        map(int, month_arg.split("-"))
+        if month_arg is not None
+        else (today.year, today.month)
     )
-
-    window = build_month_window(target_date)
+    window = resolve_month_window(year, month, execution_date=today)
     note_path = resolve_note_path(window.filename)
 
     service = _build_period_sync_service(deps=resolved)

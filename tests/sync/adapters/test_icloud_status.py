@@ -49,17 +49,17 @@ def test_target_days_stages_payload_dates_and_anchor(monkeypatch):
         return [(payload, path)]
 
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_files",
+        "sync.adapters.icloud_status._read_status_files",
         fake_read_status_files,
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.finalize_status_file",
+        "sync.adapters.icloud_status._finalize_status_file",
         lambda filename, path: finalized.append((filename, path)),
     )
     quarantined: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.quarantine_status_file",
+        "sync.adapters.icloud_status._quarantine_status_file",
         lambda filename, path: quarantined.append((filename, path)),
     )
 
@@ -103,17 +103,17 @@ def test_target_days_quarantines_future_dated_payload(monkeypatch):
         "sleep_status.json": (False, None, None),
     }
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_files",
+        "sync.adapters.icloud_status._read_status_files",
         _payload_files(payloads),
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.finalize_status_file",
+        "sync.adapters.icloud_status._finalize_status_file",
         lambda filename, path: finalized.append((filename, path)),
     )
     quarantined: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.quarantine_status_file",
+        "sync.adapters.icloud_status._quarantine_status_file",
         lambda filename, path: quarantined.append((filename, path)),
     )
 
@@ -145,12 +145,12 @@ def test_target_days_is_idempotent_per_anchor_day(monkeypatch):
         return [(payload, path)]
 
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.read_status_files",
+        "sync.adapters.icloud_status._read_status_files",
         fake_read_status_files,
     )
     finalized: list[tuple[str, str | None]] = []
     monkeypatch.setattr(
-        "sync.adapters.icloud_status.finalize_status_file",
+        "sync.adapters.icloud_status._finalize_status_file",
         lambda filename, path: finalized.append((filename, path)),
     )
 

@@ -103,4 +103,3 @@ def format_week_label(start_date: datetime.date, end_date: datetime.date) -> str
     """Format week range as 'MON DD-DD'."""
     month = MONTH_ABBR[start_date.month - 1]
     return f"{month} {start_date.day:02d}-{end_date.day:02d}"
-

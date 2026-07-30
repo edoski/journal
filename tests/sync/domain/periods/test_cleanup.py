@@ -33,7 +33,7 @@ def test_resync_if_marker_returns_false_without_marker(tmp_path):
     assert called is False
 
 
-def test_resync_if_marker_ignores_chart_down_arrow(tmp_path):
+def test_resync_if_marker_runs_callback_for_chart_down_arrow(tmp_path):
     note = tmp_path / "prev.md"
     note.write_text("┌                                      ↓")
 
@@ -44,8 +44,8 @@ def test_resync_if_marker_ignores_chart_down_arrow(tmp_path):
         called = True
 
     result = period_cleanup.resync_if_marker(str(note), _rerun)
-    assert result is False
-    assert called is False
+    assert result is True
+    assert called is True
 
 
 def test_resync_if_marker_runs_callback_when_marker_present(tmp_path):

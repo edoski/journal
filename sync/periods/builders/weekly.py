@@ -21,6 +21,7 @@ from sync.periods.builders.common import (
     sleep_stats_table_lines,
     study_minutes_for_day,
 )
+from sync.periods.windows import WeekWindow
 from sync.periods.sections import (
     append_media_section,
     append_summary_section,
@@ -38,24 +39,18 @@ from sync.writers.charts import (
 
 
 def build_weekly_metrics(
-    start_date: datetime.date,
-    end_date: datetime.date,
+    window: WeekWindow,
     daily_data: dict[datetime.date, DailyAggregate],
     prev_daily_data: dict[datetime.date, DailyAggregate],
-    prev_week_label: str,
     media_bundle: MediaBundle,
     *,
-    target_date: datetime.date,
     prior_week_metrics: list[PeriodAggregate] | None = None,
 ) -> list[str]:
-    """
-    Build the metrics block for a weekly note.
-
-    prev_week_label: label for the previous week summary column
-    prior_week_metrics: list of metrics dicts for prior 4 weeks (oldest first)
-    """
+    """Build the metrics block for a resolved weekly window."""
+    start_date = window.start
+    end_date = window.end
     dates = [start_date + datetime.timedelta(days=i) for i in range(7)]
-    today = target_date
+    today = window.target_date
 
     # Compute metrics for current and previous week
     current_metrics = compute_period_metrics(dates, daily_data)
@@ -87,7 +82,7 @@ def build_weekly_metrics(
         current_metrics,
         prev_metrics,
         "CURRENT",
-        prev_week_label,
+        window.previous_label,
         ma_metrics=ma_metrics,
         ma_label="4-WEEK" if ma_metrics else None,
         ma_training_unit="7",
@@ -120,7 +115,12 @@ def build_weekly_metrics(
 
     # TRAINING section
     training_lines = ["### **TRAINING**"]
-    current_week_date = today if start_date <= today <= end_date else None
+    current_week_date = (
+        window.current_date
+        if window.current_date is not None
+        and start_date <= window.current_date <= end_date
+        else None
+    )
     training_lines.extend(
         render_chart(
             weekly_training_grid_spec(

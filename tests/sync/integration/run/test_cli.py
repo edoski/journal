@@ -43,8 +43,8 @@ def _media_book_annotations_import_args(
     return argparse.Namespace(html_path=html_path, note=note, work=work)
 
 
-def _grades_sync_args(path: str | None = None) -> argparse.Namespace:
-    return argparse.Namespace(path=path)
+def _grades_sync_args(degree: str = "bsc") -> argparse.Namespace:
+    return argparse.Namespace(degree=degree)
 
 
 def _default_schedule() -> DayScheduleProfile:
@@ -464,7 +464,7 @@ def test_monthly_sync_default_anchors_window_to_today(
         def today(cls) -> date:
             return cls(2026, 6, 19)
 
-    captured: list[date] = []
+    captured: list[tuple[date, date | None]] = []
 
     class _FakePeriodSyncService:
         def sync_month(
@@ -476,7 +476,7 @@ def test_monthly_sync_default_anchors_window_to_today(
             cleanup_previous_runner,
         ) -> None:
             _ = note_path, cleanup_previous, cleanup_previous_runner
-            captured.append(window.target_date)
+            captured.append((window.target_date, window.current_date))
 
     monkeypatch.setattr(wiring.datetime, "date", _FrozenDate)
     monkeypatch.setattr(
@@ -493,24 +493,87 @@ def test_monthly_sync_default_anchors_window_to_today(
     )
     wiring.run_monthly_sync(month_arg=None, no_cleanup=True, deps=deps)
 
-    assert captured == [date(2026, 6, 19)]
+    assert captured == [(date(2026, 6, 19), date(2026, 6, 19))]
 
 
-def test_monthly_sync_target_date_uses_today_for_explicit_current_month() -> None:
-    target = wiring._resolve_month_target_date("2026-06", today=date(2026, 6, 19))
+def test_monthly_sync_historical_month_has_no_current_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 7, 8)
 
-    assert target == date(2026, 6, 19)
+    captured: list[tuple[date, date | None]] = []
 
+    class _FakePeriodSyncService:
+        def sync_month(
+            self,
+            window,
+            note_path,
+            *,
+            cleanup_previous,
+            cleanup_previous_runner,
+        ) -> None:
+            _ = note_path, cleanup_previous, cleanup_previous_runner
+            captured.append((window.target_date, window.current_date))
 
-def test_monthly_sync_target_date_uses_month_end_for_other_months() -> None:
-    today = date(2026, 6, 19)
-
-    assert wiring._resolve_month_target_date("2026-05", today=today) == date(
-        2026, 5, 31
+    monkeypatch.setattr(wiring.datetime, "date", _FrozenDate)
+    monkeypatch.setattr(
+        wiring,
+        "_build_period_sync_service",
+        lambda *, deps=None: _FakePeriodSyncService(),
     )
-    assert wiring._resolve_month_target_date("2026-07", today=today) == date(
-        2026, 7, 31
+    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+
+    deps = _wiring_deps(
+        session_source_factory=lambda: object(),
+        status_source_factory=lambda: object(),
+        schedule_source_factory=lambda: object(),
     )
+    wiring.run_monthly_sync(month_arg="2026-06", no_cleanup=True, deps=deps)
+
+    assert captured == [(date(2026, 6, 30), None)]
+
+
+def test_weekly_sync_historical_week_uses_week_end_without_current_marker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _FrozenDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return cls(2026, 7, 8)
+
+    captured: list[tuple[date, date | None]] = []
+
+    class _FakePeriodSyncService:
+        def sync_week(
+            self,
+            window,
+            note_path,
+            *,
+            cleanup_previous,
+            cleanup_previous_runner,
+        ) -> None:
+            _ = note_path, cleanup_previous, cleanup_previous_runner
+            captured.append((window.target_date, window.current_date))
+
+    monkeypatch.setattr(wiring.datetime, "date", _FrozenDate)
+    monkeypatch.setattr(
+        wiring,
+        "_build_period_sync_service",
+        lambda *, deps=None: _FakePeriodSyncService(),
+    )
+    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+
+    deps = _wiring_deps(
+        session_source_factory=lambda: object(),
+        status_source_factory=lambda: object(),
+        schedule_source_factory=lambda: object(),
+    )
+    wiring.run_weekly_sync(date_arg="2026-06-29", no_cleanup=True, deps=deps)
+
+    assert captured == [(date(2026, 7, 5), None)]
 
 
 def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -927,38 +990,40 @@ def test_media_book_annotations_import_creates_missing_note_from_template(
     assert "| **512** | Karamazov quote two |" in lines
 
 
-def test_grades_sync_updates_overall_values(tmp_path: Path) -> None:
-    grades_path = tmp_path / "GRADES.md"
-    _write_grades_note(grades_path)
+@pytest.mark.parametrize("degree", ["bsc", "msc"])
+def test_grades_sync_updates_only_selected_degree(
+    tmp_path: Path,
+    degree: str,
+) -> None:
+    bsc_path = tmp_path / "bsc" / "GRADES.md"
+    msc_path = tmp_path / "msc" / "GRADES.md"
+    bsc_path.parent.mkdir()
+    msc_path.parent.mkdir()
+    _write_grades_note(bsc_path)
+    _write_grades_note(msc_path)
 
     rc = grades_cmd.cmd_grades_sync(
-        _grades_sync_args(str(grades_path)),
-        config=grades_cmd.GradesCommandConfig(grades_path=str(grades_path)),
+        _grades_sync_args(degree),
+        config=grades_cmd.GradesCommandConfig(
+            bsc_grades_path=str(bsc_path),
+            msc_grades_path=str(msc_path),
+        ),
     )
 
     assert rc == 0
-    content = grades_path.read_text(encoding="utf-8")
-    assert "| 27.00 | 0.90 | 15 | 1 | 0 | 6 | 105 |" in content
-
-
-def test_grades_sync_uses_default_path(tmp_path: Path) -> None:
-    grades_path = tmp_path / "GRADES.md"
-    _write_grades_note(grades_path)
-
-    rc = grades_cmd.cmd_grades_sync(
-        _grades_sync_args(),
-        config=grades_cmd.GradesCommandConfig(grades_path=str(grades_path)),
-    )
-
-    assert rc == 0
-    content = grades_path.read_text(encoding="utf-8")
-    assert "| 27.00 | 0.90 | 15 | 1 | 0 | 6 | 105 |" in content
+    selected = bsc_path if degree == "bsc" else msc_path
+    other = msc_path if degree == "bsc" else bsc_path
+    computed_row = "| 27.00 | 0.90 | 15 | 1 | 0 | 6 | 105 |"
+    assert computed_row in selected.read_text(encoding="utf-8")
+    assert computed_row not in other.read_text(encoding="utf-8")
 
 
 def test_grades_sync_returns_error_when_file_is_missing(tmp_path: Path) -> None:
     rc = grades_cmd.cmd_grades_sync(
-        _grades_sync_args(str(tmp_path / "missing.md")),
-        config=grades_cmd.GradesCommandConfig(),
+        _grades_sync_args("msc"),
+        config=grades_cmd.GradesCommandConfig(
+            msc_grades_path=str(tmp_path / "missing.md")
+        ),
     )
     assert rc == 1
 
@@ -1000,6 +1065,7 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.html_path == "/tmp/export.html"
     assert args.note == "/tmp/book.md"
 
-    args = parser.parse_args(["grades", "sync"])
+    args = parser.parse_args(["grades", "sync", "bsc"])
     assert args.domain == "grades"
     assert args.grades_command == "sync"
+    assert args.degree == "bsc"

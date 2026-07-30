@@ -164,7 +164,7 @@ def activity_table_lines(activity_totals: dict[str, float]) -> list[str]:
     return render_table(
         SimpleGridTableSpec(
             headers=["ACTIVITY", "DURATION", "SHARE"],
-            divider_cells=["--------", "----", "-----"],
+            divider_cells=["--------", "--------", "-----"],
             rows=rows,
         )
     )

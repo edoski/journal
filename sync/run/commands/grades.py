@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
-from sync.constants import GRADES_PATH
+from sync.constants import BSC_GRADES_PATH, MSC_GRADES_PATH
 from sync.grades.engine import compute_grades
 from sync.io import atomic_write_note
 from sync.notes.locking import locked_note
@@ -17,7 +17,8 @@ from sync.writers.grades import render_grades_note
 class GradesCommandConfig:
     """Filesystem configuration for grades commands."""
 
-    grades_path: str = GRADES_PATH
+    bsc_grades_path: str = BSC_GRADES_PATH
+    msc_grades_path: str = MSC_GRADES_PATH
 
 
 def cmd_grades_sync(
@@ -26,7 +27,10 @@ def cmd_grades_sync(
     config: GradesCommandConfig | None = None,
 ) -> int:
     resolved = config or GradesCommandConfig()
-    path = args.path or resolved.grades_path
+    path = {
+        "bsc": resolved.bsc_grades_path,
+        "msc": resolved.msc_grades_path,
+    }[args.degree]
     try:
         document = load_grades(path)
     except FileNotFoundError as exc:

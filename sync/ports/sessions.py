@@ -10,12 +10,12 @@ from sync.contracts.study import StudySessionRecord
 
 
 class StudySessionSource(Protocol):
-    """Loads study sessions for a day."""
+    """Loads canonical study sessions for a day."""
 
     def load_sessions(
         self,
         day: datetime.date,
         day_schedule: DayScheduleProfile,
     ) -> list[StudySessionRecord]:
-        """Return sessions for the provided date."""
+        """Return sessions; adapters may repair superseded source rows."""
         ...

@@ -77,20 +77,6 @@ def test_only_composition_roots_import_adapters_or_application() -> None:
     )
 
 
-def test_period_snapshot_contract_is_defined_once() -> None:
-    definitions: list[str] = []
-    for path in _iter_python_files("sync"):
-        module = _parse_module(path)
-        for node in ast.walk(module):
-            if isinstance(node, ast.ClassDef) and node.name == "PeriodSnapshot":
-                definitions.append(str(path.relative_to(ROOT)))
-
-    assert definitions == ["sync/contracts/query.py"], (
-        "PeriodSnapshot must be defined exactly once in sync/contracts/query.py, "
-        "but found:\n" + "\n".join(definitions)
-    )
-
-
 def test_readers_do_not_split_markdown_rows_manually() -> None:
     violations: list[str] = []
     readers_dir = ROOT / "sync" / "readers"

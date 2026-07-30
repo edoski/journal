@@ -226,4 +226,3 @@ class TestFormatWeekLabel:
         start = datetime.date(2025, 6, 2)
         end = datetime.date(2025, 6, 8)
         assert format_week_label(start, end) == "JUN 02-08"
-

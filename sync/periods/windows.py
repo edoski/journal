@@ -20,6 +20,7 @@ class WeekWindow:
     """Window metadata for a weekly sync run."""
 
     target_date: datetime.date
+    current_date: datetime.date | None
     start: datetime.date
     end: datetime.date
     year: int
@@ -41,6 +42,7 @@ class MonthWindow:
     """Window metadata for a monthly sync run."""
 
     target_date: datetime.date
+    current_date: datetime.date | None
     start: datetime.date
     end: datetime.date
     year: int
@@ -80,7 +82,11 @@ class YearWindow:
         return year_range(self.year - years_ago)
 
 
-def build_week_window(target_date: datetime.date) -> WeekWindow:
+def build_week_window(
+    target_date: datetime.date,
+    *,
+    current_date: datetime.date | None = None,
+) -> WeekWindow:
     """Build week window metadata for a target date."""
     start, end = iso_week_range(target_date)
     year, week_num, _ = target_date.isocalendar()
@@ -93,6 +99,7 @@ def build_week_window(target_date: datetime.date) -> WeekWindow:
 
     return WeekWindow(
         target_date=target_date,
+        current_date=current_date,
         start=start,
         end=end,
         year=year,
@@ -105,7 +112,23 @@ def build_week_window(target_date: datetime.date) -> WeekWindow:
     )
 
 
-def build_month_window(target_date: datetime.date) -> MonthWindow:
+def resolve_week_window(
+    selected_date: datetime.date,
+    *,
+    execution_date: datetime.date,
+) -> WeekWindow:
+    """Resolve current and historical week anchors."""
+    start, end = iso_week_range(selected_date)
+    current_date = execution_date if start <= execution_date <= end else None
+    target_date = execution_date if current_date is not None else end
+    return build_week_window(target_date, current_date=current_date)
+
+
+def build_month_window(
+    target_date: datetime.date,
+    *,
+    current_date: datetime.date | None = None,
+) -> MonthWindow:
     """Build month window metadata for a target date."""
     start, end = month_range(target_date.year, target_date.month)
     filename = f"{target_date.year}-{target_date.month:02d}.md"
@@ -116,6 +139,7 @@ def build_month_window(target_date: datetime.date) -> MonthWindow:
 
     return MonthWindow(
         target_date=target_date,
+        current_date=current_date,
         start=start,
         end=end,
         year=target_date.year,
@@ -130,6 +154,19 @@ def build_month_window(target_date: datetime.date) -> MonthWindow:
         previous_label="PREVIOUS",
         current_label="CURRENT",
     )
+
+
+def resolve_month_window(
+    year: int,
+    month: int,
+    *,
+    execution_date: datetime.date,
+) -> MonthWindow:
+    """Resolve current and historical month anchors."""
+    start, end = month_range(year, month)
+    current_date = execution_date if start <= execution_date <= end else None
+    target_date = execution_date if current_date is not None else end
+    return build_month_window(target_date, current_date=current_date)
 
 
 def build_year_window(year: int, *, target_date: datetime.date) -> YearWindow:

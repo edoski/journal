@@ -2,13 +2,11 @@ import datetime
 import errno
 import json
 
+import sync.adapters.icloud_status as icloud
 from sync.adapters.icloud_status import ICloudDailyStatusSource
-import sync.daily.icloud as icloud
 
 
-def test_read_status_file_reprocesses_existing_pending_without_primary(
-    monkeypatch, tmp_path
-):
+def test_adapter_reprocesses_existing_pending_without_primary(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
     monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
@@ -21,14 +19,15 @@ def test_read_status_file_reprocesses_existing_pending_without_primary(
         encoding="utf-8",
     )
 
-    success, payload, parsed_path = icloud.read_status_file("workout_status.json")
+    day = datetime.date(2026, 5, 22)
+    adapter = ICloudDailyStatusSource()
 
-    assert success is True
-    assert payload == {"date": "2026-05-22", "duration": 30}
-    assert parsed_path == str(pending_path)
+    assert adapter.target_days(day) == (day,)
+    assert adapter.load_training(day).workout_entries[0].duration == 30
+    assert not pending_path.exists()
 
 
-def test_read_status_file_claims_primary_after_hydrating(monkeypatch, tmp_path):
+def test_adapter_claims_primary_after_hydrating(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
     monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
@@ -49,18 +48,19 @@ def test_read_status_file_claims_primary_after_hydrating(monkeypatch, tmp_path):
 
     monkeypatch.setattr(icloud.os, "replace", tracking_replace)
 
-    success, payload, parsed_path = icloud.read_status_file("workout_status.json")
+    day = datetime.date(2026, 5, 22)
+    adapter = ICloudDailyStatusSource()
 
-    assert success is True
-    assert payload == {"date": "2026-05-22", "duration": 30}
-    assert parsed_path is not None
-    assert parsed_path.startswith(str(tmp_path / "cache"))
-    assert replaced == [(str(path), parsed_path)]
+    assert adapter.target_days(day) == (day,)
+    assert adapter.load_training(day).workout_done
+    assert len(replaced) == 1
+    assert replaced[0][0] == str(path)
+    assert replaced[0][1].startswith(str(tmp_path / "cache"))
     assert not path.exists()
     assert not (tmp_path / "workout_status.json.invalid").exists()
 
 
-def test_read_status_file_copies_when_icloud_replace_deadlocks(monkeypatch, tmp_path):
+def test_adapter_copies_when_icloud_replace_deadlocks(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
     monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
@@ -80,16 +80,16 @@ def test_read_status_file_copies_when_icloud_replace_deadlocks(monkeypatch, tmp_
 
     monkeypatch.setattr(icloud.os, "replace", deadlocked_primary_replace)
 
-    success, payload, parsed_path = icloud.read_status_file("workout_status.json")
+    day = datetime.date(2026, 5, 22)
+    adapter = ICloudDailyStatusSource()
 
-    assert success is True
-    assert payload == {"date": "2026-05-22", "duration": 30}
-    assert parsed_path is not None
-    assert parsed_path.startswith(str(tmp_path / "cache"))
+    assert adapter.target_days(day) == (day,)
+    assert adapter.load_training(day).workout_done
     assert not path.exists()
+    assert not list((tmp_path / "cache").glob("*.pending"))
 
 
-def test_read_status_file_defers_stale_icloud_handle(monkeypatch, tmp_path):
+def test_adapter_defers_stale_icloud_handle(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud, "ICLOUD_JOURNALSYNC_DIR", str(tmp_path))
     monkeypatch.setattr(icloud, "STATUS_STAGING_DIR", str(tmp_path / "cache"))
     monkeypatch.setattr(icloud, "_READ_RETRY_SECONDS", 0)
@@ -124,11 +124,11 @@ def test_read_status_file_defers_stale_icloud_handle(monkeypatch, tmp_path):
     monkeypatch.setattr(icloud.logger, "warning", capture_warning)
     monkeypatch.setattr(icloud.logger, "error", capture_error)
 
-    success, payload, parsed_path = icloud.read_status_file("sleep_status.json")
+    day = datetime.date(2026, 6, 7)
+    adapter = ICloudDailyStatusSource()
 
-    assert success is False
-    assert payload is None
-    assert parsed_path is None
+    assert adapter.target_days(day) == (day,)
+    assert adapter.load_sleep(day) is None
     assert warnings
     warning_message, warning_args = warnings[0]
     assert warning_message == "Deferred claiming %s: %s"

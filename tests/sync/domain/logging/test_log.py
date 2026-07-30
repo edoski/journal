@@ -12,7 +12,7 @@ from sync.log import configure_logging, get_logger
 
 
 def test_get_logger_namespaces_sync():
-    assert get_logger("sync.study.db").name == "journal.sync.study.db"
+    assert get_logger("sync.study.repository").name == "journal.sync.study.repository"
     assert get_logger("sync.run.__main__").name == "journal.sync.run.__main__"
 
 

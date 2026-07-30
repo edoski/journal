@@ -10,11 +10,14 @@ from sync.dates import (
     daterange,
     iso_week_range,
     month_range,
-    month_week_ranges,
-    year_quarters,
     year_range,
 )
 from sync.metrics import compute_period_metrics
+from sync.periods.windows import (
+    build_month_window,
+    build_week_window,
+    build_year_window,
+)
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 
 
@@ -71,23 +74,17 @@ def test_weekly_metrics_block_characterization():
         prior_week_metrics.append(compute_period_metrics(p_dates, p_data))
 
     first_lines = period_builders.build_weekly_metrics(
-        start,
-        end,
+        build_week_window(end),
         daily_data,
         prev_daily_data,
-        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_week_metrics=prior_week_metrics,
     )
     second_lines = period_builders.build_weekly_metrics(
-        start,
-        end,
+        build_week_window(end),
         daily_data,
         prev_daily_data,
-        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_week_metrics=prior_week_metrics,
     )
 
@@ -102,15 +99,10 @@ def test_yearly_training_calendar_stops_at_current_month():
     target_date = datetime.date(2020, 7, 8)
 
     lines = period_builders.build_yearly_metrics(
-        year,
-        start,
-        end,
-        year_quarters(year),
-        year_quarters(year - 1),
+        build_year_window(year, target_date=target_date),
         range_data(start, end),
         range_data(prev_start, prev_end),
         FIXTURE_MEDIA_BUNDLE,
-        target_date=target_date,
     )
 
     training_text = _section_text(lines, "### **TRAINING**", "### **SLEEP**")
@@ -123,7 +115,6 @@ def test_yearly_training_calendar_stops_at_current_month():
 
 def test_monthly_metrics_block_characterization():
     start, end = month_range(2020, 5)
-    week_ranges = month_week_ranges(2020, 5)
     daily_data = range_data(start, end)
     prev_start, prev_end = month_range(2020, 4)
     prev_daily_data = range_data(prev_start, prev_end)
@@ -136,27 +127,17 @@ def test_monthly_metrics_block_characterization():
         prior_month_metrics.append(compute_period_metrics(p_dates, p_data))
 
     first_lines = period_builders.build_monthly_metrics(
-        start,
-        end,
-        week_ranges,
+        build_month_window(end),
         daily_data,
         prev_daily_data,
-        "CURRENT",
-        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_month_metrics=prior_month_metrics,
     )
     second_lines = period_builders.build_monthly_metrics(
-        start,
-        end,
-        week_ranges,
+        build_month_window(end),
         daily_data,
         prev_daily_data,
-        "CURRENT",
-        "PREVIOUS",
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_month_metrics=prior_month_metrics,
     )
 
@@ -169,15 +150,10 @@ def test_monthly_previous_summary_uses_full_previous_month_denominator():
     prev_start, _prev_end = month_range(2020, 4)
 
     lines = period_builders.build_monthly_metrics(
-        start,
-        end,
-        month_week_ranges(2020, 5),
+        build_month_window(end),
         {},
         {prev_start: _minimal_daily(60.0)},
-        "CURRENT",
-        "PREVIOUS",
         MediaBundle(books=[], podcasts=[]),
-        target_date=end,
     )
 
     assert "| `0h00m/day` | `0h02m/day` |" in _summary_line(lines, "STUDY")
@@ -187,9 +163,6 @@ def test_yearly_metrics_block_characterization():
     year = 2020
     start, end = year_range(year)
     prev_start, prev_end = year_range(year - 1)
-    quarter_ranges = year_quarters(year)
-    prev_quarter_ranges = year_quarters(year - 1)
-
     daily_data = range_data(start, end)
     prev_daily_data = range_data(prev_start, prev_end)
 
@@ -201,27 +174,17 @@ def test_yearly_metrics_block_characterization():
         prior_year_metrics.append(compute_period_metrics(p_dates, p_data))
 
     first_lines = period_builders.build_yearly_metrics(
-        year,
-        start,
-        end,
-        quarter_ranges,
-        prev_quarter_ranges,
+        build_year_window(year, target_date=end),
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_year_metrics=prior_year_metrics,
     )
     second_lines = period_builders.build_yearly_metrics(
-        year,
-        start,
-        end,
-        quarter_ranges,
-        prev_quarter_ranges,
+        build_year_window(year, target_date=end),
         daily_data,
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
-        target_date=end,
         prior_year_metrics=prior_year_metrics,
     )
 

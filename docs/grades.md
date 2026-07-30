@@ -5,13 +5,14 @@
 ## Command
 
 ```bash
-python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
+python -m sync.run grades sync bsc
+python -m sync.run grades sync msc
 ```
 
-Default path resolution:
+Each degree has an independent note and environment override:
 
-- `GRADES_PATH` env override
-- fallback: `<VAULT_DIR>/university/GRADES.md`
+- BSc: `BSC_GRADES_PATH`, falling back to `<VAULT_DIR>/university/bsc/GRADES.md`
+- MSc: `MSC_GRADES_PATH`, falling back to `<VAULT_DIR>/university/msc/GRADES.md`
 
 ## Canonical Sections
 

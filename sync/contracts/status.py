@@ -41,12 +41,3 @@ class TrainingStatus:
     @property
     def stretch_done(self) -> bool:
         return bool(self.stretch_entries)
-
-
-@dataclass(frozen=True)
-class StatusIngestionIssue:
-    """Structured status ingestion issue for diagnostics."""
-
-    source: str
-    message: str
-    level: str = "error"

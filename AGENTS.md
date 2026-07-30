@@ -19,13 +19,12 @@ journal/
     contracts/                 # Pure typed contracts (no I/O)
       study.py
       sleep.py
-      training.py
       status.py
-      deviation.py
       schedule.py
       metrics.py
-      query.py
       media.py
+      grades.py
+      cache.py
 
     ports/                     # Stable Protocol interfaces
       sessions.py
@@ -47,13 +46,10 @@ journal/
     application/               # Orchestration over ports/contracts
       daily_sync_service.py
       period_sync_service.py
-      query_metrics.py
-      query_periods.py
-      query_service.py
-      study_targets.py
 
     readers/                   # Markdown parsing (markdown -> contracts)
       schedule.py
+      media.py
     writers/                   # Rendering (contracts -> markdown)
       __init__.py
       charts/                  # Unified chart API (typed specs + renderers)
@@ -72,7 +68,6 @@ journal/
     daily/
       __main__.py              # Daily composition root
       constants.py
-      icloud.py
       sleep.py
       training.py
       orchestrator/
@@ -87,11 +82,9 @@ journal/
       core_data_time.py
       repository.py
       enrichment.py
-      db.py                    # Thin public facade over repository + enrichment
       section.py
 
     metrics/
-      loading.py
       aggregation.py
       trends.py
 
@@ -103,15 +96,16 @@ journal/
 
     periods/
       __init__.py
-      engine.py                # Period metrics facade (delegates to builders)
       builders/                # Period-specific metric builders + shared helpers
+        common.py
+        weekly.py
+        monthly.py
+        yearly.py
       windows.py
+      presentation.py
       runtime.py
       sections.py
       cleanup.py
-      weekly/                  # Package
-      monthly/                 # Package
-      yearly/                  # Package
 
     run/
       __main__.py              # Unified runtime composition root
@@ -167,14 +161,9 @@ journal/
 ### Application services
 
 - `DailySyncService`: builds and writes daily note metrics/frontmatter.
-- `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes, renders metrics through `sync/periods/engine.py`.
-  - `sync/periods/engine.py` is a facade; period-specific rendering logic lives in `sync/periods/builders/`.
+- `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes.
+  - period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
-- `QueryService`: period-window query/shift/bounds + metric snapshot service used by CLI and application consumers.
-  - snapshot contract: `PeriodSnapshot` from `sync/contracts/query.py` (single canonical definition).
-  - period navigation lives in `sync/application/query_periods.py`.
-  - metric aggregation/metadata lives in `sync/application/query_metrics.py`.
-  - study-target resolution shared with period sync lives in `sync/application/study_targets.py`.
 
 ### Canonical rendering entrypoints
 
@@ -196,15 +185,12 @@ journal/
   - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `MediaSource.scan(start, end) -> MediaBundle`
-- Study DB access is split into:
-  - `sync/study/repository.py` for Flow SQL and raw row loading
-  - `sync/study/enrichment.py` for dedupe/break/lunch/overrun enrichment
-  - `sync/study/db.py` as the canonical public facade consumed outside `sync/study`
+- `FlowStudySessionSource` owns Flow connection lifecycle, stale-row repair, and
+  session enrichment. SQL remains in `sync/study/repository.py`; pure
+  dedupe/break/lunch/overrun logic remains in `sync/study/enrichment.py`.
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
   - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation
-- Query snapshot contract is canonical across `sync/application` and CLI consumers:
-  - `PeriodSnapshot` in `sync/contracts/query.py`
 - Year sync windows must carry explicit execution anchors:
   - `YearWindow.target_date`
 
@@ -245,7 +231,7 @@ python -m sync.run period daily
 python -m sync.run period weekly [--date YYYY-MM-DD] [--no-cleanup]
 python -m sync.run period monthly [--month YYYY-MM] [--no-cleanup]
 python -m sync.run period yearly [--year YYYY]
-python -m sync.run grades sync [--path /abs/path/to/GRADES.md]
+python -m sync.run grades sync <bsc|msc>
 python -m sync.run media book annotations import /abs/path/to/export.html --note /abs/path/to/book.md
 ```
 
@@ -354,7 +340,7 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `SCHEDULE_PATH`, `GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
+- `SCHEDULE_PATH`, `BSC_GRADES_PATH`, `MSC_GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
 - `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
 - `TRAINING_CACHE_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`

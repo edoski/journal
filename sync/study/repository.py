@@ -119,13 +119,30 @@ def fetch_sessions_for_day(
     return sessions
 
 
-def load_interruptions(
+def apply_superseded_open_repairs(
+    connection: sqlite3.Connection,
+    repairs: list[tuple[int, datetime.datetime]],
+) -> None:
+    """Close stale open rows at the next same-day session start."""
+    cursor = connection.cursor()
+    for pk, completed_at in repairs:
+        cursor.execute(
+            """
+            UPDATE ZSESSION
+            SET ZCOMPLETEDAT = ?
+            WHERE Z_PK = ? AND ZCOMPLETEDAT IS NULL
+            """,
+            (datetime_to_core_data(completed_at), pk),
+        )
+    connection.commit()
+
+
+def load_interruption_totals(
     cursor: sqlite3.Cursor,
     session_pks: list[int],
-) -> tuple[int, float]:
-    """Load interruption count/duration totals for a set of source session PKs."""
-    total_count = 0
-    total_duration = 0.0
+) -> dict[int, tuple[int, float]]:
+    """Load interruption count/duration totals keyed by source session PK."""
+    totals: dict[int, tuple[int, float]] = {}
     for pk in session_pks:
         cursor.execute(
             """
@@ -136,8 +153,6 @@ def load_interruptions(
             (pk,),
         )
         row = cursor.fetchone()
-        if not row:
-            continue
-        total_count += int(row[0] or 0)
-        total_duration += float(row[1] or 0)
-    return total_count, total_duration
+        if row:
+            totals[pk] = (int(row[0] or 0), float(row[1] or 0))
+    return totals
