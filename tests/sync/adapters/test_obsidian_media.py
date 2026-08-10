@@ -231,6 +231,31 @@ def test_scan_keeps_escaped_pipe_episode_rows_byte_stable(tmp_path: Path) -> Non
     assert index_path.read_bytes() == first_render
 
 
+def test_scan_keeps_lenient_escaped_pipe_rows_byte_stable(tmp_path: Path) -> None:
+    directory = _series_dir(tmp_path, "Genesis")
+    _write_note(directory / "Part | One.md", ["date: 2026-01-10", "host: Host"])
+    index_path = directory / "Genesis.md"
+    existing = "\n".join(
+        [
+            "---",
+            "visible: true",
+            "---",
+            "",
+            "| EPISODE       | DATE",
+            "| ------------- | ----------",
+            "| [[Part \\| One]] | `2026-01-10`",
+        ]
+    ).encode()
+    index_path.write_bytes(existing)
+
+    _scan_series(tmp_path)
+    first_scan = index_path.read_bytes()
+    _scan_series(tmp_path)
+
+    assert first_scan == existing
+    assert index_path.read_bytes() == existing
+
+
 def test_scan_creates_a_hidden_index_note_for_a_series_without_one(
     tmp_path: Path,
 ) -> None:
