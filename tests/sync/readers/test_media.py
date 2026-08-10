@@ -73,6 +73,21 @@ def test_parse_podcast_note_normalizes_optional_fields() -> None:
     assert podcast.visible is False
 
 
+def test_parse_podcast_note_preserves_colons_in_link() -> None:
+    podcast = parse_podcast_note(
+        "Episode",
+        [
+            "---",
+            "date: 2026-01-03",
+            "link: https://example.test/episode",
+            "---",
+        ],
+    )
+
+    assert podcast is not None
+    assert podcast.link == "https://example.test/episode"
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
