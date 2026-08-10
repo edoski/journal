@@ -10,11 +10,8 @@ from collections import OrderedDict
 from pathlib import Path
 
 from sync.contracts.media import BookAnnotation
-from sync.io import atomic_write_note, safe_read_file
-from sync.notes.locking import locked_note
 from sync.notes.markdown import normalize_header
 from sync.notes.markdown_tables import escape_markdown_cell
-from sync.notes.sections import ensure_note
 from sync.readers.frontmatter import parse_frontmatter
 from sync.readers.kindle_annotations import parse_kindle_notebook_html
 from sync.writers.tables import SimpleGridTableSpec, render_table
@@ -315,19 +312,22 @@ def cmd_media_book_annotations_import(
         return 1
 
     try:
-        with locked_note(note_path):
-            ensure_note(note_path, template_path)
-            existing_lines = safe_read_file(note_path)
+
+        def update_note(existing_lines: list[str] | None) -> list[str]:
             if existing_lines is None:
-                print(f"Error: failed to read target note: {note_path}")
-                return 1
+                raise OSError(f"failed to read target note: {note_path}")
             normalized_lines = _normalize_book_frontmatter(
                 existing_lines,
                 author=author or None,
                 completed_day=resolved.today(),
             )
-            updated_lines = _replace_highlights_content(normalized_lines, table_lines)
-            atomic_write_note(note_path, updated_lines)
+            return _replace_highlights_content(normalized_lines, table_lines)
+
+        resolved.note_store.update(
+            note_path,
+            update_note,
+            template_path=template_path,
+        )
     except TimeoutError as exc:
         print(f"Error: could not lock note for write: {exc}")
         return 1

@@ -9,6 +9,7 @@ import pytest
 
 import sync.run.__main__ as cli
 from sync.config import PATHS
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.contracts.schedule import DayScheduleProfile
 from sync.run import wiring
 from sync.run.commands import grades as grades_cmd
@@ -223,6 +224,7 @@ def _media_deps(
             podcasts_dir=str(podcasts_dir),
         ),
         media_cache_store_factory=lambda: cache_store or _StubMediaCacheStore(),
+        note_store=MarkdownNoteStore(lock_root=str(tmp_path / "note-locks")),
         today=lambda: today or date.today(),
     )
     return deps, podcasts_dir

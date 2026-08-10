@@ -58,7 +58,8 @@ def default_wiring_deps() -> WiringDeps:
         training_cache_store_factory=JsonDailyTrainingCacheStore,
         aggregate_source_factory=MarkdownDailyAggregateSource,
         media_source_factory=lambda: ObsidianMediaSource(
-            media_cache_store=JsonMediaDateCacheStore()
+            media_cache_store=JsonMediaDateCacheStore(),
+            note_store=MarkdownNoteStore(),
         ),
         schedule_source_factory=MarkdownScheduleSource,
     )

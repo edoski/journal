@@ -11,8 +11,6 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sync.constants import NOTE_LOCK_DIR
-
 LOCK_RETENTION_DAYS = 14
 _PRUNED_LOCK_ROOTS: set[str] = set()
 
@@ -82,10 +80,3 @@ def locked_path(
     finally:
         fcntl.flock(fd, fcntl.LOCK_UN)
         os.close(fd)
-
-
-@contextmanager
-def locked_note(path: str, timeout: float = 2.0, poll: float = 0.1) -> Iterator[None]:
-    """Serialize writes to a note using the configured notes lock root."""
-    with locked_path(path, lock_root=NOTE_LOCK_DIR, timeout=timeout, poll=poll):
-        yield

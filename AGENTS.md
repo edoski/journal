@@ -25,6 +25,7 @@ journal/
       media.py
       grades.py
       cache.py
+      notes.py
 
     ports/                     # Stable Protocol interfaces
       sessions.py
@@ -180,9 +181,11 @@ journal/
   - `load_sleep(day) -> SleepPayload | None` (canonical keys only: `date`, `start`, `end`, `sleep_min`, `awake_min`, `awake_count`)
 - `ScheduleSource.resolve_day(day) -> DayScheduleProfile`
 - `NoteStore`:
-  - `read(path) -> list[str] | None`
   - `read_or_create(path, template_path) -> list[str]`
-  - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
+  - `publish(path, lines, expected=...) -> NotePublication`
+  - `update(path, updater, template_path=...) -> NotePublication`
+  - publication owns note locks, compare/no-op behavior, atomic replacement,
+    directory creation, and the canonical trailing newline
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `MediaSource.scan(start, end) -> MediaBundle`
   - `MediaBundle.items` contains immutable period-ready `MediaItem` rows; period

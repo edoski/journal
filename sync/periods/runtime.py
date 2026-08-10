@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 
 from sync.constants import JOURNAL_DIR
-from sync.notes.locking import locked_note
 from sync.notes.sections import replace_metrics_block
 from sync.ports.notes import NoteStore
 from sync.periods.cleanup import resync_if_marker
@@ -23,27 +21,19 @@ def journal_path(filename: str) -> str:
     return os.path.join(JOURNAL_DIR, filename)
 
 
-@contextmanager
-def open_period_note(
+def publish_note_metrics(
     note_path: str,
     template_path: str,
-    note_store: NoteStore,
-) -> Iterator[list[str]]:
-    """Open a period note under lock and yield mutable line content."""
-    with locked_note(note_path):
-        lines = note_store.read_or_create(note_path, template_path)
-        yield lines
-
-
-def write_note_metrics(
-    note_path: str,
-    lines: list[str],
     metrics_block: list[str],
     note_store: NoteStore,
-) -> None:
-    """Replace metrics block and atomically persist note content."""
-    updated_lines = replace_metrics_block(lines, metrics_block)
-    note_store.write(note_path, updated_lines)
+) -> bool:
+    """Replace metrics from locked current content and publish atomically."""
+    publication = note_store.update(
+        note_path,
+        lambda lines: replace_metrics_block(lines or [], metrics_block),
+        template_path=template_path,
+    )
+    return publication.changed
 
 
 def maybe_cleanup_previous(

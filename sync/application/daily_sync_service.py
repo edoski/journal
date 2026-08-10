@@ -11,7 +11,6 @@ from sync.contracts.study import StudySessionRecord
 from sync.daily.composer import DailyNoteComposer
 from sync.daily.constants import TEMPLATE_PATH
 from sync.log import get_logger
-from sync.notes.locking import locked_note
 from sync.ports.cache import DailyTrainingCacheStore
 from sync.ports.notes import NoteStore
 from sync.ports.status import DailyStatusSource
@@ -52,8 +51,7 @@ class DailySyncService:
         file_path = os.path.join(self.journal_dir, f"{today_str}.md")
         self.training_cache_store.prune(keep_days=14)
 
-        with locked_note(file_path):
-            base_lines = self.note_store.read_or_create(file_path, self.template_path)
+        base_lines = self.note_store.read_or_create(file_path, self.template_path)
         if not base_lines:
             return None
 
@@ -65,20 +63,19 @@ class DailySyncService:
         )
         updated_lines = compose_result.updated_lines
 
-        with locked_note(file_path):
-            current_lines = self.note_store.read(file_path) or []
-            if current_lines != base_lines:
-                logger.warning(
-                    "Detected concurrent update while syncing %s; skipped write.",
-                    file_path,
-                )
-                return False
-
-            current_content = "\n".join(current_lines)
-            new_content = "\n".join(updated_lines)
-            if new_content.strip() == current_content.strip():
-                return False
-            self.note_store.write(file_path, updated_lines)
+        publication = self.note_store.publish(
+            file_path,
+            updated_lines,
+            expected=base_lines,
+        )
+        if publication.status == "conflict":
+            logger.warning(
+                "Detected concurrent update while syncing %s; skipped write.",
+                file_path,
+            )
+            return False
+        if not publication.changed:
+            return False
 
         self._log_frontmatter_changes(today_str, compose_result.fm_changes)
         return True

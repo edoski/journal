@@ -6,6 +6,7 @@ import datetime
 
 from sync.application.period_sync_service import PeriodSyncService
 from sync.contracts.media import MediaBundle
+from sync.contracts.notes import NotePublication
 from sync.periods.windows import build_week_window, build_year_window
 
 
@@ -24,8 +25,30 @@ class _StubNoteStore:
             self._notes[path] = lines
         return lines[:]
 
-    def write(self, path: str, lines: list[str]) -> None:
-        self._notes[path] = lines[:]
+    def publish(
+        self,
+        path: str,
+        lines: list[str],
+        *,
+        expected: list[str] | None,
+    ) -> NotePublication:
+        current = self.read(path)
+        if current != expected:
+            return NotePublication(
+                status="conflict",
+                lines=tuple(current) if current is not None else None,
+            )
+        return self.update(path, lambda _current: lines)
+
+    def update(self, path, updater, *, template_path=None) -> NotePublication:
+        _ = template_path
+        current = self.read(path)
+        base = current or ["## Metrics", "---", "", "## Reflections", ""]
+        updated = updater(base)
+        if updated == current:
+            return NotePublication(status="unchanged", lines=tuple(updated))
+        self._notes[path] = updated[:]
+        return NotePublication(status="updated", lines=tuple(updated))
 
 
 class _StubAggregateSource:
@@ -70,13 +93,6 @@ def test_sync_week_writes_metrics_and_runs_cleanup(monkeypatch, tmp_path):
         "sync.application.period_sync_service.build_weekly_metrics",
         _stub_build_weekly_metrics,
     )
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.write_note_metrics",
-        lambda path, lines, metrics_block, store: store.write(
-            path, lines + metrics_block
-        ),
-    )
-
     cleanup_calls: list[tuple[bool, str, object | None]] = []
 
     def _record_cleanup(*, enabled, previous_note_path, rerun):
@@ -100,7 +116,7 @@ def test_sync_week_writes_metrics_and_runs_cleanup(monkeypatch, tmp_path):
 
     written = note_store.read(note_path)
     assert written is not None
-    assert written[-1] == "week"
+    assert "week" in written
     assert cleanup_calls
     enabled, _prev_path, rerun = cleanup_calls[0]
     assert enabled is True
@@ -124,16 +140,9 @@ def test_sync_year_writes_metrics(monkeypatch, tmp_path):
         "sync.application.period_sync_service.build_yearly_metrics",
         lambda *_a, **_kw: ["### **SUMMARY**", "", "year"],
     )
-    monkeypatch.setattr(
-        "sync.application.period_sync_service.write_note_metrics",
-        lambda path, lines, metrics_block, store: store.write(
-            path, lines + metrics_block
-        ),
-    )
-
     service.sync_year(window, note_path)
 
     written = note_store.read(note_path)
     assert written is not None
-    assert written[-1] == "year"
+    assert "year" in written
     assert media_source.calls == [(window.start, window.end)]

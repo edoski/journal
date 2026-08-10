@@ -8,12 +8,12 @@ from dataclasses import replace
 
 from sync.constants import BOOKS_DIR, PODCASTS_DIR
 from sync.contracts.media import MediaBundle, MediaItem, Podcast
-from sync.io import atomic_write_note, safe_read_file
+from sync.io import safe_read_file
 from sync.log import get_logger
-from sync.notes.locking import locked_note
 from sync.notes.markdown_tables import split_markdown_row_lenient
 from sync.ports.cache import MediaDateCacheStore
 from sync.ports.media import MediaSource
+from sync.ports.notes import NoteStore
 from sync.readers.media import (
     parse_book_note,
     parse_media_date,
@@ -26,8 +26,8 @@ logger = get_logger(__name__)
 
 
 def _heal_frontmatter_date(
+    note_store: NoteStore,
     filepath: str,
-    lines: list[str],
     correct_date: datetime.date,
     date_key: str = "date",
 ) -> None:
@@ -36,37 +36,40 @@ def _heal_frontmatter_date(
 
     Args:
         filepath: Path to the markdown file
-        lines: Current file lines
         correct_date: The correct date to restore
         date_key: The frontmatter key to heal (default: "date", use "completed" for books)
     """
     date_str = correct_date.strftime("%Y-%m-%d")
 
-    delimiter_indexes = [idx for idx, line in enumerate(lines) if line.strip() == "---"]
-    if len(delimiter_indexes) < 2:
-        return
+    def heal(lines: list[str] | None) -> list[str] | None:
+        if lines is None:
+            return None
+        delimiter_indexes = [
+            idx for idx, line in enumerate(lines) if line.strip() == "---"
+        ]
+        if len(delimiter_indexes) < 2:
+            return lines
 
-    frontmatter_start = delimiter_indexes[0] + 1
-    frontmatter_end = delimiter_indexes[1]
-    frontmatter_lines = lines[frontmatter_start:frontmatter_end]
-    rewritten_frontmatter = [
-        (f"{date_key}: {date_str}" if line.startswith(f"{date_key}:") else line)
-        for line in frontmatter_lines
-    ]
-
-    if rewritten_frontmatter == frontmatter_lines:
-        return
-
-    new_lines = (
-        lines[:frontmatter_start] + rewritten_frontmatter + lines[frontmatter_end:]
-    )
+        frontmatter_start = delimiter_indexes[0] + 1
+        frontmatter_end = delimiter_indexes[1]
+        frontmatter_lines = lines[frontmatter_start:frontmatter_end]
+        rewritten_frontmatter = [
+            (f"{date_key}: {date_str}" if line.startswith(f"{date_key}:") else line)
+            for line in frontmatter_lines
+        ]
+        return (
+            lines[:frontmatter_start] + rewritten_frontmatter + lines[frontmatter_end:]
+        )
 
     try:
-        with locked_note(filepath):
-            atomic_write_note(filepath, new_lines)
-        logger.info(
-            "Healed %s in %s -> %s", date_key, os.path.basename(filepath), date_str
-        )
+        publication = note_store.update(filepath, heal)
+        if publication.changed:
+            logger.info(
+                "Healed %s in %s -> %s",
+                date_key,
+                os.path.basename(filepath),
+                date_str,
+            )
     except (PermissionError, OSError) as e:
         logger.warning("Failed to heal frontmatter in %s: %s", filepath, e)
 
@@ -76,6 +79,7 @@ def _scan_books(
     end_date: datetime.date,
     books_dir: str,
     *,
+    note_store: NoteStore,
     cached_dates: dict[str, str] | None = None,
 ) -> tuple[list[MediaItem], dict[str, str], bool]:
     """
@@ -129,7 +133,12 @@ def _scan_books(
                     completed_date,
                     cached_date,
                 )
-                _heal_frontmatter_date(filepath, lines, cached_date, "completed")
+                _heal_frontmatter_date(
+                    note_store,
+                    filepath,
+                    cached_date,
+                    "completed",
+                )
                 completed_date = cached_date
         else:
             # New entry - add to cache
@@ -153,6 +162,7 @@ def _scan_podcast_directory(
     *,
     key_prefix: str,
     cache: dict[str, str],
+    note_store: NoteStore,
     skip_filename: str | None = None,
 ) -> tuple[list[Podcast], bool]:
     """
@@ -204,7 +214,7 @@ def _scan_podcast_directory(
                     podcast_date,
                     cached_date,
                 )
-                _heal_frontmatter_date(filepath, lines, cached_date)
+                _heal_frontmatter_date(note_store, filepath, cached_date)
                 podcast_date = cached_date
                 podcast = replace(podcast, date=cached_date)
         else:
@@ -281,7 +291,12 @@ def _normalized_table_cells(lines: list[str]) -> list[tuple[str, ...]]:
     return normalized
 
 
-def _sync_series_index(directory: str, title: str, episodes: list[Podcast]) -> bool:
+def _sync_series_index(
+    directory: str,
+    title: str,
+    episodes: list[Podcast],
+    note_store: NoteStore,
+) -> bool:
     """
     Regenerate a series' index note and report whether it renders.
 
@@ -299,19 +314,26 @@ def _sync_series_index(directory: str, title: str, episodes: list[Podcast]) -> b
         Whether the series opts into rendering
     """
     filepath = os.path.join(directory, f"{title}.md")
-    existing = safe_read_file(filepath)
-    frontmatter = _series_frontmatter(existing)
-    lines = _series_index_lines(frontmatter, episodes)
+    try:
 
-    if existing is None or _normalized_table_cells(existing) != (
-        _normalized_table_cells(lines)
-    ):
-        try:
-            with locked_note(filepath):
-                atomic_write_note(filepath, lines)
+        def regenerate(existing: list[str] | None) -> list[str]:
+            frontmatter = _series_frontmatter(existing)
+            rendered = _series_index_lines(frontmatter, episodes)
+            if existing is not None and _normalized_table_cells(existing) == (
+                _normalized_table_cells(rendered)
+            ):
+                return existing
+            return rendered
+
+        publication = note_store.update(filepath, regenerate)
+        if publication.changed:
             logger.info("Regenerated series index for %s", title)
-        except (TimeoutError, PermissionError, OSError) as e:
-            logger.warning("Failed to write series index for %s: %s", title, e)
+        frontmatter = _series_frontmatter(
+            list(publication.lines) if publication.lines is not None else None
+        )
+    except (TimeoutError, PermissionError, OSError) as e:
+        logger.warning("Failed to write series index for %s: %s", title, e)
+        return False
 
     return parse_series_visibility(frontmatter)
 
@@ -321,6 +343,7 @@ def _scan_podcasts(
     end_date: datetime.date,
     podcasts_dir: str,
     *,
+    note_store: NoteStore,
     cached_dates: dict[str, str] | None = None,
 ) -> tuple[list[MediaItem], dict[str, str], bool]:
     """
@@ -348,6 +371,7 @@ def _scan_podcasts(
         podcasts_dir,
         key_prefix="",
         cache=cache,
+        note_store=note_store,
     )
 
     series_items: list[MediaItem] = []
@@ -360,10 +384,11 @@ def _scan_podcasts(
             directory,
             key_prefix=f"{entry}/",
             cache=cache,
+            note_store=note_store,
             skip_filename=f"{entry}.md",
         )
         cache_modified = cache_modified or series_modified
-        visible = _sync_series_index(directory, entry, episodes)
+        visible = _sync_series_index(directory, entry, episodes, note_store)
 
         rendered = _in_range(episodes, start_date, end_date)
         if not visible or not rendered:
@@ -399,10 +424,12 @@ class ObsidianMediaSource(MediaSource):
         podcasts_dir: str = PODCASTS_DIR,
         *,
         media_cache_store: MediaDateCacheStore,
+        note_store: NoteStore,
     ) -> None:
         self.books_dir = books_dir
         self.podcasts_dir = podcasts_dir
         self.media_cache_store = media_cache_store
+        self.note_store = note_store
 
     def scan(self, start: datetime.date, end: datetime.date) -> MediaBundle:
         """Return media completed within the supplied range."""
@@ -411,12 +438,14 @@ class ObsidianMediaSource(MediaSource):
             start,
             end,
             self.books_dir,
+            note_store=self.note_store,
             cached_dates=cache.get("books", {}),
         )
         podcast_items, podcast_cache, podcasts_modified = _scan_podcasts(
             start,
             end,
             self.podcasts_dir,
+            note_store=self.note_store,
             cached_dates=cache.get("podcasts", {}),
         )
 

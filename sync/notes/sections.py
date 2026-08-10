@@ -129,20 +129,6 @@ def join_sections(sections: list[list[str]]) -> list[str]:
     return result
 
 
-def ensure_note(path: str, template_path: str) -> None:
-    """Ensure a note file exists, creating from template if needed."""
-    import os
-
-    if os.path.exists(path):
-        return
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    if template_path and os.path.exists(template_path):
-        with open(template_path, "r") as tf:
-            content = tf.read()
-        with open(path, "w") as f:
-            f.write(content)
-
-
 def replace_metrics_block(lines: list[str], new_block_lines: list[str]) -> list[str]:
     """Replace the ## Metrics section content with new lines."""
     metrics_idx = find_header_idx(lines, "Metrics")

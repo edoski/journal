@@ -25,19 +25,18 @@ class _StubStatusSource:
 
 
 class _ConflictNoteStore(MarkdownNoteStore):
-    def __init__(self, *, mutate_on_reads: int) -> None:
-        self.mutate_on_reads = mutate_on_reads
-        self.read_calls = 0
+    def __init__(self) -> None:
+        super().__init__()
+        self.mutated = False
 
-    def read(self, path: str) -> list[str] | None:
-        self.read_calls += 1
-        if self.read_calls <= self.mutate_on_reads:
-            marker = f"<!-- external-change-{self.read_calls} -->"
-            current = super().read(path) or []
-            if marker not in current:
-                current.append(marker)
-                super().write(path, current)
-        return super().read(path)
+    def publish(self, path: str, lines: list[str], *, expected: list[str] | None):
+        if not self.mutated:
+            self.mutated = True
+            self.update(
+                path,
+                lambda current: [*(current or []), "<!-- external-change -->"],
+            )
+        return super().publish(path, lines, expected=expected)
 
 
 def _session_for_day(day: datetime.date) -> dict:
@@ -161,7 +160,7 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     service, journal_dir = _build_service(
         monkeypatch,
         tmp_path,
-        note_store=_ConflictNoteStore(mutate_on_reads=1),
+        note_store=_ConflictNoteStore(),
     )
 
     caplog.set_level(logging.WARNING)
@@ -178,4 +177,4 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     assert changed is False
     assert any("skipped write" in rec.getMessage() for rec in caplog.records)
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
-    assert "<!-- external-change-1 -->" in content
+    assert "<!-- external-change -->" in content

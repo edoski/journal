@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from sync.config import PATHS, PathConfig
 from sync.ports.cache import MediaDateCacheStore
+from sync.ports.notes import NoteStore
 
 YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
 BOOK_TEMPLATE_FILENAME = "book.md"
@@ -24,15 +25,18 @@ class MediaCommandDeps:
 
     paths: PathConfig
     media_cache_store_factory: Callable[[], MediaDateCacheStore]
+    note_store: NoteStore
     today: Callable[[], datetime.date]
 
 
 def default_media_command_deps() -> MediaCommandDeps:
     """Return the default runtime dependencies for media commands."""
     from sync.adapters.json_media_cache import JsonMediaDateCacheStore
+    from sync.adapters.markdown_notes import MarkdownNoteStore
 
     return MediaCommandDeps(
         paths=PATHS,
         media_cache_store_factory=JsonMediaDateCacheStore,
+        note_store=MarkdownNoteStore(),
         today=datetime.date.today,
     )

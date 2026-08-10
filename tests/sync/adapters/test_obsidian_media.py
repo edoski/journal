@@ -5,8 +5,11 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
+from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.contracts.media import MediaItem
+from sync.contracts.notes import NotePublication
+from sync.ports.notes import NoteUpdater
 
 
 class _StubMediaCacheStore:
@@ -27,6 +30,29 @@ def _write_note(path: Path, frontmatter: list[str]) -> None:
         "\n".join(["---", *frontmatter, "---", "Body"]),
         encoding="utf-8",
     )
+
+
+def _note_store(tmp_path: Path) -> MarkdownNoteStore:
+    return MarkdownNoteStore(lock_root=str(tmp_path / "note-locks"))
+
+
+class _ConcurrentEditStore(MarkdownNoteStore):
+    def __init__(self, tmp_path: Path, edit: NoteUpdater) -> None:
+        super().__init__(lock_root=str(tmp_path / "note-locks"))
+        self.edit = edit
+        self.injected = False
+
+    def update(
+        self,
+        path: str,
+        updater: NoteUpdater,
+        *,
+        template_path: str | None = None,
+    ) -> NotePublication:
+        if not self.injected:
+            self.injected = True
+            super().update(path, self.edit)
+        return super().update(path, updater, template_path=template_path)
 
 
 def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) -> None:
@@ -62,6 +88,7 @@ def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) ->
         str(books_dir),
         str(podcasts_dir),
         media_cache_store=cache,
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert bundle.items == (
@@ -95,6 +122,7 @@ def _scan_series(tmp_path: Path, cache: _StubMediaCacheStore | None = None):
         str(books_dir),
         str(tmp_path / "podcasts"),
         media_cache_store=cache or _StubMediaCacheStore(),
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
 
@@ -298,6 +326,35 @@ def test_scan_preserves_hand_written_index_frontmatter(tmp_path: Path) -> None:
     ]
 
 
+def test_series_regeneration_preserves_frontmatter_edited_before_publication(
+    tmp_path: Path,
+) -> None:
+    directory = _series_dir(tmp_path, "Genesis", visible=True)
+    _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Host"])
+
+    def add_rating(lines: list[str] | None) -> list[str] | None:
+        if lines is None:
+            return None
+        updated = list(lines)
+        updated.insert(2, "rating: 9")
+        return updated
+
+    books_dir = tmp_path / "books"
+    books_dir.mkdir()
+    source = ObsidianMediaSource(
+        str(books_dir),
+        str(tmp_path / "podcasts"),
+        media_cache_store=_StubMediaCacheStore(),
+        note_store=_ConcurrentEditStore(tmp_path, add_rating),
+    )
+
+    source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    index = (directory / "Genesis.md").read_text(encoding="utf-8")
+    assert "rating: 9" in index
+    assert "| [[Part One]] | `2026-01-10` |" in index
+
+
 def test_scan_leaves_a_reformatted_series_index_alone(tmp_path: Path) -> None:
     directory = _series_dir(tmp_path, "Genesis")
     _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Host"])
@@ -422,6 +479,7 @@ def test_scan_omits_podcasts_that_are_not_visible_but_still_caches_them(
         str(books_dir),
         str(podcasts_dir),
         media_cache_store=cache,
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert [item.title for item in bundle.items] == ["Shown"]
@@ -450,6 +508,7 @@ def test_scan_heals_dates_of_podcasts_that_are_not_visible(tmp_path: Path) -> No
         str(books_dir),
         str(podcasts_dir),
         media_cache_store=cache,
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert bundle.items == ()
@@ -478,12 +537,46 @@ def test_scan_heals_corrupted_date_from_cache(tmp_path: Path) -> None:
         str(books_dir),
         str(podcasts_dir),
         media_cache_store=cache,
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert bundle.items[0].date == datetime.date(2026, 1, 15)
     assert "completed: 2026-01-15" in book_path.read_text(encoding="utf-8")
     assert not book_path.with_suffix(".md.tmp").exists()
     assert cache.saved == []
+
+
+def test_date_healing_preserves_frontmatter_edited_before_publication(
+    tmp_path: Path,
+) -> None:
+    books_dir = tmp_path / "books"
+    podcasts_dir = tmp_path / "podcasts"
+    books_dir.mkdir()
+    podcasts_dir.mkdir()
+    book_path = books_dir / "Book.md"
+    _write_note(book_path, ["completed: 2026-02-01", "author: Original"])
+    cache = _StubMediaCacheStore({"books": {"Book": "2026-01-15"}, "podcasts": {}})
+
+    def change_author(lines: list[str] | None) -> list[str] | None:
+        if lines is None:
+            return None
+        return [
+            "author: Concurrent" if line == "author: Original" else line
+            for line in lines
+        ]
+
+    source = ObsidianMediaSource(
+        str(books_dir),
+        str(podcasts_dir),
+        media_cache_store=cache,
+        note_store=_ConcurrentEditStore(tmp_path, change_author),
+    )
+
+    source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    healed = book_path.read_text(encoding="utf-8")
+    assert "completed: 2026-01-15" in healed
+    assert "author: Concurrent" in healed
 
 
 def test_scan_ignores_missing_directories_and_malformed_notes(tmp_path: Path) -> None:
@@ -496,6 +589,7 @@ def test_scan_ignores_missing_directories_and_malformed_notes(tmp_path: Path) ->
         str(books_dir),
         str(tmp_path / "missing-podcasts"),
         media_cache_store=cache,
+        note_store=_note_store(tmp_path),
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert bundle.items == ()

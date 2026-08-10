@@ -22,8 +22,7 @@ from sync.periods.builders import (
 from sync.periods.runtime import (
     journal_path,
     maybe_cleanup_previous,
-    open_period_note,
-    write_note_metrics,
+    publish_note_metrics,
 )
 from sync.periods.windows import MonthWindow, WeekWindow, YearWindow
 from sync.ports.daily_aggregates import DailyAggregateSource
@@ -74,32 +73,32 @@ class PeriodSyncService:
         cleanup_previous: bool,
         cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
-        with open_period_note(
-            note_path, WEEKLY_TEMPLATE_PATH, self.note_store
-        ) as lines:
-            week_dates = list(daterange(window.start, window.end))
-            daily_data = self._load_dates(week_dates)
+        week_dates = list(daterange(window.start, window.end))
+        daily_data = self._load_dates(week_dates)
 
-            prev_week_dates = list(
-                daterange(window.previous_start, window.previous_end)
-            )
-            prev_daily_data = self._load_dates(prev_week_dates)
+        prev_week_dates = list(daterange(window.previous_start, window.previous_end))
+        prev_daily_data = self._load_dates(prev_week_dates)
 
-            prior_week_metrics = self._load_prior_metrics(
-                range(4, 0, -1),
-                window.prior_bounds,
-            )
-            media_bundle = self.media_source.scan(window.start, window.end)
+        prior_week_metrics = self._load_prior_metrics(
+            range(4, 0, -1),
+            window.prior_bounds,
+        )
+        media_bundle = self.media_source.scan(window.start, window.end)
 
-            metrics_block = build_weekly_metrics(
-                window,
-                daily_data,
-                prev_daily_data,
-                media_bundle,
-                prior_week_metrics=prior_week_metrics,
-            )
+        metrics_block = build_weekly_metrics(
+            window,
+            daily_data,
+            prev_daily_data,
+            media_bundle,
+            prior_week_metrics=prior_week_metrics,
+        )
 
-            write_note_metrics(note_path, lines, metrics_block, self.note_store)
+        publish_note_metrics(
+            note_path,
+            WEEKLY_TEMPLATE_PATH,
+            metrics_block,
+            self.note_store,
+        )
 
         maybe_cleanup_previous(
             enabled=cleanup_previous,
@@ -115,34 +114,34 @@ class PeriodSyncService:
         cleanup_previous: bool,
         cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
-        with open_period_note(
-            note_path, MONTHLY_TEMPLATE_PATH, self.note_store
-        ) as lines:
-            month_start, month_end = window.start, window.end
+        month_start, month_end = window.start, window.end
 
-            month_dates = list(daterange(month_start, month_end))
-            daily_data = self._load_dates(month_dates)
+        month_dates = list(daterange(month_start, month_end))
+        daily_data = self._load_dates(month_dates)
 
-            prev_month_dates = list(
-                daterange(window.previous_start, window.previous_end)
-            )
-            prev_daily_data = self._load_dates(prev_month_dates)
+        prev_month_dates = list(daterange(window.previous_start, window.previous_end))
+        prev_daily_data = self._load_dates(prev_month_dates)
 
-            prior_month_metrics = self._load_prior_metrics(
-                range(3, 0, -1),
-                window.prior_bounds,
-            )
-            media_bundle = self.media_source.scan(month_start, month_end)
+        prior_month_metrics = self._load_prior_metrics(
+            range(3, 0, -1),
+            window.prior_bounds,
+        )
+        media_bundle = self.media_source.scan(month_start, month_end)
 
-            metrics_block = build_monthly_metrics(
-                window,
-                daily_data,
-                prev_daily_data,
-                media_bundle,
-                prior_month_metrics=prior_month_metrics,
-            )
+        metrics_block = build_monthly_metrics(
+            window,
+            daily_data,
+            prev_daily_data,
+            media_bundle,
+            prior_month_metrics=prior_month_metrics,
+        )
 
-            write_note_metrics(note_path, lines, metrics_block, self.note_store)
+        publish_note_metrics(
+            note_path,
+            MONTHLY_TEMPLATE_PATH,
+            metrics_block,
+            self.note_store,
+        )
 
         maybe_cleanup_previous(
             enabled=cleanup_previous,
@@ -151,26 +150,26 @@ class PeriodSyncService:
         )
 
     def sync_year(self, window: YearWindow, note_path: str) -> None:
-        with open_period_note(
-            note_path, YEARLY_TEMPLATE_PATH, self.note_store
-        ) as lines:
-            year_dates = list(daterange(window.start, window.end))
-            daily_data = self._load_dates(year_dates)
-            prev_daily_data = self._load_range(
-                window.previous_start, window.previous_end
-            )
-            prior_year_metrics = self._load_prior_metrics(
-                range(3, 0, -1),
-                window.prior_bounds,
-            )
-            media_bundle = self.media_source.scan(window.start, window.end)
+        year_dates = list(daterange(window.start, window.end))
+        daily_data = self._load_dates(year_dates)
+        prev_daily_data = self._load_range(window.previous_start, window.previous_end)
+        prior_year_metrics = self._load_prior_metrics(
+            range(3, 0, -1),
+            window.prior_bounds,
+        )
+        media_bundle = self.media_source.scan(window.start, window.end)
 
-            metrics_block = build_yearly_metrics(
-                window,
-                daily_data,
-                prev_daily_data,
-                media_bundle,
-                prior_year_metrics=prior_year_metrics,
-            )
+        metrics_block = build_yearly_metrics(
+            window,
+            daily_data,
+            prev_daily_data,
+            media_bundle,
+            prior_year_metrics=prior_year_metrics,
+        )
 
-            write_note_metrics(note_path, lines, metrics_block, self.note_store)
+        publish_note_metrics(
+            note_path,
+            YEARLY_TEMPLATE_PATH,
+            metrics_block,
+            self.note_store,
+        )

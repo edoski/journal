@@ -12,9 +12,8 @@ import urllib.parse
 import urllib.request
 from typing import cast
 
-from sync.io import atomic_write_note, safe_read_file
+from sync.io import safe_read_file
 from sync.log import get_logger
-from sync.notes.locking import locked_note
 
 from .media_common import (
     PODCAST_TEMPLATE_FILENAME,
@@ -193,15 +192,17 @@ def cmd_media_podcast_add(
         link=args.url,
     )
 
-    os.makedirs(resolved.paths.podcasts_dir, exist_ok=True)
     note_path = os.path.join(resolved.paths.podcasts_dir, f"{title}.md")
 
     try:
-        with locked_note(note_path):
-            if os.path.exists(note_path):
-                print(f"Error: podcast note already exists: {note_path}")
-                return 1
-            atomic_write_note(note_path, note_lines)
+        publication = resolved.note_store.publish(
+            note_path,
+            note_lines,
+            expected=None,
+        )
+        if publication.status == "conflict":
+            print(f"Error: podcast note already exists: {note_path}")
+            return 1
     except TimeoutError as exc:
         print(f"Error: could not lock note for write: {exc}")
         return 1
