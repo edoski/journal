@@ -45,8 +45,8 @@ This is the authoritative implementation and review ledger for the cleanup run. 
 | S1 Flow operations | 2c4e617 | complete | impl_s1_flow | review_s1_flow | GREEN LIGHT at 81261b0; 54 focused and 561 standard-gate tests passed |
 | S2 Markdown row semantics | 90af101 | complete | impl_s2_markdown | review_s2_markdown | GREEN LIGHT at 871c7c7; 27 focused and 563 standard-gate tests passed; baselines unchanged |
 | S3 Period-ready media items | ad59dca | complete | impl_s3_media | review_s3_media | GREEN LIGHT at f39639f; 55 focused and 563 standard-gate tests passed; baselines unchanged |
-| S4 Reader and training contracts | f39639f | pending | pending | pending | pending |
-| S5 Locked note publication | pending | pending | pending | pending | pending |
+| S4 Reader and training contracts | 897f241 | complete | impl_s4_reader_training | review_s4_reader_training | GREEN LIGHT at f79adac; 262 focused and 564 standard-gate tests passed; randomized semantics and baselines unchanged |
+| S5 Locked note publication | f79adac | pending | pending | pending | pending |
 
 ## S1: Flow operation ownership
 
