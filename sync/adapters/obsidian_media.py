@@ -337,7 +337,7 @@ def _scan_podcasts(
         podcasts_dir: Path to podcasts directory
 
     Returns:
-        Standalone podcasts, series entries, the updated cache, and whether it changed
+        Normalized period-ready media items, the updated cache, and whether it changed
     """
     cache = dict(cached_dates or {})
 
