@@ -39,7 +39,7 @@ class _StubMediaSource:
 
     def scan(self, start: datetime.date, end: datetime.date) -> MediaBundle:
         self.calls.append((start, end))
-        return MediaBundle(books=[], podcasts=[], series=[])
+        return MediaBundle(items=())
 
 
 def test_sync_week_writes_metrics_and_runs_cleanup(monkeypatch, tmp_path):

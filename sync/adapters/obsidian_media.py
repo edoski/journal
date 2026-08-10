@@ -7,7 +7,7 @@ import os
 from dataclasses import replace
 
 from sync.constants import BOOKS_DIR, PODCASTS_DIR
-from sync.contracts.media import Book, MediaBundle, Podcast, PodcastSeries
+from sync.contracts.media import MediaBundle, MediaItem, Podcast
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import get_logger
 from sync.notes.locking import locked_note
@@ -77,7 +77,7 @@ def _scan_books(
     books_dir: str,
     *,
     cached_dates: dict[str, str] | None = None,
-) -> tuple[list[Book], dict[str, str], bool]:
+) -> tuple[list[MediaItem], dict[str, str], bool]:
     """
     Scan notes/books/ for books completed within the date range.
 
@@ -90,9 +90,9 @@ def _scan_books(
         books_dir: Path to books directory
 
     Returns:
-        List of Book dataclasses for books completed in range
+        Period-ready book items completed in range
     """
-    books: list[Book] = []
+    books: list[MediaItem] = []
     cache = dict(cached_dates or {})
     cache_modified = False
 
@@ -112,10 +112,10 @@ def _scan_books(
             continue
 
         title = filename[:-3]
-        book = parse_book_note(title, lines)
-        if book is None:
+        parsed = parse_book_note(title, lines)
+        if parsed is None:
             continue
-        completed_date = book.completed
+        completed_date = parsed.completed
 
         # Cache check and healing for completed date
         cached_date_str = cache.get(title)
@@ -131,7 +131,6 @@ def _scan_books(
                 )
                 _heal_frontmatter_date(filepath, lines, cached_date, "completed")
                 completed_date = cached_date
-                book = replace(book, completed=cached_date)
         else:
             # New entry - add to cache
             cache[title] = completed_date.strftime("%Y-%m-%d")
@@ -141,10 +140,10 @@ def _scan_books(
         if not (start_date <= completed_date <= end_date):
             continue
 
-        books.append(book)
+        books.append(MediaItem(kind="BOOK", title=parsed.title, date=completed_date))
 
-    # Sort by completed date
-    books.sort(key=lambda b: b.completed)
+    # Keep the period table's existing completed-date order.
+    books.sort(key=lambda item: item.date)
 
     return books, cache, cache_modified
 
@@ -323,7 +322,7 @@ def _scan_podcasts(
     podcasts_dir: str,
     *,
     cached_dates: dict[str, str] | None = None,
-) -> tuple[list[Podcast], list[PodcastSeries], dict[str, str], bool]:
+) -> tuple[list[MediaItem], dict[str, str], bool]:
     """
     Scan notes/podcasts/ for visible podcasts within the date range.
 
@@ -343,7 +342,7 @@ def _scan_podcasts(
     cache = dict(cached_dates or {})
 
     if not os.path.isdir(podcasts_dir):
-        return [], [], cache, False
+        return [], cache, False
 
     root_notes, cache_modified = _scan_podcast_directory(
         podcasts_dir,
@@ -351,7 +350,7 @@ def _scan_podcasts(
         cache=cache,
     )
 
-    series: list[PodcastSeries] = []
+    series_items: list[MediaItem] = []
     for entry in sorted(os.listdir(podcasts_dir)):
         directory = os.path.join(podcasts_dir, entry)
         if entry.startswith(".") or not os.path.isdir(directory):
@@ -370,22 +369,25 @@ def _scan_podcasts(
         if not visible or not rendered:
             continue
 
-        series.append(
-            PodcastSeries(
+        series_items.append(
+            MediaItem(
+                kind="PODCAST",
                 title=entry,
                 date=max(episode.date for episode in rendered),
             )
         )
 
-    # Sort by date
-    podcasts = [
-        podcast
+    # Keep one date-ordered podcast run regardless of storage topology.
+    podcast_items = [
+        MediaItem(kind="PODCAST", title=podcast.title, date=podcast.date)
         for podcast in _in_range(root_notes, start_date, end_date)
         if podcast.visible
     ]
-    series.sort(key=lambda s: s.date)
+    series_items.sort(key=lambda item: item.date)
+    items = podcast_items + series_items
+    items.sort(key=lambda item: item.date)
 
-    return podcasts, series, cache, cache_modified
+    return items, cache, cache_modified
 
 
 class ObsidianMediaSource(MediaSource):
@@ -405,13 +407,13 @@ class ObsidianMediaSource(MediaSource):
     def scan(self, start: datetime.date, end: datetime.date) -> MediaBundle:
         """Return media completed within the supplied range."""
         cache = self.media_cache_store.load()
-        books, book_cache, books_modified = _scan_books(
+        book_items, book_cache, books_modified = _scan_books(
             start,
             end,
             self.books_dir,
             cached_dates=cache.get("books", {}),
         )
-        podcasts, series, podcast_cache, podcasts_modified = _scan_podcasts(
+        podcast_items, podcast_cache, podcasts_modified = _scan_podcasts(
             start,
             end,
             self.podcasts_dir,
@@ -426,4 +428,4 @@ class ObsidianMediaSource(MediaSource):
                 }
             )
 
-        return MediaBundle(books=books, podcasts=podcasts, series=series)
+        return MediaBundle(items=tuple(book_items + podcast_items))

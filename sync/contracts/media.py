@@ -9,7 +9,7 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class Book:
-    """A completed book from the books directory."""
+    """A parsed book note."""
 
     title: str
     author: str
@@ -19,7 +19,7 @@ class Book:
 
 @dataclass(frozen=True)
 class Podcast:
-    """A listened podcast from the podcasts directory."""
+    """A parsed podcast note."""
 
     title: str
     host: str
@@ -30,9 +30,10 @@ class Podcast:
 
 
 @dataclass(frozen=True)
-class PodcastSeries:
-    """A podcast subdirectory collapsed into one media entry."""
+class MediaItem:
+    """One period-ready media row."""
 
+    kind: Literal["BOOK", "PODCAST"]
     title: str
     date: datetime.date
 
@@ -60,6 +61,4 @@ class KindleNotebookExport:
 class MediaBundle:
     """Media items discovered for a date window."""
 
-    books: list[Book]
-    podcasts: list[Podcast]
-    series: list[PodcastSeries]
+    items: tuple[MediaItem, ...]

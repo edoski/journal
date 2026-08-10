@@ -4,21 +4,17 @@ from __future__ import annotations
 
 import datetime
 
-from sync.contracts.media import MediaBundle
+from sync.contracts.media import MediaBundle, MediaItem
 from sync.dates import daterange
-from sync.contracts.media import Book
 
 FIXTURE_MEDIA_BUNDLE = MediaBundle(
-    books=[
-        Book(
+    items=(
+        MediaItem(
+            kind="BOOK",
             title="Fixture Book",
-            author="Fixture Author",
-            completed=datetime.date(2020, 1, 1),
-            rating=None,
-        )
-    ],
-    podcasts=[],
-    series=[],
+            date=datetime.date(2020, 1, 1),
+        ),
+    ),
 )
 
 

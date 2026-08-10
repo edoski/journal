@@ -102,19 +102,13 @@ def append_media_section(
     media_bundle: MediaBundle,
 ) -> None:
     """Render and append MEDIA section lines for the period."""
-    if not media_bundle.books and not media_bundle.podcasts and not media_bundle.series:
+    if not media_bundle.items:
         return
 
-    rows: list[list[str]] = []
-    for book in media_bundle.books:
-        rows.append(["**BOOK**", f"[[{book.title}]]", f"`{book.completed:%Y-%m-%d}`"])
-
-    # Standalone podcasts and series entries share one date-ordered run of rows
-    podcast_entries = [
-        (podcast.date, podcast.title) for podcast in media_bundle.podcasts
-    ] + [(series.date, series.title) for series in media_bundle.series]
-    for entry_date, title in sorted(podcast_entries, key=lambda entry: entry[0]):
-        rows.append(["**PODCAST**", f"[[{title}]]", f"`{entry_date:%Y-%m-%d}`"])
+    rows = [
+        [f"**{item.kind}**", f"[[{item.title}]]", f"`{item.date:%Y-%m-%d}`"]
+        for item in media_bundle.items
+    ]
 
     media_lines: list[str] = ["### **MEDIA**", ""]
     media_lines.extend(

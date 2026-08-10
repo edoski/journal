@@ -4,18 +4,15 @@ from __future__ import annotations
 
 import datetime
 
-from sync.contracts.media import Book, Podcast
+from sync.contracts.media import MediaItem
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 
-def _render_media_table(books: list[Book], podcasts: list[Podcast]) -> list[str]:
-    rows: list[list[str]] = []
-    for book in books:
-        rows.append(["**BOOK**", f"[[{book.title}]]", f"`{book.completed:%Y-%m-%d}`"])
-    for podcast in podcasts:
-        rows.append(
-            ["**PODCAST**", f"[[{podcast.title}]]", f"`{podcast.date:%Y-%m-%d}`"]
-        )
+def _render_media_table(items: list[MediaItem]) -> list[str]:
+    rows = [
+        [f"**{item.kind}**", f"[[{item.title}]]", f"`{item.date:%Y-%m-%d}`"]
+        for item in items
+    ]
     return render_table(
         SimpleGridTableSpec(
             headers=["TYPE", "TITLE", "DATE"],
@@ -27,26 +24,20 @@ def _render_media_table(books: list[Book], podcasts: list[Podcast]) -> list[str]
 
 class TestRenderMediaTable:
     def test_renders_books_and_podcasts(self):
-        books = [
-            Book(
+        items = [
+            MediaItem(
+                kind="BOOK",
                 title="Deep Work",
-                author="Cal Newport",
-                completed=datetime.date(2025, 1, 22),
-                rating=None,
-            )
-        ]
-        podcasts = [
-            Podcast(
+                date=datetime.date(2025, 1, 22),
+            ),
+            MediaItem(
+                kind="PODCAST",
                 title="Great Episode",
-                host="Lex Fridman",
                 date=datetime.date(2025, 1, 20),
-                rating=None,
-                link=None,
-                visible=True,
-            )
+            ),
         ]
 
-        lines = _render_media_table(books, podcasts)
+        lines = _render_media_table(items)
         assert "| TYPE | TITLE | DATE |" in lines[0]
         assert "**BOOK**" in lines[2]
         assert "[[Deep Work]]" in lines[2]
@@ -54,19 +45,18 @@ class TestRenderMediaTable:
         assert "[[Great Episode]]" in lines[3]
 
     def test_empty_returns_header_only(self):
-        lines = _render_media_table([], [])
+        lines = _render_media_table([])
         assert len(lines) == 2
         assert "TYPE" in lines[0]
 
     def test_books_only(self):
-        books = [
-            Book(
+        items = [
+            MediaItem(
+                kind="BOOK",
                 title="Test Book",
-                author="Author",
-                completed=datetime.date(2025, 1, 15),
-                rating=None,
+                date=datetime.date(2025, 1, 15),
             )
         ]
-        lines = _render_media_table(books, [])
+        lines = _render_media_table(items)
         assert len(lines) == 3
         assert "**BOOK**" in lines[2]

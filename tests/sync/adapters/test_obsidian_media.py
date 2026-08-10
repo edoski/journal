@@ -6,6 +6,7 @@ import datetime
 from pathlib import Path
 
 from sync.adapters.obsidian_media import ObsidianMediaSource
+from sync.contracts.media import MediaItem
 
 
 class _StubMediaCacheStore:
@@ -63,11 +64,11 @@ def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) ->
         media_cache_store=cache,
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
-    assert [book.title for book in bundle.books] == ["Earlier", "Later"]
-    assert bundle.books[1].author == "B"
-    assert bundle.books[1].rating == 8.5
-    assert [podcast.title for podcast in bundle.podcasts] == ["Episode"]
-    assert bundle.podcasts[0].link == "https://example.test/episode"
+    assert bundle.items == (
+        MediaItem(kind="BOOK", title="Earlier", date=datetime.date(2026, 1, 5)),
+        MediaItem(kind="BOOK", title="Later", date=datetime.date(2026, 1, 20)),
+        MediaItem(kind="PODCAST", title="Episode", date=datetime.date(2026, 1, 10)),
+    )
     assert cache.state == {
         "books": {
             "Earlier": "2026-01-05",
@@ -106,10 +107,9 @@ def test_scan_collapses_a_series_folder_into_one_entry_dated_by_latest_episode(
 
     bundle = _scan_series(tmp_path)
 
-    assert bundle.podcasts == []
-    assert [(entry.title, entry.date) for entry in bundle.series] == [
-        ("Genesis", datetime.date(2026, 1, 31))
-    ]
+    assert bundle.items == (
+        MediaItem(kind="PODCAST", title="Genesis", date=datetime.date(2026, 1, 31)),
+    )
 
 
 def test_scan_dates_a_series_by_its_latest_episode_inside_the_window(
@@ -122,7 +122,7 @@ def test_scan_dates_a_series_by_its_latest_episode_inside_the_window(
 
     bundle = _scan_series(tmp_path)
 
-    assert [entry.date for entry in bundle.series] == [datetime.date(2026, 1, 10)]
+    assert bundle.items[0].date == datetime.date(2026, 1, 10)
 
 
 def test_scan_omits_a_visible_series_without_episodes_in_the_window(
@@ -133,7 +133,7 @@ def test_scan_omits_a_visible_series_without_episodes_in_the_window(
 
     bundle = _scan_series(tmp_path)
 
-    assert bundle.series == []
+    assert bundle.items == ()
 
 
 def test_scan_dates_a_visible_series_by_every_episode_it_holds(
@@ -148,7 +148,7 @@ def test_scan_dates_a_visible_series_by_every_episode_it_holds(
 
     bundle = _scan_series(tmp_path)
 
-    assert [entry.date for entry in bundle.series] == [datetime.date(2026, 1, 24)]
+    assert bundle.items[0].date == datetime.date(2026, 1, 24)
 
 
 def test_scan_hides_a_series_whose_index_note_does_not_opt_in(
@@ -161,7 +161,7 @@ def test_scan_hides_a_series_whose_index_note_does_not_opt_in(
 
     bundle = _scan_series(tmp_path)
 
-    assert bundle.series == []
+    assert bundle.items == ()
 
 
 def test_scan_keeps_a_hidden_series_hidden_whatever_its_episodes_say(
@@ -175,8 +175,7 @@ def test_scan_keeps_a_hidden_series_hidden_whatever_its_episodes_say(
 
     bundle = _scan_series(tmp_path)
 
-    assert bundle.podcasts == []
-    assert bundle.series == []
+    assert bundle.items == ()
 
 
 def test_scan_namespaces_series_episodes_in_the_date_cache(tmp_path: Path) -> None:
@@ -189,8 +188,9 @@ def test_scan_namespaces_series_episodes_in_the_date_cache(tmp_path: Path) -> No
     )
     cache = _StubMediaCacheStore()
 
-    _scan_series(tmp_path, cache)
+    bundle = _scan_series(tmp_path, cache)
 
+    assert [item.title for item in bundle.items] == ["Genesis", "Part One"]
     assert cache.state["podcasts"] == {
         "Part One": "2026-01-11",
         "Genesis/Part One": "2026-01-10",
@@ -264,7 +264,7 @@ def test_scan_creates_a_hidden_index_note_for_a_series_without_one(
 
     bundle = _scan_series(tmp_path)
 
-    assert bundle.series == []
+    assert bundle.items == ()
     assert (directory / "Genesis.md").read_text(encoding="utf-8").splitlines() == [
         "---",
         "visible: false",
@@ -284,7 +284,7 @@ def test_scan_preserves_hand_written_index_frontmatter(tmp_path: Path) -> None:
 
     bundle = _scan_series(tmp_path)
 
-    assert [entry.title for entry in bundle.series] == ["Genesis"]
+    assert [item.title for item in bundle.items] == ["Genesis"]
     assert index_path.read_text(encoding="utf-8").splitlines() == [
         "---",
         "visible: true",
@@ -392,7 +392,7 @@ def test_scan_keeps_a_dated_index_note_out_of_its_own_episode_list(
 
     bundle = _scan_series(tmp_path, cache)
 
-    assert [entry.date for entry in bundle.series] == [datetime.date(2026, 1, 10)]
+    assert bundle.items[0].date == datetime.date(2026, 1, 10)
     assert "[[Genesis]]" not in (directory / "Genesis.md").read_text(encoding="utf-8")
     assert cache.state["podcasts"] == {"Genesis/Part One": "2026-01-10"}
 
@@ -424,7 +424,7 @@ def test_scan_omits_podcasts_that_are_not_visible_but_still_caches_them(
         media_cache_store=cache,
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
-    assert [podcast.title for podcast in bundle.podcasts] == ["Shown"]
+    assert [item.title for item in bundle.items] == ["Shown"]
     assert cache.state["podcasts"] == {
         "Hidden": "2026-01-10",
         "Unmarked": "2026-01-11",
@@ -452,7 +452,7 @@ def test_scan_heals_dates_of_podcasts_that_are_not_visible(tmp_path: Path) -> No
         media_cache_store=cache,
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
-    assert bundle.podcasts == []
+    assert bundle.items == ()
     assert "date: 2026-01-15" in podcast_path.read_text(encoding="utf-8")
     assert cache.saved == []
 
@@ -480,7 +480,7 @@ def test_scan_heals_corrupted_date_from_cache(tmp_path: Path) -> None:
         media_cache_store=cache,
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
-    assert bundle.books[0].completed == datetime.date(2026, 1, 15)
+    assert bundle.items[0].date == datetime.date(2026, 1, 15)
     assert "completed: 2026-01-15" in book_path.read_text(encoding="utf-8")
     assert not book_path.with_suffix(".md.tmp").exists()
     assert cache.saved == []
@@ -498,6 +498,5 @@ def test_scan_ignores_missing_directories_and_malformed_notes(tmp_path: Path) ->
         media_cache_store=cache,
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
-    assert bundle.books == []
-    assert bundle.podcasts == []
+    assert bundle.items == ()
     assert cache.saved == []

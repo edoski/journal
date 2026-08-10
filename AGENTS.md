@@ -185,6 +185,8 @@ journal/
   - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `MediaSource.scan(start, end) -> MediaBundle`
+  - `MediaBundle.items` contains immutable period-ready `MediaItem` rows; period
+    rendering does not interpret podcast storage topology
 - `FlowSessionRepository` owns Flow connection lifecycle, session SQL,
   stale-row repair, and transactions. `FlowStudySessionSource` delegates
   persistence to it and owns session enrichment; pure dedupe/break/lunch/overrun
