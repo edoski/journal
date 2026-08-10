@@ -248,6 +248,24 @@ def _unique_pks(pks: list[int]) -> tuple[int, ...]:
     return tuple(dict.fromkeys(pks))
 
 
+def _require_session_pks(
+    connection: sqlite3.Connection,
+    pks: tuple[int, ...],
+) -> None:
+    if not pks:
+        return
+    placeholders = ", ".join("?" for _pk in pks)
+    rows = connection.execute(
+        f"SELECT Z_PK FROM ZSESSION WHERE Z_PK IN ({placeholders})",
+        pks,
+    ).fetchall()
+    found = {int(row[0]) for row in rows}
+    missing = [pk for pk in pks if pk not in found]
+    if missing:
+        detail = ", ".join(str(pk) for pk in missing)
+        raise LookupError(f"Flow session rows not found: {detail}")
+
+
 class FlowSessionRepository:
     """Own all SQLite lifecycle and persistence operations for Flow sessions."""
 
@@ -270,6 +288,7 @@ class FlowSessionRepository:
     def _transaction(self) -> Iterator[sqlite3.Connection]:
         with self._connection(False) as connection:
             try:
+                connection.execute("BEGIN IMMEDIATE")
                 yield connection
             except Exception:
                 connection.rollback()
@@ -277,9 +296,9 @@ class FlowSessionRepository:
             else:
                 connection.commit()
 
-    def ensure_available(self, *, readonly: bool) -> None:
-        """Open and close the configured database to validate availability."""
-        with self._connection(readonly):
+    def ensure_readable(self) -> None:
+        """Open and close the configured database in read-only mode."""
+        with self._connection(True):
             pass
 
     def load_day_sessions(
@@ -328,6 +347,7 @@ class FlowSessionRepository:
             return
         placeholders = ", ".join("?" for _pk in unique_pks)
         with self._transaction() as connection:
+            _require_session_pks(connection, unique_pks)
             connection.execute(
                 f"UPDATE ZSESSION SET ZTITLE = ? WHERE Z_PK IN ({placeholders})",
                 (title, *unique_pks),
@@ -349,6 +369,7 @@ class FlowSessionRepository:
         """Delete a logical focus session and its linked breaks atomically."""
         focus_pks = _unique_pks(pks)
         with self._transaction() as connection:
+            _require_session_pks(connection, focus_pks)
             breaks = (
                 tuple(_associated_break_sessions(connection, focus_end))
                 if focus_end is not None

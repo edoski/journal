@@ -74,6 +74,7 @@ def test_record_to_cli_session_preserves_all_source_primary_keys() -> None:
 def test_cmd_session_rename_updates_all_source_primary_keys(
     monkeypatch,
     tmp_path: Path,
+    capsys,
 ) -> None:
     db_path = tmp_path / "sessions.sqlite"
     _create_session_db(db_path)
@@ -126,6 +127,13 @@ def test_cmd_session_rename_updates_all_source_primary_keys(
         schedule_source_factory=MarkdownScheduleSource,
         repository=repository,
     )
+    rename_sessions = repository.rename_sessions
+
+    def rename_after_target_is_printed(pks: list[int], title: str) -> None:
+        assert "SESSION TO BE RENAMED" in capsys.readouterr().out
+        rename_sessions(pks, title)
+
+    monkeypatch.setattr(repository, "rename_sessions", rename_after_target_is_printed)
 
     result = session_cmd.cmd_session_rename(
         argparse.Namespace(confirm=True, title="Architecture"),
@@ -142,6 +150,7 @@ def test_cmd_session_rename_updates_all_source_primary_keys(
 def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
     monkeypatch,
     tmp_path: Path,
+    capsys,
 ) -> None:
     db_path = tmp_path / "sessions.sqlite"
     _create_session_db(db_path)
@@ -213,6 +222,13 @@ def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
         schedule_source_factory=MarkdownScheduleSource,
         repository=repository,
     )
+    undo_session = repository.undo_session
+
+    def undo_after_target_is_printed(pks, end):
+        assert "SESSIONS TO DELETE" in capsys.readouterr().out
+        return undo_session(pks, end)
+
+    monkeypatch.setattr(repository, "undo_session", undo_after_target_is_printed)
     rc = session_cmd.cmd_session_undo(
         argparse.Namespace(confirm=True),
         deps=deps,

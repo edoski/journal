@@ -185,9 +185,10 @@ journal/
   - `write(path, lines) -> None` (canonical persistence path uses `sync.io.atomic_write_note`, writes with a trailing newline)
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `MediaSource.scan(start, end) -> MediaBundle`
-- `FlowStudySessionSource` owns Flow connection lifecycle, stale-row repair, and
-  session enrichment. SQL remains in `sync/study/repository.py`; pure
-  dedupe/break/lunch/overrun logic remains in `sync/study/enrichment.py`.
+- `FlowSessionRepository` owns Flow connection lifecycle, session SQL,
+  stale-row repair, and transactions. `FlowStudySessionSource` delegates
+  persistence to it and owns session enrichment; pure dedupe/break/lunch/overrun
+  logic remains in `sync/study/enrichment.py`.
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
   - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
   - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation

@@ -154,10 +154,7 @@ def cmd_session_rename(
         return 0
 
     try:
-        if args.confirm:
-            resolved.repository.rename_sessions(focus["pks"], args.title)
-        else:
-            resolved.repository.ensure_available(readonly=True)
+        resolved.repository.ensure_readable()
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
@@ -172,6 +169,11 @@ def cmd_session_rename(
     if not args.confirm:
         print("\nPreview only. Re-run with --confirm to apply.")
         return 0
+    try:
+        resolved.repository.rename_sessions(focus["pks"], args.title)
+    except Exception as exc:
+        print(f"Error: could not open database: {exc}")
+        return 1
     print(f'\nUpdated session title to "{args.title}"')
     return 0
 
@@ -195,20 +197,15 @@ def cmd_session_undo(
         return 0
 
     focus_end = _session_end_for_break_lookup(focus)
+    break_records: tuple[StudySessionRecord, ...]
     try:
-        if args.confirm:
-            undo_result = resolved.repository.undo_session(focus["pks"], focus_end)
-            break_records = undo_result.breaks
-            total_interruptions = undo_result.deleted_interruptions
-        elif focus_end is None:
-            resolved.repository.ensure_available(readonly=True)
+        if focus_end is None:
+            resolved.repository.ensure_readable()
             break_records = ()
-            total_interruptions = 0
         else:
             break_records = resolved.repository.find_associated_break_sessions(
                 focus_end
             )
-            total_interruptions = 0
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
@@ -226,5 +223,11 @@ def cmd_session_undo(
     if not args.confirm:
         print("\nPreview only. Re-run with --confirm to apply deletion.")
         return 0
+    try:
+        undo_result = resolved.repository.undo_session(focus["pks"], focus_end)
+    except Exception as exc:
+        print(f"Error: could not open database: {exc}")
+        return 1
+    total_interruptions = undo_result.deleted_interruptions
     print(f"Deleted session(s). Interruptions deleted: {total_interruptions}")
     return 0

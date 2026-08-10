@@ -85,6 +85,22 @@ def test_rename_sessions_updates_every_source_row(tmp_path: Path) -> None:
     assert titles == [(10, "Architecture"), (11, "Architecture")]
 
 
+def test_rename_sessions_rejects_a_missing_source_row(tmp_path: Path) -> None:
+    db_path = tmp_path / "flow.sqlite"
+    _create_flow_db(db_path)
+    start = datetime.datetime(2026, 8, 10, 9, 0)
+    end = start + datetime.timedelta(hours=1)
+    _insert_session(db_path, pk=10, phase="flow", start=start, completed=end)
+
+    with pytest.raises(LookupError, match="11"):
+        _repository(db_path).rename_sessions([10, 11], "Architecture")
+
+    connection = sqlite3.connect(db_path)
+    titles = connection.execute("SELECT ZTITLE FROM ZSESSION").fetchall()
+    connection.close()
+    assert titles == [("Study",)]
+
+
 def test_undo_session_deletes_all_source_rows_and_linked_breaks(
     tmp_path: Path,
 ) -> None:
@@ -173,4 +189,30 @@ def test_undo_session_rolls_back_every_delete_on_failure(tmp_path: Path) -> None
     ).fetchall()
     connection.close()
     assert session_pks == [(10,), (11,)]
+    assert interruption_pks == [(10,)]
+
+
+def test_undo_session_rejects_a_missing_source_row_before_deleting(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "flow.sqlite"
+    _create_flow_db(db_path)
+    start = datetime.datetime(2026, 8, 10, 9, 0)
+    end = start + datetime.timedelta(hours=1)
+    _insert_session(db_path, pk=10, phase="flow", start=start, completed=end)
+    connection = sqlite3.connect(db_path)
+    connection.execute("INSERT INTO ZINTERRUPTION (ZSESSION) VALUES (10)")
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(LookupError, match="11"):
+        _repository(db_path).undo_session([10, 11], end)
+
+    connection = sqlite3.connect(db_path)
+    session_pks = connection.execute("SELECT Z_PK FROM ZSESSION").fetchall()
+    interruption_pks = connection.execute(
+        "SELECT ZSESSION FROM ZINTERRUPTION"
+    ).fetchall()
+    connection.close()
+    assert session_pks == [(10,)]
     assert interruption_pks == [(10,)]
