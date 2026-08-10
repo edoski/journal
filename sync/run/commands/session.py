@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import sqlite3
 from dataclasses import dataclass
 from datetime import date, timedelta
 from collections.abc import Callable
@@ -15,14 +14,15 @@ from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 from sync.ports.schedule import ScheduleSource
-from sync.study.constants import BREAK_LINK_MAX_GAP_SECONDS, DB_PATH
-from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
+from sync.ports.sessions import StudySessionSource
+from sync.study.repository import FlowSessionRepository
 
 logger = get_logger(__name__)
 
 
 class CliSession(TypedDict):
     pk: int
+    pks: list[int]
     phase: str
     duration: float
     start: datetime.datetime | None
@@ -36,25 +36,19 @@ class CliSession(TypedDict):
 class SessionCommandDeps:
     """Factory dependencies for Flow session mutation commands."""
 
-    session_source_factory: Callable[[], FlowStudySessionSource]
+    session_source_factory: Callable[[], StudySessionSource]
     schedule_source_factory: Callable[[], ScheduleSource]
-    connection_factory: Callable[[bool], sqlite3.Connection]
+    repository: FlowSessionRepository
 
 
 def default_session_command_deps() -> SessionCommandDeps:
     """Return the default runtime dependencies for session commands."""
+    repository = FlowSessionRepository()
     return SessionCommandDeps(
-        session_source_factory=FlowStudySessionSource,
+        session_source_factory=lambda: FlowStudySessionSource(repository=repository),
         schedule_source_factory=MarkdownScheduleSource,
-        connection_factory=lambda readonly: get_connection(readonly=readonly),
+        repository=repository,
     )
-
-
-def get_connection(readonly: bool = True) -> sqlite3.Connection:
-    if readonly:
-        uri = f"file:{DB_PATH}?mode=ro"
-        return sqlite3.connect(uri, uri=True)
-    return sqlite3.connect(str(DB_PATH))
 
 
 def format_session(session: CliSession, include_pk: bool = False) -> str:
@@ -78,19 +72,16 @@ def _find_most_recent_focus(sessions: list[CliSession]) -> CliSession | None:
     return None
 
 
-def _delete_session(conn: sqlite3.Connection, pk: int) -> int:
-    cur = conn.cursor()
-    cur.execute("DELETE FROM ZINTERRUPTION WHERE ZSESSION = ?", (pk,))
-    deleted_interruptions = cur.rowcount
-    cur.execute("DELETE FROM ZSESSION WHERE Z_PK = ?", (pk,))
-    return deleted_interruptions
-
-
 def _record_to_cli_session(record: StudySessionRecord) -> CliSession:
     planned = record.get("planned_duration") or record.get("duration") or 0.0
+    pk = int(record.get("pk", 0) or 0)
+    pks = list(record.get("pks", []))
+    if not pks and pk:
+        pks = [pk]
     return {
-        "pk": int(record.get("pk", 0) or 0),
-        "phase": "flow",
+        "pk": pk,
+        "pks": pks,
+        "phase": record.get("phase") or "flow",
         "duration": float(planned),
         "start": record.get("start"),
         "completed": record.get("completed_at"),
@@ -101,7 +92,7 @@ def _record_to_cli_session(record: StudySessionRecord) -> CliSession:
 
 
 def _load_recent_focus_sessions(
-    source: FlowStudySessionSource,
+    source: StudySessionSource,
     schedule_source: ScheduleSource,
     *,
     limit: int,
@@ -144,48 +135,6 @@ def _session_end_for_break_lookup(
     return start + datetime.timedelta(minutes=planned_minutes)
 
 
-def _find_associated_break_sessions(
-    conn: sqlite3.Connection,
-    focus_session: CliSession,
-) -> list[CliSession]:
-    focus_end = _session_end_for_break_lookup(focus_session)
-    if not isinstance(focus_end, datetime.datetime):
-        return []
-
-    focus_core = datetime_to_core_data(focus_end)
-    if focus_core is None:
-        return []
-
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE
-        FROM ZSESSION
-        WHERE ZPHASE IN ('shortBreak', 'longBreak')
-          AND ZSTARTEDAT >= ?
-          AND ZSTARTEDAT <= ?
-        ORDER BY ZSTARTEDAT ASC
-        """,
-        (focus_core, focus_core + BREAK_LINK_MAX_GAP_SECONDS),
-    )
-    rows = cur.fetchall()
-    breaks: list[CliSession] = []
-    for pk, phase, duration, started_at, completed_at, title in rows:
-        breaks.append(
-            {
-                "pk": int(pk),
-                "phase": str(phase),
-                "duration": float(duration or 0.0),
-                "start": core_data_to_datetime(started_at),
-                "completed": core_data_to_datetime(completed_at),
-                "title": str(title or ""),
-                "interruptions_count": 0,
-                "interruptions_duration": 0.0,
-            }
-        )
-    return breaks
-
-
 def cmd_session_rename(
     args: argparse.Namespace,
     *,
@@ -205,7 +154,10 @@ def cmd_session_rename(
         return 0
 
     try:
-        conn = resolved.connection_factory(not args.confirm)
+        if args.confirm:
+            resolved.repository.rename_sessions(focus["pks"], args.title)
+        else:
+            resolved.repository.ensure_available(readonly=True)
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
@@ -219,15 +171,7 @@ def cmd_session_rename(
 
     if not args.confirm:
         print("\nPreview only. Re-run with --confirm to apply.")
-        conn.close()
         return 0
-
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE ZSESSION SET ZTITLE = ? WHERE Z_PK = ?", (args.title, focus["pk"])
-    )
-    conn.commit()
-    conn.close()
     print(f'\nUpdated session title to "{args.title}"')
     return 0
 
@@ -250,13 +194,25 @@ def cmd_session_undo(
         print("No focus session found to delete.")
         return 0
 
+    focus_end = _session_end_for_break_lookup(focus)
     try:
-        conn = resolved.connection_factory(not args.confirm)
+        if args.confirm:
+            undo_result = resolved.repository.undo_session(focus["pks"], focus_end)
+            break_records = undo_result.breaks
+            total_interruptions = undo_result.deleted_interruptions
+        elif focus_end is None:
+            resolved.repository.ensure_available(readonly=True)
+            break_records = ()
+            total_interruptions = 0
+        else:
+            break_records = resolved.repository.find_associated_break_sessions(
+                focus_end
+            )
+            total_interruptions = 0
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1
-
-    breaks = _find_associated_break_sessions(conn, focus)
+    breaks = [_record_to_cli_session(record) for record in break_records]
 
     print("=" * 60)
     print("SESSIONS TO DELETE")
@@ -269,15 +225,6 @@ def cmd_session_undo(
 
     if not args.confirm:
         print("\nPreview only. Re-run with --confirm to apply deletion.")
-        conn.close()
         return 0
-
-    total_interruptions = 0
-    for brk in breaks:
-        total_interruptions += _delete_session(conn, brk["pk"])
-    total_interruptions += _delete_session(conn, focus["pk"])
-
-    conn.commit()
-    conn.close()
     print(f"Deleted session(s). Interruptions deleted: {total_interruptions}")
     return 0

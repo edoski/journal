@@ -5,7 +5,10 @@ import sqlite3
 from pathlib import Path
 
 import sync.run.commands.session as session_cmd
+from sync.adapters.flow_sessions import FlowStudySessionSource
+from sync.adapters.markdown_schedule import MarkdownScheduleSource
 from sync.study.core_data_time import datetime_to_core_data
+from sync.study.repository import FlowSessionRepository
 
 
 def _create_session_db(path: Path) -> None:
@@ -53,6 +56,89 @@ def _insert_break_row(
     conn.close()
 
 
+def test_record_to_cli_session_preserves_all_source_primary_keys() -> None:
+    session = session_cmd._record_to_cli_session(
+        {
+            "pk": 10,
+            "pks": [10, 11],
+            "phase": "flow",
+            "planned_duration": 60,
+            "title": "Study",
+        }
+    )
+
+    assert session["pk"] == 10
+    assert session["pks"] == [10, 11]
+
+
+def test_cmd_session_rename_updates_all_source_primary_keys(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "sessions.sqlite"
+    _create_session_db(db_path)
+    start = session_cmd.datetime.datetime(2026, 8, 10, 9, 0)
+    end = start + session_cmd.datetime.timedelta(hours=1)
+    focus = {
+        "pk": 10,
+        "pks": [10, 11],
+        "phase": "flow",
+        "duration": 60.0,
+        "start": start,
+        "completed": end,
+        "title": "Study",
+        "interruptions_count": 0,
+        "interruptions_duration": 0.0,
+    }
+    connection = sqlite3.connect(db_path)
+    connection.executemany(
+        """
+        INSERT INTO ZSESSION (Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                pk,
+                focus["phase"],
+                focus["duration"],
+                datetime_to_core_data(start),
+                datetime_to_core_data(end),
+                focus["title"],
+            )
+            for pk in focus["pks"]
+        ],
+    )
+    connection.commit()
+    connection.close()
+    monkeypatch.setattr(
+        session_cmd,
+        "_load_recent_focus_sessions",
+        lambda *_args, **_kwargs: [focus],
+    )
+    repository = FlowSessionRepository(
+        connection_factory=lambda _readonly: sqlite3.connect(db_path)
+    )
+    deps = session_cmd.SessionCommandDeps(
+        session_source_factory=lambda: FlowStudySessionSource(
+            repository=repository,
+            break_defaults={"shortBreak": 30, "longBreak": 60},
+        ),
+        schedule_source_factory=MarkdownScheduleSource,
+        repository=repository,
+    )
+
+    result = session_cmd.cmd_session_rename(
+        argparse.Namespace(confirm=True, title="Architecture"),
+        deps=deps,
+    )
+
+    assert result == 0
+    connection = sqlite3.connect(db_path)
+    titles = connection.execute("SELECT ZTITLE FROM ZSESSION ORDER BY Z_PK").fetchall()
+    connection.close()
+    assert titles == [("Architecture",), ("Architecture",)]
+
+
 def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
     monkeypatch,
     tmp_path: Path,
@@ -76,6 +162,7 @@ def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
 
     focus = {
         "pk": 100,
+        "pks": [100, 104],
         "phase": "flow",
         "duration": 60.0,
         "start": focus_start,
@@ -90,36 +177,55 @@ def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
         "_load_recent_focus_sessions",
         lambda *_args, **_kwargs: [focus],
     )
-    monkeypatch.setattr(
-        session_cmd,
-        "get_connection",
-        lambda readonly=True: sqlite3.connect(db_path),
-    )
-
     conn = sqlite3.connect(db_path)
-    conn.execute(
+    conn.executemany(
         """
         INSERT INTO ZSESSION (Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (
-            focus["pk"],
-            focus["phase"],
-            focus["duration"],
-            datetime_to_core_data(focus_start),
-            datetime_to_core_data(focus_end),
-            focus["title"],
-        ),
+        [
+            (
+                pk,
+                focus["phase"],
+                focus["duration"],
+                datetime_to_core_data(focus_start),
+                datetime_to_core_data(focus_end),
+                focus["title"],
+            )
+            for pk in focus["pks"]
+        ],
+    )
+    conn.executemany(
+        "INSERT INTO ZINTERRUPTION (ZSESSION) VALUES (?)",
+        [(100,), (104,), (101,)],
     )
     conn.commit()
     conn.close()
 
-    rc = session_cmd.cmd_session_undo(argparse.Namespace(confirm=True))
+    repository = FlowSessionRepository(
+        connection_factory=lambda _readonly: sqlite3.connect(db_path)
+    )
+    deps = session_cmd.SessionCommandDeps(
+        session_source_factory=lambda: FlowStudySessionSource(
+            repository=repository,
+            break_defaults={"shortBreak": 30, "longBreak": 60},
+        ),
+        schedule_source_factory=MarkdownScheduleSource,
+        repository=repository,
+    )
+    rc = session_cmd.cmd_session_undo(
+        argparse.Namespace(confirm=True),
+        deps=deps,
+    )
 
     assert rc == 0
 
     conn = sqlite3.connect(db_path)
     remaining = conn.execute("SELECT Z_PK FROM ZSESSION ORDER BY Z_PK").fetchall()
+    remaining_interruptions = conn.execute(
+        "SELECT ZSESSION FROM ZINTERRUPTION ORDER BY ZSESSION"
+    ).fetchall()
     conn.close()
 
     assert remaining == [(103,)]
+    assert remaining_interruptions == []

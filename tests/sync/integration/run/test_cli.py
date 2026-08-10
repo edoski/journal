@@ -16,6 +16,7 @@ from sync.run.commands import media_books as media_books_cmd
 from sync.run.commands import media_common as media_common_cmd
 from sync.run.commands import media_podcast as media_podcast_cmd
 from sync.study import flow_automation
+from sync.study.repository import FlowSessionRepository
 
 FLOW_GET_PHASE = 'tell application "Flow" to getPhase'
 FLOW_GET_TIME = 'tell application "Flow" to getTime'
@@ -121,8 +122,10 @@ def _flow_automation_deps(
         flow_reminder_stagnant_threshold=(
             flow_automation.FLOW_REMINDER_STAGNANT_THRESHOLD
         ),
-        connection_factory=connection_factory
-        or (lambda _readonly: _make_session_conn()),
+        repository=FlowSessionRepository(
+            connection_factory=connection_factory
+            or (lambda _readonly: _make_session_conn())
+        ),
         run_launchctl=run_launchctl or (lambda _args: (0, "", "")),
         run_applescript=run_applescript or (lambda _script: None),
         now=now or datetime.now,
@@ -635,19 +638,19 @@ def test_period_all_is_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == ["daily"]
 
 
-def test_latest_row_is_open_flow_true_for_open_flow() -> None:
+def test_repository_finds_latest_open_flow() -> None:
     conn = _make_session_conn()
     _insert_session_row(conn, phase="shortBreak", completed_at=None, started_at=1.0)
     _insert_session_row(conn, phase="flow", completed_at=None, started_at=2.0)
-    assert flow_automation._latest_row_is_open_flow(conn) is True
-    conn.close()
+    repository = FlowSessionRepository(connection_factory=lambda _readonly: conn)
+    assert repository.latest_open_flow_started_at() == 2.0
 
 
-def test_latest_row_is_open_flow_false_for_completed_flow() -> None:
+def test_repository_rejects_completed_latest_flow() -> None:
     conn = _make_session_conn()
     _insert_session_row(conn, phase="flow", completed_at=1234.0)
-    assert flow_automation._latest_row_is_open_flow(conn) is False
-    conn.close()
+    repository = FlowSessionRepository(connection_factory=lambda _readonly: conn)
+    assert repository.latest_open_flow_started_at() is None
 
 
 def test_session_skip_noops_when_disabled(tmp_path: Path) -> None:

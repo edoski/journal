@@ -13,6 +13,7 @@ from sync.contracts.schedule import DayScheduleProfile
 from sync.study.constants import CORE_DATA_EPOCH_OFFSET
 from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
 from sync.study.enrichment import dedupe_sessions
+from sync.study.repository import FlowSessionRepository
 
 
 class TestCoreDataToDatetime:
@@ -329,7 +330,9 @@ def _load_day_sessions(
     day: datetime.date,
 ) -> list[dict[str, object]]:
     source = FlowStudySessionSource(
-        connection_factory=lambda _readonly: sqlite3.connect(db_uri, uri=True),
+        repository=FlowSessionRepository(
+            connection_factory=lambda _readonly: sqlite3.connect(db_uri, uri=True)
+        ),
         break_defaults={"shortBreak": 30, "longBreak": 60},
     )
     return source.load_sessions(day, _default_schedule())

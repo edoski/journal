@@ -6,7 +6,6 @@ import datetime
 import json
 import os
 import re
-import sqlite3
 import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -15,7 +14,7 @@ from typing import cast
 
 from sync.config import PATHS, PathConfig
 from sync.log import get_logger
-from sync.study.constants import DB_PATH
+from sync.study.repository import FlowSessionRepository
 
 SKIP_LAUNCHD_LABEL = "com.edo.skip"
 SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
@@ -51,7 +50,7 @@ class FlowAutomationDeps:
     flow_reminder_state_filename: str
     flow_reminder_cooldown_seconds: int
     flow_reminder_stagnant_threshold: int
-    connection_factory: Callable[[bool], sqlite3.Connection]
+    repository: FlowSessionRepository
     run_launchctl: Callable[[list[str]], tuple[int, str, str]]
     run_applescript: Callable[[str], str | None]
     now: Callable[[], datetime.datetime]
@@ -70,18 +69,11 @@ def default_flow_automation_deps() -> FlowAutomationDeps:
         flow_reminder_state_filename=FLOW_REMINDER_STATE_FILENAME,
         flow_reminder_cooldown_seconds=FLOW_REMINDER_COOLDOWN_SECONDS,
         flow_reminder_stagnant_threshold=FLOW_REMINDER_STAGNANT_THRESHOLD,
-        connection_factory=_get_connection,
+        repository=FlowSessionRepository(),
         run_launchctl=_run_launchctl,
         run_applescript=_run_applescript,
         now=_now,
     )
-
-
-def _get_connection(readonly: bool = True) -> sqlite3.Connection:
-    if readonly:
-        uri = f"file:{DB_PATH}?mode=ro"
-        return sqlite3.connect(uri, uri=True)
-    return sqlite3.connect(str(DB_PATH))
 
 
 def _run_launchctl(args: list[str]) -> tuple[int, str, str]:
@@ -337,34 +329,6 @@ def _run_applescript(script: str) -> str | None:
         return None
 
 
-def _latest_row_is_open_flow(conn: sqlite3.Connection) -> bool:
-    return _latest_open_flow_started_at(conn) is not None
-
-
-def _latest_open_flow_started_at(conn: sqlite3.Connection) -> float | None:
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT ZPHASE, ZCOMPLETEDAT, ZSTARTEDAT
-        FROM ZSESSION
-        ORDER BY ZSTARTEDAT DESC
-        LIMIT 1
-        """
-    )
-    row = cur.fetchone()
-    if not row:
-        return None
-    phase, completed_at, started_at = row
-    if phase != "flow" or completed_at is not None:
-        return None
-    if started_at is None:
-        return None
-    try:
-        return float(started_at)
-    except (TypeError, ValueError):
-        return None
-
-
 def _now() -> datetime.datetime:
     return datetime.datetime.now()
 
@@ -393,20 +357,12 @@ def run_session_skip(
         return 0
 
     try:
-        conn = resolved.connection_factory(True)
-    except Exception as exc:
-        logger.warning("Skip no-op: failed to read Flow DB state: %s", exc)
-        return 0
-
-    try:
-        if not _latest_row_is_open_flow(conn):
+        if resolved.repository.latest_open_flow_started_at() is None:
             logger.info("Skip no-op: latest session is not an open flow row")
             return 0
     except Exception as exc:
         logger.warning("Skip no-op: failed to evaluate latest session row: %s", exc)
         return 0
-    finally:
-        conn.close()
 
     if resolved.run_applescript('tell application "Flow" to skip') is None:
         logger.warning("Skip no-op: Flow skip command failed")
@@ -447,18 +403,10 @@ def run_session_remind(
         return 0
 
     try:
-        conn = resolved.connection_factory(True)
-    except Exception as exc:
-        logger.warning("Remind no-op: failed to read Flow DB state: %s", exc)
-        return 0
-
-    try:
-        open_started_at = _latest_open_flow_started_at(conn)
+        open_started_at = resolved.repository.latest_open_flow_started_at()
     except Exception as exc:
         logger.warning("Remind no-op: failed to evaluate latest session row: %s", exc)
         return 0
-    finally:
-        conn.close()
 
     if open_started_at is None:
         logger.info("Remind no-op: latest session is not an open flow row")

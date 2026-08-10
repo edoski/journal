@@ -6,10 +6,14 @@ import datetime
 import os
 import sqlite3
 import subprocess
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 
 from sync.contracts.study import StudySessionRecord
 from sync.log import get_logger
 from sync.study.constants import (
+    BREAK_LINK_MAX_GAP_SECONDS,
     DB_PATH,
     FLOW_APP_DEFAULTS_DOMAIN,
     FLOW_BREAK_DEFAULT_KEYS,
@@ -19,6 +23,24 @@ from sync.study.constants import (
 from sync.study.core_data_time import core_data_to_datetime, datetime_to_core_data
 
 logger = get_logger(__name__)
+
+ConnectionFactory = Callable[[bool], sqlite3.Connection]
+
+
+@dataclass(frozen=True)
+class FlowDaySessions:
+    """Raw Flow rows and interruption totals loaded in one repository read."""
+
+    sessions: list[StudySessionRecord]
+    interruption_totals: dict[int, tuple[int, float]]
+
+
+@dataclass(frozen=True)
+class FlowUndoResult:
+    """Rows affected by one atomic session undo."""
+
+    breaks: tuple[StudySessionRecord, ...]
+    deleted_interruptions: int
 
 
 def read_break_defaults() -> dict[str, int | None]:
@@ -58,7 +80,7 @@ def get_db_connection(readonly: bool = True) -> sqlite3.Connection:
     return sqlite3.connect(str(DB_PATH))
 
 
-def fetch_sessions_for_day(
+def _fetch_sessions_for_day(
     conn: sqlite3.Connection,
     day: datetime.date,
     *,
@@ -119,7 +141,7 @@ def fetch_sessions_for_day(
     return sessions
 
 
-def apply_superseded_open_repairs(
+def _apply_superseded_open_repairs(
     connection: sqlite3.Connection,
     repairs: list[tuple[int, datetime.datetime]],
 ) -> None:
@@ -134,10 +156,9 @@ def apply_superseded_open_repairs(
             """,
             (datetime_to_core_data(completed_at), pk),
         )
-    connection.commit()
 
 
-def load_interruption_totals(
+def _load_interruption_totals(
     cursor: sqlite3.Cursor,
     session_pks: list[int],
 ) -> dict[int, tuple[int, float]]:
@@ -156,3 +177,221 @@ def load_interruption_totals(
         if row:
             totals[pk] = (int(row[0] or 0), float(row[1] or 0))
     return totals
+
+
+def _superseded_open_repairs(
+    sessions: list[StudySessionRecord],
+) -> list[tuple[int, datetime.datetime]]:
+    repairs: list[tuple[int, datetime.datetime]] = []
+    for index, session in enumerate(sessions[:-1]):
+        if session.get("completed_at") is not None:
+            continue
+        pk = session.get("pk")
+        start = session.get("start")
+        next_start = sessions[index + 1].get("start")
+        if not isinstance(pk, int):
+            continue
+        if not isinstance(start, datetime.datetime):
+            continue
+        if not isinstance(next_start, datetime.datetime):
+            continue
+        if next_start.date() != start.date() or next_start <= start:
+            continue
+        repairs.append((pk, next_start))
+    return repairs
+
+
+def _associated_break_sessions(
+    connection: sqlite3.Connection,
+    focus_end: datetime.datetime,
+) -> list[StudySessionRecord]:
+    focus_core = datetime_to_core_data(focus_end)
+    if focus_core is None:
+        return []
+
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE
+        FROM ZSESSION
+        WHERE ZPHASE IN ('shortBreak', 'longBreak')
+          AND ZSTARTEDAT >= ?
+          AND ZSTARTEDAT <= ?
+        ORDER BY ZSTARTEDAT ASC
+        """,
+        (focus_core, focus_core + BREAK_LINK_MAX_GAP_SECONDS),
+    )
+    sessions: list[StudySessionRecord] = []
+    for pk, phase, duration, started_at, completed_at, title in cursor.fetchall():
+        start = core_data_to_datetime(started_at)
+        if start is None:
+            continue
+        sessions.append(
+            {
+                "pk": int(pk),
+                "pks": [int(pk)],
+                "phase": str(phase),
+                "duration": float(duration or 0.0),
+                "planned_duration": float(duration or 0.0),
+                "start": start,
+                "end": core_data_to_datetime(completed_at) or start,
+                "completed_at": core_data_to_datetime(completed_at),
+                "title": str(title or ""),
+                "interruptions_count": 0,
+                "interruptions_duration": 0.0,
+            }
+        )
+    return sessions
+
+
+def _unique_pks(pks: list[int]) -> tuple[int, ...]:
+    return tuple(dict.fromkeys(pks))
+
+
+class FlowSessionRepository:
+    """Own all SQLite lifecycle and persistence operations for Flow sessions."""
+
+    def __init__(
+        self,
+        *,
+        connection_factory: ConnectionFactory = get_db_connection,
+    ) -> None:
+        self._connection_factory = connection_factory
+
+    @contextmanager
+    def _connection(self, readonly: bool) -> Iterator[sqlite3.Connection]:
+        connection = self._connection_factory(readonly)
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    @contextmanager
+    def _transaction(self) -> Iterator[sqlite3.Connection]:
+        with self._connection(False) as connection:
+            try:
+                yield connection
+            except Exception:
+                connection.rollback()
+                raise
+            else:
+                connection.commit()
+
+    def ensure_available(self, *, readonly: bool) -> None:
+        """Open and close the configured database to validate availability."""
+        with self._connection(readonly):
+            pass
+
+    def load_day_sessions(
+        self,
+        day: datetime.date,
+        *,
+        now: datetime.datetime,
+    ) -> FlowDaySessions:
+        """Load one day's rows, repairing stale open sessions when needed."""
+        with self._connection(True) as connection:
+            sessions = _fetch_sessions_for_day(connection, day, now=now)
+            repairs = _superseded_open_repairs(sessions)
+            if not repairs:
+                session_pks = [
+                    pk
+                    for session in sessions
+                    if isinstance((pk := session.get("pk")), int)
+                ]
+                return FlowDaySessions(
+                    sessions=sessions,
+                    interruption_totals=_load_interruption_totals(
+                        connection.cursor(), session_pks
+                    ),
+                )
+
+        with self._transaction() as connection:
+            _apply_superseded_open_repairs(connection, repairs)
+
+        with self._connection(True) as connection:
+            sessions = _fetch_sessions_for_day(connection, day, now=now)
+            session_pks = [
+                pk for session in sessions if isinstance((pk := session.get("pk")), int)
+            ]
+            interruption_totals = _load_interruption_totals(
+                connection.cursor(), session_pks
+            )
+        return FlowDaySessions(
+            sessions=sessions,
+            interruption_totals=interruption_totals,
+        )
+
+    def rename_sessions(self, pks: list[int], title: str) -> None:
+        """Rename every source row represented by one logical session."""
+        unique_pks = _unique_pks(pks)
+        if not unique_pks:
+            return
+        placeholders = ", ".join("?" for _pk in unique_pks)
+        with self._transaction() as connection:
+            connection.execute(
+                f"UPDATE ZSESSION SET ZTITLE = ? WHERE Z_PK IN ({placeholders})",
+                (title, *unique_pks),
+            )
+
+    def find_associated_break_sessions(
+        self,
+        focus_end: datetime.datetime,
+    ) -> tuple[StudySessionRecord, ...]:
+        """Return break rows linked to a focus session's end."""
+        with self._connection(True) as connection:
+            return tuple(_associated_break_sessions(connection, focus_end))
+
+    def undo_session(
+        self,
+        pks: list[int],
+        focus_end: datetime.datetime | None,
+    ) -> FlowUndoResult:
+        """Delete a logical focus session and its linked breaks atomically."""
+        focus_pks = _unique_pks(pks)
+        with self._transaction() as connection:
+            breaks = (
+                tuple(_associated_break_sessions(connection, focus_end))
+                if focus_end is not None
+                else ()
+            )
+            break_pks = tuple(item["pk"] for item in breaks)
+            target_pks = _unique_pks([*focus_pks, *break_pks])
+            if not target_pks:
+                return FlowUndoResult(breaks=breaks, deleted_interruptions=0)
+            placeholders = ", ".join("?" for _pk in target_pks)
+            cursor = connection.execute(
+                f"DELETE FROM ZINTERRUPTION WHERE ZSESSION IN ({placeholders})",
+                target_pks,
+            )
+            deleted_interruptions = cursor.rowcount
+            connection.execute(
+                f"DELETE FROM ZSESSION WHERE Z_PK IN ({placeholders})",
+                target_pks,
+            )
+        return FlowUndoResult(
+            breaks=breaks,
+            deleted_interruptions=deleted_interruptions,
+        )
+
+    def latest_open_flow_started_at(self) -> float | None:
+        """Return the latest row's start marker only when it is an open focus."""
+        with self._connection(True) as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT ZPHASE, ZCOMPLETEDAT, ZSTARTEDAT
+                FROM ZSESSION
+                ORDER BY ZSTARTEDAT DESC
+                LIMIT 1
+                """
+            )
+            row = cursor.fetchone()
+        if not row:
+            return None
+        phase, completed_at, started_at = row
+        if phase != "flow" or completed_at is not None or started_at is None:
+            return None
+        try:
+            return float(started_at)
+        except (TypeError, ValueError):
+            return None
