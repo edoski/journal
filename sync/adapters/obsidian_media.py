@@ -11,6 +11,7 @@ from sync.contracts.media import Book, MediaBundle, Podcast, PodcastSeries
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import get_logger
 from sync.notes.locking import locked_note
+from sync.notes.markdown_tables import split_markdown_row
 from sync.ports.cache import MediaDateCacheStore
 from sync.ports.media import MediaSource
 from sync.readers.media import (
@@ -271,7 +272,10 @@ def _normalized_table_cells(lines: list[str]) -> list[tuple[str, ...]]:
     for line in lines:
         if not line.strip():
             continue
-        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        cells = split_markdown_row(line)
+        if cells is None:
+            normalized.append((line.strip(),))
+            continue
         normalized.append(
             tuple("-" if set(cell) <= {"-", ":"} and cell else cell for cell in cells)
         )
