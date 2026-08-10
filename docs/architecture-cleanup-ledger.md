@@ -42,8 +42,8 @@ This is the authoritative implementation and review ledger for the cleanup run. 
 
 | Slice | Baseline | Status | Implementer | Reviewer | Result |
 | --- | --- | --- | --- | --- | --- |
-| S1 Flow operations | ff0b3a80 | pending | pending | pending | pending |
-| S2 Markdown row semantics | pending | pending | pending | pending | pending |
+| S1 Flow operations | 2c4e617 | complete | impl_s1_flow | review_s1_flow | GREEN LIGHT at 81261b0; 54 focused and 561 standard-gate tests passed |
+| S2 Markdown row semantics | 81261b0 | pending | pending | pending | pending |
 | S3 Period-ready media items | pending | pending | pending | pending | pending |
 | S4 Parse-only readers | pending | pending | pending | pending | pending |
 | S5 Locked note publication | pending | pending | pending | pending | pending |
