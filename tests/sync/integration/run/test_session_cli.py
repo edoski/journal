@@ -224,9 +224,9 @@ def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
     )
     undo_session = repository.undo_session
 
-    def undo_after_target_is_printed(pks, end):
+    def undo_after_target_is_printed(pks, end, break_pks):
         assert "SESSIONS TO DELETE" in capsys.readouterr().out
-        return undo_session(pks, end)
+        return undo_session(pks, end, break_pks)
 
     monkeypatch.setattr(repository, "undo_session", undo_after_target_is_printed)
     rc = session_cmd.cmd_session_undo(
@@ -245,3 +245,100 @@ def test_cmd_session_undo_deletes_all_breaks_linked_from_focus_end(
 
     assert remaining == [(103,)]
     assert remaining_interruptions == []
+
+
+def test_cmd_session_undo_aborts_when_a_break_appears_after_display(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "sessions.sqlite"
+    _create_session_db(db_path)
+    focus_start = session_cmd.datetime.datetime(2026, 8, 10, 13, 0)
+    focus_end = focus_start + session_cmd.datetime.timedelta(hours=1)
+    _insert_break_row(
+        path=db_path,
+        pk=101,
+        started_at=datetime_to_core_data(
+            focus_end + session_cmd.datetime.timedelta(minutes=1)
+        ),
+    )
+    focus = {
+        "pk": 100,
+        "pks": [100],
+        "phase": "flow",
+        "duration": 60.0,
+        "start": focus_start,
+        "completed": focus_end,
+        "title": "Study",
+        "interruptions_count": 0,
+        "interruptions_duration": 0.0,
+    }
+    monkeypatch.setattr(
+        session_cmd,
+        "_load_recent_focus_sessions",
+        lambda *_args, **_kwargs: [focus],
+    )
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        """
+        INSERT INTO ZSESSION (Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            focus["pk"],
+            focus["phase"],
+            focus["duration"],
+            datetime_to_core_data(focus_start),
+            datetime_to_core_data(focus_end),
+            focus["title"],
+        ),
+    )
+    connection.execute("INSERT INTO ZINTERRUPTION (ZSESSION) VALUES (100)")
+    connection.commit()
+    connection.close()
+    repository = FlowSessionRepository(
+        connection_factory=lambda _readonly: sqlite3.connect(db_path)
+    )
+    deps = session_cmd.SessionCommandDeps(
+        session_source_factory=lambda: FlowStudySessionSource(
+            repository=repository,
+            break_defaults={"shortBreak": 30, "longBreak": 60},
+        ),
+        schedule_source_factory=MarkdownScheduleSource,
+        repository=repository,
+    )
+    find_breaks = repository.find_associated_break_sessions
+
+    def find_breaks_then_add_one(end):
+        displayed = find_breaks(end)
+        _insert_break_row(
+            path=db_path,
+            pk=102,
+            started_at=datetime_to_core_data(
+                focus_end + session_cmd.datetime.timedelta(minutes=2)
+            ),
+        )
+        return displayed
+
+    monkeypatch.setattr(
+        repository,
+        "find_associated_break_sessions",
+        find_breaks_then_add_one,
+    )
+
+    result = session_cmd.cmd_session_undo(
+        argparse.Namespace(confirm=True),
+        deps=deps,
+    )
+
+    assert result == 1
+    connection = sqlite3.connect(db_path)
+    remaining_sessions = connection.execute(
+        "SELECT Z_PK FROM ZSESSION ORDER BY Z_PK"
+    ).fetchall()
+    remaining_interruptions = connection.execute(
+        "SELECT ZSESSION FROM ZINTERRUPTION"
+    ).fetchall()
+    connection.close()
+    assert remaining_sessions == [(100,), (101,), (102,)]
+    assert remaining_interruptions == [(100,)]

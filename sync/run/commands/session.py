@@ -224,7 +224,11 @@ def cmd_session_undo(
         print("\nPreview only. Re-run with --confirm to apply deletion.")
         return 0
     try:
-        undo_result = resolved.repository.undo_session(focus["pks"], focus_end)
+        undo_result = resolved.repository.undo_session(
+            focus["pks"],
+            focus_end,
+            [record["pk"] for record in break_records],
+        )
     except Exception as exc:
         print(f"Error: could not open database: {exc}")
         return 1

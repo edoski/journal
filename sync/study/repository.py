@@ -365,9 +365,11 @@ class FlowSessionRepository:
         self,
         pks: list[int],
         focus_end: datetime.datetime | None,
+        displayed_break_pks: list[int],
     ) -> FlowUndoResult:
-        """Delete a logical focus session and its linked breaks atomically."""
+        """Delete a logical focus session and its displayed breaks atomically."""
         focus_pks = _unique_pks(pks)
+        expected_break_pks = _unique_pks(displayed_break_pks)
         with self._transaction() as connection:
             _require_session_pks(connection, focus_pks)
             breaks = (
@@ -375,8 +377,10 @@ class FlowSessionRepository:
                 if focus_end is not None
                 else ()
             )
-            break_pks = tuple(item["pk"] for item in breaks)
-            target_pks = _unique_pks([*focus_pks, *break_pks])
+            current_break_pks = _unique_pks([item["pk"] for item in breaks])
+            if set(current_break_pks) != set(expected_break_pks):
+                raise LookupError("Associated Flow break rows changed before deletion")
+            target_pks = _unique_pks([*focus_pks, *expected_break_pks])
             if not target_pks:
                 return FlowUndoResult(breaks=breaks, deleted_interruptions=0)
             placeholders = ", ".join("?" for _pk in target_pks)

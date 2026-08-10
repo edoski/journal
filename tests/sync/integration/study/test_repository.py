@@ -139,7 +139,7 @@ def test_undo_session_deletes_all_source_rows_and_linked_breaks(
     connection.commit()
     connection.close()
 
-    result = _repository(db_path).undo_session([10, 11], end)
+    result = _repository(db_path).undo_session([10, 11], end, [20, 21])
 
     assert [item["pk"] for item in result.breaks] == [20, 21]
     assert result.deleted_interruptions == 3
@@ -178,7 +178,7 @@ def test_undo_session_rolls_back_every_delete_on_failure(tmp_path: Path) -> None
     connection.close()
 
     with pytest.raises(sqlite3.IntegrityError, match="blocked"):
-        _repository(db_path).undo_session([10, 11], end)
+        _repository(db_path).undo_session([10, 11], end, [])
 
     connection = sqlite3.connect(db_path)
     session_pks = connection.execute(
@@ -206,7 +206,7 @@ def test_undo_session_rejects_a_missing_source_row_before_deleting(
     connection.close()
 
     with pytest.raises(LookupError, match="11"):
-        _repository(db_path).undo_session([10, 11], end)
+        _repository(db_path).undo_session([10, 11], end, [])
 
     connection = sqlite3.connect(db_path)
     session_pks = connection.execute("SELECT Z_PK FROM ZSESSION").fetchall()
