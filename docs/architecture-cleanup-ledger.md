@@ -44,10 +44,9 @@ This is the authoritative implementation and review ledger for the cleanup run. 
 | --- | --- | --- | --- | --- | --- |
 | S1 Flow operations | 2c4e617 | complete | impl_s1_flow | review_s1_flow | GREEN LIGHT at 81261b0; 54 focused and 561 standard-gate tests passed |
 | S2 Markdown row semantics | 90af101 | complete | impl_s2_markdown | review_s2_markdown | GREEN LIGHT at 871c7c7; 27 focused and 563 standard-gate tests passed; baselines unchanged |
-| S3 Period-ready media items | 871c7c7 | pending | pending | pending | pending |
-| S4 Parse-only readers | pending | pending | pending | pending | pending |
+| S3 Period-ready media items | ad59dca | complete | impl_s3_media | review_s3_media | GREEN LIGHT at f39639f; 55 focused and 563 standard-gate tests passed; baselines unchanged |
+| S4 Reader and training contracts | f39639f | pending | pending | pending | pending |
 | S5 Locked note publication | pending | pending | pending | pending | pending |
-| S6 Training occurrences | pending | pending | pending | pending | pending |
 
 ## S1: Flow operation ownership
 
@@ -116,9 +115,9 @@ Checks:
 - Focused media contract, adapter, application, and period tests.
 - Standard and rendering gates.
 
-## S4: Parse-only readers
+## S4: Parse-only readers and cohesive training occurrences
 
-Expected outcome: reader modules transform supplied text into contracts and perform no filesystem I/O.
+Expected outcome: reader modules transform supplied text into contracts without filesystem I/O, and training aggregation carries aligned duration and time data as typed occurrences instead of six parallel maps, while current calculations and note rendering stay identical.
 
 Scope:
 
@@ -126,16 +125,24 @@ Scope:
 - Move safe file reads and path-specific error context to adapters or composition callers.
 - Extend architecture enforcement so reader imports of sync.io are forbidden.
 - Preserve parser validation messages where they describe malformed content; keep useful path context at raw I/O boundaries.
+- Introduce a cohesive typed training occurrence representation at the metrics contract boundary.
+- Migrate parsing, aggregation, reduction, and period presentation to use it.
+- Remove obsolete parallel duration, start, and end mappings.
+- Correct repository documentation to describe the actual protected periodic TRAINING schema.
+- Preserve activity ordering, session counts, duration averages, interrupt values, dominant averaged time range, rounding, and exact Markdown.
 
 Non-goals:
 
 - No ports for pure parsers.
 - No compatibility overloads that accept both paths and text.
 - No schema changes.
+- No multi-range rendering.
+- No training cache migration.
+- No change to daily TRAINING validation.
 
 Checks:
 
-- Focused reader, caller, and architecture tests.
+- Focused reader, caller, architecture, metrics, period builder, contract, and snapshot tests.
 - Standard and rendering gates.
 
 ## S5: Locked note publication
@@ -158,29 +165,6 @@ Non-goals:
 Checks:
 
 - Focused note-store, concurrency, adapter, and application tests.
-- Standard and rendering gates.
-
-## S6: Cohesive training occurrences
-
-Expected outcome: training aggregation carries aligned duration and time data as typed occurrences instead of six parallel maps, while current calculations and note rendering stay identical.
-
-Scope:
-
-- Introduce a cohesive typed training occurrence representation at the metrics contract boundary.
-- Migrate aggregation, reduction, and period presentation to use it.
-- Remove obsolete parallel duration, start, and end mappings.
-- Correct repository documentation to describe the actual protected periodic TRAINING schema.
-- Preserve activity ordering, session counts, duration averages, interrupt values, dominant averaged time range, rounding, and exact Markdown.
-
-Non-goals:
-
-- No multi-range rendering.
-- No training schema or cache migration.
-- No change to daily TRAINING validation.
-
-Checks:
-
-- Focused metrics, period builder, contract, and snapshot tests.
 - Standard and rendering gates.
 
 ## Completion gates
