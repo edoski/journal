@@ -314,26 +314,22 @@ def _sync_series_index(
         Whether the series opts into rendering
     """
     filepath = os.path.join(directory, f"{title}.md")
-    try:
 
-        def regenerate(existing: list[str] | None) -> list[str]:
-            frontmatter = _series_frontmatter(existing)
-            rendered = _series_index_lines(frontmatter, episodes)
-            if existing is not None and _normalized_table_cells(existing) == (
-                _normalized_table_cells(rendered)
-            ):
-                return existing
-            return rendered
+    def regenerate(existing: list[str] | None) -> list[str]:
+        frontmatter = _series_frontmatter(existing)
+        rendered = _series_index_lines(frontmatter, episodes)
+        if existing is not None and _normalized_table_cells(existing) == (
+            _normalized_table_cells(rendered)
+        ):
+            return existing
+        return rendered
 
-        publication = note_store.update(filepath, regenerate)
-        if publication.changed:
-            logger.info("Regenerated series index for %s", title)
-        frontmatter = _series_frontmatter(
-            list(publication.lines) if publication.lines is not None else None
-        )
-    except (TimeoutError, PermissionError, OSError) as e:
-        logger.warning("Failed to write series index for %s: %s", title, e)
-        return False
+    publication = note_store.update(filepath, regenerate)
+    if publication.changed:
+        logger.info("Regenerated series index for %s", title)
+    frontmatter = _series_frontmatter(
+        list(publication.lines) if publication.lines is not None else None
+    )
 
     return parse_series_visibility(frontmatter)
 

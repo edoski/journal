@@ -7,7 +7,7 @@ from contextlib import AbstractContextManager
 
 from sync.constants import NOTE_LOCK_DIR
 from sync.contracts.notes import NotePublication
-from sync.io import atomic_write_note, safe_read_file
+from sync.io import atomic_write_note
 from sync.notes.locking import locked_path
 from sync.ports.notes import NoteStore, NoteUpdater
 
@@ -29,10 +29,10 @@ class MarkdownNoteStore(NoteStore):
     def read_or_create(self, path: str, template_path: str) -> list[str]:
         """Read note lines, atomically creating from a template when missing."""
         with self._locked(path):
-            current = safe_read_file(path)
+            current = _read_note(path)
             if current is not None:
                 return current
-            template = safe_read_file(template_path)
+            template = _read_note(template_path)
             if template is None:
                 return []
             self._write(path, template)
@@ -47,7 +47,7 @@ class MarkdownNoteStore(NoteStore):
     ) -> NotePublication:
         """Publish only when the locked current content matches expected."""
         with self._locked(path):
-            current = safe_read_file(path)
+            current = _read_note(path)
             if current != expected:
                 return NotePublication(
                     status="conflict",
@@ -64,10 +64,10 @@ class MarkdownNoteStore(NoteStore):
     ) -> NotePublication:
         """Transform and publish current content within one note lock."""
         with self._locked(path):
-            current = safe_read_file(path)
+            current = _read_note(path)
             base = current
             if base is None and template_path is not None:
-                base = safe_read_file(template_path) or []
+                base = _read_note(template_path) or []
             updated = updater(list(base) if base is not None else None)
             if updated is None:
                 return NotePublication(
@@ -101,6 +101,15 @@ class MarkdownNoteStore(NoteStore):
         if directory:
             os.makedirs(directory, exist_ok=True)
         atomic_write_note(path, lines)
+
+
+def _read_note(path: str) -> list[str] | None:
+    """Read note lines, treating only a missing path as absent."""
+    try:
+        with open(path, "r", encoding="utf-8") as note:
+            return note.read().splitlines()
+    except FileNotFoundError:
+        return None
 
 
 def _canonical_lines(lines: list[str]) -> list[str]:

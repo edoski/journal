@@ -4,7 +4,21 @@ from __future__ import annotations
 
 import threading
 
+import pytest
+
+import sync.adapters.markdown_notes as markdown_notes
 from sync.adapters.markdown_notes import MarkdownNoteStore
+
+
+def _raise_when_reading(monkeypatch, denied_path, error):
+    real_open = open
+
+    def guarded_open(path, mode="r", *args, **kwargs):
+        if str(path) == str(denied_path) and "r" in mode:
+            raise error
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(markdown_notes, "open", guarded_open, raising=False)
 
 
 def test_read_or_create_bootstraps_from_template(tmp_path):
@@ -99,3 +113,57 @@ def test_update_serializes_concurrent_transformations(tmp_path):
     assert not first_thread.is_alive()
     assert not second_thread.is_alive()
     assert note_path.read_text(encoding="utf-8") == "base\nfirst\nsecond\n"
+
+
+def test_update_aborts_when_existing_note_read_is_denied(monkeypatch, tmp_path):
+    store = MarkdownNoteStore(lock_root=str(tmp_path / "locks"))
+    note_path = tmp_path / "note.md"
+    note_path.write_text("original\n", encoding="utf-8")
+    _raise_when_reading(monkeypatch, note_path, PermissionError("denied"))
+
+    with pytest.raises(PermissionError, match="denied"):
+        store.update(str(note_path), lambda _lines: ["replacement"])
+
+    assert note_path.read_text(encoding="utf-8") == "original\n"
+
+
+def test_publish_aborts_when_existing_note_read_fails(monkeypatch, tmp_path):
+    store = MarkdownNoteStore(lock_root=str(tmp_path / "locks"))
+    note_path = tmp_path / "note.md"
+    note_path.write_text("original\n", encoding="utf-8")
+    _raise_when_reading(monkeypatch, note_path, OSError("read failed"))
+
+    with pytest.raises(OSError, match="read failed"):
+        store.publish(str(note_path), ["replacement"], expected=["original"])
+
+    assert note_path.read_text(encoding="utf-8") == "original\n"
+
+
+def test_read_or_create_aborts_when_existing_note_read_is_denied(
+    monkeypatch,
+    tmp_path,
+):
+    store = MarkdownNoteStore(lock_root=str(tmp_path / "locks"))
+    note_path = tmp_path / "note.md"
+    template_path = tmp_path / "template.md"
+    note_path.write_text("original\n", encoding="utf-8")
+    template_path.write_text("template\n", encoding="utf-8")
+    _raise_when_reading(monkeypatch, note_path, PermissionError("denied"))
+
+    with pytest.raises(PermissionError, match="denied"):
+        store.read_or_create(str(note_path), str(template_path))
+
+    assert note_path.read_text(encoding="utf-8") == "original\n"
+
+
+def test_read_or_create_aborts_when_template_read_fails(monkeypatch, tmp_path):
+    store = MarkdownNoteStore(lock_root=str(tmp_path / "locks"))
+    note_path = tmp_path / "note.md"
+    template_path = tmp_path / "template.md"
+    template_path.write_text("template\n", encoding="utf-8")
+    _raise_when_reading(monkeypatch, template_path, OSError("template failed"))
+
+    with pytest.raises(OSError, match="template failed"):
+        store.read_or_create(str(note_path), str(template_path))
+
+    assert not note_path.exists()

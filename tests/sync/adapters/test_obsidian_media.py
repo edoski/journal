@@ -5,6 +5,8 @@ from __future__ import annotations
 import datetime
 from pathlib import Path
 
+import pytest
+
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.contracts.media import MediaItem
@@ -53,6 +55,18 @@ class _ConcurrentEditStore(MarkdownNoteStore):
             self.injected = True
             super().update(path, self.edit)
         return super().update(path, updater, template_path=template_path)
+
+
+class _FailingNoteStore(MarkdownNoteStore):
+    def update(
+        self,
+        path: str,
+        updater: NoteUpdater,
+        *,
+        template_path: str | None = None,
+    ) -> NotePublication:
+        _ = (path, updater, template_path)
+        raise PermissionError("publication denied")
 
 
 def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) -> None:
@@ -353,6 +367,24 @@ def test_series_regeneration_preserves_frontmatter_edited_before_publication(
     index = (directory / "Genesis.md").read_text(encoding="utf-8")
     assert "rating: 9" in index
     assert "| [[Part One]] | `2026-01-10` |" in index
+
+
+def test_visible_series_publication_failure_aborts_scan(tmp_path: Path) -> None:
+    directory = _series_dir(tmp_path, "Genesis", visible=True)
+    _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Host"])
+    books_dir = tmp_path / "books"
+    books_dir.mkdir()
+    source = ObsidianMediaSource(
+        str(books_dir),
+        str(tmp_path / "podcasts"),
+        media_cache_store=_StubMediaCacheStore(),
+        note_store=_FailingNoteStore(lock_root=str(tmp_path / "note-locks")),
+    )
+
+    with pytest.raises(PermissionError, match="publication denied"):
+        source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    assert "visible: true" in (directory / "Genesis.md").read_text(encoding="utf-8")
 
 
 def test_scan_leaves_a_reformatted_series_index_alone(tmp_path: Path) -> None:
