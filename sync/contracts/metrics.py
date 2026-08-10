@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TypeAlias, TypedDict
+
+
+@dataclass(frozen=True, slots=True)
+class TrainingOccurrence:
+    """One complete training session parsed from a daily note."""
+
+    activity: str
+    duration_minutes: float
+    interrupt_minutes: float
+    start_minutes: int
+    end_minutes: int
 
 
 class DailyAggregate(TypedDict):
@@ -19,12 +31,7 @@ class DailyAggregate(TypedDict):
     interrupt_minutes: float
     overrun_minutes: float
     planned_break_minutes: float
-    training_type_minutes: dict[str, float]
-    training_type_sessions: dict[str, int]
-    training_type_duration_minutes: dict[str, tuple[float, ...]]
-    training_type_interrupt_minutes: dict[str, tuple[float, ...]]
-    training_type_start_minutes: dict[str, tuple[int, ...]]
-    training_type_end_minutes: dict[str, tuple[int, ...]]
+    training_occurrences: tuple[TrainingOccurrence, ...]
 
 
 class PeriodAggregate(TypedDict):

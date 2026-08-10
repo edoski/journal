@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 from sync.contracts.schedule import DayScheduleProfile, Weekday
-from sync.io import safe_read_file
 from sync.notes.markdown_tables import split_markdown_row
 
 _TABLE_HEADERS = (
@@ -215,12 +214,8 @@ def _parse_study_window_cells(
     return study_start, study_end, False
 
 
-def load_schedule_rules(path: str) -> ScheduleRules:
-    """Parse strict schedule rules from PROTOCOL.md."""
-    lines = safe_read_file(path)
-    if lines is None:
-        raise FileNotFoundError(f"Required schedule config not found: {path}")
-
+def parse_schedule_rules(lines: list[str]) -> ScheduleRules:
+    """Parse strict schedule rules from PROTOCOL.md lines."""
     schedule_header_idx = _find_schedule_header(lines)
     table_start = _find_table_start(lines, schedule_header_idx)
 

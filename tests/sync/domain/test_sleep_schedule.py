@@ -59,12 +59,7 @@ class TestComputeAvgSchedule:
                 "interrupt_minutes": 0,
                 "overrun_minutes": 0,
                 "planned_break_minutes": 0,
-                "training_type_minutes": {},
-                "training_type_sessions": {},
-                "training_type_duration_minutes": {},
-                "training_type_interrupt_minutes": {},
-                "training_type_start_minutes": {},
-                "training_type_end_minutes": {},
+                "training_occurrences": (),
             }
         }
         result = compute_avg_schedule([datetime.date(2020, 1, 1)], data)
@@ -84,12 +79,7 @@ class TestComputeAvgSchedule:
                 "interrupt_minutes": 0,
                 "overrun_minutes": 0,
                 "planned_break_minutes": 0,
-                "training_type_minutes": {},
-                "training_type_sessions": {},
-                "training_type_duration_minutes": {},
-                "training_type_interrupt_minutes": {},
-                "training_type_start_minutes": {},
-                "training_type_end_minutes": {},
+                "training_occurrences": (),
             },
             datetime.date(2020, 1, 2): {
                 "study_minutes": 0,
@@ -103,12 +93,7 @@ class TestComputeAvgSchedule:
                 "interrupt_minutes": 0,
                 "overrun_minutes": 0,
                 "planned_break_minutes": 0,
-                "training_type_minutes": {},
-                "training_type_sessions": {},
-                "training_type_duration_minutes": {},
-                "training_type_interrupt_minutes": {},
-                "training_type_start_minutes": {},
-                "training_type_end_minutes": {},
+                "training_occurrences": (),
             },
         }
         dates = [datetime.date(2020, 1, 1), datetime.date(2020, 1, 2)]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sync.readers.grades import load_grades, parse_grades_lines
+from sync.readers.grades import parse_grades_lines
 
 
 def _sample_lines() -> list[str]:
@@ -40,12 +40,6 @@ def test_parse_grades_lines_valid_document() -> None:
     assert document.years[0].entries[2].kind == "pending"
     assert document.years[1].entries[0].kind == "lode"
     assert document.overall.thesis == 6
-
-
-def test_load_grades_missing_file_raises(tmp_path) -> None:
-    missing = tmp_path / "GRADES.md"
-    with pytest.raises(FileNotFoundError, match="Required grades note not found"):
-        load_grades(str(missing))
 
 
 def test_parse_requires_overall_section() -> None:

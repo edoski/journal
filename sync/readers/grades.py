@@ -14,7 +14,6 @@ from sync.contracts.grades import (
     YEAR_TABLE_HEADERS,
     YearGradeTable,
 )
-from sync.io import safe_read_file
 from sync.notes.markdown_tables import TableSchema, parse_markdown_table
 
 _YEAR_SECTION_RE = re.compile(r"^## YEAR (\d+)$")
@@ -242,15 +241,3 @@ def parse_grades_lines(lines: list[str]) -> GradesDocument:
 
     overall = _parse_overall(lines, overall_idx)
     return GradesDocument(years=tuple(tables), overall=overall)
-
-
-def load_grades(path: str) -> GradesDocument:
-    """Load and parse ``GRADES.md`` from disk."""
-    lines = safe_read_file(path)
-    if lines is None:
-        raise FileNotFoundError(f"Required grades note not found: {path}")
-
-    try:
-        return parse_grades_lines(lines)
-    except _ParseError as exc:
-        raise ValueError(str(exc)) from exc

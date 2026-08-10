@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from sync.contracts.metrics import (
     DailyAggregate,
     PeriodAggregate,
+    TrainingOccurrence,
     TrainingTypeSessionStat,
 )
 
@@ -275,87 +276,47 @@ def aggregate_training_type_session_stats(
         if daily is None:
             continue
         try:
-            minutes_map = daily["training_type_minutes"]
-            sessions_map = daily["training_type_sessions"]
-            duration_minutes_map = daily["training_type_duration_minutes"]
-            interrupt_minutes_map = daily["training_type_interrupt_minutes"]
-            start_minutes_map = daily["training_type_start_minutes"]
-            end_minutes_map = daily["training_type_end_minutes"]
+            occurrences = daily["training_occurrences"]
         except KeyError as exc:
-            missing_key = str(exc).strip("'")
             raise ValueError(
                 "Daily aggregate missing required training field "
-                f"{missing_key!r} on {d.isoformat()}"
+                f"'training_occurrences' on {d.isoformat()}"
             ) from exc
 
-        if (
-            not minutes_map
-            and not sessions_map
-            and not duration_minutes_map
-            and not interrupt_minutes_map
-            and not start_minutes_map
-            and not end_minutes_map
-        ):
+        if not occurrences:
             continue
 
-        keys = (
-            set(minutes_map.keys())
-            | set(sessions_map.keys())
-            | set(duration_minutes_map.keys())
-            | set(interrupt_minutes_map.keys())
-            | set(start_minutes_map.keys())
-            | set(end_minutes_map.keys())
-        )
-        for raw_label in keys:
-            label = (raw_label or "").strip()
+        day_occurrences_by_type: dict[str, list[TrainingOccurrence]] = {}
+        for occurrence in occurrences:
+            label = occurrence.activity.strip()
             norm = _normalize_training_type_label(label)
             if not norm:
                 continue
-
-            sessions = int(sessions_map.get(raw_label, 0) or 0)
-            total_minutes = float(minutes_map.get(raw_label, 0.0) or 0.0)
-            if sessions <= 0 or total_minutes <= 0.0:
+            if occurrence.duration_minutes <= 0.0:
                 continue
-
-            start_samples = tuple(start_minutes_map.get(raw_label, ()))
-            end_samples = tuple(end_minutes_map.get(raw_label, ()))
-            duration_samples = tuple(duration_minutes_map.get(raw_label, ()))
-            interrupt_samples = tuple(interrupt_minutes_map.get(raw_label, ()))
-            if (
-                len(duration_samples) != sessions
-                or len(interrupt_samples) != sessions
-                or len(start_samples) != sessions
-                or len(end_samples) != sessions
-            ):
-                raise ValueError(
-                    "Training schedule sample count mismatch for "
-                    f"{label or norm!r} on {d.isoformat()}: "
-                    f"sessions={sessions}, durations={len(duration_samples)}, "
-                    f"interrupts={len(interrupt_samples)}, "
-                    f"starts={len(start_samples)}, "
-                    f"ends={len(end_samples)}"
-                )
-            if abs(sum(duration_samples) - total_minutes) > 1e-6:
-                raise ValueError(
-                    "Training duration total mismatch for "
-                    f"{label or norm!r} on {d.isoformat()}: "
-                    f"total={total_minutes}, sum={sum(duration_samples)}"
-                )
-
-            ordered_samples = tuple(
-                sorted(
-                    zip(start_samples, end_samples, duration_samples),
-                    key=lambda sample: (sample[0], sample[1], sample[2]),
-                )
-            )
             entry = per_type.setdefault(norm, _TrainingAccumulator(display_type=label))
             if not entry.display_type and label:
                 entry.display_type = label
             entry.active_days.add(d)
-            entry.total_sessions += sessions
-            entry.total_minutes += total_minutes
-            entry.total_interrupt_minutes += sum(interrupt_samples)
+            entry.total_sessions += 1
+            entry.total_minutes += occurrence.duration_minutes
+            entry.total_interrupt_minutes += occurrence.interrupt_minutes
+            day_occurrences_by_type.setdefault(norm, []).append(occurrence)
 
+        for norm, day_occurrences in day_occurrences_by_type.items():
+            ordered_samples = tuple(
+                sorted(
+                    (
+                        (
+                            occurrence.start_minutes,
+                            occurrence.end_minutes,
+                            occurrence.duration_minutes,
+                        )
+                        for occurrence in day_occurrences
+                    ),
+                    key=lambda sample: (sample[0], sample[1], sample[2]),
+                )
+            )
             clusters = schedule_clusters_by_type.setdefault(norm, [])
             _cluster_schedule_samples(d, ordered_samples, clusters)
 
@@ -369,20 +330,7 @@ def aggregate_training_type_session_stats(
         if sessions <= 0 or total_session_count <= 0 or total_minutes <= 0:
             continue
 
-        clusters = schedule_clusters_by_type.get(norm, [])
-        if not clusters:
-            raise ValueError(
-                "Training schedule sample count mismatch for "
-                f"{data.display_type or norm!r}: no schedule clusters were built"
-            )
-        sample_count = sum(len(cluster.start_minutes) for cluster in clusters)
-        if sample_count != total_session_count:
-            raise ValueError(
-                "Training schedule sample count mismatch for "
-                f"{data.display_type or norm!r}: "
-                f"sessions={total_session_count}, starts={sample_count}"
-            )
-
+        clusters = schedule_clusters_by_type[norm]
         schedule_range = _dominant_schedule_range(clusters)
 
         stats.append(

@@ -7,6 +7,7 @@ import os
 
 from sync.constants import JOURNAL_DIR
 from sync.contracts.metrics import DailyAggregate
+from sync.io import safe_read_file
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.readers.daily import parse_daily_note
 
@@ -41,11 +42,11 @@ class MarkdownDailyAggregateSource(DailyAggregateSource):
 
         for day in sorted(set(dates)):
             path = os.path.join(self.journal_dir, f"{day:%Y-%m-%d}.md")
-            if not os.path.exists(path):
-                continue
-
             try:
-                parsed = parse_daily_note(path)
+                lines = safe_read_file(path)
+                if lines is None:
+                    continue
+                parsed = parse_daily_note(lines)
             except ValueError as exc:
                 offenders.append((day, path, str(exc)))
                 continue

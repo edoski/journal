@@ -7,9 +7,9 @@ from dataclasses import dataclass
 
 from sync.constants import BSC_GRADES_PATH, MSC_GRADES_PATH
 from sync.grades.engine import compute_grades
-from sync.io import atomic_write_note
+from sync.io import atomic_write_note, safe_read_file
 from sync.notes.locking import locked_note
-from sync.readers.grades import load_grades
+from sync.readers.grades import parse_grades_lines
 from sync.writers.grades import render_grades_note
 
 
@@ -31,13 +31,14 @@ def cmd_grades_sync(
         "bsc": resolved.bsc_grades_path,
         "msc": resolved.msc_grades_path,
     }[args.degree]
-    try:
-        document = load_grades(path)
-    except FileNotFoundError as exc:
-        print(f"Error: {exc}")
+    lines = safe_read_file(path)
+    if lines is None:
+        print(f"Error: Required grades note not found: {path}")
         return 1
+    try:
+        document = parse_grades_lines(lines)
     except ValueError as exc:
-        print(f"Error: {exc}")
+        print(f"Error: Invalid grades note at {path}: {exc}")
         return 1
 
     computed = compute_grades(document, status_bonus=0)

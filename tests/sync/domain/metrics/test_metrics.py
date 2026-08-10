@@ -7,9 +7,11 @@ Covers period aggregation and delta computation functions.
 from __future__ import annotations
 
 import datetime
+from dataclasses import FrozenInstanceError
 
 import pytest
 
+from sync.contracts.metrics import TrainingOccurrence
 from sync.metrics import (
     compute_period_metrics,
     aggregate_activity_totals,
@@ -19,19 +21,25 @@ from sync.metrics import (
 )
 
 
-def _add_training_interrupts(
-    daily_data: dict[datetime.date, dict],
-    *,
-    overrides: dict[datetime.date, dict[str, tuple[float, ...]]] | None = None,
-) -> None:
-    overrides = overrides or {}
-    for day, payload in daily_data.items():
-        durations = payload["training_type_duration_minutes"]
-        interrupts = {
-            label: tuple(0.0 for _ in samples) for label, samples in durations.items()
-        }
-        interrupts.update(overrides.get(day, {}))
-        payload["training_type_interrupt_minutes"] = interrupts
+def _training(
+    activity: str,
+    duration: float,
+    start: int,
+    end: int,
+    interrupt: float = 0.0,
+) -> TrainingOccurrence:
+    return TrainingOccurrence(activity, duration, interrupt, start, end)
+
+
+def _training_day(*occurrences: TrainingOccurrence) -> dict:
+    return {"training_occurrences": occurrences}
+
+
+def test_training_occurrence_is_immutable() -> None:
+    occurrence = _training("Stretching", 20.0, 1140, 1160)
+
+    with pytest.raises(FrozenInstanceError):
+        setattr(occurrence, "end_minutes", 1170)
 
 
 class TestComputePeriodMetrics:
@@ -330,36 +338,13 @@ class TestAggregateTrainingTypeSessionStats:
     def test_single_slot_activity_remains_unchanged(self):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"Functional Strength Training": 60.0},
-                "training_type_sessions": {"Functional Strength Training": 1},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (60.0,)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (1080,)
-                },
-                "training_type_end_minutes": {"Functional Strength Training": (1140,)},
-            },
-            dates[1]: {
-                "training_type_minutes": {"Functional Strength Training": 90.0},
-                "training_type_sessions": {"Functional Strength Training": 1},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (90.0,)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (1140,)
-                },
-                "training_type_end_minutes": {"Functional Strength Training": (1230,)},
-            },
+            dates[0]: _training_day(
+                _training("Functional Strength Training", 60.0, 1080, 1140, 5.0)
+            ),
+            dates[1]: _training_day(
+                _training("Functional Strength Training", 90.0, 1140, 1230, 15.0)
+            ),
         }
-        _add_training_interrupts(
-            daily_data,
-            overrides={
-                dates[0]: {"Functional Strength Training": (5.0,)},
-                dates[1]: {"Functional Strength Training": (15.0,)},
-            },
-        )
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -375,35 +360,12 @@ class TestAggregateTrainingTypeSessionStats:
             datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
         ]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {
-                    "Yoga": 10.0,
-                    "Cooldown": 20.0,
-                    "Functional Strength Training": 60.0,
-                },
-                "training_type_sessions": {
-                    "Yoga": 1,
-                    "Cooldown": 1,
-                    "Functional Strength Training": 1,
-                },
-                "training_type_duration_minutes": {
-                    "Yoga": (10.0,),
-                    "Cooldown": (20.0,),
-                    "Functional Strength Training": (60.0,),
-                },
-                "training_type_start_minutes": {
-                    "Yoga": (430,),
-                    "Cooldown": (1140,),
-                    "Functional Strength Training": (1080,),
-                },
-                "training_type_end_minutes": {
-                    "Yoga": (440,),
-                    "Cooldown": (1160,),
-                    "Functional Strength Training": (1140,),
-                },
-            }
+            dates[0]: _training_day(
+                _training("Yoga", 10.0, 430, 440),
+                _training("Cooldown", 20.0, 1140, 1160),
+                _training("Functional Strength Training", 60.0, 1080, 1140),
+            )
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
         by_type = {row["type"]: row for row in rows}
@@ -420,30 +382,14 @@ class TestAggregateTrainingTypeSessionStats:
             datetime.date(2025, 1, 2),
         ]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"Functional Strength Training": 30.0},
-                "training_type_sessions": {"Functional Strength Training": 2},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (10.0, 20.0)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (420, 1260)
-                },
-                "training_type_end_minutes": {
-                    "Functional Strength Training": (430, 1280)
-                },
-            },
-            dates[1]: {
-                "training_type_minutes": {"Functional Strength Training": 12.0},
-                "training_type_sessions": {"Functional Strength Training": 1},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (12.0,)
-                },
-                "training_type_start_minutes": {"Functional Strength Training": (450,)},
-                "training_type_end_minutes": {"Functional Strength Training": (462,)},
-            },
+            dates[0]: _training_day(
+                _training("Functional Strength Training", 10.0, 420, 430),
+                _training("Functional Strength Training", 20.0, 1260, 1280),
+            ),
+            dates[1]: _training_day(
+                _training("Functional Strength Training", 12.0, 450, 462)
+            ),
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -458,19 +404,10 @@ class TestAggregateTrainingTypeSessionStats:
             datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(31)
         ]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"Functional Strength Training": 60.0},
-                "training_type_sessions": {"Functional Strength Training": 1},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (60.0,)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (1080,)
-                },
-                "training_type_end_minutes": {"Functional Strength Training": (1140,)},
-            }
+            dates[0]: _training_day(
+                _training("Functional Strength Training", 60.0, 1080, 1140)
+            )
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -482,35 +419,12 @@ class TestAggregateTrainingTypeSessionStats:
             datetime.date(2025, 1, 1) + datetime.timedelta(days=i) for i in range(7)
         ]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {
-                    "Zone 2 Run": 40.0,
-                    "Traditional Strength Training": 60.0,
-                    "Yoga": 40.0,
-                },
-                "training_type_sessions": {
-                    "Zone 2 Run": 1,
-                    "Traditional Strength Training": 1,
-                    "Yoga": 1,
-                },
-                "training_type_duration_minutes": {
-                    "Zone 2 Run": (40.0,),
-                    "Traditional Strength Training": (60.0,),
-                    "Yoga": (40.0,),
-                },
-                "training_type_start_minutes": {
-                    "Zone 2 Run": (1140,),
-                    "Traditional Strength Training": (1080,),
-                    "Yoga": (420,),
-                },
-                "training_type_end_minutes": {
-                    "Zone 2 Run": (1180,),
-                    "Traditional Strength Training": (1140,),
-                    "Yoga": (460,),
-                },
-            }
+            dates[0]: _training_day(
+                _training("Zone 2 Run", 40.0, 1140, 1180),
+                _training("Traditional Strength Training", 60.0, 1080, 1140),
+                _training("Yoga", 40.0, 420, 460),
+            )
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
         labels = [row["type"] for row in rows]
@@ -520,22 +434,9 @@ class TestAggregateTrainingTypeSessionStats:
     def test_merges_case_and_whitespace_variants(self):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"  Stretching ": 20.0},
-                "training_type_sessions": {"  Stretching ": 1},
-                "training_type_duration_minutes": {"  Stretching ": (20.0,)},
-                "training_type_start_minutes": {"  Stretching ": (1140,)},
-                "training_type_end_minutes": {"  Stretching ": (1160,)},
-            },
-            dates[1]: {
-                "training_type_minutes": {"stretching": 25.0},
-                "training_type_sessions": {"stretching": 1},
-                "training_type_duration_minutes": {"stretching": (25.0,)},
-                "training_type_start_minutes": {"stretching": (1145,)},
-                "training_type_end_minutes": {"stretching": (1165,)},
-            },
+            dates[0]: _training_day(_training("  Stretching ", 20.0, 1140, 1160)),
+            dates[1]: _training_day(_training("stretching", 25.0, 1145, 1165)),
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 
@@ -545,53 +446,29 @@ class TestAggregateTrainingTypeSessionStats:
         assert rows[0]["average_minutes"] == 22.5
         assert rows[0]["schedule_range"] == ("19:02", "19:22")
 
-    def test_raises_when_schedule_samples_are_missing(self):
+    def test_occurrence_keeps_training_fields_aligned(self):
         dates = [datetime.date(2025, 1, 1)]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"Stretching": 20.0},
-                "training_type_sessions": {"Stretching": 1},
-                "training_type_duration_minutes": {},
-                "training_type_start_minutes": {},
-                "training_type_end_minutes": {},
-            }
+            dates[0]: _training_day(_training("Stretching", 20.0, 1140, 1160))
         }
-        _add_training_interrupts(daily_data)
 
-        with pytest.raises(ValueError, match="sample count mismatch"):
-            aggregate_training_type_session_stats(dates, daily_data)
+        rows = aggregate_training_type_session_stats(dates, daily_data)
+
+        assert rows[0]["average_minutes"] == 20.0
+        assert rows[0]["schedule_range"] == ("19:00", "19:20")
 
     def test_tie_breaks_dominant_schedule_by_total_duration(self):
         dates = [datetime.date(2025, 1, 1), datetime.date(2025, 1, 2)]
         daily_data = {
-            dates[0]: {
-                "training_type_minutes": {"Functional Strength Training": 30.0},
-                "training_type_sessions": {"Functional Strength Training": 2},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (10.0, 20.0)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (420, 1260)
-                },
-                "training_type_end_minutes": {
-                    "Functional Strength Training": (430, 1280)
-                },
-            },
-            dates[1]: {
-                "training_type_minutes": {"Functional Strength Training": 25.0},
-                "training_type_sessions": {"Functional Strength Training": 2},
-                "training_type_duration_minutes": {
-                    "Functional Strength Training": (12.0, 13.0)
-                },
-                "training_type_start_minutes": {
-                    "Functional Strength Training": (450, 1250)
-                },
-                "training_type_end_minutes": {
-                    "Functional Strength Training": (462, 1263)
-                },
-            },
+            dates[0]: _training_day(
+                _training("Functional Strength Training", 10.0, 420, 430),
+                _training("Functional Strength Training", 20.0, 1260, 1280),
+            ),
+            dates[1]: _training_day(
+                _training("Functional Strength Training", 12.0, 450, 462),
+                _training("Functional Strength Training", 13.0, 1250, 1263),
+            ),
         }
-        _add_training_interrupts(daily_data)
 
         rows = aggregate_training_type_session_stats(dates, daily_data)
 

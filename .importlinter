@@ -54,6 +54,7 @@ source_modules =
 forbidden_modules =
     sync.application
     sync.adapters
+    sync.io
     sync.writers
     sync.run
 

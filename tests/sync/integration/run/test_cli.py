@@ -1033,6 +1033,24 @@ def test_grades_sync_returns_error_when_file_is_missing(tmp_path: Path) -> None:
     assert rc == 1
 
 
+def test_grades_sync_reports_source_path_for_invalid_content(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    path = tmp_path / "GRADES.md"
+    path.write_text("## INVALID\n", encoding="utf-8")
+
+    rc = grades_cmd.cmd_grades_sync(
+        _grades_sync_args("msc"),
+        config=grades_cmd.GradesCommandConfig(msc_grades_path=str(path)),
+    )
+
+    assert rc == 1
+    output = capsys.readouterr().out
+    assert str(path) in output
+    assert "at least one '## YEAR n' section" in output
+
+
 def test_cli_parser_has_expected_commands() -> None:
     parser = cli.build_parser()
 

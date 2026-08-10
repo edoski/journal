@@ -11,8 +11,7 @@ from sync.constants import (
     NO_TRAINING_SESSIONS_TOKEN,
     TRAINING_SECTION_HEADER,
 )
-from sync.contracts.metrics import DailyAggregate
-from sync.io import safe_read_file
+from sync.contracts.metrics import DailyAggregate, TrainingOccurrence
 from sync.notes.markdown_tables import find_markdown_table
 from sync.readers.common import extract_block, parse_duration_to_minutes
 from sync.readers.frontmatter import parse_frontmatter
@@ -70,7 +69,7 @@ def _parse_training_time_range(raw: str, *, line_no: int) -> tuple[int, int]:
 
 def _parse_training_table_rows(
     lines: list[str],
-) -> list[tuple[str, float, float, int, int]]:
+) -> list[TrainingOccurrence]:
     """Parse the TRAINING table into session rows."""
     block = extract_block(lines, TRAINING_SECTION_HEADER)
     if not block:
@@ -90,7 +89,7 @@ def _parse_training_table_rows(
     if table is None:
         return []
 
-    rows: list[tuple[str, float, float, int, int]] = []
+    rows: list[TrainingOccurrence] = []
     for row_no, parts in enumerate(table.rows, start=table.start_idx + 3):
         if NO_TRAINING_SESSIONS_TOKEN in " | ".join(parts).lower():
             continue
@@ -106,28 +105,24 @@ def _parse_training_table_rows(
             )
             interrupt_min = parse_duration_to_minutes(parts[3]) or 0.0
             rows.append(
-                (activity, duration_min, interrupt_min, start_minutes, end_minutes)
+                TrainingOccurrence(
+                    activity=activity,
+                    duration_minutes=duration_min,
+                    interrupt_minutes=interrupt_min,
+                    start_minutes=start_minutes,
+                    end_minutes=end_minutes,
+                )
             )
 
     return rows
 
 
-def parse_daily_note(path: str) -> DailyAggregate | None:
-    """Parse a daily note file and return extracted aggregate metrics."""
-    lines = safe_read_file(path)
-    if lines is None:
-        return None
-
+def parse_daily_note(lines: list[str]) -> DailyAggregate:
+    """Parse daily-note lines into aggregate metrics."""
     fm = parse_frontmatter(lines)
-    try:
-        study_rows = parse_study_table(lines)
-    except ValueError as exc:
-        raise ValueError(f"Invalid daily note schema in {path}: {exc}") from exc
+    study_rows = parse_study_table(lines)
     sleep_rows = parse_sleep_table(lines)
-    try:
-        training_rows = _parse_training_table_rows(lines)
-    except ValueError as exc:
-        raise ValueError(f"Invalid daily note schema in {path}: {exc}") from exc
+    training_rows = _parse_training_table_rows(lines)
 
     sleep_from_fm = parse_duration_to_minutes(fm.get("sleep"))
     sleep_total = (
@@ -158,26 +153,6 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
 
     study_total = sum(activity_totals.values())
 
-    training_type_minutes = defaultdict[str, float](float)
-    training_type_sessions = defaultdict[str, int](int)
-    training_type_duration_minutes = defaultdict[str, list[float]](list)
-    training_type_interrupt_minutes = defaultdict[str, list[float]](list)
-    training_type_start_minutes = defaultdict[str, list[int]](list)
-    training_type_end_minutes = defaultdict[str, list[int]](list)
-    for (
-        activity,
-        minutes,
-        interrupt_minutes,
-        start_minutes,
-        end_minutes,
-    ) in training_rows:
-        training_type_minutes[activity] += minutes
-        training_type_sessions[activity] += 1
-        training_type_duration_minutes[activity].append(minutes)
-        training_type_interrupt_minutes[activity].append(interrupt_minutes)
-        training_type_start_minutes[activity].append(start_minutes)
-        training_type_end_minutes[activity].append(end_minutes)
-
     return {
         "study_minutes": study_total,
         "sleep_minutes": sleep_total,
@@ -190,22 +165,5 @@ def parse_daily_note(path: str) -> DailyAggregate | None:
         "interrupt_minutes": interrupt_total,
         "overrun_minutes": overrun_total,
         "planned_break_minutes": planned_break_total,
-        "training_type_minutes": dict(training_type_minutes),
-        "training_type_sessions": dict(training_type_sessions),
-        "training_type_duration_minutes": {
-            activity: tuple(values)
-            for activity, values in training_type_duration_minutes.items()
-        },
-        "training_type_interrupt_minutes": {
-            activity: tuple(values)
-            for activity, values in training_type_interrupt_minutes.items()
-        },
-        "training_type_start_minutes": {
-            activity: tuple(values)
-            for activity, values in training_type_start_minutes.items()
-        },
-        "training_type_end_minutes": {
-            activity: tuple(values)
-            for activity, values in training_type_end_minutes.items()
-        },
+        "training_occurrences": tuple(training_rows),
     }

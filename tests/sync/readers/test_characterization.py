@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from sync.contracts.metrics import TrainingOccurrence
 from sync.readers.daily import (
     _parse_training_table_rows,
     parse_daily_note,
@@ -13,15 +14,12 @@ from sync.readers.daily import (
 from sync.readers.study import parse_study_table
 
 
-def _write_note(tmp_path, lines: list[str], name: str = "2025-01-15.md") -> str:
-    path = tmp_path / name
-    path.write_text("\n".join(lines) + "\n")
-    return str(path)
+def _note_lines(lines: list[str]) -> list[str]:
+    return lines
 
 
-def test_parse_daily_note_characterization(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_characterization():
+    note_lines = _note_lines(
         [
             "---",
             "sleep: 7h15m",
@@ -48,7 +46,7 @@ def test_parse_daily_note_characterization(tmp_path):
         ],
     )
 
-    parsed = parse_daily_note(note_path)
+    parsed = parse_daily_note(note_lines)
 
     assert parsed == {
         "study_minutes": 210.0,
@@ -62,12 +60,7 @@ def test_parse_daily_note_characterization(tmp_path):
         "interrupt_minutes": 100.0,
         "overrun_minutes": 65,
         "planned_break_minutes": 25,
-        "training_type_minutes": {},
-        "training_type_sessions": {},
-        "training_type_duration_minutes": {},
-        "training_type_interrupt_minutes": {},
-        "training_type_start_minutes": {},
-        "training_type_end_minutes": {},
+        "training_occurrences": (),
     }
 
 
@@ -105,9 +98,8 @@ def test_parse_study_table_rejects_non_canonical_header():
         )
 
 
-def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_reports_non_canonical_study_content():
+    note_lines = _note_lines(
         [
             "---",
             "sleep: 7h",
@@ -124,25 +116,14 @@ def test_parse_daily_note_error_includes_path_for_non_canonical_study(tmp_path):
             "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `5m` | extra |",
             "",
         ],
-        name="2025-12-23.md",
     )
 
-    with pytest.raises(ValueError) as excinfo:
-        parse_daily_note(note_path)
-
-    message = str(excinfo.value)
-    assert f"Invalid daily note schema in {note_path}:" in message
-    assert "Non-canonical STUDY table header" in message
+    with pytest.raises(ValueError, match="Non-canonical STUDY table header"):
+        parse_daily_note(note_lines)
 
 
-def test_parse_daily_note_returns_none_for_missing_file(tmp_path):
-    missing = tmp_path / "missing.md"
-    assert parse_daily_note(str(missing)) is None
-
-
-def test_parse_daily_note_training_type_aggregates(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_training_type_aggregates():
+    note_lines = _note_lines(
         [
             "---",
             "sleep: 7h",
@@ -163,40 +144,30 @@ def test_parse_daily_note_training_type_aggregates(tmp_path):
         ],
     )
 
-    parsed = parse_daily_note(note_path)
+    parsed = parse_daily_note(note_lines)
 
-    assert parsed is not None
-    assert parsed["training_type_minutes"] == {
-        "Traditional Strength Training": 60.0,
-        "Stretching": 30.0,
-    }
-    assert parsed["training_type_sessions"] == {
-        "Traditional Strength Training": 1,
-        "Stretching": 1,
-    }
-    assert parsed["training_type_duration_minutes"] == {
-        "Traditional Strength Training": (60.0,),
-        "Stretching": (30.0,),
-    }
-    assert parsed["training_type_interrupt_minutes"] == {
-        "Traditional Strength Training": (5.0,),
-        "Stretching": (0.0,),
-    }
-    assert parsed["training_type_start_minutes"] == {
-        "Traditional Strength Training": (420,),
-        "Stretching": (1080,),
-    }
-    assert parsed["training_type_end_minutes"] == {
-        "Traditional Strength Training": (480,),
-        "Stretching": (1110,),
-    }
+    assert parsed["training_occurrences"] == (
+        TrainingOccurrence(
+            activity="Traditional Strength Training",
+            duration_minutes=60.0,
+            interrupt_minutes=5.0,
+            start_minutes=420,
+            end_minutes=480,
+        ),
+        TrainingOccurrence(
+            activity="Stretching",
+            duration_minutes=30.0,
+            interrupt_minutes=0.0,
+            start_minutes=1080,
+            end_minutes=1110,
+        ),
+    )
     assert parsed["workout"] is True
     assert parsed["stretch"] is True
 
 
-def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_rejects_non_canonical_training_time():
+    note_lines = _note_lines(
         [
             "---",
             "sleep: 7h",
@@ -215,10 +186,9 @@ def test_parse_daily_note_rejects_non_canonical_training_time(tmp_path):
     )
 
     with pytest.raises(ValueError) as excinfo:
-        parse_daily_note(note_path)
+        parse_daily_note(note_lines)
 
     message = str(excinfo.value)
-    assert f"Invalid daily note schema in {note_path}:" in message
     assert "Non-canonical TRAINING TIME value" in message
 
 
@@ -238,7 +208,7 @@ def test_parse_training_table_rows_handles_edge_cases():
         ]
     )
 
-    assert rows == [("Lift", 60.0, 0.0, 420, 480)]
+    assert rows == [TrainingOccurrence("Lift", 60.0, 0.0, 420, 480)]
 
 
 def test_parse_training_table_rows_returns_empty_when_header_missing():
@@ -288,7 +258,7 @@ def test_parse_training_table_rows_skips_no_training_message_case_insensitively(
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
+    assert rows == [TrainingOccurrence("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_is_valid():
@@ -301,7 +271,7 @@ def test_parse_training_table_rows_skips_no_training_message_even_if_row_shape_i
             "| `07:00 - 07:01` | `Lift` | `1m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
+    assert rows == [TrainingOccurrence("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars():
@@ -313,7 +283,7 @@ def test_parse_training_table_rows_activity_strip_keeps_non_backtick_edge_chars(
             "| `07:00 - 08:00` | `XLiftX` | `1h00m` | `+00m` |",
         ]
     )
-    assert rows == [("XLiftX", 60.0, 0.0, 420, 480)]
+    assert rows == [TrainingOccurrence("XLiftX", 60.0, 0.0, 420, 480)]
 
 
 def test_parse_training_table_rows_header_match_is_case_insensitive():
@@ -325,7 +295,7 @@ def test_parse_training_table_rows_header_match_is_case_insensitive():
             "| `07:00 - 07:10` | Lift | `10m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 10.0, 0.0, 420, 430)]
+    assert rows == [TrainingOccurrence("Lift", 10.0, 0.0, 420, 430)]
 
 
 def test_parse_training_table_rows_short_row_does_not_break_following_rows():
@@ -338,7 +308,7 @@ def test_parse_training_table_rows_short_row_does_not_break_following_rows():
             "| `07:00 - 07:05` | Lift | `5m` | `+00m` |",
         ]
     )
-    assert rows == [("Lift", 5.0, 0.0, 420, 425)]
+    assert rows == [TrainingOccurrence("Lift", 5.0, 0.0, 420, 425)]
 
 
 def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
@@ -350,7 +320,7 @@ def test_parse_training_table_rows_accepts_rows_without_trailing_pipe():
             "| `07:00 - 07:01` | Lift | `1m` | `+00m`",
         ]
     )
-    assert rows == [("Lift", 1.0, 0.0, 420, 421)]
+    assert rows == [TrainingOccurrence("Lift", 1.0, 0.0, 420, 421)]
 
 
 def test_parse_training_table_rows_rejects_non_canonical_time_range():
@@ -365,9 +335,8 @@ def test_parse_training_table_rows_rejects_non_canonical_time_range():
         )
 
 
-def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing():
+    note_lines = _note_lines(
         [
             "---",
             "workout: false",
@@ -385,15 +354,13 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing(tmp_pa
         ],
     )
 
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
+    parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 540.0
     assert parsed["awake_minutes"] == 15.0
 
 
-def test_parse_daily_note_sleep_absent_defaults(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_sleep_absent_defaults():
+    note_lines = _note_lines(
         [
             "---",
             "workout: no",
@@ -408,20 +375,17 @@ def test_parse_daily_note_sleep_absent_defaults(tmp_path):
             "| ---- | -------- | -------- | --------- | ----- |",
             "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `0m` |",
         ],
-        name="2025-03-01.md",
     )
 
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
+    parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 0
     assert parsed["awake_minutes"] is None
     assert parsed["workout"] is False
     assert parsed["stretch"] is False
 
 
-def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_sleep_table_zero_duration_stays_zero():
+    note_lines = _note_lines(
         [
             "---",
             "workout: false",
@@ -436,16 +400,13 @@ def test_parse_daily_note_sleep_table_zero_duration_stays_zero(tmp_path):
             "| ---- | -------- | ----- |",
             "| 23:00-23:00 | `` | `` |",
         ],
-        name="2025-03-05.md",
     )
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
+    parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 0
 
 
-def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
-    note_path = _write_note(
-        tmp_path,
+def test_parse_daily_note_aggregates_duplicate_keys_across_sections():
+    note_lines = _note_lines(
         [
             "---",
             "sleep: 6h00m",
@@ -468,14 +429,10 @@ def test_parse_daily_note_aggregates_duplicate_keys_across_sections(tmp_path):
             "| `07:00 - 07:20` | Lift | `20m` | `+00m` |",
             "| `08:00 - 08:10` | Lift | `10m` | `+00m` |",
         ],
-        name="2025-03-06.md",
     )
-    parsed = parse_daily_note(note_path)
-    assert parsed is not None
+    parsed = parse_daily_note(note_lines)
     assert parsed["activity_totals"] == {"coding": 75.0}
-    assert parsed["training_type_minutes"] == {"Lift": 30.0}
-    assert parsed["training_type_sessions"] == {"Lift": 2}
-    assert parsed["training_type_duration_minutes"] == {"Lift": (20.0, 10.0)}
-    assert parsed["training_type_interrupt_minutes"] == {"Lift": (0.0, 0.0)}
-    assert parsed["training_type_start_minutes"] == {"Lift": (420, 480)}
-    assert parsed["training_type_end_minutes"] == {"Lift": (440, 490)}
+    assert parsed["training_occurrences"] == (
+        TrainingOccurrence("Lift", 20.0, 0.0, 420, 440),
+        TrainingOccurrence("Lift", 10.0, 0.0, 480, 490),
+    )

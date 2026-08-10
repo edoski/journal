@@ -192,8 +192,8 @@ journal/
   persistence to it and owns session enrichment; pure dedupe/break/lunch/overrun
   logic remains in `sync/study/enrichment.py`.
 - Metrics contracts are canonical across `sync/metrics`, `sync/application`, and `sync/periods`:
-  - `DailyAggregate`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
-  - `DailyAggregate.training_type_duration_minutes` must stay aligned with `training_type_start_minutes` and `training_type_end_minutes` for training-type duration averaging and multi-range schedule aggregation
+  - `DailyAggregate`, `TrainingOccurrence`, `PeriodAggregate`, `MovingAverageAggregate`, `TrainingTypeSessionStat`, `MetricValue`
+  - `DailyAggregate.training_occurrences` stores complete immutable sessions for training-type duration, interrupt, and schedule aggregation
 - Year sync windows must carry explicit execution anchors:
   - `YearWindow.target_date`
 
@@ -203,8 +203,8 @@ journal/
   - `| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |`
 - Daily `TRAINING` rows with a positive `DURATION` are canonical only when `TIME` is `HH:MM - HH:MM` (24-hour); non-canonical values are rejected with explicit errors.
 - Periodic `TRAINING` type summary tables are canonical only when they include:
-  - `| TYPE | SESSIONS | DURATION | TIME |`
-  - `TIME` renders one row per activity type and uses slash-separated exact averaged ranges when a type has multiple recurring windows
+  - `| TIME | ACTIVITY | DURATION | INTERRUPT |`
+  - one row per activity type, with one dominant averaged `HH:MM - HH:MM` range
 - `notes/podcasts/` entries render in periodic `MEDIA` tables only when:
   - a note directly in the directory sets `visible: true`; it renders as its own entry
   - a subdirectory is a series: it renders as one entry titled after the folder, dated

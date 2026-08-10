@@ -43,3 +43,15 @@ def test_resolve_day_raises_for_missing_protocol(tmp_path):
     source = MarkdownScheduleSource(str(tmp_path / "missing.md"))
     with pytest.raises(FileNotFoundError):
         source.resolve_day(datetime.date(2026, 2, 16))
+
+
+def test_resolve_day_adds_source_path_to_schema_errors(tmp_path):
+    path = tmp_path / "PROTOCOL.md"
+    path.write_text("## OTHER\n", encoding="utf-8")
+    source = MarkdownScheduleSource(str(path))
+
+    with pytest.raises(ValueError) as excinfo:
+        source.resolve_day(datetime.date(2026, 2, 16))
+
+    assert str(path) in str(excinfo.value)
+    assert "must contain a '## SCHEDULE' section" in str(excinfo.value)
