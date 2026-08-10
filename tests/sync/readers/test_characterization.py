@@ -14,37 +14,31 @@ from sync.readers.daily import (
 from sync.readers.study import parse_study_table
 
 
-def _note_lines(lines: list[str]) -> list[str]:
-    return lines
-
-
 def test_parse_daily_note_characterization():
-    note_lines = _note_lines(
-        [
-            "---",
-            "sleep: 7h15m",
-            "workout: true",
-            "stretch: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **STUDY**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
-            "| ---- | -------- | -------- | --------- | ----- |",
-            "| 09:00 - 11:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` |",
-            "| 14:00 - 15:30 | `reading` | `1h30m` | `+1h30m` | `10m (+1h)` |",
-            "",
-            "### **SLEEP**",
-            "",
-            "| TIME | ASLEEP | AWAKE |",
-            "| ---- | -------- | ----- |",
-            "| 23:00-07:00 | `8h00m` | `20m` |",
-            "| 07:30-08:30 | `1h00m` | `5m` |",
-            "",
-        ],
-    )
+    note_lines = [
+        "---",
+        "sleep: 7h15m",
+        "workout: true",
+        "stretch: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **STUDY**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+        "| ---- | -------- | -------- | --------- | ----- |",
+        "| 09:00 - 11:00 | `coding` | `2h00m` | `+10m` | `15m (+5m)` |",
+        "| 14:00 - 15:30 | `reading` | `1h30m` | `+1h30m` | `10m (+1h)` |",
+        "",
+        "### **SLEEP**",
+        "",
+        "| TIME | ASLEEP | AWAKE |",
+        "| ---- | -------- | ----- |",
+        "| 23:00-07:00 | `8h00m` | `20m` |",
+        "| 07:30-08:30 | `1h00m` | `5m` |",
+        "",
+    ]
 
     parsed = parse_daily_note(note_lines)
 
@@ -99,50 +93,46 @@ def test_parse_study_table_rejects_non_canonical_header():
 
 
 def test_parse_daily_note_reports_non_canonical_study_content():
-    note_lines = _note_lines(
-        [
-            "---",
-            "sleep: 7h",
-            "workout: false",
-            "stretch: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **STUDY**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
-            "| ---- | -------- | -------- | --------- | ----- | ----- |",
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `5m` | extra |",
-            "",
-        ],
-    )
+    note_lines = [
+        "---",
+        "sleep: 7h",
+        "workout: false",
+        "stretch: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **STUDY**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK | EXTRA |",
+        "| ---- | -------- | -------- | --------- | ----- | ----- |",
+        "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `5m` | extra |",
+        "",
+    ]
 
     with pytest.raises(ValueError, match="Non-canonical STUDY table header"):
         parse_daily_note(note_lines)
 
 
 def test_parse_daily_note_training_type_aggregates():
-    note_lines = _note_lines(
-        [
-            "---",
-            "sleep: 7h",
-            "workout: true",
-            "stretch: true",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **TRAINING**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
-            "| ---- | -------- | -------- | --------- |",
-            "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+05m` |",
-            "| `18:00 - 18:30` | Stretching | `30m` | `+00m` |",
-            "| `22:00 - 22:00` | Traditional Strength Training | `` | `+00m` |",
-            "",
-        ],
-    )
+    note_lines = [
+        "---",
+        "sleep: 7h",
+        "workout: true",
+        "stretch: true",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **TRAINING**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+        "| ---- | -------- | -------- | --------- |",
+        "| `07:00 - 08:00` | Traditional Strength Training | `1h00m` | `+05m` |",
+        "| `18:00 - 18:30` | Stretching | `30m` | `+00m` |",
+        "| `22:00 - 22:00` | Traditional Strength Training | `` | `+00m` |",
+        "",
+    ]
 
     parsed = parse_daily_note(note_lines)
 
@@ -167,23 +157,21 @@ def test_parse_daily_note_training_type_aggregates():
 
 
 def test_parse_daily_note_rejects_non_canonical_training_time():
-    note_lines = _note_lines(
-        [
-            "---",
-            "sleep: 7h",
-            "workout: true",
-            "stretch: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **TRAINING**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
-            "| ---- | -------- | -------- | --------- |",
-            "| `07:00-07:30` | Lift | `30m` | `+00m` |",
-        ],
-    )
+    note_lines = [
+        "---",
+        "sleep: 7h",
+        "workout: true",
+        "stretch: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **TRAINING**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+        "| ---- | -------- | -------- | --------- |",
+        "| `07:00-07:30` | Lift | `30m` | `+00m` |",
+    ]
 
     with pytest.raises(ValueError) as excinfo:
         parse_daily_note(note_lines)
@@ -336,23 +324,21 @@ def test_parse_training_table_rows_rejects_non_canonical_time_range():
 
 
 def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing():
-    note_lines = _note_lines(
-        [
-            "---",
-            "workout: false",
-            "stretch: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **SLEEP**",
-            "",
-            "| TIME | ASLEEP | AWAKE |",
-            "| ---- | -------- | ----- |",
-            "| 23:00-07:00 | `8h00m` | `15m` |",
-            "| 08:00-09:00 | `1h00m` | `` |",
-        ],
-    )
+    note_lines = [
+        "---",
+        "workout: false",
+        "stretch: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **SLEEP**",
+        "",
+        "| TIME | ASLEEP | AWAKE |",
+        "| ---- | -------- | ----- |",
+        "| 23:00-07:00 | `8h00m` | `15m` |",
+        "| 08:00-09:00 | `1h00m` | `` |",
+    ]
 
     parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 540.0
@@ -360,22 +346,20 @@ def test_parse_daily_note_uses_sleep_table_when_frontmatter_sleep_missing():
 
 
 def test_parse_daily_note_sleep_absent_defaults():
-    note_lines = _note_lines(
-        [
-            "---",
-            "workout: no",
-            "stretch: yes",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **STUDY**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
-            "| ---- | -------- | -------- | --------- | ----- |",
-            "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `0m` |",
-        ],
-    )
+    note_lines = [
+        "---",
+        "workout: no",
+        "stretch: yes",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **STUDY**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+        "| ---- | -------- | -------- | --------- | ----- |",
+        "| 09:00 - 10:00 | `coding` | `1h00m` | `+00m` | `0m` |",
+    ]
 
     parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 0
@@ -385,51 +369,47 @@ def test_parse_daily_note_sleep_absent_defaults():
 
 
 def test_parse_daily_note_sleep_table_zero_duration_stays_zero():
-    note_lines = _note_lines(
-        [
-            "---",
-            "workout: false",
-            "stretch: false",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **SLEEP**",
-            "",
-            "| TIME | ASLEEP | AWAKE |",
-            "| ---- | -------- | ----- |",
-            "| 23:00-23:00 | `` | `` |",
-        ],
-    )
+    note_lines = [
+        "---",
+        "workout: false",
+        "stretch: false",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **SLEEP**",
+        "",
+        "| TIME | ASLEEP | AWAKE |",
+        "| ---- | -------- | ----- |",
+        "| 23:00-23:00 | `` | `` |",
+    ]
     parsed = parse_daily_note(note_lines)
     assert parsed["sleep_minutes"] == 0
 
 
 def test_parse_daily_note_aggregates_duplicate_keys_across_sections():
-    note_lines = _note_lines(
-        [
-            "---",
-            "sleep: 6h00m",
-            "workout: true",
-            "stretch: true",
-            "---",
-            "",
-            "## Metrics",
-            "---",
-            "### **STUDY**",
-            "",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
-            "| ---- | -------- | -------- | --------- | ----- |",
-            "| 09:00 - 09:30 | `coding` | `30m` | `+00m` | `0m` |",
-            "| 10:00 - 10:45 | `coding` | `45m` | `+00m` | `0m` |",
-            "",
-            "### **TRAINING**",
-            "| TIME | ACTIVITY | DURATION | INTERRUPT |",
-            "| ---- | -------- | -------- | --------- |",
-            "| `07:00 - 07:20` | Lift | `20m` | `+00m` |",
-            "| `08:00 - 08:10` | Lift | `10m` | `+00m` |",
-        ],
-    )
+    note_lines = [
+        "---",
+        "sleep: 6h00m",
+        "workout: true",
+        "stretch: true",
+        "---",
+        "",
+        "## Metrics",
+        "---",
+        "### **STUDY**",
+        "",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT | BREAK |",
+        "| ---- | -------- | -------- | --------- | ----- |",
+        "| 09:00 - 09:30 | `coding` | `30m` | `+00m` | `0m` |",
+        "| 10:00 - 10:45 | `coding` | `45m` | `+00m` | `0m` |",
+        "",
+        "### **TRAINING**",
+        "| TIME | ACTIVITY | DURATION | INTERRUPT |",
+        "| ---- | -------- | -------- | --------- |",
+        "| `07:00 - 07:20` | Lift | `20m` | `+00m` |",
+        "| `08:00 - 08:10` | Lift | `10m` | `+00m` |",
+    ]
     parsed = parse_daily_note(note_lines)
     assert parsed["activity_totals"] == {"coding": 75.0}
     assert parsed["training_occurrences"] == (

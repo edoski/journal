@@ -51,8 +51,7 @@ class MarkdownDailyAggregateSource(DailyAggregateSource):
                 offenders.append((day, path, str(exc)))
                 continue
 
-            if parsed:
-                data[day] = parsed
+            data[day] = parsed
 
         if offenders:
             _raise_window_schema_error(offenders)

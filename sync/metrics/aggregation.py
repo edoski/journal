@@ -275,13 +275,7 @@ def aggregate_training_type_session_stats(
         daily = daily_data.get(d)
         if daily is None:
             continue
-        try:
-            occurrences = daily["training_occurrences"]
-        except KeyError as exc:
-            raise ValueError(
-                "Daily aggregate missing required training field "
-                f"'training_occurrences' on {d.isoformat()}"
-            ) from exc
+        occurrences = daily["training_occurrences"]
 
         if not occurrences:
             continue

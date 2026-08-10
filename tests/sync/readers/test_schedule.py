@@ -21,7 +21,7 @@ _DIVIDER = (
 )
 
 
-def _protocol_lines(_tmp_path, table_lines: list[str]) -> list[str]:
+def _protocol_lines(table_lines: list[str]) -> list[str]:
     return [
         "## SUPPLEMENTS",
         "",
@@ -48,9 +48,8 @@ def _default_row(
     )
 
 
-def test_schedule_rules_resolve_default_weekday_and_date_precedence(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_resolve_default_weekday_and_date_precedence():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -60,7 +59,7 @@ def test_schedule_rules_resolve_default_weekday_and_date_precedence(tmp_path):
         ],
     )
 
-    rules = parse_schedule_rules(path)
+    rules = parse_schedule_rules(lines)
 
     monday = rules.resolve_day(datetime.date(2026, 2, 16))
     wednesday = rules.resolve_day(datetime.date(2026, 2, 18))
@@ -79,9 +78,8 @@ def test_schedule_rules_resolve_default_weekday_and_date_precedence(tmp_path):
     assert friday_with_date_override.is_off_day is False
 
 
-def test_schedule_rules_date_override_updates_end_lunch_and_workout_fields(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_date_override_updates_end_lunch_and_workout_fields():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -89,7 +87,7 @@ def test_schedule_rules_date_override_updates_end_lunch_and_workout_fields(tmp_p
             "| DATE:2026-02-20 | | 17:30 | | 14:00 | 19:30 |",
         ],
     )
-    rules = parse_schedule_rules(path)
+    rules = parse_schedule_rules(lines)
     profile = rules.resolve_day(datetime.date(2026, 2, 20))
 
     assert profile.study_start == datetime.time(8, 0)
@@ -201,19 +199,17 @@ def test_parse_rule_date_returns_canonical_kind_literal():
     ],
 )
 def test_schedule_rules_invalid_default_time_reports_exact_line_and_column(
-    tmp_path,
     default_row: str,
     expected: str,
 ):
-    path = _protocol_lines(tmp_path, [_HEADER, _DIVIDER, default_row])
+    lines = _protocol_lines([_HEADER, _DIVIDER, default_row])
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == expected
 
 
-def test_schedule_rules_reject_noncanonical_header(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_noncanonical_header():
+    lines = _protocol_lines(
         [
             "| TIME | ACTIVITY |",
             "| ---- | -------- |",
@@ -222,16 +218,15 @@ def test_schedule_rules_reject_noncanonical_header(tmp_path):
     )
 
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == (
         "## SCHEDULE table header must be exactly: "
         "| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |"
     )
 
 
-def test_schedule_rules_reject_duplicate_weekday_selector(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_duplicate_weekday_selector():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -242,13 +237,12 @@ def test_schedule_rules_reject_duplicate_weekday_selector(tmp_path):
     )
 
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "PROTOCOL.md line 9: duplicate WEEKDAY selector 'WED'"
 
 
-def test_schedule_rules_reject_invalid_time_format(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_invalid_time_format():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -257,12 +251,11 @@ def test_schedule_rules_reject_invalid_time_format(tmp_path):
     )
 
     with pytest.raises(ValueError, match="must be HH:MM"):
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
 
 
-def test_schedule_rules_reject_resolved_invalid_study_window(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_resolved_invalid_study_window():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -270,7 +263,7 @@ def test_schedule_rules_reject_resolved_invalid_study_window(tmp_path):
             "| DATE:2026-02-20 | 19:00 | | | | |",
         ],
     )
-    rules = parse_schedule_rules(path)
+    rules = parse_schedule_rules(lines)
 
     with pytest.raises(ValueError, match="STUDY_START must be earlier than STUDY_END"):
         rules.resolve_day(datetime.date(2026, 2, 20))
@@ -286,9 +279,8 @@ def test_schedule_rules_reject_missing_table():
         parse_schedule_rules(["## SCHEDULE", "", "No table here"])
 
 
-def test_schedule_rules_reject_missing_divider_row(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_missing_divider_row():
+    lines = _protocol_lines(
         [
             _HEADER,
             "not-a-divider",
@@ -296,20 +288,19 @@ def test_schedule_rules_reject_missing_divider_row(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "## SCHEDULE table is missing the divider row"
 
 
-def test_schedule_rules_reject_empty_rules_table(tmp_path):
-    path = _protocol_lines(tmp_path, [_HEADER, _DIVIDER])
+def test_schedule_rules_reject_empty_rules_table():
+    lines = _protocol_lines([_HEADER, _DIVIDER])
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "## SCHEDULE table must contain at least one rule row"
 
 
-def test_schedule_rules_reject_missing_default_row(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_missing_default_row():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -317,13 +308,12 @@ def test_schedule_rules_reject_missing_default_row(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "## SCHEDULE table must define one DEFAULT row"
 
 
-def test_schedule_rules_reject_duplicate_default_rows(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_duplicate_default_rows():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -332,13 +322,12 @@ def test_schedule_rules_reject_duplicate_default_rows(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "## SCHEDULE table must define exactly one DEFAULT row"
 
 
-def test_schedule_rules_reject_default_row_with_missing_fields(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_row_with_missing_fields():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -346,16 +335,15 @@ def test_schedule_rules_reject_default_row_with_missing_fields(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value)
         == "PROTOCOL.md line 7: DEFAULT row must set all schedule fields"
     )
 
 
-def test_schedule_rules_reject_default_row_with_invalid_study_window(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_row_with_invalid_study_window():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -363,13 +351,12 @@ def test_schedule_rules_reject_default_row_with_invalid_study_window(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "DEFAULT row must satisfy STUDY_START < STUDY_END"
 
 
-def test_schedule_rules_reject_default_row_with_invalid_lunch_window(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_row_with_invalid_lunch_window():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -377,13 +364,12 @@ def test_schedule_rules_reject_default_row_with_invalid_lunch_window(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "DEFAULT row must satisfy LUNCH_START < LUNCH_END"
 
 
-def test_schedule_rules_reject_override_without_values(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_override_without_values():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -392,16 +378,15 @@ def test_schedule_rules_reject_override_without_values(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value)
         == "PROTOCOL.md line 8: override rows must set at least one field"
     )
 
 
-def test_schedule_rules_reject_default_off_row(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_off_row():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -409,13 +394,12 @@ def test_schedule_rules_reject_default_off_row(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "PROTOCOL.md line 7: DEFAULT row cannot be OFF"
 
 
-def test_schedule_rules_reject_partial_off_row(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_partial_off_row():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -424,16 +408,15 @@ def test_schedule_rules_reject_partial_off_row(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value)
         == "PROTOCOL.md line 8: OFF must be used in both STUDY_START and STUDY_END"
     )
 
 
-def test_schedule_rules_reject_off_row_with_non_blank_lunch_or_workout(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_off_row_with_non_blank_lunch_or_workout():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -442,16 +425,15 @@ def test_schedule_rules_reject_off_row_with_non_blank_lunch_or_workout(tmp_path)
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value)
         == "PROTOCOL.md line 8: OFF rows must leave LUNCH_START, LUNCH_END, and WORKOUT_START blank"
     )
 
 
-def test_schedule_rules_resolve_weekday_off_and_date_reenable_precedence(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_resolve_weekday_off_and_date_reenable_precedence():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -460,7 +442,7 @@ def test_schedule_rules_resolve_weekday_off_and_date_reenable_precedence(tmp_pat
             "| DATE:2026-02-22 | 10:00 | 12:00 | | | |",
         ],
     )
-    rules = parse_schedule_rules(path)
+    rules = parse_schedule_rules(lines)
 
     saturday = rules.resolve_day(datetime.date(2026, 2, 21))
     sunday = rules.resolve_day(datetime.date(2026, 2, 22))
@@ -471,9 +453,8 @@ def test_schedule_rules_resolve_weekday_off_and_date_reenable_precedence(tmp_pat
     assert sunday.study_end == datetime.time(12, 0)
 
 
-def test_schedule_rules_reject_duplicate_date_selector(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_duplicate_date_selector():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -483,15 +464,14 @@ def test_schedule_rules_reject_duplicate_date_selector(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value) == "PROTOCOL.md line 9: duplicate DATE selector '2026-02-20'"
     )
 
 
-def test_schedule_rules_reject_invalid_weekday_token(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_invalid_weekday_token():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -500,12 +480,11 @@ def test_schedule_rules_reject_invalid_weekday_token(tmp_path):
         ],
     )
     with pytest.raises(ValueError, match="invalid WEEKDAY token"):
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
 
 
-def test_schedule_rules_reject_duplicate_weekday_token_in_same_rule(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_duplicate_weekday_token_in_same_rule():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -514,12 +493,11 @@ def test_schedule_rules_reject_duplicate_weekday_token_in_same_rule(tmp_path):
         ],
     )
     with pytest.raises(ValueError, match="duplicate WEEKDAY token"):
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
 
 
-def test_schedule_rules_reject_invalid_date_rule_shape(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_invalid_date_rule_shape():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -528,12 +506,11 @@ def test_schedule_rules_reject_invalid_date_rule_shape(tmp_path):
         ],
     )
     with pytest.raises(ValueError, match="DATE rule must be DATE:YYYY-MM-DD"):
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
 
 
-def test_schedule_rules_reject_unsupported_rule(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_unsupported_rule():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -542,12 +519,11 @@ def test_schedule_rules_reject_unsupported_rule(tmp_path):
         ],
     )
     with pytest.raises(ValueError, match="unsupported RULE"):
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
 
 
-def test_schedule_rules_reject_row_with_wrong_column_count(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_row_with_wrong_column_count():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -555,13 +531,12 @@ def test_schedule_rules_reject_row_with_wrong_column_count(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "PROTOCOL.md line 7: expected 6 columns, got 5"
 
 
-def test_schedule_rules_resolve_day_rejects_invalid_lunch_window(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_resolve_day_rejects_invalid_lunch_window():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -569,14 +544,13 @@ def test_schedule_rules_resolve_day_rejects_invalid_lunch_window(tmp_path):
             "| DATE:2026-02-20 | | | 15:00 | | |",
         ],
     )
-    rules = parse_schedule_rules(path)
+    rules = parse_schedule_rules(lines)
     with pytest.raises(ValueError, match="LUNCH_START must be earlier than LUNCH_END"):
         rules.resolve_day(datetime.date(2026, 2, 20))
 
 
-def test_schedule_rules_reject_header_row_that_is_not_a_markdown_row(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_header_row_that_is_not_a_markdown_row():
+    lines = _protocol_lines(
         [
             "| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START",
             _DIVIDER,
@@ -584,13 +558,12 @@ def test_schedule_rules_reject_header_row_that_is_not_a_markdown_row(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "PROTOCOL.md line 5: invalid markdown table row"
 
 
-def test_schedule_rules_reject_invalid_rule_row_with_exact_line_number(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_invalid_rule_row_with_exact_line_number():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -599,16 +572,15 @@ def test_schedule_rules_reject_invalid_rule_row_with_exact_line_number(tmp_path)
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert (
         str(excinfo.value)
         == "PROTOCOL.md line 8: unsupported RULE 'HOLIDAY'; expected DEFAULT, WEEKDAY:..., or DATE:YYYY-MM-DD"
     )
 
 
-def test_schedule_rules_reject_invalid_markdown_body_row_with_exact_line(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_invalid_markdown_body_row_with_exact_line():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -617,7 +589,7 @@ def test_schedule_rules_reject_invalid_markdown_body_row_with_exact_line(tmp_pat
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "PROTOCOL.md line 8: invalid markdown table row"
 
 
@@ -635,9 +607,8 @@ def test_schedule_rules_rejects_missing_divider_when_header_is_last_line():
     assert str(excinfo.value) == "## SCHEDULE table is missing the divider row"
 
 
-def test_schedule_rules_reject_default_row_when_study_times_are_equal(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_row_when_study_times_are_equal():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -645,13 +616,12 @@ def test_schedule_rules_reject_default_row_when_study_times_are_equal(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "DEFAULT row must satisfy STUDY_START < STUDY_END"
 
 
-def test_schedule_rules_reject_default_row_when_lunch_times_are_equal(tmp_path):
-    path = _protocol_lines(
-        tmp_path,
+def test_schedule_rules_reject_default_row_when_lunch_times_are_equal():
+    lines = _protocol_lines(
         [
             _HEADER,
             _DIVIDER,
@@ -659,5 +629,5 @@ def test_schedule_rules_reject_default_row_when_lunch_times_are_equal(tmp_path):
         ],
     )
     with pytest.raises(ValueError) as excinfo:
-        parse_schedule_rules(path)
+        parse_schedule_rules(lines)
     assert str(excinfo.value) == "DEFAULT row must satisfy LUNCH_START < LUNCH_END"
