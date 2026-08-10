@@ -188,6 +188,7 @@ def _write_podcast_template(path: Path) -> None:
                 "host:",
                 'date: <% tp.date.now("YYYY-MM-DD") %>',
                 "link:",
+                "visible: false",
                 "genre: psychology",
                 "---",
                 "",
@@ -900,6 +901,7 @@ def test_media_podcast_add_creates_note_with_sanitized_filename(
     assert "host: Jordan B Peterson" in lines
     assert "date: 2026-02-20" in lines
     assert "link: https://www.youtube.com/watch?v=kYYJlNbV1OM" in lines
+    assert "visible: false" in lines
     assert "genre: psychology" in lines
     assert lines[-1] == "# Notes"
     assert cache_store.saved == [

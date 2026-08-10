@@ -18,6 +18,7 @@ FIXTURE_MEDIA_BUNDLE = MediaBundle(
         )
     ],
     podcasts=[],
+    series=[],
 )
 
 

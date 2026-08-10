@@ -41,6 +41,11 @@ def _parse_rating(value: str) -> float | None:
         return None
 
 
+def _parse_visible(frontmatter: dict[str, str]) -> bool:
+    """Read the `visible` checkbox property; anything but `true` stays hidden."""
+    return _frontmatter_text(frontmatter, "visible").strip().lower() == "true"
+
+
 def parse_book_note(title: str, lines: list[str]) -> Book | None:
     """Parse one book note."""
     frontmatter = parse_frontmatter(lines)
@@ -68,4 +73,15 @@ def parse_podcast_note(title: str, lines: list[str]) -> Podcast | None:
         date=podcast_date,
         rating=_parse_rating(_frontmatter_text(frontmatter, "rating")),
         link=link or None,
+        visible=_parse_visible(frontmatter),
     )
+
+
+def parse_series_visibility(lines: list[str]) -> bool:
+    """
+    Read whether a podcast series' index note opts into rendering.
+
+    The index note is the series' representative note, so its `visible` property
+    speaks for the whole folder exactly as a podcast note's does for itself.
+    """
+    return _parse_visible(parse_frontmatter(lines))

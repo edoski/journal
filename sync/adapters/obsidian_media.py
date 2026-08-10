@@ -7,7 +7,7 @@ import os
 from dataclasses import replace
 
 from sync.constants import BOOKS_DIR, PODCASTS_DIR
-from sync.contracts.media import Book, MediaBundle, Podcast
+from sync.contracts.media import Book, MediaBundle, Podcast, PodcastSeries
 from sync.io import atomic_write_note, safe_read_file
 from sync.log import get_logger
 from sync.notes.locking import locked_note
@@ -17,7 +17,9 @@ from sync.readers.media import (
     parse_book_note,
     parse_media_date,
     parse_podcast_note,
+    parse_series_visibility,
 )
+from sync.writers.tables import SimpleGridTableSpec, render_table
 
 logger = get_logger(__name__)
 
@@ -146,39 +148,36 @@ def _scan_books(
     return books, cache, cache_modified
 
 
-def _scan_podcasts(
-    start_date: datetime.date,
-    end_date: datetime.date,
-    podcasts_dir: str,
+def _scan_podcast_directory(
+    directory: str,
     *,
-    cached_dates: dict[str, str] | None = None,
-) -> tuple[list[Podcast], dict[str, str], bool]:
+    key_prefix: str,
+    cache: dict[str, str],
+    skip_filename: str | None = None,
+) -> tuple[list[Podcast], bool]:
     """
-    Scan notes/podcasts/ for podcasts within the date range.
+    Scan one directory of podcast notes, updating `cache` in place.
 
-    Also maintains a cache of podcast dates and heals corrupted frontmatter
-    when dates differ from cached values (caused by Obsidian Sync issues).
+    Every note is cached and date-healed; date-range and visibility filtering is
+    left to callers, which also need the notes a series entry hides.
 
     Args:
-        start_date: Start of date range (inclusive)
-        end_date: End of date range (inclusive)
-        podcasts_dir: Path to podcasts directory
+        directory: Directory holding podcast notes
+        key_prefix: Prefix making cache keys unique across subdirectories
+        cache: Title-to-date cache, mutated as notes are discovered
+        skip_filename: Note left out of the scan (a series' own index note)
 
     Returns:
-        List of Podcast dataclasses for podcasts in range
+        Every parsed podcast note, and whether the cache gained new entries
     """
     podcasts: list[Podcast] = []
-    cache = dict(cached_dates or {})
     cache_modified = False
 
-    if not os.path.isdir(podcasts_dir):
-        return podcasts, cache, cache_modified
-
-    for filename in os.listdir(podcasts_dir):
-        if not filename.endswith(".md"):
+    for filename in sorted(os.listdir(directory)):
+        if not filename.endswith(".md") or filename == skip_filename:
             continue
 
-        filepath = os.path.join(podcasts_dir, filename)
+        filepath = os.path.join(directory, filename)
         if not os.path.isfile(filepath):
             continue
 
@@ -191,16 +190,17 @@ def _scan_podcasts(
         if podcast is None:
             continue
         podcast_date = podcast.date
+        cache_key = f"{key_prefix}{title}"
 
         # Cache check and healing
-        cached_date_str = cache.get(title)
+        cached_date_str = cache.get(cache_key)
         if cached_date_str:
             cached_date = parse_media_date(cached_date_str)
             if cached_date and cached_date != podcast_date:
                 # Date was corrupted - heal it
                 logger.warning(
                     "Podcast '%s' date mismatch: frontmatter=%s, cached=%s. Healing.",
-                    title,
+                    cache_key,
                     podcast_date,
                     cached_date,
                 )
@@ -209,19 +209,179 @@ def _scan_podcasts(
                 podcast = replace(podcast, date=cached_date)
         else:
             # New entry - add to cache
-            cache[title] = podcast_date.strftime("%Y-%m-%d")
+            cache[cache_key] = podcast_date.strftime("%Y-%m-%d")
             cache_modified = True
-
-        # Check if within date range
-        if not (start_date <= podcast_date <= end_date):
-            continue
 
         podcasts.append(podcast)
 
-    # Sort by date
-    podcasts.sort(key=lambda p: p.date)
+    podcasts.sort(key=lambda p: (p.date, p.title))
 
-    return podcasts, cache, cache_modified
+    return podcasts, cache_modified
+
+
+def _in_range(
+    podcasts: list[Podcast],
+    start_date: datetime.date,
+    end_date: datetime.date,
+) -> list[Podcast]:
+    """Keep the podcasts watched inside the period window."""
+    return [podcast for podcast in podcasts if start_date <= podcast.date <= end_date]
+
+
+def _series_frontmatter(lines: list[str] | None) -> list[str]:
+    """
+    Return an index note's frontmatter block, defaulting to a hidden series.
+
+    The block is the hand-edited half of the note: `visible: true` there opts the
+    series into media tables, so an existing block is preserved verbatim.
+    """
+    if lines and lines[0].strip() == "---":
+        for index, line in enumerate(lines[1:], start=1):
+            if line.strip() == "---":
+                return lines[: index + 1]
+    return ["---", "visible: false", "---"]
+
+
+def _series_index_lines(frontmatter: list[str], episodes: list[Podcast]) -> list[str]:
+    """Render a series index note: its frontmatter above an episode table."""
+    return [
+        *frontmatter,
+        "",
+        *render_table(
+            SimpleGridTableSpec(
+                headers=["EPISODE", "DATE"],
+                divider_cells=["-------", "----"],
+                rows=[
+                    [f"[[{episode.title}]]", f"`{episode.date:%Y-%m-%d}`"]
+                    for episode in episodes
+                ],
+            )
+        ),
+    ]
+
+
+def _normalized_table_cells(lines: list[str]) -> list[tuple[str, ...]]:
+    """
+    Reduce table lines to their cell values, ignoring column padding.
+
+    Obsidian formatters pad table columns, which must not read as a content
+    change and start a rewrite war with the generated index note.
+    """
+    normalized: list[tuple[str, ...]] = []
+    for line in lines:
+        if not line.strip():
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        normalized.append(
+            tuple("-" if set(cell) <= {"-", ":"} and cell else cell for cell in cells)
+        )
+    return normalized
+
+
+def _sync_series_index(directory: str, title: str, episodes: list[Podcast]) -> bool:
+    """
+    Regenerate a series' index note and report whether it renders.
+
+    The note represents the series in periodic media tables, so its `visible`
+    property decides rendering exactly as a standalone podcast's does for itself.
+    Only the episode table below the frontmatter is generated: it is rewritten
+    whenever the episode list drifts and left untouched otherwise.
+
+    Args:
+        directory: The series folder
+        title: Series title, which the index note is named after
+        episodes: Every episode note in the folder, in watch order
+
+    Returns:
+        Whether the series opts into rendering
+    """
+    filepath = os.path.join(directory, f"{title}.md")
+    existing = safe_read_file(filepath)
+    frontmatter = _series_frontmatter(existing)
+    lines = _series_index_lines(frontmatter, episodes)
+
+    if existing is None or _normalized_table_cells(existing) != (
+        _normalized_table_cells(lines)
+    ):
+        try:
+            with locked_note(filepath):
+                atomic_write_note(filepath, lines)
+            logger.info("Regenerated series index for %s", title)
+        except (TimeoutError, PermissionError, OSError) as e:
+            logger.warning("Failed to write series index for %s: %s", title, e)
+
+    return parse_series_visibility(frontmatter)
+
+
+def _scan_podcasts(
+    start_date: datetime.date,
+    end_date: datetime.date,
+    podcasts_dir: str,
+    *,
+    cached_dates: dict[str, str] | None = None,
+) -> tuple[list[Podcast], list[PodcastSeries], dict[str, str], bool]:
+    """
+    Scan notes/podcasts/ for visible podcasts within the date range.
+
+    Notes directly in the directory render as one entry each and are visible only
+    when they say so themselves. Each subdirectory is a series that renders as a
+    single entry, dated by its latest episode in range; the series says whether
+    it is visible through its own index note, which is regenerated on every scan.
+
+    Args:
+        start_date: Start of date range (inclusive)
+        end_date: End of date range (inclusive)
+        podcasts_dir: Path to podcasts directory
+
+    Returns:
+        Standalone podcasts, series entries, the updated cache, and whether it changed
+    """
+    cache = dict(cached_dates or {})
+
+    if not os.path.isdir(podcasts_dir):
+        return [], [], cache, False
+
+    root_notes, cache_modified = _scan_podcast_directory(
+        podcasts_dir,
+        key_prefix="",
+        cache=cache,
+    )
+
+    series: list[PodcastSeries] = []
+    for entry in sorted(os.listdir(podcasts_dir)):
+        directory = os.path.join(podcasts_dir, entry)
+        if entry.startswith(".") or not os.path.isdir(directory):
+            continue
+
+        episodes, series_modified = _scan_podcast_directory(
+            directory,
+            key_prefix=f"{entry}/",
+            cache=cache,
+            skip_filename=f"{entry}.md",
+        )
+        cache_modified = cache_modified or series_modified
+        visible = _sync_series_index(directory, entry, episodes)
+
+        rendered = _in_range(episodes, start_date, end_date)
+        if not visible or not rendered:
+            continue
+
+        series.append(
+            PodcastSeries(
+                title=entry,
+                date=max(episode.date for episode in rendered),
+            )
+        )
+
+    # Sort by date
+    podcasts = [
+        podcast
+        for podcast in _in_range(root_notes, start_date, end_date)
+        if podcast.visible
+    ]
+    series.sort(key=lambda s: s.date)
+
+    return podcasts, series, cache, cache_modified
 
 
 class ObsidianMediaSource(MediaSource):
@@ -247,7 +407,7 @@ class ObsidianMediaSource(MediaSource):
             self.books_dir,
             cached_dates=cache.get("books", {}),
         )
-        podcasts, podcast_cache, podcasts_modified = _scan_podcasts(
+        podcasts, series, podcast_cache, podcasts_modified = _scan_podcasts(
             start,
             end,
             self.podcasts_dir,
@@ -262,4 +422,4 @@ class ObsidianMediaSource(MediaSource):
                 }
             )
 
-        return MediaBundle(books=books, podcasts=podcasts)
+        return MediaBundle(books=books, podcasts=podcasts, series=series)

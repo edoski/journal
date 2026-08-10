@@ -42,6 +42,7 @@ class TestRenderMediaTable:
                 date=datetime.date(2025, 1, 20),
                 rating=None,
                 link=None,
+                visible=True,
             )
         ]
 

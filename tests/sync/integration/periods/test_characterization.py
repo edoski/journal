@@ -153,7 +153,7 @@ def test_monthly_previous_summary_uses_full_previous_month_denominator():
         build_month_window(end),
         {},
         {prev_start: _minimal_daily(60.0)},
-        MediaBundle(books=[], podcasts=[]),
+        MediaBundle(books=[], podcasts=[], series=[]),
     )
 
     assert "| `0h00m/day` | `0h02m/day` |" in _summary_line(lines, "STUDY")

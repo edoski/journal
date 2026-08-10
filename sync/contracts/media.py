@@ -26,6 +26,15 @@ class Podcast:
     date: datetime.date
     rating: float | None
     link: str | None
+    visible: bool
+
+
+@dataclass(frozen=True)
+class PodcastSeries:
+    """A podcast subdirectory collapsed into one media entry."""
+
+    title: str
+    date: datetime.date
 
 
 @dataclass(frozen=True)
@@ -53,3 +62,4 @@ class MediaBundle:
 
     books: list[Book]
     podcasts: list[Podcast]
+    series: list[PodcastSeries]

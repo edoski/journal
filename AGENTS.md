@@ -202,6 +202,16 @@ journal/
 - Periodic `TRAINING` type summary tables are canonical only when they include:
   - `| TYPE | SESSIONS | DURATION | TIME |`
   - `TIME` renders one row per activity type and uses slash-separated exact averaged ranges when a type has multiple recurring windows
+- `notes/podcasts/` entries render in periodic `MEDIA` tables only when:
+  - a note directly in the directory sets `visible: true`; it renders as its own entry
+  - a subdirectory is a series: it renders as one entry titled after the folder, dated
+    by its latest episode inside the period window
+  - a series is represented by its `<folder>/<folder>.md` index note, whose
+    `visible: true` opts the whole series in exactly as a standalone podcast note does
+    for itself; episodes' own `visible` properties are ignored inside a series
+  - the index note's episode table is regenerated on every scan from all its episodes
+    in watch order, so only its frontmatter may be hand-edited; a series without an
+    index note gets a hidden one (`visible: false`) written on the next scan
 - `PROTOCOL.md` `## SCHEDULE` is canonical only when it includes:
   - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
   - required `DEFAULT` row with full values
