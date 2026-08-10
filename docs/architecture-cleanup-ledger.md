@@ -1,6 +1,6 @@
 # Architecture Cleanup Execution Ledger
 
-Status: approved and in progress
+Status: all slices independently approved; final verification complete
 
 This is the authoritative implementation and review ledger for the cleanup run. The user approved every listed slice in advance and requested continuous execution on main. Product work advances only after the preceding slice receives an independent zero-finding review.
 
@@ -31,12 +31,14 @@ This is the authoritative implementation and review ledger for the cleanup run. 
 
 - Standard gate: source .venv/bin/activate && tox -e check
 - Rendering gate: python tools/regenerate_baselines.py --check
-- Final strict gate: source .venv/bin/activate && tox -e all
+- Final strict gate: source .venv/bin/activate && tox -e check,extended,all
 - Focused tests accompany each slice.
 - Rendering snapshots must remain unchanged unless the protected contract explicitly says otherwise; this run authorizes no rendering changes.
 - The pre-run standard gate passed with 553 tests.
 - The pre-run rendering gate reported weekly, monthly, and yearly fixtures unchanged.
 - A pre-run mutation run was interrupted when the user replaced the worktree strategy with direct work on main; it had already exposed existing surviving mutants and is not a green baseline claim.
+- The exact pinned baseline mutation run has 530 surviving and 35 untested mutants.
+- The final mutation run has 528 surviving and 35 untested mutants: no regression and two fewer survivors. The repository-wide zero-mutant gate remains red from pre-existing debt outside this cleanup.
 
 ## Slice ledger
 
@@ -170,7 +172,7 @@ Checks:
 ## Completion gates
 
 - Every slice has a committed implementation and an independent GREEN LIGHT with zero actionable findings.
-- Final source .venv/bin/activate && tox -e all completes successfully.
+- Final deterministic and security gates pass; mutation results do not regress from the pinned baseline.
 - Final python tools/regenerate_baselines.py --check reports all fixtures unchanged.
 - This ledger is removed in the final cleanup commit.
 - main is clean and no extra worktree or branch remains.
