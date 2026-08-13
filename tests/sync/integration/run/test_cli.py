@@ -106,6 +106,7 @@ def _flow_automation_deps(
     run_launchctl=None,
     run_applescript=None,
     connection_factory=None,
+    show_paused_reminder=None,
     now=None,
 ) -> flow_automation.FlowAutomationDeps:
     cache_dir = tmp_path / "cache"
@@ -129,6 +130,7 @@ def _flow_automation_deps(
         ),
         run_launchctl=run_launchctl or (lambda _args: (0, "", "")),
         run_applescript=run_applescript or (lambda _script: None),
+        show_paused_reminder=show_paused_reminder or (lambda: True),
         now=now or datetime.now,
     )
 
@@ -792,8 +794,9 @@ def test_session_remind_noops_when_phase_is_not_flow_and_clears_state(
     assert not state_path.exists()
 
 
-def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
+def test_session_remind_shows_helper_on_first_stagnant_check(tmp_path: Path) -> None:
     calls: list[str] = []
+    reminders: list[None] = []
 
     def _fake_run(script: str) -> str:
         calls.append(script)
@@ -801,8 +804,6 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
             return "Flow"
         if script == FLOW_GET_TIME:
             return "25:00"
-        if script == FLOW_SHOW:
-            return "Flow"
         return "ok"
 
     deps = _flow_automation_deps(
@@ -817,6 +818,7 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
         ),
         run_applescript=_fake_run,
         connection_factory=lambda _readonly: _make_open_flow_conn(started_at=10.0),
+        show_paused_reminder=lambda: reminders.append(None) is None,
         now=lambda: datetime(2026, 2, 27, 12, 0, 0),
     )
 
@@ -830,8 +832,8 @@ def test_session_remind_reveals_on_first_stagnant_check(tmp_path: Path) -> None:
         FLOW_GET_TIME,
         FLOW_GET_PHASE,
         FLOW_GET_TIME,
-        FLOW_SHOW,
     ]
+    assert reminders == [None]
     assert flow_automation._load_flow_reminder_state(deps) == {
         "open_session_started_at": 10.0,
         "remaining_time": "25:00",

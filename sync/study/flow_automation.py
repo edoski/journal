@@ -25,6 +25,7 @@ REMIND_LAUNCHD_TARGET = f"{REMIND_LAUNCHD_DOMAIN}/{REMIND_LAUNCHD_LABEL}"
 FLOW_REMINDER_STATE_FILENAME = "flow_reminder_state.json"
 FLOW_REMINDER_COOLDOWN_SECONDS = 120
 FLOW_REMINDER_STAGNANT_THRESHOLD = 1
+FLOW_PAUSED_REMINDER_URL = "flowtitle://remind"
 
 logger = get_logger(__name__)
 
@@ -53,6 +54,7 @@ class FlowAutomationDeps:
     repository: FlowSessionRepository
     run_launchctl: Callable[[list[str]], tuple[int, str, str]]
     run_applescript: Callable[[str], str | None]
+    show_paused_reminder: Callable[[], bool]
     now: Callable[[], datetime.datetime]
 
 
@@ -72,6 +74,7 @@ def default_flow_automation_deps() -> FlowAutomationDeps:
         repository=FlowSessionRepository(),
         run_launchctl=_run_launchctl,
         run_applescript=_run_applescript,
+        show_paused_reminder=_show_flow_paused_reminder,
         now=_now,
     )
 
@@ -329,6 +332,28 @@ def _run_applescript(script: str) -> str | None:
         return None
 
 
+def _show_flow_paused_reminder() -> bool:
+    try:
+        result = subprocess.run(
+            ["/usr/bin/open", "-g", FLOW_PAUSED_REMINDER_URL],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError as exc:
+        logger.error("Failed to open Flow paused reminder: %s", exc)
+        return False
+
+    if result.returncode == 0:
+        return True
+
+    detail = (
+        result.stderr.strip() or result.stdout.strip() or f"exit {result.returncode}"
+    )
+    logger.error("Failed to open Flow paused reminder: %s", detail)
+    return False
+
+
 def _now() -> datetime.datetime:
     return datetime.datetime.now()
 
@@ -471,8 +496,8 @@ def run_session_remind(
             _save_flow_reminder_state(next_state, resolved)
             return 0
 
-    if resolved.run_applescript('tell application "Flow" to show') is None:
-        logger.warning("Remind no-op: Flow show command failed")
+    if not resolved.show_paused_reminder():
+        logger.warning("Remind no-op: paused reminder failed")
         _save_flow_reminder_state(next_state, resolved)
         return 0
 
