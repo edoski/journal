@@ -70,7 +70,13 @@ def build_parser(
     session_undo = session_sub.add_parser(
         "undo", help="Delete most recent focus session"
     )
-    session_undo.add_argument("--confirm", action="store_true")
+    session_undo_mode = session_undo.add_mutually_exclusive_group()
+    session_undo_mode.add_argument("--confirm", action="store_true")
+    session_undo_mode.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit a machine-readable preview",
+    )
     session_undo.set_defaults(func=_resolve_handler(handlers, "session_undo"))
 
     session_skip = session_sub.add_parser(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import json
 from dataclasses import dataclass
 from datetime import date, timedelta
 from collections.abc import Callable
@@ -135,6 +136,27 @@ def _session_end_for_break_lookup(
     return start + datetime.timedelta(minutes=planned_minutes)
 
 
+def _undo_preview_payload(
+    focus: CliSession,
+    *,
+    associated_break_count: int,
+) -> dict[str, object]:
+    started_at = focus["start"]
+    return {
+        "session": {
+            "title": focus["title"],
+            "started_at": (
+                started_at.strftime("%Y-%m-%d %H:%M:%S")
+                if started_at is not None
+                else None
+            ),
+            "duration_minutes": focus["duration"],
+            "status": "completed" if focus["completed"] else "in-progress",
+        },
+        "associated_break_count": associated_break_count,
+    }
+
+
 def cmd_session_rename(
     args: argparse.Namespace,
     *,
@@ -193,7 +215,10 @@ def cmd_session_undo(
     )
     focus = _find_most_recent_focus(sessions)
     if not focus:
-        print("No focus session found to delete.")
+        if getattr(args, "json", False):
+            print(json.dumps({"session": None, "associated_break_count": 0}))
+        else:
+            print("No focus session found to delete.")
         return 0
 
     focus_end = _session_end_for_break_lookup(focus)
@@ -210,6 +235,17 @@ def cmd_session_undo(
         print(f"Error: could not open database: {exc}")
         return 1
     breaks = [_record_to_cli_session(record) for record in break_records]
+
+    if getattr(args, "json", False) and not args.confirm:
+        print(
+            json.dumps(
+                _undo_preview_payload(
+                    focus,
+                    associated_break_count=len(break_records),
+                )
+            )
+        )
+        return 0
 
     print("=" * 60)
     print("SESSIONS TO DELETE")

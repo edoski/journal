@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sqlite3
 from pathlib import Path
+from unittest.mock import Mock
 
 import sync.run.commands.session as session_cmd
 from sync.adapters.flow_sessions import FlowStudySessionSource
@@ -69,6 +71,51 @@ def test_record_to_cli_session_preserves_all_source_primary_keys() -> None:
 
     assert session["pk"] == 10
     assert session["pks"] == [10, 11]
+
+
+def test_cmd_session_undo_json_preview_contains_only_hud_fields(
+    monkeypatch,
+    capsys,
+) -> None:
+    focus = {
+        "pk": 10,
+        "pks": [10],
+        "phase": "flow",
+        "duration": 90.0,
+        "start": session_cmd.datetime.datetime(2026, 8, 13, 16, 54, 43),
+        "completed": None,
+        "title": "Metodi Numerici",
+        "interruptions_count": 0,
+        "interruptions_duration": 0.0,
+    }
+    monkeypatch.setattr(
+        session_cmd,
+        "_load_recent_focus_sessions",
+        lambda *_args, **_kwargs: [focus],
+    )
+    repository = Mock(spec=FlowSessionRepository)
+    repository.find_associated_break_sessions.return_value = ()
+    deps = session_cmd.SessionCommandDeps(
+        session_source_factory=lambda: FlowStudySessionSource(repository=repository),
+        schedule_source_factory=MarkdownScheduleSource,
+        repository=repository,
+    )
+
+    result = session_cmd.cmd_session_undo(
+        argparse.Namespace(confirm=False, json=True),
+        deps=deps,
+    )
+
+    assert result == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "session": {
+            "title": "Metodi Numerici",
+            "started_at": "2026-08-13 16:54:43",
+            "duration_minutes": 90.0,
+            "status": "in-progress",
+        },
+        "associated_break_count": 0,
+    }
 
 
 def test_cmd_session_rename_updates_all_source_primary_keys(

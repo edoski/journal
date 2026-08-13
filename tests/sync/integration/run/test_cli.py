@@ -1064,6 +1064,10 @@ def test_cli_parser_has_expected_commands() -> None:
     assert args.title == "Retitle"
     assert args.confirm is True
 
+    args = parser.parse_args(["session", "undo", "--json"])
+    assert args.session_command == "undo"
+    assert args.json is True
+
     args = parser.parse_args(["session", "skip", "--state", "status"])
     assert args.domain == "session"
     assert args.session_command == "skip"
