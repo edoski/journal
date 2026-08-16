@@ -154,11 +154,7 @@ enum JournalUndoError: LocalizedError {
 }
 
 final class JournalUndoRunner {
-    private let directory = URL(fileURLWithPath: "/Users/edo/dev/python/journal")
-    private let python = URL(
-        fileURLWithPath: "/Users/edo/dev/python/journal/.venv/bin/python"
-    )
-    private let queue = DispatchQueue(label: "com.edo.FlowTitle.journal")
+    private let queue = DispatchQueue(label: "com.edo.journal.undo")
 
     func preview(
         completion: @escaping (Result<UndoPreviewEnvelope, JournalUndoError>) -> Void
@@ -199,30 +195,74 @@ final class JournalUndoRunner {
     }
 
     private func execute(arguments: [String]) -> CommandResult {
-        let process = Process()
-        let output = Pipe()
-        process.currentDirectoryURL = directory
-        process.executableURL = python
-        process.arguments = ["-m", "sync.run", "session", "undo"] + arguments
-        process.standardOutput = output
-        process.standardError = output
+        BundledPython.runCaptured(
+            arguments: ["session", "undo"] + arguments,
+            startErrorPrefix: "Could not start jundo",
+            unreadableOutput: "jundo returned unreadable output."
+        )
+    }
+}
 
+enum BundledPython {
+    private static func process(arguments: [String]) throws -> Process {
+        guard let resources = Bundle.main.resourceURL else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let pythonHome = resources.appendingPathComponent("Python")
+        let process = Process()
+        process.currentDirectoryURL = resources.appendingPathComponent("JournalSync")
+        process.executableURL = pythonHome.appendingPathComponent("bin/python3")
+        process.arguments = ["-m", "sync.run"] + arguments
+
+        var environment = ProcessInfo.processInfo.environment
+        environment["PYTHONHOME"] = pythonHome.path
+        environment["PYTHONPATH"] = resources
+            .appendingPathComponent("JournalSync")
+            .path
+        environment["PYTHONNOUSERSITE"] = "1"
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        process.environment = environment
+        return process
+    }
+
+    static func runCaptured(
+        arguments: [String],
+        startErrorPrefix: String,
+        unreadableOutput: String
+    ) -> CommandResult {
+        let output = Pipe()
         do {
+            let process = try process(arguments: arguments)
+            process.standardOutput = output
+            process.standardError = output
             try process.run()
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            return CommandResult(
+                status: process.terminationStatus,
+                output: String(data: data, encoding: .utf8) ?? unreadableOutput
+            )
         } catch {
             return CommandResult(
                 status: 1,
-                output: "Could not start jundo:\n\(error.localizedDescription)"
+                output: "\(startErrorPrefix):\n\(error.localizedDescription)"
             )
         }
+    }
 
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return CommandResult(
-            status: process.terminationStatus,
-            output: String(data: data, encoding: .utf8) ??
-                "jundo returned unreadable output."
-        )
+    static func runAttached(arguments: [String]) -> Int32 {
+        do {
+            let process = try process(arguments: arguments)
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        } catch {
+            FileHandle.standardError.write(
+                Data("Could not start Journal command: \(error.localizedDescription)\n".utf8)
+            )
+            return 1
+        }
     }
 }
 
@@ -921,8 +961,13 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
     }
 }
 
-let app = NSApplication.shared
-let controller = PromptController()
-app.setActivationPolicy(.accessory)
-app.delegate = controller
-app.run()
+let arguments = Array(CommandLine.arguments.dropFirst())
+if arguments.first == "--run" {
+    exit(BundledPython.runAttached(arguments: Array(arguments.dropFirst())))
+} else {
+    let app = NSApplication.shared
+    let controller = PromptController()
+    app.setActivationPolicy(.accessory)
+    app.delegate = controller
+    app.run()
+}

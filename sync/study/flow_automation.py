@@ -16,10 +16,10 @@ from sync.config import PATHS, PathConfig
 from sync.log import get_logger
 from sync.study.repository import FlowSessionRepository
 
-SKIP_LAUNCHD_LABEL = "com.edo.skip"
+SKIP_LAUNCHD_LABEL = "com.edo.journal.skip"
 SKIP_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
 SKIP_LAUNCHD_TARGET = f"{SKIP_LAUNCHD_DOMAIN}/{SKIP_LAUNCHD_LABEL}"
-REMIND_LAUNCHD_LABEL = "com.edo.remind"
+REMIND_LAUNCHD_LABEL = "com.edo.journal.remind"
 REMIND_LAUNCHD_DOMAIN = f"gui/{os.geteuid()}"
 REMIND_LAUNCHD_TARGET = f"{REMIND_LAUNCHD_DOMAIN}/{REMIND_LAUNCHD_LABEL}"
 FLOW_REMINDER_STATE_FILENAME = "flow_reminder_state.json"

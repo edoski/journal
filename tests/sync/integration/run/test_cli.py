@@ -135,6 +135,11 @@ def _flow_automation_deps(
     )
 
 
+def test_flow_automation_uses_journal_launchd_labels() -> None:
+    assert flow_automation.SKIP_LAUNCHD_LABEL == "com.edo.journal.skip"
+    assert flow_automation.REMIND_LAUNCHD_LABEL == "com.edo.journal.remind"
+
+
 def _wiring_deps(
     *,
     session_source_factory,
