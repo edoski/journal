@@ -16,4 +16,8 @@ xcrun swiftc \
     "$project_dir/Sources/Journal.swift" \
     -o "$contents_dir/MacOS/Journal"
 
+if [ -n "${JOURNAL_CODESIGN_IDENTITY:-}" ]; then
+    codesign --force --deep --sign "$JOURNAL_CODESIGN_IDENTITY" "$app_dir"
+fi
+
 printf '%s\n' "$app_dir"
