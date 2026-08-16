@@ -21,6 +21,7 @@ mutants/
 .coverage
 .coverage.*
 htmlcov/
+/build/
 
 # OS / editor cruft
 .DS_Store
