@@ -24,16 +24,15 @@ SCHEDULE_PATH = PATHS.schedule_path
 BSC_GRADES_PATH = PATHS.bsc_grades_path
 MSC_GRADES_PATH = PATHS.msc_grades_path
 
-# Cache directories
-JOURNAL_CACHE_DIR = PATHS.journal_cache_dir
+# State and cache directories
+APPLICATION_SUPPORT_DIR = PATHS.application_support_dir
+STATE_DIR = PATHS.state_dir
 MEDIA_CACHE_DIR = PATHS.media_cache_dir
-DAILY_CACHE_DIR = PATHS.daily_cache_dir
-TRAINING_CACHE_DIR = PATHS.daily_training_cache_dir
+DAILY_STATE_DIR = PATHS.daily_state_dir
+TRAINING_STATE_DIR = PATHS.daily_training_state_dir
 
-# Lock directories
+# Lock directory
 LOCK_DIR = PATHS.lock_dir
-NOTE_LOCK_DIR = PATHS.note_lock_dir
-STATE_LOCK_DIR = PATHS.state_lock_dir
 
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]

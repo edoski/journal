@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from sync.adapters.json_daily_cache import (
-    JsonDailyTrainingCacheStore,
+from sync.adapters.json_daily_state import (
+    JsonDailyTrainingStateStore,
 )
 from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 
@@ -13,7 +13,7 @@ from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 def test_media_cache_load_raises_on_missing_required_bucket(tmp_path):
     store = JsonMediaDateCacheStore(
         cache_dir=str(tmp_path / "cache" / "media"),
-        lock_root=str(tmp_path / "cache" / "locks" / "state"),
+        lock_root=str(tmp_path / "locks"),
     )
     path = tmp_path / "cache" / "media" / "dates.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -23,12 +23,12 @@ def test_media_cache_load_raises_on_missing_required_bucket(tmp_path):
         store.load()
 
 
-def test_daily_training_cache_load_raises_on_date_mismatch(tmp_path):
-    store = JsonDailyTrainingCacheStore(
-        cache_dir=str(tmp_path / "cache" / "daily" / "training"),
-        lock_root=str(tmp_path / "cache" / "locks" / "state"),
+def test_daily_training_state_load_raises_on_date_mismatch(tmp_path):
+    store = JsonDailyTrainingStateStore(
+        state_dir=str(tmp_path / "state" / "daily" / "training"),
+        lock_root=str(tmp_path / "locks"),
     )
-    path = tmp_path / "cache" / "daily" / "training" / "2026-02-10.json"
+    path = tmp_path / "state" / "daily" / "training" / "2026-02-10.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps({"date": "2026-02-09", "entries": []}),

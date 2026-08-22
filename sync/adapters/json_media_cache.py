@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from typing import cast
 
-from sync.constants import MEDIA_CACHE_DIR, STATE_LOCK_DIR
+from sync.constants import LOCK_DIR, MEDIA_CACHE_DIR
 from sync.contracts.cache import MediaDateCacheState
 from sync.ports.cache import MediaDateCacheStore
 
@@ -68,7 +68,7 @@ class JsonMediaDateCacheStore(
         self.cache_dir = cache_dir or MEDIA_CACHE_DIR
         super().__init__(
             path=os.path.join(self.cache_dir, "dates.json"),
-            lock_root=lock_root or STATE_LOCK_DIR,
+            lock_root=lock_root or LOCK_DIR,
             empty_state=lambda: {"books": {}, "podcasts": {}},
             validator=_validate_media_cache,
         )

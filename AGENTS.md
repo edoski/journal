@@ -356,9 +356,9 @@ Primary env overrides:
 
 - `JOURNAL_DIR`, `VAULT_DIR`, `BOOKS_DIR`, `PODCASTS_DIR`
 - `DAILY_TEMPLATE_PATH`, `WEEKLY_TEMPLATE_PATH`, `MONTHLY_TEMPLATE_PATH`, `YEARLY_TEMPLATE_PATH`
-- `SCHEDULE_PATH`, `BSC_GRADES_PATH`, `MSC_GRADES_PATH`, `JOURNAL_CACHE_DIR`, `LOCK_DIR`, `NOTE_LOCK_DIR`, `STATE_LOCK_DIR`
-- `MEDIA_CACHE_DIR`, `DAILY_CACHE_DIR`
-- `TRAINING_CACHE_DIR`
+- `SCHEDULE_PATH`, `BSC_GRADES_PATH`, `MSC_GRADES_PATH`
+- `JOURNAL_SUPPORT_DIR`, `JOURNAL_STATE_DIR`, `DAILY_STATE_DIR`, `TRAINING_STATE_DIR`
+- `MEDIA_CACHE_DIR`, `LOCK_DIR`
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
 
 ## Runtime Configuration
@@ -372,7 +372,7 @@ Operational guidance:
 
 - Keep LaunchAgents minimal and route scheduled jobs through `python -m sync.run`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
-- Keep env var names stable and explicit; avoid embedding machine-specific repo paths in code.
+- Keep env var names explicit; use clean breaks when storage semantics change.
 - `sync.run session skip` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
 - `sync.run session remind` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
 - Logging is stderr-only; no app-level log file sink is used.
@@ -386,13 +386,12 @@ Move checklist (repo relocation):
 
 ## Data and Cache Files
 
-- media cache: `~/.cache/journal/media/dates.json`
-- flow reminder state cache: `~/.cache/journal/flow_reminder_state.json`
-- shortcut status pending cache: `~/.cache/journal/daily/status/pending/`
-- shortcut status invalid cache: `~/.cache/journal/daily/status/invalid/`
-- training cache: `~/.cache/journal/daily/training/YYYY-MM-DD.json`
-- note locks: `~/.cache/journal/locks/notes/<shard>/<sha1>.lock`
-- state locks: `~/.cache/journal/locks/state/<shard>/<sha1>.lock`
+- media cache: `~/Library/Caches/Journal/media/dates.json`
+- flow reminder state: `~/Library/Application Support/Journal/state/flow_reminder_state.json`
+- shortcut pending state: `~/Library/Application Support/Journal/state/daily/status/pending/`
+- shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)
+- training state: `~/Library/Application Support/Journal/state/daily/training/YYYY-MM-DD.json` (14-day retention)
+- locks: `~/Library/Application Support/Journal/locks/<shard>/<sha1>.lock` (14-day retention)
 
 ## LaunchAgents
 

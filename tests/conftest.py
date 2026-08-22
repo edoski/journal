@@ -19,25 +19,18 @@ def isolate_cache_dirs(tmp_path, monkeypatch):
     """
     cache_root = tmp_path / "cache"
     media_cache_dir = cache_root / "media"
-    training_cache_dir = cache_root / "daily" / "training"
-    note_lock_dir = cache_root / "locks" / "notes"
-    state_lock_dir = cache_root / "locks" / "state"
+    training_state_dir = tmp_path / "state" / "daily" / "training"
+    lock_dir = cache_root / "locks"
 
     monkeypatch.setattr(
         "sync.adapters.json_media_cache.MEDIA_CACHE_DIR", str(media_cache_dir)
     )
+    monkeypatch.setattr("sync.adapters.json_media_cache.LOCK_DIR", str(lock_dir))
     monkeypatch.setattr(
-        "sync.adapters.json_media_cache.STATE_LOCK_DIR", str(state_lock_dir)
+        "sync.adapters.json_daily_state.TRAINING_STATE_DIR", str(training_state_dir)
     )
-    monkeypatch.setattr(
-        "sync.adapters.json_daily_cache.TRAINING_CACHE_DIR", str(training_cache_dir)
-    )
-    monkeypatch.setattr(
-        "sync.adapters.json_daily_cache.STATE_LOCK_DIR", str(state_lock_dir)
-    )
-    monkeypatch.setattr(
-        "sync.adapters.markdown_notes.NOTE_LOCK_DIR", str(note_lock_dir)
-    )
+    monkeypatch.setattr("sync.adapters.json_daily_state.LOCK_DIR", str(lock_dir))
+    monkeypatch.setattr("sync.adapters.markdown_notes.LOCK_DIR", str(lock_dir))
     monkeypatch.setattr("sync.notes.locking._PRUNED_LOCK_ROOTS", set())
 
     yield

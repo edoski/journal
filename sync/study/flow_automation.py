@@ -163,7 +163,7 @@ def _apply_skip_state(
 def _flow_reminder_state_path(deps: FlowAutomationDeps | None = None) -> str:
     resolved = deps or default_flow_automation_deps()
     return os.path.join(
-        resolved.paths.journal_cache_dir,
+        resolved.paths.state_dir,
         resolved.flow_reminder_state_filename,
     )
 

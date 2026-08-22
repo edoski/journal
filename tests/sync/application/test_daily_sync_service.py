@@ -6,7 +6,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
+from sync.adapters.json_daily_state import JsonDailyTrainingStateStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
 from sync.contracts.schedule import DayScheduleProfile
@@ -77,15 +77,15 @@ def _build_service(
     template_path = tmp_path / "daily_template.md"
     template_path.write_text("---\nsleep: 7h30m\n---\n", encoding="utf-8")
     _ = monkeypatch
-    training_cache_store = JsonDailyTrainingCacheStore(
-        cache_dir=str(tmp_path / "cache" / "daily" / "training"),
+    training_state_store = JsonDailyTrainingStateStore(
+        state_dir=str(tmp_path / "state" / "daily" / "training"),
         lock_root=str(tmp_path / "cache" / "locks" / "state"),
     )
 
     service = DailySyncService(
         note_store=note_store or MarkdownNoteStore(),
         status_source=status_source or _StubStatusSource(),
-        training_cache_store=training_cache_store,
+        training_state_store=training_state_store,
         journal_dir=str(journal_dir),
         template_path=str(template_path),
     )

@@ -112,7 +112,7 @@ def _flow_automation_deps(
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return flow_automation.FlowAutomationDeps(
-        paths=replace(PATHS, journal_cache_dir=str(cache_dir)),
+        paths=replace(PATHS, state_dir=str(cache_dir)),
         skip_launchd_label=flow_automation.SKIP_LAUNCHD_LABEL,
         skip_launchd_domain=flow_automation.SKIP_LAUNCHD_DOMAIN,
         skip_launchd_target=flow_automation.SKIP_LAUNCHD_TARGET,
@@ -147,11 +147,11 @@ def _wiring_deps(
     schedule_source_factory,
 ) -> wiring.WiringDeps:
     return wiring.WiringDeps(
-        bootstrap_cache_layout=lambda: None,
+        bootstrap_storage_layout=lambda: None,
         session_source_factory=session_source_factory,
         status_source_factory=status_source_factory,
         note_store_factory=lambda: object(),
-        training_cache_store_factory=lambda: object(),
+        training_state_store_factory=lambda: object(),
         aggregate_source_factory=lambda: object(),
         media_source_factory=lambda: object(),
         schedule_source_factory=schedule_source_factory,

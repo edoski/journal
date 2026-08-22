@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from contextlib import AbstractContextManager
 
-from sync.constants import NOTE_LOCK_DIR
+from sync.constants import LOCK_DIR
 from sync.contracts.notes import NotePublication
 from sync.io import atomic_write_note
 from sync.notes.locking import locked_path
@@ -22,7 +22,7 @@ class MarkdownNoteStore(NoteStore):
         lock_timeout: float = 2.0,
         lock_poll: float = 0.1,
     ) -> None:
-        self.lock_root = lock_root or NOTE_LOCK_DIR
+        self.lock_root = lock_root or LOCK_DIR
         self.lock_timeout = lock_timeout
         self.lock_poll = lock_poll
 

@@ -21,13 +21,12 @@ class PathConfig:
     schedule_path: str
     bsc_grades_path: str
     msc_grades_path: str
-    journal_cache_dir: str
+    application_support_dir: str
+    state_dir: str
     media_cache_dir: str
-    daily_cache_dir: str
-    daily_training_cache_dir: str
+    daily_state_dir: str
+    daily_training_state_dir: str
     lock_dir: str
-    note_lock_dir: str
-    state_lock_dir: str
     flow_db_path: str
     icloud_shortcuts_dir: str
     icloud_journalsync_dir: str
@@ -74,8 +73,14 @@ def _build_paths() -> PathConfig:
         "Documents",
     )
 
-    journal_cache_dir = _env_path("JOURNAL_CACHE_DIR", "~/.cache/journal")
-    lock_dir = _env_path("LOCK_DIR", os.path.join(journal_cache_dir, "locks"))
+    application_support_dir = _env_path(
+        "JOURNAL_SUPPORT_DIR",
+        "~/Library/Application Support/Journal",
+    )
+    state_dir = _env_path(
+        "JOURNAL_STATE_DIR",
+        os.path.join(application_support_dir, "state"),
+    )
 
     return PathConfig(
         journal_dir=journal_dir,
@@ -116,27 +121,23 @@ def _build_paths() -> PathConfig:
             "MSC_GRADES_PATH",
             os.path.join(vault_dir, "university", "msc", "GRADES.md"),
         ),
-        journal_cache_dir=journal_cache_dir,
+        application_support_dir=application_support_dir,
+        state_dir=state_dir,
         media_cache_dir=_env_path(
             "MEDIA_CACHE_DIR",
-            os.path.join(journal_cache_dir, "media"),
+            "~/Library/Caches/Journal/media",
         ),
-        daily_cache_dir=_env_path(
-            "DAILY_CACHE_DIR",
-            os.path.join(journal_cache_dir, "daily"),
+        daily_state_dir=_env_path(
+            "DAILY_STATE_DIR",
+            os.path.join(state_dir, "daily"),
         ),
-        daily_training_cache_dir=_env_path(
-            "TRAINING_CACHE_DIR",
-            os.path.join(journal_cache_dir, "daily", "training"),
+        daily_training_state_dir=_env_path(
+            "TRAINING_STATE_DIR",
+            os.path.join(state_dir, "daily", "training"),
         ),
-        lock_dir=lock_dir,
-        note_lock_dir=_env_path(
-            "NOTE_LOCK_DIR",
-            os.path.join(lock_dir, "notes"),
-        ),
-        state_lock_dir=_env_path(
-            "STATE_LOCK_DIR",
-            os.path.join(lock_dir, "state"),
+        lock_dir=_env_path(
+            "LOCK_DIR",
+            os.path.join(application_support_dir, "locks"),
         ),
         flow_db_path=_env_path(
             "FLOW_DB_PATH",

@@ -19,7 +19,7 @@ from sync.notes.sections import (
     replace_metrics_block,
     section_bounds,
 )
-from sync.ports.cache import DailyTrainingCacheStore
+from sync.ports.state import DailyTrainingStateStore
 from sync.ports.status import DailyStatusSource
 from sync.study.section import build_study_section
 
@@ -45,7 +45,7 @@ class DailyNoteComposer:
     """Compose daily-note markdown from loaded daily inputs."""
 
     status_source: DailyStatusSource
-    training_cache_store: DailyTrainingCacheStore
+    training_state_store: DailyTrainingStateStore
 
     def compose(
         self,
@@ -116,7 +116,7 @@ class DailyNoteComposer:
             training_status,
             existing_training_block,
             day.isoformat(),
-            training_cache_store=self.training_cache_store,
+            training_state_store=self.training_state_store,
         )
         sleep_lines = build_sleep_section(sleep_data, existing_sleep_block)
         metrics_lines: list[str] = []

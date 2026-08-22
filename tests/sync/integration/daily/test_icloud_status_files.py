@@ -1,9 +1,33 @@
 import datetime
 import errno
 import json
+import os
+import time
 
 import sync.adapters.icloud_status as icloud
 from sync.adapters.icloud_status import ICloudDailyStatusSource
+
+
+def test_prune_invalid_status_files_removes_only_expired_invalid_files(
+    monkeypatch, tmp_path
+):
+    invalid_dir = tmp_path / "invalid"
+    invalid_dir.mkdir()
+    expired = invalid_dir / "sleep_status.json.invalid"
+    retained = invalid_dir / "workout_status.json.invalid"
+    unrelated = invalid_dir / "notes.txt"
+    expired.write_text("bad", encoding="utf-8")
+    retained.write_text("bad", encoding="utf-8")
+    unrelated.write_text("keep", encoding="utf-8")
+    old = time.time() - ((icloud._INVALID_RETENTION_DAYS + 1) * 86400)
+    os.utime(expired, (old, old))
+    monkeypatch.setattr(icloud, "STATUS_INVALID_DIR", str(invalid_dir))
+
+    icloud._prune_invalid_status_files()
+
+    assert not expired.exists()
+    assert retained.exists()
+    assert unrelated.exists()
 
 
 def test_adapter_reprocesses_existing_pending_without_primary(monkeypatch, tmp_path):

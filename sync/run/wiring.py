@@ -6,10 +6,10 @@ import datetime
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sync.adapters.cache_bootstrap import bootstrap_cache_layout
+from sync.adapters.storage_bootstrap import bootstrap_storage_layout
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.icloud_status import ICloudDailyStatusSource
-from sync.adapters.json_daily_cache import JsonDailyTrainingCacheStore
+from sync.adapters.json_daily_state import JsonDailyTrainingStateStore
 from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 from sync.adapters.markdown_daily_aggregates import MarkdownDailyAggregateSource
 from sync.adapters.markdown_notes import MarkdownNoteStore
@@ -23,14 +23,12 @@ from sync.periods.windows import (
     resolve_month_window,
     resolve_week_window,
 )
-from sync.ports.cache import (
-    DailyTrainingCacheStore,
-)
 from sync.ports.daily_aggregates import DailyAggregateSource
 from sync.ports.media import MediaSource
 from sync.ports.notes import NoteStore
 from sync.ports.schedule import ScheduleSource
 from sync.ports.sessions import StudySessionSource
+from sync.ports.state import DailyTrainingStateStore
 from sync.ports.status import DailyStatusSource
 
 
@@ -38,11 +36,11 @@ from sync.ports.status import DailyStatusSource
 class WiringDeps:
     """Factories and runtime hooks used by the composition root."""
 
-    bootstrap_cache_layout: Callable[[], None]
+    bootstrap_storage_layout: Callable[[], None]
     session_source_factory: Callable[[], StudySessionSource]
     status_source_factory: Callable[[], DailyStatusSource]
     note_store_factory: Callable[[], NoteStore]
-    training_cache_store_factory: Callable[[], DailyTrainingCacheStore]
+    training_state_store_factory: Callable[[], DailyTrainingStateStore]
     aggregate_source_factory: Callable[[], DailyAggregateSource]
     media_source_factory: Callable[[], MediaSource]
     schedule_source_factory: Callable[[], ScheduleSource]
@@ -51,11 +49,11 @@ class WiringDeps:
 def default_wiring_deps() -> WiringDeps:
     """Return the default runtime wiring dependencies."""
     return WiringDeps(
-        bootstrap_cache_layout=bootstrap_cache_layout,
+        bootstrap_storage_layout=bootstrap_storage_layout,
         session_source_factory=FlowStudySessionSource,
         status_source_factory=ICloudDailyStatusSource,
         note_store_factory=MarkdownNoteStore,
-        training_cache_store_factory=JsonDailyTrainingCacheStore,
+        training_state_store_factory=JsonDailyTrainingStateStore,
         aggregate_source_factory=MarkdownDailyAggregateSource,
         media_source_factory=lambda: ObsidianMediaSource(
             media_cache_store=JsonMediaDateCacheStore(),
@@ -77,17 +75,17 @@ def _build_period_sync_service(*, deps: WiringDeps | None = None) -> PeriodSyncS
 
 def run_daily_sync(*, deps: WiringDeps | None = None) -> None:
     resolved = deps or default_wiring_deps()
-    resolved.bootstrap_cache_layout()
+    resolved.bootstrap_storage_layout()
     day = datetime.date.today()
     schedule_source = resolved.schedule_source_factory()
     session_source = resolved.session_source_factory()
     note_store = resolved.note_store_factory()
-    training_cache_store = resolved.training_cache_store_factory()
+    training_state_store = resolved.training_state_store_factory()
     status_source = resolved.status_source_factory()
     service = DailySyncService(
         note_store=note_store,
         status_source=status_source,
-        training_cache_store=training_cache_store,
+        training_state_store=training_state_store,
     )
 
     target_days = status_source.target_days(day)
@@ -109,7 +107,7 @@ def run_weekly_sync(
     deps: WiringDeps | None = None,
 ) -> None:
     resolved = deps or default_wiring_deps()
-    resolved.bootstrap_cache_layout()
+    resolved.bootstrap_storage_layout()
 
     today = datetime.date.today()
     if date_arg:
@@ -145,7 +143,7 @@ def run_monthly_sync(
     deps: WiringDeps | None = None,
 ) -> None:
     resolved = deps or default_wiring_deps()
-    resolved.bootstrap_cache_layout()
+    resolved.bootstrap_storage_layout()
 
     today = datetime.date.today()
     year, month = (
@@ -180,7 +178,7 @@ def run_yearly_sync(
     deps: WiringDeps | None = None,
 ) -> None:
     resolved = deps or default_wiring_deps()
-    resolved.bootstrap_cache_layout()
+    resolved.bootstrap_storage_layout()
 
     if year_arg:
         year = int(year_arg)

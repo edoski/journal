@@ -1,4 +1,4 @@
-"""Typed contracts for cache/state payloads."""
+"""Typed contracts for cache payloads."""
 
 from __future__ import annotations
 
@@ -10,14 +10,3 @@ class MediaDateCacheState(TypedDict):
 
     podcasts: dict[str, str]
     books: dict[str, str]
-
-
-class DailyTrainingCacheRow(TypedDict):
-    """Canonical row stored in per-day training cache."""
-
-    start: str | None
-    end: str | None
-    time_raw: str
-    activity: str
-    duration: str
-    interrupt: float | str

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import cast
 
-from sync.constants import STATE_LOCK_DIR, TRAINING_CACHE_DIR
-from sync.contracts.cache import DailyTrainingCacheRow
-from sync.ports.cache import DailyTrainingCacheStore
+from sync.constants import LOCK_DIR, TRAINING_STATE_DIR
+from sync.contracts.state import DailyTrainingStateRow
+from sync.ports.state import DailyTrainingStateStore
 
 from .json_cache_common import (
     JsonValidatedPerDateStore,
@@ -19,7 +19,7 @@ def _validate_training_entry(
     *,
     path: str,
     index: int,
-) -> DailyTrainingCacheRow:
+) -> DailyTrainingStateRow:
     if not isinstance(raw, dict):
         raise schema_error(path, f"entries[{index}] must be an object")
     entry = cast(dict[str, object], raw)
@@ -77,7 +77,7 @@ def _validate_training_payload(
     *,
     path: str,
     date_str: str,
-) -> list[DailyTrainingCacheRow]:
+) -> list[DailyTrainingStateRow]:
     if not isinstance(raw, dict):
         raise schema_error(path, "root payload must be an object")
     payload = cast(dict[str, object], raw)
@@ -91,28 +91,28 @@ def _validate_training_payload(
     if not isinstance(entries, list):
         raise schema_error(path, "entries must be a list")
 
-    typed_entries: list[DailyTrainingCacheRow] = []
+    typed_entries: list[DailyTrainingStateRow] = []
     for index, entry in enumerate(cast(list[object], entries)):
         typed_entries.append(_validate_training_entry(entry, path=path, index=index))
 
     return typed_entries
 
 
-class JsonDailyTrainingCacheStore(
-    JsonValidatedPerDateStore[list[DailyTrainingCacheRow]],
-    DailyTrainingCacheStore,
+class JsonDailyTrainingStateStore(
+    JsonValidatedPerDateStore[list[DailyTrainingStateRow]],
+    DailyTrainingStateStore,
 ):
-    """Filesystem-backed per-day training cache store."""
+    """Filesystem-backed per-day training state store."""
 
     def __init__(
         self,
         *,
-        cache_dir: str | None = None,
+        state_dir: str | None = None,
         lock_root: str | None = None,
     ) -> None:
         super().__init__(
-            cache_dir=cache_dir or TRAINING_CACHE_DIR,
-            lock_root=lock_root or STATE_LOCK_DIR,
+            cache_dir=state_dir or TRAINING_STATE_DIR,
+            lock_root=lock_root or LOCK_DIR,
             empty_entries=list,
             validator=_validate_training_payload,
         )

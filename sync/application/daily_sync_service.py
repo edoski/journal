@@ -11,7 +11,7 @@ from sync.contracts.study import StudySessionRecord
 from sync.daily.composer import DailyNoteComposer
 from sync.daily.constants import TEMPLATE_PATH
 from sync.log import get_logger
-from sync.ports.cache import DailyTrainingCacheStore
+from sync.ports.state import DailyTrainingStateStore
 from sync.ports.notes import NoteStore
 from sync.ports.status import DailyStatusSource
 
@@ -26,18 +26,18 @@ class DailySyncService:
         *,
         note_store: NoteStore,
         status_source: DailyStatusSource,
-        training_cache_store: DailyTrainingCacheStore,
+        training_state_store: DailyTrainingStateStore,
         journal_dir: str = JOURNAL_DIR,
         template_path: str = TEMPLATE_PATH,
     ) -> None:
         self.note_store = note_store
         self.status_source = status_source
-        self.training_cache_store = training_cache_store
+        self.training_state_store = training_state_store
         self.journal_dir = journal_dir
         self.template_path = template_path
         self.composer = DailyNoteComposer(
             status_source=status_source,
-            training_cache_store=training_cache_store,
+            training_state_store=training_state_store,
         )
 
     def sync_day(
@@ -49,7 +49,7 @@ class DailySyncService:
         """Synchronize the daily note for a specific date."""
         today_str = day.isoformat()
         file_path = os.path.join(self.journal_dir, f"{today_str}.md")
-        self.training_cache_store.prune(keep_days=14)
+        self.training_state_store.prune(keep_days=14)
 
         base_lines = self.note_store.read_or_create(file_path, self.template_path)
         if not base_lines:

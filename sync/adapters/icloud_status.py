@@ -23,9 +23,10 @@ from sync.ports.status import DailyStatusSource
 
 logger = get_logger(__name__)
 
-STATUS_STAGING_DIR = os.path.join(PATHS.daily_cache_dir, "status", "pending")
-STATUS_INVALID_DIR = os.path.join(PATHS.daily_cache_dir, "status", "invalid")
+STATUS_STAGING_DIR = os.path.join(PATHS.daily_state_dir, "status", "pending")
+STATUS_INVALID_DIR = os.path.join(PATHS.daily_state_dir, "status", "invalid")
 _READ_RETRY_SECONDS = 0.25
+_INVALID_RETENTION_DAYS = 30
 StatusPayloadFile = tuple[object, str]
 _TRANSIENT_ERRNOS = {
     errno.EAGAIN,
@@ -228,6 +229,23 @@ def _quarantine_status_file(filename: str, parsed_path: str | None) -> None:
         pass
 
 
+def _prune_invalid_status_files() -> None:
+    """Remove quarantined payloads older than the diagnostic retention window."""
+    cutoff = time.time() - (_INVALID_RETENTION_DAYS * 86400)
+    try:
+        names = os.listdir(STATUS_INVALID_DIR)
+    except (FileNotFoundError, OSError):
+        return
+
+    for name in names:
+        path = os.path.join(STATUS_INVALID_DIR, name)
+        try:
+            if name.endswith(".invalid") and os.path.getmtime(path) < cutoff:
+                os.remove(path)
+        except OSError:
+            pass
+
+
 def _required_non_empty_str(payload: Mapping[str, object], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value.strip():
@@ -350,6 +368,7 @@ class ICloudDailyStatusSource(DailyStatusSource):
         if self._anchor_day == anchor_day:
             return self._resolved_days
 
+        _prune_invalid_status_files()
         self._reset_staging(anchor_day)
         resolved_days: set[datetime.date] = {anchor_day}
         self._ingest_training_file(

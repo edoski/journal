@@ -8,14 +8,14 @@ from __future__ import annotations
 
 from collections import OrderedDict
 
-from sync.contracts.cache import DailyTrainingCacheRow
+from sync.contracts.state import DailyTrainingStateRow
 from sync.formatting import format_minutes_seconds
 from sync.contracts.status import TrainingEntryPayload, TrainingStatus
-from sync.ports.cache import DailyTrainingCacheStore
+from sync.ports.state import DailyTrainingStateStore
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
 # Internal table row shape persisted in cache and used for rendering.
-TrainingTableRow = DailyTrainingCacheRow
+TrainingTableRow = DailyTrainingStateRow
 
 
 def _parse_time_to_minutes(time_str: str) -> int | None:
@@ -27,20 +27,20 @@ def _parse_time_to_minutes(time_str: str) -> int | None:
         return None
 
 
-def _load_training_cache(
+def _load_training_state(
     date_str: str,
-    cache_store: DailyTrainingCacheStore,
+    state_store: DailyTrainingStateStore,
 ) -> list[TrainingTableRow]:
-    entries = cache_store.load_for_date(date_str)
+    entries = state_store.load_for_date(date_str)
     return entries if isinstance(entries, list) else []
 
 
-def _save_training_cache(
+def _save_training_state(
     date_str: str,
     entries: list[TrainingTableRow],
-    cache_store: DailyTrainingCacheStore,
+    state_store: DailyTrainingStateStore,
 ) -> None:
-    cache_store.save_for_date(date_str, entries)
+    state_store.save_for_date(date_str, entries)
 
 
 def _rows_from_canonical_entries(
@@ -166,7 +166,7 @@ def build_training_section(
     _existing_block: list[str] | None,
     today_str: str,
     *,
-    training_cache_store: DailyTrainingCacheStore,
+    training_state_store: DailyTrainingStateStore,
 ) -> tuple[list[str], list[TrainingTableRow]]:
     """
     Build TRAINING section lines from canonical training status data.
@@ -175,13 +175,13 @@ def build_training_section(
         training_status.workout_entries
     ) + _rows_from_canonical_entries(training_status.stretch_entries)
 
-    cache_rows = _load_training_cache(today_str, training_cache_store)
+    state_rows = _load_training_state(today_str, training_state_store)
     merged_rows: list[TrainingTableRow] = []
     if new_rows:
-        merged_rows = _merge_training_rows(cache_rows, new_rows)
-        _save_training_cache(today_str, merged_rows, training_cache_store)
-    elif cache_rows:
-        merged_rows = cache_rows
+        merged_rows = _merge_training_rows(state_rows, new_rows)
+        _save_training_state(today_str, merged_rows, training_state_store)
+    elif state_rows:
+        merged_rows = state_rows
 
     lines_out = ["### **TRAINING**", ""]
     if merged_rows:
