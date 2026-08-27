@@ -14,6 +14,8 @@ from typing import cast
 
 from sync.config import PATHS, PathConfig
 from sync.log import get_logger
+from sync.study.constants import FLOW_APP_DEFAULTS_DOMAIN
+from sync.study.core_data_time import datetime_to_core_data
 from sync.study.repository import FlowSessionRepository
 
 SKIP_LAUNCHD_LABEL = "com.edo.journal.skip"
@@ -54,6 +56,7 @@ class FlowAutomationDeps:
     repository: FlowSessionRepository
     run_launchctl: Callable[[list[str]], tuple[int, str, str]]
     run_applescript: Callable[[str], str | None]
+    read_flow_duration_minutes: Callable[[], int | None]
     show_paused_reminder: Callable[[], bool]
     now: Callable[[], datetime.datetime]
 
@@ -74,6 +77,7 @@ def default_flow_automation_deps() -> FlowAutomationDeps:
         repository=FlowSessionRepository(),
         run_launchctl=_run_launchctl,
         run_applescript=_run_applescript,
+        read_flow_duration_minutes=_read_flow_duration_minutes,
         show_paused_reminder=_show_flow_paused_reminder,
         now=_now,
     )
@@ -332,6 +336,29 @@ def _run_applescript(script: str) -> str | None:
         return None
 
 
+def _read_flow_duration_minutes() -> int | None:
+    try:
+        output = subprocess.check_output(
+            [
+                "defaults",
+                "read",
+                FLOW_APP_DEFAULTS_DOMAIN,
+                "flow.durationInMinutes",
+            ],
+            text=True,
+        )
+        value = int(output.strip())
+        return value if value > 0 else None
+    except (
+        subprocess.CalledProcessError,
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+        ValueError,
+    ):
+        return None
+
+
 def _show_flow_paused_reminder() -> bool:
     try:
         result = subprocess.run(
@@ -358,6 +385,53 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now()
 
 
+def _remaining_seconds(value: str) -> int | None:
+    parts = value.strip().split(":")
+    if len(parts) not in (2, 3):
+        return None
+    try:
+        numbers = [int(part) for part in parts]
+    except ValueError:
+        return None
+    if any(number < 0 for number in numbers):
+        return None
+    total = 0
+    for number in numbers:
+        total = total * 60 + number
+    return total
+
+
+def _live_flow_has_progress(
+    remaining_time: str,
+    deps: FlowAutomationDeps,
+) -> bool:
+    remaining = _remaining_seconds(remaining_time)
+    duration_minutes = deps.read_flow_duration_minutes()
+    if remaining is None or duration_minutes is None:
+        return False
+    return remaining < duration_minutes * 60
+
+
+def _recent_completed_break_at(
+    deps: FlowAutomationDeps,
+) -> float | None:
+    duration_minutes = deps.read_flow_duration_minutes()
+    now_marker = datetime_to_core_data(deps.now())
+    if duration_minutes is None or now_marker is None:
+        return None
+    try:
+        completed_at = deps.repository.latest_completed_break_at()
+    except Exception as exc:
+        logger.warning("Failed to evaluate latest completed break: %s", exc)
+        return None
+    if completed_at is None:
+        return None
+    elapsed = now_marker - completed_at
+    if 0 <= elapsed <= duration_minutes * 60:
+        return completed_at
+    return None
+
+
 def run_session_skip(
     state: str | None = None,
     *,
@@ -382,12 +456,20 @@ def run_session_skip(
         return 0
 
     try:
-        if resolved.repository.latest_open_flow_started_at() is None:
-            logger.info("Skip no-op: latest session is not an open flow row")
-            return 0
+        open_started_at = resolved.repository.latest_open_flow_started_at()
     except Exception as exc:
-        logger.warning("Skip no-op: failed to evaluate latest session row: %s", exc)
-        return 0
+        logger.warning("Failed to evaluate latest session row: %s", exc)
+        open_started_at = None
+
+    if open_started_at is None:
+        remaining_time = resolved.run_applescript('tell application "Flow" to getTime')
+        if remaining_time is None or not _live_flow_has_progress(
+            remaining_time,
+            resolved,
+        ):
+            logger.info("Skip no-op: no active Flow session")
+            return 0
+        logger.info("Open Flow row absent; using live timer progress")
 
     if resolved.run_applescript('tell application "Flow" to skip') is None:
         logger.warning("Skip no-op: Flow skip command failed")
@@ -427,17 +509,6 @@ def run_session_remind(
         _clear_flow_reminder_state(resolved)
         return 0
 
-    try:
-        open_started_at = resolved.repository.latest_open_flow_started_at()
-    except Exception as exc:
-        logger.warning("Remind no-op: failed to evaluate latest session row: %s", exc)
-        return 0
-
-    if open_started_at is None:
-        logger.info("Remind no-op: latest session is not an open flow row")
-        _clear_flow_reminder_state(resolved)
-        return 0
-
     remaining_time = resolved.run_applescript('tell application "Flow" to getTime')
     if remaining_time is None:
         logger.warning("Remind no-op: failed to read Flow remaining time")
@@ -446,6 +517,25 @@ def run_session_remind(
     if not remaining_time:
         logger.warning("Remind no-op: Flow remaining time was empty")
         return 0
+
+    try:
+        open_started_at = resolved.repository.latest_open_flow_started_at()
+    except Exception as exc:
+        logger.warning("Failed to evaluate latest session row: %s", exc)
+        open_started_at = None
+
+    if open_started_at is None and not _live_flow_has_progress(
+        remaining_time,
+        resolved,
+    ):
+        open_started_at = _recent_completed_break_at(resolved)
+        if open_started_at is None:
+            logger.info("Remind no-op: no active or pending Flow session")
+            _clear_flow_reminder_state(resolved)
+            return 0
+        logger.info("Open Flow row absent; using recent break transition")
+    elif open_started_at is None:
+        logger.info("Open Flow row absent; using live timer progress")
 
     reminder_state = _load_flow_reminder_state(resolved)
     previous_started_at = reminder_state.get("open_session_started_at")

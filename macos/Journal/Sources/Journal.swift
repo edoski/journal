@@ -79,15 +79,7 @@ struct FlowStateReader {
         )
     }
 
-    func canSkip(phase: String, remainingTime: String) -> Bool {
-        guard let duration = durations()?.seconds(for: phase),
-              let remaining = Self.seconds(in: remainingTime) else {
-            return false
-        }
-        return remaining != duration
-    }
-
-    func isActive(phase: String, remainingTime: String) -> Bool? {
+    func canSkip(phase: String, remainingTime: String) -> Bool? {
         guard let duration = durations()?.seconds(for: phase),
               let remaining = Self.seconds(in: remainingTime) else {
             return nil
@@ -268,7 +260,6 @@ enum BundledPython {
 
 final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private enum FlowActivity: Equatable {
-        case idle
         case paused
         case running
     }
@@ -313,6 +304,7 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
     private var undoRequestID = 0
     private var skipStateRequestID = 0
     private var flowActivity: FlowActivity?
+    private var flowCanSkip: Bool?
     private let flowAutomationQueue = DispatchQueue(label: "com.edo.FlowTitle.automation")
     private let journalUndoRunner = JournalUndoRunner()
     private let flowStateReader = FlowStateReader()
@@ -546,6 +538,8 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
     private func refreshFlowActions() {
         skipStateRequestID += 1
         let requestID = skipStateRequestID
+        flowActivity = nil
+        flowCanSkip = nil
         renderFlowActions()
 
         updateFlowActions(requestID: requestID)
@@ -553,39 +547,34 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
 
     private func renderFlowActions() {
         switch flowActivity {
-        case .idle:
-            pauseResumeButton.title = "Start"
-            pauseResumeButton.isEnabled = true
-            skipButton.isEnabled = false
         case .paused:
             pauseResumeButton.title = "Resume"
             pauseResumeButton.isEnabled = true
-            skipButton.isEnabled = true
         case .running:
             pauseResumeButton.title = "Pause"
             pauseResumeButton.isEnabled = true
-            skipButton.isEnabled = true
         case nil:
             pauseResumeButton.title = "Pause / Resume"
             pauseResumeButton.isEnabled = false
-            skipButton.isEnabled = false
         }
+        skipButton.isEnabled = flowCanSkip ?? false
     }
 
     private func updateFlowActions(requestID: Int) {
         flowAutomationQueue.async { [weak self] in
             guard let self,
                   let phase = self.execute(self.flowPhaseScript),
-                  let initialTime = self.readFlowTime(),
-                  let isActive = self.flowStateReader.isActive(
-                    phase: phase,
-                    remainingTime: initialTime
-                  ) else { return }
-            guard isActive else {
+                  let initialTime = self.readFlowTime() else { return }
+            guard let canSkip = self.flowStateReader.canSkip(
+                phase: phase,
+                remainingTime: initialTime
+            ) else { return }
+            guard canSkip else {
                 DispatchQueue.main.async { [weak self] in
                     guard let self,
                           self.skipStateRequestID == requestID else { return }
-                    self.flowActivity = .idle
+                    self.flowActivity = .paused
+                    self.flowCanSkip = false
                     if self.panel.isVisible { self.renderFlowActions() }
                 }
                 return
@@ -613,6 +602,7 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
                     guard let self,
                           self.skipStateRequestID == requestID else { return }
                     self.flowActivity = activity
+                    self.flowCanSkip = true
                     if self.panel.isVisible { self.renderFlowActions() }
                 }
                 return
@@ -627,6 +617,7 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
 
     private func showPausedReminder() {
         flowActivity = .paused
+        flowCanSkip = true
         reminderLabel.stringValue = "\(currentTitle) is paused"
 
         let mouseLocation = NSEvent.mouseLocation
@@ -761,16 +752,17 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
                       now - prefixTime < 0.25 else { return Unmanaged.passUnretained(event) }
                 controller.superPrefixTime = nil
                 DispatchQueue.main.async {
-                    switch controller.flowActivity {
-                    case .running:
-                        controller.flowActivity = .paused
-                    case .idle, .paused:
-                        controller.flowActivity = .running
-                    case nil:
-                        break
-                    }
+                    controller.skipStateRequestID += 1
+                    controller.flowActivity = nil
+                    controller.flowCanSkip = nil
                     if controller.panel.isVisible { controller.renderFlowActions() }
                     if controller.reminderPanel.isVisible { controller.hidePausedReminder() }
+                    if controller.panel.isVisible {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            guard controller.panel.isVisible else { return }
+                            controller.refreshFlowActions()
+                        }
+                    }
                 }
                 return Unmanaged.passUnretained(event)
             },
@@ -810,6 +802,8 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
             }
             guard remaining != initial else { return }
             DispatchQueue.main.async { [weak self] in
+                self?.flowActivity = .running
+                self?.flowCanSkip = true
                 self?.hidePausedReminder()
             }
         }
@@ -829,31 +823,42 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
     }
 
     @objc private func resumeSession() {
-        flowActivity = .running
         hidePausedReminder()
         flowAutomationQueue.async { [weak self] in
             guard let self else { return }
-            _ = self.execute(self.flowStartScript)
+            let succeeded = self.execute(self.flowStartScript) != nil
+            DispatchQueue.main.async { [weak self] in
+                self?.flowActivity = succeeded ? .running : nil
+                self?.flowCanSkip = succeeded ? true : nil
+            }
         }
     }
 
     @objc private func toggleSession() {
         guard let flowActivity else { return }
         let shouldStop = flowActivity == .running
-        self.flowActivity = shouldStop ? .paused : .running
         hide()
         flowAutomationQueue.async { [weak self] in
             guard let self else { return }
-            _ = self.execute(shouldStop ? self.flowStopScript : self.flowStartScript)
+            let succeeded = self.execute(
+                shouldStop ? self.flowStopScript : self.flowStartScript
+            ) != nil
+            DispatchQueue.main.async { [weak self] in
+                self?.flowActivity = succeeded ? (shouldStop ? .paused : .running) : nil
+                self?.flowCanSkip = succeeded ? true : nil
+            }
         }
     }
 
     @objc private func skipSession() {
-        flowActivity = .idle
         hide()
         flowAutomationQueue.async { [weak self] in
             guard let self else { return }
             _ = self.execute(self.flowSkipScript)
+            DispatchQueue.main.async { [weak self] in
+                self?.flowActivity = nil
+                self?.flowCanSkip = nil
+            }
         }
     }
 

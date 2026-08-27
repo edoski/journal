@@ -95,6 +95,17 @@ def _make_open_flow_conn(*, started_at: float = 1.0) -> sqlite3.Connection:
     return conn
 
 
+def _make_completed_break_conn(*, completed_at: float) -> sqlite3.Connection:
+    conn = _make_session_conn()
+    _insert_session_row(
+        conn,
+        phase="shortBreak",
+        completed_at=completed_at,
+        started_at=1.0,
+    )
+    return conn
+
+
 def _print_disabled_output(disabled: bool, *, label: str) -> str:
     value = "true" if disabled else "false"
     return f'{{\n  "{label}" => {value}\n}}'
@@ -106,6 +117,7 @@ def _flow_automation_deps(
     run_launchctl=None,
     run_applescript=None,
     connection_factory=None,
+    read_flow_duration_minutes=None,
     show_paused_reminder=None,
     now=None,
 ) -> flow_automation.FlowAutomationDeps:
@@ -130,6 +142,7 @@ def _flow_automation_deps(
         ),
         run_launchctl=run_launchctl or (lambda _args: (0, "", "")),
         run_applescript=run_applescript or (lambda _script: None),
+        read_flow_duration_minutes=read_flow_duration_minutes or (lambda: 90),
         show_paused_reminder=show_paused_reminder or (lambda: True),
         now=now or datetime.now,
     )
@@ -714,6 +727,64 @@ def test_session_skip_executes_when_phase_flow_and_latest_row_open_flow(
     assert calls == [FLOW_GET_PHASE, FLOW_SKIP, FLOW_START, FLOW_SHOW]
 
 
+def test_session_skip_executes_when_live_timer_progressed_without_open_row(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        return "ok"
+
+    deps = _flow_automation_deps(
+        tmp_path,
+        run_launchctl=lambda _args: (
+            0,
+            _print_disabled_output(
+                disabled=False,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
+            ),
+            "",
+        ),
+        run_applescript=_fake_run,
+    )
+
+    assert flow_automation.run_session_skip(deps=deps) == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME, FLOW_SKIP, FLOW_START, FLOW_SHOW]
+
+
+def test_session_skip_rejects_full_timer_without_open_row(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def _fake_run(script: str) -> str:
+        calls.append(script)
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "90:00"
+        raise AssertionError("Pending Flow session must not be skipped")
+
+    deps = _flow_automation_deps(
+        tmp_path,
+        run_launchctl=lambda _args: (
+            0,
+            _print_disabled_output(
+                disabled=False,
+                label=flow_automation.SKIP_LAUNCHD_LABEL,
+            ),
+            "",
+        ),
+        run_applescript=_fake_run,
+    )
+
+    assert flow_automation.run_session_skip(deps=deps) == 0
+    assert calls == [FLOW_GET_PHASE, FLOW_GET_TIME]
+
+
 def test_session_skip_state_toggle_calls_launchctl_disable(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -845,6 +916,77 @@ def test_session_remind_shows_helper_on_first_stagnant_check(tmp_path: Path) -> 
         "stagnant_checks": 1,
         "last_reminded_epoch": datetime(2026, 2, 27, 12, 0, 0).timestamp(),
     }
+
+
+def test_session_remind_uses_progressed_timer_without_open_row(
+    tmp_path: Path,
+) -> None:
+    reminders: list[None] = []
+
+    def _fake_run(script: str) -> str:
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "25:00"
+        raise AssertionError(f"Unexpected script: {script}")
+
+    deps = _flow_automation_deps(
+        tmp_path,
+        run_launchctl=lambda _args: (
+            0,
+            _print_disabled_output(
+                disabled=False,
+                label=flow_automation.REMIND_LAUNCHD_LABEL,
+            ),
+            "",
+        ),
+        run_applescript=_fake_run,
+        show_paused_reminder=lambda: reminders.append(None) is None,
+        now=lambda: datetime(2026, 8, 27, 9, 15),
+    )
+
+    assert flow_automation.run_session_remind(deps=deps) == 0
+    assert flow_automation.run_session_remind(deps=deps) == 0
+    assert reminders == [None]
+
+
+def test_session_remind_treats_full_timer_after_break_as_paused(
+    tmp_path: Path,
+) -> None:
+    reminders: list[None] = []
+
+    def _fake_run(script: str) -> str:
+        if script == FLOW_GET_PHASE:
+            return "Flow"
+        if script == FLOW_GET_TIME:
+            return "90:00"
+        raise AssertionError(f"Unexpected script: {script}")
+
+    deps = _flow_automation_deps(
+        tmp_path,
+        run_launchctl=lambda _args: (
+            0,
+            _print_disabled_output(
+                disabled=False,
+                label=flow_automation.REMIND_LAUNCHD_LABEL,
+            ),
+            "",
+        ),
+        run_applescript=_fake_run,
+        connection_factory=lambda _readonly: _make_completed_break_conn(
+            completed_at=809510400.0
+        ),
+        show_paused_reminder=lambda: reminders.append(None) is None,
+        now=lambda: datetime(2026, 8, 27, 10, 2),
+    )
+
+    assert flow_automation.run_session_remind(deps=deps) == 0
+    assert flow_automation.run_session_remind(deps=deps) == 0
+    assert reminders == [None]
+    assert (
+        flow_automation._load_flow_reminder_state(deps)["open_session_started_at"]
+        == 809510400.0
+    )
 
 
 def test_session_remind_respects_cooldown(tmp_path: Path) -> None:

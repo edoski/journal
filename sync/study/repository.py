@@ -16,6 +16,7 @@ from sync.study.constants import (
     BREAK_LINK_MAX_GAP_SECONDS,
     DB_PATH,
     FLOW_APP_DEFAULTS_DOMAIN,
+    FLOW_BREAK_PHASES,
     FLOW_BREAK_DEFAULT_KEYS,
     FLOW_PHASE_LONG_BREAK,
     FLOW_PHASE_SHORT_BREAK,
@@ -418,5 +419,26 @@ class FlowSessionRepository:
             return None
         try:
             return float(started_at)
+        except (TypeError, ValueError):
+            return None
+
+    def latest_completed_break_at(self) -> float | None:
+        """Return the latest row's completion marker when it is a break."""
+        with self._connection(True) as connection:
+            row = connection.execute(
+                """
+                SELECT ZPHASE, ZCOMPLETEDAT
+                FROM ZSESSION
+                ORDER BY ZSTARTEDAT DESC
+                LIMIT 1
+                """
+            ).fetchone()
+        if not row:
+            return None
+        phase, completed_at = row
+        if phase not in FLOW_BREAK_PHASES or completed_at is None:
+            return None
+        try:
+            return float(completed_at)
         except (TypeError, ValueError):
             return None
