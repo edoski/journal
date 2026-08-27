@@ -395,21 +395,21 @@ Move checklist (repo relocation):
 
 ## LaunchAgents
 
-- Journal sync: `~/Library/LaunchAgents/com.edo.journalsync.plist`
-- Skip automation: `~/Library/LaunchAgents/com.edo.skip.plist`
-- Remind automation: `~/Library/LaunchAgents/com.edo.remind.plist`
+- Journal sync: `~/Library/LaunchAgents/com.edo.journal.sync.plist`
+- Skip automation: `~/Library/LaunchAgents/com.edo.journal.skip.plist`
+- Remind automation: `~/Library/LaunchAgents/com.edo.journal.remind.plist`
 
 Reload:
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.edo.journalsync.plist
-launchctl load ~/Library/LaunchAgents/com.edo.journalsync.plist
+launchctl unload ~/Library/LaunchAgents/com.edo.journal.sync.plist
+launchctl load ~/Library/LaunchAgents/com.edo.journal.sync.plist
 
-launchctl unload ~/Library/LaunchAgents/com.edo.skip.plist
-launchctl load ~/Library/LaunchAgents/com.edo.skip.plist
+launchctl unload ~/Library/LaunchAgents/com.edo.journal.skip.plist
+launchctl load ~/Library/LaunchAgents/com.edo.journal.skip.plist
 
-launchctl unload ~/Library/LaunchAgents/com.edo.remind.plist
-launchctl load ~/Library/LaunchAgents/com.edo.remind.plist
+launchctl unload ~/Library/LaunchAgents/com.edo.journal.remind.plist
+launchctl load ~/Library/LaunchAgents/com.edo.journal.remind.plist
 ```
 
 ## Coding Conventions

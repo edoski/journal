@@ -35,17 +35,15 @@ def test_parse_book_note_returns_canonical_book() -> None:
             "---",
             "completed: '[[2026-01-02]]'",
             "author: Author",
-            "rating: 8.5",
             "---",
         ],
     )
 
     assert book is not None
-    assert (book.title, book.author, book.completed, book.rating) == (
+    assert (book.title, book.author, book.completed) == (
         "Book",
         "Author",
         datetime.date(2026, 1, 2),
-        8.5,
     )
 
 
@@ -56,7 +54,6 @@ def test_parse_podcast_note_normalizes_optional_fields() -> None:
             "---",
             "date: 2026-01-03",
             "host: Host",
-            "rating: invalid",
             "link:",
             "---",
         ],
@@ -68,7 +65,6 @@ def test_parse_podcast_note_normalizes_optional_fields() -> None:
         "Host",
         datetime.date(2026, 1, 3),
     )
-    assert podcast.rating is None
     assert podcast.link is None
     assert podcast.visible is False
 

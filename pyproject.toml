@@ -12,18 +12,13 @@ authors = [{ name = "Edo", email = "edo@example.com" }]
 
 [project.optional-dependencies]
 dev = [
-    "deptry",
     "hypothesis",
     "import-linter",
     "mypy",
-    "mutmut",
-    "pip-audit",
     "pyright",
     "pytest-cov",
     "pytest",
-    "ruff",
-    "tox",
-    "vulture",
+    "ruff==0.15.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -36,27 +31,3 @@ source = ["sync"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
-
-[tool.mutmut]
-paths_to_mutate = [
-    "sync/formatting.py",
-    "sync/readers",
-    "sync/writers",
-]
-do_not_mutate = [
-    "sync/readers/__init__.py",
-    "sync/writers/__init__.py",
-    "sync/writers/charts/__init__.py",
-    "sync/writers/tables/__init__.py",
-    "sync/writers/tables/renderers/__init__.py",
-]
-also_copy = [
-    "sync",
-    "tools",
-]
-pytest_add_cli_args = [
-    "-o",
-    "pythonpath=",
-    "-o",
-    "addopts=-q --tb=native",
-]

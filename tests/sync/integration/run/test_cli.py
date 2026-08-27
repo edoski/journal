@@ -189,7 +189,6 @@ def _write_book_template(path: Path) -> None:
                 "---",
                 "author:",
                 'completed: <% tp.date.now("YYYY-MM-DD") %>',
-                "rating:",
                 "---",
                 "",
                 "## Highlights",
@@ -257,7 +256,6 @@ def _write_book_note(path: Path) -> None:
                 "---",
                 "author: Carl Jung",
                 "completed:",
-                "rating:",
                 "---",
                 "",
                 "## Highlights",
@@ -1141,7 +1139,6 @@ def test_media_book_annotations_import_creates_missing_note_from_template(
     lines = note_path.read_text(encoding="utf-8").splitlines()
     assert "author: Fyodor Dostoyevsky" in lines
     assert "completed: 2026-03-24" in lines
-    assert "rating:" in lines
     assert "| **73625** | Karamazov quote one |" in lines
     assert "| **512** | Karamazov quote two |" in lines
 

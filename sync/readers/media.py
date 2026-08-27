@@ -31,16 +31,6 @@ def parse_media_date(value: str) -> datetime.date | None:
         return None
 
 
-def _parse_rating(value: str) -> float | None:
-    """Parse an optional numeric rating."""
-    if not value:
-        return None
-    try:
-        return float(value.strip())
-    except ValueError:
-        return None
-
-
 def _parse_visible(frontmatter: dict[str, str]) -> bool:
     """Read the `visible` checkbox property; anything but `true` stays hidden."""
     return _frontmatter_text(frontmatter, "visible").strip().lower() == "true"
@@ -56,7 +46,6 @@ def parse_book_note(title: str, lines: list[str]) -> Book | None:
         title=title,
         author=_frontmatter_text(frontmatter, "author"),
         completed=completed,
-        rating=_parse_rating(_frontmatter_text(frontmatter, "rating")),
     )
 
 
@@ -71,7 +60,6 @@ def parse_podcast_note(title: str, lines: list[str]) -> Podcast | None:
         title=title,
         host=_frontmatter_text(frontmatter, "host"),
         date=podcast_date,
-        rating=_parse_rating(_frontmatter_text(frontmatter, "rating")),
         link=link or None,
         visible=_parse_visible(frontmatter),
     )

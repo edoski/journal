@@ -76,7 +76,7 @@ def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) ->
     podcasts_dir.mkdir()
     _write_note(
         books_dir / "Later.md",
-        ["completed: '[[2026-01-20]]'", "author: B", "rating: 8.5"],
+        ["completed: '[[2026-01-20]]'", "author: B"],
     )
     _write_note(
         books_dir / "Earlier.md",
@@ -91,7 +91,6 @@ def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) ->
         [
             "date: 2026-01-10",
             "host: Host",
-            "rating: 9",
             "link: https://example.test/episode",
             "visible: true",
         ],
@@ -322,7 +321,7 @@ def test_scan_preserves_hand_written_index_frontmatter(tmp_path: Path) -> None:
     directory = _series_dir(tmp_path, "Genesis")
     _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Host"])
     index_path = directory / "Genesis.md"
-    _write_note(index_path, ["visible: true", "host: Host", "rating: 9"])
+    _write_note(index_path, ["visible: true", "host: Host", "genre: history"])
 
     bundle = _scan_series(tmp_path)
 
@@ -331,7 +330,7 @@ def test_scan_preserves_hand_written_index_frontmatter(tmp_path: Path) -> None:
         "---",
         "visible: true",
         "host: Host",
-        "rating: 9",
+        "genre: history",
         "---",
         "",
         "| EPISODE | DATE |",
@@ -346,11 +345,11 @@ def test_series_regeneration_preserves_frontmatter_edited_before_publication(
     directory = _series_dir(tmp_path, "Genesis", visible=True)
     _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Host"])
 
-    def add_rating(lines: list[str] | None) -> list[str] | None:
+    def add_genre(lines: list[str] | None) -> list[str] | None:
         if lines is None:
             return None
         updated = list(lines)
-        updated.insert(2, "rating: 9")
+        updated.insert(2, "genre: history")
         return updated
 
     books_dir = tmp_path / "books"
@@ -359,13 +358,13 @@ def test_series_regeneration_preserves_frontmatter_edited_before_publication(
         str(books_dir),
         str(tmp_path / "podcasts"),
         media_cache_store=_StubMediaCacheStore(),
-        note_store=_ConcurrentEditStore(tmp_path, add_rating),
+        note_store=_ConcurrentEditStore(tmp_path, add_genre),
     )
 
     source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     index = (directory / "Genesis.md").read_text(encoding="utf-8")
-    assert "rating: 9" in index
+    assert "genre: history" in index
     assert "| [[Part One]] | `2026-01-10` |" in index
 
 

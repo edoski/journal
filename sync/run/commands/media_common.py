@@ -13,7 +13,7 @@ from sync.ports.notes import NoteStore
 YOUTUBE_OEMBED_ENDPOINT = "https://www.youtube.com/oembed"
 BOOK_TEMPLATE_FILENAME = "book.md"
 PODCAST_TEMPLATE_FILENAME = "podcast.md"
-BOOK_FRONTMATTER_KEYS = ("author", "completed", "rating")
+BOOK_FRONTMATTER_KEYS = ("author", "completed")
 HIGHLIGHTS_SECTION_TITLE = "Highlights"
 REFLECTIONS_SECTION_TITLE = "Reflections"
 REFLECTIONS_PLACEHOLDER = "_No reflections have been made yet._"

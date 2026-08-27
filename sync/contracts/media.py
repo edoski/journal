@@ -14,7 +14,6 @@ class Book:
     title: str
     author: str
     completed: datetime.date
-    rating: float | None
 
 
 @dataclass(frozen=True)
@@ -24,7 +23,6 @@ class Podcast:
     title: str
     host: str
     date: datetime.date
-    rating: float | None
     link: str | None
     visible: bool
 
