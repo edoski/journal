@@ -948,7 +948,7 @@ def test_session_remind_uses_progressed_timer_without_open_row(
     assert reminders == [None]
 
 
-def test_session_remind_treats_full_timer_after_break_as_paused(
+def test_session_remind_rejects_full_idle_timer_after_break(
     tmp_path: Path,
 ) -> None:
     reminders: list[None] = []
@@ -980,11 +980,8 @@ def test_session_remind_treats_full_timer_after_break_as_paused(
 
     assert flow_automation.run_session_remind(deps=deps) == 0
     assert flow_automation.run_session_remind(deps=deps) == 0
-    assert reminders == [None]
-    assert (
-        flow_automation._load_flow_reminder_state(deps)["open_session_started_at"]
-        == 809510400.0
-    )
+    assert reminders == []
+    assert flow_automation._load_flow_reminder_state(deps) == {}
 
 
 def test_session_remind_respects_cooldown(tmp_path: Path) -> None:

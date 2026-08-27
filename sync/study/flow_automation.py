@@ -15,7 +15,6 @@ from typing import cast
 from sync.config import PATHS, PathConfig
 from sync.log import get_logger
 from sync.study.constants import FLOW_APP_DEFAULTS_DOMAIN
-from sync.study.core_data_time import datetime_to_core_data
 from sync.study.repository import FlowSessionRepository
 
 SKIP_LAUNCHD_LABEL = "com.edo.journal.skip"
@@ -412,26 +411,6 @@ def _live_flow_has_progress(
     return remaining < duration_minutes * 60
 
 
-def _recent_completed_break_at(
-    deps: FlowAutomationDeps,
-) -> float | None:
-    duration_minutes = deps.read_flow_duration_minutes()
-    now_marker = datetime_to_core_data(deps.now())
-    if duration_minutes is None or now_marker is None:
-        return None
-    try:
-        completed_at = deps.repository.latest_completed_break_at()
-    except Exception as exc:
-        logger.warning("Failed to evaluate latest completed break: %s", exc)
-        return None
-    if completed_at is None:
-        return None
-    elapsed = now_marker - completed_at
-    if 0 <= elapsed <= duration_minutes * 60:
-        return completed_at
-    return None
-
-
 def run_session_skip(
     state: str | None = None,
     *,
@@ -528,12 +507,9 @@ def run_session_remind(
         remaining_time,
         resolved,
     ):
-        open_started_at = _recent_completed_break_at(resolved)
-        if open_started_at is None:
-            logger.info("Remind no-op: no active or pending Flow session")
-            _clear_flow_reminder_state(resolved)
-            return 0
-        logger.info("Open Flow row absent; using recent break transition")
+        logger.info("Remind no-op: no active Flow session")
+        _clear_flow_reminder_state(resolved)
+        return 0
     elif open_started_at is None:
         logger.info("Open Flow row absent; using live timer progress")
 
