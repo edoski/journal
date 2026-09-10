@@ -32,8 +32,17 @@ class MediaItem:
     """One period-ready media row."""
 
     kind: Literal["BOOK", "PODCAST"]
+    author: str
     title: str
     date: datetime.date
+
+
+@dataclass(frozen=True)
+class SeriesIndex:
+    """The hand-edited frontmatter of a podcast series' index note."""
+
+    visible: bool
+    host: str
 
 
 @dataclass(frozen=True)

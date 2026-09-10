@@ -12,6 +12,7 @@ FIXTURE_MEDIA_BUNDLE = MediaBundle(
     items=(
         MediaItem(
             kind="BOOK",
+            author="Fixture Author",
             title="Fixture Book",
             date=datetime.date(2020, 1, 1),
         ),

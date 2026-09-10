@@ -10,7 +10,7 @@ from sync.readers.media import (
     parse_book_note,
     parse_media_date,
     parse_podcast_note,
-    parse_series_visibility,
+    parse_series_index,
 )
 
 
@@ -115,16 +115,34 @@ def test_parse_podcast_note_reads_visible_checkbox(value: str, expected: bool) -
         ([], False),
     ],
 )
-def test_parse_series_visibility_reads_the_index_note(
+def test_parse_series_index_reads_visibility_from_the_index_note(
     frontmatter: list[str], expected: bool
 ) -> None:
     lines = ["---", *frontmatter, "---", "| EPISODE | DATE |"]
 
-    assert parse_series_visibility(lines) is expected
+    assert parse_series_index(lines).visible is expected
 
 
-def test_parse_series_visibility_hides_an_index_note_without_frontmatter() -> None:
-    assert parse_series_visibility(["| EPISODE | DATE |"]) is False
+@pytest.mark.parametrize(
+    ("frontmatter", "expected"),
+    [
+        (["visible: true", "host: Host"], "Host"),
+        (["host:"], ""),
+        ([], ""),
+    ],
+)
+def test_parse_series_index_reads_the_host_from_the_index_note(
+    frontmatter: list[str], expected: str
+) -> None:
+    lines = ["---", *frontmatter, "---", "| EPISODE | DATE |"]
+
+    assert parse_series_index(lines).host == expected
+
+
+def test_parse_series_index_hides_an_index_note_without_frontmatter() -> None:
+    index = parse_series_index(["| EPISODE | DATE |"])
+
+    assert (index.visible, index.host) == (False, "")
 
 
 def test_parsers_reject_notes_without_canonical_dates() -> None:

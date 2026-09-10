@@ -208,6 +208,12 @@ journal/
 - Periodic `TRAINING` type summary tables are canonical only when they include:
   - `| TIME | ACTIVITY | DURATION | INTERRUPT |`
   - one row per activity type, with one dominant averaged `HH:MM - HH:MM` range
+- Periodic `MEDIA` tables are canonical only when they include:
+  - `| TYPE | AUTHOR | TITLE | DATE |`
+  - `AUTHOR` is a book note's `author`, a podcast note's `host`, or, for a series,
+    its index note's `host` falling back to the latest in-range episode's; media
+    without one renders a blank cell
+  - rows are sorted globally by `DATE`, intermixing books and podcasts
 - `notes/podcasts/` entries render in periodic `MEDIA` tables only when:
   - a note directly in the directory sets `visible: true`; it renders as its own entry
   - a subdirectory is a series: it renders as one entry titled after the folder, dated

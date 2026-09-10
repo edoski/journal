@@ -75,6 +75,6 @@
 
 ### **MEDIA**
 
-| TYPE | TITLE | DATE |
-| ---- | ----- | ---- |
-| **BOOK** | [[Fixture Book]] | `2020-01-01` |
+| TYPE | AUTHOR | TITLE | DATE |
+| ---- | ------ | ----- | ---- |
+| **BOOK** | Fixture Author | [[Fixture Book]] | `2020-01-01` |

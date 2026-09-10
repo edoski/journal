@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import re
 
-from sync.contracts.media import Book, Podcast
+from sync.contracts.media import Book, Podcast, SeriesIndex
 from sync.readers.frontmatter import parse_frontmatter
 
 
@@ -65,11 +65,16 @@ def parse_podcast_note(title: str, lines: list[str]) -> Podcast | None:
     )
 
 
-def parse_series_visibility(lines: list[str]) -> bool:
+def parse_series_index(lines: list[str]) -> SeriesIndex:
     """
-    Read whether a podcast series' index note opts into rendering.
+    Read a podcast series' index-note frontmatter.
 
-    The index note is the series' representative note, so its `visible` property
-    speaks for the whole folder exactly as a podcast note's does for itself.
+    The index note is the series' representative note, so its `visible` and
+    `host` properties speak for the whole folder exactly as a podcast note's do
+    for itself. A blank `host` leaves the series' author to its episodes.
     """
-    return _parse_visible(parse_frontmatter(lines))
+    frontmatter = parse_frontmatter(lines)
+    return SeriesIndex(
+        visible=_parse_visible(frontmatter),
+        host=_frontmatter_text(frontmatter, "host"),
+    )

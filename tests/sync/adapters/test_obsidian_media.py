@@ -105,9 +105,24 @@ def test_scan_returns_sorted_in_range_media_and_updates_cache(tmp_path: Path) ->
     ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
 
     assert bundle.items == (
-        MediaItem(kind="BOOK", title="Earlier", date=datetime.date(2026, 1, 5)),
-        MediaItem(kind="BOOK", title="Later", date=datetime.date(2026, 1, 20)),
-        MediaItem(kind="PODCAST", title="Episode", date=datetime.date(2026, 1, 10)),
+        MediaItem(
+            kind="BOOK",
+            author="A",
+            title="Earlier",
+            date=datetime.date(2026, 1, 5),
+        ),
+        MediaItem(
+            kind="PODCAST",
+            author="Host",
+            title="Episode",
+            date=datetime.date(2026, 1, 10),
+        ),
+        MediaItem(
+            kind="BOOK",
+            author="B",
+            title="Later",
+            date=datetime.date(2026, 1, 20),
+        ),
     )
     assert cache.state == {
         "books": {
@@ -149,7 +164,12 @@ def test_scan_collapses_a_series_folder_into_one_entry_dated_by_latest_episode(
     bundle = _scan_series(tmp_path)
 
     assert bundle.items == (
-        MediaItem(kind="PODCAST", title="Genesis", date=datetime.date(2026, 1, 31)),
+        MediaItem(
+            kind="PODCAST",
+            author="Host",
+            title="Genesis",
+            date=datetime.date(2026, 1, 31),
+        ),
     )
 
 
@@ -483,6 +503,94 @@ def test_scan_keeps_a_dated_index_note_out_of_its_own_episode_list(
     assert bundle.items[0].date == datetime.date(2026, 1, 10)
     assert "[[Genesis]]" not in (directory / "Genesis.md").read_text(encoding="utf-8")
     assert cache.state["podcasts"] == {"Genesis/Part One": "2026-01-10"}
+
+
+def test_scan_reads_a_series_author_from_its_index_note(tmp_path: Path) -> None:
+    directory = _series_dir(tmp_path, "Genesis")
+    _write_note(directory / "Genesis.md", ["visible: true", "host: Index Host"])
+    _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Episode Host"])
+
+    bundle = _scan_series(tmp_path)
+
+    assert bundle.items[0].author == "Index Host"
+
+
+def test_scan_falls_back_to_the_latest_episode_host_for_a_series(
+    tmp_path: Path,
+) -> None:
+    directory = _series_dir(tmp_path, "Genesis", visible=True)
+    _write_note(directory / "Part One.md", ["date: 2026-01-10", "host: Early Host"])
+    _write_note(directory / "Part Two.md", ["date: 2026-01-24", "host: Latest Host"])
+
+    bundle = _scan_series(tmp_path)
+
+    assert bundle.items[0].author == "Latest Host"
+
+
+def test_scan_breaks_a_latest_episode_tie_by_title(tmp_path: Path) -> None:
+    directory = _series_dir(tmp_path, "Genesis", visible=True)
+    _write_note(directory / "Part One.md", ["date: 2026-01-24", "host: First Host"])
+    _write_note(directory / "Part Two.md", ["date: 2026-01-24", "host: Second Host"])
+
+    bundle = _scan_series(tmp_path)
+
+    assert bundle.items[0].author == "Second Host"
+
+
+def test_scan_leaves_media_without_an_author_blank(tmp_path: Path) -> None:
+    books_dir = tmp_path / "books"
+    podcasts_dir = tmp_path / "podcasts"
+    books_dir.mkdir()
+    podcasts_dir.mkdir()
+    _write_note(books_dir / "Anonymous.md", ["completed: 2026-01-05"])
+    _write_note(podcasts_dir / "Unattributed.md", ["date: 2026-01-10", "visible: true"])
+
+    bundle = ObsidianMediaSource(
+        str(books_dir),
+        str(podcasts_dir),
+        media_cache_store=_StubMediaCacheStore(),
+        note_store=_note_store(tmp_path),
+    ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    assert [item.author for item in bundle.items] == ["", ""]
+
+
+def test_scan_intermixes_books_and_podcasts_globally_by_date(tmp_path: Path) -> None:
+    books_dir = tmp_path / "books"
+    podcasts_dir = tmp_path / "podcasts"
+    books_dir.mkdir()
+    podcasts_dir.mkdir()
+
+    _write_note(
+        books_dir / "Book Alpha.md", ["completed: 2026-01-02", "author: Author A"]
+    )
+    _write_note(
+        podcasts_dir / "Podcast Beta.md",
+        ["date: 2026-01-08", "host: Host B", "visible: true"],
+    )
+    _write_note(
+        books_dir / "Book Gamma.md", ["completed: 2026-01-15", "author: Author C"]
+    )
+    series = _series_dir(tmp_path, "Series Delta", visible=True)
+    _write_note(series / "Episode 1.md", ["date: 2026-01-22", "host: Host D"])
+    _write_note(
+        books_dir / "Book Epsilon.md", ["completed: 2026-01-29", "author: Author E"]
+    )
+
+    bundle = ObsidianMediaSource(
+        str(books_dir),
+        str(podcasts_dir),
+        media_cache_store=_StubMediaCacheStore(),
+        note_store=_note_store(tmp_path),
+    ).scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    assert [(item.kind, item.title, str(item.date)) for item in bundle.items] == [
+        ("BOOK", "Book Alpha", "2026-01-02"),
+        ("PODCAST", "Podcast Beta", "2026-01-08"),
+        ("BOOK", "Book Gamma", "2026-01-15"),
+        ("PODCAST", "Series Delta", "2026-01-22"),
+        ("BOOK", "Book Epsilon", "2026-01-29"),
+    ]
 
 
 def test_scan_omits_podcasts_that_are_not_visible_but_still_caches_them(

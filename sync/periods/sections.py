@@ -106,7 +106,12 @@ def append_media_section(
         return
 
     rows = [
-        [f"**{item.kind}**", f"[[{item.title}]]", f"`{item.date:%Y-%m-%d}`"]
+        [
+            f"**{item.kind}**",
+            item.author,
+            f"[[{item.title}]]",
+            f"`{item.date:%Y-%m-%d}`",
+        ]
         for item in media_bundle.items
     ]
 
@@ -114,8 +119,8 @@ def append_media_section(
     media_lines.extend(
         render_table(
             SimpleGridTableSpec(
-                headers=["TYPE", "TITLE", "DATE"],
-                divider_cells=["----", "-----", "----"],
+                headers=["TYPE", "AUTHOR", "TITLE", "DATE"],
+                divider_cells=["----", "------", "-----", "----"],
                 rows=rows,
             )
         )

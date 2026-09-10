@@ -7,7 +7,7 @@ import os
 from dataclasses import replace
 
 from sync.constants import BOOKS_DIR, PODCASTS_DIR
-from sync.contracts.media import MediaBundle, MediaItem, Podcast
+from sync.contracts.media import MediaBundle, MediaItem, Podcast, SeriesIndex
 from sync.io import safe_read_file
 from sync.log import get_logger
 from sync.notes.markdown_tables import split_markdown_row_lenient
@@ -18,7 +18,7 @@ from sync.readers.media import (
     parse_book_note,
     parse_media_date,
     parse_podcast_note,
-    parse_series_visibility,
+    parse_series_index,
 )
 from sync.writers.tables import SimpleGridTableSpec, render_table
 
@@ -149,7 +149,14 @@ def _scan_books(
         if not (start_date <= completed_date <= end_date):
             continue
 
-        books.append(MediaItem(kind="BOOK", title=parsed.title, date=completed_date))
+        books.append(
+            MediaItem(
+                kind="BOOK",
+                author=parsed.author,
+                title=parsed.title,
+                date=completed_date,
+            )
+        )
 
     # Keep the period table's existing completed-date order.
     books.sort(key=lambda item: item.date)
@@ -296,14 +303,15 @@ def _sync_series_index(
     title: str,
     episodes: list[Podcast],
     note_store: NoteStore,
-) -> bool:
+) -> SeriesIndex:
     """
-    Regenerate a series' index note and report whether it renders.
+    Regenerate a series' index note and return its hand-edited frontmatter.
 
     The note represents the series in periodic media tables, so its `visible`
-    property decides rendering exactly as a standalone podcast's does for itself.
-    Only the episode table below the frontmatter is generated: it is rewritten
-    whenever the episode list drifts and left untouched otherwise.
+    and `host` properties speak for the series exactly as a standalone
+    podcast's do for itself. Only the episode table below the frontmatter is
+    generated: it is rewritten whenever the episode list drifts and left
+    untouched otherwise.
 
     Args:
         directory: The series folder
@@ -311,7 +319,7 @@ def _sync_series_index(
         episodes: Every episode note in the folder, in watch order
 
     Returns:
-        Whether the series opts into rendering
+        The series' declared visibility and host
     """
     filepath = os.path.join(directory, f"{title}.md")
 
@@ -331,7 +339,7 @@ def _sync_series_index(
         list(publication.lines) if publication.lines is not None else None
     )
 
-    return parse_series_visibility(frontmatter)
+    return parse_series_index(frontmatter)
 
 
 def _scan_podcasts(
@@ -384,23 +392,30 @@ def _scan_podcasts(
             skip_filename=f"{entry}.md",
         )
         cache_modified = cache_modified or series_modified
-        visible = _sync_series_index(directory, entry, episodes, note_store)
+        index = _sync_series_index(directory, entry, episodes, note_store)
 
         rendered = _in_range(episodes, start_date, end_date)
-        if not visible or not rendered:
+        if not index.visible or not rendered:
             continue
 
+        latest = max(rendered, key=lambda episode: (episode.date, episode.title))
         series_items.append(
             MediaItem(
                 kind="PODCAST",
+                author=index.host or latest.host,
                 title=entry,
-                date=max(episode.date for episode in rendered),
+                date=latest.date,
             )
         )
 
     # Keep one date-ordered podcast run regardless of storage topology.
     podcast_items = [
-        MediaItem(kind="PODCAST", title=podcast.title, date=podcast.date)
+        MediaItem(
+            kind="PODCAST",
+            author=podcast.host,
+            title=podcast.title,
+            date=podcast.date,
+        )
         for podcast in _in_range(root_notes, start_date, end_date)
         if podcast.visible
     ]
@@ -453,4 +468,6 @@ class ObsidianMediaSource(MediaSource):
                 }
             )
 
-        return MediaBundle(items=tuple(book_items + podcast_items))
+        items = book_items + podcast_items
+        items.sort(key=lambda item: item.date)
+        return MediaBundle(items=tuple(items))

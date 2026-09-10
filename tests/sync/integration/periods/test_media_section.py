@@ -20,6 +20,7 @@ class TestAppendMediaSection:
             items=(
                 MediaItem(
                     kind="BOOK",
+                    author="Cal Newport",
                     title="Deep Work",
                     date=datetime.date(2025, 1, 22),
                 ),
@@ -30,7 +31,10 @@ class TestAppendMediaSection:
         assert len(sections) == 1
         media_lines = sections[0]
         assert media_lines[0] == "### **MEDIA**"
-        assert "| **BOOK** | [[Deep Work]] | `2025-01-22` |" in media_lines
+        assert "| TYPE | AUTHOR | TITLE | DATE |" in media_lines
+        assert (
+            "| **BOOK** | Cal Newport | [[Deep Work]] | `2025-01-22` |" in media_lines
+        )
 
     def test_items_render_in_source_order(self):
         sections: list[list[str]] = []
@@ -38,16 +42,19 @@ class TestAppendMediaSection:
             items=(
                 MediaItem(
                     kind="PODCAST",
+                    author="Genesis Host",
                     title="Genesis",
                     date=datetime.date(2025, 1, 8),
                 ),
                 MediaItem(
                     kind="PODCAST",
+                    author="",
                     title="Loose Episode",
                     date=datetime.date(2025, 1, 20),
                 ),
                 MediaItem(
                     kind="PODCAST",
+                    author="Exodus Host",
                     title="Exodus",
                     date=datetime.date(2025, 1, 30),
                 ),
@@ -57,9 +64,9 @@ class TestAppendMediaSection:
         append_media_section(sections, bundle)
         rows = [line for line in sections[0] if line.startswith("| **PODCAST**")]
         assert rows == [
-            "| **PODCAST** | [[Genesis]] | `2025-01-08` |",
-            "| **PODCAST** | [[Loose Episode]] | `2025-01-20` |",
-            "| **PODCAST** | [[Exodus]] | `2025-01-30` |",
+            "| **PODCAST** | Genesis Host | [[Genesis]] | `2025-01-08` |",
+            "| **PODCAST** |  | [[Loose Episode]] | `2025-01-20` |",
+            "| **PODCAST** | Exodus Host | [[Exodus]] | `2025-01-30` |",
         ]
 
     def test_podcast_only_bundle_still_appends_section(self):
@@ -68,6 +75,7 @@ class TestAppendMediaSection:
             items=(
                 MediaItem(
                     kind="PODCAST",
+                    author="Genesis Host",
                     title="Genesis",
                     date=datetime.date(2025, 1, 8),
                 ),
@@ -75,4 +83,6 @@ class TestAppendMediaSection:
         )
 
         append_media_section(sections, bundle)
-        assert "| **PODCAST** | [[Genesis]] | `2025-01-08` |" in sections[0]
+        assert (
+            "| **PODCAST** | Genesis Host | [[Genesis]] | `2025-01-08` |" in sections[0]
+        )

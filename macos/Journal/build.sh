@@ -1,6 +1,19 @@
 #!/bin/sh
 set -eu
 
+install=0
+for arg in "$@"; do
+    case "$arg" in
+        -i|--install)
+            install=1
+            ;;
+        *)
+            printf 'Unknown argument: %s\n' "$arg" >&2
+            exit 1
+            ;;
+    esac
+done
+
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$project_dir/../.." && pwd)
 app_dir="$repo_dir/build/Journal.app"
@@ -12,7 +25,11 @@ python_executable=$(uv python find \
     --no-python-downloads \
     "$python_version")
 python_dir=$(CDPATH= cd -- "$(dirname -- "$python_executable")/.." && pwd)
-codesign_identity=${JOURNAL_CODESIGN_IDENTITY:--}
+codesign_identity=${JOURNAL_CODESIGN_IDENTITY:-}
+if [ -z "$codesign_identity" ]; then
+    codesign_identity=$(security find-identity -p codesigning -v 2>/dev/null | awk -F'"' '/Apple Development/ { print $2; exit }')
+    codesign_identity=${codesign_identity:--}
+fi
 
 rm -rf "$app_dir"
 mkdir -p "$contents_dir/MacOS" "$resources_dir/JournalSync/sync"
@@ -65,4 +82,11 @@ codesign \
     --timestamp=none \
     "$app_dir"
 
-printf '%s\n' "$app_dir"
+if [ "$install" -eq 1 ]; then
+    install_target="/Applications/Journal.app"
+    rm -rf "$install_target"
+    cp -R "$app_dir" "$install_target"
+    printf 'Installed to %s\n' "$install_target"
+else
+    printf '%s\n' "$app_dir"
+fi

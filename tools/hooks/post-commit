@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+# Only run if sync/ or macos/ files were changed in this commit
+if git diff-tree -r --no-commit-id --name-only HEAD | grep -qE '^(sync/|macos/)'; then
+    echo "🔄 Journal code modified in commit. Rebuilding and installing /Applications/Journal.app..."
+    repo_dir="$(git rev-parse --show-toplevel)"
+    "$repo_dir/macos/Journal/build.sh" --install
+    echo "✅ /Applications/Journal.app updated."
+fi
