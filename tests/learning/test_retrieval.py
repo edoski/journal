@@ -6,6 +6,50 @@ import pytest
 from learning import records, retrieval
 
 
+def test_selected_assessment_brings_support_and_corrections_without_recursive_topics(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "sources": {"sheet": {"path": "transfer.md"}},
+            "topics": {
+                "a": {
+                    "assessment": {
+                        "summary": "Transfer remains assisted",
+                        "observations": ["o2"],
+                        "considered_observations": ["o1", "o2", "o3"],
+                    }
+                },
+                "b": {
+                    "assessment": {
+                        "summary": "A separate interpretation",
+                        "observations": ["o4"],
+                        "considered_observations": ["o2", "o3", "o4"],
+                    }
+                },
+                "c": {},
+            },
+            "observations": [
+                {"topics": ["a"], "text": "Initial attempt"},
+                {"topics": ["b"], "text": "Transfer", "source": "sheet"},
+                {"topics": ["b"], "text": "Transfer used a hint", "corrects": ["o2"]},
+                {"topics": ["c"], "text": "Unrelated history"},
+            ],
+        },
+    )
+    result = retrieval.context(tmp_path, "course", topics=["a"], limit=1)
+    assert result["complete"] is True
+    assert result["total"] == 1
+    assert list(result["observations"]) == ["o1", "o2", "o3"]
+    assert result["expanded_observations"] == ["o2", "o3"]
+    assert set(result["topics"]) == {"a"}
+    assert result["sources"]["sheet"]["path"] == "transfer.md"
+    assert result["selection"]["active_topics"] == ["a"]
+
+
 def test_focused_history_exact_selection_and_index_are_distinct(tmp_path: Path) -> None:
     records.save(
         tmp_path,

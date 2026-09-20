@@ -44,12 +44,14 @@ def test_plan_joins_recorded_time_and_learning_without_reading_other_scopes(
                         "summary": "Solves triangular systems independently",
                         "gap": "Cannot yet explain rank deficiency",
                         "observations": ["$attempt"],
+                        "considered_observations": ["$attempt"],
                     },
                     "review": {
                         "due": today.isoformat(),
                         "reason": "Check the remaining conceptual gap",
                         "task": "Explain a rank-deficient system without hints",
                         "observations": ["$attempt"],
+                        "considered_observations": ["$attempt"],
                     },
                 }
             },
@@ -119,6 +121,78 @@ def test_plan_joins_recorded_time_and_learning_without_reading_other_scopes(
     assert corrected_topic["assessment"]["pending"] is True
     assert corrected["reviews"][0]["pending"] is True
     assert set(corrected["scopes"][0]["observations"]) == {"o1", "o2"}
+
+
+def test_plan_includes_active_task_links_and_corrections_without_future_history(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    save(
+        root,
+        "course",
+        0,
+        {
+            "sources": {
+                name: {"path": f"{name}.md"}
+                for name in ("worksheet", "frame", "current", "base", "future")
+            },
+            "topics": {
+                "systems": {
+                    "assessment": {
+                        "summary": "Only the last attempt was independent",
+                        "observations": ["o6"],
+                        "considered_observations": [f"o{i}" for i in range(1, 8)],
+                    }
+                }
+            },
+            "observations": [
+                *[
+                    {"topics": ["systems"], "text": label}
+                    for label in ("task", "frame", "current", "base", "future", "claim")
+                ],
+                {
+                    "topics": ["systems"],
+                    "text": "Task attempt followed a hint",
+                    "corrects": ["o1"],
+                },
+            ],
+            "tasks": {
+                "exercise": {
+                    "observations": ["o1"],
+                    "refs": [{"source": "worksheet", "locator": "Exercise 5"}],
+                    "frame": {"observations": ["o2"], "source": "frame"},
+                    "plan": {
+                        "status": "agreed",
+                        "current": "now",
+                        "nodes": {
+                            "base": {
+                                "label": "Read columns",
+                                "observations": ["o4"],
+                                "source": "base",
+                            },
+                            "now": {
+                                "label": "Explain dependence",
+                                "needs": ["base"],
+                                "observations": ["o3"],
+                                "source": "current",
+                            },
+                            "later": {
+                                "label": "Transfer",
+                                "needs": ["now"],
+                                "observations": ["o5"],
+                                "source": "future",
+                            },
+                        },
+                    },
+                }
+            },
+        },
+    )
+    course = plan(root, tmp_path, "course")["scopes"][0]
+    assert list(course["observations"]) == ["o1", "o2", "o3", "o4", "o6", "o7"]
+    assert set(course["sources"]) == {"worksheet", "frame", "current", "base"}
+    assert course["topics"]["systems"]["assessment"]["pending"] is False
+    assert "exercise" in course["unfinished"]
 
 
 def test_planning_catalog_preserves_healthy_scopes_and_reports_corruption(

@@ -1,9 +1,11 @@
 /** Deterministic Pi adapter checks. Run with `node --test tests/learning/test_pi.mjs`. */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import childProcess, { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -16,7 +18,7 @@ const { loadExtensions } = await import(pathToFileURL(join(piPackage, "dist/core
 const { SessionManager } = await import(pathToFileURL(join(piPackage, "dist/core/session-manager.js")));
 const { validateToolArguments } = await import(pathToFileURL(join(piPackage, "node_modules/@earendil-works/pi-ai/dist/utils/validation.js")));
 
-async function fixture(t) {
+async function fixture(t, { open = false, throwOnOpen = false, beforePublish } = {}) {
   const root = realpathSync(await mkdtemp(join(tmpdir(), "learning-pi-unit-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const previous = { ...process.env };
@@ -24,7 +26,7 @@ async function fixture(t) {
     LEARNING_ROOT: root,
     LEARNING_PACKAGE: repository,
     LEARNING_PYTHON: join(repository, ".venv/bin/python"),
-    LEARNING_OPEN: "0",
+    LEARNING_OPEN: open ? "1" : "0",
     VAULT_DIR: join(root, "vault"),
     LEARNING_ASSETS: join(root, "assets"),
   });
@@ -34,6 +36,23 @@ async function fixture(t) {
       else process.env[key] = previous[key];
     }
   });
+  const openings = [];
+  if (open) {
+    const realSpawn = childProcess.spawn;
+    const mock = t.mock.method(childProcess, "spawn", (command, ...args) => {
+      if (command !== "/usr/bin/open") {
+        if (args[0].includes("publish-lesson")) beforePublish?.(openings);
+        return realSpawn(command, ...args);
+      }
+      if (throwOnOpen) throw new Error("Opener unavailable");
+      const child = new EventEmitter();
+      child.unref = () => child;
+      openings.push(child);
+      return child;
+    });
+    syncBuiltinESMExports();
+    t.after(() => { mock.mock.restore(); syncBuiltinESMExports(); });
+  }
   const loaded = await loadExtensions([join(repository, "learning/pi.ts")], repository);
   assert.deepEqual(loaded.errors, []);
   const extension = loaded.extensions[0];
@@ -59,7 +78,7 @@ async function fixture(t) {
   const append = (message) => branch.push({ type: "message", id: randomUUID(), message });
   const complete = async (message) => { await emit("message_end", { message }); append(message); };
   const path = join(root, "sessions", `${id}.md`);
-  return { ctx, branch, errors, emit, append, complete, path, extension, runtime: loaded.runtime, activeTools: () => activeTools };
+  return { ctx, branch, errors, openings, emit, append, complete, path, extension, runtime: loaded.runtime, activeTools: () => activeTools };
 }
 
 const assistant = (text) => ({ role: "assistant", content: [{ type: "text", text }] });
@@ -405,4 +424,113 @@ test("terminal hides duplicate teaching by default but exposes it if publication
   await f.emit("agent_settled");
   assert.match(await readFile(f.path, "utf8"), /Teaching remains accessible/);
   assert.equal(transform("Teaching", { messageType: "assistant", isStreaming: false }), "");
+});
+
+for (const failure of ["spawn error", "nonzero exit", "signal", "synchronous spawn error"]) {
+  test(`known opener ${failure} preserves saved teaching and enables terminal fallback once`, async (t) => {
+    const f = await fixture(t, { open: true, throwOnOpen: failure === "synchronous spawn error" });
+    await f.emit("session_start", { reason: "new" });
+    await f.complete(assistant("This saved explanation must remain readable."));
+    if (failure === "spawn error") {
+      f.openings[0].emit("error", new Error("Opener unavailable"));
+      f.openings[0].emit("exit", -2, null);
+    } else if (failure === "nonzero exit") f.openings[0].emit("exit", 1, null);
+    else if (failure === "signal") f.openings[0].emit("exit", null, "SIGTERM");
+    assert.equal(f.errors.filter((message) => message.startsWith("Lesson saved;")).length, 1);
+    assert.equal(f.errors.filter((message) => message.includes("This saved explanation")).length, 1);
+    assert.equal(f.extension.markdownTransformer("Next teaching", { messageType: "assistant" }), "Next teaching");
+    await f.complete(assistant("Next teaching"));
+    await f.emit("agent_settled");
+    assert.equal(f.extension.markdownTransformer("Still readable", { messageType: "assistant" }), "Still readable");
+    assert.equal(f.openings.length, failure === "synchronous spawn error" ? 0 : 1);
+    assert.match(await readFile(f.path, "utf8"), /This saved explanation[\s\S]*Next teaching/);
+    assert.ok(!f.errors.some((message) => message.startsWith("Lesson sync failed:")));
+  });
+}
+
+test("delayed open failure exposes the latest corrected teaching without replaying corrections", async (t) => {
+  const f = await fixture(t, { open: true });
+  await f.complete(assistant("The inverse equals P squared."));
+  await f.complete(assistant("Now apply the inverse."));
+  const receipt = await f.extension.tools.get("correct_lesson").definition.execute("fix", {
+    original: "The inverse equals P squared.", replacement: "The inverse equals P.",
+    reason: "P squared is the identity.",
+  }, undefined, undefined, f.ctx);
+  assert.equal(receipt.content[0].text, "Correction saved to the lesson.");
+  const beforeFailure = await readFile(f.path, "utf8");
+  f.openings[0].emit("exit", 1, null);
+  assert.match(f.errors[1], /The inverse equals P\.[\s\S]*Now apply the inverse\./);
+  assert.doesNotMatch(f.errors[1], /The inverse equals P squared/);
+  await f.complete(assistant("Continue from this corrected result."));
+  assert.equal(f.branch.filter((entry) => entry.customType === "learning-correction").length, 1);
+  assert.equal(f.openings.length, 1);
+  assert.equal(f.errors.length, 2);
+  assert.ok((await readFile(f.path, "utf8")).startsWith(beforeFailure.trimEnd()));
+});
+
+test("open failure during the next publication reveals its already-hidden pending teaching", async (t) => {
+  let publications = 0;
+  const f = await fixture(t, { open: true, beforePublish: (openings) => {
+    if (++publications === 2) openings[0].emit("exit", 1, null);
+  } });
+  await f.complete(assistant("First teaching."));
+  await f.complete(assistant("Teaching awaiting publication."));
+  assert.match(f.errors[1], /First teaching[\s\S]*Teaching awaiting publication/);
+  assert.equal(f.extension.markdownTransformer("Readable", { messageType: "assistant" }), "Readable");
+  assert.match(await readFile(f.path, "utf8"), /Teaching awaiting publication/);
+});
+
+for (const transition of ["session", "branch"]) {
+  test(`stale opener callbacks cannot replay teaching across a ${transition} change`, async (t) => {
+    const f = await fixture(t, { open: true });
+    await f.complete(assistant("Old teaching."));
+    const stale = f.openings[0];
+    f.branch.length = 0;
+    if (transition === "session") {
+      const id = randomUUID();
+      f.ctx.sessionManager.getSessionId = () => id;
+      await f.emit("session_start", { reason: "new" });
+    } else await f.emit("session_tree");
+    await f.complete(assistant("Current teaching."));
+    assert.equal(f.openings.length, 2);
+    stale.emit("error", new Error("Late failure"));
+    stale.emit("exit", 1, null);
+    assert.deepEqual(f.errors, []);
+    assert.equal(f.extension.markdownTransformer("Hidden", { messageType: "assistant" }), "");
+    f.openings[1].emit("exit", null, "SIGTERM");
+    assert.match(f.errors[1], /Current teaching/);
+    assert.doesNotMatch(f.errors[1], /Old teaching/);
+    assert.equal(f.extension.markdownTransformer("Readable", { messageType: "assistant" }), "Readable");
+    f.branch.length = 0;
+    const nextId = randomUUID();
+    f.ctx.sessionManager.getSessionId = () => nextId;
+    await f.emit("session_start", { reason: "new" });
+    await f.complete(assistant("New session teaching."));
+    f.openings[2].emit("exit", 0, null);
+    assert.equal(f.extension.markdownTransformer("Hidden again", { messageType: "assistant" }), "");
+    await f.complete(assistant("More teaching."));
+    assert.equal(f.openings.length, 3);
+  });
+}
+
+test("explicit reload retries the reading surface and restores fallback if it still fails", async (t) => {
+  const f = await fixture(t, { open: true });
+  const transform = (text) => f.extension.markdownTransformer(text, { messageType: "assistant" });
+  await f.complete(assistant("Teaching before reload."));
+  f.openings[0].emit("error", new Error("Obsidian unavailable"));
+  assert.equal(transform("Readable"), "Readable");
+  await f.emit("session_start", { reason: "reload" });
+  assert.equal(f.openings.length, 2);
+  f.openings[0].emit("exit", 1, null);
+  assert.equal(f.errors.length, 2);
+  f.openings[1].emit("exit", null, "SIGTERM");
+  assert.equal(transform("Still readable"), "Still readable");
+  assert.equal(f.errors.filter((message) => message.includes("Teaching before reload")).length, 2);
+  await f.complete(assistant("Continue in the terminal."));
+  assert.equal(f.openings.length, 2);
+  await f.emit("session_start", { reason: "reload" });
+  f.openings[2].emit("exit", 0, null);
+  assert.equal(transform("Normal reading surface"), "");
+  await f.complete(assistant("Continue in Obsidian."));
+  assert.equal(f.openings.length, 3);
 });

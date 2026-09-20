@@ -169,7 +169,7 @@ def main() -> int:
                     .resolve()
                 ),
             )
-            policy_topics = result.get("policy_topics", {})
+            policy_topics = result.pop("policy_topics", {})
             result["preferences"] = preferences.context(
                 root,
                 scope=args.scope,

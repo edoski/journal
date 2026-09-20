@@ -37,6 +37,8 @@ def normalize(
     """Validate persisted interpretations; freshness is never persisted."""
     if not isinstance(value, dict):
         raise ValueError(f"{field} must be an object")
+    if "reviewed_through" in value:
+        raise ValueError(f"{field}: use considered_observations, not reviewed_through")
     result = {key: item for key, item in value.items() if key != "pending"}
     text_fields = ("reason", "task") if review else ("summary", "gap", "status")
     for key in (*text_fields, "uncertainty"):
@@ -64,19 +66,32 @@ def normalize(
         )
     if not support and not historical and (review or not result.get("uncertainty")):
         raise ValueError(f"{field} requires supporting observations")
-    watermark = result.get("reviewed_through")
-    maximum = max((int(key[1:]) for key in observations), default=0)
-    if type(watermark) is not int or not 0 <= watermark <= maximum:
-        raise ValueError(f"{field}.reviewed_through must be a valid evidence watermark")
-    if any(int(key[1:]) > watermark for key in support):
-        raise ValueError(f"{field} support cannot follow its evidence watermark")
+    if "considered_observations" not in result:
+        raise ValueError(f"{field}.considered_observations is required")
+    considered = result["considered_observations"]
+    if considered is not None:
+        if (
+            not isinstance(considered, list)
+            or any(
+                not isinstance(key, str) or key not in observations
+                for key in considered
+            )
+            or len(considered) != len(set(considered))
+        ):
+            raise ValueError(
+                f"{field}.considered_observations must name distinct existing observations"
+            )
+        if not set(support).issubset(considered):
+            raise ValueError(
+                f"{field}.considered_observations must include all support"
+            )
     timestamp(result.get("assessed_at"), f"{field}.assessed_at", unknown=True)
     if "retain" in result and type(result["retain"]) is not bool:
         raise ValueError(f"{field}.retain must be a boolean")
     return result
 
 
-def stamp(value: Any, observations: dict[str, Any], now: str, field: str) -> Any:
+def stamp(value: Any, now: str, field: str) -> Any:
     """Assign metadata to an agent-supplied replacement assessment or review."""
     if value is None:
         return None
@@ -84,13 +99,13 @@ def stamp(value: Any, observations: dict[str, Any], now: str, field: str) -> Any
         raise ValueError(f"{field} must be an object")
     if HELPER_FIELDS.intersection(value):
         raise ValueError(
-            f"{field}: assessment timestamps, watermarks and pending are helper-owned"
+            f"{field}: assessment timestamps and pending are helper-owned; reviewed_through is obsolete"
         )
-    return {
-        **value,
-        "reviewed_through": max((int(key[1:]) for key in observations), default=0),
-        "assessed_at": now,
-    }
+    if not isinstance(value.get("considered_observations"), list):
+        raise ValueError(
+            f"{field}.considered_observations must declare reviewed evidence"
+        )
+    return {**value, "assessed_at": now}
 
 
 def _pending(
@@ -100,18 +115,17 @@ def _pending(
     links: dict[str, set[str]],
 ) -> bool:
     """New relevant events or corrections require a fresh tutor interpretation."""
-    if not value.get("observations") or value.get("assessed_at") is None:
-        return True
-    watermark = value["reviewed_through"]
-    if any(
-        topic in event["topics"] and int(key[1:]) > watermark
-        for key, event in observations.items()
+    considered = value["considered_observations"]
+    if (
+        considered is None
+        or not value.get("observations")
+        or value.get("assessed_at") is None
     ):
         return True
     related = set(value["observations"]) | {
         key for key, event in observations.items() if topic in event["topics"]
     }
-    return any(int(key[1:]) > watermark for key in expand_corrections(links, related))
+    return not expand_corrections(links, related).issubset(considered)
 
 
 def with_freshness(record: dict[str, Any]) -> dict[str, Any]:

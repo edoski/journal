@@ -176,16 +176,24 @@ def context(
     if offset > total:
         raise ValueError("offset exceeds selected observation count")
     page = selected[offset : None if limit is None else offset + limit]
-    expanded = expand_corrections(correction_links(stored), page)
-    items = {key: stored[key] for key in sorted(expanded, key=lambda key: int(key[1:]))}
+    links = correction_links(stored)
+    expanded = expand_corrections(links, page)
     selected_topics = set(topics or []) | context_topics
-    for item in items.values():
-        selected_topics.update(item["topics"])
+    for key in expanded:
+        selected_topics.update(stored[key]["topics"])
     if continuing or task is not None:
         selected_topics.update(checkpoint.get("topics", []))
     relevant_topics = {
         key: value for key, value in stored_topics.items() if key in selected_topics
     }
+    support = {
+        key
+        for topic in relevant_topics.values()
+        for field in ("assessment", "review")
+        for key in topic.get(field, {}).get("observations", [])
+    }
+    expanded = expand_corrections(links, expanded | support)
+    items = {key: stored[key] for key in sorted(expanded, key=lambda key: int(key[1:]))}
     selected_sources = set(source_ids(record))
     selected_sources.update(source_ids(record.get("course_context", {})))
     if continuing or task is not None:

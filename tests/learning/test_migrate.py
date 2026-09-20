@@ -10,18 +10,26 @@ from learning import records, migrate, storage
 
 def legacy(root: Path, scope: str = "course") -> bytes:
     record = {
-        "schema_version": 3,
+        "schema_version": 4,
         "revision": 7,
         "updated_at": "2026-01-01T12:00:00+00:00",
-        "sources": {"sheet": {"path": "original.md"}},
+        "sources": {"sheet": {"path": "original.md", "version": "edition-1"}},
         "topics": {
             "t": {
-                "summary": "Old interpretation",
-                "gap": "Old gap",
+                "assessment": {
+                    "summary": "Old interpretation",
+                    "gap": "Old gap",
+                    "observations": ["o1"],
+                    "reviewed_through": 1,
+                    "assessed_at": "2026-01-01T12:00:00+00:00",
+                },
                 "review": {
                     "due": "2026-09-20",
                     "reason": "Revisit",
                     "task": "Try again",
+                    "observations": ["o1"],
+                    "reviewed_through": 1,
+                    "assessed_at": "2026-01-01T12:00:00+00:00",
                 },
             }
         },
@@ -29,8 +37,17 @@ def legacy(root: Path, scope: str = "course") -> bytes:
             "o1": {
                 "topics": ["t"],
                 "text": "Actual evidence",
-                "origin": "Imported from the original lesson",
-                "refs": [{"source": "sheet", "locator": "Exercise 2"}],
+                "origin": "direct_attempt",
+                "recorded_at": "2026-01-01T11:00:00+00:00",
+                "response": "The equations coincide",
+                "assistance": "A hint identified the repeated row",
+                "refs": [
+                    {
+                        "source": "sheet",
+                        "locator": "Exercise 2",
+                        "source_version": "edition-1",
+                    }
+                ],
                 "details": {"observations": ["$attempt"]},
             }
         },
@@ -65,18 +82,26 @@ def test_preview_is_read_only_and_apply_preserves_original_backup_and_unknowns(
     record = records.read(tmp_path, "course")
     assert isinstance(record, dict)
     assert record["revision"] == 8
-    assert record["topics"]["t"]["assessment"]["summary"] == "Old interpretation"
-    assert record["topics"]["t"]["assessment"]["observations"] == []
-    assert record["topics"]["t"]["assessment"]["pending"] is True
-    assert record["topics"]["t"]["review"]["pending"] is True
-    event = record["observations"]["o1"]
-    assert event["recorded_at"] is None
-    assert "date" not in event
-    assert event["origin"] == "unknown"
-    assert event["provenance"] == "Imported from the original lesson"
-    assert event["refs"][0]["source_version"] is None
-    assert record["tasks"]["work"]["question"] == "Continue here"
+    previous = json.loads(original)
+    assert record["schema_version"] == 5
+    for field in ("observations", "sources", "tasks", "current_task"):
+        assert record[field] == previous[field]
+    for field in ("assessment", "review"):
+        interpretation = record["topics"]["t"][field]
+        original_interpretation = previous["topics"]["t"][field]
+        assert interpretation == {
+            **{
+                key: value
+                for key, value in original_interpretation.items()
+                if key != "reviewed_through"
+            },
+            "considered_observations": None,
+            "pending": True,
+        }
+    before_repeat = (tmp_path / "state/course.json").read_bytes()
     assert migrate.migrate(tmp_path, apply=True)["scopes"][0]["status"] == "current"
+    assert (tmp_path / "state/course.json").read_bytes() == before_repeat
+    assert (tmp_path / "preferences.json").read_bytes() == policy
 
 
 def test_new_alias_never_changes_existing_observation_content(tmp_path: Path) -> None:
@@ -173,3 +198,45 @@ def test_scope_names_cannot_collide_with_backup_metadata(tmp_path: Path) -> None
         "state/manifest.json",
         "preferences.json",
     }
+
+
+def test_migrated_unknown_coverage_survives_sparse_save_and_needs_explicit_reassessment(
+    tmp_path: Path,
+) -> None:
+    legacy(tmp_path)
+    migrate.migrate(tmp_path, apply=True)
+    records.save(tmp_path, "course", 8, {"tasks": {"work": {"question": "Next step"}}})
+    state = records.read(tmp_path, "course")
+    assert isinstance(state, dict)
+    assert state["topics"]["t"]["assessment"]["considered_observations"] is None
+    assert state["topics"]["t"]["assessment"]["pending"] is True
+    records.save(
+        tmp_path,
+        "course",
+        9,
+        {
+            "topics": {
+                "t": {
+                    "assessment": {
+                        "summary": "Assisted success remains untested independently",
+                        "observations": ["o1"],
+                        "considered_observations": ["o1"],
+                    }
+                }
+            }
+        },
+    )
+    updated = records.read(tmp_path, "course")
+    assert isinstance(updated, dict)
+    assert updated["topics"]["t"]["assessment"]["pending"] is False
+    assert updated["topics"]["t"]["review"]["pending"] is True
+
+
+def test_migration_leaves_lesson_artifacts_unchanged(tmp_path: Path) -> None:
+    legacy(tmp_path)
+    artifact = tmp_path / "notes" / "lesson.md"
+    artifact.parent.mkdir()
+    artifact.write_bytes(b"# Saved lesson\n\nExact teaching survives.\n")
+    before = artifact.read_bytes()
+    migrate.migrate(tmp_path, apply=True)
+    assert artifact.read_bytes() == before

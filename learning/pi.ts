@@ -197,10 +197,13 @@ function quizResult(params: QuizParameters, question: Question, outcome: QuizOut
 export default function (pi: ExtensionAPI) {
   const root = process.env.LEARNING_ROOT;
   if (!root) throw new Error("LEARNING_ROOT is required; use the learning launcher.");
-  let lastError = "";
+  let publicationError = "";
+  let displayFallback = false;
+  let viewEpoch = 0;
   let openedPath: string | undefined;
+  let openAttempt: { path: string; epoch: number; settled: boolean; teaching: string } | undefined;
   pi.registerMarkdownTransformer((markdown, { messageType }) =>
-    !lastError && messageType === "assistant" ? "" : markdown
+    !publicationError && !displayFallback && messageType === "assistant" ? "" : markdown
   );
   let published: { path: string; text: string } | undefined;
 
@@ -246,17 +249,49 @@ export default function (pi: ExtensionAPI) {
   const lessonPath = (ctx: ExtensionContext) => join(resolve(root), "sessions", `${ctx.sessionManager.getSessionId()}.md`);
   const report = (ctx: ExtensionContext, error: unknown) => {
     const message = `Lesson sync failed: ${error instanceof Error ? error.message : String(error)}`;
-    if (message !== lastError) {
+    if (message !== publicationError) {
       if (ctx.hasUI) ctx.ui.notify(message, "error");
       else process.stderr.write(`${message}\n`);
     }
-    lastError = message;
+    publicationError = message;
   };
 
-  async function sync(ctx: ExtensionContext, pending?: Message): Promise<boolean> {
+  function openLesson(ctx: ExtensionContext, path: string, epoch: number, teaching: string) {
+    const attempt = { path, epoch, settled: false, teaching };
+    openAttempt = attempt;
+    openedPath = path;
+    const fail = (reason: string) => {
+      if (attempt.settled) return;
+      attempt.settled = true;
+      if (openAttempt !== attempt || viewEpoch !== epoch || lessonPath(ctx) !== path) return;
+      displayFallback = true;
+      ctx.ui.notify(`Lesson saved; Obsidian could not open it: ${reason}. Teaching is available here.`, "warning");
+      // Changing the transformer does not repaint already-hidden transcript entries.
+      if (attempt.teaching) ctx.ui.notify(attempt.teaching, "info");
+    };
     try {
-      const path = lessonPath(ctx);
+      const child = spawn("/usr/bin/open", ["-g", `obsidian://open?path=${encodeURIComponent(path)}`], {
+        detached: true, stdio: "ignore",
+      });
+      child.once("error", (error) => fail(error.message));
+      child.once("exit", (code, signal) => {
+        if (signal !== null || code !== 0) fail(signal ? `signal ${signal}` : `exit ${code}`);
+        else attempt.settled = true;
+      });
+      child.unref();
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function sync(ctx: ExtensionContext, pending?: Message): Promise<boolean> {
+    const path = lessonPath(ctx);
+    const sessionId = ctx.sessionManager.getSessionId();
+    const epoch = viewEpoch;
+    const current = () => viewEpoch === epoch && lessonPath(ctx) === path;
+    try {
       await withFileMutationQueue(path, async () => {
+        if (!current()) return;
         const entries: LessonEntry[] = [...ctx.sessionManager.getBranch()];
         // message_end precedes appendMessage; use event identity, never text equality.
         if (pending && !entries.some((entry) => entry.message === pending)) entries.push({ id: "pending", type: "message", message: pending });
@@ -267,25 +302,22 @@ export default function (pi: ExtensionAPI) {
           return;
         }
         const text = teaching.map((text) => `${text}\n\n---`).join("\n\n");
+        if (openAttempt?.path === path && openAttempt.epoch === epoch && !openAttempt.settled) {
+          openAttempt.teaching = text;
+        }
         if (published?.path !== path || published.text !== text) {
-          await runLearning(["publish-lesson", ctx.sessionManager.getSessionId()], text);
-          published = { path, text };
+          await runLearning(["publish-lesson", sessionId], text);
+          if (current()) published = { path, text };
         }
       });
-      lastError = "";
-      if (published?.path === path && published.text && openedPath !== path && ctx.mode === "tui" && process.env.LEARNING_OPEN !== "0") {
-        const child = spawn("/usr/bin/open", ["-g", `obsidian://open?path=${encodeURIComponent(path)}`], {
-          detached: true, stdio: "ignore",
-        });
-        child.on("error", (error) => ctx.ui.notify(`Lesson saved; Obsidian could not open it: ${error.message}`, "warning"));
-        child.on("exit", (code) => {
-          if (code !== null && code !== 0) ctx.ui.notify(`Lesson saved; Obsidian could not open ${path} (exit ${code}).`, "warning");
-        });
-        child.unref();
-        openedPath = path;
+      if (!current()) return false;
+      publicationError = "";
+      if (published?.path === path && published.text && openedPath !== path && !displayFallback && ctx.mode === "tui" && process.env.LEARNING_OPEN !== "0") {
+        openLesson(ctx, path, epoch, published.text);
       }
       return true;
     } catch (error) {
+      if (!current()) return false;
       report(ctx, error);
       if (ctx.hasUI && pending && lessonText(pending)) {
         ctx.ui.notify(lessonText(pending), "info");
@@ -311,7 +343,7 @@ export default function (pi: ExtensionAPI) {
       }
       pi.appendEntry(CORRECTION, { messageId: matches[0].id, original: params.original, replacement: params.replacement, reason: params.reason });
       if (!await sync(ctx)) throw new Error("Correction was saved but lesson publication failed; retry publication rather than adding the correction again.");
-      return { content: [{ type: "text", text: "Correction saved and displayed." }], details: {} };
+      return { content: [{ type: "text", text: "Correction saved to the lesson." }], details: {} };
     },
   });
 
@@ -372,18 +404,27 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  pi.on("session_start", async (event, ctx) => {
+  pi.on("session_start", async (_event, ctx) => {
     if (ctx.mode !== "tui") pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "quiz"));
+    viewEpoch += 1;
+    openAttempt = undefined;
+    publicationError = "";
+    displayFallback = false;
     published = undefined;
-    openedPath = event.reason === "reload" ? lessonPath(ctx) : undefined;
+    openedPath = undefined;
     await sync(ctx);
   });
   pi.on("message_end", async (event, ctx) => {
     if (lessonText(event.message)) await sync(ctx, event.message);
   });
-  pi.on("session_tree", async (_event, ctx) => { await sync(ctx); });
+  pi.on("session_tree", async (_event, ctx) => {
+    viewEpoch += 1;
+    if (openAttempt && !openAttempt.settled) openedPath = undefined;
+    openAttempt = undefined;
+    await sync(ctx);
+  });
   pi.on("agent_settled", async (_event, ctx) => {
-    if (lastError) await sync(ctx);
+    if (publicationError) await sync(ctx);
   });
   pi.on("before_agent_start", async (event, ctx) => ({
     systemPrompt: `${event.systemPrompt}\nLesson destination (created with first teaching): ${lessonPath(ctx)}`,

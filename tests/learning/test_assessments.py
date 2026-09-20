@@ -21,12 +21,14 @@ def seed(root: Path) -> None:
                     "assessment": {
                         "summary": "One independent attempt",
                         "observations": ["$attempt"],
+                        "considered_observations": ["$attempt"],
                     },
                     "review": {
                         "in_days": 2,
                         "reason": "Check transfer",
                         "task": "Solve a new system",
                         "observations": ["$attempt"],
+                        "considered_observations": ["$attempt"],
                     },
                 },
                 "other": {},
@@ -89,6 +91,7 @@ def test_assessment_and_review_follow_relevant_evidence_and_cross_topic_correcti
                     "assessment": {
                         "summary": "Assisted attempt only",
                         "observations": ["o3"],
+                        "considered_observations": ["o1", "o3"],
                     }
                 }
             }
@@ -143,7 +146,11 @@ def test_unknown_assessment_is_explicit_and_pending(tmp_path: Path) -> None:
         {
             "topics": {
                 "systems": {
-                    "assessment": {"uncertainty": "Not assessed", "observations": []}
+                    "assessment": {
+                        "uncertainty": "Not assessed",
+                        "observations": [],
+                        "considered_observations": [],
+                    }
                 }
             }
         },
@@ -157,7 +164,11 @@ def test_unknown_assessment_is_explicit_and_pending(tmp_path: Path) -> None:
             {
                 "topics": {
                     "systems": {
-                        "assessment": {"summary": "Mastered", "observations": []}
+                        "assessment": {
+                            "summary": "Mastered",
+                            "observations": [],
+                            "considered_observations": [],
+                        }
                     }
                 }
             },
@@ -182,6 +193,7 @@ def test_agent_cannot_assign_assessment_metadata(
                         "assessment": {
                             "summary": "Claim",
                             "observations": ["o1"],
+                            "considered_observations": ["o1"],
                             field: value,
                         }
                     }
@@ -326,3 +338,135 @@ def test_preference_creation_and_topic_removal_cannot_commit_a_dangling_selector
     assert isinstance(state, dict)
     policy = preferences.read(tmp_path)
     assert "unused" in state["topics"] or not policy["rules"]
+
+
+def test_declared_coverage_keeps_partial_reads_and_holes_pending(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {"systems": {}, "other": {}},
+            "observations": [
+                {"topics": ["systems"], "text": "Solved with help"},
+                {"topics": ["systems"], "text": "Could not repeat unaided"},
+                {"topics": ["other"], "text": "Unrelated newest attempt"},
+            ],
+        },
+    )
+    for revision, considered in enumerate(
+        (["o1"], ["o1", "o3"], ["o1", "o2"]), start=1
+    ):
+        records.save(
+            tmp_path,
+            "course",
+            revision,
+            {
+                "topics": {
+                    "systems": {
+                        "assessment": {
+                            "summary": "Assisted performance",
+                            "observations": ["o1"],
+                            "considered_observations": considered,
+                        }
+                    }
+                }
+            },
+        )
+        assert topic(tmp_path)["assessment"]["pending"] is ("o2" not in considered)
+
+
+@pytest.mark.parametrize("considered", [None, [], ["o99"], ["o1", "o1"], "o1", [1]])
+def test_invalid_coverage_does_not_publish(tmp_path: Path, considered: Any) -> None:
+    seed(tmp_path)
+    before = (tmp_path / "state/course.json").read_bytes()
+    with pytest.raises(ValueError, match="considered_observations"):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {
+                "topics": {
+                    "systems": {
+                        "assessment": {
+                            "summary": "Claim",
+                            "observations": ["o1"],
+                            "considered_observations": considered,
+                        }
+                    }
+                }
+            },
+        )
+    assert (tmp_path / "state/course.json").read_bytes() == before
+
+
+def test_replacement_requires_coverage_without_affecting_sparse_saves(
+    tmp_path: Path,
+) -> None:
+    seed(tmp_path)
+    records.save(tmp_path, "course", 1, {"tasks": {"work": {"task": "Continue"}}})
+    with pytest.raises(ValueError, match="considered_observations"):
+        records.save(
+            tmp_path,
+            "course",
+            2,
+            {
+                "topics": {
+                    "systems": {
+                        "assessment": {"summary": "Claim", "observations": ["o1"]}
+                    }
+                }
+            },
+        )
+    assert topic(tmp_path)["assessment"]["pending"] is False
+
+
+def test_cross_topic_support_requires_its_corrections_but_not_its_entire_topic(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {
+                "systems": {
+                    "assessment": {
+                        "summary": "Transfer remains uncertain",
+                        "observations": ["$support"],
+                        "considered_observations": ["$support", "$correction"],
+                    }
+                },
+                "other": {},
+            },
+            "observations": [
+                {"as": "support", "topics": ["other"], "text": "Transfer attempt"},
+                {"topics": ["other"], "text": "Unrelated history"},
+                {
+                    "as": "correction",
+                    "topics": ["other"],
+                    "text": "Tutor supplied answer",
+                    "corrects": ["$support"],
+                },
+            ],
+        },
+    )
+    assert topic(tmp_path)["assessment"]["considered_observations"] == ["o1", "o3"]
+    assert topic(tmp_path)["assessment"]["pending"] is False
+    records.save(
+        tmp_path,
+        "course",
+        1,
+        {
+            "observations": [
+                {
+                    "topics": ["other"],
+                    "text": "Correct attribution again",
+                    "corrects": ["o3"],
+                }
+            ]
+        },
+    )
+    assert topic(tmp_path)["assessment"]["pending"] is True

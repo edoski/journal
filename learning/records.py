@@ -118,18 +118,18 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
     if not isinstance(record, dict):
         raise ValueError("state must be a JSON object")
     if (
-        type(record.get("schema_version", 4)) is not int
-        or record.get("schema_version", 4) != 4
+        type(record.get("schema_version", 5)) is not int
+        or record.get("schema_version", 5) != 5
     ):
         raise ValueError(
-            "learning state requires schema_version 4; run the explicit learning migration first"
+            "learning state requires schema_version 5; run the explicit learning migration first"
         )
     result = {
         key: value
         for key, value in record.items()
         if key not in {"revision", "updated_at", "topic_index"}
     }
-    result["schema_version"] = 4
+    result["schema_version"] = 5
     for field in ("topics", "sources", "observations"):
         value = result.setdefault(field, {})
         if not isinstance(value, dict) or any(
@@ -288,9 +288,9 @@ def _scope(value: str) -> str:
 def _validated(record: dict[str, Any]) -> dict[str, Any]:
     if record["revision"] == 0:
         return record
-    if record.get("schema_version") != 4:
+    if record.get("schema_version") != 5:
         raise ValueError(
-            "learning state requires schema_version 4; run the explicit learning migration first"
+            "learning state requires schema_version 5; run the explicit learning migration first"
         )
     normalized = normalize_record(record)
     return {
@@ -335,7 +335,7 @@ def _aliases(value: Any, aliases: dict[str, str]) -> Any:
     result = {}
     for key, item in value.items():
         if (
-            key in {"observations", "corrects"}
+            key in {"observations", "considered_observations", "corrects"}
             and isinstance(item, list)
             and all(isinstance(ref, str) for ref in item)
         ):
@@ -438,7 +438,7 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
                         for name in ("assessment", "review"):
                             if name in change:
                                 change[name] = assessments.stamp(
-                                    change[name], saved, now, f"topics.{key}.{name}"
+                                    change[name], now, f"topics.{key}.{name}"
                                 )
                     merged[key] = {**merged.get(key, {}), **change}
                 else:

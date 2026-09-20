@@ -55,12 +55,17 @@ def test_scope_patches_append_observations_and_preserve_other_fields(
             "current_task": "work",
             "topics": {
                 "current": {
-                    "assessment": {"summary": "Assisted", "observations": ["$first"]},
+                    "assessment": {
+                        "summary": "Assisted",
+                        "observations": ["$first"],
+                        "considered_observations": ["$first"],
+                    },
                     "review": {
                         "due": "2030-02-01",
                         "reason": "Retry",
                         "task": "Solve unaided",
                         "observations": ["$first"],
+                        "considered_observations": ["$first"],
                     },
                 },
                 "other": {"title": "Untouched"},
@@ -87,12 +92,14 @@ def test_scope_patches_append_observations_and_preserve_other_fields(
                     "assessment": {
                         "summary": "Independent",
                         "observations": ["$second"],
+                        "considered_observations": ["o1", "$second"],
                     },
                     "review": {
                         "due": "2030-02-05",
                         "reason": "Check transfer",
                         "task": "New system",
                         "observations": ["$second"],
+                        "considered_observations": ["o1", "$second"],
                     },
                 },
                 "unused": None,
@@ -113,7 +120,7 @@ def test_scope_patches_append_observations_and_preserve_other_fields(
     assert receipt["review_dates"] == {"current": "2030-02-05"}
     current = records.read(tmp_path, "course")
     assert isinstance(current, dict)
-    assert current["schema_version"] == 4
+    assert current["schema_version"] == 5
     assert current["goal"] == "Understand systems"
     assert current["topics"]["current"]["assessment"]["summary"] == "Independent"
     assert current["topics"]["current"]["assessment"]["observations"] == ["o2"]
@@ -152,7 +159,11 @@ def test_scope_patches_append_observations_and_preserve_other_fields(
     ],
 )
 def test_new_review_interval_respects_upcoming_exam(exam: str | None, due: str) -> None:
-    metadata = {"observations": [], "reviewed_through": 0, "assessed_at": None}
+    metadata = {
+        "observations": [],
+        "considered_observations": None,
+        "assessed_at": None,
+    }
     record = records.normalize_record(
         {
             "exam": exam,

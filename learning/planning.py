@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any
 
 from learning.course import context_for_plan
+from learning import task_context
 from sync.study.context import journal_summary
-from learning.records import read
+from learning.records import read, source_ids
 from learning.retrieval import evidence
 
 
@@ -68,15 +69,17 @@ def plan(
                 "assessment": assessment,
                 **({"review": review} if review else {}),
             }
-        supporting = evidence(state, list(selected))
         source_context = context_for_plan(state)
-        source_ids = set(source_context.get("sources", {}))
+        referenced_sources = set(source_context.get("sources", {}))
+        for task in state.get("tasks", {}).values():
+            for part in (task, *task_context.parts(task, active_only=True)):
+                selected.update(part.get("observations", []))
+                referenced_sources.update(source_ids(part))
+        supporting = evidence(state, list(selected))
         for observation in supporting.values():
-            if "source" in observation:
-                source_ids.add(observation["source"])
-            source_ids.update(ref["source"] for ref in observation.get("refs", []))
+            referenced_sources.update(source_ids(observation))
         source_context["sources"] = {
-            key: state["sources"][key] for key in sorted(source_ids)
+            key: state["sources"][key] for key in sorted(referenced_sources)
         }
         exam = date.fromisoformat(state["exam"]) if state.get("exam") else None
         activity = state.get("journal_activity")
