@@ -1,0 +1,9 @@
+{
+  "unrelated_topic_excludes_response_knowledge": true,
+  "unrelated_topic_includes_only_routed_hardware_entry": true,
+  "literal_query_discovers_saved_prose": true,
+  "exact_read_preserves_complete_entry": true,
+  "exact_read_omits_learner_history_and_policy": true,
+  "identical_save_keeps_revision_and_bytes": true,
+  "native_state_unchanged": true
+}

@@ -9,6 +9,78 @@ import pytest
 from learning import records, storage
 
 
+def test_knowledge_replacements_preserve_other_understanding_and_outlive_tasks(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {"systems": {}},
+            "tasks": {"exercise": {"task": "Solve this"}},
+            "current_task": "exercise",
+            "knowledge": {
+                "resources": {
+                    "text": "Old sheets may be current.",
+                    "topics": ["systems"],
+                },
+                "notation": {"text": "The lecturer uses g; the book uses h."},
+            },
+        },
+    )
+    receipt = records.save(
+        tmp_path,
+        "course",
+        1,
+        {
+            "knowledge": {
+                "resources": {"text": "Learner reports old sheets are outdated."}
+            },
+            "tasks": {"exercise": None},
+        },
+    )
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    assert current["knowledge"] == {
+        "resources": {"text": "Learner reports old sheets are outdated."},
+        "notation": {"text": "The lecturer uses g; the book uses h."},
+    }
+    assert current["tasks"] == {}
+    assert current["current_task"] is None
+    assert current["observations"] == {}
+    assert receipt["assigned_observations"] == []
+    assert records.save(tmp_path, "course", 2, {"knowledge": {}})["revision"] == 2
+    assert (
+        records.save(
+            tmp_path,
+            "course",
+            2,
+            {"knowledge": {"resources": current["knowledge"]["resources"]}},
+        )["revision"]
+        == 2
+    )
+    with pytest.raises(ValueError, match="revision conflict"):
+        records.save(tmp_path, "course", 1, {"knowledge": {"notation": None}})
+    records.save(
+        tmp_path,
+        "course",
+        2,
+        {
+            "knowledge": {
+                "resources": None,
+                "current-resources": current["knowledge"]["resources"],
+            }
+        },
+    )
+    renamed = records.read(tmp_path, "course")
+    assert isinstance(renamed, dict)
+    assert renamed["knowledge"] == {
+        "current-resources": current["knowledge"]["resources"],
+        "notation": current["knowledge"]["notation"],
+    }
+
+
 def test_conflicting_writers_preserve_committed_state(tmp_path: Path) -> None:
     records.save(tmp_path, "course", 0, {"title": "Original"})
     original = records.read(tmp_path, "course")
@@ -34,6 +106,121 @@ def test_conflicting_writers_preserve_committed_state(tmp_path: Path) -> None:
     assert isinstance(current, dict)
     assert current["revision"] == 2
     assert current["title"] == winners[0]
+
+
+@pytest.mark.parametrize(
+    ("knowledge", "message"),
+    [
+        (None, "knowledge patch must be an object"),
+        ({"Invalid": {"text": "Meaning"}}, "knowledge.Invalid"),
+        ({"Invalid": None}, "knowledge.Invalid"),
+        ({"x" * 65: {"text": "Meaning"}}, "knowledge"),
+        ({"note": "Meaning"}, "knowledge.note"),
+        ({"note": {}}, "knowledge.note.text"),
+        ({"note": {"text": " "}}, "knowledge.note.text"),
+        ({"note": {"text": "Meaning", "confidence": 1}}, "knowledge.note"),
+        ({"note": {"text": "Meaning", "topics": ["missing"]}}, "knowledge.note.topics"),
+        (
+            {"note": {"text": "Meaning", "refs": [{"source": "missing"}]}},
+            "knowledge.note.source",
+        ),
+        ({"note": {"text": "Meaning", "refs": "missing"}}, "knowledge.note.refs"),
+        (
+            {
+                "note": {
+                    "text": "Meaning",
+                    "refs": [{"source": "sheet", "source_version": None}],
+                }
+            },
+            "helper-owned",
+        ),
+    ],
+)
+def test_invalid_knowledge_cannot_partially_publish(
+    tmp_path: Path, knowledge: Any, message: str
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {"title": "Original", "sources": {"sheet": {"path": "sheet.pdf"}}},
+    )
+    original = records.read(tmp_path, "course")
+    with pytest.raises(ValueError, match=message):
+        records.save(
+            tmp_path, "course", 1, {"title": "Do not save", "knowledge": knowledge}
+        )
+    assert records.read(tmp_path, "course") == original
+
+
+def test_knowledge_citations_capture_versions_and_protect_links(tmp_path: Path) -> None:
+    entry = {
+        "text": "Tentative convention.",
+        "topics": ["systems"],
+        "refs": [{"source": "sheet", "locator": "p. 3"}],
+    }
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "knowledge": {"convention": entry},
+            "topics": {"systems": {}},
+            "sources": {"sheet": {"path": "sheet.pdf", "version": "first"}},
+        },
+    )
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    assert current["knowledge"]["convention"]["refs"] == [
+        {"source": "sheet", "locator": "p. 3", "source_version": "first"}
+    ]
+    assert (
+        records.save(tmp_path, "course", 1, {"knowledge": {"convention": entry}})[
+            "revision"
+        ]
+        == 1
+    )
+    for patch in (
+        {"topics": {"systems": None}},
+        {"sources": {"sheet": None}},
+        {"sources": {"sheet": {"version": "second"}}},
+    ):
+        with pytest.raises(ValueError):
+            records.save(tmp_path, "course", 1, patch)
+        assert records.read(tmp_path, "course") == current
+    records.save(tmp_path, "course", 1, {"sources": {"sheet": {"path": "moved.pdf"}}})
+    moved = records.read(tmp_path, "course")
+    assert isinstance(moved, dict)
+    assert moved["knowledge"] == current["knowledge"]
+    records.save(
+        tmp_path,
+        "course",
+        2,
+        {
+            "sources": {"sheet": None, "new-sheet": {"path": "new.pdf"}},
+            "topics": {"systems": None},
+            "knowledge": {
+                "convention": {
+                    "text": "Revised convention.",
+                    "refs": [{"source": "new-sheet"}],
+                }
+            },
+        },
+    )
+    revised = records.read(tmp_path, "course")
+    assert isinstance(revised, dict)
+    assert revised["knowledge"]["convention"] == {
+        "text": "Revised convention.",
+        "refs": [{"source": "new-sheet", "source_version": None}],
+    }
+    corrupted = dict(revised)
+    corrupted["knowledge"] = {
+        "convention": {"text": "Uncaptured", "refs": [{"source": "new-sheet"}]}
+    }
+    with pytest.raises(
+        ValueError, match="knowledge.convention.refs requires a captured source_version"
+    ):
+        records.normalize_record(corrupted)
 
 
 def test_scope_patches_append_observations_and_preserve_other_fields(

@@ -1,0 +1,162 @@
+[
+  {
+    "check": "initial uses additive schema 5",
+    "passed": true
+  },
+  {
+    "check": "initial preserves seeded unrelated hardware note",
+    "passed": true
+  },
+  {
+    "check": "initial invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "initial invents no learner assessment",
+    "passed": true
+  },
+  {
+    "check": "orientation uses additive schema 5",
+    "passed": true
+  },
+  {
+    "check": "orientation preserves seeded unrelated hardware note",
+    "passed": true
+  },
+  {
+    "check": "orientation invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "orientation invents no learner assessment",
+    "passed": true
+  },
+  {
+    "check": "correction uses additive schema 5",
+    "passed": true
+  },
+  {
+    "check": "correction preserves seeded unrelated hardware note",
+    "passed": true
+  },
+  {
+    "check": "correction invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "correction invents no learner assessment",
+    "passed": true
+  },
+  {
+    "check": "unrelated uses additive schema 5",
+    "passed": true
+  },
+  {
+    "check": "unrelated preserves seeded unrelated hardware note",
+    "passed": true
+  },
+  {
+    "check": "unrelated invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "unrelated invents no learner assessment",
+    "passed": true
+  },
+  {
+    "check": "recall uses additive schema 5",
+    "passed": true
+  },
+  {
+    "check": "recall preserves seeded unrelated hardware note",
+    "passed": true
+  },
+  {
+    "check": "recall invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "recall invents no learner assessment",
+    "passed": true
+  },
+  {
+    "check": "Native orientation saves additional generic knowledge",
+    "passed": true
+  },
+  {
+    "check": "orientation retains lecturer g and textbook h",
+    "passed": true
+  },
+  {
+    "check": "correction retains lecturer g and textbook h",
+    "passed": true
+  },
+  {
+    "check": "unrelated retains lecturer g and textbook h",
+    "passed": true
+  },
+  {
+    "check": "recall retains lecturer g and textbook h",
+    "passed": true
+  },
+  {
+    "check": "Correction completes the orientation task",
+    "passed": true
+  },
+  {
+    "check": "Correction retains current versus old time distinction",
+    "passed": true
+  },
+  {
+    "check": "Unrelated clarification leaves generic knowledge unchanged",
+    "passed": true
+  },
+  {
+    "check": "Unrelated clarification leaves all learner state unchanged",
+    "passed": true
+  },
+  {
+    "check": "Unrelated answer omits unnecessary hardware and course recap",
+    "passed": true
+  },
+  {
+    "check": "Fresh recall does not recreate finished orientation",
+    "passed": true
+  },
+  {
+    "check": "Conflict is retained with both time conventions",
+    "passed": true
+  },
+  {
+    "check": "s1-orientation native process completed",
+    "passed": true
+  },
+  {
+    "check": "s1-orientation used stable production and skill bytes",
+    "passed": true
+  },
+  {
+    "check": "s2-correction-close native process completed",
+    "passed": true
+  },
+  {
+    "check": "s2-correction-close used stable production and skill bytes",
+    "passed": true
+  },
+  {
+    "check": "s3-unrelated-topic native process completed",
+    "passed": true
+  },
+  {
+    "check": "s3-unrelated-topic used stable production and skill bytes",
+    "passed": true
+  },
+  {
+    "check": "s4-fresh-recall-conflict native process completed",
+    "passed": true
+  },
+  {
+    "check": "s4-fresh-recall-conflict used stable production and skill bytes",
+    "passed": true
+  }
+]

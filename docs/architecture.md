@@ -28,6 +28,31 @@ totals are loaded in grouped queries. Learning retrieval indexes observation
 counts and traverses correction relationships directly. None of these require a
 persistent cache or background worker.
 
+Learning also retains optional agent-authored `knowledge` entries in the same
+schema-5 record. Their prose carries reusable understanding and uncertainty;
+observations retain learner evidence, tasks retain continuation, and preferences
+retain current teaching policy. Completing a task does not delete knowledge.
+`records.py` validates complete-entry replacement/removal and source/topic links
+under the existing revision-checked atomic publication. It captures source
+versions without certifying their truth or detecting file-content changes.
+
+`retrieval.py` owns bounded whole-entry selection, focused reads, and paged literal
+search across knowledge and existing metadata. Ordinary context and single-scope
+planning use a 4,096-byte default knowledge allowance; multi-scope planning exposes
+counts. The allowance counts serialized UTF-8 payload and newly introduced source
+locations, not model tokens or the entire response. Exact reads default to 8,192
+bytes and return complete entries or an actionable size error. Context and scoped
+planning accept deliberate budget overrides; no source text or note is clipped
+to make a whole-entry read fit. Discovery/index pages have separate 4,096-byte
+bounds. Python owns these semantics; CLI and Pi expose the same existing tools.
+
+The tutor chooses useful organization and corrects relevant understanding during
+normal study. Retrieval treats knowledge as evidence, never instructions. No
+curriculum model, vector service, background reflection process or parallel
+knowledge store is introduced. More stored knowledge does not require loading it
+all, but once loaded its context cost depends on the native host's subsequent
+requests and compaction.
+
 ## Maintenance
 
 Run `python tools/check.py` from the project environment. Use `sync` or `learning`

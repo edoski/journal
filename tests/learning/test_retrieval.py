@@ -153,7 +153,7 @@ def test_query_pages_and_correction_pairs_preserve_old_evidence(tmp_path: Path) 
     assert matched["total"] == 2
     assert list(matched["observations"]) == ["o1", "o3", "o4"]
     assert matched["expanded_observations"] == ["o3"]
-    assert set(matched["candidates"]["observations"]) == {"o1", "o4"}
+    assert matched["candidates"]["items"] == []
     exact = retrieval.context(tmp_path, "course", observations=["o3"])
     assert isinstance(exact, dict)
     assert list(exact["observations"]) == ["o1", "o3"]
@@ -172,7 +172,9 @@ def test_query_pages_and_correction_pairs_preserve_old_evidence(tmp_path: Path) 
     candidate = retrieval.context(tmp_path, "course", query="singular")
     assert isinstance(candidate, dict)
     assert candidate["total"] == 0
-    assert set(candidate["candidates"]["topics"]) == {"systems"}
+    assert [
+        (item["kind"], item["key"]) for item in candidate["candidates"]["items"]
+    ] == [("topic", "systems")]
     with pytest.raises(ValueError, match="expected revision"):
         retrieval.context(tmp_path, "course", ["systems"], offset=1)
     records.save(tmp_path, "course", 1, {"title": "Updated"})
@@ -370,9 +372,12 @@ def test_resume_carries_purpose_and_nearby_plan_evidence_without_future_history(
     assert set(result["topics"]) == {"goal", "current", "base", "pinned"}
     assert result["sources"]["sheet"]["path"] == "exercises.md"
     assert result["complete"] is True
-    assert retrieval.context(tmp_path, "course", query="uniqueness")["candidates"][
-        "tasks"
-    ].keys() == {"exercise"}
+    candidates = retrieval.context(tmp_path, "course", query="uniqueness")[
+        "candidates"
+    ]["items"]
+    assert [(item["kind"], item["key"]) for item in candidates] == [
+        ("task", "exercise")
+    ]
     explicit = retrieval.context(
         tmp_path, "course", task="exercise", topics=["current"]
     )
@@ -390,3 +395,366 @@ def test_resume_carries_purpose_and_nearby_plan_evidence_without_future_history(
         result["observations"]
     )
     assert second["complete"] is True
+
+
+def test_knowledge_discovery_and_exact_read_survive_task_completion(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {"a": {"notes": "A hidden notation correspondence"}, "b": {}},
+            "sources": {
+                "sheet": {
+                    "path": "sheet.md",
+                    "version": "v1",
+                    "notes": "Not needed in focused reads",
+                }
+            },
+            "knowledge": {
+                "notation": {
+                    "text": "The lecturer uses g, while Atlas uses h; this is provisional.",
+                    "topics": ["a"],
+                    "refs": [{"source": "sheet"}],
+                }
+            },
+            "tasks": {"work": {"topics": ["a"]}},
+        },
+    )
+    records.save(tmp_path, "course", 1, {"tasks": {"work": None}, "focus": ["b"]})
+    ordinary = retrieval.context(tmp_path, "course")
+    assert ordinary["knowledge"] == {}
+    assert ordinary["knowledge_selection"] == {
+        "eligible": 0,
+        "included": 0,
+        "omitted": 0,
+    }
+    discovered = retrieval.context(tmp_path, "course", query="Atlas uses h")
+    assert [
+        (item["kind"], item["key"]) for item in discovered["candidates"]["items"]
+    ] == [("knowledge", "notation")]
+    assert "knowledge" not in discovered
+    topic = retrieval.context(tmp_path, "course", query="hidden notation")
+    assert [(item["kind"], item["key"]) for item in topic["candidates"]["items"]] == [
+        ("topic", "a")
+    ]
+    exact = retrieval.context(tmp_path, "course", knowledge=["notation"])
+    assert set(exact) == {"scope", "revision", "knowledge", "sources"}
+    assert exact["knowledge"]["notation"]["text"].endswith("provisional.")
+    assert exact["sources"] == {"sheet": {"path": "sheet.md", "version": "v1"}}
+
+
+def test_automatic_knowledge_is_whole_bounded_and_counts_sources() -> None:
+    record = {
+        "sources": {"sheet": {"path": "é" * 500, "version": "v1"}},
+        "knowledge": {
+            "a-large": {"text": "λ" * 1000, "topics": ["a"]},
+            "b-ref": {
+                "text": "Small but its reference has a long path",
+                "topics": ["a"],
+                "refs": [{"source": "sheet"}],
+            },
+            "c-small": {
+                "text": "Not verified; do not skip the exam topic.",
+                "topics": ["a"],
+            },
+            "d-general": {"text": "A general fact."},
+            "e-other": {"text": "An irrelevant fact.", "topics": ["b"]},
+        },
+    }
+    result = retrieval.knowledge_context(record, ["a"], budget=400)
+    assert list(result["knowledge"]) == ["c-small", "d-general"]
+    assert result["knowledge_selection"] == {"eligible": 4, "included": 2, "omitted": 2}
+    assert (
+        len(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode())
+        <= 400
+    )
+    reused = retrieval.knowledge_context(
+        record, ["a"], {"sheet": record["sources"]["sheet"]}, budget=400
+    )
+    assert "b-ref" in reused["knowledge"]
+    assert reused["sources"] == {}
+
+
+def test_exact_knowledge_size_error_and_override(tmp_path: Path) -> None:
+    records.save(tmp_path, "course", 0, {"knowledge": {"large": {"text": "è" * 5000}}})
+    with pytest.raises(
+        ValueError,
+        match=r"knowledge read requires \d+ bytes .*entries: large=\d+.*--knowledge-budget",
+    ):
+        retrieval.context(tmp_path, "course", knowledge=["large"])
+    result = retrieval.context(
+        tmp_path, "course", knowledge=["large"], knowledge_budget=20000
+    )
+    assert result["knowledge"]["large"]["text"] == "è" * 5000
+    with pytest.raises(ValueError, match="unknown"):
+        retrieval.context(tmp_path, "course", knowledge=["missing"])
+
+
+def test_knowledge_index_pages_are_revision_pinned(tmp_path: Path) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {"knowledge": {f"k{i:02}": {"text": str(i)} for i in range(23)}},
+    )
+    first = retrieval.context(tmp_path, "course", knowledge=[])
+    assert len(first["knowledge_index"]) == 20
+    assert first["selection"]["next_offset"] == 20
+    assert all(set(item) == {"key", "bytes"} for item in first["knowledge_index"])
+    with pytest.raises(ValueError, match="expected revision"):
+        retrieval.context(tmp_path, "course", knowledge=[], offset=20)
+    last = retrieval.context(tmp_path, "course", knowledge=[], offset=20, expected=1)
+    assert last["selection"]["complete"] is True
+    assert len(last["knowledge_index"]) == 3
+    records.save(tmp_path, "course", 1, {"title": "New title"})
+    with pytest.raises(ValueError, match="revision conflict"):
+        retrieval.context(tmp_path, "course", knowledge=[], offset=20, expected=1)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"knowledge": ["x"], "topics": []},
+        {"knowledge": [], "query": "x"},
+        {"knowledge": ["x"], "limit": 1},
+        {"knowledge": [], "limit": 21},
+        {"knowledge": [], "knowledge_budget": 100},
+        {"query": "x", "knowledge_budget": 100},
+        {"candidate_offset": 1},
+        {"query": "x", "candidate_offset": 1},
+        {"knowledge": ["x"], "knowledge_budget": True},
+    ],
+)
+def test_knowledge_selection_rejects_ambiguous_options(
+    tmp_path: Path, arguments: dict
+) -> None:
+    with pytest.raises(ValueError):
+        retrieval.context(tmp_path, "course", **arguments)
+
+
+def test_query_streams_advance_separately_without_repeating_support(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {
+                "a": {
+                    "assessment": {
+                        "summary": "needle",
+                        "observations": ["o2"],
+                        "considered_observations": ["o1", "o2"],
+                    }
+                }
+            },
+            "observations": [
+                {"topics": ["a"], "text": "needle"},
+                {"topics": ["a"], "text": "Support"},
+            ],
+            "knowledge": {
+                f"k{i:02}": {"text": "needle " + "λ" * 300} for i in range(19)
+            },
+        },
+    )
+    first = retrieval.context(tmp_path, "course", query="needle")
+    assert first["total"] == 1
+    assert list(first["observations"]) == ["o1", "o2"]
+    candidates = first["candidates"]
+    assert len(candidates["items"]) == 8
+    assert candidates["total"] == 19
+    assert all(
+        len(item["excerpt"].encode()) <= 256 and item["discovery_only"]
+        for item in candidates["items"]
+    )
+    assert (
+        len(
+            json.dumps(
+                {"candidates": candidates}, ensure_ascii=False, separators=(",", ":")
+            ).encode()
+        )
+        <= 4096
+    )
+    second = retrieval.context(
+        tmp_path,
+        "course",
+        query="needle",
+        topics=["a"],
+        offset=1,
+        candidate_offset=8,
+        expected=1,
+    )
+    assert second["observations"] == {}
+    assert second["topics"] == {}
+    assert second["expanded_observations"] == []
+    assert second["candidates"]["offset"] == 8
+    exhausted = retrieval.context(
+        tmp_path, "course", query="needle", candidate_offset=19, expected=1
+    )
+    assert exhausted["candidates"]["items"] == []
+    assert list(exhausted["observations"]) == ["o1", "o2"]
+    ordinary = retrieval.context(tmp_path, "course", topics=["a"], observations=[])
+    assert list(ordinary["observations"]) == ["o2"]
+
+
+def test_candidate_byte_paging_advances_by_actual_count_and_rejects_huge_handle(
+    tmp_path: Path,
+) -> None:
+    handles = [f"{i}-" + "s" * 950 for i in range(5)]
+    records.save(
+        tmp_path, "course", 0, {"sources": {key: {"path": "needle"} for key in handles}}
+    )
+    first = retrieval.context(tmp_path, "course", query="needle")
+    candidate_page = first["candidates"]
+    assert 0 < len(candidate_page["items"]) < 5
+    assert candidate_page["next_offset"] == len(candidate_page["items"])
+    assert (
+        len(
+            json.dumps(
+                {"candidates": candidate_page},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()
+        )
+        <= 4096
+    )
+    second = retrieval.context(
+        tmp_path,
+        "course",
+        query="needle",
+        offset=0,
+        expected=1,
+        candidate_offset=candidate_page["next_offset"],
+    )
+    assert [
+        item["key"] for item in candidate_page["items"] + second["candidates"]["items"]
+    ] == handles
+    records.save(tmp_path, "huge", 0, {"sources": {"s" * 5000: {"path": "needle"}}})
+    with pytest.raises(ValueError, match="descriptor exceeds"):
+        retrieval.context(tmp_path, "huge", query="needle")
+
+
+def test_incidental_evidence_does_not_route_knowledge_or_expand_policy(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "focus": ["a"],
+            "topics": {
+                "a": {
+                    "assessment": {
+                        "summary": "Uses transfer evidence",
+                        "observations": ["o1"],
+                        "considered_observations": ["o1"],
+                    }
+                },
+                "b": {},
+            },
+            "observations": [{"topics": ["b"], "text": "A transfer exercise"}],
+            "knowledge": {
+                "a-note": {"text": "Relevant note", "topics": ["a"]},
+                "b-note": {"text": "Incidental note", "topics": ["b"]},
+            },
+        },
+    )
+    result = retrieval.context(tmp_path, "course")
+    assert list(result["observations"]) == ["o1"]
+    assert list(result["knowledge"]) == ["a-note"]
+    assert list(result["policy_topics"]) == ["a"]
+
+
+def test_exact_knowledge_shared_source_is_counted_once(tmp_path: Path) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "sources": {"s": {"path": "sheet.md", "version": "first"}},
+            "knowledge": {
+                key: {"text": key, "refs": [{"source": "s"}]} for key in ("a", "b")
+            },
+        },
+    )
+    full = retrieval.context(tmp_path, "course", knowledge=["b", "a"])
+    assert list(full["knowledge"]) == ["a", "b"]
+    assert list(full["sources"]) == ["s"]
+    size = len(json.dumps(full, ensure_ascii=False, separators=(",", ":")).encode())
+    assert (
+        retrieval.context(
+            tmp_path, "course", knowledge=["b", "a"], knowledge_budget=size
+        )
+        == full
+    )
+    with pytest.raises(ValueError, match=f"requires {size} bytes"):
+        retrieval.context(
+            tmp_path, "course", knowledge=["b", "a"], knowledge_budget=size - 1
+        )
+
+
+def test_ordinary_knowledge_budget_can_expand_or_reduce_without_clipping(
+    tmp_path: Path,
+) -> None:
+    text = "A provisional interpretation; " * 170
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {"knowledge": {"large": {"text": text}, "small": {"text": "A smaller fact"}}},
+    )
+    ordinary = retrieval.context(tmp_path, "course")
+    assert list(ordinary["knowledge"]) == ["small"]
+    assert ordinary["knowledge_selection"] == {
+        "eligible": 2,
+        "included": 1,
+        "omitted": 1,
+    }
+    expanded = retrieval.context(tmp_path, "course", knowledge_budget=8192)
+    assert list(expanded["knowledge"]) == ["large", "small"]
+    assert expanded["knowledge"]["large"]["text"] == text
+    tiny = retrieval.context(tmp_path, "course", knowledge_budget=100)
+    assert tiny["knowledge"] == {}
+    assert tiny["knowledge_selection"]["omitted"] == 2
+    with pytest.raises(ValueError, match="envelope"):
+        retrieval.context(tmp_path, "course", knowledge_budget=1)
+    with pytest.raises(ValueError, match="scoped context"):
+        retrieval.context(tmp_path, None, knowledge_budget=100)
+
+
+def test_query_excerpt_preserves_match_after_unicode_casefold_expansion(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {"knowledge": {"notation": {"text": "ß" * 100 + "needle is important"}}},
+    )
+    result = retrieval.context(tmp_path, "course", query="needle")
+    excerpt = result["candidates"]["items"][0]["excerpt"]
+    assert "needle is important" in excerpt
+    assert len(excerpt.encode("utf-8")) <= 256
+
+
+def test_candidate_budget_counts_its_outer_response_key(tmp_path: Path) -> None:
+    records.save(tmp_path, "fits", 0, {"sources": {"s" * 3946: {"path": "needle"}}})
+    result = retrieval.context(tmp_path, "fits", query="needle")
+    assert (
+        len(
+            json.dumps(
+                {"candidates": result["candidates"]},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()
+        )
+        == 4096
+    )
+    records.save(tmp_path, "course", 0, {"sources": {"s" * 3947: {"path": "needle"}}})
+    with pytest.raises(ValueError, match="descriptor exceeds"):
+        retrieval.context(tmp_path, "course", query="needle")

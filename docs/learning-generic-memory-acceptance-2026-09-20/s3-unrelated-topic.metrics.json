@@ -1,0 +1,99 @@
+{
+  "seconds": 17.209,
+  "returncode": 0,
+  "calls": 6,
+  "errors": 0,
+  "usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 896,
+        "output": 49,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "totalTokens": 2481,
+        "cost": {
+          "input": 0.0044800000000000005,
+          "output": 0.00147,
+          "cacheRead": 0.000768,
+          "cacheWrite": 0,
+          "total": 0.006718
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2728,
+        "output": 48,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "totalTokens": 4312,
+        "cost": {
+          "input": 0.013640000000000001,
+          "output": 0.00144,
+          "cacheRead": 0.000768,
+          "cacheWrite": 0,
+          "total": 0.015848
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 955,
+        "output": 40,
+        "cacheRead": 3584,
+        "cacheWrite": 0,
+        "totalTokens": 4579,
+        "cost": {
+          "input": 0.004775000000000001,
+          "output": 0.0012000000000000001,
+          "cacheRead": 0.001792,
+          "cacheWrite": 0,
+          "total": 0.007767000000000001
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1114,
+        "output": 75,
+        "cacheRead": 3584,
+        "cacheWrite": 0,
+        "totalTokens": 4773,
+        "cost": {
+          "input": 0.00557,
+          "output": 0.0022500000000000003,
+          "cacheRead": 0.001792,
+          "cacheWrite": 0,
+          "total": 0.009612
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 819,
+        "output": 155,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5582,
+        "cost": {
+          "input": 0.0040950000000000005,
+          "output": 0.0046500000000000005,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.011049000000000002
+        }
+      }
+    }
+  ],
+  "source_changed_during_run": false
+}

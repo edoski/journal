@@ -1,0 +1,61 @@
+{
+  "signals-studio": {
+    "title": "Signals Studio",
+    "focus": [
+      "response"
+    ],
+    "sources": {
+      "overview": {
+        "path": "course-overview.md"
+      },
+      "current-lab-sheet": {
+        "path": "current-lab-sheet.md"
+      },
+      "lab-notice": {
+        "path": "lab-notice.md"
+      }
+    },
+    "topics": {
+      "response": {
+        "title": "Response and stability"
+      },
+      "quantization": {
+        "title": "Quantization"
+      }
+    },
+    "knowledge": {
+      "bench-wiring": {
+        "text": "For the optional quantization bench only, the violet lead is wired to jack Q7; this hardware detail does not concern course organization or the theory of response and stability.",
+        "topics": [
+          "quantization"
+        ]
+      },
+      "materials-orientation": {
+        "text": "Working orientation: Lumen is the lecture-note resource and is organised as response, stability and frequency; Atlas is a reference textbook with longer derivations; lab sheets provide laboratory questions. Response and stability should be treated as recurring viewpoints on systems, and the frequency material revisits both viewpoints rather than being a wholly separate module. A noted notation difference is that the lecturer/Lumen convention uses g for impulse response while Atlas may use h. Current lab timing convention is unresolved from the available files: lab-notice.md says discrete-time signals with impulse response g[n], while current-lab-sheet.md says continuous-time signals with impulse response g(t); neither has an issue date or edition identifier, so the conflict cannot be settled from these sources alone. Do not infer learner mathematical ability from discussion of course organisation/materials.",
+        "topics": [
+          "response"
+        ],
+        "refs": [
+          {
+            "source": "overview",
+            "source_version": null
+          },
+          {
+            "source": "lab-notice",
+            "source_version": null
+          },
+          {
+            "source": "current-lab-sheet",
+            "source_version": null
+          }
+        ]
+      }
+    },
+    "tasks": {},
+    "current_task": null,
+    "observations": {},
+    "schema_version": 5,
+    "revision": 4,
+    "updated_at": "2026-09-20T15:49:30+00:00"
+  }
+}

@@ -248,6 +248,24 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
                     result["observations"],
                     review=field == "review",
                 )
+    knowledge = result.get("knowledge", {})
+    if not isinstance(knowledge, dict):
+        raise ValueError("knowledge must map handles to entry objects")
+    for key, entry in knowledge.items():
+        field = f"knowledge.{key}"
+        if not isinstance(key, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9_-]{0,63}", key
+        ):
+            raise ValueError(f"{field}: handles must be short lowercase identifiers")
+        if not isinstance(entry, dict):
+            raise ValueError(f"{field} must be an object")
+        if set(entry) - {"text", "topics", "refs"}:
+            raise ValueError(f"{field} accepts only text, topics and refs")
+        if not isinstance(entry.get("text"), str) or not entry["text"].strip():
+            raise ValueError(f"{field}.text must be a nonempty string")
+        _links(entry, result, field)
+        if any("source_version" not in ref for ref in entry.get("refs", [])):
+            raise ValueError(f"{field}.refs requires a captured source_version")
     if "focus" in result:
         validate_references(result["focus"], topics, "focus")
     if "active" in result:
@@ -353,7 +371,7 @@ def _aliases(value: Any, aliases: dict[str, str]) -> Any:
 
 
 def snapshot_sources(value: dict[str, Any], sources: dict[str, Any]) -> dict[str, Any]:
-    """Capture a source edition on newly ingested evidence, including unknown editions."""
+    """Capture editions on newly ingested source references, including unknown editions."""
     result = deepcopy(value)
     for ref in result.get("refs", []):
         if isinstance(ref, dict) and ref.get("source") in sources:
@@ -475,6 +493,37 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
             else:
                 raise ValueError(f"tasks.{key} must be an object or null")
         result["tasks"] = tasks
+        if "knowledge" in patch:
+            knowledge_changes = patch["knowledge"]
+            if not isinstance(knowledge_changes, dict):
+                raise ValueError(
+                    "knowledge patch must be an object; remove individual entries with null"
+                )
+            knowledge = dict(current.get("knowledge", {}))
+            for key, change in knowledge_changes.items():
+                field = f"knowledge.{key}"
+                if not isinstance(key, str) or not re.fullmatch(
+                    r"[a-z0-9][a-z0-9_-]{0,63}", key
+                ):
+                    raise ValueError(
+                        f"{field}: handles must be short lowercase identifiers"
+                    )
+                if change is None:
+                    knowledge.pop(key, None)
+                elif isinstance(change, dict):
+                    refs = change.get("refs", [])
+                    if isinstance(refs, list) and any(
+                        isinstance(ref, dict) and "source_version" in ref
+                        for ref in refs
+                    ):
+                        raise ValueError(
+                            f"{field}.refs.source_version is helper-owned; omit it"
+                        )
+                    _source_links(change, result, field)
+                    knowledge[key] = snapshot_sources(change, result["sources"])
+                else:
+                    raise ValueError(f"knowledge.{key} must be an object or null")
+            result["knowledge"] = knowledge
         selected = result.get("current_task")
         if (
             isinstance(selected, str)

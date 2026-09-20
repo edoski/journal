@@ -178,3 +178,38 @@ def test_migration_failure_has_a_nonzero_exit_and_preserves_input(
     assert json.loads(completed.stdout)["errors"][0]["scope"] == "broken"
     assert damaged.read_text() == "{"
     assert not (tmp_path / "backups").exists()
+
+
+def test_exact_knowledge_read_is_focused_and_preserves_source_location(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    saved = invoke(
+        root,
+        "save",
+        "course",
+        "--expect",
+        "0",
+        patch={
+            "sources": {"notes": {"path": "notes.md", "version": "2026"}},
+            "knowledge": {
+                "notation": {
+                    "text": "The lecturer uses g; the textbook uses h.",
+                    "refs": [{"source": "notes", "locator": "Notation"}],
+                }
+            },
+        },
+    )
+    result = invoke(root, "context", "course", "--knowledge", "notation")
+    assert result["revision"] == saved["revision"]
+    assert result["knowledge"]["notation"]["text"] == (
+        "The lecturer uses g; the textbook uses h."
+    )
+    assert result["knowledge"]["notation"]["refs"][0]["source_version"] == "2026"
+    assert result["sources"]["notes"]["path"] == "notes.md"
+    assert (
+        not {"preferences", "vault", "assets", "observations", "tasks"} & result.keys()
+    )
+    index = invoke(root, "context", "course", "--knowledge", "")
+    assert index["selection"]["mode"] == "knowledge_index"
+    assert index["selection"]["total"] == 1

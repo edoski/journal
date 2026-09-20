@@ -1,0 +1,166 @@
+{
+  "unrelated_topic": {
+    "title": "Signals Studio",
+    "focus": [
+      "response"
+    ],
+    "current_task": null,
+    "schema_version": 5,
+    "revision": 4,
+    "updated_at": "2026-09-20T15:49:30+00:00",
+    "task": null,
+    "task_index": {},
+    "found": true,
+    "topics": {
+      "quantization": {
+        "title": "Quantization"
+      }
+    },
+    "sources": {},
+    "observations": {},
+    "selection": {
+      "active_topics": [
+        "quantization"
+      ],
+      "mode": "topics",
+      "task": null,
+      "topics": [
+        "quantization"
+      ],
+      "observations": null,
+      "query": null,
+      "context_topics": [],
+      "context_observations": []
+    },
+    "total": 0,
+    "returned": 0,
+    "offset": 0,
+    "complete": true,
+    "next_offset": null,
+    "expanded_observations": [],
+    "knowledge": {
+      "bench-wiring": {
+        "text": "For the optional quantization bench only, the violet lead is wired to jack Q7; this hardware detail does not concern course organization or the theory of response and stability.",
+        "topics": [
+          "quantization"
+        ]
+      }
+    },
+    "knowledge_selection": {
+      "eligible": 1,
+      "included": 1,
+      "omitted": 0
+    },
+    "vault": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault",
+    "learning": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault/learn",
+    "assets": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault/assets/learn",
+    "preferences": {
+      "revision": 0,
+      "rules": [],
+      "scope_revision": 4
+    }
+  },
+  "literal_discovery": {
+    "title": "Signals Studio",
+    "focus": [
+      "response"
+    ],
+    "current_task": null,
+    "schema_version": 5,
+    "revision": 4,
+    "updated_at": "2026-09-20T15:49:30+00:00",
+    "task": null,
+    "task_index": {},
+    "found": true,
+    "topics": {},
+    "sources": {},
+    "observations": {},
+    "selection": {
+      "active_topics": [],
+      "mode": "query",
+      "task": null,
+      "topics": null,
+      "observations": null,
+      "query": "impulse response",
+      "context_topics": [],
+      "context_observations": []
+    },
+    "total": 0,
+    "returned": 0,
+    "offset": 0,
+    "complete": true,
+    "next_offset": null,
+    "expanded_observations": [],
+    "candidates": {
+      "items": [
+        {
+          "kind": "knowledge",
+          "key": "materials-orientation",
+          "excerpt": "\u2026he lecturer/Lumen convention uses g for impulse response while Atlas may use h. Current lab timing convention is unresolved from the available files: lab-notice.md says discrete-time signals with impulse response g[n], while current-lab-sheet.md says\u2026",
+          "discovery_only": true
+        }
+      ],
+      "offset": 0,
+      "total": 1,
+      "next_offset": null,
+      "complete": true
+    },
+    "vault": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault",
+    "learning": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault/learn",
+    "assets": "/private/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-generic-acceptance-20260920-hpvx6a2a/vault/assets/learn",
+    "preferences": {
+      "revision": 0,
+      "rules": [],
+      "scope_revision": 4
+    }
+  },
+  "exact_entry": {
+    "scope": "signals-studio",
+    "revision": 4,
+    "knowledge": {
+      "materials-orientation": {
+        "text": "Working orientation: Lumen is the lecture-note resource and is organised as response, stability and frequency; Atlas is a reference textbook with longer derivations; lab sheets provide laboratory questions. Response and stability should be treated as recurring viewpoints on systems, and the frequency material revisits both viewpoints rather than being a wholly separate module. A noted notation difference is that the lecturer/Lumen convention uses g for impulse response while Atlas may use h. Current lab timing convention is unresolved from the available files: lab-notice.md says discrete-time signals with impulse response g[n], while current-lab-sheet.md says continuous-time signals with impulse response g(t); neither has an issue date or edition identifier, so the conflict cannot be settled from these sources alone. Do not infer learner mathematical ability from discussion of course organisation/materials.",
+        "topics": [
+          "response"
+        ],
+        "refs": [
+          {
+            "source": "overview",
+            "source_version": null
+          },
+          {
+            "source": "lab-notice",
+            "source_version": null
+          },
+          {
+            "source": "current-lab-sheet",
+            "source_version": null
+          }
+        ]
+      }
+    },
+    "sources": {
+      "current-lab-sheet": {
+        "path": "current-lab-sheet.md"
+      },
+      "lab-notice": {
+        "path": "lab-notice.md"
+      },
+      "overview": {
+        "path": "course-overview.md"
+      }
+    }
+  },
+  "identical_save_in_copy": {
+    "receipt": {
+      "scope": "signals-studio",
+      "revision": 4,
+      "updated_at": "2026-09-20T15:49:30+00:00",
+      "assigned_observations": [],
+      "review_dates": {}
+    },
+    "bytes_unchanged": true,
+    "sha256": "78d724d9a3e926f98b60030e5a3429c400b0e32a527a2c4b686155c4166ae36e"
+  },
+  "native_state_unchanged": true
+}

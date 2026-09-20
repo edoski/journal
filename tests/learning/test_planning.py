@@ -278,3 +278,63 @@ def test_journal_rejects_invalid_window_lengths(tmp_path: Path) -> None:
         journal_summary(tmp_path, horizon=0)
     with pytest.raises(ValueError, match="days"):
         journal_summary(tmp_path, days=0)
+
+
+def test_planning_selects_knowledge_for_active_work_and_catalog_only_counts(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    save(
+        root,
+        "course",
+        0,
+        {
+            "topics": {key: {} for key in ("focus", "active", "future")},
+            "focus": ["focus"],
+            "sources": {
+                "notes": {
+                    "path": "notes.md",
+                    "version": "v1",
+                    "description": "x" * 8000,
+                }
+            },
+            "tasks": {
+                "exercise": {
+                    "plan": {
+                        "status": "agreed",
+                        "current": "now",
+                        "nodes": {
+                            "now": {"label": "Now", "topics": ["active"]},
+                            "later": {
+                                "label": "Later",
+                                "needs": ["now"],
+                                "topics": ["future"],
+                            },
+                        },
+                    }
+                }
+            },
+            "knowledge": {
+                "general": {
+                    "text": "Still a tentative map",
+                    "refs": [{"source": "notes"}],
+                },
+                "focus": {"text": "Focus detail", "topics": ["focus"]},
+                "active": {"text": "Active detail", "topics": ["active"]},
+                "future": {"text": "Future detail", "topics": ["future"]},
+                "large": {"text": "a" * 5000},
+            },
+        },
+    )
+    course = plan(root, tmp_path, "course")["scopes"][0]
+    assert set(course["knowledge"]) == {"focus", "active", "general"}
+    assert course["knowledge_selection"] == {"eligible": 4, "included": 3, "omitted": 1}
+    assert course["sources"] == {"notes": {"path": "notes.md", "version": "v1"}}
+    expanded = plan(root, tmp_path, "course", knowledge_budget=8192)["scopes"][0]
+    assert "large" in expanded["knowledge"]
+    catalog = plan(root, tmp_path)["scopes"][0]
+    assert catalog["knowledge_count"] == 5
+    assert "knowledge" not in catalog
+    assert "notes" not in catalog["sources"]
+    with pytest.raises(ValueError, match="single scope"):
+        plan(root, tmp_path, knowledge_budget=8192)

@@ -1,0 +1,1 @@
+A one-bit quantizer stores only one binary digit per sample, and one binary digit has exactly two possible values: usually `0` or `1`. Each value is assigned to one reconstruction/output level, so the quantizer can only choose between two levels—commonly a “low” level and a “high” level.

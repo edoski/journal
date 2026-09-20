@@ -10,7 +10,7 @@ from learning.course import context_for_plan
 from learning import task_context
 from sync.study.context import journal_summary
 from learning.records import read, source_ids
-from learning.retrieval import evidence
+from learning.retrieval import AUTOMATIC_KNOWLEDGE_BYTES, evidence, knowledge_context
 
 
 def plan(
@@ -20,7 +20,14 @@ def plan(
     days: int = 7,
     *,
     horizon: int = 7,
+    knowledge_budget: int | None = None,
 ) -> dict[str, Any]:
+    if knowledge_budget is not None and (
+        scope is None or type(knowledge_budget) is not int or knowledge_budget < 1
+    ):
+        raise ValueError(
+            "knowledge_budget must be positive and requires a single scope"
+        )
     today = date.today()
     errors = []
     if scope is not None:
@@ -71,8 +78,10 @@ def plan(
             }
         source_context = context_for_plan(state)
         referenced_sources = set(source_context.get("sources", {}))
+        active_topics = set(state.get("focus", []))
         for task in state.get("tasks", {}).values():
             for part in (task, *task_context.parts(task, active_only=True)):
+                active_topics.update(part.get("topics", []))
                 selected.update(part.get("observations", []))
                 referenced_sources.update(source_ids(part))
         supporting = evidence(state, list(selected))
@@ -81,6 +90,19 @@ def plan(
         source_context["sources"] = {
             key: state["sources"][key] for key in sorted(referenced_sources)
         }
+        if scope is not None:
+            knowledge = knowledge_context(
+                state,
+                sorted(active_topics),
+                source_context["sources"],
+                budget=AUTOMATIC_KNOWLEDGE_BYTES
+                if knowledge_budget is None
+                else knowledge_budget,
+            )
+            source_context["sources"].update(knowledge.pop("sources"))
+            source_context.update(knowledge)
+        else:
+            source_context["knowledge_count"] = len(state.get("knowledge", {}))
         exam = date.fromisoformat(state["exam"]) if state.get("exam") else None
         activity = state.get("journal_activity")
         recorded = by_activity.get(activity) if isinstance(activity, str) else None

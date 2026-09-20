@@ -125,11 +125,14 @@ function projectLesson(entries: LessonEntry[]) {
 }
 
 const contextParameters = Type.Object({
-  scope: Type.Optional(Type.String({ description: "Course/interest key; omit to discover scopes." })),
+  scope: Type.Optional(Type.String({ description: "Course/interest key; omit to discover scopes, without selectors or paging parameters." })),
   task: Type.Optional(Type.String({ description: "Exact stable task_index key returned by context, e.g. exercise-7, not the display title Exercise 7. Reuse a known key directly; omit when unknown to inspect the scope's task_index." })),
   topics: Type.Optional(Type.Array(Type.String(), { description: "Exact stable topic handles returned by context, not display labels. Reuse known handles; [] returns the index without history when discovery is needed." })),
   observations: Type.Optional(Type.Array(Type.String(), { description: "Exact observation handles returned by context or save, e.g. o1. Omit when no handles are known." })),
-  query: Type.Optional(Type.String({ description: "Literal evidence search." })),
+  query: Type.Optional(Type.String({ description: "Literal search of evidence and contextual understanding. Discovery excerpts are incomplete; read whole knowledge entries before relying on qualifications or editing." })),
+  knowledge: Type.Optional(Type.Array(Type.String(), { description: "Exact knowledge keys for a focused whole-entry read; [] returns the paged knowledge index. Cannot combine with task/topic/observation/query, all, or preference selectors. Nonempty reads also exclude offset/limit." })),
+  candidate_offset: Type.Optional(Type.Integer({ minimum: 0, description: "Query-only discovery cursor, separate from the observation offset. Continuing requires expected_revision." })),
+  knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "UTF-8 byte allowance for ordinary scoped context or a nonempty exact knowledge read; never tokens. Choose deliberately when more or less knowledge is needed. Invalid for query, index, all or scope catalog." })),
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   expected_revision: Type.Optional(Type.Integer({ minimum: 0, description: "Required when continuing a page." })),
@@ -210,7 +213,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_context",
     label: "Learning context",
-    description: "Retrieve shared learning context and applicable preferences. Known scope/task resumes directly; reuse loaded context until more evidence is needed. Source files are read with native tools.",
+    description: "Retrieve shared learning context, useful understanding and applicable preferences. Omit scope and all selectors/limits for the scope catalog. Known scope/task resumes directly; reuse loaded context until more evidence is needed. Search discovers entries; knowledge reads return them whole. Source files are read with native tools.",
     parameters: contextParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
@@ -218,7 +221,9 @@ export default function (pi: ExtensionAPI) {
       const { scope, expected_revision, all, ...filters } = params;
       const args = ["context"];
       for (const [key, value] of Object.entries(filters)) {
-        if (value !== undefined) args.push(`--${key}=${Array.isArray(value) ? value.join(",") : value}`);
+        const flag = key === "candidate_offset" ? "candidate-offset"
+          : key === "knowledge_budget" ? "knowledge-budget" : key;
+        if (value !== undefined) args.push(`--${flag}=${Array.isArray(value) ? value.join(",") : value}`);
       }
       if (expected_revision !== undefined) args.push(`--expect=${expected_revision}`);
       if (all) args.push("--all");

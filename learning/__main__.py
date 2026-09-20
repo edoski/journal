@@ -51,7 +51,16 @@ def main() -> int:
     context.add_argument(
         "--observations", help="Comma-separated saved observation handles (e.g. o1)"
     )
-    context.add_argument("--query", help="Literal search across retained evidence")
+    context.add_argument("--query", help="Literal search across evidence and memory")
+    context.add_argument(
+        "--knowledge", help="Exact entry handles; empty string requests index"
+    )
+    context.add_argument(
+        "--knowledge-budget",
+        type=int,
+        help="Knowledge allowance in serialized UTF-8 bytes",
+    )
+    context.add_argument("--candidate-offset", type=int, default=0)
     context.add_argument("--offset", type=int, default=0)
     context.add_argument("--limit", type=int)
     context.add_argument(
@@ -81,6 +90,7 @@ def main() -> int:
     planner.add_argument("scope", nargs="?")
     planner.add_argument("--days", type=int, default=7)
     planner.add_argument("--horizon", type=int, default=7)
+    planner.add_argument("--knowledge-budget", type=int)
     journal = commands.add_parser("journal")
     journal.add_argument("--days", type=int, default=7)
     journal.add_argument("--horizon", type=int, default=7)
@@ -118,6 +128,9 @@ def main() -> int:
                 or args.topics is not None
                 or args.observations is not None
                 or args.query is not None
+                or args.knowledge is not None
+                or args.knowledge_budget is not None
+                or args.candidate_offset
                 or args.all
                 or args.offset
                 or args.limit is not None
@@ -130,6 +143,9 @@ def main() -> int:
                 or args.topics is not None
                 or args.observations is not None
                 or args.query is not None
+                or args.knowledge is not None
+                or args.knowledge_budget is not None
+                or args.candidate_offset
                 or args.offset
                 or args.limit is not None
                 or args.expect is not None
@@ -137,6 +153,11 @@ def main() -> int:
                 raise ValueError(
                     "--all cannot be combined with evidence selection or paging"
                 )
+            if args.knowledge is not None and any(
+                value is not None
+                for value in (args.concepts, args.domains, args.activity)
+            ):
+                raise ValueError("knowledge reads cannot include policy selectors")
             topics = keys(args.topics)
             result = (
                 records.read(root, args.scope)
@@ -148,6 +169,9 @@ def main() -> int:
                     task=args.task,
                     observations=keys(args.observations),
                     query=args.query,
+                    knowledge=keys(args.knowledge),
+                    knowledge_budget=args.knowledge_budget,
+                    candidate_offset=args.candidate_offset,
                     offset=args.offset,
                     limit=args.limit,
                     expected=args.expect,
@@ -160,27 +184,28 @@ def main() -> int:
                     "errors": [item for item in result if "error" in item],
                 }
             assert isinstance(result, dict)
-            result.update(
-                vault=str(vault),
-                learning=str(root),
-                assets=str(
-                    Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
-                    .expanduser()
-                    .resolve()
-                ),
-            )
-            policy_topics = result.pop("policy_topics", {})
-            result["preferences"] = preferences.context(
-                root,
-                scope=args.scope,
-                topics=list(policy_topics),
-                concepts=keys(args.concepts),
-                domains=keys(args.domains),
-                activity=args.activity,
-                state={"revision": result["revision"], "topics": policy_topics}
-                if args.scope
-                else None,
-            )
+            if args.knowledge is None:
+                result.update(
+                    vault=str(vault),
+                    learning=str(root),
+                    assets=str(
+                        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
+                        .expanduser()
+                        .resolve()
+                    ),
+                )
+                policy_topics = result.pop("policy_topics", {})
+                result["preferences"] = preferences.context(
+                    root,
+                    scope=args.scope,
+                    topics=list(policy_topics),
+                    concepts=keys(args.concepts),
+                    domains=keys(args.domains),
+                    activity=args.activity,
+                    state={"revision": result["revision"], "topics": policy_topics}
+                    if args.scope
+                    else None,
+                )
         elif args.command == "save":
             result = records.save(root, args.scope, args.expect, json.load(sys.stdin))
         elif args.command == "migrate":
@@ -199,7 +224,14 @@ def main() -> int:
         elif args.command == "plan":
             from learning.planning import plan
 
-            result = plan(root, vault, args.scope, args.days, horizon=args.horizon)
+            result = plan(
+                root,
+                vault,
+                args.scope,
+                args.days,
+                horizon=args.horizon,
+                knowledge_budget=args.knowledge_budget,
+            )
         elif args.command == "journal":
             from sync.study.context import journal_summary
 

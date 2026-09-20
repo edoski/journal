@@ -1,0 +1,48 @@
+{
+  "signals-studio": {
+    "title": "Signals Studio",
+    "focus": [
+      "response"
+    ],
+    "sources": {
+      "overview": {
+        "path": "course-overview.md"
+      }
+    },
+    "topics": {
+      "response": {
+        "title": "Response and stability"
+      },
+      "quantization": {
+        "title": "Quantization"
+      }
+    },
+    "knowledge": {
+      "bench-wiring": {
+        "text": "For the optional quantization bench only, the violet lead is wired to jack Q7; this hardware detail does not concern course organization or the theory of response and stability.",
+        "topics": [
+          "quantization"
+        ]
+      }
+    },
+    "tasks": {
+      "orientation": {
+        "task": "Form a provisional picture of Signals Studio",
+        "topics": [
+          "response"
+        ],
+        "pending_question": "How should the course resources and recurring viewpoints fit together?",
+        "refs": [
+          {
+            "source": "overview"
+          }
+        ]
+      }
+    },
+    "current_task": "orientation",
+    "observations": {},
+    "schema_version": 5,
+    "revision": 1,
+    "updated_at": "2026-09-20T15:47:05+00:00"
+  }
+}

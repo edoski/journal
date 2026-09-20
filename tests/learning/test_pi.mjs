@@ -189,6 +189,73 @@ test("memory tools reject invalid writes and stale revisions without changing ev
   await assert.rejects(memoryTool(f, "learning_context", { scope: "course", expected_revision: 0 }), /revision conflict/);
 });
 
+test("knowledge tools share focused CLI reads, source metadata and explicit byte-budget errors", async (t) => {
+  const f = await fixture(t);
+  const context = (args) => memoryTool(f, "learning_context", { scope: "course", ...args });
+  const literal = "-it's $literal `text`\n日本語 and \\LaTeX";
+  await memoryTool(f, "learning_save", {
+    scope: "course", expected_revision: 0,
+    changes: {
+      sources: { sheet: { path: "notes/lecture.md", version: "edition-1" } },
+      knowledge: {
+        notation: { text: literal, refs: [{ source: "sheet", locator: "Notation" }] },
+        lengthy: { text: "日本語".repeat(1200) },
+      },
+    },
+  });
+  const cli = (args) => JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
+    ["-m", "learning", "context", "course", ...args], { cwd: repository, encoding: "utf8" }));
+  const focused = await context({ knowledge: ["notation"], expected_revision: 1 });
+  assert.deepEqual(focused, cli(["--knowledge=notation", "--expect=1"]));
+  assert.equal(focused.knowledge.notation.text, literal);
+  assert.equal(focused.knowledge.notation.refs[0].source_version, "edition-1");
+  assert.equal(focused.sources.sheet.path, "notes/lecture.md");
+  assert.equal(focused.observations, undefined);
+  const index = await context({ knowledge: [], limit: 1 });
+  assert.deepEqual(index, cli(["--knowledge=", "--limit=1"]));
+  assert.equal(index.selection.mode, "knowledge_index");
+  assert.equal(index.selection.next_offset, 1);
+  const next = await context({ knowledge: [], limit: 1, offset: 1, expected_revision: 1 });
+  assert.deepEqual(next, cli(["--knowledge=", "--limit=1", "--offset=1", "--expect=1"]));
+  assert.equal(next.selection.complete, true);
+  await assert.rejects(context({ knowledge: ["lengthy"] }),
+    /^Error: learning: knowledge read requires \d+ bytes \(budget \d+\); entries: lengthy=\d+; fetch fewer entries or set --knowledge-budget \d+$/);
+  const enlarged = await context({ knowledge: ["lengthy"], knowledge_budget: 20000 });
+  assert.deepEqual(enlarged, cli(["--knowledge=lengthy", "--knowledge-budget=20000"]));
+  assert.equal(enlarged.knowledge.lengthy.text, "日本語".repeat(1200));
+  const bounded = await context({ knowledge_budget: 1024 });
+  assert.deepEqual(bounded, cli(["--knowledge-budget=1024"]));
+  assert.deepEqual(Object.keys(bounded.knowledge), ["notation"]);
+  assert.equal(bounded.knowledge_selection.omitted, 1);
+  assert.equal((await context({ knowledge_budget: 20000 })).knowledge.lengthy.text,
+    "日本語".repeat(1200));
+  await assert.rejects(context({ knowledge: ["notation"], query: "literal" }), /knowledge selection cannot combine/);
+  await assert.rejects(context({ knowledge: [], knowledge_budget: 20000 }), /knowledge.*budget|knowledge-budget/);
+});
+
+test("knowledge discovery preserves independent revision-bound candidate paging", async (t) => {
+  const f = await fixture(t);
+  await memoryTool(f, "learning_save", {
+    scope: "course", expected_revision: 0,
+    changes: { knowledge: Object.fromEntries(Array.from({ length: 9 }, (_, index) =>
+      [`note-${index}`, { text: `Remembered marker ${index}.` }])) },
+  });
+  const context = (args) => memoryTool(f, "learning_context", { scope: "course", query: "Remembered marker", ...args });
+  const first = await context({});
+  assert.equal(first.candidates.items.length, 8);
+  assert.equal(first.candidates.complete, false);
+  assert.equal(first.candidates.next_offset, 8);
+  await assert.rejects(context({ candidate_offset: 8 }), /revision|expect/);
+  const next = await context({ candidate_offset: 8, expected_revision: first.revision });
+  const cli = JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
+    ["-m", "learning", "context", "course", "--query=Remembered marker", "--candidate-offset=8", "--expect=1"],
+    { cwd: repository, encoding: "utf8" }));
+  assert.deepEqual(next, cli);
+  assert.deepEqual(next.candidates.items.map((item) => [item.kind, item.key, item.discovery_only]),
+    [["knowledge", "note-8", true]]);
+  assert.equal(next.candidates.complete, true);
+});
+
 test("memory bookkeeping stays out of the lesson and terminal while errors remain visible", async (t) => {
   const f = await fixture(t);
   for (const name of ["learning_context", "learning_save"]) {

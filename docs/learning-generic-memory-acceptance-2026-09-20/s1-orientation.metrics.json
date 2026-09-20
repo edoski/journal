@@ -1,0 +1,207 @@
+{
+  "seconds": 62.805,
+  "returncode": 0,
+  "calls": 12,
+  "errors": 2,
+  "usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2497,
+        "output": 49,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 2546,
+        "cost": {
+          "input": 0.012485000000000001,
+          "output": 0.00147,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.013955000000000002
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 4329,
+        "output": 112,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 4441,
+        "cost": {
+          "input": 0.021645,
+          "output": 0.00336,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.025005
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1150,
+        "output": 38,
+        "cacheRead": 3584,
+        "cacheWrite": 0,
+        "totalTokens": 4772,
+        "cost": {
+          "input": 0.005750000000000001,
+          "output": 0.00114,
+          "cacheRead": 0.001792,
+          "cacheWrite": 0,
+          "total": 0.008682
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 229,
+        "output": 40,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 4877,
+        "cost": {
+          "input": 0.0011450000000000002,
+          "output": 0.0012000000000000001,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.004649
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3732,
+        "output": 86,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "totalTokens": 5354,
+        "cost": {
+          "input": 0.018660000000000003,
+          "output": 0.0025800000000000003,
+          "cacheRead": 0.000768,
+          "cacheWrite": 0,
+          "total": 0.022008000000000003
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 771,
+        "output": 157,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5536,
+        "cost": {
+          "input": 0.0038550000000000004,
+          "output": 0.00471,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.010869
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1008,
+        "output": 272,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5888,
+        "cost": {
+          "input": 0.00504,
+          "output": 0.00816,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.015504
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1323,
+        "output": 62,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5993,
+        "cost": {
+          "input": 0.006615,
+          "output": 0.00186,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.010779
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3651,
+        "output": 293,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 8552,
+        "cost": {
+          "input": 0.018255,
+          "output": 0.008790000000000001,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.029349
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 916,
+        "output": 324,
+        "cacheRead": 7680,
+        "cacheWrite": 0,
+        "totalTokens": 8920,
+        "cost": {
+          "input": 0.004580000000000001,
+          "output": 0.00972,
+          "cacheRead": 0.0038399999999999997,
+          "cacheWrite": 0,
+          "total": 0.01814
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1293,
+        "output": 681,
+        "cacheRead": 7680,
+        "cacheWrite": 0,
+        "totalTokens": 9654,
+        "cost": {
+          "input": 0.006465,
+          "output": 0.02043,
+          "cacheRead": 0.0038399999999999997,
+          "cacheWrite": 0,
+          "total": 0.030735000000000002
+        }
+      }
+    }
+  ],
+  "source_changed_during_run": false
+}
