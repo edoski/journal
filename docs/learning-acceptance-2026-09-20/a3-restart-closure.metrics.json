@@ -1,0 +1,70 @@
+{
+  "elapsed_seconds": 20.64,
+  "first_text_seconds": 18.491946708993055,
+  "tool_calls": [
+    "learning_context",
+    "learning_save"
+  ],
+  "provider_usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 789,
+        "output": 53,
+        "cacheRead": 7680,
+        "cacheWrite": 0,
+        "totalTokens": 8522,
+        "cost": {
+          "input": 0.003945000000000001,
+          "output": 0.00159,
+          "cacheRead": 0.0038399999999999997,
+          "cacheWrite": 0,
+          "total": 0.009375000000000001
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1814,
+        "output": 584,
+        "cacheRead": 7680,
+        "cacheWrite": 0,
+        "totalTokens": 10078,
+        "cost": {
+          "input": 0.00907,
+          "output": 0.01752,
+          "cacheRead": 0.0038399999999999997,
+          "cacheWrite": 0,
+          "total": 0.030430000000000002
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1431,
+        "output": 130,
+        "cacheRead": 8704,
+        "cacheWrite": 0,
+        "totalTokens": 10265,
+        "cost": {
+          "input": 0.007155000000000001,
+          "output": 0.0039000000000000003,
+          "cacheRead": 0.004352,
+          "cacheWrite": 0,
+          "total": 0.015407
+        }
+      }
+    }
+  ],
+  "response": {
+    "id": "a3-restart-closure",
+    "type": "response",
+    "command": "prompt",
+    "success": true
+  }
+}

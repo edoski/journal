@@ -1,0 +1,1 @@
+For this answer only, use exactly two bullets: remind me why determinant zero alone cannot distinguish no solutions from infinitely many, then repeat our parameterization. I have made no new attempt; this is the same clarification.

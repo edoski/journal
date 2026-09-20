@@ -1,0 +1,31 @@
+{
+  "elapsed_seconds": 7.396,
+  "first_text_seconds": 3.0930791670107283,
+  "tool_calls": [],
+  "provider_usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3864,
+        "output": 219,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 4083,
+        "cost": {
+          "input": 0.01932,
+          "output": 0.00657,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.02589
+        }
+      }
+    }
+  ],
+  "response": {
+    "id": "a4-after-compaction",
+    "type": "response",
+    "command": "prompt",
+    "success": true
+  }
+}

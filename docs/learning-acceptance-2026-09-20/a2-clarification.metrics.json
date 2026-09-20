@@ -1,0 +1,31 @@
+{
+  "elapsed_seconds": 4.147,
+  "first_text_seconds": 2.522724666981958,
+  "tool_calls": [],
+  "provider_usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 6759,
+        "output": 103,
+        "cacheRead": 1536,
+        "cacheWrite": 0,
+        "totalTokens": 8398,
+        "cost": {
+          "input": 0.033795000000000006,
+          "output": 0.00309,
+          "cacheRead": 0.000768,
+          "cacheWrite": 0,
+          "total": 0.037653000000000006
+        }
+      }
+    }
+  ],
+  "response": {
+    "id": "a2-clarification",
+    "type": "response",
+    "command": "prompt",
+    "success": true
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "scopes": {
+    "exam-prep": {
+      "title": "Exam Preparation",
+      "focus": [
+        "singular"
+      ],
+      "sources": {
+        "worksheet": {
+          "path": "worksheet.md",
+          "version": "synthetic-2026-09"
+        }
+      },
+      "topics": {
+        "singular": {
+          "title": "Singular systems",
+          "assessment": {
+            "summary": "Independently classified the coincident system correctly, but later independently misclassified the inconsistent system in Exercise 8 as having infinitely many solutions because its determinant is zero.",
+            "gap": "Distinguishing a redundant equation from a contradiction after row reduction remains unresolved. The old claim that zero determinant always implies inconsistency was the tutor's error, not learner evidence.",
+            "observations": [
+              "o1",
+              "o2",
+              "o4"
+            ],
+            "considered_observations": [
+              "o1",
+              "o2",
+              "o3",
+              "o4"
+            ],
+            "assessed_at": "2026-09-20T09:56:45.074006+00:00"
+          },
+          "review": {
+            "due": "2026-09-20",
+            "reason": "Recommend focused review within the learner's available 45 minutes: later independent Exercise 8 error outweighs treating one correct coincident-system classification as sufficient evidence to skip singular systems. Exclude the tutor-originated statement from learner-error evidence.",
+            "task": "Review the Exercise 7/8 contrast, focusing on redundant versus contradictory rows and why determinant zero alone does not settle consistency. Recommendation only; no new study task started.",
+            "observations": [
+              "o1",
+              "o2",
+              "o4"
+            ],
+            "considered_observations": [
+              "o1",
+              "o2",
+              "o3",
+              "o4"
+            ],
+            "assessed_at": "2026-09-20T09:56:45.074006+00:00"
+          }
+        }
+      },
+      "observations": {
+        "o1": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "direct_attempt",
+          "assistance": "None",
+          "text": "Correctly classified x+y=2, 2x+2y=4 as infinitely many solutions.",
+          "recorded_at": "2026-09-20T09:56:02.568386+00:00"
+        },
+        "o2": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "direct_attempt",
+          "assistance": "None",
+          "text": "Later classified x+y=2, 2x+2y=5 as infinitely many solutions because det(A)=0.",
+          "refs": [
+            {
+              "source": "worksheet",
+              "locator": "Exercise 8",
+              "source_version": "synthetic-2026-09"
+            }
+          ],
+          "recorded_at": "2026-09-20T09:56:02.568386+00:00"
+        },
+        "o3": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "tutor_inference",
+          "text": "Learner said zero determinant always implies inconsistency.",
+          "assistance": "Unknown",
+          "recorded_at": "2026-09-20T09:56:02.568386+00:00"
+        },
+        "o4": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "self_report",
+          "corrects": [
+            "o3"
+          ],
+          "text": "Learner clarifies that the statement that zero determinant always implies inconsistency came from the tutor, not the learner. It must not be treated as a learner misconception. Learner explicitly confirms that the later Exercise 8 answer recorded in o2 was their own.",
+          "assistance": "No new attempt or quiz; attribution correction only.",
+          "recorded_at": "2026-09-20T09:56:45.074006+00:00"
+        }
+      },
+      "tasks": {
+        "stalled-classification": {
+          "task": "Exercise 8: resolve conflicting singular-system classifications",
+          "topics": [
+            "singular"
+          ],
+          "observations": [
+            "o2"
+          ],
+          "pending_question": "Why is a zero coefficient row with right-hand side 1 inconsistent?",
+          "frame": {
+            "goal": "Distinguish inconsistency from coincident equations",
+            "completion": "Justify the contrast using row reduction",
+            "refs": [
+              {
+                "source": "worksheet",
+                "locator": "Exercise 8"
+              }
+            ]
+          }
+        }
+      },
+      "current_task": "stalled-classification",
+      "schema_version": 5,
+      "revision": 2,
+      "updated_at": "2026-09-20T09:56:45+00:00"
+    },
+    "algebra-lab": {
+      "title": "Algebra Lab",
+      "focus": [
+        "singular"
+      ],
+      "sources": {
+        "worksheet": {
+          "path": "worksheet.md",
+          "version": "synthetic-2026-09"
+        }
+      },
+      "topics": {
+        "singular": {
+          "title": "Singular systems",
+          "assessment": {
+            "summary": "Learner completed Exercise 7's requested parameterization check after earlier assistance: x=t, y=2-t satisfies both equations for every real t.",
+            "gap": "Independent classification of singular systems remains untested; do not treat this as a newly solved independent problem.",
+            "observations": [
+              "o2",
+              "o3"
+            ],
+            "considered_observations": [
+              "o1",
+              "o2",
+              "o3"
+            ],
+            "uncertainty": "Exercise 7 is finished, but the solution was developed with a tutor hint and clarification.",
+            "assessed_at": "2026-09-20T09:57:59.859300+00:00"
+          }
+        }
+      },
+      "observations": {
+        "o1": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "tutor_inference",
+          "text": "Learner independently concluded determinant zero means no solutions.",
+          "assistance": "Recorded as none by prior tutor",
+          "recorded_at": "2026-09-20T09:56:02.567476+00:00"
+        },
+        "o2": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "direct_attempt",
+          "corrects": [
+            "o1"
+          ],
+          "text": "Correction for Exercise 7: learner did not independently conclude determinant zero means no solutions; that claim came from the old tutor and the learner repeated it. After the tutor hinted to subtract twice the first equation from the second, learner got 0=0 and proposed choosing x freely with y=2-x.",
+          "response": "After subtracting twice the first equation from the second I got 0=0. I can choose x and take y=2-x.",
+          "assistance": "Tutor hinted to subtract twice the first equation from the second; explanation of infinitely many solutions requested, no quiz.",
+          "refs": [
+            {
+              "source": "worksheet",
+              "locator": "Exercise 7",
+              "source_version": "synthetic-2026-09"
+            }
+          ],
+          "recorded_at": "2026-09-20T09:57:27.447531+00:00"
+        },
+        "o3": {
+          "topics": [
+            "singular"
+          ],
+          "origin": "direct_attempt",
+          "text": "Learner checked the Exercise 7 parameterization x=t, y=2-t by substituting it into both equations, obtaining x+y=2 and 2x+2y=4 for every real t.",
+          "response": "x=t and y=2-t give x+y=2 and 2x+2y=4 for every real t.",
+          "assistance": "Continuation of the same assisted Exercise 7 work; earlier tutor hint led to the parameterization, learner completed the requested substitution check.",
+          "refs": [
+            {
+              "source": "worksheet",
+              "locator": "Exercise 7",
+              "source_version": "synthetic-2026-09"
+            }
+          ],
+          "recorded_at": "2026-09-20T09:57:59.859300+00:00"
+        }
+      },
+      "tasks": {
+        "exercise-8": {
+          "task": "Exercise 8: classify the inconsistent system",
+          "topics": [
+            "singular"
+          ],
+          "pending_question": "Explain the contradiction",
+          "refs": [
+            {
+              "source": "worksheet",
+              "locator": "Exercise 8"
+            }
+          ]
+        }
+      },
+      "current_task": "exercise-8",
+      "schema_version": 5,
+      "revision": 4,
+      "updated_at": "2026-09-20T10:04:51+00:00"
+    }
+  },
+  "preferences": {
+    "schema_version": 1,
+    "rules": [
+      {
+        "when": {
+          "scope": "algebra-lab"
+        },
+        "values": {
+          "lesson_pace": {
+            "instruction": "Give the conceptual reason before the calculation.",
+            "origin": "explicit",
+            "basis": "Learner requested this for the course."
+          },
+          "response_format": {
+            "instruction": "Use short connected paragraphs for this course.",
+            "origin": "explicit"
+          }
+        }
+      },
+      {
+        "when": {
+          "scope": "exam-prep"
+        },
+        "values": {
+          "response_format": {
+            "instruction": "Explain the conceptual reason before any calculations, using connected prose.",
+            "origin": "explicit"
+          }
+        }
+      }
+    ],
+    "revision": 2,
+    "updated_at": "2026-09-20T09:57:34+00:00"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "elapsed_seconds": 0.0,
+  "first_text_seconds": null,
+  "tool_calls": [],
+  "provider_usage": [],
+  "response": {
+    "id": "a-session",
+    "type": "response",
+    "command": "get_state",
+    "success": true,
+    "data": {
+      "model": {
+        "id": "gpt-5.5",
+        "name": "GPT-5.5",
+        "api": "openai-codex-responses",
+        "provider": "openai-codex",
+        "baseUrl": "https://chatgpt.com/backend-api",
+        "input": [
+          "text",
+          "image"
+        ],
+        "cost": {
+          "input": 5,
+          "output": 30,
+          "cacheRead": 0.5,
+          "cacheWrite": 0,
+          "tiers": [
+            {
+              "inputTokensAbove": 272000,
+              "input": 10,
+              "output": 45,
+              "cacheRead": 1,
+              "cacheWrite": 0
+            }
+          ]
+        },
+        "contextWindow": 272000,
+        "maxTokens": 128000,
+        "compat": {
+          "supportsOpenAIGrammarTools": true,
+          "supportsToolSearch": true,
+          "supportsMidConvoSystemMessages": true
+        }
+      },
+      "isStreaming": false,
+      "isCompacting": false,
+      "steeringMode": "one-at-a-time",
+      "followUpMode": "one-at-a-time",
+      "sessionFile": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-acceptance-20260920-jz5180lf/pi-sessions/2026-09-20T09-56-55-013Z_01a0be3f-4e65-7385-8aa5-69038deff4d6.jsonl",
+      "sessionId": "01a0be3f-4e65-7385-8aa5-69038deff4d6",
+      "autoCompactionEnabled": true,
+      "messageCount": 24,
+      "pendingMessageCount": 0
+    }
+  }
+}

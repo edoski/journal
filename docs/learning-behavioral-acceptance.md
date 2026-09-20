@@ -52,7 +52,11 @@ they do not estimate a general success rate or establish better exam performance
 
 ## Results
 
-This document defines cases, not results. A run record should name the cases and
+The [20 September 2026 native run](learning-acceptance-2026-09-20/README.md) records
+the exercised Codex/Pi dialogue, state, restart/compaction and token measurements,
+including recovered tool errors and unverified GUI/Claude behavior.
+
+This document defines cases, not universal acceptance. A run record should name the cases and
 hosts actually exercised, link the retained synthetic trace/state artifacts, list
 the observed outcomes and identify missing UI or provider coverage. Do not infer
 completed acceptance from passing deterministic tests.

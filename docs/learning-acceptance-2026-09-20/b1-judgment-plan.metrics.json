@@ -1,0 +1,15 @@
+{
+  "elapsed_seconds": 52.239,
+  "returncode": 0,
+  "usage": [
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 185722,
+        "cached_input_tokens": 155392,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 988
+      }
+    }
+  ]
+}

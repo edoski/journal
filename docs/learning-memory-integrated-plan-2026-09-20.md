@@ -1,6 +1,6 @@
 # Learning memory: integrated assessment and implementation plan
 
-20 September 2026. This is the current recommendation after reconciling the independent GPT-6 Pro audit with the earlier local [architecture assessment](learning-memory-architecture-assessment-2026-09-20.md) and [research comparison](learning-memory-research-refresh-2026-09-20.md). It supersedes their proposed implementation order. It records review and design work; none of the proposed repairs has been implemented.
+20 September 2026. This plan reconciled the independent GPT-6 Pro audit with the earlier local [architecture assessment](learning-memory-architecture-assessment-2026-09-20.md) and [research comparison](learning-memory-research-refresh-2026-09-20.md), superseding their proposed implementation order. The approved repairs are now implemented; see the [implementation and rollout record](learning-memory-implementation-2026-09-20.md) and [native acceptance evidence](learning-acceptance-2026-09-20/README.md). The remaining text preserves the assessment and decisions made before implementation; its descriptions of current defects and outstanding work refer to that baseline.
 
 ## Decision
 

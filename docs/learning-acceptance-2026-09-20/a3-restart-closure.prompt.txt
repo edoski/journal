@@ -1,0 +1,1 @@
+Back to Exercise 7 in Algebra Lab after that detour; use my usual course format. I checked our parameterization: x=t and y=2-t give x+y=2 and 2x+2y=4 for every real t. That finishes the requested check; mark this exercise finished, leaving Exercise 8 for another time. Explain briefly what we have established, without claiming I solved a new problem independently.

@@ -1,0 +1,13 @@
+{
+  "elapsed_seconds": 0.001,
+  "first_text_seconds": null,
+  "tool_calls": [],
+  "provider_usage": [],
+  "response": {
+    "id": "a-compact",
+    "type": "response",
+    "command": "compact",
+    "success": false,
+    "error": "Nothing to compact (session too small)"
+  }
+}

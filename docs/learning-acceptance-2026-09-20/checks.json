@@ -1,0 +1,118 @@
+[
+  {
+    "check": "All exercised scope files use schema 5",
+    "passed": true
+  },
+  {
+    "check": "Original Algebra Lab evidence remains",
+    "passed": true
+  },
+  {
+    "check": "Misattributed original has a linked correction",
+    "passed": true
+  },
+  {
+    "check": "Assisted attempt explicitly retains hint",
+    "passed": true
+  },
+  {
+    "check": "Exercise 8 unchanged after study",
+    "passed": true
+  },
+  {
+    "check": "Exercise 7 is the active continuation after study",
+    "passed": true
+  },
+  {
+    "check": "Temporary clarification does not rewrite learner state",
+    "passed": true
+  },
+  {
+    "check": "Temporary clarification has exactly two bullet lines",
+    "passed": true
+  },
+  {
+    "check": "Course preference remains reason-first",
+    "passed": true
+  },
+  {
+    "check": "No temporary two-bullet rule persisted",
+    "passed": true
+  },
+  {
+    "check": "Requested Exercise 7 closed after restart",
+    "passed": true
+  },
+  {
+    "check": "Exercise 8 survives restart and closure unchanged",
+    "passed": true
+  },
+  {
+    "check": "Actual native compaction succeeded",
+    "passed": true
+  },
+  {
+    "check": "Restart preserved the session ID",
+    "passed": true
+  },
+  {
+    "check": "Compacted native session survives a further process restart",
+    "passed": true
+  },
+  {
+    "check": "Post-compaction clarification leaves learner state unchanged",
+    "passed": true
+  },
+  {
+    "check": "Native lesson retains pre-compaction teaching exactly",
+    "passed": true
+  },
+  {
+    "check": "Genuine contrary attempt unchanged",
+    "passed": true
+  },
+  {
+    "check": "Tutor misattribution corrected separately",
+    "passed": true
+  },
+  {
+    "check": "Revised interpretation considers contrary evidence",
+    "passed": true
+  },
+  {
+    "check": "Stalled task remains available after recommendation",
+    "passed": true
+  },
+  {
+    "check": "Other course policy survives",
+    "passed": true
+  },
+  {
+    "check": "Unfinished work resumes in the same compacted native session",
+    "passed": true
+  },
+  {
+    "check": "Exercise 8 becomes the current task",
+    "passed": true
+  },
+  {
+    "check": "Exercise 8 retains original purpose, source and pending step",
+    "passed": true
+  },
+  {
+    "check": "Continuation invents no learner performance",
+    "passed": true
+  },
+  {
+    "check": "Continuation preserves honest assisted assessment",
+    "passed": true
+  },
+  {
+    "check": "Continuation preserves durable preferences",
+    "passed": true
+  },
+  {
+    "check": "Continuation retrieves the explicit unfinished task from portable state",
+    "passed": true
+  }
+]

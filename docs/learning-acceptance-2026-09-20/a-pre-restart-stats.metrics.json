@@ -1,0 +1,34 @@
+{
+  "elapsed_seconds": 0.0,
+  "first_text_seconds": null,
+  "tool_calls": [],
+  "provider_usage": [],
+  "response": {
+    "id": "a-pre-restart-stats",
+    "type": "response",
+    "command": "get_session_stats",
+    "success": true,
+    "data": {
+      "sessionFile": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-acceptance-20260920-jz5180lf/pi-sessions/2026-09-20T09-56-55-013Z_01a0be3f-4e65-7385-8aa5-69038deff4d6.jsonl",
+      "sessionId": "01a0be3f-4e65-7385-8aa5-69038deff4d6",
+      "userMessages": 2,
+      "assistantMessages": 12,
+      "toolCalls": 10,
+      "toolResults": 10,
+      "totalMessages": 24,
+      "tokens": {
+        "input": 27886,
+        "output": 1622,
+        "cacheRead": 45056,
+        "cacheWrite": 0,
+        "total": 74564
+      },
+      "cost": 0.21061800000000003,
+      "contextUsage": {
+        "tokens": 8398,
+        "contextWindow": 272000,
+        "percent": 3.0875
+      }
+    }
+  }
+}

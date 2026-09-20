@@ -1,0 +1,70 @@
+[
+  {
+    "variant": "baseline",
+    "packet_bytes": 4139,
+    "elapsed_seconds": 5.129,
+    "returncode": 0,
+    "messages": [
+      {
+        "role": "assistant",
+        "model": "gpt-5.5",
+        "provider": "openai-codex",
+        "usage": {
+          "input": 1562,
+          "output": 5,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 0,
+          "totalTokens": 1567,
+          "cost": {
+            "input": 0.007810000000000001,
+            "output": 0.00015000000000000001,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.007960000000000002
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "OK"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "variant": "candidate",
+    "packet_bytes": 3537,
+    "elapsed_seconds": 4.747,
+    "returncode": 0,
+    "messages": [
+      {
+        "role": "assistant",
+        "model": "gpt-5.5",
+        "provider": "openai-codex",
+        "usage": {
+          "input": 1417,
+          "output": 5,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "reasoning": 0,
+          "totalTokens": 1422,
+          "cost": {
+            "input": 0.007085,
+            "output": 0.00015000000000000001,
+            "cacheRead": 0,
+            "cacheWrite": 0,
+            "total": 0.007235
+          }
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "OK"
+          }
+        ]
+      }
+    ]
+  }
+]
