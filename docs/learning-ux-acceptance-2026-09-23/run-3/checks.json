@@ -1,0 +1,120 @@
+{
+  "passed": 24,
+  "total": 27,
+  "failed": [
+    "s1-qualified-correction preserves unrelated notation entry",
+    "s8-explicit-transfer preserves unrelated notation entry",
+    "s7-new-authority preserves unrelated notation entry"
+  ],
+  "checks": [
+    {
+      "check": "s1-qualified-correction process succeeded",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction stable production bytes",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction adds no learner observations",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction preserves unrelated notation entry",
+      "passed": false
+    },
+    {
+      "check": "s1-qualified-correction preserves unfinished Numerical Methods tasks",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction preserves free-parameter knowledge",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer process succeeded",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer stable production bytes",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer adds no learner observations",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer preserves unrelated notation entry",
+      "passed": false
+    },
+    {
+      "check": "s8-explicit-transfer preserves unfinished Numerical Methods tasks",
+      "passed": true
+    },
+    {
+      "check": "s8-explicit-transfer preserves free-parameter knowledge",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority process succeeded",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority stable production bytes",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority adds no learner observations",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority preserves unrelated notation entry",
+      "passed": false
+    },
+    {
+      "check": "s7-new-authority preserves unfinished Numerical Methods tasks",
+      "passed": true
+    },
+    {
+      "check": "s7-new-authority preserves free-parameter knowledge",
+      "passed": true
+    },
+    {
+      "check": "Correction preserves Numerical Methods",
+      "passed": true
+    },
+    {
+      "check": "Explicit unanswered transfer does not change portable state",
+      "passed": true
+    },
+    {
+      "check": "New authority preserves Signals",
+      "passed": true
+    },
+    {
+      "check": "New authority registers notice",
+      "passed": true
+    },
+    {
+      "check": "New authority clears superseded uncertainty",
+      "passed": true
+    },
+    {
+      "check": "Final production bytes match prepared",
+      "passed": true
+    }
+  ],
+  "limitation": "Structural subset checks only. The semantic report separately records notation fidelity and visible bookkeeping failures."
+}

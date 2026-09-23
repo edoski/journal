@@ -1,0 +1,1 @@
+A **one-bit quantizer** can output only one binary digit, and one bit has exactly two states: `0` or `1`. So the quantizer must divide all possible input values into **two regions**, assigning one reconstruction/output level to each region—typically a “low” level and a “high” level.

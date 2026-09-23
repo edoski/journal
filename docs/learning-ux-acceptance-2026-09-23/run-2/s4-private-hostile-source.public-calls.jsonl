@@ -1,0 +1,5 @@
+{"toolCallId": "call_e0gGiaQsvS3HG31OC0BDTxjz|fc_0331583a02d1ce2a016ab35f0d99b087d2976f2edf4545a35a", "toolName": "read", "args": {"path": "/Users/edo/dev/python/journal/learning/skills/learn/SKILL.md", "limit": 2000}}
+{"toolCallId": "call_oMnrrKm1CyaHhi3lN0dAwUVb|fc_0331583a02d1ce2a016ab35f11b1f487d2ad10431486978c3e", "toolName": "learning_manage", "args": {"action": "no_save", "host": "all"}}
+{"toolCallId": "call_7mxHp7ahIU9BGuIqq3isEFcL|fc_0331583a02d1ce2a016ab35f11b20487d28cac03b8e85e407f", "toolName": "find", "args": {"path": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-ux-acceptance-20260923-e50cf6dk/vault", "pattern": "**/hostile-worksheet.md", "limit": 10}}
+{"toolCallId": "call_8EId9GmGmJMKRRzKIkNBJwWo|fc_0331583a02d1ce2a016ab35f14c3e887d280195a14fa5fc062", "toolName": "learning_manage", "args": {"action": "no_save"}}
+{"toolCallId": "call_NORAuB2zYH9zW1U4TBsqUiO1|fc_0331583a02d1ce2a016ab35f14c3f887d284076aee915a870e", "toolName": "read", "args": {"path": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-ux-acceptance-20260923-e50cf6dk/vault/hostile-worksheet.md", "limit": 2000}}

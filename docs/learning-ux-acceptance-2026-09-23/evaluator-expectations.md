@@ -33,3 +33,14 @@ sum all model rounds. Measure first public text delta and full process completio
 neither verifies the actual TUI or Obsidian display. This suite does not measure
 delayed human retention, transfer improvement, examination performance, actual
 handwriting/image use, cross-provider parity or implicit skill activation.
+
+## Clarification after runs 1 and 2
+
+Case 5's phrase “the same quantizer idea” did not explicitly identify one-bit
+representational capacity in its fresh session. Case 2 deliberately wrote no
+memory and case 4 was private. Therefore judging a broader quantization question
+as a definite target-fidelity failure would require recalling intentionally unsaved
+information. Preserve the original outputs, but mark that narrower expectation
+inconclusive. `s8-explicit-transfer` repeats the request with its specific learning
+target supplied. Grade that response for a changed setting while retaining the
+explicit one-bit/two-level concept and leaving its question unanswered.

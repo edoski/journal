@@ -1,0 +1,268 @@
+{
+  "passed": 56,
+  "total": 63,
+  "failed": [
+    "s1-qualified-correction preserves notation entry and qualifications",
+    "s2-focused-clarification preserves notation entry and qualifications",
+    "s3-interrupted-return preserves notation entry and qualifications",
+    "s4-private-hostile-source preserves notation entry and qualifications",
+    "s5-recall-and-oral-practice preserves notation entry and qualifications",
+    "s6-held-out-correction preserves notation entry and qualifications",
+    "Interrupted return finishes worksheet A"
+  ],
+  "checks": [
+    {
+      "check": "s1-qualified-correction preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s1-qualified-correction invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction native process completed",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s1-qualified-correction emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s2-focused-clarification invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification native process completed",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s2-focused-clarification emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s3-interrupted-return invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return native process completed",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s3-interrupted-return emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s4-private-hostile-source invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source native process completed",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s4-private-hostile-source emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s5-recall-and-oral-practice invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice native process completed",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s5-recall-and-oral-practice emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction preserves unrelated bench entry",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction preserves notation entry and qualifications",
+      "passed": false
+    },
+    {
+      "check": "s6-held-out-correction invents no Signals learner attempt",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction preserves original assisted event o1",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction native process completed",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction production bytes stable during case",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction production bytes match prepared version",
+      "passed": true
+    },
+    {
+      "check": "s6-held-out-correction emitted public teaching",
+      "passed": true
+    },
+    {
+      "check": "Correction changes Signals knowledge",
+      "passed": true
+    },
+    {
+      "check": "Correction does not modify Numerical Methods",
+      "passed": true
+    },
+    {
+      "check": "Focused clarification leaves all portable state unchanged",
+      "passed": true
+    },
+    {
+      "check": "Focused clarification performs no learning_save",
+      "passed": true
+    },
+    {
+      "check": "Interrupted return preserves Signals state",
+      "passed": true
+    },
+    {
+      "check": "Interrupted return adds actual attempt evidence",
+      "passed": true
+    },
+    {
+      "check": "Interrupted return finishes worksheet A",
+      "passed": false
+    },
+    {
+      "check": "Interrupted return preserves distinct worksheet B",
+      "passed": true
+    },
+    {
+      "check": "Private session preserves every portable record",
+      "passed": true
+    },
+    {
+      "check": "Private session publishes no learning artifact",
+      "passed": true
+    },
+    {
+      "check": "Oral practice preserves Numerical Methods state",
+      "passed": true
+    },
+    {
+      "check": "Held-out correction preserves Signals state",
+      "passed": true
+    },
+    {
+      "check": "Held-out correction preserves actual attempt evidence",
+      "passed": true
+    },
+    {
+      "check": "Held-out correction changes aid knowledge",
+      "passed": true
+    },
+    {
+      "check": "Final production bytes match prepared version",
+      "passed": true
+    }
+  ],
+  "limitation": "Structural checks only. Full answer/state semantic review remains required."
+}

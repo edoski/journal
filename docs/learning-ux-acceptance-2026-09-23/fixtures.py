@@ -173,3 +173,24 @@ SCENARIOS = [
         "prompt": "Back to Numerical Methods. Correction to my recollection: the formula-card permission I mentioned was for last year's written test, not this year's oral component. I still haven't checked the current rules. That does not change what I managed on worksheet A. Remind me briefly what we established there and what help I had, then tell me whether we can assume a formula card is allowed for the oral. Don't begin a new exercise.",
     },
 ]
+
+# Added after run 1. Do not expose these exact facts to implementation workers
+# before the next production freeze; earlier cases cannot see this new upload.
+HELD_OUT = {
+    "name": "s7-new-authority",
+    "uploads": {
+        "oral-notice.md": """# Numerical Methods — oral examination 2026/27
+Official oral examination notice, released 23 September 2026.
+This notice replaces older written-test aid notices for the oral component.
+One A5 sheet of formulas, handwritten on one side, is permitted.
+Worked derivations and worked solutions are not permitted.
+Calculator rules are not specified in this notice.
+""",
+    },
+    "prompt": "I now have the current official Numerical Methods oral-exam notice in oral-notice.md. Please check whether our uncertainty about a formula card is resolved. Tell me exactly what I may bring, without recapping worksheet A or testing me. Don't generalize beyond what this notice says.",
+}
+
+EXPLICIT_TRANSFER = {
+    "name": "s8-explicit-transfer",
+    "prompt": "Back to Signals Studio in this new conversation. Briefly remind me which resources help with current conventions versus derivations, and the lecturer-versus-textbook impulse-response symbols. Read lab-notice.md and lab-sheet.md: can we actually settle their disagreement from those undated documents? Then ask me one short oral question specifically about one-bit representation and why it permits only two output levels, using a different concrete setting. Don't give its answer. Don't assume we know the exam rules. I have two minutes.",
+}

@@ -1,0 +1,197 @@
+{
+  "state/numerical-methods.json": {
+    "title": "Numerical Methods",
+    "goal": "Explain and solve linear systems, including singular cases.",
+    "focus": [
+      "linear-systems"
+    ],
+    "sources": {
+      "worksheet-a": {
+        "path": "linear-worksheet.md"
+      }
+    },
+    "course_context": {
+      "assessment": "Short oral explanations followed by worked problems.",
+      "criteria": [
+        "Justify consistency before parameterizing solutions."
+      ],
+      "constraints": [
+        "No numerical calculator is needed for this exercise."
+      ],
+      "unknowns": [
+        "The actual examination date and full permitted aids are unknown."
+      ]
+    },
+    "topics": {
+      "linear-systems": {
+        "title": "Linear systems"
+      },
+      "row-dependence": {
+        "title": "Dependent equations"
+      }
+    },
+    "knowledge": {
+      "free-parameter": {
+        "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+        "topics": [
+          "row-dependence"
+        ],
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)",
+            "source_version": null
+          }
+        ]
+      },
+      "assessment-aid": {
+        "text": "The learner reports that the formula-card permission they remembered applied to last year's written test, not this year's oral component.",
+        "attribution": "Learner correction of prior recollection; no official current rules inspected.",
+        "uncertainty": "Whether formula cards or other aids are allowed for the current oral component is unknown until the current rules are checked."
+      }
+    },
+    "observations": {
+      "o1": {
+        "topics": [
+          "linear-systems",
+          "row-dependence"
+        ],
+        "text": "The learner recognized that the equations coincide after the tutor pointed out that the second is twice the first.",
+        "origin": "direct_attempt",
+        "response": "They are the same line, so there are infinitely many solutions.",
+        "assistance": "The tutor explicitly identified the second equation as twice the first.",
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)",
+            "source_version": null
+          }
+        ],
+        "recorded_at": "2026-09-23T05:08:18.823091+00:00"
+      },
+      "o2": {
+        "text": "For worksheet A exercise 5(b), the learner parameterized the dependent system as y=t and x=2-t for any real t after prior tutor explanation of dependence, and asked whether this is the whole solution set.",
+        "topics": [
+          "linear-systems",
+          "row-dependence"
+        ],
+        "origin": "direct_attempt",
+        "assistance": "Assisted: prior tutor help identified the equations as dependent; the learner explicitly said not to count this as independent success.",
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)",
+            "source_version": null
+          }
+        ],
+        "recorded_at": "2026-09-23T05:09:23.261638+00:00"
+      }
+    },
+    "tasks": {
+      "worksheet-b-5b": {
+        "task": "Worksheet B exercise 5(b): x+y=3, x-y=1",
+        "topics": [
+          "linear-systems"
+        ],
+        "question": "An unrelated exercise, not the interrupted worksheet A problem."
+      }
+    },
+    "current_task": null,
+    "observation_sequence": 2,
+    "schema_version": 5,
+    "revision": 3,
+    "updated_at": "2026-09-23T05:10:38+00:00"
+  },
+  "state/signals-studio.json": {
+    "title": "Signals Studio",
+    "goal": "Connect response, stability and frequency using course notation.",
+    "focus": [
+      "response"
+    ],
+    "sources": {
+      "overview": {
+        "path": "signals-overview.md",
+        "title": "Signals Studio overview"
+      },
+      "notice": {
+        "path": "lab-notice.md"
+      },
+      "sheet": {
+        "path": "lab-sheet.md"
+      },
+      "quantizer-sheet": {
+        "path": "hostile-worksheet.md"
+      }
+    },
+    "topics": {
+      "response": {
+        "title": "Response and stability"
+      },
+      "quantization": {
+        "title": "Quantization"
+      }
+    },
+    "knowledge": {
+      "notation": {
+        "text": "The lecturer writes g for impulse response; Atlas writes h.",
+        "attribution": "The learner reported the lecturer/textbook correspondence.",
+        "uncertainty": "Not independently checked in the current slides."
+      },
+      "resources": {
+        "text": "The current Signals Studio lab should be treated as discrete time. The learner checked with the lecturer: the older lab sheets assume continuous time, but the current lab uses discrete time. Use Lumen for current course conventions; Atlas remains useful for derivations.",
+        "attribution": "Learner report of what the lecturer said, plus course resource overview naming Lumen and Atlas.",
+        "uncertainty": "The lecturer report is not a newly dated source. The undated notice says discrete time and the undated old sheet says continuous time; the lecturer's clarification resolves the working convention for study but does not date the source files.",
+        "refs": [
+          {
+            "source": "notice",
+            "source_version": null
+          },
+          {
+            "source": "sheet",
+            "source_version": null
+          },
+          {
+            "source": "overview",
+            "source_version": null
+          }
+        ]
+      },
+      "bench-wiring": {
+        "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+        "topics": [
+          "quantization"
+        ]
+      }
+    },
+    "tasks": {},
+    "observations": {
+      "o1": {
+        "text": "The learner reported a lecturer clarification: their earlier impression of the old lab sheets was wrong; old sheets assume continuous time, the current lab is discrete time, Lumen should be used for current conventions, and Atlas remains useful for derivations. This records resource/context clarification only, not mathematical mastery.",
+        "topics": [
+          "response"
+        ],
+        "origin": "self_report",
+        "assistance": "No exercise or mathematical attempt was made.",
+        "refs": [
+          {
+            "source": "notice",
+            "source_version": null
+          },
+          {
+            "source": "sheet",
+            "source_version": null
+          },
+          {
+            "source": "overview",
+            "source_version": null
+          }
+        ],
+        "recorded_at": "2026-09-23T05:08:48.397671+00:00"
+      }
+    },
+    "observation_sequence": 1,
+    "schema_version": 5,
+    "revision": 2,
+    "updated_at": "2026-09-23T05:08:48+00:00"
+  }
+}

@@ -1,0 +1,1 @@
+A one-bit quantizer has two possible output levels because one bit can represent exactly two distinct states: `0` or `1`. So the continuous input range is split into two regions, and every input sample is mapped to one of two reconstruction values, often a “low” level and a “high” level.

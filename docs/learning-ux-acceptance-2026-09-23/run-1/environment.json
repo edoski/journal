@@ -1,0 +1,10 @@
+{
+  "temporary_root": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-ux-acceptance-20260923-isnh_ud8",
+  "repo": "/Users/edo/dev/python/journal",
+  "pi_version": "0.85.1",
+  "git_head": "5e1e389f32839c7cc74cf0938c9c005e266153d3",
+  "provider": "openai-codex",
+  "model_selection": "Existing Pi default; recorded from each response",
+  "actual_gui_verified": false,
+  "isolation": "Synthetic vault and fresh local session directory per case; shared existing authorized provider, no prior transcripts"
+}

@@ -1,0 +1,98 @@
+{
+  "name": "s2-focused-clarification",
+  "seconds_full_turn": 12.999,
+  "seconds_first_public_text_delta": 8.755,
+  "timing_note": "First model text delta, not human-rated useful teaching or verified GUI rendering; full time includes tools and publication.",
+  "returncode": 0,
+  "timed_out": false,
+  "tool_calls": {
+    "read": 1,
+    "learning_context": 2
+  },
+  "tool_errors": {},
+  "calls": 3,
+  "errors": 0,
+  "usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3229,
+        "output": 56,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 3285,
+        "cost": {
+          "input": 0.016145,
+          "output": 0.00168,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.017825
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2146,
+        "output": 30,
+        "cacheRead": 2560,
+        "cacheWrite": 0,
+        "totalTokens": 4736,
+        "cost": {
+          "input": 0.010730000000000002,
+          "output": 0.0009,
+          "cacheRead": 0.0012799999999999999,
+          "cacheWrite": 0,
+          "total": 0.012910000000000001
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 516,
+        "output": 49,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5173,
+        "cost": {
+          "input": 0.0025800000000000003,
+          "output": 0.00147,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.006354
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1056,
+        "output": 101,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5765,
+        "cost": {
+          "input": 0.005280000000000001,
+          "output": 0.00303,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.010614000000000002
+        }
+      }
+    }
+  ],
+  "usage_totals": {
+    "input": 6947,
+    "output": 236,
+    "cacheRead": 11776,
+    "cacheWrite": 0,
+    "totalTokens": 18959
+  },
+  "usage_note": "Provider-reported uncached input, cache reads/writes and output kept separate; totals sum every model call, not one context window. Cost fields are provider estimates, not billing proof.",
+  "source_changed_during_run": false
+}

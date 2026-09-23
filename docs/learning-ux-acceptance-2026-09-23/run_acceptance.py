@@ -14,11 +14,12 @@ import sys
 import tempfile
 import time
 
-from fixtures import SCENARIOS, SOURCES, initial_records
+from fixtures import EXPLICIT_TRANSFER, HELD_OUT, SCENARIOS, SOURCES, initial_records
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
+OMIT_PRIVATE = object()
 
 
 def dump(directory, name, value):
@@ -30,7 +31,7 @@ def dump(directory, name, value):
 def sanitize(value):
     if isinstance(value, dict):
         if value.get("type") in {"thinking", "reasoning"}:
-            return None
+            return OMIT_PRIVATE
         return {
             key: clean
             for key, item in value.items()
@@ -46,10 +47,12 @@ def sanitize(value):
                     "refresh_token",
                 )
             )
-            and (clean := sanitize(item)) is not None
+            and (clean := sanitize(item)) is not OMIT_PRIVATE
         }
     if isinstance(value, list):
-        return [clean for item in value if (clean := sanitize(item)) is not None]
+        return [
+            clean for item in value if (clean := sanitize(item)) is not OMIT_PRIVATE
+        ]
     return value
 
 
@@ -184,6 +187,10 @@ def environment(vault, root):
 
 def run(directory, base, vault, root, scenario):
     name = scenario["name"]
+    if uploads := scenario.get("uploads"):
+        for filename, content in uploads.items():
+            (vault / filename).write_text(content)
+        dump(directory, f"{name}.evaluator-upload.json", uploads)
     boundary = (
         f"Use the canonical learn skill at {REPO}/learning/skills/learn/SKILL.md and its actual tools. "
         f"This is an isolated synthetic study vault: {vault}. Environment variables already point to it. "
@@ -379,7 +386,19 @@ def main():
     parser.add_argument(
         "--only", nargs="*", help="Scenario names to run; defaults to all"
     )
+    parser.add_argument(
+        "--heldout", action="store_true", help="Add the new post-run-1 semantic variant"
+    )
     args = parser.parse_args()
+    registry = {
+        scenario["name"]: scenario
+        for scenario in [*SCENARIOS, HELD_OUT, EXPLICIT_TRANSFER]
+    }
+    selected = [*SCENARIOS, *([HELD_OUT] if args.heldout else [])]
+    if args.only is not None:
+        if unknown := set(args.only) - registry.keys():
+            parser.error("Unknown cases: " + ", ".join(sorted(unknown)))
+        selected = [registry[name] for name in args.only]
     if Path(args.output).name != args.output:
         parser.error("--output must be a directory name, not a path")
     directory = HERE / args.output
@@ -391,9 +410,8 @@ def main():
         directory.mkdir(exist_ok=False)
         base, vault, root = prepare(directory)
     if args.run:
-        for scenario in SCENARIOS:
-            if args.only is None or scenario["name"] in args.only:
-                run(directory, base, vault, root, scenario)
+        for scenario in selected:
+            run(directory, base, vault, root, scenario)
         dump(directory, "final-source-digests.json", digests())
     else:
         print(f"Prepared synthetic fixture at {base}; no provider calls made")

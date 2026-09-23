@@ -1,0 +1,4 @@
+{"toolCallId": "call_0RrhmQ9nI9zgJyMKArKYrWk4|fc_0533e3eb8372de4b016ab35ce7556487d2b7346ff3ae5334f5", "toolName": "read", "args": {"path": "/Users/edo/dev/python/journal/learning/skills/learn/SKILL.md", "limit": 2000}}
+{"toolCallId": "call_FEmjvZxkzmpodTAz2mrVVO54|fc_0533e3eb8372de4b016ab35cebac3487d2b61b82e1ea39b5fa", "toolName": "learning_context", "args": {"scope": "Signals Studio", "knowledge_budget": 1000, "evidence_budget": 100}}
+{"toolCallId": "call_L83Z6Xdc1PZMzOCxap0y6taQ|fc_0533e3eb8372de4b016ab35ced69a087d2ac68be3a134fca86", "toolName": "learning_context", "args": {}}
+{"toolCallId": "call_osAdAXmYwfDQ68FLttDtR1gB|fc_0533e3eb8372de4b016ab35cef004887d29c2e7d3ce252a3ad", "toolName": "learning_context", "args": {"scope": "signals-studio", "knowledge_budget": 2000, "evidence_budget": 100}}
