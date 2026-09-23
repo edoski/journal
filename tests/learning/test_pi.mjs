@@ -154,7 +154,7 @@ test("memory tools preserve patches and share CLI retrieval, preferences and rev
   });
   assert.deepEqual(saved.assigned_observations, ["o1", "o2"]);
   const cli = (args, input) => JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
-    ["-m", "learning", ...args], { cwd: repository, encoding: "utf8", input }));
+    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, ...args], { cwd: repository, encoding: "utf8", input }));
   cli(["preferences", "--expect", "0"], JSON.stringify({ rules: [{
     when: { domain: "mathematics", activity: "proof" },
     values: { pace: { instruction: "Justify each step.", origin: "explicit" } },
@@ -209,7 +209,7 @@ test("knowledge tools share focused CLI reads, source metadata and explicit byte
     },
   });
   const cli = (args) => JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
-    ["-m", "learning", "context", "course", ...args], { cwd: repository, encoding: "utf8" }));
+    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, "context", "course", ...args], { cwd: repository, encoding: "utf8" }));
   const focused = await context({ knowledge: ["notation"], expected_revision: 1 });
   assert.deepEqual(focused, cli(["--knowledge=notation", "--expect=1"]));
   assert.equal(focused.knowledge.notation.text, literal);
@@ -255,7 +255,7 @@ test("knowledge discovery preserves independent revision-bound candidate paging"
   await assert.rejects(context({ candidate_offset: 8 }), /revision|expect/);
   const next = await context({ candidate_offset: 8, expected_revision: first.revision });
   const cli = JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
-    ["-m", "learning", "context", "course", "--query=Remembered marker", "--candidate-offset=8", "--expect=1"],
+    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, "context", "course", "--query=Remembered marker", "--candidate-offset=8", "--expect=1"],
     { cwd: repository, encoding: "utf8" }));
   assert.deepEqual(next, cli);
   assert.deepEqual(next.candidates.items.map((item) => [item.kind, item.key, item.discovery_only]),

@@ -19,7 +19,7 @@ def invoke(
     root: Path, *args: str, patch: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     completed = subprocess.run(
-        [sys.executable, "-m", "learning", *args],
+        [sys.executable, "-m", "learning", "--workspace", str(root), *args],
         input=json.dumps(patch) if patch is not None else None,
         text=True,
         capture_output=True,
@@ -198,6 +198,8 @@ def test_invalid_context_combination_reports_an_error(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "learning",
+            "--workspace",
+            str(tmp_path),
             "context",
             "course",
             "--all",
@@ -221,7 +223,15 @@ def test_migration_failure_has_a_nonzero_exit_and_preserves_input(
     damaged = state / "broken.json"
     damaged.write_text("{", encoding="utf-8")
     completed = subprocess.run(
-        [sys.executable, "-m", "learning", "migrate", "--apply"],
+        [
+            sys.executable,
+            "-m",
+            "learning",
+            "--workspace",
+            str(tmp_path),
+            "migrate",
+            "--apply",
+        ],
         text=True,
         capture_output=True,
         env={**os.environ, "STUDY_WORKSPACE": str(tmp_path)},
@@ -299,6 +309,8 @@ def test_snapshot_conflict_has_a_distinct_machine_readable_error(
             sys.executable,
             "-m",
             "learning",
+            "--workspace",
+            str(tmp_path),
             "save",
             "course",
             "--expect",
@@ -324,7 +336,17 @@ def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
         "LEARNING_NO_SAVE": "1",
     }
     rejected = subprocess.run(
-        [sys.executable, "-m", "learning", "save", "course", "--expect", "0"],
+        [
+            sys.executable,
+            "-m",
+            "learning",
+            "--workspace",
+            str(tmp_path),
+            "save",
+            "course",
+            "--expect",
+            "0",
+        ],
         input='{"title":"Must not persist"}',
         text=True,
         capture_output=True,
@@ -334,7 +356,15 @@ def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
     assert json.loads(rejected.stderr)["error"]["kind"] == "no_save"
     assert not (root / ".study/state").exists()
     readable = subprocess.run(
-        [sys.executable, "-m", "learning", "context", "course"],
+        [
+            sys.executable,
+            "-m",
+            "learning",
+            "--workspace",
+            str(tmp_path),
+            "context",
+            "course",
+        ],
         text=True,
         capture_output=True,
         env=env,

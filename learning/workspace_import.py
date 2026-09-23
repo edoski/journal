@@ -14,24 +14,28 @@ from learning import preferences, records, storage
 from learning.workspace import Workspace
 
 
-def _rebase(value: Any, source: Path, target: Path) -> Any:
+def _location(value: str, source: Path, target: Path) -> str:
+    if urlsplit(value).scheme:
+        return value
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = source / path
+    path = path.resolve()
+    return os.path.relpath(path, target) if path.is_relative_to(target) else str(path)
+
+
+def _rebase_references(value: Any, source: Path, target: Path) -> Any:
     if isinstance(value, list):
-        return [_rebase(item, source, target) for item in value]
+        return [_rebase_references(item, source, target) for item in value]
     if not isinstance(value, dict):
         return value
-    result = {}
-    for key, item in value.items():
-        if (
-            key in {"path", "source_path"}
-            and isinstance(item, str)
-            and not urlsplit(item).scheme
-        ):
-            path = Path(item).expanduser()
-            if not path.is_absolute():
-                path = source / path
-            result[key] = os.path.relpath(path.resolve(), target)
-        else:
-            result[key] = _rebase(item, source, target)
+    result = {
+        key: _rebase_references(item, source, target) for key, item in value.items()
+    }
+    if "source" in result:
+        for key in ("path", "source_path"):
+            if isinstance(result.get(key), str):
+                result[key] = _location(result[key], source, target)
     return result
 
 
@@ -57,7 +61,9 @@ def import_scope(
     if original["revision"] == 0:
         raise ValueError(f"No existing scope to import: {scope}")
     raw = storage.load(source / "state" / f"{scope}.json")
-    candidate = _rebase(deepcopy(raw), source_directory, workspace.directory)
+    candidate = _rebase_references(deepcopy(raw), source_directory, workspace.directory)
+    for entry in candidate.get("sources", {}).values():
+        entry["path"] = _location(entry["path"], source_directory, workspace.directory)
     policy = preferences.read(source)
     rules = [
         rule

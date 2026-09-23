@@ -222,3 +222,17 @@ def test_import_preserves_originals_rebases_sources_and_selects_preferences(
     with pytest.raises(ValueError, match="empty workspace"):
         import_scope(workspace, root, old, "course", apply=True)
     assert len(records.read(workspace.root, None)) == 1
+    moved = tmp_path / "elsewhere/moved"
+    moved.parent.mkdir()
+    shutil.move(target, moved)
+    assert (
+        Path(
+            records.read(resolve(moved).root, "course")["sources"]["notes"]["path"]
+        ).read_text()
+        == "Original source"
+    )
+    with_defaults = tmp_path / "defaults"
+    with_defaults.mkdir()
+    local = initialize(with_defaults)
+    import_scope(local, root, old, "course", include_defaults=True, apply=True)
+    assert len(preferences.read(local.root)["rules"]) == 2

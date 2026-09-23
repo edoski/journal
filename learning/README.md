@@ -65,8 +65,9 @@ study import aikr --from /path/to/old/learn --source-directory /path/to/old/vaul
 study import aikr --from /path/to/old/learn --source-directory /path/to/old/vault --apply
 ```
 
-Relative source paths are rebased to retain their original targets; sources already
-inside the destination become local relative paths. Knowledge, provenance and
+Source paths retain their original targets: files inside the destination become
+local relative paths; external targets use absolute paths so moving the workspace
+does not change their meaning. Knowledge, provenance and
 learner evidence are preserved. Only the selected scope's preferences are copied;
 `--include-defaults` explicitly adds unscoped defaults as local rules. Imports
 validate the candidate and preferences before publication and refuse existing state

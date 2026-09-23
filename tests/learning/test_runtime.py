@@ -65,7 +65,10 @@ def test_regular_launch_pins_workspace_tools_and_resume(
     sibling.mkdir()
     other = initialize(sibling)
     monkeypatch.chdir(sibling)
-    assert resolve() == workspace  # Native calls retain the session binding.
+    assert (
+        resolve() == other
+    )  # Ordinary discovery ignores an inherited session binding.
+    assert resolve(workspace.directory) == workspace
     assert resolve(sibling) == other
 
 

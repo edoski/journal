@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 import json
 import os
 from pathlib import Path
+import tempfile
 
 from learning import storage
 
@@ -15,6 +17,7 @@ _MANIFEST = {"version": 1}
 @dataclass(frozen=True)
 class Workspace:
     directory: Path
+    source_directory: Path | None = None
 
     @property
     def root(self) -> Path:
@@ -30,11 +33,7 @@ class Workspace:
 
     @property
     def sources(self) -> Path:
-        if os.environ.get("LEARNING_PRIVATE") == "1" and os.environ.get(
-            "LEARNING_SOURCE_ROOT"
-        ):
-            return Path(os.environ["LEARNING_SOURCE_ROOT"]).resolve()
-        return self.directory
+        return self.source_directory or self.directory
 
 
 def _load(directory: Path) -> Workspace:
@@ -58,7 +57,7 @@ def _load(directory: Path) -> Workspace:
 
 def resolve(directory: str | Path | None = None) -> Workspace:
     """Explicit selection is exact; automatic discovery selects the nearest marker."""
-    explicit = directory if directory is not None else os.environ.get("STUDY_WORKSPACE")
+    explicit = directory
     start = (
         Path(explicit).expanduser().resolve()
         if explicit is not None
@@ -69,7 +68,15 @@ def resolve(directory: str | Path | None = None) -> Workspace:
     for candidate in [start] if explicit is not None else [start, *start.parents]:
         marker = candidate / ".study"
         if marker.exists() or marker.is_symlink():
-            return _load(candidate)
+            workspace = _load(candidate)
+            if os.environ.get("LEARNING_PRIVATE") == "1" and os.environ.get(
+                "LEARNING_SOURCE_ROOT"
+            ):
+                return Workspace(
+                    workspace.directory,
+                    Path(os.environ["LEARNING_SOURCE_ROOT"]).resolve(),
+                )
+            return workspace
     raise ValueError(
         f"No study workspace at {start}. Run `study init` in the intended directory or select `--workspace DIRECTORY`."
     )
@@ -90,14 +97,19 @@ def initialize(directory: str | Path | None = None) -> Workspace:
         raise ValueError(
             f"Cannot initialize study workspace: {root} is not a local directory"
         )
-    root.mkdir(exist_ok=True)
-    with storage.lock(root / ".workspace.lock"):
-        if (root / "workspace.json").exists():
+    if (root / "workspace.json").exists():
+        return _load(target)
+    if root.exists() and any(root.iterdir()):
+        raise ValueError(f"Refusing to initialize nonempty unowned directory: {root}")
+    with tempfile.TemporaryDirectory(prefix=".study-init-", dir=target) as directory:
+        staged = Path(directory)
+        storage.publish_text(staged / "workspace.json", json.dumps(_MANIFEST) + "\n")
+        storage.publish_text(staged / ".gitignore", "*\n")
+        try:
+            os.rename(staged, root)
+        except OSError as error:
+            if error.errno not in {errno.EEXIST, errno.ENOTEMPTY}:
+                raise
+            # A concurrent initializer may already have published the same workspace.
             return _load(target)
-        if any(path.name != ".workspace.lock" for path in root.iterdir()):
-            raise ValueError(
-                f"Refusing to initialize nonempty unowned directory: {root}"
-            )
-        storage.publish_text(root / "workspace.json", json.dumps(_MANIFEST) + "\n")
-        storage.publish_text(root / ".gitignore", "*\n")
     return workspace

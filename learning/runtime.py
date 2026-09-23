@@ -22,10 +22,8 @@ def _launch(
     pi: str,
     workspace: Workspace,
     args: argparse.Namespace,
-    *,
-    source_directory: Path | None = None,
 ) -> None:
-    vault, root = source_directory or workspace.sources, workspace.root
+    vault, root = workspace.sources, workspace.root
     assets, sessions = workspace.assets, workspace.conversations
     runtime = Path(__file__).resolve().parent
     root.mkdir(parents=True, exist_ok=True)
@@ -43,8 +41,8 @@ def _launch(
     if args.private:
         environment["LEARNING_NO_SAVE"] = "1"
     environment.pop("LEARNING_SOURCE_ROOT", None)
-    if source_directory is not None:
-        environment["LEARNING_SOURCE_ROOT"] = str(source_directory)
+    if args.private:
+        environment["LEARNING_SOURCE_ROOT"] = str(workspace.sources)
     presentation = (
         "The learner talks and reads your teaching in this terminal. "
         if args.private
@@ -139,6 +137,6 @@ def start_pi(workspace: Workspace, args: argparse.Namespace) -> None:
                     workspace.root / "preferences.json",
                     temporary.root / "preferences.json",
                 )
-            _launch(pi, temporary, args, source_directory=workspace.sources)
+            _launch(pi, Workspace(temporary.directory, workspace.sources), args)
         return
     _launch(pi, workspace, args)
