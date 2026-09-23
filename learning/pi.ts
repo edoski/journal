@@ -146,7 +146,7 @@ const contextParameters = Type.Object({
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   expected_revision: Type.Optional(Type.Integer({ minimum: 0, description: "Required when continuing a page." })),
-  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Ordinary context evidence byte allowance; omitted evidence is disclosed." })),
+  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Evidence allowance in UTF-8 bytes. Applies to scoped evidence reads; ignored for knowledge-only reads. Invalid for catalog or all." })),
   concepts: Type.Optional(Type.Array(Type.String())),
   domains: Type.Optional(Type.Array(Type.String())),
   activity: Type.Optional(Type.String()),
@@ -162,6 +162,7 @@ const saveParameters = Type.Object({
   scope: Type.String(),
   expected_revision: Type.Integer({ minimum: 0 }),
   expected_digest: Type.Optional(Type.String()),
+  confirm_qualification_changes: Type.Optional(Type.Array(Type.String(), { uniqueItems: true, description: "Only entries whose qualification replacement or deletion you reviewed; requires current digest. Omit by default; never acknowledge blindly." })),
   changes: Type.Object({
     title: Type.Optional(Type.String()),
     focus: Type.Optional(Type.Array(Type.String())),
@@ -322,7 +323,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_save",
     label: "Save learning",
-    description: "Save related learning-record changes together at the last read revision (0 for a new scope). Returns the next revision and observation handles. Reconcile conflicts before retrying; a successful receipt needs no reread.",
+    description: "Save related changes at the last read revision (0 for new scope). Returns a receipt, or needs_confirmation with exact knowledge changes and no writes. Review those changes: preserve qualifications or acknowledge justified revisions internally. Reconcile conflicts; a successful receipt needs no reread.",
     parameters: saveParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
@@ -332,6 +333,7 @@ export default function (pi: ExtensionAPI) {
       try {
         const args = ["save", `--expect=${params.expected_revision}`];
         if (params.expected_digest !== undefined) args.push(`--expect-digest=${params.expected_digest}`);
+        if (params.confirm_qualification_changes !== undefined) args.push(`--confirm-qualification-changes=${JSON.stringify(params.confirm_qualification_changes)}`);
         args.push("--", params.scope);
         const text = await runLearning(args, JSON.stringify(params.changes), signal);
         return { content: [{ type: "text", text }], details: {} };

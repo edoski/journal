@@ -68,7 +68,11 @@ def main() -> int:
         "--observations", help="Comma-separated saved observation handles (e.g. o1)"
     )
     context.add_argument("--query", help="Search evidence, aliases and course memory")
-    context.add_argument("--evidence-budget", type=int)
+    context.add_argument(
+        "--evidence-budget",
+        type=int,
+        help="Evidence allowance in UTF-8 bytes, minimum 2; ignored for knowledge-only reads; invalid for catalog or --all",
+    )
     context.add_argument(
         "--knowledge", help="Exact entry handles; empty string requests index"
     )
@@ -93,6 +97,10 @@ def main() -> int:
     writer.add_argument("scope")
     writer.add_argument("--expect", type=int, required=True)
     writer.add_argument("--expect-digest")
+    writer.add_argument(
+        "--confirm-qualification-changes",
+        help="Reviewed knowledge entry handles; requires the current digest",
+    )
     migration = commands.add_parser("migrate", help="Inspect the schema conversion")
     migration.add_argument(
         "--apply", action="store_true", help="Back up and convert old records"
@@ -282,6 +290,7 @@ def main() -> int:
                 args.expect,
                 json.load(sys.stdin),
                 expected_digest=args.expect_digest,
+                confirm_qualification_changes=keys(args.confirm_qualification_changes),
             )
         elif args.command == "migrate":
             from learning.migrate import migrate

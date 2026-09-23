@@ -75,6 +75,8 @@ def test_knowledge_patches_preserve_other_understanding_and_outlive_tasks(
                 "current-resources": current["knowledge"]["resources"],
             }
         },
+        expected_digest=current["digest"],
+        confirm_qualification_changes=["resources"],
     )
     renamed = records.read(tmp_path, "course")
     assert isinstance(renamed, dict)
@@ -210,6 +212,8 @@ def test_knowledge_citations_capture_versions_and_protect_links(tmp_path: Path) 
                 }
             },
         },
+        expected_digest=moved["digest"],
+        confirm_qualification_changes=["convention"],
     )
     revised = records.read(tmp_path, "course")
     assert isinstance(revised, dict)
@@ -515,6 +519,8 @@ def test_knowledge_patch_preserves_evidential_metadata_and_clears_explicitly(
         "course",
         2,
         {"knowledge": {"notation": {"uncertainty": None, "conflicts": None}}},
+        expected_digest=current["digest"],
+        confirm_qualification_changes=["notation"],
     )
     cleared = records.read(tmp_path, "course")
     assert isinstance(cleared, dict)
@@ -595,3 +601,224 @@ def test_scope_digest_rejects_divergent_content_at_same_revision(
         )
     assert path.read_text() == replacement
     assert '"digest"' not in replacement
+
+
+@pytest.mark.parametrize(
+    "change,guarded",
+    [
+        ({"uncertainty": None}, True),
+        ({"attribution": "Official notice"}, True),
+        ({"uncertainty": "Not checked; new detail"}, True),
+        ({"conflicts": ["Undated B"]}, True),
+        ({"refs": [{"source": "sheet", "locator": "p1"}]}, True),
+        (None, True),
+        ({"text": "A clarified assertion"}, False),
+        ({"uncertainty": "Not checked"}, False),
+        ({"conflicts": ["Undated B", "Undated A", "Undated C"]}, False),
+        ({"aliases": ["notation"]}, False),
+        (
+            {
+                "refs": [
+                    {"source": "sheet", "locator": "p2"},
+                    {"source": "sheet", "locator": "p1", "excerpt": "A claim"},
+                ]
+            },
+            False,
+        ),
+    ],
+)
+def test_qualification_guard_distinguishes_loss_from_addition(
+    tmp_path: Path, change: Any, guarded: bool
+) -> None:
+    first = records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "sources": {"sheet": {"path": "sheet.md"}},
+            "knowledge": {
+                "notation": {
+                    "text": "A claim",
+                    "attribution": "Learner report",
+                    "uncertainty": "Not checked",
+                    "conflicts": ["Undated A", "Undated B"],
+                    "refs": [
+                        {"source": "sheet", "locator": "p1", "excerpt": "A claim"}
+                    ],
+                }
+            },
+        },
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    result = records.save(
+        tmp_path, "course", first["revision"], {"knowledge": {"notation": change}}
+    )
+    if guarded:
+        assert result["status"] == "needs_confirmation"
+        assert result["revision"] == first["revision"]
+        assert result["digest"] == first["digest"]
+        assert result["changes"][0]["entry"] == "notation"
+        assert "assigned_observations" not in result
+        assert path.read_bytes() == before
+        if change is None:
+            assert result["changes"][0]["deleted"] is True
+            assert result["changes"][0]["before"]["text"] == "A claim"
+    else:
+        assert "status" not in result
+
+
+def test_qualification_review_blocks_whole_transaction_and_retry_commits_once(
+    tmp_path: Path,
+) -> None:
+    first = records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {"systems": {}},
+            "tasks": {"exercise": {"task": "Solve"}},
+            "knowledge": {
+                "a": {"text": "Old", "uncertainty": "Unknown"},
+                "z": {"text": "Plain assertion"},
+            },
+        },
+    )
+    patch = {
+        "observations": [{"topics": ["systems"], "text": "A real assisted attempt"}],
+        "tasks": {"exercise": None},
+        "sources": {"notice": {"path": "notice.md"}},
+        "knowledge": {"a": {"text": "New", "uncertainty": None}, "z": None},
+    }
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    preview = records.save(
+        tmp_path,
+        "course",
+        1,
+        patch,
+        expected_digest=first["digest"],
+        confirm_qualification_changes=["z"],
+    )
+    assert preview["status"] == "needs_confirmation"
+    assert path.read_bytes() == before
+    assert [item["entry"] for item in preview["changes"]] == ["a", "z"]
+    assert preview["changes"][0]["fields"] == {
+        "uncertainty": {"before": "Unknown", "after": None},
+        "text": {"before": "Old", "after": "New"},
+    }
+    saved = records.save(
+        tmp_path,
+        "course",
+        preview["revision"],
+        patch,
+        expected_digest=preview["digest"],
+        confirm_qualification_changes=["a", "z"],
+    )
+    assert saved["assigned_observations"] == ["o1"]
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    assert current["revision"] == 2
+    assert current["observation_sequence"] == 1
+    assert current["tasks"] == {}
+    assert current["knowledge"] == {"a": {"text": "New"}}
+    assert current["sources"]["notice"]["path"] == "notice.md"
+    assert "confirm_qualification_changes" not in current
+    with pytest.raises(storage.RevisionConflict):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            patch,
+            expected_digest=preview["digest"],
+            confirm_qualification_changes=["a", "z"],
+        )
+    assert len(records.read(tmp_path, "course")["observations"]) == 1
+
+
+@pytest.mark.parametrize(
+    "confirmed", [["missing"], ["notation", "notation"], "notation", [None]]
+)
+def test_invalid_qualification_acknowledgment_never_publishes(
+    tmp_path: Path, confirmed: Any
+) -> None:
+    first = records.save(
+        tmp_path,
+        "course",
+        0,
+        {"knowledge": {"notation": {"text": "Original", "uncertainty": "Unknown"}}},
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="confirm_qualification_changes"):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {"knowledge": {"notation": None}},
+            expected_digest=first["digest"],
+            confirm_qualification_changes=confirmed,
+        )
+    assert path.read_bytes() == before
+
+
+def test_review_validation_conflicts_and_repair(tmp_path: Path) -> None:
+    first = records.save(
+        tmp_path,
+        "course",
+        0,
+        {"knowledge": {"notation": {"text": "Original", "uncertainty": "Unknown"}}},
+    )
+    removal = {"knowledge": {"notation": None}}
+    with pytest.raises(ValueError, match="requires expected_digest"):
+        records.save(
+            tmp_path, "course", 1, removal, confirm_qualification_changes=["notation"]
+        )
+    with pytest.raises(ValueError, match="outside the state patch"):
+        records.save(
+            tmp_path, "course", 1, {"confirm_qualification_changes": ["notation"]}
+        )
+    with pytest.raises(ValueError, match="text must be a nonempty string"):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {"knowledge": {"notation": {"text": None, "uncertainty": None}}},
+        )
+    with pytest.raises(ValueError, match="only entries with guarded changes"):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {"knowledge": {"notation": {"text": "Clarified"}}},
+            expected_digest=first["digest"],
+            confirm_qualification_changes=["notation"],
+        )
+    assert (
+        records.save(tmp_path, "course", 1, removal)["status"] == "needs_confirmation"
+    )
+    repaired = records.save(
+        tmp_path,
+        "course",
+        1,
+        {
+            "knowledge": {
+                "new-fact": {"text": "A different assertion"},
+                "notation": {"attribution": "Learner report"},
+            }
+        },
+    )
+    assert repaired["revision"] == 2
+    path = tmp_path / "state/course.json"
+    changed = path.read_text().replace("Original", "Concurrent edit")
+    path.write_text(changed)
+    with pytest.raises(storage.RevisionConflict, match="snapshot conflict"):
+        records.save(
+            tmp_path,
+            "course",
+            2,
+            removal,
+            expected_digest=repaired["digest"],
+            confirm_qualification_changes=["notation"],
+        )
+    assert path.read_text() == changed

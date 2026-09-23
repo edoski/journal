@@ -216,6 +216,8 @@ test("knowledge tools share focused CLI reads, source metadata and explicit byte
   assert.equal(focused.sources.sheet.path, "notes/lecture.md");
   assert.equal(focused.observations, undefined);
   const index = await context({ knowledge: [], limit: 1 });
+  assert.deepEqual(await context({ knowledge: [], limit: 1, evidence_budget: 2 }), index);
+  assert.deepEqual(await context({ knowledge: ["notation"], expected_revision: 1, evidence_budget: 2 }), focused);
   assert.deepEqual(index, cli(["--knowledge=", "--limit=1"]));
   assert.equal(index.selection.mode, "knowledge_index");
   assert.equal(index.selection.next_offset, 1);
@@ -749,10 +751,22 @@ test("save schema allows canonical explicit clearing of optional knowledge and c
     course_context: { assessment: "Oral examination" },
     knowledge: { convention: { text: "A denotes the matrix.", topics: ["systems"], refs: [{ source: "sheet", locator: "Notation" }], attribution: "Course sheet", uncertainty: "Edition unknown", conflicts: ["Earlier notes differ"], aliases: ["Matrix notation"] } },
   } });
-  await memoryTool(f, "learning_save", { scope: "course", expected_revision: first.revision, expected_digest: first.digest, changes: {
+  const args = { scope: "course", expected_revision: first.revision, expected_digest: first.digest, changes: {
     course_context: null,
     knowledge: { convention: { topics: null, refs: null, attribution: null, uncertainty: null, conflicts: null, aliases: null } },
-  } });
+  } };
+  const path = join(process.env.LEARNING_ROOT, "state/course.json");
+  const before = await readFile(path, "utf8");
+  const preview = await memoryTool(f, "learning_save", args);
+  assert.equal(preview.status, "needs_confirmation");
+  assert.deepEqual(preview.changes[0].fields.uncertainty, { before: "Edition unknown", after: null });
+  assert.equal(await readFile(path, "utf8"), before);
+  const tool = f.extension.tools.get("learning_save").definition;
+  const rendered = tool.renderResult({ content: [{ type: "text", text: JSON.stringify(preview) }] }, { expanded: false }, {}, { isError: false });
+  assert.deepEqual(rendered.render(80), []);
+  const saved = await memoryTool(f, "learning_save", { ...args, confirm_qualification_changes: ["convention"] });
+  assert.equal(saved.status, undefined);
+  assert.equal(saved.revision, first.revision + 1);
   const context = await memoryTool(f, "learning_context", { scope: "course", all: true });
   assert.deepEqual(context.knowledge.convention, { text: "A denotes the matrix." });
   assert.equal(context.course_context, undefined);

@@ -21,6 +21,46 @@ def invoke(
     return result
 
 
+def test_save_review_and_knowledge_budget_share_core_contract(tmp_path: Path) -> None:
+    first = invoke(
+        tmp_path,
+        "save",
+        "course",
+        "--expect=0",
+        patch={
+            "knowledge": {
+                "notation": {"text": "g means response", "uncertainty": "Unverified"}
+            },
+        },
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    patch = {"knowledge": {"notation": {"uncertainty": None}}}
+    preview = invoke(tmp_path, "save", "course", "--expect=1", patch=patch)
+    assert preview["status"] == "needs_confirmation"
+    assert preview["digest"] == first["digest"]
+    assert path.read_bytes() == before
+    saved = invoke(
+        tmp_path,
+        "save",
+        "course",
+        "--expect=1",
+        f"--expect-digest={preview['digest']}",
+        '--confirm-qualification-changes=["notation"]',
+        patch=patch,
+    )
+    assert saved["revision"] == 2
+    assert "status" not in saved
+    for selection in ("", "notation"):
+        assert invoke(
+            tmp_path,
+            "context",
+            "course",
+            f"--knowledge={selection}",
+            "--evidence-budget=2",
+        ) == invoke(tmp_path, "context", "course", f"--knowledge={selection}")
+
+
 def test_context_combines_new_scope_and_saved_policy(tmp_path: Path) -> None:
     root = tmp_path / "learn"
     empty = invoke(root, "context", "course")

@@ -44,3 +44,40 @@ information. Preserve the original outputs, but mark that narrower expectation
 inconclusive. `s8-explicit-transfer` repeats the request with its specific learning
 target supplied. Grade that response for a changed setting while retaining the
 explicit one-bit/two-level concept and leaving its question unanswered.
+
+## Fidelity follow-up rubric (frozen before comparison)
+
+Each profile/repetition starts from the initial synthetic records. The correction
+must preserve the meanings that the lecturer writes g, Atlas writes h, the
+correspondence is learner-reported, and it has not been independently checked in
+current slides. Adding g[n] is allowed only with those assertions and their
+individual provenance/qualifications intact. “Atlas may use h” weakens the stored
+assertion. A laboratory notice does not establish the textbook correspondence.
+The unrelated bench entry stays exactly unchanged. A source correction must not
+create learner-performance evidence.
+
+The authority profile may resolve only what the current notice establishes: one
+A5 sheet, handwritten on one side, formulas only; no worked derivations/solutions;
+calculator permission remains unknown. The recall profile gives the g/h
+correspondence and its limits, without exercises or invented performance.
+
+Score visible answer and saved meaning independently, inspecting each changed
+entry and observation. Exact equality is required for untouched controls, not for
+an entry legitimately enriched. Ordinary teaching contains no volunteered
+recording/classification narration. An explicit restriction may receive one brief
+natural acknowledgment followed by subject content when requested. A direct
+memory question permits an accurate account of memory and its limits. Subject
+uses of “evidence” and “observation” are legitimate, not bookkeeping leaks.
+
+The ordinary control explains binary alternatives without a recording instruction.
+The vocabulary control explains Bayesian evidence/observation as subject content.
+The memory control describes the assisted worksheet-A attempt and unfinished
+parameterization without independent-success claims. An additional held-out
+correction will be defined independently after production freeze, before candidate
+evaluation, with its own evaluator-only rubric.
+
+Report five samples per comparison profile, preserving all failures. Separate
+genuine tool errors from expected needs_confirmation outcomes; inspect whether
+the erroneous budget combination was actually exercised. Capture every usage
+round. Small samples do not establish population reliability, provider parity,
+UI delivery or learning gains. Do not rerun an unchanged candidate until clean.

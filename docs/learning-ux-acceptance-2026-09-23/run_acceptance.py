@@ -14,12 +14,22 @@ import sys
 import tempfile
 import time
 
-from fixtures import EXPLICIT_TRANSFER, HELD_OUT, SCENARIOS, SOURCES, initial_records
+from fixtures import (
+    EXPLICIT_TRANSFER,
+    FIDELITY_CONTROLS,
+    FIDELITY_PROFILES,
+    HELD_OUT,
+    SCENARIOS,
+    SOURCES,
+    initial_records,
+)
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO))
 OMIT_PRIVATE = object()
+MODEL = "gpt-6-sol"
+THINKING = "high"
 
 
 def dump(directory, name, value):
@@ -108,7 +118,8 @@ def prepare(directory):
                 ["git", "rev-parse", "HEAD"], cwd=REPO, text=True
             ).strip(),
             "provider": "openai-codex",
-            "model_selection": "Existing Pi default; recorded from each response",
+            "model_selection": MODEL,
+            "thinking": THINKING,
             "actual_gui_verified": False,
             "isolation": "Synthetic vault and fresh local session directory per case; shared existing authorized provider, no prior transcripts",
         },
@@ -220,6 +231,10 @@ def run(directory, base, vault, root, scenario):
         "pi",
         "--provider",
         "openai-codex",
+        "--model",
+        MODEL,
+        "--thinking",
+        THINKING,
         "--offline",
         "--no-context-files",
         "--no-extensions",
@@ -362,6 +377,12 @@ def run(directory, base, vault, root, scenario):
         raise RuntimeError(
             f"{name} failed; private process diagnostics retained at {base}"
         )
+    if any(
+        item["model"] != MODEL or item["provider"] != "openai-codex" for item in usage
+    ):
+        raise RuntimeError(
+            "Native model/provider differs from the pinned selection; exclude this run"
+        )
     if metrics["source_changed_during_run"]:
         raise RuntimeError(
             "Production bytes changed during native acceptance; stop before further calls"
@@ -369,6 +390,7 @@ def run(directory, base, vault, root, scenario):
 
 
 def main():
+    global REPO, MODEL, THINKING
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output", default="run-1", help="New evidence subdirectory name"
@@ -389,10 +411,45 @@ def main():
     parser.add_argument(
         "--heldout", action="store_true", help="Add the new post-run-1 semantic variant"
     )
+    parser.add_argument("--repo", type=Path, default=REPO)
+    parser.add_argument("--model", default=MODEL)
+    parser.add_argument("--thinking", default=THINKING)
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=1,
+        help="Fresh fixture and conversation for each case/repetition",
+    )
+    parser.add_argument(
+        "--isolated",
+        action="store_true",
+        help="Do not share state between selected cases",
+    )
     args = parser.parse_args()
+    REPO = args.repo.resolve()
+    MODEL, THINKING = args.model, args.thinking
+    sys.path.insert(0, str(REPO))
+    if args.run:
+        catalog = subprocess.check_output(["pi", "--list-models", MODEL], text=True)
+        if not any(
+            line.split()[:2] == ["openai-codex", MODEL] for line in catalog.splitlines()
+        ):
+            parser.error(
+                f"Exact model openai-codex/{MODEL} is unavailable; refusing fallback"
+            )
+    if args.repeat < 1 or (args.resume and (args.isolated or args.repeat != 1)):
+        parser.error(
+            "repeat must be positive; resume cannot combine with isolation/repetition"
+        )
     registry = {
         scenario["name"]: scenario
-        for scenario in [*SCENARIOS, HELD_OUT, EXPLICIT_TRANSFER]
+        for scenario in [
+            *SCENARIOS,
+            HELD_OUT,
+            EXPLICIT_TRANSFER,
+            *FIDELITY_PROFILES,
+            *FIDELITY_CONTROLS,
+        ]
     }
     selected = [*SCENARIOS, *([HELD_OUT] if args.heldout else [])]
     if args.only is not None:
@@ -402,6 +459,17 @@ def main():
     if Path(args.output).name != args.output:
         parser.error("--output must be a directory name, not a path")
     directory = HERE / args.output
+    if args.isolated or args.repeat != 1:
+        directory.mkdir(exist_ok=False)
+        for repetition in range(1, args.repeat + 1):
+            for scenario in selected:
+                case_dir = directory / f"{repetition}-{scenario['name']}"
+                case_dir.mkdir()
+                base, vault, root = prepare(case_dir)
+                if args.run:
+                    run(case_dir, base, vault, root, scenario)
+                    dump(case_dir, "final-source-digests.json", digests())
+        return
     if args.resume:
         config = json.loads((directory / "environment.json").read_text())
         base = Path(config["temporary_root"])

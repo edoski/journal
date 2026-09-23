@@ -498,6 +498,38 @@ def capture_source_fingerprints(
     }
 
 
+class _QualificationReview(Exception):
+    def __init__(self, result: dict[str, Any]) -> None:
+        self.result = result
+        super().__init__("Knowledge changes require review")
+
+
+def _qualification_changes(
+    previous: dict[str, Any], candidate: dict[str, Any]
+) -> list[dict[str, Any]]:
+    changes = []
+    for key, before in sorted(previous.items()):
+        if key not in candidate:
+            changes.append({"entry": key, "deleted": True, "before": before})
+            continue
+        after = candidate[key]
+        fields = {}
+        for name in ("attribution", "uncertainty", "conflicts", "refs"):
+            old, new = before.get(name), after.get(name)
+            lost = (
+                any(item not in (new or []) for item in old)
+                if name in {"conflicts", "refs"} and old
+                else bool(old) and old != new
+            )
+            if lost:
+                fields[name] = {"before": old, "after": new}
+        if fields:
+            if before["text"] != after["text"]:
+                fields["text"] = {"before": before["text"], "after": after["text"]}
+            changes.append({"entry": key, "fields": fields})
+    return changes
+
+
 def save(
     root: Path,
     scope: str,
@@ -505,10 +537,26 @@ def save(
     record: Any,
     *,
     expected_digest: str | None = None,
+    confirm_qualification_changes: list[str] | None = None,
 ) -> dict[str, Any]:
     scope = _scope(scope)
     if not isinstance(record, dict):
         raise ValueError("state patch must be a JSON object")
+    if "confirm_qualification_changes" in record:
+        raise ValueError(
+            "confirm_qualification_changes belongs outside the state patch"
+        )
+    confirmed = confirm_qualification_changes
+    if confirmed is None:
+        confirmed = []
+    if (
+        not isinstance(confirmed, list)
+        or any(not isinstance(key, str) for key in confirmed)
+        or len(set(confirmed)) != len(confirmed)
+    ):
+        raise ValueError("confirm_qualification_changes must be unique entry handles")
+    if confirmed and expected_digest is None:
+        raise ValueError("confirm_qualification_changes requires expected_digest")
     if {
         "revision",
         "updated_at",
@@ -523,6 +571,7 @@ def save(
     assigned: list[str] = []
 
     def transform(current: dict[str, Any]) -> dict[str, Any]:
+        snapshot = current
         current = _validated(current)
         patch = deepcopy(record)
         now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
@@ -661,15 +710,37 @@ def save(
             result["current_task"] = None
         result["observations"] = saved
         result["observation_sequence"] = next_id - 1
-        return normalize_record(result)
-
-    with storage.lock(root / ".records.lock"):
-        result = storage.update(
-            root / "state" / f"{scope}.json",
-            expected,
-            transform,
-            expected_digest=expected_digest,
+        result = normalize_record(result)
+        changes_to_review = _qualification_changes(
+            current.get("knowledge", {}), result.get("knowledge", {})
         )
+        guarded = {change["entry"] for change in changes_to_review}
+        if set(confirmed) - guarded:
+            raise ValueError(
+                "confirm_qualification_changes must name only entries with guarded changes"
+            )
+        if guarded - set(confirmed):
+            raise _QualificationReview(
+                {
+                    "status": "needs_confirmation",
+                    "scope": scope,
+                    "revision": current["revision"],
+                    "digest": storage.digest(snapshot),
+                    "changes": changes_to_review,
+                }
+            )
+        return result
+
+    try:
+        with storage.lock(root / ".records.lock"):
+            result = storage.update(
+                root / "state" / f"{scope}.json",
+                expected,
+                transform,
+                expected_digest=expected_digest,
+            )
+    except _QualificationReview as review:
+        return review.result
     return {
         "scope": scope,
         "revision": result["revision"],

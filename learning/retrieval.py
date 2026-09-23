@@ -506,14 +506,11 @@ def context(
     if candidate_offset and query is None:
         raise ValueError("candidate_offset requires a query")
     if evidence_budget is not None and (
-        scope is None
-        or knowledge is not None
-        or type(evidence_budget) is not int
-        or evidence_budget < 2
+        type(evidence_budget) is not int or evidence_budget < 2
     ):
-        raise ValueError(
-            "evidence_budget must be at least 2 bytes and requires evidence context"
-        )
+        raise ValueError("evidence_budget must be at least 2 bytes")
+    if evidence_budget is not None and scope is None:
+        raise ValueError("evidence_budget requires a scope")
     if knowledge_budget is not None and (
         scope is None
         or query is not None

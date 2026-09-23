@@ -7,6 +7,54 @@ from learning import records, retrieval
 from learning.storage import RevisionConflict
 
 
+@pytest.mark.parametrize("selection", [[], ["notation"]])
+def test_knowledge_reads_ignore_only_valid_evidence_budgets(
+    tmp_path: Path, selection: list[str]
+) -> None:
+    records.save(
+        tmp_path, "course", 0, {"knowledge": {"notation": {"text": "g means response"}}}
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    expected = retrieval.context(tmp_path, "course", knowledge=selection)
+    assert (
+        retrieval.context(tmp_path, "course", knowledge=selection, evidence_budget=2)
+        == expected
+    )
+    assert path.read_bytes() == before
+    for invalid in (True, 0, 1, "2", 2.5):
+        with pytest.raises(ValueError, match="at least 2 bytes"):
+            retrieval.context(
+                tmp_path, "course", knowledge=selection, evidence_budget=invalid
+            )  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="cannot combine"):
+        retrieval.context(
+            tmp_path, "course", knowledge=selection, query="response", evidence_budget=2
+        )
+    with pytest.raises(ValueError, match="requires a scope"):
+        retrieval.context(tmp_path, None, evidence_budget=2)
+
+
+def test_scoped_query_still_bounds_evidence(tmp_path: Path) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "topics": {"response": {}},
+            "observations": [
+                {"topics": ["response"], "text": "Response explanation " * 100}
+            ],
+        },
+    )
+    bounded = retrieval.context(tmp_path, "course", query="Response", evidence_budget=2)
+    expanded = retrieval.context(
+        tmp_path, "course", query="Response", evidence_budget=10000
+    )
+    assert bounded["observations"] == {}
+    assert set(expanded["observations"]) == {"o1"}
+
+
 def test_selected_assessment_brings_support_and_corrections_without_recursive_topics(
     tmp_path: Path,
 ) -> None:

@@ -194,3 +194,27 @@ EXPLICIT_TRANSFER = {
     "name": "s8-explicit-transfer",
     "prompt": "Back to Signals Studio in this new conversation. Briefly remind me which resources help with current conventions versus derivations, and the lecturer-versus-textbook impulse-response symbols. Read lab-notice.md and lab-sheet.md: can we actually settle their disagreement from those undated documents? Then ask me one short oral question specifically about one-bit representation and why it permits only two output levels, using a different concrete setting. Don't give its answer. Don't assume we know the exam rules. I have two minutes.",
 }
+
+FIDELITY_PROFILES = [
+    SCENARIOS[0],
+    HELD_OUT,
+    {
+        "name": "f3-course-recall",
+        "prompt": "In Signals Studio, remind me of the lecturer's and Atlas's impulse-response symbols. Distinguish what I reported from what has actually been checked. Keep it brief; no exercise.",
+    },
+]
+
+FIDELITY_CONTROLS = [
+    {
+        "name": "f4-ordinary-teaching",
+        "prompt": "In Signals Studio, why can a one-bit quantizer represent exactly two output levels? Explain in one short paragraph.",
+    },
+    {
+        "name": "f5-subject-vocabulary",
+        "prompt": "Explain Bayesian evidence and an observation using a simple discrete coin-toss example. Keep the explanation short and don't quiz me.",
+    },
+    {
+        "name": "f6-explicit-memory",
+        "prompt": "What do you remember about my Numerical Methods worksheet A attempt, what help I received, and where we stopped? I want to check what you have recorded, not start another exercise.",
+    },
+]

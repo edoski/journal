@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "skill_words": 1122,
+    "live_description_words": 805,
+    "schema_bytes": 11522
+  },
+  "candidate": {
+    "skill_words": 1145,
+    "live_description_words": 843,
+    "schema_bytes": 11914
+  },
+  "net_words": 61,
+  "net_schema_bytes": 392
+}
