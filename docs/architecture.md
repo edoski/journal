@@ -28,30 +28,65 @@ totals are loaded in grouped queries. Learning retrieval indexes observation
 counts and traverses correction relationships directly. None of these require a
 persistent cache or background worker.
 
-Learning also retains optional agent-authored `knowledge` entries in the same
-schema-5 record. Their prose carries reusable understanding and uncertainty;
-observations retain learner evidence, tasks retain continuation, and preferences
-retain current teaching policy. Completing a task does not delete knowledge.
-`records.py` validates complete-entry replacement/removal and source/topic links
-under the existing revision-checked atomic publication. It captures source
-versions without certifying their truth or detecting file-content changes.
+Learning retains optional agent-authored `knowledge` in the same schema-5
+record. Text and explicit attribution/uncertainty/conflicts carry reusable
+understanding; observations retain learner evidence, tasks retain continuation,
+and preferences retain current teaching policy. `records.py` validates field
+patches and links. Omitted knowledge fields survive unrelated edits; optional
+null fields clear and null entries remove. Helper-owned source version and
+fingerprint metadata may round-trip unchanged, never be invented. A raw snapshot
+digest accompanies revisions to detect same-revision divergence; local locking
+still does not coordinate remote iCloud writers.
 
-`retrieval.py` owns bounded whole-entry selection, focused reads, and paged literal
-search across knowledge and existing metadata. Ordinary context and single-scope
-planning use a 4,096-byte default knowledge allowance; multi-scope planning exposes
-counts. The allowance counts serialized UTF-8 payload and newly introduced source
-locations, not model tokens or the entire response. Exact reads default to 8,192
-bytes and return complete entries or an actionable size error. Context and scoped
-planning accept deliberate budget overrides; no source text or note is clipped
-to make a whole-entry read fit. Discovery/index pages have separate 4,096-byte
-bounds. Python owns these semantics; CLI and Pi expose the same existing tools.
+`retrieval.py` owns default evidence budgets, whole-entry knowledge selection,
+focused reads and lexical discovery. Default context selects at most 24 seed
+observations; complete correction/support groups fit inside a 12,288-byte
+observation-map budget. Interpretations whose support cannot fit are withheld
+from that response. Knowledge uses a separate 4,096-byte allowance; exact reads
+default to 8,192 bytes and either return complete entries or report required size.
+`task_context.py` projects a 4,096-byte briefing of existing course/activity/route
+fields, retaining omission descriptors. Metadata outside these projections is
+not globally bounded. Every partial selection exposes its limits. Exact reads,
+revision-bound pages and deliberate overrides support consequential decisions.
 
-The tutor chooses useful organization and corrects relevant understanding during
-normal study. Retrieval treats knowledge as evidence, never instructions. No
-curriculum model, vector service, background reflection process or parallel
-knowledge store is introduced. More stored knowledge does not require loading it
-all, but once loaded its context cost depends on the native host's subsequent
-requests and compaction.
+Task-purpose, current-step and direct-prerequisite knowledge is separate from
+active-topic policy. Explicit aliases and accent-insensitive token matching aid
+discovery; cross-course search returns handles, without transferring mastery,
+evidence or preferences. Knowledge and imported content remain evidence, never
+instructions. There is no vector service, background reflection worker, separate
+curriculum database or numerical mastery model. Loaded context is reused; later
+prompt cost still depends on the native host's requests and caching.
+
+`sources.py` owns on-demand selected-file hashing and fingerprint capture. Byte
+identity does not certify authority or retroactively verify an older reference.
+`memory.py` owns inspection and preview-bound selective removal. Observation
+erasure repairs structural links and invalidates affected interpretations. Course,
+preference, owned-artifact and verified-backup operations have explicit distinct
+boundaries; no operation promises deletion of unrelated semantic copies, native
+history or provider data. File deletion reports per-file outcomes rather than
+claiming multi-file atomicity.
+
+The canonical skill and focused references own teaching workflows: natural
+conversation, course-grounded practice, assistance fading, delayed independent
+retrieval, transfer and feedback on native image/code inputs. Host adapters route
+to these instructions, not a second pedagogical state model. Pi's three quiet
+memory tools invoke the Python CLI directly. Default study tools retain reading
+and bash but omit direct edit/write tools; this narrows accidental surface area
+without pretending bash is sandboxed.
+
+`lessons.py` separates generated teaching from learner-owned annotations, checks
+generated-region fingerprints and publishes atomically. Pi streams readable
+teaching in the terminal, then projects completed messages into Obsidian. An
+optional Obsidian-only display mode retains fallback on publication/open failure.
+Branch reconstruction and tutor corrections preserve annotation regions. A saved
+artifact and a delivered answer remain different events.
+
+No-save rejects portable mutations/publication. Private Pi sessions copy existing
+learning state into a disposable root and disable local session persistence;
+provider retention remains external. `readiness.py` inspects paths, canonical
+links, copied instructions and runtime availability; installation performs a
+preflight before managed changes. Neither readiness nor adapter fixtures prove
+that an actual host UI delivered the intended learning experience.
 
 ## Maintenance
 

@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from learning import records, retrieval
+from learning.storage import RevisionConflict
 
 
 def test_selected_assessment_brings_support_and_corrections_without_recursive_topics(
@@ -178,7 +179,7 @@ def test_query_pages_and_correction_pairs_preserve_old_evidence(tmp_path: Path) 
     with pytest.raises(ValueError, match="expected revision"):
         retrieval.context(tmp_path, "course", ["systems"], offset=1)
     records.save(tmp_path, "course", 1, {"title": "Updated"})
-    with pytest.raises(ValueError, match="revision conflict"):
+    with pytest.raises(RevisionConflict, match="revision conflict"):
         retrieval.context(tmp_path, "course", query="determinant", offset=1, expected=1)
     with pytest.raises(ValueError, match="unknown"):
         retrieval.context(tmp_path, "course", topics=["absent"])
@@ -441,7 +442,7 @@ def test_knowledge_discovery_and_exact_read_survive_task_completion(
         ("topic", "a")
     ]
     exact = retrieval.context(tmp_path, "course", knowledge=["notation"])
-    assert set(exact) == {"scope", "revision", "knowledge", "sources"}
+    assert set(exact) == {"scope", "revision", "digest", "knowledge", "sources"}
     assert exact["knowledge"]["notation"]["text"].endswith("provisional.")
     assert exact["sources"] == {"sheet": {"path": "sheet.md", "version": "v1"}}
 
@@ -510,7 +511,7 @@ def test_knowledge_index_pages_are_revision_pinned(tmp_path: Path) -> None:
     assert last["selection"]["complete"] is True
     assert len(last["knowledge_index"]) == 3
     records.save(tmp_path, "course", 1, {"title": "New title"})
-    with pytest.raises(ValueError, match="revision conflict"):
+    with pytest.raises(RevisionConflict, match="revision conflict"):
         retrieval.context(tmp_path, "course", knowledge=[], offset=20, expected=1)
 
 
@@ -758,3 +759,242 @@ def test_candidate_budget_counts_its_outer_response_key(tmp_path: Path) -> None:
     records.save(tmp_path, "course", 0, {"sources": {"s" * 3947: {"path": "needle"}}})
     with pytest.raises(ValueError, match="descriptor exceeds"):
         retrieval.context(tmp_path, "course", query="needle")
+
+
+def test_resume_briefing_retrieves_prerequisite_knowledge_without_activating_policy(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "math",
+        0,
+        {
+            "title": "Numerical Methods",
+            "goal": "Explain interpolation at the oral exam",
+            "coverage": "Interpolation, then quadrature",
+            "course_context": {
+                "unknowns": ["Permitted reference sheet is unconfirmed"]
+            },
+            "topics": {
+                "interpolation": {"prerequisites": ["basis"]},
+                "basis": {},
+                "future": {},
+            },
+            "knowledge": {
+                "basis-notation": {
+                    "text": "The lecturer uses B for this basis; unverified elsewhere.",
+                    "topics": ["basis"],
+                },
+                "future-detail": {
+                    "text": "Unrelated later convention",
+                    "topics": ["future"],
+                },
+            },
+            "tasks": {
+                "oral": {
+                    "topics": ["interpolation"],
+                    "pending_question": "Why is the polynomial unique?",
+                    "frame": {"within": "Module 2", "goal": "Explain uniqueness"},
+                    "plan": {
+                        "status": "agreed",
+                        "current": "explain",
+                        "nodes": {
+                            "basis": {"label": "Recall a basis", "topics": ["basis"]},
+                            "explain": {
+                                "label": "Justify uniqueness",
+                                "needs": ["basis"],
+                            },
+                            "later": {"label": "Quadrature", "topics": ["future"]},
+                        },
+                    },
+                }
+            },
+        },
+    )
+    result = retrieval.context(tmp_path, "math")
+    assert set(result["knowledge"]) == {"basis-notation"}
+    assert set(result["policy_topics"]) == {"interpolation"}
+    briefing = result["briefing"]
+    assert briefing["course"]["goal"] == "Explain interpolation at the oral exam"
+    assert briefing["course"]["coverage"] == "Interpolation, then quadrature"
+    assert briefing["course"]["course_context"]["unknowns"]
+    assert briefing["activity"]["pending_question"] == "Why is the polynomial unique?"
+    assert set(briefing["route"]["prerequisites"]) == {"basis"}
+    assert "later" not in json.dumps(briefing)
+    assert records.read(tmp_path, "math")["revision"] == 1
+
+
+def test_default_context_bounds_history_and_exposes_whole_group_expansion(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "math",
+        0,
+        {
+            "focus": ["a"],
+            "topics": {"a": {}},
+            "observations": [
+                {"topics": ["a"], "text": f"Attempt {i}: " + "x" * 200}
+                for i in range(1000)
+            ],
+        },
+    )
+    first = retrieval.context(tmp_path, "math")
+    assert len(first["observations"]) == 24
+    assert "o1000" in first["observations"]
+    assert first["complete"] is False
+    assert first["next_offset"] == 24
+    assert first["evidence_selection"]["scope_complete"] is False
+    assert first["evidence_selection"]["omitted_observations"] == 976
+    second = retrieval.context(
+        tmp_path, "math", offset=first["next_offset"], expected=first["revision"]
+    )
+    assert not set(first["observations"]) & set(second["observations"])
+    assert len(json.dumps(first).encode()) < 16000
+    exact = retrieval.context(tmp_path, "math", observations=["o1"])
+    assert exact["complete"] is True
+    assert exact["evidence_selection"]["scope_complete"] is False
+
+
+def test_oversized_correction_and_assessment_support_never_appear_partially(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "math",
+        0,
+        {
+            "focus": ["a"],
+            "topics": {
+                "a": {
+                    "assessment": {
+                        "summary": "Assistance is unresolved",
+                        "observations": ["o1"],
+                        "considered_observations": ["o1", "o2"],
+                    }
+                }
+            },
+            "observations": [
+                {"topics": ["a"], "text": "Independent answer"},
+                {
+                    "topics": ["a"],
+                    "text": "Actually received a worked solution " + "x" * 1000,
+                    "corrects": ["o1"],
+                },
+            ],
+        },
+    )
+    small = retrieval.context(tmp_path, "math", evidence_budget=500)
+    assert small["observations"] == {}
+    assert "assessment" not in small["topics"]["a"]
+    assert small["complete"] is False
+    assert small["evidence_selection"]["omissions"][0]["field"] == "assessment"
+    assert any(
+        item.get("observation") == "o1"
+        for item in small["evidence_selection"]["omissions"]
+    )
+    expanded = retrieval.context(tmp_path, "math", observations=["o1"])
+    assert set(expanded["observations"]) == {"o1", "o2"}
+    assert (
+        expanded["topics"]["a"]["assessment"]["summary"] == "Assistance is unresolved"
+    )
+
+
+def test_qualified_knowledge_ranks_before_alphabetical_and_oversize_is_discoverable(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "math",
+        0,
+        {
+            "focus": ["a"],
+            "topics": {"a": {}},
+            "knowledge": {
+                "a-long": {"text": "x" * 10000, "topics": ["a"]},
+                "b-routine": {"text": "y" * 450, "topics": ["a"]},
+                "z-disputed": {
+                    "text": "Convention is disputed",
+                    "topics": ["a"],
+                    "uncertainty": "Two undated handouts disagree",
+                },
+            },
+        },
+    )
+    result = retrieval.context(tmp_path, "math", knowledge_budget=650)
+    assert list(result["knowledge"]) == ["z-disputed"]
+    omitted = result["knowledge_omissions"]["items"]
+    assert omitted[0]["key"] == "a-long"
+    assert omitted[0]["bytes"] > 10000
+    assert (
+        result["knowledge"]["z-disputed"]["uncertainty"]
+        == "Two undated handouts disagree"
+    )
+
+
+def test_alias_token_discovery_crosses_scopes_without_importing_evidence_or_preferences(
+    tmp_path: Path,
+) -> None:
+    for scope in ("math", "physics"):
+        records.save(
+            tmp_path,
+            scope,
+            0,
+            {
+                "title": scope,
+                "topics": {
+                    "basis": {"aliases": ["base ortogonale", "orthogonal basis"]}
+                },
+                "knowledge": {
+                    "notation": {
+                        "text": "Local notation only",
+                        "aliases": ["basis orthogonal"],
+                        "topics": ["basis"],
+                    }
+                },
+                "observations": [
+                    {"topics": ["basis"], "text": "Succeeded independently"}
+                ],
+            },
+        )
+    query = retrieval.context(tmp_path, "math", query="ortogonale base")
+    assert [(item["kind"], item["key"]) for item in query["candidates"]["items"]] == [
+        ("topic", "basis")
+    ]
+    found = retrieval.discover(tmp_path, "orthogonal basis", limit=3)
+    assert found["total"] == 4
+    assert found["complete"] is False
+    assert found["discovery_only"] is True
+    assert {item["scope"] for item in found["items"]} == {"math", "physics"}
+    assert all(
+        set(item) == {"scope", "revision", "kind", "key"} for item in found["items"]
+    )
+    assert "Succeeded" not in json.dumps(found)
+
+
+def test_briefing_omits_large_fields_explicitly_and_preserves_current_question(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "math",
+        0,
+        {
+            "goal": "Explain the method",
+            "coverage": "x" * 10000,
+            "tasks": {"work": {"pending_question": "Why does this converge?"}},
+        },
+    )
+    result = retrieval.context(tmp_path, "math")["briefing"]
+    assert (
+        len(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode())
+        <= 4096
+    )
+    assert result["activity"]["pending_question"] == "Why does this converge?"
+    assert result["course"]["goal"] == "Explain the method"
+    assert "coverage" not in result["course"]
+    assert result["omitted_fields"] == [
+        {"field": "course.coverage", "path": ["coverage"], "bytes": 10002}
+    ]
+    assert result["expand"] == "context --all"

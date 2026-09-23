@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import childProcess, { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { realpathSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
@@ -18,7 +18,7 @@ const { loadExtensions } = await import(pathToFileURL(join(piPackage, "dist/core
 const { SessionManager } = await import(pathToFileURL(join(piPackage, "dist/core/session-manager.js")));
 const { validateToolArguments } = await import(pathToFileURL(join(piPackage, "node_modules/@earendil-works/pi-ai/dist/utils/validation.js")));
 
-async function fixture(t, { open = false, throwOnOpen = false, beforePublish } = {}) {
+async function fixture(t, { open = false, throwOnOpen = false, beforePublish, readingMode = "terminal", privateLaunch = false } = {}) {
   const root = realpathSync(await mkdtemp(join(tmpdir(), "learning-pi-unit-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const previous = { ...process.env };
@@ -27,11 +27,14 @@ async function fixture(t, { open = false, throwOnOpen = false, beforePublish } =
     LEARNING_PACKAGE: repository,
     LEARNING_PYTHON: join(repository, ".venv/bin/python"),
     LEARNING_OPEN: open ? "1" : "0",
+    LEARNING_READING_MODE: readingMode,
+    LEARNING_PRIVATE: privateLaunch ? "1" : "0",
+    LEARNING_NO_SAVE: "0",
     VAULT_DIR: join(root, "vault"),
     LEARNING_ASSETS: join(root, "assets"),
   });
   t.after(() => {
-    for (const key of ["LEARNING_ROOT", "LEARNING_PACKAGE", "LEARNING_PYTHON", "LEARNING_OPEN", "VAULT_DIR", "LEARNING_ASSETS"]) {
+    for (const key of ["LEARNING_ROOT", "LEARNING_PACKAGE", "LEARNING_PYTHON", "LEARNING_OPEN", "LEARNING_READING_MODE", "LEARNING_PRIVATE", "LEARNING_NO_SAVE", "VAULT_DIR", "LEARNING_ASSETS"]) {
       if (previous[key] === undefined) delete process.env[key];
       else process.env[key] = previous[key];
     }
@@ -86,6 +89,7 @@ const params = {
   question: "How many solutions does this consistent singular system have?",
   context: "$Ax=b$, with two identical equations.",
   choices: [{ id: "none", label: "None" }, { id: "many", label: "Infinitely many" }],
+  labels: { write: "Write an answer", unknown: "I don't know", skip: "Skip this question", placeholder: "Your answer", cancelled: "Question cancelled", unavailable: "Use ordinary chat for this question" },
   answer_id: "many", explanation: "SECRET: a line of solutions.", assistance: "Consistency was explained.",
 };
 const questionMessage = () => ({ role: "assistant", content: [{ type: "toolCall", name: "quiz", id: randomUUID(), arguments: params }] });
@@ -99,8 +103,8 @@ test("assistant projection preserves event identity and branch reconstruction wi
   const original = await readFile(f.path, "utf8");
   assert.doesNotMatch(original, /# Singular systems|# Study session/);
   assert.ok(original.includes(teaching.content[0].text));
-  assert.ok(original.endsWith("\n\n---\n"));
-  assert.doesNotMatch(original, /USER PROMPT|## You|## Tutor/);
+  assert.match(original, /\n\n---\n<!-- learning-generated:end -->/);
+  assert.doesNotMatch(original, /USER PROMPT|## You\n|## Tutor\n/);
   const python = process.env.LEARNING_PYTHON;
   process.env.LEARNING_PYTHON = "/unavailable-python";
   await f.emit("message_end", { message: teaching });
@@ -219,7 +223,7 @@ test("knowledge tools share focused CLI reads, source metadata and explicit byte
   assert.deepEqual(next, cli(["--knowledge=", "--limit=1", "--offset=1", "--expect=1"]));
   assert.equal(next.selection.complete, true);
   await assert.rejects(context({ knowledge: ["lengthy"] }),
-    /^Error: learning: knowledge read requires \d+ bytes \(budget \d+\); entries: lengthy=\d+; fetch fewer entries or set --knowledge-budget \d+$/);
+    /^Error: knowledge read requires \d+ bytes \(budget \d+\); entries: lengthy=\d+; fetch fewer entries or set --knowledge-budget \d+$/);
   const enlarged = await context({ knowledge: ["lengthy"], knowledge_budget: 20000 });
   assert.deepEqual(enlarged, cli(["--knowledge=lengthy", "--knowledge-budget=20000"]));
   assert.equal(enlarged.knowledge.lengthy.text, "日本語".repeat(1200));
@@ -258,7 +262,7 @@ test("knowledge discovery preserves independent revision-bound candidate paging"
 
 test("memory bookkeeping stays out of the lesson and terminal while errors remain visible", async (t) => {
   const f = await fixture(t);
-  for (const name of ["learning_context", "learning_save"]) {
+  for (const name of ["learning_context", "learning_save", "learning_manage", "correct_lesson"]) {
     const tool = f.extension.tools.get(name).definition;
     assert.deepEqual(tool.renderCall().render(80), []);
     const result = { content: [{ type: "text", text: "Internal result" }], details: {} };
@@ -477,8 +481,8 @@ test("lesson corrections survive reconstruction and stay with their message and 
 });
 
 
-test("terminal hides duplicate teaching by default but exposes it if publication fails", async (t) => {
-  const f = await fixture(t);
+test("explicit Obsidian reading mode hides duplicate teaching and falls back after publication failure", async (t) => {
+  const f = await fixture(t, { readingMode: "obsidian" });
   const transform = f.extension.markdownTransformer;
   assert.equal(transform("Teaching", { messageType: "assistant", isStreaming: true }), "");
   assert.equal(transform("Question", { messageType: "user", isStreaming: false }), "Question");
@@ -495,7 +499,7 @@ test("terminal hides duplicate teaching by default but exposes it if publication
 
 for (const failure of ["spawn error", "nonzero exit", "signal", "synchronous spawn error"]) {
   test(`known opener ${failure} preserves saved teaching and enables terminal fallback once`, async (t) => {
-    const f = await fixture(t, { open: true, throwOnOpen: failure === "synchronous spawn error" });
+    const f = await fixture(t, { open: true, readingMode: "obsidian", throwOnOpen: failure === "synchronous spawn error" });
     await f.emit("session_start", { reason: "new" });
     await f.complete(assistant("This saved explanation must remain readable."));
     if (failure === "spawn error") {
@@ -516,7 +520,7 @@ for (const failure of ["spawn error", "nonzero exit", "signal", "synchronous spa
 }
 
 test("delayed open failure exposes the latest corrected teaching without replaying corrections", async (t) => {
-  const f = await fixture(t, { open: true });
+  const f = await fixture(t, { open: true, readingMode: "obsidian" });
   await f.complete(assistant("The inverse equals P squared."));
   await f.complete(assistant("Now apply the inverse."));
   const receipt = await f.extension.tools.get("correct_lesson").definition.execute("fix", {
@@ -532,12 +536,12 @@ test("delayed open failure exposes the latest corrected teaching without replayi
   assert.equal(f.branch.filter((entry) => entry.customType === "learning-correction").length, 1);
   assert.equal(f.openings.length, 1);
   assert.equal(f.errors.length, 2);
-  assert.ok((await readFile(f.path, "utf8")).startsWith(beforeFailure.trimEnd()));
+  assert.match(await readFile(f.path, "utf8"), /The inverse equals P\.[\s\S]*Now apply the inverse\.[\s\S]*Continue from this corrected result/);
 });
 
 test("open failure during the next publication reveals its already-hidden pending teaching", async (t) => {
   let publications = 0;
-  const f = await fixture(t, { open: true, beforePublish: (openings) => {
+  const f = await fixture(t, { open: true, readingMode: "obsidian", beforePublish: (openings) => {
     if (++publications === 2) openings[0].emit("exit", 1, null);
   } });
   await f.complete(assistant("First teaching."));
@@ -549,7 +553,7 @@ test("open failure during the next publication reveals its already-hidden pendin
 
 for (const transition of ["session", "branch"]) {
   test(`stale opener callbacks cannot replay teaching across a ${transition} change`, async (t) => {
-    const f = await fixture(t, { open: true });
+    const f = await fixture(t, { open: true, readingMode: "obsidian" });
     await f.complete(assistant("Old teaching."));
     const stale = f.openings[0];
     f.branch.length = 0;
@@ -581,7 +585,7 @@ for (const transition of ["session", "branch"]) {
 }
 
 test("explicit reload retries the reading surface and restores fallback if it still fails", async (t) => {
-  const f = await fixture(t, { open: true });
+  const f = await fixture(t, { open: true, readingMode: "obsidian" });
   const transform = (text) => f.extension.markdownTransformer(text, { messageType: "assistant" });
   await f.complete(assistant("Teaching before reload."));
   f.openings[0].emit("error", new Error("Obsidian unavailable"));
@@ -600,4 +604,156 @@ test("explicit reload retries the reading surface and restores fallback if it st
   assert.equal(transform("Normal reading surface"), "");
   await f.complete(assistant("Continue in Obsidian."));
   assert.equal(f.openings.length, 3);
+});
+
+test("teaching streams in the terminal by default and only complete messages are mirrored", async (t) => {
+  const f = await fixture(t);
+  const transform = f.extension.markdownTransformer;
+  assert.equal(transform("An unfinished explanation", { messageType: "assistant", isStreaming: true }), "An unfinished explanation");
+  await assert.rejects(readFile(f.path), { code: "ENOENT" });
+  await f.complete(assistant("A complete explanation."));
+  assert.match(await readFile(f.path, "utf8"), /A complete explanation/);
+  assert.equal(transform("A complete explanation.", { messageType: "assistant", isStreaming: false }), "A complete explanation.");
+  process.env.LEARNING_PYTHON = "/unavailable-python";
+  await f.complete(assistant("The next explanation stays readable."));
+  assert.equal(f.errors.length, 1);
+  assert.match(f.errors[0], /Lesson sync failed/);
+  assert.equal(transform("Still readable", { messageType: "assistant", isStreaming: true }), "Still readable");
+});
+
+test("localized free-text quiz enters an answer directly without a menu", async (t) => {
+  const f = await fixture(t);
+  const quiz = f.extension.tools.get("quiz").definition;
+  const localized = {
+    question: "Perché il sistema non ha soluzione unica?",
+    labels: { write: "Rispondi", unknown: "Non so", skip: "Salta", placeholder: "La tua risposta", cancelled: "Domanda annullata", unavailable: "Rispondi nella conversazione" },
+  };
+  f.ctx.ui.select = async () => { assert.fail("Free text must not open a menu"); };
+  f.ctx.ui.input = async (title, placeholder) => {
+    assert.equal(title, localized.question);
+    assert.equal(placeholder, localized.labels.placeholder);
+    return "Le equazioni sono dipendenti.";
+  };
+  const args = validateToolArguments(quiz, { type: "toolCall", id: "quiz", name: "quiz", arguments: localized });
+  const result = await quiz.execute("quiz", args, undefined, undefined, f.ctx);
+  assert.equal(result.details.answer.text, "Le equazioni sono dipendenti.");
+  assert.equal(result.details.assistance, undefined);
+  f.ctx.ui.input = async () => undefined;
+  const cancelled = await quiz.execute("quiz", args, undefined, undefined, f.ctx);
+  assert.match(quiz.renderResult(cancelled).render(100).join("\n"), /Domanda annullata/);
+});
+
+test("quiet management shares preferences, source snapshots, memory previews and exact array labels", async (t) => {
+  const f = await fixture(t);
+  const manage = (args) => memoryTool(f, "learning_manage", args);
+  const initial = await manage({ action: "preferences" });
+  await manage({ action: "preferences", expected_revision: initial.revision, expected_digest: initial.digest,
+    changes: { rules: [{ when: { domain: "algebra, geometry" }, values: { pace: { instruction: "Explain geometrically.", origin: "explicit" } } }] } });
+  const policyContext = await memoryTool(f, "learning_context", { domains: ["algebra, geometry"] });
+  assert.equal(policyContext.preferences.rules[0].values.pace.instruction, "Explain geometrically.");
+  const vault = process.env.VAULT_DIR;
+  await mkdir(vault, { recursive: true });
+  await writeFile(join(vault, "sheet.md"), "Course notation and assumptions.\n");
+  const saved = await memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: {
+    sources: { sheet: { path: "sheet.md" } },
+    knowledge: { convention: { text: "Use lambda for the multiplier.", aliases: ["Lagrange multiplier"] } },
+  } });
+  const inspectedSource = await manage({ action: "sources", scope: "course", sources: ["sheet"] });
+  assert.equal(inspectedSource.sources.sheet.status, "unverified");
+  const capture = await manage({ action: "sources", scope: "course", sources: ["sheet"], expected_revision: saved.revision, expected_digest: saved.digest });
+  assert.deepEqual(capture.captured, ["sheet"]);
+  const inspection = await manage({ action: "inspect", scope: "course" });
+  assert.equal(inspection.records[0].record.knowledge.convention.text, "Use lambda for the multiplier.");
+  const discovery = await manage({ action: "discover", query: "Lagrange multiplier" });
+  assert.match(JSON.stringify(discovery), /convention/);
+  const plan = await manage({ action: "plan", scope: "course", days: 1, horizon: 1, knowledge_budget: 1024, evidence_budget: 2048 });
+  assert.equal(plan.scopes[0].scope, "course");
+  const preview = await manage({ action: "forget", scope: "course", selection: { knowledge: ["convention"] } });
+  assert.equal(preview.applied, false);
+  await manage({ action: "forget", scope: "course", selection: { knowledge: ["convention"] }, apply: true, expected_revision: preview.revision, expected_digest: preview.digest });
+  const final = await memoryTool(f, "learning_context", { scope: "course", knowledge: [] });
+  assert.doesNotMatch(JSON.stringify(final), /convention/);
+});
+
+test("definitive validation/conflict failures differ from interrupted write delivery", async (t) => {
+  const f = await fixture(t);
+  const saved = await memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: { title: "Course" } });
+  await assert.rejects(memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: { title: "Stale" } }), (error) => {
+    assert.equal(error.kind, "conflict");
+    assert.doesNotMatch(error.message, /may have completed|interrupted/);
+    return true;
+  });
+  await assert.rejects(memoryTool(f, "learning_save", { scope: "course", expected_revision: saved.revision, changes: { focus: ["missing"] } }), (error) => {
+    assert.equal(error.kind, "validation");
+    assert.doesNotMatch(error.message, /may have completed|interrupted/);
+    return true;
+  });
+  process.env.LEARNING_PYTHON = "/unavailable-python";
+  await assert.rejects(memoryTool(f, "learning_save", { scope: "course", expected_revision: saved.revision, changes: { title: "Not started" } }), (error) => {
+    assert.equal(error.kind, "io");
+    assert.doesNotMatch(error.message, /may have completed|interrupted/);
+    return true;
+  });
+  const delayed = join(process.env.LEARNING_ROOT, "delayed-command");
+  await writeFile(delayed, "#!/bin/sh\nexec /bin/sleep 5\n");
+  await chmod(delayed, 0o700);
+  process.env.LEARNING_PYTHON = delayed;
+  const controller = new AbortController();
+  const pending = memoryTool(f, "learning_save", { scope: "course", expected_revision: saved.revision, changes: { title: "Uncertain" } }, controller.signal);
+  setTimeout(() => controller.abort(), 50);
+  await assert.rejects(pending, /retrieve context.*may have completed/);
+});
+
+for (const privateLaunch of [false, true]) {
+  test(`${privateLaunch ? "private launch" : "natural no-save request"} suppresses portable writes and publication`, async (t) => {
+    const f = await fixture(t, { privateLaunch });
+    await f.emit("session_start");
+    if (!privateLaunch) {
+      const receipt = await memoryTool(f, "learning_manage", { action: "no_save" });
+      assert.equal(receipt.portable_saving, false);
+      assert.match(receipt.native_history, /unchanged/);
+      await f.emit("session_start", { reason: "reload" });
+    }
+    assert.deepEqual((await memoryTool(f, "learning_context", {})).scopes, []);
+    await f.complete(assistant("Study continues naturally."));
+    await assert.rejects(readFile(f.path), { code: "ENOENT" });
+    assert.equal(f.extension.markdownTransformer("Study continues naturally.", { messageType: "assistant", isStreaming: true }), "Study continues naturally.");
+    await assert.rejects(memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: { title: "No write" } }), /does not save/);
+    await assert.rejects(memoryTool(f, "learning_manage", { action: "preferences", expected_revision: 0, changes: { rules: [] } }), /does not save/);
+    await assert.rejects(readFile(join(process.env.LEARNING_ROOT, "state/course.json")), { code: "ENOENT" });
+  });
+}
+
+test("learner notes survive correction, branch reconstruction and restart", async (t) => {
+  const f = await fixture(t);
+  await f.complete(assistant("The inverse is P squared."));
+  await writeFile(f.path, (await readFile(f.path, "utf8")) + "\nMy question: why can P be its own inverse?\n");
+  await f.extension.tools.get("correct_lesson").definition.execute("fix", {
+    original: "The inverse is P squared.", replacement: "The inverse is P.", reason: "P squared is the identity.",
+  }, undefined, undefined, f.ctx);
+  await f.complete(assistant("Try a different permutation."));
+  await f.emit("session_tree");
+  await f.emit("session_start", { reason: "reload" });
+  const lesson = await readFile(f.path, "utf8");
+  assert.match(lesson, /My question: why can P be its own inverse/);
+  assert.match(lesson, /The inverse is P\./);
+  assert.doesNotMatch(lesson, /The inverse is P squared/);
+});
+
+
+test("save schema allows canonical explicit clearing of optional knowledge and course context", async (t) => {
+  const f = await fixture(t);
+  const first = await memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: {
+    topics: { systems: { title: "Linear systems" } },
+    sources: { sheet: { path: "sheet.md" } },
+    course_context: { assessment: "Oral examination" },
+    knowledge: { convention: { text: "A denotes the matrix.", topics: ["systems"], refs: [{ source: "sheet", locator: "Notation" }], attribution: "Course sheet", uncertainty: "Edition unknown", conflicts: ["Earlier notes differ"], aliases: ["Matrix notation"] } },
+  } });
+  await memoryTool(f, "learning_save", { scope: "course", expected_revision: first.revision, expected_digest: first.digest, changes: {
+    course_context: null,
+    knowledge: { convention: { topics: null, refs: null, attribution: null, uncertainty: null, conflicts: null, aliases: null } },
+  } });
+  const context = await memoryTool(f, "learning_context", { scope: "course", all: true });
+  assert.deepEqual(context.knowledge.convention, { text: "A denotes the matrix." });
+  assert.equal(context.course_context, undefined);
 });

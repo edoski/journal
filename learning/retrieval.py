@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
@@ -11,10 +13,13 @@ from typing import Any
 from learning import task_context
 from learning.observations import correction_links, expand_corrections
 from learning.records import read, source_ids, validate_references
+from learning.storage import RevisionConflict
 
 AUTOMATIC_KNOWLEDGE_BYTES = 4096
 EXACT_KNOWLEDGE_BYTES = 8192
 DISCOVERY_BYTES = 4096
+AUTOMATIC_EVIDENCE_BYTES = 12288
+AUTOMATIC_OBSERVATIONS = 24
 
 
 def _bytes(value: Any) -> int:
@@ -53,7 +58,17 @@ def knowledge_context(
         if active.intersection(entry.get("topics", []))
     )
     general = sorted(key for key, entry in stored.items() if not entry.get("topics"))
-    eligible = related + general
+    eligible = sorted(
+        related + general,
+        key=lambda key: (
+            key not in related,
+            not any(
+                stored[key].get(name)
+                for name in ("uncertainty", "conflicts", "attribution")
+            ),
+            key,
+        ),
+    )
     result: dict[str, Any] = {
         "knowledge": {},
         "knowledge_selection": {
@@ -65,6 +80,13 @@ def knowledge_context(
     }
     if type(budget) is not int or budget < _bytes(result):
         raise ValueError("knowledge budget must fit the selection envelope")
+    reserve = (
+        min(1024, budget // 3)
+        if sum(_bytes(stored[key]) + _bytes(key) + 2 for key in eligible)
+        + _bytes(result)
+        > budget
+        else 0
+    )
     for key in eligible:
         entries = {**result["knowledge"], key: stored[key]}
         candidate = {
@@ -76,8 +98,31 @@ def knowledge_context(
             },
             "sources": _knowledge_sources(record, entries, available_sources or {}),
         }
-        if _bytes(candidate) <= budget:
+        if _bytes(candidate) <= budget - reserve:
             result = candidate
+    omitted = [key for key in eligible if key not in result["knowledge"]]
+    if omitted:
+        descriptors: list[dict[str, Any]] = []
+        for key in omitted[:8]:
+            descriptor = {"key": key, "bytes": _bytes(stored[key])}
+            candidate = {
+                **result,
+                "knowledge_omissions": {
+                    "items": [*descriptors, descriptor],
+                    "remaining": len(omitted) - len(descriptors) - 1,
+                    "expand": {"knowledge": []},
+                },
+            }
+            if _bytes(candidate) > budget:
+                break
+            descriptors.append(descriptor)
+            result = candidate
+        if not descriptors:
+            # The count stays visible even for tiny requested budgets; the exact
+            # revision-pinned index always enumerates every omitted handle.
+            candidate = {**result, "knowledge_omissions": {"expand": {"knowledge": []}}}
+            if _bytes(candidate) <= budget:
+                result = candidate
     return result
 
 
@@ -96,6 +141,7 @@ def _knowledge_read(
         result = {
             "scope": scope,
             "revision": record["revision"],
+            "digest": record["digest"],
             "knowledge": entries,
             "sources": _knowledge_sources(record, entries, {}),
         }
@@ -138,6 +184,7 @@ def _knowledge_index(
     return {
         "scope": scope,
         "revision": record["revision"],
+        "digest": record["digest"],
         "knowledge_index": page,
         "selection": {
             "mode": "knowledge_index",
@@ -168,11 +215,34 @@ def _excerpt(text: str, needle: str) -> str:
     return encoded[:253].decode("utf-8", errors="ignore") + "…"
 
 
-def _candidates(
-    record: dict[str, Any], scope: str, query: str, offset: int
-) -> dict[str, Any]:
+def _tokens(text: str) -> set[str]:
+    normalized = unicodedata.normalize("NFKD", text.casefold())
+    return set(
+        re.findall(
+            r"[^\W_]+",
+            "".join(
+                character
+                for character in normalized
+                if not unicodedata.combining(character)
+            ),
+        )
+    )
+
+
+def _match(texts: list[str], query: str) -> str | None:
+    """Match phrases or reordered words, including explicit stored aliases."""
     needle = query.casefold()
-    collections = {
+    exact = next((text for text in texts if needle in text.casefold()), None)
+    if exact is not None:
+        return exact
+    wanted = _tokens(query)
+    if wanted and wanted <= {token for text in texts for token in _tokens(text)}:
+        return next((text for text in texts if wanted & _tokens(text)), texts[0])
+    return None
+
+
+def _discovery_collections(record: dict[str, Any], scope: str) -> dict[str, Any]:
+    return {
         "knowledge": record.get("knowledge", {}),
         "topic": {
             key: {
@@ -182,39 +252,83 @@ def _candidates(
             }
             for key, item in record.get("topics", {}).items()
         },
-        "source": record.get("sources", {}),
-        "task": record.get("tasks", {}),
         "scope": {
             scope: {
-                key: value
-                for key, value in record.items()
-                if key
-                not in {
-                    "knowledge",
-                    "topics",
-                    "sources",
-                    "tasks",
-                    "observations",
-                    "revision",
-                    "schema_version",
-                    "updated_at",
-                    "current_task",
-                    "focus",
-                }
+                key: record[key]
+                for key in ("title", "aliases", "goal", "coverage", "course_context")
+                if key in record
             }
         },
+    }
+
+
+def discover(root: Path, query: str, *, limit: int = 8) -> dict[str, Any]:
+    """Find cross-course handles deliberately; never transfer evidence or policy."""
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query must be a nonempty string")
+    if type(limit) is not int or not 1 <= limit <= 20:
+        raise ValueError("discovery limit must be between 1 and 20")
+    catalog = read(root, None)
+    assert isinstance(catalog, list)
+    items: list[dict[str, Any]] = []
+    total = 0
+    errors = []
+    for entry in catalog:
+        if "error" in entry:
+            errors.append(entry["scope"])
+            continue
+        scope = entry["scope"]
+        try:
+            record = read(root, scope)
+        except (ValueError, OSError):
+            errors.append(scope)
+            continue
+        assert isinstance(record, dict)
+        for kind, collection in _discovery_collections(record, scope).items():
+            for key, value in sorted(collection.items()):
+                if _match([key, *_strings(value)], query) is None:
+                    continue
+                total += 1
+                item = {
+                    "scope": scope,
+                    "revision": record["revision"],
+                    "kind": kind,
+                    "key": key,
+                }
+                if (
+                    len(items) < limit
+                    and _bytes(items) + _bytes(item) < DISCOVERY_BYTES - 512
+                ):
+                    items.append(item)
+    return {
+        "items": items,
+        "total": total,
+        "complete": len(items) == total and not errors,
+        "discovery_only": True,
+        "unreadable_scopes": errors[:8],
+        "additional_unreadable_scopes": max(0, len(errors) - 8),
+    }
+
+
+def _candidates(
+    record: dict[str, Any], scope: str, query: str, offset: int
+) -> dict[str, Any]:
+    collections = {
+        **_discovery_collections(record, scope),
+        "source": record.get("sources", {}),
+        "task": record.get("tasks", {}),
     }
     matches = []
     for kind, entities in sorted(collections.items()):
         for key, value in sorted(entities.items()):
             texts = [key, *_strings(value)]
-            matched = next((text for text in texts if needle in text.casefold()), None)
+            matched = _match(texts, query)
             if matched is not None:
                 matches.append(
                     {
                         "kind": kind,
                         "key": key,
-                        "excerpt": _excerpt(matched, needle),
+                        "excerpt": _excerpt(matched, query.casefold()),
                         "discovery_only": True,
                     }
                 )
@@ -297,6 +411,70 @@ def evidence(record: dict[str, Any], observation_ids: list[str]) -> dict[str, An
     }
 
 
+def select_evidence(
+    record: dict[str, Any],
+    observation_ids: list[str],
+    *,
+    topics: dict[str, Any] | None = None,
+    budget: int | None = AUTOMATIC_EVIDENCE_BYTES,
+) -> dict[str, Any]:
+    """Fit complete correction/support groups, exposing every omitted selection."""
+    if budget is not None and (type(budget) is not int or budget < 2):
+        raise ValueError("evidence_budget must be at least 2 bytes")
+    stored = record.get("observations", {})
+    links = correction_links(stored)
+    selected: set[str] = set()
+    omitted: list[dict[str, Any]] = []
+    visible_topics = {key: dict(value) for key, value in (topics or {}).items()}
+    size = 2
+
+    def include(handles: list[str]) -> tuple[bool, int]:
+        nonlocal size
+        group = expand_corrections(links, handles)
+        additions = group - selected
+        extra = sum(_bytes(key) + 1 + _bytes(stored[key]) + 1 for key in additions)
+        if additions and not selected:
+            extra -= 1
+        required = size + extra
+        if budget is not None and required > budget:
+            return False, _bytes({key: stored[key] for key in group})
+        selected.update(additions)
+        size = required
+        return True, required
+
+    for topic, value in visible_topics.items():
+        for field in ("assessment", "review"):
+            decision = value.get(field)
+            if decision is None:
+                continue
+            included, required = include(decision.get("observations", []))
+            if not included:
+                value.pop(field)
+                omitted.append({"topic": topic, "field": field, "bytes": required})
+    for key in observation_ids:
+        included, required = include([key])
+        if not included:
+            omitted.append({"observation": key, "bytes": required})
+    items = {key: stored[key] for key in sorted(selected, key=lambda key: int(key[1:]))}
+    selection: dict[str, Any] = {
+        "complete": not omitted,
+        "budget": budget,
+        "bytes": _bytes(items),
+        "omitted_groups": len(omitted),
+        "omissions": omitted[:8],
+        "additional_omissions": max(0, len(omitted) - 8),
+    }
+    if omitted:
+        selection["expand"] = (
+            "Use exact observation handles or the same topics with a larger evidence_budget; all reads inspect the full record."
+        )
+    return {
+        "observations": items,
+        "topics": visible_topics,
+        "evidence_selection": selection,
+    }
+
+
 def context(
     root: Path,
     scope: str | None,
@@ -308,6 +486,7 @@ def context(
     knowledge: list[str] | None = None,
     candidate_offset: int = 0,
     knowledge_budget: int | None = None,
+    evidence_budget: int | None = None,
     offset: int = 0,
     limit: int | None = None,
     expected: int | None = None,
@@ -326,6 +505,15 @@ def context(
         raise ValueError("continued pages require an expected revision")
     if candidate_offset and query is None:
         raise ValueError("candidate_offset requires a query")
+    if evidence_budget is not None and (
+        scope is None
+        or knowledge is not None
+        or type(evidence_budget) is not int
+        or evidence_budget < 2
+    ):
+        raise ValueError(
+            "evidence_budget must be at least 2 bytes and requires evidence context"
+        )
     if knowledge_budget is not None and (
         scope is None
         or query is not None
@@ -351,7 +539,7 @@ def context(
         if not knowledge and limit is not None and limit > 20:
             raise ValueError("knowledge index limit must not exceed 20")
     if query is not None and (not isinstance(query, str) or not query.strip()):
-        raise ValueError("query must be a nonempty literal string")
+        raise ValueError("query must be a nonempty string")
     if scope is None and (
         topics is not None
         or task is not None
@@ -367,7 +555,7 @@ def context(
     if isinstance(record, list):
         return record
     if expected is not None and record["revision"] != expected:
-        raise ValueError(
+        raise RevisionConflict(
             f"revision conflict for {scope}: expected {expected}, found {record['revision']}"
         )
     if knowledge is not None:
@@ -422,16 +610,25 @@ def context(
             key for key in selected if topic_filter.intersection(stored[key]["topics"])
         ]
     if query is not None:
-        needle = query.casefold()
         selected = [
             key
             for key in selected
-            if any(needle in text.casefold() for text in _strings(stored[key]))
+            if _match(list(_strings(stored[key])), query) is not None
         ]
     context_parts = (
         task_context.parts(checkpoint, active_only=True) if continuing else []
     )
     context_topics = {key for part in context_parts for key in part.get("topics", [])}
+    knowledge_topics = set(active_topics) | {
+        key
+        for part in task_context.parts(checkpoint, active_only=True)
+        for key in part.get("topics", [])
+    }
+    knowledge_topics.update(
+        prerequisite
+        for key in list(knowledge_topics)
+        for prerequisite in stored_topics[key].get("prerequisites", [])
+    )
     context_observations = {
         key for part in context_parts for key in part.get("observations", [])
     }
@@ -443,11 +640,21 @@ def context(
         for key, item in stored.items()
         if context_topics.intersection(item["topics"])
     )
-    selected = sorted(set(selected), key=lambda key: int(key[1:]))
+    newest_first = limit is None and observations is None
+    selected = sorted(set(selected), key=lambda key: int(key[1:]), reverse=newest_first)
+    if newest_first:
+        selected = [key for key in selected if key in context_observations] + [
+            key for key in selected if key not in context_observations
+        ]
     total = len(selected)
     if offset > total:
         raise ValueError("offset exceeds selected observation count")
-    page = selected[offset : None if limit is None else offset + limit]
+    page_limit = (
+        limit
+        if limit is not None
+        else (None if observations is not None else AUTOMATIC_OBSERVATIONS)
+    )
+    page = selected[offset : None if page_limit is None else offset + page_limit]
     links = correction_links(stored)
     expanded = expand_corrections(links, page)
     selected_topics = set(topics or []) | context_topics
@@ -460,23 +667,34 @@ def context(
     }
     if query is not None and expected is not None and offset == total:
         relevant_topics = {}
-    support = {
-        key
-        for topic in relevant_topics.values()
-        for field in ("assessment", "review")
-        for key in topic.get(field, {}).get("observations", [])
-    }
-    expanded = expand_corrections(links, expanded | support)
-    items = {key: stored[key] for key in sorted(expanded, key=lambda key: int(key[1:]))}
+    bounded = select_evidence(
+        record,
+        page,
+        topics=relevant_topics,
+        budget=evidence_budget
+        if evidence_budget is not None
+        else (None if observations is not None else AUTOMATIC_EVIDENCE_BYTES),
+    )
+    items = bounded["observations"]
+    relevant_topics = bounded["topics"]
     selected_sources = set(source_ids(record))
     selected_sources.update(source_ids(record.get("course_context", {})))
+    if isinstance(record.get("coverage"), dict):
+        selected_sources.update(source_ids(record["coverage"]))
     if continuing or task is not None:
         selected_sources.update(source_ids(checkpoint))
-        for part in task_context.parts(checkpoint):
+        for part in task_context.parts(checkpoint, active_only=True):
             selected_sources.update(source_ids(part))
     for value in [*items.values(), *relevant_topics.values()]:
         selected_sources.update(source_ids(value))
     next_offset = offset + len(page)
+    bounded["evidence_selection"].update(
+        selection_complete=next_offset == total
+        and bounded["evidence_selection"]["complete"],
+        scope_complete=len(items) == len(stored),
+        omitted_observations=len(set(selected) - items.keys()),
+        order="task_links_then_newest" if newest_first else "oldest_first",
+    )
     result = {
         **{
             key: value
@@ -504,6 +722,7 @@ def context(
             if index or key in selected_sources
         },
         "observations": items,
+        "evidence_selection": bounded["evidence_selection"],
         "policy_topics": {key: stored_topics[key] for key in active_topics},
         "selection": {
             "active_topics": active_topics,
@@ -520,7 +739,7 @@ def context(
         "total": total,
         "returned": len(items),
         "offset": offset,
-        "complete": next_offset == total,
+        "complete": next_offset == total and bounded["evidence_selection"]["complete"],
         "next_offset": None if next_offset == total else next_offset,
         "expanded_observations": [key for key in items if key not in page],
     }
@@ -532,7 +751,7 @@ def context(
     else:
         selected_knowledge = knowledge_context(
             record,
-            active_topics,
+            sorted(knowledge_topics),
             result["sources"],
             budget=AUTOMATIC_KNOWLEDGE_BYTES
             if knowledge_budget is None
@@ -540,4 +759,10 @@ def context(
         )
         result["sources"].update(selected_knowledge.pop("sources"))
         result.update(selected_knowledge)
+        result["briefing"] = task_context.briefing(
+            record,
+            selected_task,
+            checkpoint,
+            sorted(set(active_topics) | context_topics),
+        )
     return result

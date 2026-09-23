@@ -1,6 +1,6 @@
 # Current preferences
 
-Preferences are shared mutable learner data, separate from historical learning evidence. Context supplies the applicable current rules and policy revision. Update through `scripts/learn preferences --expect REV`, passing a JSON patch on stdin:
+Preferences are shared mutable learner data, separate from historical learning evidence. Context supplies the applicable current rules and policy revision. Use the quiet `learning_manage` preferences operation when available. Otherwise update through `scripts/learn preferences --expect REV --expect-digest DIGEST`, using the preference snapshot's revision/digest and a JSON patch on stdin:
 
 ```json
 {"rules":[{"when":{"domain":"mathematics","activity":"proof"},"values":{"lesson_pace":{"instruction":"Develop one justified inference at a time.","origin":"explicit"}}}]}

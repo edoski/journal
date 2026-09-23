@@ -36,6 +36,14 @@ const quizParameters = Type.Object({
   answer_id: Type.Optional(Type.String({ description: "Correct choice ID, when known." })),
   explanation: Type.Optional(Type.String({ description: "Feedback for the tutor after the attempt." })),
   assistance: Type.Optional(Type.String({ description: "Relevant help already given; omit if unknown." })),
+  labels: Type.Object({
+    write: Type.String({ minLength: 1 }),
+    unknown: Type.String({ minLength: 1 }),
+    skip: Type.String({ minLength: 1 }),
+    placeholder: Type.String({ minLength: 1 }),
+    cancelled: Type.String({ minLength: 1 }),
+    unavailable: Type.String({ minLength: 1 }),
+  }, { description: "Short controls in the learner's language. Free-text questions open input directly; ordinary chat remains the default." }),
 });
 
 type QuizParameters = Static<typeof quizParameters>;
@@ -47,6 +55,7 @@ type QuizDetails = {
   answer?: { text: string; choice_id?: string; position?: number };
   correct?: boolean;
   explanation?: string;
+  display: string;
 };
 
 function publicQuestion(value: unknown): Question | undefined {
@@ -95,6 +104,7 @@ function lessonText(message: Message): string {
 type Correction = { messageId: string; original: string; replacement: string; reason: string };
 type LessonEntry = { id: string; type: string; message?: Message; customType?: string; data?: unknown };
 const CORRECTION = "learning-correction";
+const NO_SAVE = "learning-no-save";
 const correctionParameters = Type.Object({
   original: Type.String({ minLength: 1 }),
   replacement: Type.String({ minLength: 1 }),
@@ -129,23 +139,76 @@ const contextParameters = Type.Object({
   task: Type.Optional(Type.String({ description: "Exact stable task_index key returned by context, e.g. exercise-7, not the display title Exercise 7. Reuse a known key directly; omit when unknown to inspect the scope's task_index." })),
   topics: Type.Optional(Type.Array(Type.String(), { description: "Exact stable topic handles returned by context, not display labels. Reuse known handles; [] returns the index without history when discovery is needed." })),
   observations: Type.Optional(Type.Array(Type.String(), { description: "Exact observation handles returned by context or save, e.g. o1. Omit when no handles are known." })),
-  query: Type.Optional(Type.String({ description: "Literal search of evidence and contextual understanding. Discovery excerpts are incomplete; read whole knowledge entries before relying on qualifications or editing." })),
+  query: Type.Optional(Type.String({ description: "Search evidence and contextual understanding, including established aliases. Discovery excerpts are incomplete; read whole knowledge entries before relying on qualifications or editing." })),
   knowledge: Type.Optional(Type.Array(Type.String(), { description: "Exact knowledge keys for a focused whole-entry read; [] returns the paged knowledge index. Cannot combine with task/topic/observation/query, all, or preference selectors. Nonempty reads also exclude offset/limit." })),
   candidate_offset: Type.Optional(Type.Integer({ minimum: 0, description: "Query-only discovery cursor, separate from the observation offset. Continuing requires expected_revision." })),
   knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "UTF-8 byte allowance for ordinary scoped context or a nonempty exact knowledge read; never tokens. Choose deliberately when more or less knowledge is needed. Invalid for query, index, all or scope catalog." })),
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
   expected_revision: Type.Optional(Type.Integer({ minimum: 0, description: "Required when continuing a page." })),
+  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Ordinary context evidence byte allowance; omitted evidence is disclosed." })),
   concepts: Type.Optional(Type.Array(Type.String())),
   domains: Type.Optional(Type.Array(Type.String())),
   activity: Type.Optional(Type.String()),
   all: Type.Optional(Type.Boolean({ description: "Full scope; cannot combine with evidence filters or paging." })),
 });
 
+const linkedPatch = Type.Object({}, { additionalProperties: true });
+const nullablePatch = Type.Union([linkedPatch, Type.Null()]);
+const refs = Type.Array(Type.Object({
+  source: Type.String(), locator: Type.Optional(Type.String()),
+}, { additionalProperties: true }));
 const saveParameters = Type.Object({
   scope: Type.String(),
   expected_revision: Type.Integer({ minimum: 0 }),
-  changes: Type.Object({}, { additionalProperties: true, description: "Changed learning-record fields; see the learn skill's records reference when needed. Python validates the patch." }),
+  expected_digest: Type.Optional(Type.String()),
+  changes: Type.Object({
+    title: Type.Optional(Type.String()),
+    focus: Type.Optional(Type.Array(Type.String())),
+    sources: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Map source handle to {path, version?, title?}; register before citing.' })),
+    topics: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Map known topic handle to changed fields, e.g. {title, concepts, domains, assessment, review}.' })),
+    observations: Type.Optional(Type.Array(Type.Object({
+      text: Type.String({ minLength: 1 }),
+      topics: Type.Array(Type.String(), { minItems: 1 }),
+      origin: Type.Optional(Type.String({ enum: ["direct_attempt", "self_report", "tutor_inference", "external_assessment", "unknown"] })),
+      assistance: Type.Optional(Type.String()),
+      uncertainty: Type.Optional(Type.String()),
+      as: Type.Optional(Type.String({ description: 'Batch alias; refer to it as $alias in this save.' })),
+      corrects: Type.Optional(Type.Array(Type.String())),
+      refs: Type.Optional(refs),
+    }, { additionalProperties: true }), { description: 'Append only actual new evidence. Never copy retrieved observations or helper-owned recorded_at/source_version.' })),
+    knowledge: Type.Optional(Type.Record(Type.String(), Type.Union([Type.Object({
+      text: Type.Optional(Type.String()),
+      topics: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+      refs: Type.Optional(Type.Union([refs, Type.Null()])),
+      attribution: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      uncertainty: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      conflicts: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+      aliases: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
+    }, { additionalProperties: true }), Type.Null()]), { description: 'Map entry handle to changed fields; omitted fields survive. New entries require text; null removes an entry or clears an optional field. Preserve source authority and unresolved conflicts.' })),
+    tasks: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Map task handle to checkpoint fields: task, topics, question, frame, plan; null closes/removes it.' })),
+    current_task: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    course_context: Type.Optional(nullablePatch),
+  }, { additionalProperties: true, description: "Only changed fields. Use returned handles, not display labels. Python owns validation and generated metadata; read the records reference for uncommon structures." }),
+});
+
+const manageParameters = Type.Object({
+  action: Type.String({ enum: ["preferences", "plan", "journal", "sources", "inspect", "forget", "discover", "readiness", "no_save"] }),
+  scope: Type.Optional(Type.String()),
+  expected_revision: Type.Optional(Type.Integer({ minimum: 0 })),
+  expected_digest: Type.Optional(Type.String()),
+  changes: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Preferences patch: {rules:[{when:{scope?,topic?,concept?,domain?,activity?},values:{dimension:{instruction,origin:'explicit'|'inferred',basis?}|null}}]}. Requires expected_revision." })),
+  dimension: Type.Optional(Type.String({ description: "Preferences read restricted to one dimension." })),
+  days: Type.Optional(Type.Integer({ minimum: 1 })),
+  horizon: Type.Optional(Type.Integer({ minimum: 1 })),
+  knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "Planning knowledge allowance in UTF-8 bytes." })),
+  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Planning evidence allowance in UTF-8 bytes; omitted evidence stays discoverable." })),
+  sources: Type.Optional(Type.Array(Type.String(), { description: "Exact source handles. Read-only check by default; expected_revision captures current fingerprints." })),
+  selection: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Forget selection: scoped observations/knowledge/tasks arrays or course:true; unscoped preferences, artifacts or backups arrays. Do not mix ownership groups. Preview first, then apply using its returned revision AND digest after explicit user authorization." })),
+  apply: Type.Optional(Type.Boolean()),
+  query: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Integer({ minimum: 1 })),
+  host: Type.Optional(Type.String({ enum: ["all", "codex", "claude", "pi"] })),
 });
 
 const silentMemoryDisplay: Pick<ToolDefinition, "renderShell" | "renderCall" | "renderResult"> = {
@@ -157,6 +220,20 @@ const silentMemoryDisplay: Pick<ToolDefinition, "renderShell" | "renderCall" | "
       : new Container();
   },
 };
+
+class LearningError extends Error {
+  constructor(message: string, readonly kind: string) { super(message); }
+}
+
+function commandError(output: string, code: number | null): LearningError {
+  try {
+    const result = JSON.parse(output);
+    if (result.error && typeof result.error === "object") {
+      return new LearningError(result.error.message, result.error.kind);
+    }
+  } catch { /* Non-JSON diagnostics belong to the external-process boundary. */ }
+  return new LearningError(output || `Learning command exited with ${code}.`, "process");
+}
 
 function runLearning(args: string[], input = "", signal?: AbortSignal): Promise<string> {
   const python = process.env.LEARNING_PYTHON;
@@ -171,19 +248,24 @@ function runLearning(args: string[], input = "", signal?: AbortSignal): Promise<
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk: string) => { stdout += chunk; });
     child.stderr.setEncoding("utf8").on("data", (chunk: string) => { stderr += chunk; });
-    child.on("error", reject);
+    child.on("error", (error) => reject(new LearningError(error.message, child.pid ? "transport" : "io")));
     child.on("close", (code) => {
       if (code === 0) accept(stdout.trim());
-      else reject(new Error(stderr.trim() || stdout.trim() || `Learning memory exited with ${code}.`));
+      else reject(code === null
+        ? new LearningError(stderr.trim() || "Learning command was interrupted.", "transport")
+        : commandError(stderr.trim() || stdout.trim(), code));
     });
-    child.stdin.on("error", reject);
+    child.stdin.on("error", (error) => reject(new LearningError(error.message, child.pid ? "transport" : "io")));
     child.stdin.end(input);
   });
 }
 
 function quizResult(params: QuizParameters, question: Question, outcome: QuizOutcome,
                     answer?: QuizDetails["answer"]) {
-  const details: QuizDetails = { question, outcome };
+  const details: QuizDetails = { question, outcome, display: answer?.text ?? {
+    answered: "", dont_know: params.labels.unknown, skipped: params.labels.skip,
+    cancelled: params.labels.cancelled, unavailable: params.labels.unavailable,
+  }[outcome] };
   if (params.assistance !== undefined) details.assistance = params.assistance;
   if (answer) {
     details.answer = answer;
@@ -202,11 +284,14 @@ export default function (pi: ExtensionAPI) {
   if (!root) throw new Error("LEARNING_ROOT is required; use the learning launcher.");
   let publicationError = "";
   let displayFallback = false;
+  const privateLaunch = process.env.LEARNING_PRIVATE === "1";
+  let noSave = privateLaunch || process.env.LEARNING_NO_SAVE === "1";
+  const obsidianOnly = process.env.LEARNING_READING_MODE === "obsidian";
   let viewEpoch = 0;
   let openedPath: string | undefined;
   let openAttempt: { path: string; epoch: number; settled: boolean; teaching: string } | undefined;
   pi.registerMarkdownTransformer((markdown, { messageType }) =>
-    !publicationError && !displayFallback && messageType === "assistant" ? "" : markdown
+    obsidianOnly && !noSave && !publicationError && !displayFallback && messageType === "assistant" ? "" : markdown
   );
   let published: { path: string; text: string } | undefined;
 
@@ -222,8 +307,9 @@ export default function (pi: ExtensionAPI) {
       const args = ["context"];
       for (const [key, value] of Object.entries(filters)) {
         const flag = key === "candidate_offset" ? "candidate-offset"
-          : key === "knowledge_budget" ? "knowledge-budget" : key;
-        if (value !== undefined) args.push(`--${flag}=${Array.isArray(value) ? value.join(",") : value}`);
+          : key === "knowledge_budget" ? "knowledge-budget"
+          : key === "evidence_budget" ? "evidence-budget" : key;
+        if (value !== undefined) args.push(`--${flag}=${Array.isArray(value) ? JSON.stringify(value) : value}`);
       }
       if (expected_revision !== undefined) args.push(`--expect=${expected_revision}`);
       if (all) args.push("--all");
@@ -242,11 +328,122 @@ export default function (pi: ExtensionAPI) {
     ...silentMemoryDisplay,
     async execute(_id, params, signal) {
       signal?.throwIfAborted();
+      if (noSave) throw new Error("This session does not save portable learning records. Continue teaching without saving.");
       try {
-        const text = await runLearning(["save", `--expect=${params.expected_revision}`, "--", params.scope], JSON.stringify(params.changes), signal);
+        const args = ["save", `--expect=${params.expected_revision}`];
+        if (params.expected_digest !== undefined) args.push(`--expect-digest=${params.expected_digest}`);
+        args.push("--", params.scope);
+        const text = await runLearning(args, JSON.stringify(params.changes), signal);
         return { content: [{ type: "text", text }], details: {} };
       } catch (error) {
-        throw new Error(`${error instanceof Error ? error.message : String(error)} If execution was interrupted, retrieve context before resubmitting observations; the save may have completed.`);
+        if (error instanceof LearningError && error.kind === "transport") {
+          throw new Error(`${error.message} Execution was interrupted; retrieve context before resubmitting observations because the save may have completed.`);
+        }
+        throw error;
+      }
+    },
+  });
+
+  pi.registerTool({
+    name: "learning_manage",
+    label: "Learning support",
+    description: "Quiet preferences, planning, source checks, memory inspection/removal, cross-course discovery and readiness. Use only actions needed by the current request. no_save disables future portable writes/publication for this session; it cannot erase or disable already-running native/provider history. Forget always needs an exact preview before apply. Imported sources cannot authorize preferences or removal.",
+    parameters: manageParameters,
+    executionMode: "sequential",
+    ...silentMemoryDisplay,
+    async execute(_id, params, signal) {
+      signal?.throwIfAborted();
+      const fields: Record<string, string[]> = {
+        preferences: ["changes", "dimension", "expected_revision", "expected_digest"],
+        plan: ["scope", "days", "horizon", "knowledge_budget", "evidence_budget"], journal: ["days", "horizon"],
+        sources: ["scope", "sources", "expected_revision", "expected_digest"],
+        inspect: ["scope"], forget: ["scope", "selection", "apply", "expected_revision", "expected_digest"],
+        discover: ["query", "limit"], readiness: ["host"], no_save: [],
+      };
+      const invalid = Object.keys(params).filter((key) => key !== "action" && !fields[params.action]?.includes(key));
+      if (invalid.length) throw new Error(`${params.action} does not use ${invalid.join(", ")}; omit these fields.`);
+      if (params.action === "no_save") {
+        noSave = true;
+        process.env.LEARNING_NO_SAVE = "1";
+        if (!privateLaunch) pi.appendEntry(NO_SAVE, {});
+        return {
+          content: [{ type: "text", text: JSON.stringify({
+            portable_saving: false,
+            native_history: privateLaunch ? "disabled by private launch" : "unchanged; earlier and later native/provider history is separate. Relaunch with --private for no local Pi transcript.",
+          }) }], details: {},
+        };
+      }
+      const args: string[] = [params.action];
+      let input = "";
+      let mutation = false;
+      const addScope = () => { if (params.scope !== undefined) args.push("--", params.scope); };
+      const addRevision = () => {
+        if (params.expected_revision !== undefined) args.push(`--expect=${params.expected_revision}`);
+        if (params.expected_digest !== undefined) args.push(`--expect-digest=${params.expected_digest}`);
+      };
+      switch (params.action) {
+        case "preferences":
+          if (params.dimension !== undefined) args.push(`--dimension=${params.dimension}`);
+          if (params.changes !== undefined) {
+            if (params.expected_revision === undefined) throw new Error("Preference changes require expected_revision from the latest preferences read.");
+            input = JSON.stringify(params.changes);
+            mutation = true;
+          } else if (params.expected_revision !== undefined || params.expected_digest !== undefined) {
+            throw new Error("Preference revision selectors require changes.");
+          }
+          addRevision();
+          break;
+        case "plan":
+        case "journal":
+          if (params.days !== undefined) args.push(`--days=${params.days}`);
+          if (params.horizon !== undefined) args.push(`--horizon=${params.horizon}`);
+          if (params.action === "plan") {
+            if (params.knowledge_budget !== undefined) args.push(`--knowledge-budget=${params.knowledge_budget}`);
+            if (params.evidence_budget !== undefined) args.push(`--evidence-budget=${params.evidence_budget}`);
+            addScope();
+          }
+          break;
+        case "sources":
+          if (!params.scope || !params.sources?.length) throw new Error("Source checks require scope and exact sources handles.");
+          args.push(`--sources=${JSON.stringify(params.sources)}`);
+          mutation = params.expected_revision !== undefined;
+          addRevision();
+          addScope();
+          break;
+        case "inspect":
+          addScope();
+          break;
+        case "forget":
+          if (!params.selection) throw new Error("Forgetting requires a precise selection; inspect memory first when handles are unknown.");
+          input = JSON.stringify(params.selection);
+          if (params.apply) {
+            if (params.expected_revision === undefined || params.expected_digest === undefined) throw new Error("Applying removal requires the exact preview's revision and digest.");
+            args.push("--apply");
+            mutation = true;
+          }
+          addRevision();
+          addScope();
+          break;
+        case "discover":
+          if (!params.query?.trim()) throw new Error("Discovery requires a search query.");
+          if (params.limit !== undefined) args.push(`--limit=${params.limit}`);
+          args.push("--", params.query);
+          break;
+        case "readiness":
+          if (params.host !== undefined) args.push(`--host=${params.host}`);
+          break;
+        default:
+          throw new Error("Unknown learning action.");
+      }
+      if (mutation && noSave) throw new Error("This session does not save portable learning data. Continue teaching without saving.");
+      try {
+        const text = await runLearning(args, input, signal);
+        return { content: [{ type: "text", text }], details: {} };
+      } catch (error) {
+        if (mutation && error instanceof LearningError && error.kind === "transport") {
+          throw new Error(`${error.message} Execution was interrupted; inspect current state before retrying because the operation may have completed.`);
+        }
+        throw error;
       }
     },
   });
@@ -272,7 +469,7 @@ export default function (pi: ExtensionAPI) {
       displayFallback = true;
       ctx.ui.notify(`Lesson saved; Obsidian could not open it: ${reason}. Teaching is available here.`, "warning");
       // Changing the transformer does not repaint already-hidden transcript entries.
-      if (attempt.teaching) ctx.ui.notify(attempt.teaching, "info");
+      if (obsidianOnly && attempt.teaching) ctx.ui.notify(attempt.teaching, "info");
     };
     try {
       const child = spawn("/usr/bin/open", ["-g", `obsidian://open?path=${encodeURIComponent(path)}`], {
@@ -290,6 +487,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function sync(ctx: ExtensionContext, pending?: Message): Promise<boolean> {
+    if (noSave) return true;
     const path = lessonPath(ctx);
     const sessionId = ctx.sessionManager.getSessionId();
     const epoch = viewEpoch;
@@ -324,7 +522,7 @@ export default function (pi: ExtensionAPI) {
     } catch (error) {
       if (!current()) return false;
       report(ctx, error);
-      if (ctx.hasUI && pending && lessonText(pending)) {
+      if (obsidianOnly && ctx.hasUI && pending && lessonText(pending)) {
         ctx.ui.notify(lessonText(pending), "info");
       }
       return false;
@@ -337,6 +535,7 @@ export default function (pi: ExtensionAPI) {
     description: "Correct a previous explanation in the current Obsidian lesson. Supply an exact unique original passage, its replacement and a concise conceptual reason. If ambiguous, use the returned message ID. Corrections survive reloads on this branch. Explain the substantive correction in your next teaching response too; this does not update learner evidence.",
     parameters: correctionParameters,
     executionMode: "sequential",
+    ...silentMemoryDisplay,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       if (![params.original, params.replacement, params.reason].every((value) => value.trim()) || params.original === params.replacement) {
         throw new Error("Provide a changed passage and a nonempty correction reason.");
@@ -346,6 +545,7 @@ export default function (pi: ExtensionAPI) {
       if (matches.length !== 1 || matches[0].text.split(params.original).length !== 2) {
         throw new Error(`Passage must match once; use a longer exact passage or message_id. Matching messages: ${matches.map((turn) => turn.id).join(", ") || "none"}`);
       }
+      if (noSave) throw new Error("This session does not publish lessons; explain the correction directly in chat.");
       pi.appendEntry(CORRECTION, { messageId: matches[0].id, original: params.original, replacement: params.replacement, reason: params.reason });
       if (!await sync(ctx)) throw new Error("Correction was saved but lesson publication failed; retry publication rather than adding the correction again.");
       return { content: [{ type: "text", text: "Correction saved to the lesson." }], details: {} };
@@ -372,21 +572,27 @@ export default function (pi: ExtensionAPI) {
       if (signal?.aborted) return result("cancelled");
       const choices = question.choices ?? [];
       const labels = choices.map((choice, index) => `${index + 1}. ${choice.label}`);
-      const freeText = "Write an answer";
-      const unknown = "I don't know";
-      const skip = "Skip this question";
+      const input = async () => {
+        const text = await ctx.ui.input(
+          [question.context, question.question].filter(Boolean).join("\n\n"),
+          params.labels.placeholder, { signal },
+        );
+        if (signal?.aborted || text === undefined || !text.trim()) return result("cancelled");
+        return result("answered", { text: text.trim() });
+      };
+      if (!choices.length) return input();
+      const { write, unknown, skip } = params.labels;
+      if (new Set([...labels, write, unknown, skip]).size !== labels.length + 3) {
+        throw new Error("Quiz controls and choice labels must be distinct.");
+      }
       const selected = await ctx.ui.select(
         [question.context, question.question].filter(Boolean).join("\n\n"),
-        [...labels, freeText, unknown, skip], { signal },
+        [...labels, write, unknown, skip], { signal },
       );
       if (signal?.aborted || selected === undefined) return result("cancelled");
       if (selected === unknown) return result("dont_know");
       if (selected === skip) return result("skipped");
-      if (selected === freeText) {
-        const text = await ctx.ui.input(question.question, "Your answer", { signal });
-        if (signal?.aborted || text === undefined || !text.trim()) return result("cancelled");
-        return result("answered", { text: text.trim() });
-      }
+      if (selected === write) return input();
       const index = labels.indexOf(selected);
       if (index < 0) return result("cancelled");
       return result("answered", { text: choices[index].label, choice_id: choices[index].id, position: index + 1 });
@@ -397,19 +603,13 @@ export default function (pi: ExtensionAPI) {
     },
     renderResult(result) {
       if (!result.details) return new Text("Question could not be completed.", 0, 0);
-      const { outcome, answer } = result.details;
-      const text = answer?.text ?? {
-        answered: "Answer recorded",
-        dont_know: "I don't know",
-        skipped: "Question skipped",
-        cancelled: "Question cancelled",
-        unavailable: "Use ordinary chat for this question",
-      }[outcome];
-      return new Text(text, 0, 0);
+      return new Text(result.details.display, 0, 0);
     },
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    noSave ||= ctx.sessionManager.getBranch().some((entry) => entry.type === "custom" && entry.customType === NO_SAVE);
+    if (noSave) process.env.LEARNING_NO_SAVE = "1";
     if (ctx.mode !== "tui") pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "quiz"));
     viewEpoch += 1;
     openAttempt = undefined;
@@ -432,6 +632,9 @@ export default function (pi: ExtensionAPI) {
     if (publicationError) await sync(ctx);
   });
   pi.on("before_agent_start", async (event, ctx) => ({
-    systemPrompt: `${event.systemPrompt}\nLesson destination (created with first teaching): ${lessonPath(ctx)}`,
+    systemPrompt: `${event.systemPrompt}\n${noSave
+      ? "No-save study: do not persist portable records, preferences, lessons, notes or assets. Continue teaching normally. Native/provider history is separate; only a --private launch disables the local Pi session file."
+      : `Teaching is readable here as it streams; complete messages are mirrored to ${lessonPath(ctx)}. Keep routine tool work silent, without narrating reads or saves.`}`,
+
   }));
 }

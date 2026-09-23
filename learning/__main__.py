@@ -9,10 +9,21 @@ from pathlib import Path
 import sys
 from uuid import uuid4
 
-from learning import records, retrieval, lessons, preferences
+from learning import records, retrieval, lessons, preferences, storage
+
+
+class NoSaveError(ValueError):
+    """The current study session does not permit durable publication."""
 
 
 def keys(value: str | None) -> list[str] | None:
+    if value is not None and value.lstrip().startswith("["):
+        parsed = json.loads(value)
+        if not isinstance(parsed, list) or any(
+            not isinstance(item, str) or not item.strip() for item in parsed
+        ):
+            raise ValueError("selectors must be an array of nonempty strings")
+        return parsed
     return (
         [key.strip() for key in value.split(",") if key.strip()]
         if value is not None
@@ -38,6 +49,11 @@ def main() -> int:
     start.add_argument("--print", dest="headless", action="store_true")
     start.add_argument("--json", action="store_true")
     start.add_argument("--no-open", action="store_true")
+    start.add_argument(
+        "--private",
+        action="store_true",
+        help="Study in disposable local state without a saved Pi session",
+    )
     context = commands.add_parser("context")
     context.add_argument("scope", nargs="?")
     context.add_argument(
@@ -51,7 +67,8 @@ def main() -> int:
     context.add_argument(
         "--observations", help="Comma-separated saved observation handles (e.g. o1)"
     )
-    context.add_argument("--query", help="Literal search across evidence and memory")
+    context.add_argument("--query", help="Search evidence, aliases and course memory")
+    context.add_argument("--evidence-budget", type=int)
     context.add_argument(
         "--knowledge", help="Exact entry handles; empty string requests index"
     )
@@ -75,6 +92,7 @@ def main() -> int:
     writer = commands.add_parser("save")
     writer.add_argument("scope")
     writer.add_argument("--expect", type=int, required=True)
+    writer.add_argument("--expect-digest")
     migration = commands.add_parser("migrate", help="Inspect the schema conversion")
     migration.add_argument(
         "--apply", action="store_true", help="Back up and convert old records"
@@ -86,11 +104,44 @@ def main() -> int:
     policy.add_argument(
         "--expect", type=int, help="Apply a JSON patch from stdin at this revision"
     )
+    policy.add_argument("--expect-digest")
+    discovery = commands.add_parser(
+        "discover", help="Find course/topic/memory handles across scopes"
+    )
+    discovery.add_argument("query")
+    discovery.add_argument("--limit", type=int, default=8)
+    inspection = commands.add_parser(
+        "inspect", help="Inspect portable memory and its retention boundaries"
+    )
+    inspection.add_argument("scope", nargs="?")
+    forgetting = commands.add_parser(
+        "forget", help="Preview or apply explicitly selected memory removal"
+    )
+    forgetting.add_argument("scope", nargs="?")
+    forgetting.add_argument("--expect", type=int)
+    forgetting.add_argument("--expect-digest")
+    forgetting.add_argument("--apply", action="store_true")
+    source_check = commands.add_parser(
+        "sources", help="Inspect or capture selected local source fingerprints"
+    )
+    source_check.add_argument("scope")
+    source_check.add_argument("--sources", required=True)
+    source_check.add_argument("--expect", type=int)
+    source_check.add_argument("--expect-digest")
+    readiness = commands.add_parser(
+        "readiness", help="Check this host without changing its configuration"
+    )
+    readiness.add_argument(
+        "--host", choices=("all", "codex", "claude", "pi"), default="all"
+    )
     planner = commands.add_parser("plan")
     planner.add_argument("scope", nargs="?")
     planner.add_argument("--days", type=int, default=7)
     planner.add_argument("--horizon", type=int, default=7)
     planner.add_argument("--knowledge-budget", type=int)
+    planner.add_argument(
+        "--evidence-budget", type=int, default=retrieval.AUTOMATIC_EVIDENCE_BYTES
+    )
     journal = commands.add_parser("journal")
     journal.add_argument("--days", type=int, default=7)
     journal.add_argument("--horizon", type=int, default=7)
@@ -108,7 +159,21 @@ def main() -> int:
     note.add_argument("--title", default="Study notes")
     args = parser.parse_args()
     vault, root = paths()
+    assets = (
+        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
+        .expanduser()
+        .resolve()
+    )
     try:
+        mutating = (
+            args.command in {"save", "lesson", "publish-lesson", "visual", "note"}
+            or (args.command in {"preferences", "sources"} and args.expect is not None)
+            or (args.command in {"forget", "migrate"} and args.apply)
+        )
+        if mutating and os.environ.get("LEARNING_NO_SAVE") == "1":
+            raise NoSaveError(
+                "This session is not saving study memory or artifacts. Continue teaching without a write."
+            )
         if args.command in (None, "start"):
             from learning.runtime import start_pi
 
@@ -118,7 +183,12 @@ def main() -> int:
                 args
                 if args.command
                 else argparse.Namespace(
-                    prompt=None, resume=False, headless=False, json=False, no_open=False
+                    prompt=None,
+                    resume=False,
+                    headless=False,
+                    json=False,
+                    no_open=False,
+                    private=False,
                 ),
             )
             return 0
@@ -130,6 +200,7 @@ def main() -> int:
                 or args.query is not None
                 or args.knowledge is not None
                 or args.knowledge_budget is not None
+                or args.evidence_budget is not None
                 or args.candidate_offset
                 or args.all
                 or args.offset
@@ -145,6 +216,7 @@ def main() -> int:
                 or args.query is not None
                 or args.knowledge is not None
                 or args.knowledge_budget is not None
+                or args.evidence_budget is not None
                 or args.candidate_offset
                 or args.offset
                 or args.limit is not None
@@ -171,6 +243,7 @@ def main() -> int:
                     query=args.query,
                     knowledge=keys(args.knowledge),
                     knowledge_budget=args.knowledge_budget,
+                    evidence_budget=args.evidence_budget,
                     candidate_offset=args.candidate_offset,
                     offset=args.offset,
                     limit=args.limit,
@@ -188,11 +261,7 @@ def main() -> int:
                 result.update(
                     vault=str(vault),
                     learning=str(root),
-                    assets=str(
-                        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
-                        .expanduser()
-                        .resolve()
-                    ),
+                    assets=str(assets),
                 )
                 policy_topics = result.pop("policy_topics", {})
                 result["preferences"] = preferences.context(
@@ -207,7 +276,13 @@ def main() -> int:
                     else None,
                 )
         elif args.command == "save":
-            result = records.save(root, args.scope, args.expect, json.load(sys.stdin))
+            result = records.save(
+                root,
+                args.scope,
+                args.expect,
+                json.load(sys.stdin),
+                expected_digest=args.expect_digest,
+            )
         elif args.command == "migrate":
             from learning.migrate import migrate
 
@@ -216,11 +291,51 @@ def main() -> int:
             if args.expect is not None:
                 if args.dimension is not None:
                     raise ValueError("--dimension selects a read; omit it when saving")
-                result = preferences.save(root, args.expect, json.load(sys.stdin))
+                result = preferences.save(
+                    root,
+                    args.expect,
+                    json.load(sys.stdin),
+                    expected_digest=args.expect_digest,
+                )
+            elif args.expect_digest is not None:
+                raise ValueError("--expect-digest requires --expect")
             elif args.dimension is not None:
                 result = preferences.inspect(root, args.dimension)
             else:
                 result = preferences.read(root)
+        elif args.command == "discover":
+            result = retrieval.discover(root, args.query, limit=args.limit)
+        elif args.command == "inspect":
+            from learning.memory import inspect
+
+            result = inspect(root, args.scope, assets=assets)
+        elif args.command == "forget":
+            from learning.memory import forget
+
+            result = forget(
+                root,
+                args.scope,
+                json.load(sys.stdin),
+                expected=args.expect,
+                expected_digest=args.expect_digest,
+                apply=args.apply,
+                assets=assets,
+            )
+        elif args.command == "sources":
+            from learning.sources import inspect_sources
+
+            result = inspect_sources(
+                root,
+                vault,
+                args.scope,
+                keys(args.sources) or [],
+                expected=args.expect,
+                expected_digest=args.expect_digest,
+            )
+        elif args.command == "readiness":
+            from learning.readiness import check
+
+            result = check(root, vault, host=args.host)
         elif args.command == "plan":
             from learning.planning import plan
 
@@ -231,6 +346,7 @@ def main() -> int:
                 args.days,
                 horizon=args.horizon,
                 knowledge_budget=args.knowledge_budget,
+                evidence_budget=args.evidence_budget,
             )
         elif args.command == "journal":
             from sync.study.context import journal_summary
@@ -255,7 +371,7 @@ def main() -> int:
                 vault,
                 args.title,
                 sys.stdin.read(),
-                assets=Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn")),
+                assets=assets,
             )
         else:
             title = " ".join(args.title.splitlines())
@@ -267,7 +383,21 @@ def main() -> int:
             )
         )
     except (ValueError, OSError) as error:
-        print(f"learning: {error}", file=sys.stderr)
+        kind = (
+            "no_save"
+            if isinstance(error, NoSaveError)
+            else "conflict"
+            if isinstance(error, storage.RevisionConflict)
+            else "io"
+            if isinstance(error, OSError)
+            else "validation"
+        )
+        print(
+            json.dumps(
+                {"error": {"kind": kind, "message": str(error)}}, ensure_ascii=False
+            ),
+            file=sys.stderr,
+        )
         return 1
     return 1 if args.command == "migrate" and result.get("errors") else 0
 

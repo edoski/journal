@@ -10,6 +10,10 @@ from typing import Any
 
 from learning import assessments, course, preferences, storage, task_context
 
+KNOWLEDGE_FIELDS = frozenset(
+    {"text", "topics", "refs", "attribution", "uncertainty", "conflicts", "aliases"}
+)
+
 
 def _date(value: Any, field: str) -> date:
     if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
@@ -111,6 +115,26 @@ def _source_links(value: dict[str, Any], record: dict[str, Any], field: str) -> 
             raise ValueError(
                 f"{field}.refs source version no longer matches its source handle"
             )
+        if "source_fingerprint" in ref and (
+            ref["source_fingerprint"] is None
+            or ref["source_fingerprint"]
+            != record["sources"][ref["source"]].get("fingerprint")
+        ):
+            raise ValueError(
+                f"{field}.refs source fingerprint no longer matches its source handle"
+            )
+    if (
+        "source" in value
+        and "source_fingerprint" in value
+        and (
+            value["source_fingerprint"] is None
+            or value["source_fingerprint"]
+            != record["sources"][value["source"]].get("fingerprint")
+        )
+    ):
+        raise ValueError(
+            f"{field}.source_fingerprint no longer matches its source handle"
+        )
 
 
 def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
@@ -127,7 +151,7 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
     result = {
         key: value
         for key, value in record.items()
-        if key not in {"revision", "updated_at", "topic_index"}
+        if key not in {"revision", "updated_at", "digest", "topic_index"}
     }
     result["schema_version"] = 5
     for field in ("topics", "sources", "observations"):
@@ -152,6 +176,19 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
             raise ValueError(f"sources.{key}.version must be a nonempty string or null")
         if "title" in source and not isinstance(source["title"], str):
             raise ValueError(f"sources.{key}.title must be a string")
+        if "fingerprint" in source:
+            fingerprint = source["fingerprint"]
+            if (
+                not isinstance(fingerprint, dict)
+                or set(fingerprint) != {"sha256", "size"}
+                or not isinstance(fingerprint.get("sha256"), str)
+                or not re.fullmatch(r"[a-f0-9]{64}", fingerprint["sha256"])
+                or type(fingerprint.get("size")) is not int
+                or fingerprint["size"] < 0
+            ):
+                raise ValueError(
+                    f"sources.{key}.fingerprint must contain sha256 and size"
+                )
     if result.get("course_context") is None:
         result.pop("course_context", None)
     else:
@@ -239,6 +276,12 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
             raise ValueError(
                 f"observations.{key}.corrects must refer to earlier observations"
             )
+    last_observation = max((int(key[1:]) for key in result["observations"]), default=0)
+    sequence = result.setdefault("observation_sequence", last_observation)
+    if type(sequence) is not int or sequence < last_observation:
+        raise ValueError(
+            "observation_sequence must be an integer at least the last observation handle"
+        )
     for key, topic in topics.items():
         for field in ("assessment", "review"):
             if field in topic:
@@ -259,10 +302,20 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
             raise ValueError(f"{field}: handles must be short lowercase identifiers")
         if not isinstance(entry, dict):
             raise ValueError(f"{field} must be an object")
-        if set(entry) - {"text", "topics", "refs"}:
-            raise ValueError(f"{field} accepts only text, topics and refs")
+        if set(entry) - KNOWLEDGE_FIELDS:
+            raise ValueError(
+                f"{field} accepts only text, topics, refs, attribution, uncertainty, conflicts and aliases"
+            )
         if not isinstance(entry.get("text"), str) or not entry["text"].strip():
             raise ValueError(f"{field}.text must be a nonempty string")
+        for name in ("attribution", "uncertainty"):
+            if name in entry and (
+                not isinstance(entry[name], str) or not entry[name].strip()
+            ):
+                raise ValueError(f"{field}.{name} must be a nonempty string")
+        for name in ("conflicts", "aliases"):
+            if name in entry:
+                _names(entry[name], f"{field}.{name}")
         _links(entry, result, field)
         if any("source_version" not in ref for ref in entry.get("refs", [])):
             raise ValueError(f"{field}.refs requires a captured source_version")
@@ -321,13 +374,16 @@ def _validated(record: dict[str, Any]) -> dict[str, Any]:
 def read(root: Path, scope: str | None) -> dict[str, Any] | list[dict[str, Any]]:
     directory = root / "state"
     if scope is not None:
-        return assessments.with_freshness(
-            _validated(storage.load(directory / f"{_scope(scope)}.json"))
-        )
+        stored = storage.load(directory / f"{_scope(scope)}.json")
+        return {
+            **assessments.with_freshness(_validated(stored)),
+            "digest": storage.digest(stored),
+        }
     catalog = []
     for path in sorted(directory.glob("*.json")):
         try:
-            record = _validated(storage.load(path))
+            stored = storage.load(path)
+            record = _validated(stored)
         except (ValueError, OSError, TypeError, KeyError, AttributeError) as error:
             catalog.append({"scope": path.stem, "error": str(error)})
             continue
@@ -336,6 +392,7 @@ def read(root: Path, scope: str | None) -> dict[str, Any] | list[dict[str, Any]]
             "title": record.get("title", path.stem),
             "aliases": record.get("aliases", []),
             "revision": record["revision"],
+            "digest": storage.digest(stored),
             "updated_at": record.get("updated_at"),
             "topic_count": len(record.get("topics", {})),
         }
@@ -375,8 +432,19 @@ def snapshot_sources(value: dict[str, Any], sources: dict[str, Any]) -> dict[str
     result = deepcopy(value)
     for ref in result.get("refs", []):
         if isinstance(ref, dict) and ref.get("source") in sources:
+            if "source_version" not in ref and "fingerprint" in sources[ref["source"]]:
+                ref["source_fingerprint"] = deepcopy(
+                    sources[ref["source"]]["fingerprint"]
+                )
             ref["source_version"] = sources[ref["source"]].get("version")
     if "source" in result and result["source"] in sources:
+        if (
+            "source_version" not in result
+            and "fingerprint" in sources[result["source"]]
+        ):
+            result["source_fingerprint"] = deepcopy(
+                sources[result["source"]]["fingerprint"]
+            )
         result["source_version"] = sources[result["source"]].get("version")
     return result
 
@@ -389,11 +457,25 @@ def _cites(value: Any, source: str) -> bool:
     return isinstance(value, list) and any(_cites(item, source) for item in value)
 
 
-def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
+def save(
+    root: Path,
+    scope: str,
+    expected: int,
+    record: Any,
+    *,
+    expected_digest: str | None = None,
+) -> dict[str, Any]:
     scope = _scope(scope)
     if not isinstance(record, dict):
         raise ValueError("state patch must be a JSON object")
-    if {"revision", "updated_at", "topic_index", "policy_topics"}.intersection(record):
+    if {
+        "revision",
+        "updated_at",
+        "digest",
+        "topic_index",
+        "policy_topics",
+        "observation_sequence",
+    }.intersection(record):
         raise ValueError(
             "record revision, timestamps and retrieval metadata are helper-owned"
         )
@@ -407,20 +489,15 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
         if not isinstance(additions, list):
             raise ValueError("observations patch must be a list of new observations")
         saved = dict(current.get("observations", {}))
-        next_id = max((int(key[1:]) for key in saved), default=0) + 1
+        next_id = current.get("observation_sequence", 0) + 1
         aliases = {}
         for item in additions:
             if not isinstance(item, dict):
                 raise ValueError("new observations must be objects")
             if "refs" in item and not isinstance(item["refs"], list):
                 raise ValueError("observation refs must be a list")
-            if {"recorded_at", "source_version"}.intersection(item) or any(
-                isinstance(ref, dict) and "source_version" in ref
-                for ref in item.get("refs", [])
-            ):
-                raise ValueError(
-                    "observation recorded_at and source_version are helper-owned"
-                )
+            if "recorded_at" in item:
+                raise ValueError("observation recorded_at is helper-owned")
             key = f"o{next_id}"
             alias = item.pop("as", None)
             if alias is not None:
@@ -474,6 +551,15 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
                 raise ValueError(
                     f"sources.{key}: cited content versions are immutable; use a new source handle for a new edition"
                 )
+            if (
+                key in result["sources"]
+                and "fingerprint" in source
+                and source["fingerprint"] != result["sources"][key].get("fingerprint")
+                and _cites(current, key)
+            ):
+                raise ValueError(
+                    f"sources.{key}: cited fingerprints are immutable; use a new source handle for changed content"
+                )
         for key in assigned:
             _source_links(saved[key], result, f"observations.{key}")
             saved[key] = snapshot_sources(saved[key], result["sources"])
@@ -511,16 +597,17 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
                 if change is None:
                     knowledge.pop(key, None)
                 elif isinstance(change, dict):
-                    refs = change.get("refs", [])
-                    if isinstance(refs, list) and any(
-                        isinstance(ref, dict) and "source_version" in ref
-                        for ref in refs
-                    ):
-                        raise ValueError(
-                            f"{field}.refs.source_version is helper-owned; omit it"
-                        )
-                    _source_links(change, result, field)
-                    knowledge[key] = snapshot_sources(change, result["sources"])
+                    if set(change) - KNOWLEDGE_FIELDS:
+                        raise ValueError(f"{field} contains unknown fields")
+                    entry = {
+                        name: value
+                        for name, value in {**knowledge.get(key, {}), **change}.items()
+                        if value is not None or name == "text"
+                    }
+                    _source_links(entry, result, field)
+                    if "refs" in change and change["refs"] is not None:
+                        entry = snapshot_sources(entry, result["sources"])
+                    knowledge[key] = entry
                 else:
                     raise ValueError(f"knowledge.{key} must be an object or null")
             result["knowledge"] = knowledge
@@ -532,13 +619,20 @@ def save(root: Path, scope: str, expected: int, record: Any) -> dict[str, Any]:
         ):
             result["current_task"] = None
         result["observations"] = saved
+        result["observation_sequence"] = next_id - 1
         return normalize_record(result)
 
     with storage.lock(root / ".records.lock"):
-        result = storage.update(root / "state" / f"{scope}.json", expected, transform)
+        result = storage.update(
+            root / "state" / f"{scope}.json",
+            expected,
+            transform,
+            expected_digest=expected_digest,
+        )
     return {
         "scope": scope,
         "revision": result["revision"],
+        "digest": storage.digest(result),
         "updated_at": result.get("updated_at"),
         "assigned_observations": assigned,
         "review_dates": {

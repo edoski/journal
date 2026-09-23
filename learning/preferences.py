@@ -99,7 +99,8 @@ def _record(record: dict[str, Any]) -> dict[str, Any]:
 
 def read(root: Path) -> dict[str, Any]:
     """Read the current policy, without interpreting or ranking its instructions."""
-    return _record(storage.load(root / "preferences.json"))
+    raw = storage.load(root / "preferences.json")
+    return {**_record(raw), "digest": storage.digest(raw)}
 
 
 def assert_topics_removable(root: Path, scope: str, deleted_topics: set[str]) -> None:
@@ -181,7 +182,7 @@ def _selection(
             for rule in rules
             if dimension in rule["values"]
         ]
-    return {"revision": policy["revision"], "rules": rules}
+    return {"revision": policy["revision"], "digest": policy["digest"], "rules": rules}
 
 
 def inspect(root: Path, dimension: str) -> dict[str, Any]:
@@ -190,7 +191,9 @@ def inspect(root: Path, dimension: str) -> dict[str, Any]:
     return _selection(policy, policy["rules"], dimension)
 
 
-def save(root: Path, expected: int, patch: Any) -> dict[str, Any]:
+def save(
+    root: Path, expected: int, patch: Any, *, expected_digest: str | None = None
+) -> dict[str, Any]:
     """Replace supplied values under each selector; null deletes one dimension."""
     fields = _object(patch, "preference patch")
     if set(fields) != {"rules"}:
@@ -250,9 +253,15 @@ def save(root: Path, expected: int, patch: Any) -> dict[str, Any]:
         return {"schema_version": 1, "rules": normalized}
 
     with storage.lock(root / ".records.lock"):
-        result = storage.update(root / "preferences.json", expected, transform)
+        result = storage.update(
+            root / "preferences.json",
+            expected,
+            transform,
+            expected_digest=expected_digest,
+        )
     return {
         "revision": result["revision"],
+        "digest": storage.digest(result),
         **({"updated_at": result["updated_at"]} if "updated_at" in result else {}),
         "selectors": changed,
     }

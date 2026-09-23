@@ -2,9 +2,109 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from graphlib import CycleError, TopologicalSorter
+import json
 import re
 from typing import Any
+
+BRIEFING_BYTES = 4096
+
+
+def briefing(
+    record: dict[str, Any],
+    task_id: str | None,
+    task: dict[str, Any],
+    topics: list[str],
+    *,
+    budget: int = BRIEFING_BYTES,
+) -> dict[str, Any]:
+    """Project stored orientation, keeping whole fields and naming any omissions."""
+    values: list[tuple[list[str], list[str], Any]] = []
+    if task_id is not None:
+        for field in ("task", "question", "pending_question", "assistance", "frame"):
+            if field in task:
+                values.append(
+                    (["activity", field], ["tasks", task_id, field], task[field])
+                )
+        plan = task.get("plan", {})
+        if plan:
+            values.append(
+                (
+                    ["route", "status"],
+                    ["tasks", task_id, "plan", "status"],
+                    plan["status"],
+                )
+            )
+        current = plan.get("current")
+        nodes = plan.get("nodes", {})
+        if current:
+            values.append(
+                (
+                    ["route", "current"],
+                    ["tasks", task_id, "plan", "nodes", current],
+                    {"id": current, **nodes[current]},
+                )
+            )
+    for field in ("title", "goal", "exam", "course_context", "coverage"):
+        if field in record:
+            values.append((["course", field], [field], record[field]))
+    if task_id is not None and current:
+        values.append(
+            (
+                ["route", "prerequisites"],
+                ["tasks", task_id, "plan", "nodes"],
+                {key: nodes[key] for key in nodes[current].get("needs", [])},
+            )
+        )
+    values.append((["topics"], ["topics"], list(topics)))
+    linked = [record, task, *parts(task, active_only=True)]
+    linked.extend(
+        value
+        for field in ("course_context", "coverage")
+        if isinstance(value := record.get(field), dict)
+    )
+    linked.extend(record.get("topics", {}).get(key, {}) for key in topics)
+    sources = set()
+    for part in linked:
+        if isinstance(part, dict):
+            if "source" in part:
+                sources.add(part["source"])
+            sources.update(ref["source"] for ref in part.get("refs", []))
+    values.append((["sources"], ["sources"], sorted(sources)))
+
+    def size(value: Any) -> int:
+        return len(
+            json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        )
+
+    result: dict[str, Any] = {
+        "course": {},
+        "activity": {"id": task_id} if task_id is not None else None,
+        "omitted_fields": [
+            {"field": ".".join(target), "path": path, "bytes": size(value)}
+            for target, path, value in values
+        ],
+        "expand": "context --all",
+    }
+    if type(budget) is not int or size(result) > budget:
+        raise ValueError("briefing budget must fit the omission descriptors")
+    for target, _, value in values:
+        candidate = deepcopy(result)
+        parent = candidate
+        for key in target[:-1]:
+            parent = parent.setdefault(key, {})
+        parent[target[-1]] = deepcopy(value)
+        candidate["omitted_fields"] = [
+            item
+            for item in candidate["omitted_fields"]
+            if item["field"] != ".".join(target)
+        ]
+        if not candidate["omitted_fields"]:
+            candidate.pop("expand")
+        if size(candidate) <= budget:
+            result = candidate
+    return result
 
 
 def validate(task: dict[str, Any], field: str) -> None:

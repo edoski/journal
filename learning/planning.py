@@ -10,7 +10,12 @@ from learning.course import context_for_plan
 from learning import task_context
 from sync.study.context import journal_summary
 from learning.records import read, source_ids
-from learning.retrieval import AUTOMATIC_KNOWLEDGE_BYTES, evidence, knowledge_context
+from learning.retrieval import (
+    AUTOMATIC_EVIDENCE_BYTES,
+    AUTOMATIC_KNOWLEDGE_BYTES,
+    select_evidence,
+    knowledge_context,
+)
 
 
 def plan(
@@ -21,7 +26,10 @@ def plan(
     *,
     horizon: int = 7,
     knowledge_budget: int | None = None,
+    evidence_budget: int = AUTOMATIC_EVIDENCE_BYTES,
 ) -> dict[str, Any]:
+    if type(evidence_budget) is not int or evidence_budget < 2:
+        raise ValueError("evidence_budget must be at least 2 bytes")
     if knowledge_budget is not None and (
         scope is None or type(knowledge_budget) is not int or knowledge_budget < 1
     ):
@@ -84,7 +92,16 @@ def plan(
                 active_topics.update(part.get("topics", []))
                 selected.update(part.get("observations", []))
                 referenced_sources.update(source_ids(part))
-        supporting = evidence(state, list(selected))
+        bounded = select_evidence(
+            state,
+            sorted(selected, key=lambda key: int(key[1:]), reverse=True),
+            topics=topic_context,
+            budget=evidence_budget,
+        )
+        supporting = bounded["observations"]
+        bounded["evidence_selection"]["scope_complete"] = len(supporting) == len(
+            state["observations"]
+        )
         for observation in supporting.values():
             referenced_sources.update(source_ids(observation))
         source_context["sources"] = {
@@ -115,6 +132,8 @@ def plan(
         courses.append(
             {
                 "scope": slug,
+                "revision": state["revision"],
+                "digest": state["digest"],
                 **{
                     key: state[key]
                     for key in (
@@ -129,8 +148,9 @@ def plan(
                 },
                 "days_to_exam": (exam - today).days if exam else None,
                 "unfinished": state.get("tasks", {}),
-                "topics": topic_context,
+                "topics": bounded["topics"],
                 "observations": supporting,
+                "evidence_selection": bounded["evidence_selection"],
                 "recent_study": {
                     "status": study_status,
                     "recorded_study_minutes": recorded["study_minutes"]
@@ -151,7 +171,13 @@ def plan(
                 continue
             due = date.fromisoformat(review["due"])
             reviews.append(
-                {"scope": slug, "topic": topic, **review, "due_now": due <= today}
+                {
+                    "scope": slug,
+                    "topic": topic,
+                    **review,
+                    "due_now": due <= today,
+                    "support_in_context": "review" in bounded["topics"].get(topic, {}),
+                }
             )
     reviews.sort(key=lambda item: (item["due"], item["scope"], item["topic"]))
     return {

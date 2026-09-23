@@ -7,11 +7,33 @@ from contextlib import contextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
 from typing import Any
+
+
+class RevisionConflict(ValueError):
+    """The record changed after the caller read its expected snapshot."""
+
+
+def digest(record: dict[str, Any]) -> str:
+    """Hash raw stored content, excluding publication metadata and the digest itself."""
+    content = {
+        key: value
+        for key, value in record.items()
+        if key not in {"revision", "updated_at", "digest"}
+    }
+    encoded = json.dumps(
+        content,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def reject_constant(value: str) -> None:
@@ -66,17 +88,31 @@ def publish_text(path: Path, content: str) -> None:
 
 
 def update(
-    path: Path, expected: int, transform: Callable[[dict[str, Any]], dict[str, Any]]
+    path: Path,
+    expected: int,
+    transform: Callable[[dict[str, Any]], dict[str, Any]],
+    *,
+    expected_digest: str | None = None,
 ) -> dict[str, Any]:
     """Validate and publish under one lock, returning the full committed record."""
     if type(expected) is not int or expected < 0:
         raise ValueError("expected revision must be a nonnegative integer")
+    if expected_digest is not None and (
+        not isinstance(expected_digest, str)
+        or len(expected_digest) != 64
+        or any(character not in "0123456789abcdef" for character in expected_digest)
+    ):
+        raise ValueError("expected_digest must be a lowercase SHA-256 digest")
     with lock(path.with_name(f".{path.stem}.lock")):
         current = load(path)
         revision = current["revision"]
         if revision != expected:
-            raise ValueError(
+            raise RevisionConflict(
                 f"revision conflict for {path.stem}: expected {expected}, found {revision}; read current state before retrying"
+            )
+        if expected_digest is not None and digest(current) != expected_digest:
+            raise RevisionConflict(
+                f"snapshot conflict for {path.stem}: content changed at revision {revision}; read current state before retrying"
             )
         result = transform(deepcopy(current))
         if not isinstance(result, dict):
@@ -84,12 +120,12 @@ def update(
         values = {
             key: value
             for key, value in result.items()
-            if key not in {"revision", "updated_at"}
+            if key not in {"revision", "updated_at", "digest"}
         }
         previous = {
             key: value
             for key, value in current.items()
-            if key not in {"revision", "updated_at"}
+            if key not in {"revision", "updated_at", "digest"}
         }
         if values == previous:
             return current

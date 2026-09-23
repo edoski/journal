@@ -338,3 +338,51 @@ def test_planning_selects_knowledge_for_active_work_and_catalog_only_counts(
     assert "notes" not in catalog["sources"]
     with pytest.raises(ValueError, match="single scope"):
         plan(root, tmp_path, knowledge_budget=8192)
+
+
+def test_plan_bounds_whole_support_and_does_not_present_unsupported_assessment(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    save(
+        root,
+        "course",
+        0,
+        {
+            "topics": {
+                "a": {
+                    "assessment": {
+                        "summary": "Attempt was assisted",
+                        "observations": ["o1"],
+                        "considered_observations": ["o1", "o2"],
+                    },
+                    "review": {
+                        "due": date.today().isoformat(),
+                        "task": "Explain independently",
+                        "reason": "The earlier attempt used a solution",
+                        "observations": ["o1"],
+                        "considered_observations": ["o1", "o2"],
+                    },
+                }
+            },
+            "observations": [
+                {"topics": ["a"], "text": "Initial attempt"},
+                {
+                    "topics": ["a"],
+                    "text": "Full solution was provided " + "x" * 1000,
+                    "corrects": ["o1"],
+                },
+            ],
+        },
+    )
+    result = plan(root, tmp_path, "course", evidence_budget=500)
+    course = result["scopes"][0]
+    assert course["observations"] == {}
+    assert "assessment" not in course["topics"]["a"]
+    assert course["evidence_selection"]["complete"] is False
+    assert course["evidence_selection"]["scope_complete"] is False
+    assert result["reviews"][0]["support_in_context"] is False
+    expanded = plan(root, tmp_path, "course", evidence_budget=4000)
+    assert set(expanded["scopes"][0]["observations"]) == {"o1", "o2"}
+    assert expanded["reviews"][0]["support_in_context"] is True
+    assert course["revision"] == 1 and course["digest"]

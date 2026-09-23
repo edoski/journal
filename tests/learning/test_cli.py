@@ -27,7 +27,10 @@ def test_context_combines_new_scope_and_saved_policy(tmp_path: Path) -> None:
     assert empty["revision"] == 0
     assert empty["vault"] == str(tmp_path)
     assert empty["learning"] == str(root)
-    assert empty["preferences"] == {"revision": 0, "rules": [], "scope_revision": 0}
+    assert empty["preferences"]["revision"] == 0
+    assert empty["preferences"]["rules"] == []
+    assert empty["preferences"]["scope_revision"] == 0
+    assert len(empty["preferences"]["digest"]) == 64
     saved = invoke(
         root,
         "save",
@@ -213,3 +216,143 @@ def test_exact_knowledge_read_is_focused_and_preserves_source_location(
     index = invoke(root, "context", "course", "--knowledge", "")
     assert index["selection"]["mode"] == "knowledge_index"
     assert index["selection"]["total"] == 1
+
+
+def test_json_selectors_preserve_handles_with_commas(tmp_path: Path) -> None:
+    root = tmp_path / "learn"
+    invoke(
+        root,
+        "save",
+        "course",
+        "--expect",
+        "0",
+        patch={
+            "topics": {"unit,1": {}},
+            "observations": [{"topics": ["unit,1"], "text": "An independent attempt."}],
+        },
+    )
+    result = invoke(root, "context", "course", "--topics", '["unit,1"]')
+    assert result["selection"]["active_topics"] == ["unit,1"]
+    assert result["observations"]["o1"]["topics"] == ["unit,1"]
+
+
+def test_snapshot_conflict_has_a_distinct_machine_readable_error(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    saved = invoke(root, "save", "course", "--expect", "0", patch={"title": "First"})
+    path = root / "state/course.json"
+    changed = json.loads(path.read_text())
+    changed["title"] = "Remote replacement at the same revision"
+    path.write_text(json.dumps(changed))
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "learning",
+            "save",
+            "course",
+            "--expect",
+            str(saved["revision"]),
+            "--expect-digest",
+            saved["digest"],
+        ],
+        input=json.dumps({"title": "Overwrite"}),
+        text=True,
+        capture_output=True,
+        env={**os.environ, "LEARNING_ROOT": str(root), "VAULT_DIR": str(tmp_path)},
+    )
+    assert completed.returncode == 1
+    assert json.loads(completed.stderr)["error"]["kind"] == "conflict"
+    assert json.loads(path.read_text())["title"] == changed["title"]
+
+
+def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
+    root = tmp_path / "learn"
+    env = {
+        **os.environ,
+        "LEARNING_ROOT": str(root),
+        "VAULT_DIR": str(tmp_path),
+        "LEARNING_NO_SAVE": "1",
+    }
+    rejected = subprocess.run(
+        [sys.executable, "-m", "learning", "save", "course", "--expect", "0"],
+        input='{"title":"Must not persist"}',
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    assert rejected.returncode == 1
+    assert json.loads(rejected.stderr)["error"]["kind"] == "no_save"
+    assert not root.exists()
+    readable = subprocess.run(
+        [sys.executable, "-m", "learning", "context", "course"],
+        text=True,
+        capture_output=True,
+        env=env,
+    )
+    assert readable.returncode == 0
+    assert json.loads(readable.stdout)["found"] is False
+    assert not root.exists()
+
+
+def test_source_capture_discovery_and_previewed_forgetting_round_trip(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "learn"
+    (tmp_path / "notes.md").write_text("Finite probability spaces.\n")
+    saved = invoke(
+        root,
+        "save",
+        "course",
+        "--expect",
+        "0",
+        patch={
+            "title": "Probability",
+            "sources": {"notes": {"path": "notes.md"}},
+            "knowledge": {
+                "course-rule": {
+                    "text": "Use finite spaces.",
+                    "aliases": ["discrete probability"],
+                    "attribution": "Learner report",
+                }
+            },
+        },
+    )
+    captured = invoke(
+        root,
+        "sources",
+        "course",
+        "--sources",
+        '["notes"]',
+        "--expect",
+        str(saved["revision"]),
+        "--expect-digest",
+        saved["digest"],
+    )
+    assert captured["captured"] == ["notes"]
+    assert captured["sources"]["notes"]["status"] == "unchanged"
+    discovery = invoke(root, "discover", "discrete probability")
+    assert "course-rule" in json.dumps(discovery)
+    selection = {"knowledge": ["course-rule"]}
+    preview = invoke(root, "forget", "course", patch=selection)
+    assert not preview["applied"]
+    assert invoke(root, "inspect", "course")["records"][0]["counts"]["knowledge"] == 1
+    erased = invoke(
+        root,
+        "forget",
+        "course",
+        "--apply",
+        "--expect",
+        str(preview["revision"]),
+        "--expect-digest",
+        preview["digest"],
+        patch=selection,
+    )
+    assert erased["applied"]
+    record = invoke(root, "inspect", "course")["records"][0]["record"]
+    assert record["knowledge"] == {}
+    assert (
+        record["sources"]["notes"]["fingerprint"]
+        == captured["sources"]["notes"]["stored_fingerprint"]
+    )

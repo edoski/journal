@@ -9,7 +9,7 @@ import pytest
 from learning import records, storage
 
 
-def test_knowledge_replacements_preserve_other_understanding_and_outlive_tasks(
+def test_knowledge_patches_preserve_other_understanding_and_outlive_tasks(
     tmp_path: Path,
 ) -> None:
     records.save(
@@ -43,7 +43,10 @@ def test_knowledge_replacements_preserve_other_understanding_and_outlive_tasks(
     current = records.read(tmp_path, "course")
     assert isinstance(current, dict)
     assert current["knowledge"] == {
-        "resources": {"text": "Learner reports old sheets are outdated."},
+        "resources": {
+            "text": "Learner reports old sheets are outdated.",
+            "topics": ["systems"],
+        },
         "notation": {"text": "The lecturer uses g; the book uses h."},
     }
     assert current["tasks"] == {}
@@ -129,10 +132,10 @@ def test_conflicting_writers_preserve_committed_state(tmp_path: Path) -> None:
             {
                 "note": {
                     "text": "Meaning",
-                    "refs": [{"source": "sheet", "source_version": None}],
+                    "refs": [{"source": "sheet", "source_version": "wrong"}],
                 }
             },
-            "helper-owned",
+            "source version no longer matches",
         ),
     ],
 )
@@ -202,6 +205,7 @@ def test_knowledge_citations_capture_versions_and_protect_links(tmp_path: Path) 
             "knowledge": {
                 "convention": {
                     "text": "Revised convention.",
+                    "topics": None,
                     "refs": [{"source": "new-sheet"}],
                 }
             },
@@ -476,3 +480,118 @@ def test_broken_lesson_links_cannot_overwrite_saved_task(
     with pytest.raises(ValueError):
         records.save(tmp_path, "course", 1, {"tasks": {"work": patch}})
     assert (tmp_path / "state/course.json").read_bytes() == before
+
+
+def test_knowledge_patch_preserves_evidential_metadata_and_clears_explicitly(
+    tmp_path: Path,
+) -> None:
+    original = {
+        "text": "Two undated handouts disagree on the convention.",
+        "attribution": "Learner reports the lecturer uses the discrete convention.",
+        "uncertainty": "Neither handout establishes which applies to this exam.",
+        "conflicts": ["One handout uses the continuous convention."],
+        "aliases": ["convenzione", "notation"],
+    }
+    receipt = records.save(tmp_path, "course", 0, {"knowledge": {"notation": original}})
+    records.save(
+        tmp_path,
+        "course",
+        1,
+        {
+            "knowledge": {
+                "notation": {"text": "The two handouts use different notation."}
+            }
+        },
+        expected_digest=receipt["digest"],
+    )
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    assert current["knowledge"]["notation"] == {
+        **original,
+        "text": "The two handouts use different notation.",
+    }
+    records.save(
+        tmp_path,
+        "course",
+        2,
+        {"knowledge": {"notation": {"uncertainty": None, "conflicts": None}}},
+    )
+    cleared = records.read(tmp_path, "course")
+    assert isinstance(cleared, dict)
+    assert "uncertainty" not in cleared["knowledge"]["notation"]
+    assert "conflicts" not in cleared["knowledge"]["notation"]
+    assert cleared["knowledge"]["notation"]["attribution"] == original["attribution"]
+    with pytest.raises(ValueError, match="text must be a nonempty string"):
+        records.save(tmp_path, "course", 3, {"knowledge": {"notation": {"text": None}}})
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"attribution": []},
+        {"uncertainty": " "},
+        {"conflicts": "unsure"},
+        {"conflicts": [""]},
+        {"aliases": ["one", "one"]},
+        {"unsupported": None},
+    ],
+)
+def test_knowledge_rejects_invalid_metadata(
+    tmp_path: Path, metadata: dict[str, Any]
+) -> None:
+    with pytest.raises(ValueError, match="knowledge.note"):
+        records.save(
+            tmp_path,
+            "course",
+            0,
+            {"knowledge": {"note": {"text": "Claim", **metadata}}},
+        )
+    assert not (tmp_path / "state/course.json").exists()
+
+
+def test_read_entry_can_be_edited_without_dropping_captured_source_metadata(
+    tmp_path: Path,
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "sources": {"sheet": {"path": "sheet.pdf", "version": "2026"}},
+            "knowledge": {
+                "notation": {"text": "Convention", "refs": [{"source": "sheet"}]}
+            },
+        },
+    )
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    entry = current["knowledge"]["notation"]
+    entry["text"] = "Qualified convention"
+    receipt = records.save(tmp_path, "course", 1, {"knowledge": {"notation": entry}})
+    assert receipt["revision"] == 2
+    entry["refs"][0]["source_version"] = "wrong"
+    with pytest.raises(ValueError, match="source version no longer matches"):
+        records.save(tmp_path, "course", 2, {"knowledge": {"notation": entry}})
+
+
+def test_scope_digest_rejects_divergent_content_at_same_revision(
+    tmp_path: Path,
+) -> None:
+    receipt = records.save(tmp_path, "course", 0, {"title": "First device"})
+    current = records.read(tmp_path, "course")
+    assert isinstance(current, dict)
+    assert current["digest"] == receipt["digest"]
+    assert storage.digest(current) == receipt["digest"]
+    path = tmp_path / "state/course.json"
+    replacement = path.read_text().replace("First device", "Other device")
+    path.write_text(replacement)
+    with pytest.raises(storage.RevisionConflict, match="snapshot conflict"):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {"title": "Stale edit"},
+            expected_digest=receipt["digest"],
+        )
+    assert path.read_text() == replacement
+    assert '"digest"' not in replacement
