@@ -1,6 +1,8 @@
 # Learning fidelity and quiet operation: implementation spec
 
-Status: ready for implementation; this document changes no runtime behavior.
+Status: implemented and reviewed; see the [delivery report](learning-fidelity-followup-results-2026-09-23.md)
+for verification and remaining native behavioral failures. The contract below is
+the frozen implementation specification.
 Baseline: `6238921153bb67d7b861bb9a6c688bfd2c2e9555`.
 
 This is a bounded follow-up to the [integrated learning revision](learning-ux-implementation-2026-09-23.md), covering the remaining knowledge rewrite, internal narration and avoidable retrieval-error cases. It preserves the shared Python core, JSON records, thin host adapters and natural-language teaching experience. Deliver it as one integrated change, with local verification during development.

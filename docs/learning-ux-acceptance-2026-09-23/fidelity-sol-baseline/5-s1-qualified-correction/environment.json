@@ -1,0 +1,11 @@
+{
+  "temporary_root": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-ux-acceptance-20260923-u_hfxiko",
+  "repo": "/private/tmp/journal-learning-fidelity-baseline-6238921",
+  "pi_version": "0.87.1",
+  "git_head": "6238921153bb67d7b861bb9a6c688bfd2c2e9555",
+  "provider": "openai-codex",
+  "model_selection": "gpt-6-sol",
+  "thinking": "high",
+  "actual_gui_verified": false,
+  "isolation": "Synthetic vault and fresh local session directory per case; shared existing authorized provider, no prior transcripts"
+}

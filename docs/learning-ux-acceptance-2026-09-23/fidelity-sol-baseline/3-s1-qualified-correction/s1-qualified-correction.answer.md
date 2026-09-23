@@ -1,0 +1,3 @@
+For the **current lab**, use discrete-time signals and Lumen’s conventions: write the impulse response as $g[n]$, with samples indexed by $n$. Continuous-time expressions such as $g(t)$ belong to the older-sheet convention you described, so don’t carry them into the current lab unchanged. Atlas is still useful for derivations, but translate its notation and time assumption before applying a result.
+
+That’s a change in which convention to follow, not a claim about what mathematics you’ve learned. Your lecturer’s clarification guides the choice; it does not date or identify the undated notice and sheet.

@@ -1,0 +1,1 @@
+A one-bit quantizer stores each output as one binary digit, which can be either $0$ or $1$. Those two codes can be assigned to two distinct output values, so the quantizer can represent exactly $2^1=2$ levels.

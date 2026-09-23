@@ -1,0 +1,7 @@
+{
+  "name": "f7-heldout-parameter-convention",
+  "uploads": {
+    "practice-board-card.md": "# Numerical Methods — practice board card\nPrepared by the laboratory demonstrator, 23 September 2026.\n\nFor my short board presentation of worksheet A, exercise 5(b), write x=s and obtain y from x+y=2, with s ranging over the real numbers. The second equation is 2x+2y=4.\n\nThis is a presentation choice for this practice example. The card is not a statement from the course lecturer and contains no examination regulations.\n"
+  },
+  "prompt": "Back to Numerical Methods. I had taken the earlier choice y=t on worksheet A as a compulsory convention for the whole course; that was my mistaken reading, not something the lecturer told me. I've now found practice-board-card.md from the laboratory demonstrator. Please correct that interpretation for next time and explain in three sentences how the card's x=s presentation relates to our earlier y=t choice, including how s and t are related. I haven't attempted the exercise again. Don't continue either worksheet or start a quiz."
+}

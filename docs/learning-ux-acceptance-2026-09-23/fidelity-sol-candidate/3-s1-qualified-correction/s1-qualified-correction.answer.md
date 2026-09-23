@@ -1,0 +1,3 @@
+For the current lab, follow **Lumen’s discrete-time convention**: write the impulse response as $g[n]$, not $g(t)$. In the response calculations, convolution uses a **sum** rather than a continuous-time integral; for a discrete-time LTI system, the usual BIBO-stability condition is $\sum_n |g[n]|<\infty$ rather than $\int |g(t)|\,dt<\infty$.
+
+Atlas can still help with derivations, but translate its notation and continuous-time formulas before applying them. Your report of the lecturer’s clarification corrects the earlier resource advice; it does not, by itself, date or identify either undated lab file.

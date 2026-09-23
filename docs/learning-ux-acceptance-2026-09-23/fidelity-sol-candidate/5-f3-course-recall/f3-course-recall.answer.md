@@ -1,0 +1,1 @@
+You reported that the **lecturer uses $g$** and **Atlas uses $h$** for the impulse response. I haven’t checked the lecturer’s slides or Atlas directly. I did check the lab materials: the discrete-time notice writes $g[n]$, while the continuous-time sheet writes $g(t)$. Neither establishes which convention is current.

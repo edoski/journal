@@ -1,0 +1,11 @@
+{
+  "temporary_root": "/var/folders/y1/h6b6vjm114v6yhtrbzr877kc0000gn/T/learning-ux-acceptance-20260923-w49d3uy7",
+  "repo": "/Users/edo/dev/python/journal",
+  "pi_version": "0.87.1",
+  "git_head": "b8c2876e74390169330f36dfad2da771fb780a97",
+  "provider": "openai-codex",
+  "model_selection": "gpt-6-sol",
+  "thinking": "high",
+  "actual_gui_verified": false,
+  "isolation": "Synthetic vault and fresh local session directory per case; shared existing authorized provider, no prior transcripts"
+}

@@ -1,5 +1,9 @@
 # Learning experience acceptance — 23 September 2026
 
+The subsequent [fidelity follow-up](../learning-fidelity-followup-results-2026-09-23.md)
+records the reviewed implementation and 34 GPT-6 Sol sessions. The sections below
+retain the earlier evaluation and its historical limits.
+
 **Behavioral acceptance is not fully green.** The final targeted native run
 preserves resource uncertainty, keeps course facts out of learner observations,
 produces a relevant explicit transfer question and correctly resolves uncertainty
@@ -24,8 +28,9 @@ long-term learning gains or reliable behavior on every host.
 `fixtures.py` defines six fresh-session cases over two courses.
 `evaluator-expectations.md` specifies semantic expectations separately from tutor
 input. `run_acceptance.py` prepares an isolated vault by default; `--run` makes
-native calls through the already authorized Pi `openai-codex` provider. No package
-installation or model override occurs. Each run uses a new evidence subdirectory;
+native calls through the already authorized Pi `openai-codex` provider. The runner
+installs no packages and changes no global model default; it pins the requested
+session model (currently GPT-6 Sol/high). Each run uses a new evidence subdirectory;
 historical runs stay intact. `--resume --only CASE` supports a reviewed retry
 without replaying successful cases.
 

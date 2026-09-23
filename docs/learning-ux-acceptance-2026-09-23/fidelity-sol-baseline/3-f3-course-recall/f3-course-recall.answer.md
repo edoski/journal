@@ -1,0 +1,1 @@
+You reported that the **lecturer uses \(g\)** and **Atlas uses \(h\)** for the impulse response. I haven’t checked the lecture notes or Atlas to verify that pairing. The lab materials do use \(g\): \(g(t)\) on the sheet and \(g[n]\) in the notice.

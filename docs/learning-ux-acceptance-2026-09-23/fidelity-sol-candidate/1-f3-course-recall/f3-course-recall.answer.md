@@ -1,0 +1,1 @@
+You reported that the lecturer uses **$g$** for the impulse response and Atlas uses **$h$**. That lecturer–Atlas correspondence has **not been independently checked** in their materials. The lab documents do use $g[n]$ and $g(t)$, but they don’t verify Atlas’s notation.

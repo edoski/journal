@@ -1,0 +1,172 @@
+{
+  "name": "s1-qualified-correction",
+  "seconds_full_turn": 31.151,
+  "seconds_first_public_text_delta": 25.24,
+  "timing_note": "First model text delta, not human-rated useful teaching or verified GUI rendering; full time includes tools and publication.",
+  "returncode": 0,
+  "timed_out": false,
+  "tool_calls": {
+    "read": 4,
+    "learning_context": 3,
+    "find": 1,
+    "learning_save": 1
+  },
+  "tool_errors": {},
+  "calls": 9,
+  "errors": 0,
+  "usage": [
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3299,
+        "output": 58,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 3357,
+        "cost": {
+          "input": 0.016495000000000003,
+          "output": 0.00174,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.018235
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2293,
+        "output": 26,
+        "cacheRead": 2560,
+        "cacheWrite": 0,
+        "totalTokens": 4879,
+        "cost": {
+          "input": 0.011465000000000001,
+          "output": 0.00078,
+          "cacheRead": 0.0012799999999999999,
+          "cacheWrite": 0,
+          "total": 0.013525
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 662,
+        "output": 38,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5308,
+        "cost": {
+          "input": 0.0033100000000000004,
+          "output": 0.00114,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.006754000000000001
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 823,
+        "output": 46,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5477,
+        "cost": {
+          "input": 0.004115000000000001,
+          "output": 0.00138,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.007799
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1082,
+        "output": 84,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 5774,
+        "cost": {
+          "input": 0.005410000000000001,
+          "output": 0.00252,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.010234000000000002
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 1244,
+        "output": 225,
+        "cacheRead": 4608,
+        "cacheWrite": 0,
+        "totalTokens": 6077,
+        "cost": {
+          "input": 0.006220000000000001,
+          "output": 0.00675,
+          "cacheRead": 0.002304,
+          "cacheWrite": 0,
+          "total": 0.015274000000000001
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 577,
+        "output": 277,
+        "cacheRead": 5632,
+        "cacheWrite": 0,
+        "totalTokens": 6486,
+        "cost": {
+          "input": 0.0028850000000000004,
+          "output": 0.00831,
+          "cacheRead": 0.002816,
+          "cacheWrite": 0,
+          "total": 0.014011
+        }
+      }
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 943,
+        "output": 145,
+        "cacheRead": 5632,
+        "cacheWrite": 0,
+        "totalTokens": 6720,
+        "cost": {
+          "input": 0.0047150000000000004,
+          "output": 0.00435,
+          "cacheRead": 0.002816,
+          "cacheWrite": 0,
+          "total": 0.011881
+        }
+      }
+    }
+  ],
+  "usage_totals": {
+    "input": 10923,
+    "output": 899,
+    "cacheRead": 32256,
+    "cacheWrite": 0,
+    "totalTokens": 44078
+  },
+  "usage_note": "Provider-reported uncached input, cache reads/writes and output kept separate; totals sum every model call, not one context window. Cost fields are provider estimates, not billing proof.",
+  "source_changed_during_run": false
+}

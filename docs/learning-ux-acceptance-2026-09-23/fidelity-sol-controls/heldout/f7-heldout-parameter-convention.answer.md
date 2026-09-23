@@ -1,0 +1,1 @@
+For worksheet A 5(b), choosing $y=t$ gives $(x,y)=(2-t,t)$. The laboratory demonstrator’s card instead chooses $x=s$, giving $(x,y)=(s,2-s)$; these describe the same solutions because $s=2-t$. Neither choice is a compulsory course-wide convention, and the card does not state a lecturer or examination rule.

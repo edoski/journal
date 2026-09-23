@@ -1,0 +1,194 @@
+{
+  "state/numerical-methods.json": {
+    "title": "Numerical Methods",
+    "goal": "Explain and solve linear systems, including singular cases.",
+    "focus": [
+      "linear-systems"
+    ],
+    "sources": {
+      "worksheet-a": {
+        "path": "linear-worksheet.md"
+      }
+    },
+    "course_context": {
+      "assessment": "Short oral explanations followed by worked problems.",
+      "criteria": [
+        "Justify consistency before parameterizing solutions."
+      ],
+      "constraints": [
+        "No numerical calculator is needed for this exercise."
+      ],
+      "unknowns": [
+        "The actual examination date and full permitted aids are unknown."
+      ]
+    },
+    "topics": {
+      "linear-systems": {
+        "title": "Linear systems"
+      },
+      "row-dependence": {
+        "title": "Dependent equations"
+      }
+    },
+    "knowledge": {
+      "free-parameter": {
+        "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+        "topics": [
+          "row-dependence"
+        ],
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)",
+            "source_version": null
+          }
+        ]
+      },
+      "assessment-aid": {
+        "text": "The learner suspects formula cards are allowed in the oral component.",
+        "attribution": "Unverified learner recollection, not an official rule.",
+        "uncertainty": "No current examination rules have been inspected."
+      }
+    },
+    "observations": {
+      "o1": {
+        "topics": [
+          "linear-systems",
+          "row-dependence"
+        ],
+        "text": "The learner recognized that the equations coincide after the tutor pointed out that the second is twice the first.",
+        "origin": "direct_attempt",
+        "response": "They are the same line, so there are infinitely many solutions.",
+        "assistance": "The tutor explicitly identified the second equation as twice the first.",
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)",
+            "source_version": null
+          }
+        ],
+        "recorded_at": "2026-09-23T11:05:05.135722+00:00"
+      }
+    },
+    "tasks": {
+      "worksheet-a-5b": {
+        "task": "Solve worksheet A exercise 5(b): x+y=2, 2x+2y=4",
+        "topics": [
+          "linear-systems"
+        ],
+        "question": "Return from the dependent-equations explanation to parameterize every solution.",
+        "assistance": "Dependence and infinite solution count were already explained.",
+        "observations": [
+          "o1"
+        ],
+        "refs": [
+          {
+            "source": "worksheet-a",
+            "locator": "Exercise 5(b)"
+          }
+        ],
+        "frame": {
+          "within": "Numerical Methods: worksheet A",
+          "goal": "Classify and parameterize this system's solution set.",
+          "completion": "All solutions expressed using one real parameter."
+        },
+        "plan": {
+          "status": "agreed",
+          "current": "parameterize",
+          "nodes": {
+            "dependence": {
+              "label": "Why the equations coincide",
+              "topics": [
+                "row-dependence"
+              ]
+            },
+            "parameterize": {
+              "label": "Express every solution",
+              "needs": [
+                "dependence"
+              ],
+              "topics": [
+                "linear-systems"
+              ]
+            }
+          }
+        }
+      },
+      "worksheet-b-5b": {
+        "task": "Worksheet B exercise 5(b): x+y=3, x-y=1",
+        "topics": [
+          "linear-systems"
+        ],
+        "question": "An unrelated exercise, not the interrupted worksheet A problem."
+      }
+    },
+    "current_task": "worksheet-a-5b",
+    "observation_sequence": 1,
+    "schema_version": 5,
+    "revision": 1,
+    "updated_at": "2026-09-23T11:05:05+00:00"
+  },
+  "state/signals-studio.json": {
+    "title": "Signals Studio",
+    "goal": "Connect response, stability and frequency using course notation.",
+    "focus": [
+      "response"
+    ],
+    "sources": {
+      "overview": {
+        "path": "signals-overview.md"
+      },
+      "notice": {
+        "path": "lab-notice.md"
+      },
+      "sheet": {
+        "path": "lab-sheet.md"
+      },
+      "quantizer-sheet": {
+        "path": "hostile-worksheet.md"
+      }
+    },
+    "topics": {
+      "response": {
+        "title": "Response and stability"
+      },
+      "quantization": {
+        "title": "Quantization"
+      }
+    },
+    "knowledge": {
+      "notation": {
+        "text": "The lecturer writes g for impulse response; Atlas writes h.",
+        "attribution": "The learner reported the lecturer/textbook correspondence.",
+        "uncertainty": "Not independently checked in the current slides."
+      },
+      "resources": {
+        "text": "Working convention for the current lab is discrete time, using Lumen for current conventions; Atlas remains useful for derivations. The learner reports a lecturer clarification that the older lab sheets assume continuous time, correcting their earlier impression that those sheets tracked the lecturer's current assumptions. The inspected laboratory notice states discrete time and g[n]; the inspected laboratory sheet states continuous time and g(t).",
+        "attribution": "Learner report of lecturer clarification for current versus older lab conventions and resource choice; inspected undated notice and sheet for their stated assumptions.",
+        "uncertainty": "The lecturer clarification is learner-reported, not a newly dated source. Neither inspected file has an issue date or edition identifier; it is not established that the inspected continuous-time sheet is the reported older set, or that the inspected discrete-time notice is the current edition. Lumen's current conventions have not been independently checked here.",
+        "refs": [
+          {
+            "source": "notice",
+            "source_version": null
+          },
+          {
+            "source": "sheet",
+            "source_version": null
+          }
+        ]
+      },
+      "bench-wiring": {
+        "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+        "topics": [
+          "quantization"
+        ]
+      }
+    },
+    "tasks": {},
+    "observations": {},
+    "observation_sequence": 0,
+    "schema_version": 5,
+    "revision": 2,
+    "updated_at": "2026-09-23T11:05:30+00:00"
+  }
+}

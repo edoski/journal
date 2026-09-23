@@ -1,0 +1,154 @@
+{
+  "name": "s1-qualified-correction",
+  "seconds_full_turn": 68.544,
+  "seconds_first_public_text_delta": 63.515,
+  "timing_note": "First model text delta, not human-rated useful teaching or verified GUI rendering; full time includes tools and publication.",
+  "returncode": 0,
+  "timed_out": false,
+  "tool_calls": {
+    "read": 4,
+    "learning_context": 2,
+    "find": 1,
+    "learning_save": 2
+  },
+  "tool_errors": {},
+  "calls": 9,
+  "errors": 0,
+  "usage": [
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 3377,
+        "output": 57,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 3434,
+        "cost": {
+          "input": 0.006754,
+          "output": 0.0005700000000000001,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.007324
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 4959,
+        "output": 23,
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "totalTokens": 4982,
+        "cost": {
+          "input": 0.009918,
+          "output": 0.00023,
+          "cacheRead": 0,
+          "cacheWrite": 0,
+          "total": 0.010147999999999999
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2169,
+        "output": 102,
+        "cacheRead": 3200,
+        "cacheWrite": 0,
+        "totalTokens": 5471,
+        "cost": {
+          "input": 0.004338,
+          "output": 0.00102,
+          "cacheRead": 0.00064,
+          "cacheWrite": 0,
+          "total": 0.005998
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 982,
+        "output": 240,
+        "cacheRead": 5248,
+        "cacheWrite": 0,
+        "totalTokens": 6470,
+        "cost": {
+          "input": 0.001964,
+          "output": 0.0024000000000000002,
+          "cacheRead": 0.0010496000000000001,
+          "cacheWrite": 0,
+          "total": 0.0054136
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 458,
+        "output": 430,
+        "cacheRead": 6144,
+        "cacheWrite": 0,
+        "totalTokens": 7032,
+        "cost": {
+          "input": 0.0009159999999999999,
+          "output": 0.0043,
+          "cacheRead": 0.0012288000000000002,
+          "cacheWrite": 0,
+          "total": 0.0064448000000000005
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 2452,
+        "output": 295,
+        "cacheRead": 4864,
+        "cacheWrite": 0,
+        "totalTokens": 7611,
+        "cost": {
+          "input": 0.0049039999999999995,
+          "output": 0.0029500000000000004,
+          "cacheRead": 0.0009728000000000001,
+          "cacheWrite": 0,
+          "total": 0.0088268
+        }
+      }
+    },
+    {
+      "model": "gpt-6-sol",
+      "provider": "openai-codex",
+      "usage": {
+        "input": 532,
+        "output": 167,
+        "cacheRead": 7168,
+        "cacheWrite": 0,
+        "totalTokens": 7867,
+        "cost": {
+          "input": 0.001064,
+          "output": 0.00167,
+          "cacheRead": 0.0014336000000000002,
+          "cacheWrite": 0,
+          "total": 0.0041676000000000005
+        }
+      }
+    }
+  ],
+  "usage_totals": {
+    "input": 14929,
+    "output": 1314,
+    "cacheRead": 26624,
+    "cacheWrite": 0,
+    "totalTokens": 42867
+  },
+  "usage_note": "Provider-reported uncached input, cache reads/writes and output kept separate; totals sum every model call, not one context window. Cost fields are provider estimates, not billing proof.",
+  "source_changed_during_run": false
+}

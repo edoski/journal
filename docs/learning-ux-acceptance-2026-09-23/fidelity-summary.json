@@ -1,0 +1,3783 @@
+{
+  "note": "Counts and diffs only, not semantic verdicts. Excludes aborted GPT-5.5 batch. Token sums are not context-window sizes.",
+  "groups": [
+    {
+      "arm": "baseline",
+      "profile": "f3-course-recall",
+      "samples": 5,
+      "seconds": {
+        "median": 25.191,
+        "min": 21.106,
+        "max": 37.976
+      },
+      "calls": {
+        "median": 7,
+        "min": 5,
+        "max": 8
+      },
+      "total_tool_text_bytes": {
+        "median": 12579,
+        "min": 12237,
+        "max": 12780
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 31000,
+        "output": 2845,
+        "cacheRead": 116352,
+        "cacheWrite": 0,
+        "totalTokens": 150197
+      }
+    },
+    {
+      "arm": "baseline",
+      "profile": "s1-qualified-correction",
+      "samples": 5,
+      "seconds": {
+        "median": 43.559,
+        "min": 36.382,
+        "max": 54.415
+      },
+      "calls": {
+        "median": 9,
+        "min": 9,
+        "max": 11
+      },
+      "total_tool_text_bytes": {
+        "median": 28079,
+        "min": 17171,
+        "max": 32984
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 72007,
+        "output": 5084,
+        "cacheRead": 145536,
+        "cacheWrite": 0,
+        "totalTokens": 222627
+      }
+    },
+    {
+      "arm": "baseline",
+      "profile": "s7-new-authority",
+      "samples": 5,
+      "seconds": {
+        "median": 37.3,
+        "min": 28.901,
+        "max": 42.654
+      },
+      "calls": {
+        "median": 7,
+        "min": 7,
+        "max": 8
+      },
+      "total_tool_text_bytes": {
+        "median": 19569,
+        "min": 19569,
+        "max": 34700
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 43909,
+        "output": 4731,
+        "cacheRead": 122112,
+        "cacheWrite": 0,
+        "totalTokens": 170752
+      }
+    },
+    {
+      "arm": "candidate",
+      "profile": "f3-course-recall",
+      "samples": 5,
+      "seconds": {
+        "median": 31.889,
+        "min": 24.194,
+        "max": 33.475
+      },
+      "calls": {
+        "median": 7,
+        "min": 5,
+        "max": 8
+      },
+      "total_tool_text_bytes": {
+        "median": 12777,
+        "min": 12434,
+        "max": 12977
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 39591,
+        "output": 2773,
+        "cacheRead": 116480,
+        "cacheWrite": 0,
+        "totalTokens": 158844
+      }
+    },
+    {
+      "arm": "candidate",
+      "profile": "s1-qualified-correction",
+      "samples": 5,
+      "seconds": {
+        "median": 51.385,
+        "min": 47.611,
+        "max": 68.544
+      },
+      "calls": {
+        "median": 10,
+        "min": 9,
+        "max": 12
+      },
+      "total_tool_text_bytes": {
+        "median": 30576,
+        "min": 14460,
+        "max": 35199
+      },
+      "errors": 0,
+      "review_previews": 5,
+      "acknowledged_calls": 5,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 58673,
+        "output": 6681,
+        "cacheRead": 217728,
+        "cacheWrite": 0,
+        "totalTokens": 283082
+      }
+    },
+    {
+      "arm": "candidate",
+      "profile": "s7-new-authority",
+      "samples": 5,
+      "seconds": {
+        "median": 46.787,
+        "min": 39.154,
+        "max": 47.741
+      },
+      "calls": {
+        "median": 9,
+        "min": 8,
+        "max": 9
+      },
+      "total_tool_text_bytes": {
+        "median": 36412,
+        "min": 20195,
+        "max": 36881
+      },
+      "errors": 0,
+      "review_previews": 5,
+      "acknowledged_calls": 5,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 56994,
+        "output": 6435,
+        "cacheRead": 211328,
+        "cacheWrite": 0,
+        "totalTokens": 274757
+      }
+    },
+    {
+      "arm": "controls",
+      "profile": "f4-ordinary-teaching",
+      "samples": 1,
+      "seconds": {
+        "median": 26.144,
+        "min": 26.144,
+        "max": 26.144
+      },
+      "calls": {
+        "median": 8,
+        "min": 8,
+        "max": 8
+      },
+      "total_tool_text_bytes": {
+        "median": 13475,
+        "min": 13475,
+        "max": 13475
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 5049,
+        "output": 596,
+        "cacheRead": 28416,
+        "cacheWrite": 0,
+        "totalTokens": 34061
+      }
+    },
+    {
+      "arm": "controls",
+      "profile": "f5-subject-vocabulary",
+      "samples": 1,
+      "seconds": {
+        "median": 21.126,
+        "min": 21.126,
+        "max": 21.126
+      },
+      "calls": {
+        "median": 6,
+        "min": 6,
+        "max": 6
+      },
+      "total_tool_text_bytes": {
+        "median": 17499,
+        "min": 17499,
+        "max": 17499
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 7985,
+        "output": 563,
+        "cacheRead": 13312,
+        "cacheWrite": 0,
+        "totalTokens": 21860
+      }
+    },
+    {
+      "arm": "controls",
+      "profile": "f6-explicit-memory",
+      "samples": 1,
+      "seconds": {
+        "median": 26.178,
+        "min": 26.178,
+        "max": 26.178
+      },
+      "calls": {
+        "median": 6,
+        "min": 6,
+        "max": 6
+      },
+      "total_tool_text_bytes": {
+        "median": 25753,
+        "min": 25753,
+        "max": 25753
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 18850,
+        "output": 448,
+        "cacheRead": 20352,
+        "cacheWrite": 0,
+        "totalTokens": 39650
+      }
+    },
+    {
+      "arm": "controls",
+      "profile": "f7-heldout-parameter-convention",
+      "samples": 1,
+      "seconds": {
+        "median": 48.355,
+        "min": 48.355,
+        "max": 48.355
+      },
+      "calls": {
+        "median": 10,
+        "min": 10,
+        "max": 10
+      },
+      "total_tool_text_bytes": {
+        "median": 32321,
+        "min": 32321,
+        "max": 32321
+      },
+      "errors": 0,
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "usage": {
+        "input": 20721,
+        "output": 1250,
+        "cacheRead": 28672,
+        "cacheWrite": 0,
+        "totalTokens": 50643
+      }
+    }
+  ],
+  "cases": [
+    {
+      "arm": "baseline",
+      "case": "1-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 37.976,
+      "first_public_text_seconds": 33.192,
+      "calls": 8,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9130,
+        "learning_context": 3355,
+        "ls": 94,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 12780,
+      "usage": {
+        "input": 7785,
+        "output": 876,
+        "cacheRead": 31104,
+        "cacheWrite": 0,
+        "totalTokens": 39765
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              },
+              "lab-notation": {
+                "text": "The undated lab notice uses g[n] for discrete-time impulse response; the undated lab sheet uses g(t) for continuous-time impulse response. Neither checks the lecturer's slides or Atlas notation.",
+                "attribution": "Checked local lab notice and lab sheet.",
+                "uncertainty": "Neither document establishes the current time convention or source edition.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ],
+                "topics": [
+                  "response"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:04:26+00:00",
+            "after": "2026-09-23T11:04:58+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "1-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 50.788,
+      "first_public_text_seconds": 45.635,
+      "calls": 9,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 24260,
+        "learning_context": 3355,
+        "find": 263,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 28079,
+      "usage": {
+        "input": 10667,
+        "output": 939,
+        "cacheRead": 34560,
+        "cacheWrite": 0,
+        "totalTokens": 46166
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For the current lab, work in discrete time using Lumen for current conventions; Atlas remains useful for derivations. The learner corrected their earlier impression and reports that the lecturer said the former lab sheets assumed continuous time while the current lab is discrete time. The inspected undated laboratory notice specifies discrete time and g[n]; the inspected undated laboratory sheet specifies continuous time and g(t).",
+                "attribution": "Current-lab convention and former-sheet comparison are the learner's report of the lecturer's clarification, not a newly dated source; notice and sheet are inspected undated materials.",
+                "uncertainty": "Neither inspected file has an issue date or edition identifier; it remains unverified whether the inspected continuous-time sheet is one of the reported former sheets, or whether the inspected discrete-time notice is the current lab notice. The report guides the working convention without resolving the documents' identity or chronology.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:02:58+00:00",
+            "after": "2026-09-23T11:03:42+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "1-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 37.3,
+      "first_public_text_seconds": 32.898,
+      "calls": 8,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 28433,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 204
+      },
+      "total_tool_text_bytes": 34700,
+      "usage": {
+        "input": 12102,
+        "output": 1051,
+        "cacheRead": 32256,
+        "cacheWrite": 0,
+        "totalTokens": 45409
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date and rules for other aids, including calculators, are not specified in this notice."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice",
+                  "locator": "lines 1–6"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice": {
+                "path": "oral-notice.md",
+                "version": "2026/27",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:03:49+00:00",
+            "after": "2026-09-23T11:04:20+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "2-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 25.191,
+      "first_public_text_seconds": 21.74,
+      "calls": 7,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "ls": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9130,
+        "learning_context": 3355,
+        "ls": 94
+      },
+      "total_tool_text_bytes": 12579,
+      "usage": {
+        "input": 4691,
+        "output": 521,
+        "cacheRead": 27008,
+        "cacheWrite": 0,
+        "totalTokens": 32220
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "2-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 36.382,
+      "first_public_text_seconds": 31.308,
+      "calls": 9,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 24260,
+        "learning_context": 3355,
+        "find": 263,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 28079,
+      "usage": {
+        "input": 19827,
+        "output": 1096,
+        "cacheRead": 16256,
+        "cacheWrite": 0,
+        "totalTokens": 37179
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "Working convention for the current lab is discrete time, using Lumen for current conventions; Atlas remains useful for derivations. The learner reports a lecturer clarification that the older lab sheets assume continuous time, correcting their earlier impression that those sheets tracked the lecturer's current assumptions. The inspected laboratory notice states discrete time and g[n]; the inspected laboratory sheet states continuous time and g(t).",
+                "attribution": "Learner report of lecturer clarification for current versus older lab conventions and resource choice; inspected undated notice and sheet for their stated assumptions.",
+                "uncertainty": "The lecturer clarification is learner-reported, not a newly dated source. Neither inspected file has an issue date or edition identifier; it is not established that the inspected continuous-time sheet is the reported older set, or that the inspected discrete-time notice is the current edition. Lumen's current conventions have not been independently checked here.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:05:05+00:00",
+            "after": "2026-09-23T11:05:30+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "2-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 42.654,
+      "first_public_text_seconds": 38.23,
+      "calls": 7,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13303,
+        "learning_context": 6048,
+        "find": 14,
+        "learning_save": 204
+      },
+      "total_tool_text_bytes": 19569,
+      "usage": {
+        "input": 8826,
+        "output": 904,
+        "cacheRead": 21632,
+        "cacheWrite": 0,
+        "totalTokens": 31362
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the official oral-examination notice; other permitted aids are not specified here."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice",
+                  "locator": "Numerical Methods — oral examination 2026/27; permitted aids"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice": {
+                "path": "oral-notice.md",
+                "version": "2026/27; released 23 September 2026",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:05:41+00:00",
+            "after": "2026-09-23T11:06:13+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "3-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 27.177,
+      "first_public_text_seconds": 23.803,
+      "calls": 7,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9130,
+        "learning_context": 3355,
+        "find": 263
+      },
+      "total_tool_text_bytes": 12748,
+      "usage": {
+        "input": 7106,
+        "output": 603,
+        "cacheRead": 18944,
+        "cacheWrite": 0,
+        "totalTokens": 26653
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "3-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 54.415,
+      "first_public_text_seconds": 48.87,
+      "calls": 10,
+      "tool_calls": {
+        "read": 6,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 28650,
+        "learning_context": 3355,
+        "find": 263,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 32469,
+      "usage": {
+        "input": 11468,
+        "output": 992,
+        "cacheRead": 35840,
+        "cacheWrite": 0,
+        "totalTokens": 48300
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For the current lab, work in discrete time and use Lumen for current conventions; Atlas remains useful for longer derivations. The learner corrected their earlier impression: according to their report of the lecturer, the old lab sheets assume continuous time, not the current lab's discrete time. The inspected undated notice describes a discrete-time lab; the inspected undated sheet describes a continuous-time lab. These documents are not thereby identified as the reported current or old materials.",
+                "attribution": "Learner's report of lecturer clarification for old/current lab conventions and resource choice; undated notice and sheet inspected separately.",
+                "uncertainty": "The report is not a newly dated source. The undated notice and sheet do not establish their own issue dates, editions, chronological status or identity as the reported current or old materials.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:06:49+00:00",
+            "after": "2026-09-23T11:07:36+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "3-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 41.971,
+      "first_public_text_seconds": 38.484,
+      "calls": 7,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13303,
+        "learning_context": 6048,
+        "find": 14,
+        "learning_save": 204
+      },
+      "total_tool_text_bytes": 19569,
+      "usage": {
+        "input": 10133,
+        "output": 1027,
+        "cacheRead": 20352,
+        "cacheWrite": 0,
+        "totalTokens": 31512
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral examination, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the current oral-examination notice; other aids are not specified there."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice-2026-27",
+                  "locator": "Official oral examination notice, released 23 September 2026; permitted sheet and exclusions"
+                }
+              ]
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The current official 2026/27 oral-examination notice permits one A5 sheet of formulas handwritten on one side; it disallows worked derivations and worked solutions and supersedes older written-test aid notices for the oral component.",
+                "attribution": "Official Numerical Methods oral examination notice, released 23 September 2026.",
+                "uncertainty": "The notice does not specify calculator rules or other aids.",
+                "refs": [
+                  {
+                    "source": "oral-notice-2026-27",
+                    "locator": "Official oral examination notice, released 23 September 2026",
+                    "source_version": "2026/27; released 23 September 2026"
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice-2026-27": {
+                "path": "oral-notice.md",
+                "version": "2026/27; released 23 September 2026",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:07:44+00:00",
+            "after": "2026-09-23T11:08:13+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "4-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 21.811,
+      "first_public_text_seconds": 18.282,
+      "calls": 5,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 8881,
+        "learning_context": 3356
+      },
+      "total_tool_text_bytes": 12237,
+      "usage": {
+        "input": 4307,
+        "output": 451,
+        "cacheRead": 20992,
+        "cacheWrite": 0,
+        "totalTokens": 25750
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "4-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 36.902,
+      "first_public_text_seconds": 30.887,
+      "calls": 11,
+      "tool_calls": {
+        "read": 7,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29165,
+        "learning_context": 3355,
+        "find": 263,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 32984,
+      "usage": {
+        "input": 19890,
+        "output": 1117,
+        "cacheRead": 22144,
+        "cacheWrite": 0,
+        "totalTokens": 43151
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For the current lab, use discrete time and Lumen for conventions; Atlas remains useful for derivations. The learner reports that the lecturer clarified the older lab sheets assumed continuous time, correcting the learner's earlier impression that those sheets tracked current assumptions. The inspected undated lab notice uses discrete time and g[n]; the inspected undated lab sheet uses continuous time and g(t).",
+                "attribution": "Current-lab convention, older-sheet chronology and resource roles are the learner's report of a lecturer clarification; the notice and sheet claims are from the inspected files.",
+                "uncertainty": "The lecturer report supplies no newly dated source. The notice and sheet have no issue dates or edition identifiers; which specific file, if either, corresponds to the reported older sheets or current lab remains unverified. Lumen's text has not been inspected here.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:08:54+00:00",
+            "after": "2026-09-23T11:09:23+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "4-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 33.794,
+      "first_public_text_seconds": 29.367,
+      "calls": 7,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13303,
+        "learning_context": 6048,
+        "find": 14,
+        "learning_save": 204
+      },
+      "total_tool_text_bytes": 19569,
+      "usage": {
+        "input": 6409,
+        "output": 851,
+        "cacheRead": 23936,
+        "cacheWrite": 0,
+        "totalTokens": 31196
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral component, one A5 sheet of formulas handwritten on one side is permitted; worked derivations and worked solutions are not permitted. This notice replaces older written-test aid notices for the oral component."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown.",
+                "Calculator rules are not specified in the current oral notice."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice",
+                  "locator": "Numerical Methods — oral examination 2026/27"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice": {
+                "path": "oral-notice.md",
+                "title": "Numerical Methods — oral examination 2026/27",
+                "version": "released 23 September 2026"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:09:31+00:00",
+            "after": "2026-09-23T11:09:57+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "5-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 21.106,
+      "first_public_text_seconds": 17.575,
+      "calls": 5,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 8881,
+        "learning_context": 3356
+      },
+      "total_tool_text_bytes": 12237,
+      "usage": {
+        "input": 7111,
+        "output": 394,
+        "cacheRead": 18304,
+        "cacheWrite": 0,
+        "totalTokens": 25809
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "5-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 43.559,
+      "first_public_text_seconds": 40.096,
+      "calls": 9,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13520,
+        "learning_context": 3356,
+        "ls": 94,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 17171,
+      "usage": {
+        "input": 10155,
+        "output": 940,
+        "cacheRead": 36736,
+        "cacheWrite": 0,
+        "totalTokens": 47831
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For the current lab, use discrete-time conventions and Lumen lecture notes; the learner reports that the lecturer clarified that the older laboratory sheets assume continuous time. Atlas remains useful for longer derivations. The inspected undated lab notice describes discrete time and the inspected undated lab sheet describes continuous time; their alignment with the reported conventions does not establish that either file is the reported current or older edition.",
+                "attribution": "Learner's report of lecturer clarification for current versus older lab conventions; undated notice and sheet inspected separately.",
+                "uncertainty": "No independent date or edition identification for the inspected notice or sheet; their current/older status remains unverified. Lumen and Atlas were named by the learner but no actual notes or textbook edition was inspected.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:10:27+00:00",
+            "after": "2026-09-23T11:11:01+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "baseline",
+      "case": "5-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 28.901,
+      "first_public_text_seconds": 24.206,
+      "calls": 7,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13303,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 204
+      },
+      "total_tool_text_bytes": 19570,
+      "usage": {
+        "input": 6439,
+        "output": 898,
+        "cacheRead": 23936,
+        "cacheWrite": 0,
+        "totalTokens": 31273
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for worksheet A exercise 5(b).",
+                "For the 2026/27 oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted. This notice replaces older written-test aid notices for the oral component."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the 2026/27 oral notice; other permitted aids are not established by this notice."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice-2026-27",
+                  "locator": "Oral examination notice, lines 1–6"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice-2026-27": {
+                "path": "oral-notice.md",
+                "version": "2026/27",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:11:11+00:00",
+            "after": "2026-09-23T11:11:34+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "1-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 31.889,
+      "first_public_text_seconds": 28.462,
+      "calls": 7,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "ls": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9327,
+        "learning_context": 3356,
+        "ls": 94
+      },
+      "total_tool_text_bytes": 12777,
+      "usage": {
+        "input": 7215,
+        "output": 512,
+        "cacheRead": 24960,
+        "cacheWrite": 0,
+        "totalTokens": 32687
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "1-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 51.385,
+      "first_public_text_seconds": 45.535,
+      "calls": 12,
+      "tool_calls": {
+        "read": 6,
+        "learning_context": 2,
+        "ls": 1,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29933,
+        "learning_context": 3356,
+        "ls": 94,
+        "find": 263,
+        "learning_save": 1553
+      },
+      "total_tool_text_bytes": 35199,
+      "usage": {
+        "input": 12724,
+        "output": 1365,
+        "cacheRead": 41600,
+        "cacheWrite": 0,
+        "totalTokens": 55689
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner reports that the lecturer clarified the former lab sheets assume continuous time, while the current lab uses discrete time. Use Lumen for current conventions; Atlas remains useful for longer derivations. The inspected undated laboratory notice specifies discrete-time g[n], and the inspected undated laboratory sheet specifies continuous-time g(t); matching assumptions alone do not establish which file is the reported current or former edition.",
+                "attribution": "Learner's report of lecturer clarification for the working convention and resource advice; separate direct inspection of the two undated files.",
+                "uncertainty": "Neither inspected file supplies an issue date or edition identifier, so their current/former identity remains unverified. Lumen's content was not inspected.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:10:28+00:00",
+            "after": "2026-09-23T11:11:12+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "1-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 39.154,
+      "first_public_text_seconds": 34.152,
+      "calls": 8,
+      "tool_calls": {
+        "read": 3,
+        "find": 1,
+        "learning_context": 2,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13500,
+        "find": 14,
+        "learning_context": 6048,
+        "learning_save": 633
+      },
+      "total_tool_text_bytes": 20195,
+      "usage": {
+        "input": 7166,
+        "output": 1196,
+        "cacheRead": 32512,
+        "cacheWrite": 0,
+        "totalTokens": 40874
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the official oral notice; the full permitted aids remain unknown."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice-2026-27",
+                  "locator": "Numerical Methods — oral examination 2026/27, permitted sheet and exclusions"
+                }
+              ]
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice-2026-27": {
+                "path": "oral-notice.md",
+                "title": "Numerical Methods — oral examination 2026/27",
+                "version": "Released 23 September 2026"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:11:20+00:00",
+            "after": "2026-09-23T11:11:52+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "2-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 24.74,
+      "first_public_text_seconds": 19.918,
+      "calls": 7,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "ls": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9327,
+        "learning_context": 3355,
+        "ls": 94
+      },
+      "total_tool_text_bytes": 12776,
+      "usage": {
+        "input": 13093,
+        "output": 487,
+        "cacheRead": 19200,
+        "cacheWrite": 0,
+        "totalTokens": 32780
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "2-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 50.463,
+      "first_public_text_seconds": 43.217,
+      "calls": 10,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 13717,
+        "learning_context": 3356,
+        "ls": 94,
+        "learning_save": 1648
+      },
+      "total_tool_text_bytes": 18815,
+      "usage": {
+        "input": 7250,
+        "output": 1226,
+        "cacheRead": 49280,
+        "cacheWrite": 0,
+        "totalTokens": 57756
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For the current lab, use discrete-time conventions and Lumen lecture notes. The learner clarified after checking with the lecturer that their earlier impression of the old lab sheets was wrong: those older sheets assume continuous time. Atlas remains useful for longer derivations. The inspected undated laboratory notice states discrete time and g[n]; the inspected undated laboratory sheet states continuous time and g(t).",
+                "attribution": "Learner's report of lecturer clarification for current/old conventions and resource choice; undated notice and sheet inspected directly for their contents.",
+                "uncertainty": "The lecturer clarification is a learner report, not a newly dated source. Neither undated file establishes its date, edition, or identity as the reported old or current material; the relationship of these specific files to the reported old sheets/current lab is unverified.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:12:31+00:00",
+            "after": "2026-09-23T11:13:13+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "2-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 47.741,
+      "first_public_text_seconds": 43.281,
+      "calls": 9,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29716,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 1102
+      },
+      "total_tool_text_bytes": 36881,
+      "usage": {
+        "input": 13291,
+        "output": 1432,
+        "cacheRead": 44288,
+        "cacheWrite": 0,
+        "totalTokens": 59011
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the current official oral notice; the notice does not establish rules for other aids."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice",
+                  "locator": "Numerical Methods — oral examination 2026/27"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The current official 2026/27 oral-examination notice confirms that one A5 handwritten, single-sided formula sheet is permitted for the oral component; worked derivations and worked solutions are not permitted. It replaces older written-test aid notices for the oral component.",
+                "attribution": "Official oral examination notice released 23 September 2026, superseding the earlier unverified learner recollection for the oral component.",
+                "refs": [
+                  {
+                    "source": "oral-notice",
+                    "locator": "Numerical Methods — oral examination 2026/27",
+                    "source_version": "2026/27, released 23 September 2026"
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice": {
+                "path": "oral-notice.md",
+                "version": "2026/27, released 23 September 2026",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:13:22+00:00",
+            "after": "2026-09-23T11:14:03+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "3-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 33.094,
+      "first_public_text_seconds": 29.612,
+      "calls": 7,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9327,
+        "learning_context": 3355,
+        "find": 263
+      },
+      "total_tool_text_bytes": 12945,
+      "usage": {
+        "input": 6960,
+        "output": 567,
+        "cacheRead": 13312,
+        "cacheWrite": 0,
+        "totalTokens": 20839
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "3-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 55.698,
+      "first_public_text_seconds": 49.973,
+      "calls": 10,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 25543,
+        "learning_context": 3356,
+        "ls": 94,
+        "learning_save": 1625
+      },
+      "total_tool_text_bytes": 30618,
+      "usage": {
+        "input": 12060,
+        "output": 1373,
+        "cacheRead": 57728,
+        "cacheWrite": 0,
+        "totalTokens": 71161
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "For current lab work, use Lumen for discrete-time conventions; Atlas remains useful for derivations. The learner reports that the lecturer clarified that the older lab sheets assume continuous time, correcting the learner's earlier impression that those sheets tracked current assumptions. The inspected laboratory notice states discrete time, while the inspected laboratory sheet states continuous time.",
+                "attribution": "Working convention and characterization of older sheets are from the learner's report of the lecturer's clarification; the notice and sheet are inspected, undated course files.",
+                "uncertainty": "Neither inspected file has an issue date or edition identifier; the lecturer report does not establish which file is current or identify the inspected laboratory sheet as one of the reported older sheets. Current Lumen notes have not been inspected.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:14:34+00:00",
+            "after": "2026-09-23T11:15:16+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "3-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 46.943,
+      "first_public_text_seconds": 42.529,
+      "calls": 9,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29716,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 633
+      },
+      "total_tool_text_bytes": 36412,
+      "usage": {
+        "input": 13094,
+        "output": 1325,
+        "cacheRead": 44288,
+        "cacheWrite": 0,
+        "totalTokens": 58707
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral component, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted. This official notice replaces older written-test aid notices for the oral component."
+              ],
+              "unknowns": [
+                "The actual examination date, calculator rules, and any other permitted aids not specified by this notice are unknown."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice-2026-27",
+                  "locator": "Numerical Methods — oral examination 2026/27"
+                }
+              ],
+              "checked_on": "2026-09-23"
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice-2026-27": {
+                "path": "oral-notice.md",
+                "version": "2026/27; released 23 September 2026",
+                "title": "Numerical Methods — oral examination 2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:15:30+00:00",
+            "after": "2026-09-23T11:16:11+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "4-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 24.194,
+      "first_public_text_seconds": 20.501,
+      "calls": 5,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9078,
+        "learning_context": 3356
+      },
+      "total_tool_text_bytes": 12434,
+      "usage": {
+        "input": 6985,
+        "output": 364,
+        "cacheRead": 24960,
+        "cacheWrite": 0,
+        "totalTokens": 32309
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "4-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 68.544,
+      "first_public_text_seconds": 63.515,
+      "calls": 9,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9327,
+        "learning_context": 3356,
+        "find": 263,
+        "learning_save": 1514
+      },
+      "total_tool_text_bytes": 14460,
+      "usage": {
+        "input": 14929,
+        "output": 1314,
+        "cacheRead": 26624,
+        "cacheWrite": 0,
+        "totalTokens": 42867
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner reports that the lecturer clarified: the old laboratory sheets assume continuous time, whereas the current lab uses discrete time. Use Lumen lecture notes for current conventions and Atlas for derivations. The undated laboratory notice specifies discrete-time g[n], while the undated laboratory sheet specifies continuous-time g(t).",
+                "attribution": "Learner report of lecturer's clarification for current-versus-old conventions; notice and sheet for the two written assumptions; overview for resource names.",
+                "uncertainty": "The lecturer report is not a newly dated source. Neither notice nor sheet has an issue date or edition identifier, and the continuous-time sheet has not been independently identified as one of the reported old sheets.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  },
+                  {
+                    "source": "overview",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:16:51+00:00",
+            "after": "2026-09-23T11:17:47+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "4-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 40.653,
+      "first_public_text_seconds": 36.406,
+      "calls": 9,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29716,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 633
+      },
+      "total_tool_text_bytes": 36412,
+      "usage": {
+        "input": 12901,
+        "output": 1229,
+        "cacheRead": 44288,
+        "cacheWrite": 0,
+        "totalTokens": 58418
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise.",
+                "For the 2026/27 oral examination, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules and whether any other aids are permitted are not specified in the official oral notice."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice-2026-27",
+                  "locator": "Numerical Methods — oral examination 2026/27"
+                }
+              ]
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice-2026-27": {
+                "path": "oral-notice.md",
+                "version": "2026/27 official oral examination notice, released 23 September 2026"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:18:00+00:00",
+            "after": "2026-09-23T11:18:35+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "5-f3-course-recall",
+      "profile": "f3-course-recall",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 33.475,
+      "first_public_text_seconds": 28.942,
+      "calls": 8,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9327,
+        "learning_context": 3355,
+        "ls": 94,
+        "learning_save": 201
+      },
+      "total_tool_text_bytes": 12977,
+      "usage": {
+        "input": 5338,
+        "output": 843,
+        "cacheRead": 34048,
+        "cacheWrite": 0,
+        "totalTokens": 40229
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              },
+              "lab-notation": {
+                "text": "The undated lab notice writes the discrete-time impulse response as g[n]; the undated lab sheet writes the continuous-time impulse response as g(t).",
+                "attribution": "Directly checked in the lab notice and lab sheet.",
+                "uncertainty": "Neither identifies the current time convention or verifies the lecturer's slide notation or Atlas's notation.",
+                "topics": [
+                  "response"
+                ],
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:20:40+00:00",
+            "after": "2026-09-23T11:21:07+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "5-s1-qualified-correction",
+      "profile": "s1-qualified-correction",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 47.611,
+      "first_public_text_seconds": 43.91,
+      "calls": 10,
+      "tool_calls": {
+        "read": 5,
+        "learning_context": 2,
+        "ls": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 25543,
+        "learning_context": 3356,
+        "ls": 94,
+        "learning_save": 1583
+      },
+      "total_tool_text_bytes": 30576,
+      "usage": {
+        "input": 11710,
+        "output": 1403,
+        "cacheRead": 42496,
+        "cacheWrite": 0,
+        "totalTokens": 55609
+      },
+      "state_changes": {
+        "state/signals-studio.json": {
+          "knowledge": {
+            "before": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner initially thought the older laboratory sheets tracked the lecturer's assumptions. Atlas is helpful for longer derivations.",
+                "attribution": "Learner's provisional resource comparison.",
+                "uncertainty": "The undated notice says discrete time and the undated sheet says continuous time; neither establishes which is current.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            },
+            "after": {
+              "notation": {
+                "text": "The lecturer writes g for impulse response; Atlas writes h.",
+                "attribution": "The learner reported the lecturer/textbook correspondence.",
+                "uncertainty": "Not independently checked in the current slides."
+              },
+              "resources": {
+                "text": "The learner reports that the lecturer clarified the former lab sheets assumed continuous time whereas the current lab is discrete time. Use Lumen for current conventions; Atlas remains helpful for derivations. The inspected lab notice specifies discrete time and the inspected lab sheet specifies continuous time, but neither undated file is identified as the lecturer's reported current or former document.",
+                "attribution": "Learner report of lecturer clarification and resource choice; inspected undated notice and sheet support only their own stated conventions.",
+                "uncertainty": "The lecturer report is not a newly dated source. Neither undated notice nor undated sheet establishes its edition, chronology, or identity as the reported former/current document. Lumen notes were not available in the inspected course files.",
+                "refs": [
+                  {
+                    "source": "notice",
+                    "source_version": null
+                  },
+                  {
+                    "source": "sheet",
+                    "source_version": null
+                  }
+                ]
+              },
+              "bench-wiring": {
+                "text": "Optional quantization bench only: connect the violet lead to jack Q7.",
+                "topics": [
+                  "quantization"
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:19:05+00:00",
+            "after": "2026-09-23T11:19:43+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "candidate",
+      "case": "5-s7-new-authority",
+      "profile": "s7-new-authority",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 46.787,
+      "first_public_text_seconds": 42.251,
+      "calls": 9,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "learning_save": 2
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 1,
+      "acknowledged_calls": 1,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 29716,
+        "learning_context": 6049,
+        "find": 14,
+        "learning_save": 633
+      },
+      "total_tool_text_bytes": 36412,
+      "usage": {
+        "input": 10542,
+        "output": 1253,
+        "cacheRead": 45952,
+        "cacheWrite": 0,
+        "totalTokens": 57747
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "course_context": {
+            "before": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for this exercise."
+              ],
+              "unknowns": [
+                "The actual examination date and full permitted aids are unknown."
+              ]
+            },
+            "after": {
+              "assessment": "Short oral explanations followed by worked problems.",
+              "criteria": [
+                "Justify consistency before parameterizing solutions."
+              ],
+              "constraints": [
+                "No numerical calculator is needed for worksheet A exercise 5(b).",
+                "For the 2026/27 oral examination, one A5 sheet of formulas, handwritten on one side, is permitted; worked derivations and worked solutions are not permitted."
+              ],
+              "unknowns": [
+                "The actual examination date is unknown.",
+                "Calculator rules are not specified in the current oral notice."
+              ],
+              "refs": [
+                {
+                  "source": "oral-notice",
+                  "locator": "Numerical Methods — oral examination 2026/27"
+                }
+              ]
+            }
+          },
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "oral-notice": {
+                "path": "oral-notice.md",
+                "title": "Numerical Methods — oral examination 2026/27",
+                "version": "2026/27"
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:19:53+00:00",
+            "after": "2026-09-23T11:20:34+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "controls",
+      "case": "1-f4-ordinary-teaching",
+      "profile": "f4-ordinary-teaching",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 26.144,
+      "first_public_text_seconds": 22.76,
+      "calls": 8,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 2,
+        "find": 1,
+        "grep": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 9677,
+        "learning_context": 3356,
+        "find": 263,
+        "grep": 179
+      },
+      "total_tool_text_bytes": 13475,
+      "usage": {
+        "input": 5049,
+        "output": 596,
+        "cacheRead": 28416,
+        "cacheWrite": 0,
+        "totalTokens": 34061
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "controls",
+      "case": "1-f5-subject-vocabulary",
+      "profile": "f5-subject-vocabulary",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 21.126,
+      "first_public_text_seconds": 16.35,
+      "calls": 6,
+      "tool_calls": {
+        "read": 1,
+        "learning_context": 3,
+        "find": 1,
+        "grep": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 8748,
+        "learning_context": 8472,
+        "find": 263,
+        "grep": 16
+      },
+      "total_tool_text_bytes": 17499,
+      "usage": {
+        "input": 7985,
+        "output": 563,
+        "cacheRead": 13312,
+        "cacheWrite": 0,
+        "totalTokens": 21860
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "controls",
+      "case": "1-f6-explicit-memory",
+      "profile": "f6-explicit-memory",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 26.178,
+      "first_public_text_seconds": 20.115,
+      "calls": 6,
+      "tool_calls": {
+        "read": 3,
+        "learning_context": 2,
+        "learning_manage": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 15464,
+        "learning_context": 6049,
+        "learning_manage": 4240
+      },
+      "total_tool_text_bytes": 25753,
+      "usage": {
+        "input": 18850,
+        "output": 448,
+        "cacheRead": 20352,
+        "cacheWrite": 0,
+        "totalTokens": 39650
+      },
+      "state_changes": {},
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    },
+    {
+      "arm": "controls",
+      "case": "heldout",
+      "profile": "f7-heldout-parameter-convention",
+      "models": [
+        "gpt-6-sol"
+      ],
+      "seconds": 48.355,
+      "first_public_text_seconds": 41.06,
+      "calls": 10,
+      "tool_calls": {
+        "read": 4,
+        "learning_context": 3,
+        "find": 2,
+        "learning_save": 1
+      },
+      "errors": 0,
+      "tool_errors": {},
+      "review_previews": 0,
+      "acknowledged_calls": 0,
+      "knowledge_with_evidence_budget_calls": 0,
+      "tool_text_bytes": {
+        "read": 25601,
+        "learning_context": 6450,
+        "find": 62,
+        "learning_save": 208
+      },
+      "total_tool_text_bytes": 32321,
+      "usage": {
+        "input": 20721,
+        "output": 1250,
+        "cacheRead": 28672,
+        "cacheWrite": 0,
+        "totalTokens": 50643
+      },
+      "state_changes": {
+        "state/numerical-methods.json": {
+          "knowledge": {
+            "before": {
+              "free-parameter": {
+                "text": "On worksheet A, choose the free variable y=t and express x in terms of t.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ]
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            },
+            "after": {
+              "free-parameter": {
+                "text": "For worksheet A exercise 5(b), y=t gives (x,y)=(2-t,t), while the laboratory demonstrator's practice-board card presents x=s giving (x,y)=(s,2-s). Both parameterize the same real solution set, with s=2-t; neither is a compulsory course-wide convention.",
+                "topics": [
+                  "row-dependence"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  },
+                  {
+                    "source": "practice-board-card",
+                    "locator": "Worksheet A, exercise 5(b)",
+                    "source_version": null
+                  }
+                ],
+                "attribution": "Worksheet A supplies the system; x=s is the laboratory demonstrator's practice presentation, not lecturer or examination guidance."
+              },
+              "assessment-aid": {
+                "text": "The learner suspects formula cards are allowed in the oral component.",
+                "attribution": "Unverified learner recollection, not an official rule.",
+                "uncertainty": "No current examination rules have been inspected."
+              }
+            }
+          },
+          "observation_sequence": {
+            "before": 1,
+            "after": 2
+          },
+          "observations": {
+            "before": {
+              "o1": {
+                "topics": [
+                  "linear-systems",
+                  "row-dependence"
+                ],
+                "text": "The learner recognized that the equations coincide after the tutor pointed out that the second is twice the first.",
+                "origin": "direct_attempt",
+                "response": "They are the same line, so there are infinitely many solutions.",
+                "assistance": "The tutor explicitly identified the second equation as twice the first.",
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ],
+                "recorded_at": "2026-09-23T11:22:28.071065+00:00"
+              }
+            },
+            "after": {
+              "o1": {
+                "topics": [
+                  "linear-systems",
+                  "row-dependence"
+                ],
+                "text": "The learner recognized that the equations coincide after the tutor pointed out that the second is twice the first.",
+                "origin": "direct_attempt",
+                "response": "They are the same line, so there are infinitely many solutions.",
+                "assistance": "The tutor explicitly identified the second equation as twice the first.",
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ],
+                "recorded_at": "2026-09-23T11:22:28.071065+00:00"
+              },
+              "o2": {
+                "topics": [
+                  "linear-systems",
+                  "row-dependence"
+                ],
+                "text": "Learner reports previously misreading the earlier y=t choice as compulsory for the whole course, and clarifies this was their own interpretation, not a lecturer instruction; they have not reattempted the exercise.",
+                "origin": "self_report",
+                "uncertainty": "No fresh parameterization attempt or independent proficiency evidence.",
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)",
+                    "source_version": null
+                  }
+                ],
+                "recorded_at": "2026-09-23T11:23:05.695235+00:00"
+              }
+            }
+          },
+          "revision": {
+            "before": 1,
+            "after": 2
+          },
+          "sources": {
+            "before": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              }
+            },
+            "after": {
+              "worksheet-a": {
+                "path": "linear-worksheet.md"
+              },
+              "practice-board-card": {
+                "path": "practice-board-card.md",
+                "title": "Numerical Methods — practice board card"
+              }
+            }
+          },
+          "tasks": {
+            "before": {
+              "worksheet-a-5b": {
+                "task": "Solve worksheet A exercise 5(b): x+y=2, 2x+2y=4",
+                "topics": [
+                  "linear-systems"
+                ],
+                "question": "Return from the dependent-equations explanation to parameterize every solution.",
+                "assistance": "Dependence and infinite solution count were already explained.",
+                "observations": [
+                  "o1"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)"
+                  }
+                ],
+                "frame": {
+                  "within": "Numerical Methods: worksheet A",
+                  "goal": "Classify and parameterize this system's solution set.",
+                  "completion": "All solutions expressed using one real parameter."
+                },
+                "plan": {
+                  "status": "agreed",
+                  "current": "parameterize",
+                  "nodes": {
+                    "dependence": {
+                      "label": "Why the equations coincide",
+                      "topics": [
+                        "row-dependence"
+                      ]
+                    },
+                    "parameterize": {
+                      "label": "Express every solution",
+                      "needs": [
+                        "dependence"
+                      ],
+                      "topics": [
+                        "linear-systems"
+                      ]
+                    }
+                  }
+                }
+              },
+              "worksheet-b-5b": {
+                "task": "Worksheet B exercise 5(b): x+y=3, x-y=1",
+                "topics": [
+                  "linear-systems"
+                ],
+                "question": "An unrelated exercise, not the interrupted worksheet A problem."
+              }
+            },
+            "after": {
+              "worksheet-a-5b": {
+                "task": "Solve worksheet A exercise 5(b): x+y=2, 2x+2y=4",
+                "topics": [
+                  "linear-systems"
+                ],
+                "question": "When the learner returns to worksheet A 5(b), parameterize all solutions using a freely chosen parameter; y=t and x=s are equivalent, neither compulsory.",
+                "assistance": "Dependence and infinite solution count were already explained.",
+                "observations": [
+                  "o1"
+                ],
+                "refs": [
+                  {
+                    "source": "worksheet-a",
+                    "locator": "Exercise 5(b)"
+                  }
+                ],
+                "frame": {
+                  "within": "Numerical Methods: worksheet A",
+                  "goal": "Classify and parameterize this system's solution set.",
+                  "completion": "All solutions expressed using one real parameter."
+                },
+                "plan": {
+                  "status": "agreed",
+                  "current": "parameterize",
+                  "nodes": {
+                    "dependence": {
+                      "label": "Why the equations coincide",
+                      "topics": [
+                        "row-dependence"
+                      ]
+                    },
+                    "parameterize": {
+                      "label": "Express every solution",
+                      "needs": [
+                        "dependence"
+                      ],
+                      "topics": [
+                        "linear-systems"
+                      ]
+                    }
+                  }
+                }
+              },
+              "worksheet-b-5b": {
+                "task": "Worksheet B exercise 5(b): x+y=3, x-y=1",
+                "topics": [
+                  "linear-systems"
+                ],
+                "question": "An unrelated exercise, not the interrupted worksheet A problem."
+              }
+            }
+          },
+          "updated_at": {
+            "before": "2026-09-23T11:22:28+00:00",
+            "after": "2026-09-23T11:23:05+00:00"
+          }
+        }
+      },
+      "returncode": 0,
+      "timed_out": false,
+      "production_changed": false
+    }
+  ]
+}
