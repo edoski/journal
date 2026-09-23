@@ -822,3 +822,32 @@ def test_review_validation_conflicts_and_repair(tmp_path: Path) -> None:
             confirm_qualification_changes=["notation"],
         )
     assert path.read_text() == changed
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), "\ud800"])
+def test_unserializable_candidate_is_invalid_before_qualification_preview(
+    tmp_path: Path, invalid: Any
+) -> None:
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "knowledge": {
+                "notation": {"text": "Original", "uncertainty": "Unknown"},
+            }
+        },
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    with pytest.raises(ValueError):
+        records.save(
+            tmp_path,
+            "course",
+            1,
+            {
+                "knowledge": {"notation": {"uncertainty": None}},
+                "extra": invalid,
+            },
+        )
+    assert path.read_bytes() == before

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import date, datetime, timedelta, timezone
+import json
 from pathlib import Path
 import re
 from typing import Any
@@ -720,6 +721,7 @@ def save(
                 "confirm_qualification_changes must name only entries with guarded changes"
             )
         if guarded - set(confirmed):
+            json.dumps(result, ensure_ascii=False, allow_nan=False).encode("utf-8")
             raise _QualificationReview(
                 {
                     "status": "needs_confirmation",
