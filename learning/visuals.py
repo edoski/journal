@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from hashlib import sha256
 import math
+import os
 from pathlib import Path
 import re
+from urllib.parse import quote
 import xml.etree.ElementTree as ET
 
 from learning import storage
@@ -87,7 +89,7 @@ def publish_svg(
     content = svg.strip() + "\n"
     validate_svg(content)
     vault = vault.expanduser().resolve()
-    directory = (assets or vault / "assets/learn").expanduser().resolve()
+    directory = (assets or vault / ".study/assets").expanduser().resolve()
     if not directory.is_relative_to(vault):
         raise ValueError(
             "learning assets must be inside the vault for Obsidian embedding"
@@ -103,4 +105,5 @@ def publish_svg(
                 raise ValueError("refusing to replace different visual content")
         else:
             storage.publish_text(path, content)
-    return {"path": str(path), "embed": f"![[{path.relative_to(vault).as_posix()}]]"}
+    relative = quote(os.path.relpath(path, vault / ".study/lessons"))
+    return {"path": str(path), "embed": f"![Study diagram]({relative})"}

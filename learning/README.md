@@ -1,10 +1,10 @@
 # Learning
 
-One shared learning system supports natural study conversations in native agents and Pi. Ask to explain, continue, practise, review or plan; the agent handles memory quietly. The canonical skill keeps the conversation specific to the course and current problem, honours direct answers and time budgets, and uses ordinary chat for checks. No management commands, compulsory intake, curriculum dashboard or fixed teaching template are required from the learner.
+One installed learning engine supports natural study conversations in native agents and Pi. Ask to explain, continue, practise, review or plan; the agent handles memory quietly. The canonical skill keeps the conversation specific to the course and current problem, honours direct answers and time budgets, and uses ordinary chat for checks. No management commands, compulsory intake, curriculum dashboard or fixed teaching template are required from the learner.
 
 ## State and agent interface
 
-The vault owns portable state. `learn/state/<scope>.json` holds metadata, observations, source references, assessments/reviews, unfinished tasks and reusable knowledge (schema 5). `learn/preferences.json` stores current global/scoped preferences. `learn/sessions/` contains generated notes and Pi lessons; `assets/learn/` contains generated visuals. Material stays in its existing folders. Native/provider conversation histories have separate ownership and retention. Sharing records does not provide universal host access or identical model behaviour.
+Each initialized directory owns a hidden `.study/`. `.study/workspace.json` marks its format; `.study/state/<scope>.json` holds metadata, observations, source references, assessments/reviews, unfinished tasks and reusable knowledge (schema 5). `.study/preferences.json` stores workspace-wide/scoped preferences. `.study/lessons/` contains generated notes and Pi lessons, `.study/assets/` contains generated visuals, and `.study/conversations/` holds resumable Pi sessions. Material stays in its existing folders, with relative source paths resolved from the owning directory. Everything generated stays in `.study`; no separate notes directory or global learner-state store is used. Native/provider conversation histories have separate ownership and retention. Sharing records does not provide universal host access or identical model behaviour.
 
 Python owns validation, selection and publication. `records.py` handles records; `retrieval.py` selects context; `observations.py` follows correction relationships; `task_context.py` projects activity orientation. `sources.py` inspects selected local fingerprints. `memory.py` owns inspection and explicit forgetting. `lessons.py` and `visuals.py` publish through `storage.py`. Planning reads Journal only through `sync.study.context.journal_summary`; learning does not access Flow or sync adapters.
 
@@ -28,7 +28,7 @@ Course orientation uses existing scope, knowledge and task fields, without a sep
 
 ## Pi and native clients
 
-`study` launches Pi in the terminal. Teaching remains readable while it streams; completed messages are mirrored into an Obsidian note, created/opened on the first teaching or quiz. `LEARNING_READING_MODE=obsidian` opts into hiding terminal teaching, with readable fallback if publication/opening fails. `study --continue` resumes the latest saved Pi conversation; `study "Continue exercise 5"` starts with that request. Empty startup creates no lesson. Notes contain teaching with automatic turn dividers, math normalization and native Mermaid; they are reading surfaces, not continuity databases or generated course indexes.
+Run `study init` once in the course/project directory, then `study` to launch Pi in the terminal. Initialization is idempotent, needs no model and does not create a subject or ingest sources. `.study/.gitignore` excludes personal state/history from accidental Git commits. Running from a descendant finds the nearest enclosing workspace; nested workspaces are independent. A malformed nearer workspace fails rather than using its parent. `study --workspace /path/to/course` explicitly selects an initialized directory. No workspace means an actionable error, never a global fallback. The launcher preserves the caller's directory until it selects and pins the workspace. Teaching remains readable while it streams; completed messages are mirrored into an Obsidian note, created/opened on the first teaching or quiz. `LEARNING_READING_MODE=obsidian` opts into hiding terminal teaching, with readable fallback if publication/opening fails. `study --continue` resumes the latest saved Pi conversation in that workspace; `study "Continue exercise 5"` starts with that request. Empty startup creates no lesson. Notes contain teaching with automatic turn dividers, math normalization and native Mermaid; they are reading surfaces, not continuity databases or generated course indexes.
 
 Each lesson separates generated teaching from a protected **Your notes** region. Publication and reconstruction preserve learner text outside the generated region. Edits inside generated teaching cause a conflict instead of silent overwrite. Existing earlier-format content is preserved when adopting the region layout. `correct_lesson` applies exact message-targeted corrections in the current branch and adds a visible correction marker; learner evidence is corrected separately. Saving a note and successfully displaying it are separate events.
 
@@ -48,8 +48,30 @@ Local writes use locks, revisions, snapshot digests, no-op detection and atomic 
 
 ## Operation and validation
 
-The agent CLI is `python -m learning` with `context`, `save`, `preferences`, `plan`, `journal`, `sources`, `inspect`, `forget`, `discover`, `readiness`, `note`, `lesson`, `publish-lesson`, `visual`, `start` and `migrate`. Configuration uses `VAULT_DIR`, `LEARNING_ROOT`, optional `LEARNING_ASSETS` and `LEARNING_SESSION_DIR`. Pi uses its existing login and pinned `pi-web-search@1.6.0`; search consumes provider usage and first uncached loading needs network access. Desktop agents use native web tools. No new provider API key is required.
+The agent CLI is `python -m learning [--workspace DIRECTORY]` with `init`, `import`, `context`, `save`, `preferences`, `plan`, `journal`, `sources`, `inspect`, `forget`, `discover`, `readiness`, `note`, `lesson`, `publish-lesson`, `visual`, `start` and `migrate`. Native agent scripts use the same resolver. They retain the returned `workspace` and pass `--workspace DIRECTORY` on subsequent commands when their execution directory differs. Pi binds `STUDY_WORKSPACE` at launch, pins it into tool calls, and resumes only that directory’s conversations. The former `VAULT_DIR`, `LEARNING_ROOT`, `LEARNING_ASSETS` and `LEARNING_SESSION_DIR` overrides no longer select study storage. No external links or global preferences are implicitly inherited. Pi uses its existing login and pinned `pi-web-search@1.6.0`; search consumes provider usage and first uncached loading needs network access. Desktop agents use native web tools. No new provider API key is required.
 
 Schema-4 migration remains explicit: `migrate` previews; `migrate --apply` backs up and checksums before conversion. Existing valid schema-5 records require no migration for these additions. Implementation tests use isolated synthetic state, never personal learner records.
 
 Run `python tools/check.py learning` for the focused gate and `python tools/check.py` for the complete repository gate. The [behavioral acceptance protocol](../docs/learning-behavioral-acceptance.md) separates deterministic behavior, native-model conversation/state observations, real UI checks and unmeasured long-term learning outcomes. Prior [20 September acceptance](../docs/learning-acceptance-2026-09-20/README.md) and [generic-memory acceptance](../docs/learning-generic-memory-acceptance-2026-09-20/README.md) remain historical evidence, not proof of the revised experience.
+
+## Importing existing records
+
+Imports copy one selected scope into an empty initialized workspace, preserving the
+source archive. Preview and then apply explicitly:
+
+```sh
+study init
+study import aikr --from /path/to/old/learn --source-directory /path/to/old/vault
+study import aikr --from /path/to/old/learn --source-directory /path/to/old/vault --apply
+```
+
+Relative source paths are rebased to retain their original targets; sources already
+inside the destination become local relative paths. Knowledge, provenance and
+learner evidence are preserved. Only the selected scope's preferences are copied;
+`--include-defaults` explicitly adds unscoped defaults as local rules. Imports
+validate the candidate and preferences before publication and refuse existing state
+or preferences. Each file publishes atomically; a filesystem failure between files
+can leave a partial import, which must be inspected before retrying. Old mixed
+conversations and artifacts remain in the archive and are never resumed implicitly.
+A source reference to an archived lesson remains an explicit external source.
+Copying a scope does not delete the archive or migrate provider-owned history.

@@ -119,7 +119,7 @@ def test_existing_unmarked_notes_are_adopted_without_losing_content(
     tmp_path: Path, incoming: str
 ) -> None:
     session = str(uuid4())
-    path = tmp_path / "sessions" / f"{session}.md"
+    path = tmp_path / "lessons" / f"{session}.md"
     path.parent.mkdir()
     original = "Prior teaching.\n\nMy personal annotation.\n"
     path.write_text(

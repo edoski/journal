@@ -61,7 +61,7 @@ def _preference_entries(policy: dict[str, Any]) -> dict[str, Any]:
 def _lesson(root: Path, relative: str) -> tuple[Path, dict[str, Any]]:
     path = _safe_file(root, relative)
     parts = Path(relative).parts
-    if len(parts) != 2 or parts[0] != "sessions" or path.suffix != ".md":
+    if len(parts) != 2 or parts[0] != "lessons" or path.suffix != ".md":
         raise ValueError("only exact owned session notes are removable artifacts")
     if str(UUID(path.stem)) != path.stem:
         raise ValueError("invalid lesson session identifier")
@@ -81,7 +81,7 @@ def _lesson(root: Path, relative: str) -> tuple[Path, dict[str, Any]]:
 def _artifact(
     root: Path, assets: Path | None, relative: str
 ) -> tuple[Path, dict[str, Any]]:
-    if relative.startswith("sessions/"):
+    if relative.startswith("lessons/"):
         return _lesson(root, relative)
     if assets is None or not relative.startswith("assets/"):
         raise ValueError(
@@ -146,8 +146,8 @@ def _backup(root: Path, relative: str) -> tuple[Path, dict[str, Any]]:
 def _inventory(root: Path, assets: Path | None) -> dict[str, Any]:
     result: dict[str, Any] = {"artifacts": [], "backups": [], "unmanaged": []}
     candidates = [
-        ("artifacts", f"sessions/{path.name}")
-        for path in sorted((root / "sessions").glob("*.md"))
+        ("artifacts", f"lessons/{path.name}")
+        for path in sorted((root / "lessons").glob("*.md"))
     ]
     if assets is not None:
         candidates.extend(

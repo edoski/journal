@@ -15,7 +15,7 @@ Each transaction selects one group:
 | `{"observations":["o1"],"knowledge":["notation"],"tasks":["exercise-5"]}` | Required | Remove exact selected entries; these three lists can combine |
 | `{"course":true}` | Required | Clear the course while retaining publication revision and observation high-water mark |
 | `{"preferences":["p1"]}` | Omitted | Remove exact preference rules from the inspected snapshot |
-| `{"artifacts":["sessions/UUID.md","assets/name-HASH.svg"]}` | Omitted | Remove exact owned generated files |
+| `{"artifacts":["lessons/UUID.md","assets/name-HASH.svg"]}` | Omitted | Remove exact owned generated files |
 | `{"backups":["backups/schema4-to5-BATCH/state/course.json"]}` | Omitted | Remove exact verified migration backup files |
 
 Use actual returned paths/handles, not the illustrative values above. Groups cannot mix. Course removal requires resolving its scoped preferences separately first. Observation removal drops affected references and invalidates assessments/reviews that depended on it; unrelated evidence remains. Generated-file removal reports each outcome and is not an atomic multi-file transaction. Inspect after an interrupted or uncertain apply rather than assuming nothing was removed.
@@ -28,7 +28,7 @@ These operations do not search out semantic copies in unrelated prose, source fi
 
 For a temporary “don't save this,” enable the Pi `learning_manage` no-save control when available. Continue from existing context without publishing observations, preferences, source captures, lessons or generated assets. Do not bypass the control through shell/file tools. Other hosts must honour the same intent through their available controls; `LEARNING_NO_SAVE=1` makes mutating learning CLI commands reject publication, but cannot disable a general host's file tools or history.
 
-`study --private` starts Pi with disposable local study state and no saved Pi session. It may read the copied prior learning state to maintain continuity; it does not publish back to the durable vault. Do not combine private study with continuation of a saved session. Enabling no-save partway through a conversation does not erase already saved memory or history. Provider retention, terminal scrollback and independently captured material remain outside these controls. Use the actual host's guarantees rather than calling every mode “private.”
+`study --private` starts Pi with disposable local study state and no saved Pi session. It may read the copied prior learning state from this workspace only to maintain continuity; it does not publish back to the durable workspace. Do not combine private study with continuation of a saved session. Enabling no-save partway through a conversation does not erase already saved memory or history. Provider retention, terminal scrollback and independently captured material remain outside these controls. Use the actual host's guarantees rather than calling every mode “private.”
 
 ## Source freshness
 

@@ -101,3 +101,19 @@ to architecture must preserve note text, whitespace, charts, tables, CLI behavio
 and stored learning records. Keep tests for observable behavior, external-input
 errors, transactions, and concurrent publication. Avoid tests that merely assert
 which private helper called another.
+
+### Study workspace ownership
+
+The learning engine is installed once; each initialized course/project directory
+owns `.study`. `learning/workspace.py` resolves explicit selection or the nearest
+ancestor, validates the versioned marker, and derives local output paths. There is
+no global state fallback or inherited parent workspace. `learning/study.py` owns
+the short user command; `__main__.py` is the canonical agent CLI. Pi pins the selected
+workspace across tool calls and stores its conversations there. Private launches
+use a temporary workspace with read-only access to the original sources.
+
+The existing scope model remains inside each workspace. Lessons, assets, records
+and preferences are local; native provider histories outside Pi remain host-owned.
+`workspace_import.py` validates an explicit one-scope copy into an empty workspace,
+rebasing paths and selecting applicable preferences without deleting originals.
+Global aggregation and cross-workspace references are outside this implementation.

@@ -94,11 +94,12 @@ def snapshot(directory, root, name):
 
 def prepare(directory):
     from learning import records
+    from learning.workspace import initialize
 
     base = Path(tempfile.mkdtemp(prefix="learning-ux-acceptance-20260923-"))
     vault = base / "vault"
-    root = vault / "learn"
     vault.mkdir()
+    root = initialize(vault).root
     for name, source in SOURCES.items():
         (vault / name).write_text(source)
     for scope, patch in initial_records().items():
@@ -171,11 +172,7 @@ def environment(vault, root):
     ):
         env.pop(key, None)
     env.update(
-        VAULT_DIR=str(vault),
-        LEARNING_VAULT=str(vault),
-        LEARNING_ROOT=str(root),
-        LEARNING_ASSETS=str(vault / "assets/learn"),
-        LEARNING_SESSION_DIR=str(vault.parent / "native-sessions"),
+        STUDY_WORKSPACE=str(vault),
         JOURNAL_DIR=str(vault / "journal"),
         SCHEDULE_PATH=str(vault / "journal/PROTOCOL.md"),
         JOURNAL_SUPPORT_DIR=str(vault.parent / "support"),
@@ -218,7 +215,7 @@ def run(directory, base, vault, root, scenario):
         "Responses focus only on study content; handle all record keeping under the hood.\n"
         f"Read-only course sources and prior learning: {vault}\n"
         f"Learning records and study artifacts: {root}\n"
-        f"Generated study assets: {vault / 'assets/learn'}\n"
+        f"Generated study assets: {root / 'assets'}\n"
         "Use native file tools for source discovery. "
         "The skill's scripts/learn provides planning, Journal context and saved study notes. "
         "Use canonical learning operations for records and artifacts. "
@@ -247,7 +244,7 @@ def run(directory, base, vault, root, scenario):
         "--system-prompt",
         system_prompt,
         "--session-dir",
-        str(base / name),
+        str(root / "conversations" / name),
         "--tools",
         "read,bash,grep,find,ls,learning_context,learning_save,learning_manage,correct_lesson,quiz",
         "--print",
@@ -473,7 +470,7 @@ def main():
     if args.resume:
         config = json.loads((directory / "environment.json").read_text())
         base = Path(config["temporary_root"])
-        vault, root = base / "vault", base / "vault/learn"
+        vault, root = base / "vault", base / "vault/.study"
     else:
         directory.mkdir(exist_ok=False)
         base, vault, root = prepare(directory)

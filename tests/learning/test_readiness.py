@@ -115,6 +115,7 @@ def test_wrong_link_and_unusable_paths_are_reported(
     issues: Any = result["issues"]
     assert {item["name"] for item in issues} == {
         "learning_root",
+        "learning_assets",
         "vault",
         "claude_skill",
     }
@@ -147,43 +148,31 @@ def test_invalid_host_is_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    ("variable", "check_name"),
-    [("LEARNING_ASSETS", "learning_assets"), ("LEARNING_SESSION_DIR", "pi_sessions")],
+    ("directory", "check_name"),
+    [("assets", "learning_assets"), ("conversations", "pi_sessions")],
 )
-def test_configured_output_directories_reject_regular_files_without_writes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variable: str, check_name: str
+def test_workspace_output_directories_reject_regular_files_without_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, directory: str, check_name: str
 ) -> None:
     root, vault, package = setup_host(tmp_path, monkeypatch)
-    output = Path.home() / "configured-output"
+    root.mkdir()
+    output = root / directory
     output.write_text("Keep existing content.")
-    monkeypatch.setenv(variable, "~/configured-output")
     result = readiness.check(root, vault, package, "pi")
     assert result["ready"] is False
     issues: Any = result["issues"]
     assert [(row["name"], row["path"]) for row in issues] == [(check_name, str(output))]
     assert output.read_text() == "Keep existing content."
-    assert not root.exists()
 
 
-def test_pi_output_defaults_and_overrides_match_runtime_paths(
+def test_pi_outputs_are_local_to_the_workspace(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root, vault, package = setup_host(tmp_path, monkeypatch)
     result = readiness.check(root, vault, package, "pi")
     checks: Any = result["checks"]
     paths = {row["name"]: row.get("path") for row in checks}
-    assert paths["learning_assets"] == str(vault / "assets/learn")
-    assert paths["pi_sessions"] == str(
-        Path.home() / "Library/Application Support/Learning/pi-sessions"
-    )
+    assert paths["learning_assets"] == str(root / "assets")
+    assert paths["pi_sessions"] == str(root / "conversations")
     assert not Path(paths["learning_assets"]).exists()
     assert not Path(paths["pi_sessions"]).exists()
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("LEARNING_ASSETS", "new-assets")
-    monkeypatch.setenv("LEARNING_SESSION_DIR", "new-sessions")
-    result = readiness.check(root, vault, package, "pi")
-    checks = result["checks"]
-    paths = {row["name"]: row.get("path") for row in checks}
-    assert result["ready"] is True
-    assert paths["learning_assets"] == str(tmp_path / "new-assets")
-    assert paths["pi_sessions"] == str(tmp_path / "new-sessions")

@@ -77,11 +77,11 @@ def install_command(repo: Path, support: Path) -> None:
     content = (
         "#!/bin/sh\nexport PATH="
         + shlex.quote(str(Path(pi).parent))
-        + ':"$PATH"\ncd '
+        + ':"$PATH"\nexport PYTHONPATH='
         + shlex.quote(str(repo))
-        + " || exit 1\nexec "
+        + "\nexec "
         + shlex.quote(sys.executable)
-        + ' -m learning start "$@"\n'
+        + ' -m learning.study "$@"\n'
     )
     old_launchers = [Path.home() / "Applications/Study.app", support / "Study.command"]
     replaced = [path for path in old_launchers if path.exists()]

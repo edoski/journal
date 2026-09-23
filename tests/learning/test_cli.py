@@ -5,6 +5,15 @@ import subprocess
 import sys
 from typing import Any
 
+import pytest
+
+from learning.workspace import initialize
+
+
+@pytest.fixture(autouse=True)
+def workspace(tmp_path: Path) -> None:
+    initialize(tmp_path)
+
 
 def invoke(
     root: Path, *args: str, patch: dict[str, Any] | None = None
@@ -15,7 +24,7 @@ def invoke(
         text=True,
         capture_output=True,
         check=True,
-        env={**os.environ, "LEARNING_ROOT": str(root), "VAULT_DIR": str(root.parent)},
+        env={**os.environ, "STUDY_WORKSPACE": str(root)},
     )
     result: dict[str, Any] = json.loads(completed.stdout)
     return result
@@ -33,7 +42,7 @@ def test_save_review_and_knowledge_budget_share_core_contract(tmp_path: Path) ->
             },
         },
     )
-    path = tmp_path / "state/course.json"
+    path = tmp_path / ".study/state/course.json"
     before = path.read_bytes()
     patch = {"knowledge": {"notation": {"uncertainty": None}}}
     preview = invoke(tmp_path, "save", "course", "--expect=1", patch=patch)
@@ -62,11 +71,11 @@ def test_save_review_and_knowledge_budget_share_core_contract(tmp_path: Path) ->
 
 
 def test_context_combines_new_scope_and_saved_policy(tmp_path: Path) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     empty = invoke(root, "context", "course")
     assert empty["revision"] == 0
     assert empty["vault"] == str(tmp_path)
-    assert empty["learning"] == str(root)
+    assert empty["learning"] == str(root / ".study")
     assert empty["preferences"]["revision"] == 0
     assert empty["preferences"]["rules"] == []
     assert empty["preferences"]["scope_revision"] == 0
@@ -124,7 +133,7 @@ def test_context_combines_new_scope_and_saved_policy(tmp_path: Path) -> None:
 def test_evidence_pages_do_not_change_the_current_teaching_policy(
     tmp_path: Path,
 ) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     saved = invoke(
         root,
         "save",
@@ -197,17 +206,17 @@ def test_invalid_context_combination_reports_an_error(tmp_path: Path) -> None:
         ],
         text=True,
         capture_output=True,
-        env={**os.environ, "LEARNING_ROOT": str(tmp_path)},
+        env={**os.environ, "STUDY_WORKSPACE": str(tmp_path)},
     )
     assert result.returncode == 1
     assert "cannot be combined" in result.stderr
-    assert not list(tmp_path.iterdir())
+    assert not (tmp_path / ".study/state").exists()
 
 
 def test_migration_failure_has_a_nonzero_exit_and_preserves_input(
     tmp_path: Path,
 ) -> None:
-    state = tmp_path / "state"
+    state = tmp_path / ".study/state"
     state.mkdir()
     damaged = state / "broken.json"
     damaged.write_text("{", encoding="utf-8")
@@ -215,7 +224,7 @@ def test_migration_failure_has_a_nonzero_exit_and_preserves_input(
         [sys.executable, "-m", "learning", "migrate", "--apply"],
         text=True,
         capture_output=True,
-        env={**os.environ, "LEARNING_ROOT": str(tmp_path)},
+        env={**os.environ, "STUDY_WORKSPACE": str(tmp_path)},
     )
     assert completed.returncode == 1
     assert json.loads(completed.stdout)["errors"][0]["scope"] == "broken"
@@ -226,7 +235,7 @@ def test_migration_failure_has_a_nonzero_exit_and_preserves_input(
 def test_exact_knowledge_read_is_focused_and_preserves_source_location(
     tmp_path: Path,
 ) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     saved = invoke(
         root,
         "save",
@@ -259,7 +268,7 @@ def test_exact_knowledge_read_is_focused_and_preserves_source_location(
 
 
 def test_json_selectors_preserve_handles_with_commas(tmp_path: Path) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     invoke(
         root,
         "save",
@@ -279,9 +288,9 @@ def test_json_selectors_preserve_handles_with_commas(tmp_path: Path) -> None:
 def test_snapshot_conflict_has_a_distinct_machine_readable_error(
     tmp_path: Path,
 ) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     saved = invoke(root, "save", "course", "--expect", "0", patch={"title": "First"})
-    path = root / "state/course.json"
+    path = root / ".study/state/course.json"
     changed = json.loads(path.read_text())
     changed["title"] = "Remote replacement at the same revision"
     path.write_text(json.dumps(changed))
@@ -300,7 +309,7 @@ def test_snapshot_conflict_has_a_distinct_machine_readable_error(
         input=json.dumps({"title": "Overwrite"}),
         text=True,
         capture_output=True,
-        env={**os.environ, "LEARNING_ROOT": str(root), "VAULT_DIR": str(tmp_path)},
+        env={**os.environ, "STUDY_WORKSPACE": str(root)},
     )
     assert completed.returncode == 1
     assert json.loads(completed.stderr)["error"]["kind"] == "conflict"
@@ -308,11 +317,10 @@ def test_snapshot_conflict_has_a_distinct_machine_readable_error(
 
 
 def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     env = {
         **os.environ,
-        "LEARNING_ROOT": str(root),
-        "VAULT_DIR": str(tmp_path),
+        "STUDY_WORKSPACE": str(root),
         "LEARNING_NO_SAVE": "1",
     }
     rejected = subprocess.run(
@@ -324,7 +332,7 @@ def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
     )
     assert rejected.returncode == 1
     assert json.loads(rejected.stderr)["error"]["kind"] == "no_save"
-    assert not root.exists()
+    assert not (root / ".study/state").exists()
     readable = subprocess.run(
         [sys.executable, "-m", "learning", "context", "course"],
         text=True,
@@ -333,13 +341,13 @@ def test_no_save_blocks_publication_but_allows_context(tmp_path: Path) -> None:
     )
     assert readable.returncode == 0
     assert json.loads(readable.stdout)["found"] is False
-    assert not root.exists()
+    assert not (root / ".study/state").exists()
 
 
 def test_source_capture_discovery_and_previewed_forgetting_round_trip(
     tmp_path: Path,
 ) -> None:
-    root = tmp_path / "learn"
+    root = tmp_path
     (tmp_path / "notes.md").write_text("Finite probability spaces.\n")
     saved = invoke(
         root,

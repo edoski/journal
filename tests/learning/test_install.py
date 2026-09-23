@@ -145,3 +145,42 @@ def test_invalid_archive_destination_stops_before_other_installation_changes(
     assert not (home / ".codex").exists()
     assert not (home / ".agents").exists()
     assert not (home / ".local/bin/study").exists()
+
+
+def test_installed_command_preserves_cwd_for_init_and_workspace_resume(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+    import subprocess
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("STUDY_WORKSPACE", raising=False)
+    fake_pi = tmp_path / "pi"
+    fake_pi.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "print(json.dumps({'cwd': os.getcwd(), 'workspace': os.environ['STUDY_WORKSPACE'], 'args': sys.argv[1:]}))\n"
+    )
+    fake_pi.chmod(0o755)
+    monkeypatch.setattr(install.shutil, "which", lambda _: str(fake_pi))
+    repo = Path(__file__).resolve().parents[2]
+    install.install_command(repo, home / "support")
+    command = home / ".local/bin/study"
+    course = tmp_path / "course with spaces"
+    course.mkdir()
+    result = json.loads(
+        subprocess.check_output([str(command), "init"], cwd=course, text=True)
+    )
+    assert result["workspace"] == str(course)
+    nested = course / "module"
+    nested.mkdir()
+    result = json.loads(
+        subprocess.check_output([str(command), "--continue"], cwd=nested, text=True)
+    )
+    assert result["cwd"] == result["workspace"] == str(course)
+    args = result["args"]
+    assert args[args.index("--session-dir") + 1] == str(course / ".study/conversations")
+    assert "--continue" in args
+    assert not (repo / ".study").exists()

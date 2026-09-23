@@ -259,7 +259,7 @@ def test_artifact_preview_binds_canonical_target_for_relative_roots(
     session = str(uuid4())
     lessons.publish(first / "learn", session, "Worked example")
     shutil.copytree(first, second)
-    selection = {"artifacts": [f"sessions/{session}.md"]}
+    selection = {"artifacts": [f"lessons/{session}.md"]}
     monkeypatch.chdir(first)
     preview = memory.forget(Path("learn"), None, selection)
     monkeypatch.chdir(second)
@@ -272,7 +272,7 @@ def test_artifact_preview_binds_canonical_target_for_relative_roots(
             expected_digest=preview["digest"],
             apply=True,
         )
-    assert (second / "learn/sessions" / f"{session}.md").exists()
+    assert (second / "learn/lessons" / f"{session}.md").exists()
     applied = memory.forget(
         first / "learn",
         None,
@@ -282,8 +282,8 @@ def test_artifact_preview_binds_canonical_target_for_relative_roots(
         apply=True,
     )
     assert applied["complete"]
-    assert not (first / "learn/sessions" / f"{session}.md").exists()
-    assert (second / "learn/sessions" / f"{session}.md").exists()
+    assert not (first / "learn/lessons" / f"{session}.md").exists()
+    assert (second / "learn/lessons" / f"{session}.md").exists()
 
 
 def test_preferences_and_course_are_deliberate_separate_operations(
@@ -369,7 +369,7 @@ def test_owned_artifacts_are_explicit_and_snapshot_guarded(tmp_path: Path) -> No
     )
     svg = next(assets.glob("*.svg"))
     assert diagram
-    paths = [f"sessions/{session}.md", f"assets/{svg.name}"]
+    paths = [f"lessons/{session}.md", f"assets/{svg.name}"]
     inventory = memory.inspect(root, assets=assets)
     assert {item["path"] for item in inventory["artifacts"]} == set(paths)
     preview = memory.forget(root, None, {"artifacts": paths}, assets=assets)
@@ -393,17 +393,17 @@ def test_owned_artifacts_are_explicit_and_snapshot_guarded(tmp_path: Path) -> No
 
 
 def test_unowned_and_linked_files_are_not_removable(tmp_path: Path) -> None:
-    directory = tmp_path / "sessions"
+    directory = tmp_path / "lessons"
     directory.mkdir()
     session = str(uuid4())
     (directory / f"{session}.md").write_text("Personal note", encoding="utf-8")
     with pytest.raises(ValueError, match="unowned"):
-        memory.forget(tmp_path, None, {"artifacts": [f"sessions/{session}.md"]})
+        memory.forget(tmp_path, None, {"artifacts": [f"lessons/{session}.md"]})
     (directory / "linked.md").symlink_to(directory / f"{session}.md")
     with pytest.raises(ValueError, match="linked"):
-        memory.forget(tmp_path, None, {"artifacts": ["sessions/linked.md"]})
+        memory.forget(tmp_path, None, {"artifacts": ["lessons/linked.md"]})
     with pytest.raises(ValueError, match="relative"):
-        memory.forget(tmp_path, None, {"artifacts": ["sessions/../preferences.json"]})
+        memory.forget(tmp_path, None, {"artifacts": ["lessons/../preferences.json"]})
     assert len(memory.inspect(tmp_path)["unmanaged"]) == 2
 
 

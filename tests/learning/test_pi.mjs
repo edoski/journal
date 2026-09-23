@@ -19,22 +19,23 @@ const { SessionManager } = await import(pathToFileURL(join(piPackage, "dist/core
 const { validateToolArguments } = await import(pathToFileURL(join(piPackage, "node_modules/@earendil-works/pi-ai/dist/utils/validation.js")));
 
 async function fixture(t, { open = false, throwOnOpen = false, beforePublish, readingMode = "terminal", privateLaunch = false } = {}) {
-  const root = realpathSync(await mkdtemp(join(tmpdir(), "learning-pi-unit-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  const workspace = realpathSync(await mkdtemp(join(tmpdir(), "learning-pi-unit-")));
+  execFileSync(join(repository, ".venv/bin/python"), ["-m", "learning", "--workspace", workspace, "init"], { cwd: repository });
+  const root = join(workspace, ".study");
+  t.after(() => rm(workspace, { recursive: true, force: true }));
   const previous = { ...process.env };
   Object.assign(process.env, {
-    LEARNING_ROOT: root,
+    STUDY_WORKSPACE: workspace,
     LEARNING_PACKAGE: repository,
     LEARNING_PYTHON: join(repository, ".venv/bin/python"),
     LEARNING_OPEN: open ? "1" : "0",
     LEARNING_READING_MODE: readingMode,
     LEARNING_PRIVATE: privateLaunch ? "1" : "0",
     LEARNING_NO_SAVE: "0",
-    VAULT_DIR: join(root, "vault"),
-    LEARNING_ASSETS: join(root, "assets"),
+
   });
   t.after(() => {
-    for (const key of ["LEARNING_ROOT", "LEARNING_PACKAGE", "LEARNING_PYTHON", "LEARNING_OPEN", "LEARNING_READING_MODE", "LEARNING_PRIVATE", "LEARNING_NO_SAVE", "VAULT_DIR", "LEARNING_ASSETS"]) {
+    for (const key of ["STUDY_WORKSPACE", "LEARNING_PACKAGE", "LEARNING_PYTHON", "LEARNING_OPEN", "LEARNING_READING_MODE", "LEARNING_PRIVATE", "LEARNING_NO_SAVE"]) {
       if (previous[key] === undefined) delete process.env[key];
       else process.env[key] = previous[key];
     }
@@ -80,7 +81,7 @@ async function fixture(t, { open = false, throwOnOpen = false, beforePublish, re
   };
   const append = (message) => branch.push({ type: "message", id: randomUUID(), message });
   const complete = async (message) => { await emit("message_end", { message }); append(message); };
-  const path = join(root, "sessions", `${id}.md`);
+  const path = join(root, "lessons", `${id}.md`);
   return { ctx, branch, errors, openings, emit, append, complete, path, extension, runtime: loaded.runtime, activeTools: () => activeTools };
 }
 
@@ -135,7 +136,7 @@ test("memory tools preserve patches and share CLI retrieval, preferences and rev
   assert.deepEqual((await context({})).scopes, []);
   const empty = await context({ scope: "course" });
   assert.equal(empty.revision, 0);
-  assert.equal(empty.vault, process.env.VAULT_DIR);
+  assert.equal(empty.vault, process.env.STUDY_WORKSPACE);
   const evidence = "-it's $literal `text`\n日本語 and \\LaTeX";
   const saved = await memoryTool(f, "learning_save", {
     scope: "course", expected_revision: empty.revision,
@@ -180,7 +181,7 @@ test("memory tools reject invalid writes and stale revisions without changing ev
   const save = (expected_revision, changes, signal) => memoryTool(f, "learning_save",
     { scope: "course", expected_revision, changes }, signal);
   await save(0, { topics: { systems: {} }, observations: [{ topics: ["systems"], text: "Original evidence." }] });
-  const path = join(process.env.LEARNING_ROOT, "state/course.json");
+  const path = join(join(process.env.STUDY_WORKSPACE, ".study"), "state/course.json");
   const original = await readFile(path, "utf8");
   await assert.rejects(save(0, { title: "Stale" }), /revision conflict/);
   await assert.rejects(save(1, { observations: [{ topics: ["missing"], text: "Invalid reference." }] }), /unknown.*missing/);
@@ -376,15 +377,15 @@ test("empty starts stay out of the vault and first teaching uses the current ses
   const f = await fixture(t);
   await f.emit("session_start", { reason: "new" });
   await assert.rejects(readFile(f.path), { code: "ENOENT" });
-  const root = process.env.LEARNING_ROOT;
+  const root = join(process.env.STUDY_WORKSPACE, ".study");
   await assert.rejects(readFile(join(root, "index.md")), { code: "ENOENT" });
   const actualId = randomUUID();
   f.ctx.sessionManager.getSessionId = () => actualId;
   await f.complete({ role: "user", content: "Continue SMM" });
   await f.complete({ role: "assistant", content: [{ type: "toolCall", name: "read" }] });
-  await assert.rejects(readFile(join(root, "sessions", `${actualId}.md`)), { code: "ENOENT" });
+  await assert.rejects(readFile(join(root, "lessons", `${actualId}.md`)), { code: "ENOENT" });
   await f.complete(assistant("Here is the next explanation."));
-  assert.match(await readFile(join(root, "sessions", `${actualId}.md`), "utf8"), /next explanation/);
+  assert.match(await readFile(join(root, "lessons", `${actualId}.md`), "utf8"), /next explanation/);
   await assert.rejects(readFile(f.path), { code: "ENOENT" });
 });
 
@@ -411,7 +412,7 @@ test("empty branches clear previous teaching, recover publication failures and p
 
 test("persisted Pi compaction and restart reconstruct corrected teaching and selected branches", async (t) => {
   const f = await fixture(t);
-  const root = process.env.LEARNING_ROOT;
+  const root = join(process.env.STUDY_WORKSPACE, ".study");
   const sessions = join(root, "pi-sessions");
   let manager = SessionManager.create(root, sessions);
   f.ctx.sessionManager = manager;
@@ -427,7 +428,7 @@ test("persisted Pi compaction and restart reconstruct corrected teaching and sel
   manager.appendCompaction("We corrected the inverse and will continue.", retained, 1000);
   manager.appendMessage(assistant("Now apply the inverse."));
   await f.emit("session_tree");
-  const path = join(root, "sessions", `${manager.getSessionId()}.md`);
+  const path = join(root, "lessons", `${manager.getSessionId()}.md`);
   const projected = await readFile(path, "utf8");
   assert.match(projected, /The inverse equals P\./);
   assert.match(projected, /\*\*Correction:\*\*/);
@@ -653,7 +654,7 @@ test("quiet management shares preferences, source snapshots, memory previews and
     changes: { rules: [{ when: { domain: "algebra, geometry" }, values: { pace: { instruction: "Explain geometrically.", origin: "explicit" } } }] } });
   const policyContext = await memoryTool(f, "learning_context", { domains: ["algebra, geometry"] });
   assert.equal(policyContext.preferences.rules[0].values.pace.instruction, "Explain geometrically.");
-  const vault = process.env.VAULT_DIR;
+  const vault = process.env.STUDY_WORKSPACE;
   await mkdir(vault, { recursive: true });
   await writeFile(join(vault, "sheet.md"), "Course notation and assumptions.\n");
   const saved = await memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: {
@@ -696,7 +697,7 @@ test("definitive validation/conflict failures differ from interrupted write deli
     assert.doesNotMatch(error.message, /may have completed|interrupted/);
     return true;
   });
-  const delayed = join(process.env.LEARNING_ROOT, "delayed-command");
+  const delayed = join(join(process.env.STUDY_WORKSPACE, ".study"), "delayed-command");
   await writeFile(delayed, "#!/bin/sh\nexec /bin/sleep 5\n");
   await chmod(delayed, 0o700);
   process.env.LEARNING_PYTHON = delayed;
@@ -722,7 +723,7 @@ for (const privateLaunch of [false, true]) {
     assert.equal(f.extension.markdownTransformer("Study continues naturally.", { messageType: "assistant", isStreaming: true }), "Study continues naturally.");
     await assert.rejects(memoryTool(f, "learning_save", { scope: "course", expected_revision: 0, changes: { title: "No write" } }), /does not save/);
     await assert.rejects(memoryTool(f, "learning_manage", { action: "preferences", expected_revision: 0, changes: { rules: [] } }), /does not save/);
-    await assert.rejects(readFile(join(process.env.LEARNING_ROOT, "state/course.json")), { code: "ENOENT" });
+    await assert.rejects(readFile(join(join(process.env.STUDY_WORKSPACE, ".study"), "state/course.json")), { code: "ENOENT" });
   });
 }
 
@@ -755,7 +756,7 @@ test("save schema allows canonical explicit clearing of optional knowledge and c
     course_context: null,
     knowledge: { convention: { topics: null, refs: null, attribution: null, uncertainty: null, conflicts: null, aliases: null } },
   } };
-  const path = join(process.env.LEARNING_ROOT, "state/course.json");
+  const path = join(join(process.env.STUDY_WORKSPACE, ".study"), "state/course.json");
   const before = await readFile(path, "utf8");
   const preview = await memoryTool(f, "learning_save", args);
   assert.equal(preview.status, "needs_confirmation");
@@ -770,4 +771,13 @@ test("save schema allows canonical explicit clearing of optional knowledge and c
   const context = await memoryTool(f, "learning_context", { scope: "course", all: true });
   assert.deepEqual(context.knowledge.convention, { text: "A denotes the matrix." });
   assert.equal(context.course_context, undefined);
+});
+
+
+test("workspace binding survives a changed process selection", async (t) => {
+  const f = await fixture(t);
+  const selected = process.env.STUDY_WORKSPACE;
+  process.env.STUDY_WORKSPACE = join(selected, "uninitialized-other-course");
+  const result = await f.extension.tools.get("learning_context").definition.execute("bound", {}, undefined, undefined, f.ctx);
+  assert.equal(JSON.parse(result.content[0].text).workspace, selected);
 });

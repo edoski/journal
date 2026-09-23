@@ -103,7 +103,7 @@ def _change(
             raise ValueError(f"unknown lesson scope: {scope}")
     if title is not None:
         title = _title(title)
-    path = root / "sessions" / f"{session_id}.md"
+    path = root / "lessons" / f"{session_id}.md"
     marker = f"<!-- learning-session:{session_id} -->"
     # Serialise label changes and Pi publication of the same owned note.
     with storage.lock(root / ".lessons.lock"):

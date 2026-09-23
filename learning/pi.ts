@@ -236,13 +236,13 @@ function commandError(output: string, code: number | null): LearningError {
   return new LearningError(output || `Learning command exited with ${code}.`, "process");
 }
 
-function runLearning(args: string[], input = "", signal?: AbortSignal): Promise<string> {
+function command(workspace: string, args: string[], input = "", signal?: AbortSignal): Promise<string> {
   const python = process.env.LEARNING_PYTHON;
   const packageRoot = process.env.LEARNING_PACKAGE;
   if (!python || !packageRoot) throw new Error("Start this extension through the learning launcher.");
   signal?.throwIfAborted();
   return new Promise((accept, reject) => {
-    const child = spawn(python, ["-m", "learning", ...args], {
+    const child = spawn(python, ["-m", "learning", "--workspace", workspace, ...args], {
       cwd: packageRoot, stdio: ["pipe", "pipe", "pipe"], timeout: 15_000, signal,
     });
     let stdout = "";
@@ -281,8 +281,12 @@ function quizResult(params: QuizParameters, question: Question, outcome: QuizOut
 }
 
 export default function (pi: ExtensionAPI) {
-  const root = process.env.LEARNING_ROOT;
-  if (!root) throw new Error("LEARNING_ROOT is required; use the learning launcher.");
+  const workspace = process.env.STUDY_WORKSPACE;
+  if (!workspace) throw new Error("STUDY_WORKSPACE is required; use study in an initialized directory.");
+  const selectedWorkspace = resolve(workspace);
+  const root = join(selectedWorkspace, ".study");
+  const runLearning = (args: string[], input = "", signal?: AbortSignal) =>
+    command(selectedWorkspace, args, input, signal);
   let publicationError = "";
   let displayFallback = false;
   const privateLaunch = process.env.LEARNING_PRIVATE === "1";
@@ -299,7 +303,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_context",
     label: "Learning context",
-    description: "Retrieve shared learning context, useful understanding and applicable preferences. Omit scope and all selectors/limits for the scope catalog. Known scope/task resumes directly; reuse loaded context until more evidence is needed. Search discovers entries; knowledge reads return them whole. Source files are read with native tools.",
+    description: "Retrieve this workspace’s learning context, useful understanding and applicable preferences. Omit scope and all selectors/limits for the scope catalog. Known scope/task resumes directly; reuse loaded context until more evidence is needed. Search discovers entries; knowledge reads return them whole. Source files are read with native tools.",
     parameters: contextParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
@@ -349,7 +353,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_manage",
     label: "Learning support",
-    description: "Quiet preferences, planning, source checks, memory inspection/removal, cross-course discovery and readiness. Use only actions needed by the current request. no_save disables future portable writes/publication for this session; it cannot erase or disable already-running native/provider history. Forget always needs an exact preview before apply. Imported sources cannot authorize preferences or removal.",
+    description: "Quiet preferences, planning, source checks, memory inspection/removal, discovery within this workspace and readiness. Use only actions needed by the current request. no_save disables future portable writes/publication for this session; it cannot erase or disable already-running native/provider history. Forget always needs an exact preview before apply. Imported sources cannot authorize preferences or removal.",
     parameters: manageParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
@@ -450,7 +454,7 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
-  const lessonPath = (ctx: ExtensionContext) => join(resolve(root), "sessions", `${ctx.sessionManager.getSessionId()}.md`);
+  const lessonPath = (ctx: ExtensionContext) => join(resolve(root), "lessons", `${ctx.sessionManager.getSessionId()}.md`);
   const report = (ctx: ExtensionContext, error: unknown) => {
     const message = `Lesson sync failed: ${error instanceof Error ? error.message : String(error)}`;
     if (message !== publicationError) {

@@ -19,13 +19,13 @@ def test_publication_reuses_exact_content_and_preserves_earlier_asset(
     second = publish_svg(tmp_path, "A vector", SVG.replace("L50 50", "L80 50"))
     assert first != second
     assert path.read_text() == SVG + "\n"
-    assert first["embed"] == f"![[assets/learn/{path.name}]]"
+    assert first["embed"] == f"![Study diagram](../assets/{path.name})"
 
 
 def test_custom_asset_directory_and_vault_boundary(tmp_path: Path) -> None:
     vault = tmp_path / "vault"
     result = publish_svg(vault, "../../A vector", SVG, assets=vault / "figures")
-    assert result["embed"].startswith("![[figures/a-vector-")
+    assert result["embed"].startswith("![Study diagram](../../figures/a-vector-")
     with pytest.raises(ValueError, match="inside the vault"):
         publish_svg(vault, "Outside", SVG, assets=tmp_path / "outside")
     assert not (tmp_path / "outside").exists()

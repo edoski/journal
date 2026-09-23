@@ -196,11 +196,7 @@ def check(
         path.expanduser().absolute() for path in (root, vault, package)
     )
     skill = package / "skills/learn"
-    assets = (
-        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
-        .expanduser()
-        .resolve()
-    )
+    assets = root / "assets"
     checks = [
         _directory("learning_root", root, allow_missing=True),
         _directory("vault", vault, allow_missing=False),
@@ -215,16 +211,7 @@ def check(
         ),
     ]
     if host in {"all", "pi"}:
-        sessions = (
-            Path(
-                os.environ.get(
-                    "LEARNING_SESSION_DIR",
-                    Path.home() / "Library/Application Support/Learning/pi-sessions",
-                )
-            )
-            .expanduser()
-            .resolve()
-        )
+        sessions = root / "conversations"
         checks.append(_directory("pi_sessions", sessions, allow_missing=True))
         checks.append(_file("pi_extension", package / "pi.ts"))
         for command in ("pi", "node"):

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import sys
+from typing import Any
 from uuid import uuid4
 
 from learning import records, retrieval, lessons, preferences, storage
@@ -31,18 +32,17 @@ def keys(value: str | None) -> list[str] | None:
     )
 
 
-def paths() -> tuple[Path, Path]:
-    default = (
-        Path.home() / "Library/Mobile Documents/iCloud~md~obsidian/Documents/the-vault"
-    )
-    vault = Path(os.environ.get("VAULT_DIR", default)).expanduser().resolve()
-    root = Path(os.environ.get("LEARNING_ROOT", vault / "learn")).expanduser().resolve()
-    return vault, root
-
-
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workspace", help="Exact initialized study directory")
     commands = parser.add_subparsers(dest="command")
+    commands.add_parser("init", help="Initialize .study in this directory")
+    importing = commands.add_parser("import", help="Preview or copy one existing scope")
+    importing.add_argument("scope")
+    importing.add_argument("--from", dest="source", type=Path, required=True)
+    importing.add_argument("--source-directory", type=Path, required=True)
+    importing.add_argument("--include-defaults", action="store_true")
+    importing.add_argument("--apply", action="store_true")
     start = commands.add_parser("start")
     start.add_argument("prompt", nargs="?")
     start.add_argument("--continue", dest="resume", action="store_true")
@@ -165,18 +165,31 @@ def main() -> int:
     visual.add_argument("--title", required=True)
     note = commands.add_parser("note")
     note.add_argument("--title", default="Study notes")
-    args = parser.parse_args()
-    vault, root = paths()
-    assets = (
-        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
-        .expanduser()
-        .resolve()
-    )
+    args = parser.parse_args(argv)
     try:
+        from learning.workspace import initialize, resolve
+
+        if args.command == "init":
+            if os.environ.get("LEARNING_NO_SAVE") == "1":
+                raise NoSaveError(
+                    "This session cannot initialize persistent study state"
+                )
+            workspace = initialize(args.workspace)
+            print(
+                json.dumps(
+                    {
+                        "workspace": str(workspace.directory),
+                        "learning": str(workspace.root),
+                    }
+                )
+            )
+            return 0
+        workspace = resolve(args.workspace)
+        vault, root, assets = workspace.sources, workspace.root, workspace.assets
         mutating = (
             args.command in {"save", "lesson", "publish-lesson", "visual", "note"}
             or (args.command in {"preferences", "sources"} and args.expect is not None)
-            or (args.command in {"forget", "migrate"} and args.apply)
+            or (args.command in {"forget", "migrate", "import"} and args.apply)
         )
         if mutating and os.environ.get("LEARNING_NO_SAVE") == "1":
             raise NoSaveError(
@@ -186,8 +199,7 @@ def main() -> int:
             from learning.runtime import start_pi
 
             start_pi(
-                vault,
-                root,
+                workspace,
                 args
                 if args.command
                 else argparse.Namespace(
@@ -200,7 +212,18 @@ def main() -> int:
                 ),
             )
             return 0
-        if args.command == "context":
+        if args.command == "import":
+            from learning.workspace_import import import_scope
+
+            result: dict[str, Any] = import_scope(
+                workspace,
+                args.source,
+                args.source_directory,
+                args.scope,
+                include_defaults=args.include_defaults,
+                apply=args.apply,
+            )
+        elif args.command == "context":
             selection = (
                 args.task is not None
                 or args.topics is not None
@@ -239,7 +262,7 @@ def main() -> int:
             ):
                 raise ValueError("knowledge reads cannot include policy selectors")
             topics = keys(args.topics)
-            result = (
+            context_value = (
                 records.read(root, args.scope)
                 if args.all
                 else retrieval.context(
@@ -259,14 +282,17 @@ def main() -> int:
                 )
             )
             if args.scope is None:
-                assert isinstance(result, list)
+                assert isinstance(context_value, list)
                 result = {
-                    "scopes": [item for item in result if "error" not in item],
-                    "errors": [item for item in result if "error" in item],
+                    "scopes": [item for item in context_value if "error" not in item],
+                    "errors": [item for item in context_value if "error" in item],
                 }
-            assert isinstance(result, dict)
+            else:
+                assert isinstance(context_value, dict)
+                result = context_value
             if args.knowledge is None:
                 result.update(
+                    workspace=str(workspace.directory),
                     vault=str(vault),
                     learning=str(root),
                     assets=str(assets),

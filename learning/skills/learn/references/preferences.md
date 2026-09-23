@@ -6,7 +6,7 @@ Preferences are shared mutable learner data, separate from historical learning e
 {"rules":[{"when":{"domain":"mathematics","activity":"proof"},"values":{"lesson_pace":{"instruction":"Develop one justified inference at a time.","origin":"explicit"}}}]}
 ```
 
-`when` is a conjunction: all supplied conditions must match. `{}` means global. Optional scalar selectors are `scope`, `topic`, `concept`, `domain`, and `activity`; local `topic` requires `scope`. Reuse actual scope/topic IDs and established semantic labels. Add an intersection only when feedback calls for one, not every possible combination.
+`when` is a conjunction: all supplied conditions must match. `{}` means this entire workspace, never other workspaces. Optional scalar selectors are `scope`, `topic`, `concept`, `domain`, and `activity`; local `topic` requires `scope`. Reuse actual scope/topic IDs and established semantic labels. Add an intersection only when feedback calls for one, not every possible combination.
 
 Each dimension contains one current `instruction`, `origin` (`explicit` or `inferred`) and optional brief `basis`. Replace the value rather than appending obsolete versions. Use a grounded basis for an inference or non-obvious exception. Suggested dimensions are `response_format`, `explanation_depth`, `research_depth`, `lesson_pace` and `question_style`; record only those needed. Setting a dimension to null deletes it; omitted dimensions and selectors survive. The helper returns the new revision; unchanged effective patches are no-ops.
 

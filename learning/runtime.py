@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 
+from learning.workspace import Workspace, initialize
+
 _TOOLS = (
     "read,bash,grep,find,ls,learning_context,learning_save,learning_manage,"
     "correct_lesson,quiz,web_search,url_context"
@@ -18,22 +20,19 @@ _TOOLS = (
 
 def _launch(
     pi: str,
-    vault: Path,
-    root: Path,
-    assets: Path,
-    sessions: Path,
+    workspace: Workspace,
     args: argparse.Namespace,
+    *,
+    source_directory: Path | None = None,
 ) -> None:
+    vault, root = source_directory or workspace.sources, workspace.root
+    assets, sessions = workspace.assets, workspace.conversations
     runtime = Path(__file__).resolve().parent
     root.mkdir(parents=True, exist_ok=True)
     assets.mkdir(parents=True, exist_ok=True)
     environment = {
         **os.environ,
-        "LEARNING_ROOT": str(root),
-        "LEARNING_VAULT": str(vault),
-        "VAULT_DIR": str(vault),
-        "LEARNING_ASSETS": str(assets),
-        "LEARNING_SESSION_DIR": str(sessions),
+        "STUDY_WORKSPACE": str(workspace.directory),
         "LEARNING_PYTHON": sys.executable,
         "LEARNING_PACKAGE": str(runtime.parent),
         "LEARNING_PRIVATE": "1" if args.private else "0",
@@ -41,6 +40,11 @@ def _launch(
             "0" if args.private or args.no_open or args.headless or args.json else "1"
         ),
     }
+    if args.private:
+        environment["LEARNING_NO_SAVE"] = "1"
+    environment.pop("LEARNING_SOURCE_ROOT", None)
+    if source_directory is not None:
+        environment["LEARNING_SOURCE_ROOT"] = str(source_directory)
     presentation = (
         "The learner talks and reads your teaching in this terminal. "
         if args.private
@@ -50,7 +54,7 @@ def _launch(
         "You are a personal study tutor. Use the learn skill for study requests. "
         f"{presentation}"
         "Responses focus only on study content; handle all record keeping under the hood.\n"
-        f"Read-only course sources and prior learning: {vault}\n"
+        f"Read-only workspace sources: {vault}\n"
         f"Learning records and study artifacts: {root}\n"
         f"Generated study assets: {assets}\n"
         "Use native file tools for source discovery. "
@@ -102,7 +106,9 @@ def _launch(
     if args.prompt:
         command.extend(["--", args.prompt])
     if args.private:
-        completed = subprocess.run(command, cwd=root, env=environment, check=False)
+        completed = subprocess.run(
+            command, cwd=workspace.directory, env=environment, check=False
+        )
         if completed.returncode:
             raise SystemExit(
                 completed.returncode
@@ -111,52 +117,28 @@ def _launch(
             )
     else:
         os.environ.update(environment)
-        os.chdir(root)
+        os.chdir(workspace.directory)
         os.execv(pi, command)
 
 
-def start_pi(vault: Path, root: Path, args: argparse.Namespace) -> None:
+def start_pi(workspace: Workspace, args: argparse.Namespace) -> None:
     pi = shutil.which("pi")
     if not pi:
         raise ValueError("Pi is not available in the learning launcher's PATH")
-    if not vault.is_dir():
-        raise ValueError(f"Vault does not exist: {vault}")
     if args.private:
         if args.resume:
             raise ValueError("Private study starts a new session; omit --continue")
         with tempfile.TemporaryDirectory(prefix="learning-private-") as directory:
-            temporary = Path(directory)
-            ephemeral_root = temporary / "learn"
-            ephemeral_state = ephemeral_root / "state"
-            ephemeral_state.mkdir(parents=True)
-            for record in (root / "state").glob("*.json"):
+            temporary = initialize(directory)
+            ephemeral_state = temporary.root / "state"
+            ephemeral_state.mkdir()
+            for record in (workspace.root / "state").glob("*.json"):
                 shutil.copyfile(record, ephemeral_state / record.name)
-            if (root / "preferences.json").is_file():
+            if (workspace.root / "preferences.json").is_file():
                 shutil.copyfile(
-                    root / "preferences.json", ephemeral_root / "preferences.json"
+                    workspace.root / "preferences.json",
+                    temporary.root / "preferences.json",
                 )
-            _launch(
-                pi,
-                vault,
-                ephemeral_root,
-                temporary / "assets",
-                temporary / "pi-sessions",
-                args,
-            )
+            _launch(pi, temporary, args, source_directory=workspace.sources)
         return
-    assets = (
-        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
-        .expanduser()
-        .resolve()
-    )
-    sessions = (
-        Path(
-            os.environ.get(
-                "LEARNING_SESSION_DIR",
-                Path.home() / "Library/Application Support/Learning/pi-sessions",
-            )
-        )
-        .expanduser()
-        .resolve()
-    )
-    _launch(pi, vault, root, assets, sessions, args)
+    _launch(pi, workspace, args)
