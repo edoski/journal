@@ -3,6 +3,12 @@
 Approved direction: one installed learning engine, independent `.study` directories,
 no global learning-state fallback. Implementation baseline: `2139b09`.
 
+Status: implemented and reviewed; see [delivery and cutover results](study-workspaces-results-2026-09-23.md).
+During implementation the user additionally authorized migration of all clearly
+attributed personal course material and removal of the three old global locations
+after verification. That operational cutover is recorded separately from the
+non-destructive general import command specified below.
+
 `study init` initializes the current directory without a questionnaire, model call,
 copied runtime or inferred subject. Repeating it preserves existing state. A small
 versioned `.study/workspace.json` marks ownership. State, preferences, resumable Pi

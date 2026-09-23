@@ -1,0 +1,39 @@
+{
+  "courses": [
+    {
+      "scope": "aikr",
+      "status": "imported",
+      "preferences": 1
+    },
+    {
+      "scope": "smm",
+      "status": "imported",
+      "preferences": 2
+    }
+  ],
+  "lessons_copied": 4,
+  "diagrams_copied": 1,
+  "conversations_migrated": 2,
+  "conversation_changes": "cwd header only; all message bytes preserved",
+  "course_state_preserved": true,
+  "source_targets_verified": true,
+  "originals_unchanged_before_deletion": true,
+  "files_in_old_locations": 18,
+  "old_locations_removed": 3,
+  "old_files_removed": 18,
+  "destination_files_verified": 18,
+  "destination_bytes_unchanged_after_removal": true,
+  "readiness": {
+    "aikr": true,
+    "smm": true
+  },
+  "pi_resume_verified": true,
+  "production_commit": "8fb32b3893612df66383f9c80d83877332d6bd40",
+  "python_tests": 278,
+  "pi_tests": 33,
+  "import_contracts": 10,
+  "strict_mypy_source_files": 23,
+  "standards_findings": 0,
+  "spec_findings": 0,
+  "installed_command_smoke": true
+}

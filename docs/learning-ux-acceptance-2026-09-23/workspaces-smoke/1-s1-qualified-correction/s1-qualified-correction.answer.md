@@ -1,0 +1,3 @@
+Your lecturer’s clarification changes the **working convention**, not what we know about your mathematical understanding. For the current lab, follow Lumen: use discrete-time signals indexed by $n$ and write the impulse response as $g[n]$. The old continuous-time treatment uses $g(t)$ and integrals where the discrete-time treatment uses sums—for example, convolution becomes a sum.
+
+Atlas remains useful for derivations, but translate its notation and assumptions into Lumen’s discrete-time convention before applying a result. The undated files in the vault show both conventions; they don’t establish which file is an old or current edition.

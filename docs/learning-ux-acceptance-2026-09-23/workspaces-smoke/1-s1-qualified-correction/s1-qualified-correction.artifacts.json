@@ -1,0 +1,18 @@
+{
+  ".study/.gitignore": "cdbcae15105d6b781e620813c79c7e868740d4e9cc53ce6f5fcbbc12387adf4b",
+  ".study/.lessons.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".study/.records.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".study/.workspace.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".study/conversations/s1-qualified-correction/2026-09-23T19-15-55-397Z_01a0cfb2-2b84-7609-b37c-81a79022ef89.jsonl": "b2608ec2a7b32d2ce0649e37bf13add9e651269ae7c1904065d9eeb5e1a49507",
+  ".study/lessons/01a0cfb2-2b84-7609-b37c-81a79022ef89.md": "5849c0b4a1ef230b592d2dd2fbb0e63870844ace82f4c3b8748e7092d25a3139",
+  ".study/state/.numerical-methods.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".study/state/.signals-studio.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  ".study/state/numerical-methods.json": "b82d23f81c5af64fdd909671ab5ec11f8f627bdf706f38964a927caf12947ffc",
+  ".study/state/signals-studio.json": "f22a724a24646bcdb98e5b551c0e7248588fba11c9096fb4ff7c634e292e1320",
+  ".study/workspace.json": "cedb60dfefb0ead1fa5a3ccb3c68e0ceaf4bb3415df80c79863092f362bd5ab9",
+  "hostile-worksheet.md": "d120b27a63815cdc038a2733d5f61e8f70ab017a2364cacca87b81c2ba416e67",
+  "lab-notice.md": "d63401f62d12c6aab21c45ecf8a7f3709a70e237c8674115a14fe06fd7312503",
+  "lab-sheet.md": "71c2c8e0fe6830554dfd1c801fb4c97b8b534b7ad91528bf5080fa6389af6179",
+  "linear-worksheet.md": "ba2a854722442d31704504266f1c838bb1684e57cd9bc8d9ccc6be9a8bef7097",
+  "signals-overview.md": "cf251a0c374150c857e1513f7316089c4e62315dc3a39e56d94d2defe488288d"
+}
