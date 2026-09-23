@@ -1,6 +1,7 @@
 from hashlib import sha256
 import json
 from pathlib import Path
+import shutil
 from typing import Any
 from uuid import uuid4
 
@@ -163,6 +164,126 @@ def test_apply_requires_exact_preview_and_detects_same_revision_conflict(
             apply=True,
         )
     assert "notation" in storage.load(path)["knowledge"]
+
+
+@pytest.mark.parametrize("different_root", [False, True])
+def test_record_preview_cannot_target_an_identical_other_course(
+    tmp_path: Path, different_root: bool
+) -> None:
+    root = tmp_path / "original"
+    seed(root)
+    original = root / "state/algebra.json"
+    target_root = tmp_path / "other" if different_root else root
+    target_scope = "algebra" if different_root else "geometry"
+    target = target_root / "state" / f"{target_scope}.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(original.read_bytes())
+    before = target.read_bytes()
+    selection = {"knowledge": ["notation"]}
+    preview = memory.forget(root, "algebra", selection)
+    with pytest.raises(storage.RevisionConflict, match="target"):
+        memory.forget(
+            target_root,
+            target_scope,
+            selection,
+            expected=preview["revision"],
+            expected_digest=preview["digest"],
+            apply=True,
+        )
+    assert target.read_bytes() == before
+    assert original.read_bytes() == before
+    applied = memory.forget(
+        root,
+        "algebra",
+        selection,
+        expected=preview["revision"],
+        expected_digest=preview["digest"],
+        apply=True,
+    )
+    assert applied["applied"]
+    assert target.read_bytes() == before
+    assert "notation" not in storage.load(original)["knowledge"]
+
+
+def test_preference_preview_cannot_target_an_identical_other_root(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "original"
+    preferences.save(
+        root,
+        0,
+        {
+            "rules": [
+                {
+                    "when": {},
+                    "values": {
+                        "language": {"instruction": "Italian", "origin": "explicit"}
+                    },
+                }
+            ]
+        },
+    )
+    other = tmp_path / "other"
+    shutil.copytree(root, other)
+    selection = {"preferences": ["p1"]}
+    preview = memory.forget(root, None, selection)
+    before = (other / "preferences.json").read_bytes()
+    with pytest.raises(storage.RevisionConflict, match="target"):
+        memory.forget(
+            other,
+            None,
+            selection,
+            expected=preview["revision"],
+            expected_digest=preview["digest"],
+            apply=True,
+        )
+    assert (other / "preferences.json").read_bytes() == before
+    applied = memory.forget(
+        root,
+        None,
+        selection,
+        expected=preview["revision"],
+        expected_digest=preview["digest"],
+        apply=True,
+    )
+    assert applied["applied"]
+    assert preferences.read(root)["rules"] == []
+    assert (other / "preferences.json").read_bytes() == before
+
+
+def test_artifact_preview_binds_canonical_target_for_relative_roots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    session = str(uuid4())
+    lessons.publish(first / "learn", session, "Worked example")
+    shutil.copytree(first, second)
+    selection = {"artifacts": [f"sessions/{session}.md"]}
+    monkeypatch.chdir(first)
+    preview = memory.forget(Path("learn"), None, selection)
+    monkeypatch.chdir(second)
+    with pytest.raises(storage.RevisionConflict, match="target"):
+        memory.forget(
+            Path("learn"),
+            None,
+            selection,
+            expected=0,
+            expected_digest=preview["digest"],
+            apply=True,
+        )
+    assert (second / "learn/sessions" / f"{session}.md").exists()
+    applied = memory.forget(
+        first / "learn",
+        None,
+        selection,
+        expected=0,
+        expected_digest=preview["digest"],
+        apply=True,
+    )
+    assert applied["complete"]
+    assert not (first / "learn/sessions" / f"{session}.md").exists()
+    assert (second / "learn/sessions" / f"{session}.md").exists()
 
 
 def test_preferences_and_course_are_deliberate_separate_operations(

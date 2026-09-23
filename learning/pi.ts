@@ -135,11 +135,11 @@ function projectLesson(entries: LessonEntry[]) {
 }
 
 const contextParameters = Type.Object({
-  scope: Type.Optional(Type.String({ description: "Course/interest key; omit to discover scopes, without selectors or paging parameters." })),
+  scope: Type.Optional(Type.String({ description: "Exact scope ID returned by context, never a course display title or guessed slug. If only the course name is known, call with {} once for the catalog; then use its ID. Catalog calls take no selectors or budgets." })),
   task: Type.Optional(Type.String({ description: "Exact stable task_index key returned by context, e.g. exercise-7, not the display title Exercise 7. Reuse a known key directly; omit when unknown to inspect the scope's task_index." })),
   topics: Type.Optional(Type.Array(Type.String(), { description: "Exact stable topic handles returned by context, not display labels. Reuse known handles; [] returns the index without history when discovery is needed." })),
   observations: Type.Optional(Type.Array(Type.String(), { description: "Exact observation handles returned by context or save, e.g. o1. Omit when no handles are known." })),
-  query: Type.Optional(Type.String({ description: "Search evidence and contextual understanding, including established aliases. Discovery excerpts are incomplete; read whole knowledge entries before relying on qualifications or editing." })),
+  query: Type.Optional(Type.String({ description: "Scoped discovery using a few distinctive terms or established aliases, not the full learner request. Omit for ordinary continuation; use scope plus returned task ID. Search excerpts are incomplete: retrieve the matched task or whole knowledge entry before relying on it or editing." })),
   knowledge: Type.Optional(Type.Array(Type.String(), { description: "Exact knowledge keys for a focused whole-entry read; [] returns the paged knowledge index. Cannot combine with task/topic/observation/query, all, or preference selectors. Nonempty reads also exclude offset/limit." })),
   candidate_offset: Type.Optional(Type.Integer({ minimum: 0, description: "Query-only discovery cursor, separate from the observation offset. Continuing requires expected_revision." })),
   knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "UTF-8 byte allowance for ordinary scoped context or a nonempty exact knowledge read; never tokens. Choose deliberately when more or less knowledge is needed. Invalid for query, index, all or scope catalog." })),
@@ -156,7 +156,7 @@ const contextParameters = Type.Object({
 const linkedPatch = Type.Object({}, { additionalProperties: true });
 const nullablePatch = Type.Union([linkedPatch, Type.Null()]);
 const refs = Type.Array(Type.Object({
-  source: Type.String(), locator: Type.Optional(Type.String()),
+  source: Type.String({ description: "Exact registered source handle from retrieved refs/sources. Task IDs and index names are not sources. Reuse the actual task's source and locator; do not drop provenance to repair an unknown handle." }), locator: Type.Optional(Type.String()),
 }, { additionalProperties: true }));
 const saveParameters = Type.Object({
   scope: Type.String(),
@@ -182,11 +182,11 @@ const saveParameters = Type.Object({
       topics: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
       refs: Type.Optional(Type.Union([refs, Type.Null()])),
       attribution: Type.Optional(Type.Union([Type.String(), Type.Null()])),
-      uncertainty: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+      uncertainty: Type.Optional(Type.Union([Type.String(), Type.Null()], { description: "All unresolved qualifications for this entry; supplying a value replaces the field. Omit unchanged uncertainty. A learner report can guide teaching without resolving separate source identity, edition or chronology conflicts." })),
       conflicts: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
       aliases: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
     }, { additionalProperties: true }), Type.Null()]), { description: 'Map entry handle to changed fields; omitted fields survive. New entries require text; null removes an entry or clears an optional field. Preserve source authority and unresolved conflicts.' })),
-    tasks: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Map task handle to checkpoint fields: task, topics, question, frame, plan; null closes/removes it.' })),
+    tasks: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Unfinished checkpoints only. Map a task handle to changed task/topics/question/frame/plan fields. On completion use {"task-handle":null} and current_task:null if current; keep the diagnostic attempt and source refs in an observation. Do not leave completed tasks pending or put completion status in frame.' })),
     current_task: Type.Optional(Type.Union([Type.String(), Type.Null()])),
     course_context: Type.Optional(nullablePatch),
   }, { additionalProperties: true, description: "Only changed fields. Use returned handles, not display labels. Python owns validation and generated metadata; read the records reference for uncommon structures." }),

@@ -196,9 +196,15 @@ def check(
         path.expanduser().absolute() for path in (root, vault, package)
     )
     skill = package / "skills/learn"
+    assets = (
+        Path(os.environ.get("LEARNING_ASSETS", vault / "assets/learn"))
+        .expanduser()
+        .resolve()
+    )
     checks = [
         _directory("learning_root", root, allow_missing=True),
         _directory("vault", vault, allow_missing=False),
+        _directory("learning_assets", assets, allow_missing=True),
         _file("canonical_skill", skill / "SKILL.md"),
         _file("learning_command", skill / "scripts/learn", executable=True),
         _file("python_runtime", Path(sys.executable), executable=True),
@@ -209,6 +215,17 @@ def check(
         ),
     ]
     if host in {"all", "pi"}:
+        sessions = (
+            Path(
+                os.environ.get(
+                    "LEARNING_SESSION_DIR",
+                    Path.home() / "Library/Application Support/Learning/pi-sessions",
+                )
+            )
+            .expanduser()
+            .resolve()
+        )
+        checks.append(_directory("pi_sessions", sessions, allow_missing=True))
         checks.append(_file("pi_extension", package / "pi.ts"))
         for command in ("pi", "node"):
             executable = shutil.which(command)

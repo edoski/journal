@@ -109,6 +109,16 @@ def _writable_destination(path: Path) -> None:
         raise ValueError(f"installation destination is not writable: {current}")
 
 
+def _file_destination(path: Path) -> None:
+    _writable_destination(path.parent)
+    if path.is_symlink() and not path.exists():
+        raise ValueError(f"installation output is a broken symlink: {path}")
+    if path.exists() and (not path.is_file() or not os.access(path, os.R_OK | os.W_OK)):
+        raise ValueError(
+            f"installation output is not a readable, writable file: {path}"
+        )
+
+
 def preflight(package: Path, support: Path) -> None:
     """Validate runtime, source artifacts and destinations without writing anything."""
     if sys.version_info < (3, 10):
@@ -137,10 +147,12 @@ def preflight(package: Path, support: Path) -> None:
     if not os.access(launcher, os.X_OK):
         raise ValueError(f"canonical learning command is not executable: {launcher}")
     config = Path.home() / ".codex/config.toml"
+    _file_destination(config)
     original = config.read_text(encoding="utf-8") if config.exists() else ""
     _codex_content(package, original)
     for path in (
         support,
+        support / "backups",
         config.parent,
         Path.home() / ".agents/skills",
         Path.home() / ".claude/skills",
@@ -148,8 +160,14 @@ def preflight(package: Path, support: Path) -> None:
     ):
         _writable_destination(path)
     command = Path.home() / ".local/bin/study"
-    if command.exists() and not command.is_file():
-        raise ValueError(f"study command destination is not a file: {command}")
+    if not command.is_symlink():
+        _file_destination(command)
+    archive = support / "learn-claude.zip"
+    if archive.is_symlink():
+        raise ValueError(
+            f"installation archive output must not be a symlink: {archive}"
+        )
+    _file_destination(archive)
 
 
 def install() -> None:

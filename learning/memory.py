@@ -343,10 +343,22 @@ def _redact(
     }
 
 
-def _token(snapshot: Any, selection: dict[str, Any]) -> str:
+def _token(
+    root: Path,
+    kind: str,
+    targets: list[Path],
+    snapshot: Any,
+    selection: dict[str, Any],
+) -> str:
     return sha256(
         json.dumps(
-            {"snapshot": snapshot, "selection": selection},
+            {
+                "root": str(root.resolve()),
+                "kind": kind,
+                "targets": sorted(str(path.resolve()) for path in targets),
+                "snapshot": snapshot,
+                "selection": selection,
+            },
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -369,7 +381,7 @@ def _check(
         raise storage.RevisionConflict("forget revision changed; preview again")
     if expected_digest is not None and expected_digest != token:
         raise storage.RevisionConflict(
-            "forget selection or snapshot changed; preview again"
+            "forget target, selection or snapshot changed; preview again"
         )
 
 
@@ -437,7 +449,13 @@ def _forget(
                 "path": str(path),
                 "sha256": sha256(path.read_bytes()).hexdigest(),
             }
-        token = _token(files, selected)
+        token = _token(
+            root,
+            kind,
+            [Path(item["path"]) for item in files.values()],
+            {relative: item["sha256"] for relative, item in files.items()},
+            selected,
+        )
         _check(0, token, expected, expected_digest, apply)
         result.update(
             revision=0,
@@ -502,7 +520,7 @@ def _forget(
     snapshot_digest = (
         current["digest"] if kind == "preferences" else storage.digest(current)
     )
-    token = _token(snapshot_digest, selected)
+    token = _token(root, kind, [path], snapshot_digest, selected)
     _check(current["revision"], token, expected, expected_digest, apply)
     if kind == "record":
         if selected.get("course"):

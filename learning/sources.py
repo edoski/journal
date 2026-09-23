@@ -78,7 +78,7 @@ def inspect_sources(
             "expected_digest requires expected revision for source capture"
         )
     inspected: dict[str, Any] = {}
-    changes: dict[str, Any] = {}
+    captures: dict[str, dict[str, Any]] = {}
     for key in keys:
         source = record["sources"][key]
         item: dict[str, Any] = {
@@ -114,7 +114,7 @@ def inspect_sources(
             )
         else:
             item["reason"] = "no captured fingerprint"
-            changes[key] = {"fingerprint": fingerprint}
+            captures[key] = fingerprint
     result: dict[str, Any] = {
         "scope": scope,
         "revision": record["revision"],
@@ -134,18 +134,18 @@ def inspect_sources(
                 + ", ".join(unavailable)
                 + "; inspect the source and use a new handle for changed content"
             )
-        receipt = records.save(
+        receipt = records.capture_source_fingerprints(
             root,
             scope,
             expected,
-            {"sources": changes},
+            captures,
             expected_digest=record["digest"]
             if expected_digest is None
             else expected_digest,
         )
         result.update(revision=receipt["revision"], digest=receipt["digest"])
-        result["captured"] = sorted(changes)
-        for key in changes:
+        result["captured"] = sorted(captures)
+        for key in captures:
             inspected[key]["stored_fingerprint"] = inspected[key]["current_fingerprint"]
             inspected[key]["status"] = "unchanged"
             inspected[key].pop("reason", None)

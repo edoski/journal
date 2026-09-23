@@ -80,7 +80,7 @@ def test_source_capture_detects_changed_bytes_without_restamping_old_refs(
     with pytest.raises(ValueError, match="new handle for changed content"):
         sources.inspect_sources(root, vault, "course", ["sheet"], expected=3)
     assert path.read_bytes() == before
-    with pytest.raises(ValueError, match="cited fingerprints are immutable"):
+    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
         records.save(
             root,
             "course",
@@ -95,6 +95,73 @@ def test_source_capture_detects_changed_bytes_without_restamping_old_refs(
                 }
             },
         )
+
+
+def test_public_save_cannot_introduce_fabricated_fingerprints(tmp_path: Path) -> None:
+    forged = {"sha256": "0" * 64, "size": 12345}
+    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
+        records.save(
+            tmp_path,
+            "course",
+            0,
+            {
+                "sources": {"missing": {"path": "missing.pdf", "fingerprint": forged}},
+                "knowledge": {
+                    "claim": {"text": "Claim", "refs": [{"source": "missing"}]}
+                },
+            },
+        )
+    path = tmp_path / "state/course.json"
+    assert not path.exists()
+    records.save(
+        tmp_path,
+        "course",
+        0,
+        {
+            "sources": {"missing": {"path": "missing.pdf"}},
+            "knowledge": {"claim": {"text": "Claim", "refs": [{"source": "missing"}]}},
+        },
+    )
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
+        records.save(
+            tmp_path, "course", 1, {"sources": {"missing": {"fingerprint": forged}}}
+        )
+    assert path.read_bytes() == before
+    inspected = sources.inspect_sources(tmp_path, tmp_path, "course", ["missing"])
+    assert inspected["sources"]["missing"]["status"] == "missing"
+    assert inspected["sources"]["missing"]["unverified_references"] == 1
+
+
+def test_public_save_only_roundtrips_captured_fingerprints_even_when_uncited(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "sheet.pdf").write_bytes(b"actual source")
+    records.save(tmp_path, "course", 0, {"sources": {"sheet": {"path": "sheet.pdf"}}})
+    sources.inspect_sources(tmp_path, tmp_path, "course", ["sheet"], expected=1)
+    state = records.read(tmp_path, "course")
+    assert isinstance(state, dict)
+    captured = state["sources"]["sheet"]
+    assert captured["fingerprint"] == {
+        "sha256": hashlib.sha256(b"actual source").hexdigest(),
+        "size": 13,
+    }
+    assert (
+        records.save(tmp_path, "course", 2, {"sources": {"sheet": captured}})[
+            "revision"
+        ]
+        == 2
+    )
+    path = tmp_path / "state/course.json"
+    before = path.read_bytes()
+    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
+        records.save(
+            tmp_path,
+            "course",
+            2,
+            {"sources": {"sheet": {"fingerprint": {"sha256": "0" * 64, "size": 13}}}},
+        )
+    assert path.read_bytes() == before
 
 
 def test_only_selected_local_regular_sources_are_inspected(tmp_path: Path) -> None:

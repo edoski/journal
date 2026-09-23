@@ -457,6 +457,47 @@ def _cites(value: Any, source: str) -> bool:
     return isinstance(value, list) and any(_cites(item, source) for item in value)
 
 
+def capture_source_fingerprints(
+    root: Path,
+    scope: str,
+    expected: int,
+    fingerprints: dict[str, dict[str, Any]],
+    *,
+    expected_digest: str,
+) -> dict[str, Any]:
+    """Publish fingerprints computed by the local source inspector for this snapshot."""
+    scope = _scope(scope)
+
+    def transform(current: dict[str, Any]) -> dict[str, Any]:
+        current = _validated(current)
+        sources = current.get("sources", {})
+        validate_references(list(fingerprints), sources, "sources")
+        for key, fingerprint in fingerprints.items():
+            if (
+                "fingerprint" in sources[key]
+                and sources[key]["fingerprint"] != fingerprint
+            ):
+                raise ValueError(
+                    f"sources.{key}: captured fingerprints are immutable; use a new source handle for changed content"
+                )
+            sources[key]["fingerprint"] = deepcopy(fingerprint)
+        return normalize_record(current)
+
+    with storage.lock(root / ".records.lock"):
+        result = storage.update(
+            root / "state" / f"{scope}.json",
+            expected,
+            transform,
+            expected_digest=expected_digest,
+        )
+    return {
+        "scope": scope,
+        "revision": result["revision"],
+        "digest": storage.digest(result),
+        "updated_at": result.get("updated_at"),
+    }
+
+
 def save(
     root: Path,
     scope: str,
@@ -528,6 +569,15 @@ def save(
                 if change is None:
                     merged.pop(key, None)
                 elif isinstance(change, dict):
+                    if field == "sources" and "fingerprint" in change:
+                        previous = merged.get(key, {})
+                        if (
+                            "fingerprint" not in previous
+                            or change["fingerprint"] != previous["fingerprint"]
+                        ):
+                            raise ValueError(
+                                f"sources.{key}.fingerprint is helper-owned; inspect and capture the local source instead"
+                            )
                     if field == "topics":
                         change = dict(change)
                         for name in ("assessment", "review"):
@@ -550,15 +600,6 @@ def save(
             ):
                 raise ValueError(
                     f"sources.{key}: cited content versions are immutable; use a new source handle for a new edition"
-                )
-            if (
-                key in result["sources"]
-                and "fingerprint" in source
-                and source["fingerprint"] != result["sources"][key].get("fingerprint")
-                and _cites(current, key)
-            ):
-                raise ValueError(
-                    f"sources.{key}: cited fingerprints are immutable; use a new source handle for changed content"
                 )
         for key in assigned:
             _source_links(saved[key], result, f"observations.{key}")

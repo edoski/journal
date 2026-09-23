@@ -116,3 +116,32 @@ def test_study_symlink_target_is_never_modified(
     assert not command.is_symlink()
     assert target.read_text() == "Keep this unrelated command."
     assert target.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.parametrize("kind", ["directory", "unwritable"])
+def test_invalid_archive_destination_stops_before_other_installation_changes(
+    installation: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    _, home = installation
+    support = home / "Library/Application Support/Learning"
+    support.mkdir(parents=True)
+    archive = support / "learn-claude.zip"
+    if kind == "directory":
+        archive.mkdir()
+    else:
+        archive.write_text("Existing archive.")
+        actual_access = install.os.access
+        monkeypatch.setattr(
+            install.os,
+            "access",
+            lambda path, mode: (
+                False if Path(path) == archive else actual_access(path, mode)
+            ),
+        )
+    before = {str(path): path.stat().st_mtime_ns for path in home.rglob("*")}
+    with pytest.raises(ValueError, match="not a readable, writable file"):
+        install.install()
+    assert before == {str(path): path.stat().st_mtime_ns for path in home.rglob("*")}
+    assert not (home / ".codex").exists()
+    assert not (home / ".agents").exists()
+    assert not (home / ".local/bin/study").exists()
