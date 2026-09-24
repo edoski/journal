@@ -55,6 +55,7 @@ rsync -a \
     "$repo_dir/sync/" \
     "$resources_dir/JournalSync/sync/"
 xcrun swiftc \
+    -target "$(uname -m)-apple-macosx14.0" \
     -O \
     -framework AppKit \
     -framework Carbon \
