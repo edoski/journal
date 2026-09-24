@@ -98,5 +98,5 @@ forbidden_modules =
     sync
 allow_indirect_imports = True
 ignore_imports =
-    learning.__main__ -> sync.study.context
+    learning.cli -> sync.study.context
     learning.planning -> sync.study.context

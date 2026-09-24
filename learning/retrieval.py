@@ -1,18 +1,19 @@
-"""Select learning evidence, corrections, and the context needed to teach."""
+"""Bounded, whole-item retrieval: catalog, resume, search, knowledge and evidence."""
 
 from __future__ import annotations
 
-import json
-import re
-import unicodedata
 from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
+import re
 from typing import Any
+import unicodedata
 
-from learning import task_context
+from learning.briefing import briefing
 from learning.observations import correction_links, expand_corrections
-from learning.records import read, source_ids, validate_references
+from learning.packing import pack, size
+from learning.records import read
+from learning.schema import links, route_parts, source_ids, task_parts
 from learning.storage import RevisionConflict
 
 AUTOMATIC_KNOWLEDGE_BYTES = 4096
@@ -20,12 +21,55 @@ EXACT_KNOWLEDGE_BYTES = 8192
 DISCOVERY_BYTES = 4096
 AUTOMATIC_EVIDENCE_BYTES = 12288
 AUTOMATIC_OBSERVATIONS = 24
+INDEX_PAGE = 20
+CANDIDATE_PAGE = 8
+IDENTITY_FIELDS = (
+    "title",
+    "aliases",
+    "focus",
+    "current_task",
+    "journal_activity",
+    "status",
+)
 
 
-def _bytes(value: Any) -> int:
-    return len(
-        json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    )
+def _number(handle: str) -> int:
+    return int(handle[1:])
+
+
+def _load(root: Path, scope: str, expected: int | None) -> dict[str, Any]:
+    record = read(root, scope)
+    assert isinstance(record, dict)
+    if expected is not None and record["revision"] != expected:
+        raise RevisionConflict(
+            f"revision conflict for {scope}: expected {expected}, found {record['revision']}"
+        )
+    return record
+
+
+def _paging(
+    offset: int, limit: int | None, expected: int | None, candidate_offset: int = 0
+) -> None:
+    if (
+        type(offset) is not int
+        or offset < 0
+        or type(candidate_offset) is not int
+        or candidate_offset < 0
+        or (limit is not None and (type(limit) is not int or limit < 1))
+    ):
+        raise ValueError("offset must be nonnegative and limit must be positive")
+    if expected is not None and (type(expected) is not int or expected < 0):
+        raise ValueError("expected revision must be a nonnegative integer")
+    if (offset or candidate_offset) and expected is None:
+        raise ValueError("continued pages require an expected revision")
+
+
+def _evidence_budget(value: int | None) -> None:
+    if value is not None and (type(value) is not int or value < 2):
+        raise ValueError("evidence_budget must be at least 2 bytes")
+
+
+# --- knowledge --------------------------------------------------------------
 
 
 def _knowledge_sources(
@@ -69,132 +113,125 @@ def knowledge_context(
             key,
         ),
     )
-    result: dict[str, Any] = {
-        "knowledge": {},
-        "knowledge_selection": {
-            "eligible": len(eligible),
-            "included": 0,
-            "omitted": len(eligible),
-        },
-        "sources": {},
-    }
-    if type(budget) is not int or budget < _bytes(result):
-        raise ValueError("knowledge budget must fit the selection envelope")
-    reserve = (
-        min(1024, budget // 3)
-        if sum(_bytes(stored[key]) + _bytes(key) + 2 for key in eligible)
-        + _bytes(result)
-        > budget
-        else 0
-    )
-    for key in eligible:
-        entries = {**result["knowledge"], key: stored[key]}
-        candidate = {
+    available = available_sources or {}
+
+    def render(keys: list[str]) -> dict[str, Any]:
+        entries = {key: stored[key] for key in keys}
+        return {
             "knowledge": entries,
-            "knowledge_selection": {
+            "selection": {
                 "eligible": len(eligible),
-                "included": len(entries),
-                "omitted": len(eligible) - len(entries),
+                "included": len(keys),
+                "omitted": len(eligible) - len(keys),
             },
-            "sources": _knowledge_sources(record, entries, available_sources or {}),
+            "sources": _knowledge_sources(record, entries, available),
         }
-        if _bytes(candidate) <= budget - reserve:
-            result = candidate
-    omitted = [key for key in eligible if key not in result["knowledge"]]
-    if omitted:
-        descriptors: list[dict[str, Any]] = []
-        for key in omitted[:8]:
-            descriptor = {"key": key, "bytes": _bytes(stored[key])}
-            candidate = {
-                **result,
-                "knowledge_omissions": {
-                    "items": [*descriptors, descriptor],
-                    "remaining": len(omitted) - len(descriptors) - 1,
-                    "expand": {"knowledge": []},
-                },
-            }
-            if _bytes(candidate) > budget:
-                break
-            descriptors.append(descriptor)
-            result = candidate
-        if not descriptors:
-            # The count stays visible even for tiny requested budgets; the exact
-            # revision-pinned index always enumerates every omitted handle.
-            candidate = {**result, "knowledge_omissions": {"expand": {"knowledge": []}}}
-            if _bytes(candidate) <= budget:
-                result = candidate
-    return result
 
-
-def _knowledge_read(
-    record: dict[str, Any],
-    scope: str,
-    keys: list[str],
-    offset: int,
-    limit: int | None,
-    budget: int | None,
-) -> dict[str, Any]:
-    stored = record.get("knowledge", {})
-    if keys:
-        validate_references(keys, stored, "knowledge")
-        entries = {key: stored[key] for key in sorted(set(keys))}
-        result = {
-            "scope": scope,
-            "revision": record["revision"],
-            "digest": record["digest"],
-            "knowledge": entries,
-            "sources": _knowledge_sources(record, entries, {}),
-        }
-        required = _bytes(result)
-        allowance = EXACT_KNOWLEDGE_BYTES if budget is None else budget
-        if required > allowance:
-            sizes = ", ".join(
-                f"{key}={_bytes(entry)}" for key, entry in entries.items()
-            )
-            raise ValueError(
-                f"knowledge read requires {required} bytes (budget {allowance}); entries: {sizes}; "
-                f"fetch fewer entries or set --knowledge-budget {required}"
-            )
+    envelope = size(render([]))
+    if type(budget) is not int or budget < envelope:
+        raise ValueError("knowledge budget must fit the selection envelope")
+    total = sum(size(stored[key]) + size(key) + 2 for key in eligible) + envelope
+    reserve = min(1024, budget // 3) if total > budget else 0
+    _, omitted, result = pack(eligible, max(budget - reserve, envelope), render)
+    if not omitted:
         return result
-    ordered = sorted(stored)
-    if offset > len(ordered):
-        raise ValueError("offset exceeds knowledge entry count")
-    page: list[dict[str, Any]] = []
-    result = _knowledge_index(record, scope, page, offset)
-    for key in ordered[offset : offset + (20 if limit is None else limit)]:
-        candidate = _knowledge_index(
-            record, scope, [*page, {"key": key, "bytes": _bytes(stored[key])}], offset
-        )
-        if _bytes(candidate) > DISCOVERY_BYTES:
-            if not page:
-                raise ValueError(
-                    "knowledge index descriptor exceeds discovery byte budget"
-                )
-            break
-        page = candidate["knowledge_index"]
-        result = candidate
-    return result
+    descriptors = [{"key": key, "bytes": size(stored[key])} for key in omitted[:8]]
+
+    def with_omissions(items: list[dict[str, Any]]) -> dict[str, Any]:
+        selection = {
+            **result["selection"],
+            "omissions": items,
+            "remaining": len(omitted) - len(items),
+            "expand": "knowledge SCOPE KEY... reads whole entries",
+        }
+        return {**result, "selection": selection}
+
+    try:
+        return pack(descriptors, budget, with_omissions)[2]
+    except ValueError:
+        return result
 
 
 def _knowledge_index(
-    record: dict[str, Any], scope: str, page: list[dict[str, Any]], offset: int
+    record: dict[str, Any], scope: str, offset: int, limit: int | None
 ) -> dict[str, Any]:
-    total = len(record.get("knowledge", {}))
-    next_offset = offset + len(page)
-    return {
+    stored = record.get("knowledge", {})
+    ordered = sorted(stored)
+    if offset > len(ordered):
+        raise ValueError("offset exceeds knowledge entry count")
+    total = len(ordered)
+    window = ordered[offset : offset + (INDEX_PAGE if limit is None else limit)]
+    descriptors = [{"key": key, "bytes": size(stored[key])} for key in window]
+
+    def render(items: list[dict[str, Any]]) -> dict[str, Any]:
+        next_offset = offset + len(items)
+        return {
+            "scope": scope,
+            "revision": record["revision"],
+            "digest": record["digest"],
+            "knowledge_index": items,
+            "selection": {
+                "mode": "knowledge_index",
+                "total": total,
+                "returned": len(items),
+                "offset": offset,
+                "next_offset": None if next_offset == total else next_offset,
+                "complete": next_offset == total,
+            },
+        }
+
+    kept, _, result = pack(descriptors, DISCOVERY_BYTES, render, contiguous=True)
+    if window and not kept:
+        raise ValueError("knowledge index descriptor exceeds discovery byte budget")
+    return result
+
+
+def knowledge(
+    root: Path,
+    scope: str,
+    keys: list[str],
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+    budget: int | None = None,
+    expected: int | None = None,
+) -> dict[str, Any]:
+    """Whole selected entries, or a paged handle index when ``keys`` is empty."""
+    _paging(offset, limit, expected)
+    if keys:
+        if offset or limit is not None:
+            raise ValueError("exact knowledge reads cannot use offset or limit")
+    elif limit is not None and limit > INDEX_PAGE:
+        raise ValueError(f"knowledge index limit must not exceed {INDEX_PAGE}")
+    if budget is not None and (not keys or type(budget) is not int or budget < 1):
+        raise ValueError(
+            "budget must be positive and applies only to exact knowledge reads"
+        )
+    record = _load(root, scope, expected)
+    stored = record.get("knowledge", {})
+    if not keys:
+        return _knowledge_index(record, scope, offset, limit)
+    links(keys, stored, "knowledge")
+    entries = {key: stored[key] for key in sorted(set(keys))}
+    result = {
         "scope": scope,
         "revision": record["revision"],
         "digest": record["digest"],
-        "knowledge_index": page,
-        "selection": {
-            "mode": "knowledge_index",
-            "total": total,
-            "returned": len(page),
-            "offset": offset,
-            "next_offset": None if next_offset == total else next_offset,
-            "complete": next_offset == total,
-        },
+        "knowledge": entries,
+        "sources": _knowledge_sources(record, entries, {}),
     }
+    required = size(result)
+    allowance = EXACT_KNOWLEDGE_BYTES if budget is None else budget
+    if required > allowance:
+        sizes = ", ".join(f"{key}={size(entry)}" for key, entry in entries.items())
+        raise ValueError(
+            f"knowledge read requires {required} bytes (budget {allowance}); entries: {sizes}; "
+            f"fetch fewer entries or set --budget {required}"
+        )
+    return result
+
+
+# --- lexical matching -------------------------------------------------------
 
 
 def _excerpt(text: str, needle: str) -> str:
@@ -220,11 +257,7 @@ def _tokens(text: str) -> set[str]:
     return set(
         re.findall(
             r"[^\W_]+",
-            "".join(
-                character
-                for character in normalized
-                if not unicodedata.combining(character)
-            ),
+            "".join(c for c in normalized if not unicodedata.combining(c)),
         )
     )
 
@@ -239,6 +272,17 @@ def _match(texts: list[str], query: str) -> str | None:
     if wanted and wanted <= {token for text in texts for token in _tokens(text)}:
         return next((text for text in texts if wanted & _tokens(text)), texts[0])
     return None
+
+
+def _strings(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _strings(item)
 
 
 def _discovery_collections(record: dict[str, Any], scope: str) -> dict[str, Any]:
@@ -270,8 +314,7 @@ def discover(root: Path, query: str, *, limit: int = 8) -> dict[str, Any]:
         raise ValueError("discovery limit must be between 1 and 20")
     catalog = read(root, None)
     assert isinstance(catalog, list)
-    items: list[dict[str, Any]] = []
-    total = 0
+    matches: list[dict[str, Any]] = []
     errors = []
     for entry in catalog:
         if "error" in entry:
@@ -286,24 +329,22 @@ def discover(root: Path, query: str, *, limit: int = 8) -> dict[str, Any]:
         assert isinstance(record, dict)
         for kind, collection in _discovery_collections(record, scope).items():
             for key, value in sorted(collection.items()):
-                if _match([key, *_strings(value)], query) is None:
-                    continue
-                total += 1
-                item = {
-                    "scope": scope,
-                    "revision": record["revision"],
-                    "kind": kind,
-                    "key": key,
-                }
-                if (
-                    len(items) < limit
-                    and _bytes(items) + _bytes(item) < DISCOVERY_BYTES - 512
-                ):
-                    items.append(item)
+                if _match([key, *_strings(value)], query) is not None:
+                    matches.append(
+                        {
+                            "scope": scope,
+                            "revision": record["revision"],
+                            "kind": kind,
+                            "key": key,
+                        }
+                    )
+    items, _, _ = pack(
+        matches[:limit], DISCOVERY_BYTES - 512, lambda kept: kept, contiguous=True
+    )
     return {
         "items": items,
-        "total": total,
-        "complete": len(items) == total and not errors,
+        "total": len(matches),
+        "complete": len(items) == len(matches) and not errors,
         "discovery_only": True,
         "unreadable_scopes": errors[:8],
         "additional_unreadable_scopes": max(0, len(errors) - 8),
@@ -321,8 +362,7 @@ def _candidates(
     matches = []
     for kind, entities in sorted(collections.items()):
         for key, value in sorted(entities.items()):
-            texts = [key, *_strings(value)]
-            matched = _match(texts, query)
+            matched = _match([key, *_strings(value)], query)
             if matched is not None:
                 matches.append(
                     {
@@ -335,41 +375,28 @@ def _candidates(
     total = len(matches)
     if offset > total:
         raise ValueError("candidate offset exceeds candidate count")
-    page: list[dict[str, Any]] = []
-    result = _candidate_page(page, offset, total)
-    for item in matches[offset : offset + 8]:
-        candidate = _candidate_page([*page, item], offset, total)
-        if _bytes({"candidates": candidate}) > DISCOVERY_BYTES:
-            if not page:
-                raise ValueError("candidate descriptor exceeds discovery byte budget")
-            break
-        page = candidate["items"]
-        result = candidate
-    return result
+    window = matches[offset : offset + CANDIDATE_PAGE]
+
+    def render(items: list[dict[str, Any]]) -> dict[str, Any]:
+        next_offset = offset + len(items)
+        return {
+            "candidates": {
+                "items": items,
+                "offset": offset,
+                "total": total,
+                "next_offset": None if next_offset == total else next_offset,
+                "complete": next_offset == total,
+            }
+        }
+
+    kept, _, result = pack(window, DISCOVERY_BYTES, render, contiguous=True)
+    if window and not kept:
+        raise ValueError("candidate descriptor exceeds discovery byte budget")
+    page: dict[str, Any] = result["candidates"]
+    return page
 
 
-def _candidate_page(
-    items: list[dict[str, Any]], offset: int, total: int
-) -> dict[str, Any]:
-    next_offset = offset + len(items)
-    return {
-        "items": items,
-        "offset": offset,
-        "total": total,
-        "next_offset": None if next_offset == total else next_offset,
-        "complete": next_offset == total,
-    }
-
-
-def _strings(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _strings(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _strings(item)
+# --- evidence ---------------------------------------------------------------
 
 
 def _topic_index(record: dict[str, Any]) -> dict[str, Any]:
@@ -398,17 +425,14 @@ def _topic_index(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def evidence(record: dict[str, Any], observation_ids: list[str]) -> dict[str, Any]:
+def correction_group(
+    record: dict[str, Any], observation_ids: list[str]
+) -> dict[str, Any]:
     """Return selected observations together with their complete correction links."""
     stored = record.get("observations", {})
-    validate_references(observation_ids, stored, "observations")
-    return {
-        key: stored[key]
-        for key in sorted(
-            expand_corrections(correction_links(stored), observation_ids),
-            key=lambda item: int(item[1:]),
-        )
-    }
+    links(observation_ids, stored, "observations")
+    group = expand_corrections(correction_links(stored), observation_ids)
+    return {key: stored[key] for key in sorted(group, key=_number)}
 
 
 def select_evidence(
@@ -419,334 +443,205 @@ def select_evidence(
     budget: int | None = AUTOMATIC_EVIDENCE_BYTES,
 ) -> dict[str, Any]:
     """Fit complete correction/support groups, exposing every omitted selection."""
-    if budget is not None and (type(budget) is not int or budget < 2):
-        raise ValueError("evidence_budget must be at least 2 bytes")
+    _evidence_budget(budget)
     stored = record.get("observations", {})
-    links = correction_links(stored)
-    selected: set[str] = set()
-    omitted: list[dict[str, Any]] = []
+    linked = correction_links(stored)
     visible_topics = {key: dict(value) for key, value in (topics or {}).items()}
-    size = 2
-
-    def include(handles: list[str]) -> tuple[bool, int]:
-        nonlocal size
-        group = expand_corrections(links, handles)
-        additions = group - selected
-        extra = sum(_bytes(key) + 1 + _bytes(stored[key]) + 1 for key in additions)
-        if additions and not selected:
-            extra -= 1
-        required = size + extra
-        if budget is not None and required > budget:
-            return False, _bytes({key: stored[key] for key in group})
-        selected.update(additions)
-        size = required
-        return True, required
-
+    groups: list[tuple[dict[str, Any], set[str]]] = []
     for topic, value in visible_topics.items():
         for field in ("assessment", "review"):
             decision = value.get(field)
-            if decision is None:
-                continue
-            included, required = include(decision.get("observations", []))
-            if not included:
-                value.pop(field)
-                omitted.append({"topic": topic, "field": field, "bytes": required})
+            if decision is not None:
+                group = expand_corrections(linked, decision.get("observations", []))
+                groups.append(({"topic": topic, "field": field}, group))
     for key in observation_ids:
-        included, required = include([key])
-        if not included:
-            omitted.append({"observation": key, "bytes": required})
-    items = {key: stored[key] for key in sorted(selected, key=lambda key: int(key[1:]))}
+        groups.append(({"observation": key}, expand_corrections(linked, [key])))
+
+    def render(selected: list[tuple[dict[str, Any], set[str]]]) -> dict[str, Any]:
+        handles: set[str] = (
+            set().union(*(group for _, group in selected)) if selected else set()
+        )
+        return {key: stored[key] for key in sorted(handles, key=_number)}
+
+    _, omitted, items = pack(
+        groups, budget, render, error="evidence_budget must be at least 2 bytes"
+    )
+    omissions = []
+    for descriptor, group in omitted:
+        if "topic" in descriptor:
+            visible_topics[descriptor["topic"]].pop(descriptor["field"])
+        omissions.append(
+            {**descriptor, "bytes": size({key: stored[key] for key in group})}
+        )
     selection: dict[str, Any] = {
         "complete": not omitted,
         "budget": budget,
-        "bytes": _bytes(items),
+        "bytes": size(items),
         "omitted_groups": len(omitted),
-        "omissions": omitted[:8],
-        "additional_omissions": max(0, len(omitted) - 8),
+        "omissions": omissions[:8],
+        "additional_omissions": max(0, len(omissions) - 8),
     }
     if omitted:
         selection["expand"] = (
-            "Use exact observation handles or the same topics with a larger evidence_budget; all reads inspect the full record."
+            "evidence SCOPE --observations HANDLES reads whole groups; a larger --evidence-budget keeps more"
         )
-    return {
-        "observations": items,
-        "topics": visible_topics,
-        "evidence_selection": selection,
-    }
+    return {"observations": items, "topics": visible_topics, "selection": selection}
 
 
-def context(
-    root: Path,
-    scope: str | None,
-    topics: list[str] | None = None,
-    *,
-    task: str | None = None,
-    query: str | None = None,
-    observations: list[str] | None = None,
-    knowledge: list[str] | None = None,
-    candidate_offset: int = 0,
-    knowledge_budget: int | None = None,
-    evidence_budget: int | None = None,
-    offset: int = 0,
-    limit: int | None = None,
-    expected: int | None = None,
-) -> dict[str, Any] | list[dict[str, Any]]:
-    if (
-        type(offset) is not int
-        or offset < 0
-        or type(candidate_offset) is not int
-        or candidate_offset < 0
-        or (limit is not None and (type(limit) is not int or limit < 1))
-    ):
-        raise ValueError("offset must be nonnegative and limit must be positive")
-    if expected is not None and (type(expected) is not int or expected < 0):
-        raise ValueError("expected revision must be a nonnegative integer")
-    if (offset or candidate_offset) and expected is None:
-        raise ValueError("continued pages require an expected revision")
-    if candidate_offset and query is None:
-        raise ValueError("candidate_offset requires a query")
-    if evidence_budget is not None and (
-        type(evidence_budget) is not int or evidence_budget < 2
-    ):
-        raise ValueError("evidence_budget must be at least 2 bytes")
-    if evidence_budget is not None and scope is None:
-        raise ValueError("evidence_budget requires a scope")
-    if knowledge_budget is not None and (
-        scope is None
-        or query is not None
-        or knowledge == []
-        or type(knowledge_budget) is not int
-        or knowledge_budget < 1
-    ):
-        raise ValueError(
-            "knowledge_budget must be positive and requires ordinary scoped context or exact knowledge selection"
-        )
-    if knowledge is not None:
-        if (
-            topics is not None
-            or task is not None
-            or observations is not None
-            or query is not None
-        ):
-            raise ValueError(
-                "knowledge selection cannot combine with topic, task, observation, or query selectors"
-            )
-        if knowledge and (offset or limit is not None):
-            raise ValueError("exact knowledge reads cannot use offset or limit")
-        if not knowledge and limit is not None and limit > 20:
-            raise ValueError("knowledge index limit must not exceed 20")
-    if query is not None and (not isinstance(query, str) or not query.strip()):
-        raise ValueError("query must be a nonempty string")
-    if scope is None and (
-        topics is not None
-        or task is not None
-        or query is not None
-        or observations is not None
-        or knowledge is not None
-        or offset
-        or limit is not None
-        or expected is not None
-    ):
-        raise ValueError("context selection requires a scope")
-    record = read(root, scope)
-    if isinstance(record, list):
-        return record
-    if expected is not None and record["revision"] != expected:
-        raise RevisionConflict(
-            f"revision conflict for {scope}: expected {expected}, found {record['revision']}"
-        )
-    if knowledge is not None:
-        assert scope is not None
-        return _knowledge_read(
-            record, scope, knowledge, offset, limit, knowledge_budget
-        )
-    stored_topics = record.get("topics", {})
-    stored = record.get("observations", {})
-    continuing = topics is None and observations is None and query is None
+def _select_task(
+    record: dict[str, Any], task: str | None
+) -> tuple[str | None, dict[str, Any]]:
     tasks = record.get("tasks", {})
     if task is not None:
-        validate_references([task], tasks, "task")
-    selected_task = task
-    if selected_task is None and continuing:
-        selected_task = record.get("current_task")
-        if selected_task is None and len(tasks) == 1:
-            selected_task = next(iter(tasks))
-    checkpoint = tasks.get(selected_task, {})
-    if topics is None and (task is not None or continuing) and "topics" in checkpoint:
-        topics = list(checkpoint["topics"])
-    if topics is not None:
-        validate_references(topics, stored_topics, "topics")
-    if observations is not None:
-        validate_references(observations, stored, "observations")
-    active_topics = list(topics or [])
-    if topics is None and (continuing or task is not None):
-        active_topics = list(
-            checkpoint.get("topics", []) if selected_task else record.get("focus", [])
-        )
-    mode = "topics"
-    index = topics == [] and observations is None and query is None
-    if observations is not None:
-        selected = list(observations)
-        mode = "observations"
-    elif query is not None:
-        selected = list(stored)
-        mode = "query"
-    else:
-        if topics is None:
-            topics = (
-                checkpoint.get("topics", [])
-                if selected_task
-                else record.get("focus", [])
-            )
-        selected = list(stored)
-        if continuing and checkpoint.get("observations"):
-            mode = "task"
-    if topics is not None:
-        topic_filter = set(topics)
-        selected = [
-            key for key in selected if topic_filter.intersection(stored[key]["topics"])
-        ]
-    if query is not None:
-        selected = [
-            key
-            for key in selected
-            if _match(list(_strings(stored[key])), query) is not None
-        ]
-    context_parts = (
-        task_context.parts(checkpoint, active_only=True) if continuing else []
+        links([task], tasks, "task")
+        return task, tasks[task]
+    selected = record.get("current_task")
+    if selected is None and len(tasks) == 1:
+        selected = next(iter(tasks))
+    return selected, tasks.get(selected, {}) if selected else {}
+
+
+def _activity(
+    record: dict[str, Any], checkpoint: dict[str, Any], active_topics: list[str]
+) -> tuple[set[str], set[str], set[str]]:
+    """Topics and evidence linked to the selected activity and the route position."""
+    parts = task_parts(checkpoint, active_only=True)
+    route = record.get("route")
+    route_active = route_parts(route, active_only=True) if route else []
+    context_topics = {key for part in parts for key in part.get("topics", [])}
+    context_observations = set(checkpoint.get("observations", []))
+    context_observations.update(
+        key for part in parts for key in part.get("observations", [])
     )
-    context_topics = {key for part in context_parts for key in part.get("topics", [])}
-    knowledge_topics = set(active_topics) | {
-        key
-        for part in task_context.parts(checkpoint, active_only=True)
-        for key in part.get("topics", [])
-    }
+    knowledge_topics = set(active_topics) | context_topics
+    knowledge_topics.update(
+        key for part in route_active for key in part.get("topics", [])
+    )
+    stored_topics = record.get("topics", {})
     knowledge_topics.update(
         prerequisite
         for key in list(knowledge_topics)
-        for prerequisite in stored_topics[key].get("prerequisites", [])
+        for prerequisite in stored_topics.get(key, {}).get("prerequisites", [])
     )
-    context_observations = {
-        key for part in context_parts for key in part.get("observations", [])
+    return context_topics, context_observations, knowledge_topics
+
+
+def _sources(
+    record: dict[str, Any],
+    checkpoint: dict[str, Any],
+    items: dict[str, Any],
+    topics: dict[str, Any],
+) -> dict[str, Any]:
+    selected = set(source_ids(record))
+    for field in ("course_context", "coverage"):
+        if isinstance(record.get(field), dict):
+            selected.update(source_ids(record[field]))
+    for part in (checkpoint, *task_parts(checkpoint, active_only=True)):
+        selected.update(source_ids(part))
+    route = record.get("route")
+    if route:
+        for part in route_parts(route, active_only=True):
+            selected.update(source_ids(part))
+    for value in [*items.values(), *topics.values()]:
+        selected.update(source_ids(value))
+    return {
+        key: value
+        for key, value in record.get("sources", {}).items()
+        if key in selected
     }
-    if continuing:
-        context_observations.update(checkpoint.get("observations", []))
-    selected.extend(context_observations)
-    selected.extend(
-        key
-        for key, item in stored.items()
-        if context_topics.intersection(item["topics"])
-    )
-    newest_first = limit is None and observations is None
-    selected = sorted(set(selected), key=lambda key: int(key[1:]), reverse=newest_first)
-    if newest_first:
-        selected = [key for key in selected if key in context_observations] + [
-            key for key in selected if key not in context_observations
-        ]
-    total = len(selected)
+
+
+def _assemble(
+    record: dict[str, Any],
+    scope: str,
+    *,
+    mode: str,
+    task_id: str | None,
+    checkpoint: dict[str, Any],
+    active_topics: list[str],
+    topics: list[str] | None,
+    observations: list[str] | None,
+    seeds: list[str],
+    page_limit: int | None,
+    offset: int,
+    order: str,
+    budget: int | None,
+    query: str | None = None,
+    candidate_offset: int = 0,
+    exhausted: bool = False,
+    knowledge_budget: int | None = None,
+    orientation: bool = False,
+) -> dict[str, Any]:
+    stored = record.get("observations", {})
+    stored_topics = record.get("topics", {})
+    total = len(seeds)
     if offset > total:
         raise ValueError("offset exceeds selected observation count")
-    page_limit = (
-        limit
-        if limit is not None
-        else (None if observations is not None else AUTOMATIC_OBSERVATIONS)
+    page = seeds[offset : None if page_limit is None else offset + page_limit]
+    context_topics, context_observations, knowledge_topics = _activity(
+        record, checkpoint, active_topics
     )
-    page = selected[offset : None if page_limit is None else offset + page_limit]
-    links = correction_links(stored)
-    expanded = expand_corrections(links, page)
-    selected_topics = set(topics or []) | context_topics
+    expanded = expand_corrections(correction_links(stored), page)
+    selected_topics = set(topics or []) | set(active_topics)
+    selected_topics.update(checkpoint.get("topics", []))
+    if orientation:
+        selected_topics |= context_topics
     for key in expanded:
         selected_topics.update(stored[key]["topics"])
-    if continuing or task is not None:
-        selected_topics.update(checkpoint.get("topics", []))
-    relevant_topics = {
-        key: value for key, value in stored_topics.items() if key in selected_topics
-    }
-    if query is not None and expected is not None and offset == total:
-        relevant_topics = {}
-    bounded = select_evidence(
-        record,
-        page,
-        topics=relevant_topics,
-        budget=evidence_budget
-        if evidence_budget is not None
-        else (None if observations is not None else AUTOMATIC_EVIDENCE_BYTES),
+    relevant_topics = (
+        {}
+        if exhausted
+        else {
+            key: value for key, value in stored_topics.items() if key in selected_topics
+        }
     )
+    bounded = select_evidence(record, page, topics=relevant_topics, budget=budget)
     items = bounded["observations"]
-    relevant_topics = bounded["topics"]
-    selected_sources = set(source_ids(record))
-    selected_sources.update(source_ids(record.get("course_context", {})))
-    if isinstance(record.get("coverage"), dict):
-        selected_sources.update(source_ids(record["coverage"]))
-    if continuing or task is not None:
-        selected_sources.update(source_ids(checkpoint))
-        for part in task_context.parts(checkpoint, active_only=True):
-            selected_sources.update(source_ids(part))
-    for value in [*items.values(), *relevant_topics.values()]:
-        selected_sources.update(source_ids(value))
     next_offset = offset + len(page)
-    bounded["evidence_selection"].update(
-        selection_complete=next_offset == total
-        and bounded["evidence_selection"]["complete"],
-        scope_complete=len(items) == len(stored),
-        omitted_observations=len(set(selected) - items.keys()),
-        order="task_links_then_newest" if newest_first else "oldest_first",
-    )
-    result = {
-        **{
-            key: value
-            for key, value in record.items()
-            if key
-            not in {
-                "topics",
-                "observations",
-                "sources",
-                "coverage",
-                "tasks",
-                "knowledge",
-            }
-        },
-        "task": {"id": selected_task, **checkpoint} if selected_task else None,
-        "task_index": {
-            key: {field: value[field] for field in ("task", "topics") if field in value}
-            for key, value in tasks.items()
-        },
-        "found": record["revision"] != 0,
-        "topics": relevant_topics,
-        "sources": {
-            key: value
-            for key, value in record.get("sources", {}).items()
-            if index or key in selected_sources
-        },
-        "observations": items,
-        "evidence_selection": bounded["evidence_selection"],
-        "policy_topics": {key: stored_topics[key] for key in active_topics},
-        "selection": {
-            "active_topics": active_topics,
-            "mode": "index" if index else mode,
-            "task": selected_task,
-            "topics": topics,
-            "observations": observations,
-            "query": query,
-            "context_topics": sorted(context_topics),
-            "context_observations": sorted(
-                context_observations, key=lambda key: int(key[1:])
-            ),
-        },
+    evidence_selection = {
+        **bounded["selection"],
         "total": total,
         "returned": len(items),
         "offset": offset,
-        "complete": next_offset == total and bounded["evidence_selection"]["complete"],
         "next_offset": None if next_offset == total else next_offset,
-        "expanded_observations": [key for key in items if key not in page],
+        "complete": next_offset == total and bounded["selection"]["complete"],
+        "scope_complete": len(items) == len(stored),
+        "omitted_observations": len(set(seeds) - items.keys()),
+        "order": order,
+        "expanded": [key for key in items if key not in page],
     }
-    if index:
-        result["topic_index"] = _topic_index(record)
-    if query is not None:
-        assert scope is not None
-        result["candidates"] = _candidates(record, scope, query, candidate_offset)
-    else:
-        selected_knowledge = knowledge_context(
+    result: dict[str, Any] = {
+        "scope": scope,
+        "revision": record["revision"],
+        "digest": record["digest"],
+        "updated_at": record.get("updated_at"),
+        **{field: record[field] for field in IDENTITY_FIELDS if field in record},
+        "task": {"id": task_id, **checkpoint} if task_id else None,
+        "task_index": {
+            key: {field: value[field] for field in ("task", "topics") if field in value}
+            for key, value in record.get("tasks", {}).items()
+        },
+        "topics": bounded["topics"],
+        "sources": _sources(
+            record, checkpoint if orientation else {}, items, bounded["topics"]
+        ),
+        "observations": items,
+    }
+    selection: dict[str, Any] = {
+        "mode": mode,
+        "task": task_id,
+        "active_topics": list(active_topics),
+        "topics": topics,
+        "observations": observations,
+        "query": query,
+        "context_topics": sorted(context_topics) if orientation else [],
+        "context_observations": sorted(context_observations, key=_number)
+        if orientation
+        else [],
+        "evidence": evidence_selection,
+    }
+    if orientation:
+        chosen = knowledge_context(
             record,
             sorted(knowledge_topics),
             result["sources"],
@@ -754,12 +649,192 @@ def context(
             if knowledge_budget is None
             else knowledge_budget,
         )
-        result["sources"].update(selected_knowledge.pop("sources"))
-        result.update(selected_knowledge)
-        result["briefing"] = task_context.briefing(
-            record,
-            selected_task,
-            checkpoint,
-            sorted(set(active_topics) | context_topics),
+        result["sources"].update(chosen.pop("sources"))
+        result["knowledge"] = chosen["knowledge"]
+        selection["knowledge"] = chosen["selection"]
+        result["briefing"] = briefing(
+            record, checkpoint, sorted(set(active_topics) | context_topics)
         )
+    if query is not None:
+        result["candidates"] = _candidates(record, scope, query, candidate_offset)
+    result["selection"] = selection
+    result["policy_topics"] = {key: stored_topics[key] for key in active_topics}
     return result
+
+
+def resume(
+    root: Path,
+    scope: str,
+    *,
+    task: str | None = None,
+    knowledge_budget: int | None = None,
+    evidence_budget: int | None = None,
+) -> dict[str, Any]:
+    """Ordinary continuation: task, briefing, linked and recent evidence, knowledge."""
+    _evidence_budget(evidence_budget)
+    if knowledge_budget is not None and (
+        type(knowledge_budget) is not int or knowledge_budget < 1
+    ):
+        raise ValueError("knowledge_budget must be a positive integer")
+    record = _load(root, scope, None)
+    task_id, checkpoint = _select_task(record, task)
+    active_topics = (
+        list(checkpoint.get("topics", [])) if task_id else list(record.get("focus", []))
+    )
+    stored = record.get("observations", {})
+    context_topics, context_observations, _ = _activity(
+        record, checkpoint, active_topics
+    )
+    wanted = set(active_topics) | context_topics
+    seeds = {key for key, item in stored.items() if wanted.intersection(item["topics"])}
+    seeds.update(context_observations)
+    ordered = sorted(seeds, key=_number, reverse=True)
+    ordered = [key for key in ordered if key in context_observations] + [
+        key for key in ordered if key not in context_observations
+    ]
+    return _assemble(
+        record,
+        scope,
+        mode="task" if task_id else "focus",
+        task_id=task_id,
+        checkpoint=checkpoint,
+        active_topics=active_topics,
+        topics=None,
+        observations=None,
+        seeds=ordered,
+        page_limit=AUTOMATIC_OBSERVATIONS,
+        offset=0,
+        order="task_links_then_newest",
+        budget=AUTOMATIC_EVIDENCE_BYTES if evidence_budget is None else evidence_budget,
+        knowledge_budget=knowledge_budget,
+        orientation=True,
+    )
+
+
+def search(
+    root: Path,
+    scope: str,
+    query: str,
+    *,
+    topics: list[str] | None = None,
+    offset: int = 0,
+    limit: int | None = None,
+    candidate_offset: int = 0,
+    expected: int | None = None,
+    evidence_budget: int | None = None,
+) -> dict[str, Any]:
+    """Lexical discovery over evidence plus knowledge/topic/source/task candidates."""
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query must be a nonempty string")
+    _paging(offset, limit, expected, candidate_offset)
+    _evidence_budget(evidence_budget)
+    record = _load(root, scope, expected)
+    stored = record.get("observations", {})
+    if topics is not None:
+        links(topics, record.get("topics", {}), "topics")
+    seeds = [
+        key
+        for key in sorted(stored, key=_number)
+        if (topics is None or set(topics).intersection(stored[key]["topics"]))
+        and _match(list(_strings(stored[key])), query) is not None
+    ]
+    return _assemble(
+        record,
+        scope,
+        mode="search",
+        task_id=None,
+        checkpoint={},
+        active_topics=list(topics or []),
+        topics=topics,
+        observations=None,
+        seeds=seeds,
+        page_limit=limit,
+        offset=offset,
+        order="oldest_first",
+        budget=AUTOMATIC_EVIDENCE_BYTES if evidence_budget is None else evidence_budget,
+        query=query,
+        candidate_offset=candidate_offset,
+        exhausted=expected is not None and offset == len(seeds),
+    )
+
+
+def evidence(
+    root: Path,
+    scope: str,
+    *,
+    topics: list[str] | None = None,
+    observations: list[str] | None = None,
+    offset: int = 0,
+    limit: int | None = None,
+    expected: int | None = None,
+    evidence_budget: int | None = None,
+) -> dict[str, Any]:
+    """Topic histories or exact observations with their complete correction groups."""
+    if topics is None and observations is None:
+        raise ValueError("evidence requires topics or observations")
+    _paging(offset, limit, expected)
+    _evidence_budget(evidence_budget)
+    record = _load(root, scope, expected)
+    stored = record.get("observations", {})
+    if topics is not None:
+        links(topics, record.get("topics", {}), "topics")
+    if observations is not None:
+        links(observations, stored, "observations")
+    seeds = sorted(stored if observations is None else observations, key=_number)
+    if topics is not None:
+        seeds = [
+            key for key in seeds if set(topics).intersection(stored[key]["topics"])
+        ]
+    newest_first = observations is None and limit is None
+    if newest_first:
+        seeds = seeds[::-1]
+    return _assemble(
+        record,
+        scope,
+        mode="observations" if observations is not None else "topics",
+        task_id=None,
+        checkpoint={},
+        active_topics=list(topics or []),
+        topics=topics,
+        observations=observations,
+        seeds=seeds,
+        page_limit=limit
+        if limit is not None
+        else (None if observations is not None else AUTOMATIC_OBSERVATIONS),
+        offset=offset,
+        order="newest_first" if newest_first else "oldest_first",
+        budget=evidence_budget
+        if evidence_budget is not None
+        else (None if observations is not None else AUTOMATIC_EVIDENCE_BYTES),
+    )
+
+
+def catalog(root: Path, scope: str | None = None) -> dict[str, Any]:
+    """Handles only: the scope list, or one scope's topic/source/task/knowledge index."""
+    if scope is None:
+        entries = read(root, None)
+        assert isinstance(entries, list)
+        return {
+            "scopes": [item for item in entries if "error" not in item],
+            "errors": [item for item in entries if "error" in item],
+        }
+    record = _load(root, scope, None)
+    return {
+        "scope": scope,
+        "revision": record["revision"],
+        "digest": record["digest"],
+        "updated_at": record.get("updated_at"),
+        **{field: record[field] for field in IDENTITY_FIELDS if field in record},
+        "task_index": {
+            key: {field: value[field] for field in ("task", "topics") if field in value}
+            for key, value in record.get("tasks", {}).items()
+        },
+        "topic_index": _topic_index(record),
+        "sources": record.get("sources", {}),
+        "knowledge_keys": sorted(record.get("knowledge", {})),
+        "route": briefing(record, {}, []).get("route"),
+        "counts": {
+            name: len(record.get(name, {}))
+            for name in ("topics", "observations", "knowledge", "tasks", "sources")
+        },
+    }

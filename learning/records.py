@@ -1,141 +1,68 @@
-"""Learning record validation, persistence, and revision-checked publication."""
+"""Whole-record validation, scope resolution and revision-checked publication."""
 
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 import json
 from pathlib import Path
-import re
 from typing import Any
+import unicodedata
 
-from learning import assessments, course, preferences, storage, task_context
+from learning import assessments, course, preferences, schema, storage
+from learning.schema import handle, links, source_ids
 
-KNOWLEDGE_FIELDS = frozenset(
-    {"text", "topics", "refs", "attribution", "uncertainty", "conflicts", "aliases"}
-)
+__all__ = [
+    "capture_source_fingerprints",
+    "normalize_record",
+    "read",
+    "resolve_scope",
+    "save",
+    "snapshot_sources",
+    "source_ids",
+    "validate_references",
+]
 
-
-def _date(value: Any, field: str) -> date:
-    if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
-        raise ValueError(f"{field} must be a date in YYYY-MM-DD form")
-    try:
-        return date.fromisoformat(value)
-    except ValueError as error:
-        raise ValueError(f"{field} is not a valid date: {value}") from error
-
-
-def _review(value: Any, field: str, exam: date | None, today: date) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        raise ValueError(f"{field} must be an object")
-    review = dict(value)
-    if "due" in review:
-        _date(review["due"], f"{field}.due")
-    if "in_days" in review:
-        interval = review.pop("in_days")
-        if type(interval) is not int or interval < 0:
-            raise ValueError(f"{field}.in_days must be a nonnegative integer")
-        try:
-            due = today + timedelta(days=interval)
-        except OverflowError as error:
-            raise ValueError(f"{field}.in_days is too large") from error
-        if exam is not None and exam >= today:
-            due = min(due, max(today, exam - timedelta(days=1)))
-        review["due"] = due.isoformat()
-    return review
+validate_references = links
 
 
-def _names(value: Any, field: str) -> list[str]:
-    if not isinstance(value, list) or any(
-        not isinstance(item, str) or not item.strip() for item in value
-    ):
-        raise ValueError(f"{field} must be a list of nonempty strings")
-    if len(value) != len(set(value)):
-        raise ValueError(f"{field} must not contain duplicate keys")
-    return value
+def _scope(value: str) -> str:
+    return handle(value, "scope")
 
 
-def validate_references(value: Any, available: dict[str, Any], field: str) -> list[str]:
-    """Validate a caller-supplied list of unique handles against its owning map."""
-    names = _names(value, field)
-    missing = [name for name in names if name not in available]
-    if missing:
-        raise ValueError(f"unknown {field}: {', '.join(missing)}")
-    return names
+# --- normalization ----------------------------------------------------------
 
 
-def source_ids(value: dict[str, Any]) -> list[str]:
-    """Collect source handles from a validated record or record part."""
-    result = [value["source"]] if "source" in value else []
-    result.extend(ref["source"] for ref in value.get("refs", []))
-    return result
+def _reject_legacy_shapes(record: dict[str, Any]) -> None:
+    if "teaching" in record:
+        raise ValueError("store current teaching preferences in preferences.json")
+    if "review" in record:
+        raise ValueError("put each review under topics[topic].review")
+    if "active" in record:
+        raise ValueError("store unfinished work under tasks with a current_task handle")
 
 
-def _links(value: dict[str, Any], record: dict[str, Any], field: str) -> None:
-    for name, target in (
-        ("topics", "topics"),
-        ("observations", "observations"),
-        ("corrects", "observations"),
-        ("prerequisites", "topics"),
-    ):
-        if name in value:
-            validate_references(value[name], record[target], f"{field}.{name}")
-    if "parent" in value and value["parent"] is not None:
-        validate_references([value["parent"]], record["topics"], f"{field}.parent")
-    _source_links(value, record, field)
-
-
-def _source_links(value: dict[str, Any], record: dict[str, Any], field: str) -> None:
-    if "refs" in value:
-        refs = value["refs"]
-        if not isinstance(refs, list) or any(
-            not isinstance(ref, dict)
-            or not isinstance(ref.get("source"), str)
-            or ("locator" in ref and not isinstance(ref["locator"], str))
-            for ref in refs
-        ):
-            raise ValueError(
-                f"{field}.refs must contain source handles and optional string locators"
-            )
-    for source in source_ids(value):
-        validate_references([source], record["sources"], f"{field}.source")
-    if (
-        "source" in value
-        and "source_version" in value
-        and value["source_version"] != record["sources"][value["source"]].get("version")
-    ):
-        raise ValueError(f"{field}.source_version no longer matches its source handle")
-    for ref in value.get("refs", []):
-        if "excerpt" in ref and (
-            not isinstance(ref["excerpt"], str) or not ref["excerpt"].strip()
-        ):
-            raise ValueError(f"{field}.refs.excerpt must be a nonempty string")
-        if "source_version" in ref and ref["source_version"] != record["sources"][
-            ref["source"]
-        ].get("version"):
-            raise ValueError(
-                f"{field}.refs source version no longer matches its source handle"
-            )
-        if "source_fingerprint" in ref and (
-            ref["source_fingerprint"] is None
-            or ref["source_fingerprint"]
-            != record["sources"][ref["source"]].get("fingerprint")
-        ):
-            raise ValueError(
-                f"{field}.refs source fingerprint no longer matches its source handle"
-            )
-    if (
-        "source" in value
-        and "source_fingerprint" in value
-        and (
-            value["source_fingerprint"] is None
-            or value["source_fingerprint"]
-            != record["sources"][value["source"]].get("fingerprint")
-        )
-    ):
+def _normalize_observations(record: dict[str, Any]) -> None:
+    for key, value in record["observations"].items():
+        schema.observation(key, value, record, f"observations.{key}")
+    last = max((int(key[1:]) for key in record["observations"]), default=0)
+    sequence = record.setdefault("observation_sequence", last)
+    if type(sequence) is not int or sequence < last:
         raise ValueError(
-            f"{field}.source_fingerprint no longer matches its source handle"
+            "observation_sequence must be an integer at least the last observation handle"
         )
+
+
+def _normalize_interpretations(record: dict[str, Any]) -> None:
+    for key, topic in record["topics"].items():
+        for field in ("assessment", "review"):
+            if field in topic:
+                topic[field] = assessments.normalize(
+                    topic[field],
+                    f"topics.{key}.{field}",
+                    record["observations"],
+                    review=field == "review",
+                )
 
 
 def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
@@ -143,236 +70,84 @@ def normalize_record(record: Any, today: date | None = None) -> dict[str, Any]:
     if not isinstance(record, dict):
         raise ValueError("state must be a JSON object")
     if (
-        type(record.get("schema_version", 5)) is not int
-        or record.get("schema_version", 5) != 5
+        record.get("schema_version", 5) != 5
+        or type(record.get("schema_version", 5)) is not int
     ):
-        raise ValueError(
-            "learning state requires schema_version 5; run the explicit learning migration first"
-        )
+        raise ValueError("learning state requires schema_version 5")
     result = {
         key: value
         for key, value in record.items()
-        if key not in {"revision", "updated_at", "digest", "topic_index"}
+        if key not in schema.HELPER_RECORD_FIELDS
     }
     result["schema_version"] = 5
+    _reject_legacy_shapes(result)
     for field in ("topics", "sources", "observations"):
-        value = result.setdefault(field, {})
-        if not isinstance(value, dict) or any(
-            not isinstance(key, str) or not key.strip() or not isinstance(item, dict)
-            for key, item in value.items()
-        ):
-            raise ValueError(f"{field} must map nonempty keys to objects")
+        schema.object_map(result.setdefault(field, {}), field)
     if "title" in result and not isinstance(result["title"], str):
         raise ValueError("title must be a string")
-    if "teaching" in result:
-        raise ValueError("store current teaching preferences in preferences.json")
     if "aliases" in result:
-        _names(result["aliases"], "aliases")
-    for key, source in result["sources"].items():
-        if not isinstance(source.get("path"), str) or not source["path"].strip():
-            raise ValueError(f"sources.{key}.path must be a nonempty string")
-        if source.get("version") is not None and (
-            not isinstance(source["version"], str) or not source["version"].strip()
-        ):
-            raise ValueError(f"sources.{key}.version must be a nonempty string or null")
-        if "title" in source and not isinstance(source["title"], str):
-            raise ValueError(f"sources.{key}.title must be a string")
-        if "fingerprint" in source:
-            fingerprint = source["fingerprint"]
-            if (
-                not isinstance(fingerprint, dict)
-                or set(fingerprint) != {"sha256", "size"}
-                or not isinstance(fingerprint.get("sha256"), str)
-                or not re.fullmatch(r"[a-f0-9]{64}", fingerprint["sha256"])
-                or type(fingerprint.get("size")) is not int
-                or fingerprint["size"] < 0
-            ):
-                raise ValueError(
-                    f"sources.{key}.fingerprint must contain sha256 and size"
-                )
+        schema.names(result["aliases"], "aliases")
+    result["sources"] = {
+        key: schema.source(key, value, f"sources.{key}")
+        for key, value in result["sources"].items()
+    }
     if result.get("course_context") is None:
         result.pop("course_context", None)
     else:
         result["course_context"] = course.normalize_context(
             result["course_context"], result["sources"]
         )
-    _source_links(result, result, "scope")
-    exam = _date(result["exam"], "exam") if result.get("exam") is not None else None
-    if "review" in result:
-        raise ValueError("put each review under topics[topic].review")
-    topics = {}
-    for key, value in result["topics"].items():
-        if "evidence" in value or "earlier_evidence_count" in value:
-            raise ValueError(f"topics.{key}: store evidence in observations")
-        if {"summary", "gap", "status"}.intersection(value):
-            raise ValueError(f"topics.{key}: put current interpretations in assessment")
-        topic = dict(value)
-        if topic.get("assessment") is None:
-            topic.pop("assessment", None)
-        for field in ("aliases", "tags", "concepts", "domains"):
-            if field in topic:
-                _names(topic[field], f"topics.{key}.{field}")
-        if "title" in topic and not isinstance(topic["title"], str):
-            raise ValueError(f"topics.{key}.title must be a string")
-        if topic.get("review") is None:
-            topic.pop("review", None)
-        elif "review" in topic:
-            topic["review"] = _review(
-                topic["review"], f"topics.{key}.review", exam, today or date.today()
-            )
-        _links(topic, result, f"topics.{key}")
-        topics[key] = topic
-    result["topics"] = topics
-    for key, observation in result["observations"].items():
-        if not re.fullmatch(r"o[1-9]\d*", key):
-            raise ValueError(f"invalid observation handle: {key}")
-        if (
-            not isinstance(observation.get("text"), str)
-            or not observation["text"].strip()
-        ):
-            raise ValueError(f"observations.{key}.text must be a nonempty string")
-        if not validate_references(
-            observation.get("topics"), topics, f"observations.{key}.topics"
-        ):
-            raise ValueError(f"observations.{key}.topics must not be empty")
-        if not isinstance(observation.get("origin"), str) or observation[
-            "origin"
-        ] not in {
-            "direct_attempt",
-            "self_report",
-            "tutor_inference",
-            "external_assessment",
-            "unknown",
-        }:
-            raise ValueError(
-                f"observations.{key}.origin is not a supported evidence origin"
-            )
-        if "recorded_at" not in observation:
-            raise ValueError(f"observations.{key}.recorded_at is required")
-        assessments.timestamp(
-            observation["recorded_at"], f"observations.{key}.recorded_at", unknown=True
-        )
-        for field in ("response", "assistance", "uncertainty", "task", "provenance"):
-            if field in observation and (
-                not isinstance(observation[field], str)
-                or not observation[field].strip()
-            ):
-                raise ValueError(
-                    f"observations.{key}.{field} must be a nonempty string"
-                )
-        _links(observation, result, f"observations.{key}")
-        if "source" in observation and "source_version" not in observation:
-            raise ValueError(f"observations.{key} requires a captured source_version")
-        for ref in observation.get("refs", []):
-            if isinstance(ref, dict) and "source_version" not in ref:
-                raise ValueError(
-                    f"observations.{key}.refs requires a captured source_version"
-                )
-        if "date" in observation:
-            _date(observation["date"], f"observations.{key}.date")
-        if any(
-            int(target[1:]) >= int(key[1:])
-            for target in observation.get("corrects", [])
-        ):
-            raise ValueError(
-                f"observations.{key}.corrects must refer to earlier observations"
-            )
-    last_observation = max((int(key[1:]) for key in result["observations"]), default=0)
-    sequence = result.setdefault("observation_sequence", last_observation)
-    if type(sequence) is not int or sequence < last_observation:
-        raise ValueError(
-            "observation_sequence must be an integer at least the last observation handle"
-        )
-    for key, topic in topics.items():
-        for field in ("assessment", "review"):
-            if field in topic:
-                topic[field] = assessments.normalize(
-                    topic[field],
-                    f"topics.{key}.{field}",
-                    result["observations"],
-                    review=field == "review",
-                )
+    schema.source_links(result, result["sources"], "scope")
+    exam = (
+        schema.day(result["exam"], "exam") if result.get("exam") is not None else None
+    )
+    when = today or date.today()
+    result["topics"] = {
+        key: schema.topic(key, value, result, f"topics.{key}", exam=exam, today=when)
+        for key, value in result["topics"].items()
+    }
+    _normalize_observations(result)
+    _normalize_interpretations(result)
     knowledge = result.get("knowledge", {})
     if not isinstance(knowledge, dict):
         raise ValueError("knowledge must map handles to entry objects")
     for key, entry in knowledge.items():
-        field = f"knowledge.{key}"
-        if not isinstance(key, str) or not re.fullmatch(
-            r"[a-z0-9][a-z0-9_-]{0,63}", key
-        ):
-            raise ValueError(f"{field}: handles must be short lowercase identifiers")
-        if not isinstance(entry, dict):
-            raise ValueError(f"{field} must be an object")
-        if set(entry) - KNOWLEDGE_FIELDS:
-            raise ValueError(
-                f"{field} accepts only text, topics, refs, attribution, uncertainty, conflicts and aliases"
-            )
-        if not isinstance(entry.get("text"), str) or not entry["text"].strip():
-            raise ValueError(f"{field}.text must be a nonempty string")
-        for name in ("attribution", "uncertainty"):
-            if name in entry and (
-                not isinstance(entry[name], str) or not entry[name].strip()
-            ):
-                raise ValueError(f"{field}.{name} must be a nonempty string")
-        for name in ("conflicts", "aliases"):
-            if name in entry:
-                _names(entry[name], f"{field}.{name}")
-        _links(entry, result, field)
-        if any("source_version" not in ref for ref in entry.get("refs", [])):
-            raise ValueError(f"{field}.refs requires a captured source_version")
+        schema.knowledge_entry(key, entry, result)
     if "focus" in result:
-        validate_references(result["focus"], topics, "focus")
-    if "active" in result:
-        raise ValueError("store unfinished work under tasks with a current_task handle")
+        links(result["focus"], result["topics"], "focus")
     tasks = result.setdefault("tasks", {})
     if not isinstance(tasks, dict):
         raise ValueError("tasks must map handles to checkpoint objects")
-    for key, task in tasks.items():
-        if not isinstance(key, str) or not re.fullmatch(
-            r"[a-z0-9][a-z0-9_-]{0,63}", key
-        ):
-            raise ValueError("task handles must be short lowercase identifiers")
-        if not isinstance(task, dict):
-            raise ValueError(f"tasks.{key} must be an object")
-        if "task" in task and (
-            not isinstance(task["task"], str) or not task["task"].strip()
-        ):
-            raise ValueError(f"tasks.{key}.task must be a nonempty string")
-        _links(task, result, f"tasks.{key}")
-        task_context.validate(task, f"tasks.{key}")
-        for part in task_context.parts(task):
-            _links(part, result, f"tasks.{key}.context")
+    for key, value in tasks.items():
+        schema.task(key, value, result)
     if result.get("current_task") is not None:
-        validate_references([result["current_task"]], tasks, "current_task")
+        links([result["current_task"]], tasks, "current_task")
     if isinstance(result.get("coverage"), dict):
-        _links(result["coverage"], result, "coverage")
+        schema.evidence_links(result["coverage"], result, "coverage")
+    if result.get("route") is None:
+        result.pop("route", None)
+    else:
+        schema.route(result["route"], "route", result)
     return result
-
-
-def _scope(value: str) -> str:
-    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", value):
-        raise ValueError(
-            "scope must be 1–64 lowercase letters, digits, underscores or hyphens; start with a letter or digit"
-        )
-    return value
 
 
 def _validated(record: dict[str, Any]) -> dict[str, Any]:
     if record["revision"] == 0:
         return record
     if record.get("schema_version") != 5:
-        raise ValueError(
-            "learning state requires schema_version 5; run the explicit learning migration first"
-        )
-    normalized = normalize_record(record)
+        raise ValueError("learning state requires schema_version 5")
     return {
-        **normalized,
+        **normalize_record(record),
         "revision": record["revision"],
         "updated_at": record.get("updated_at"),
     }
 
 
+# --- reading ----------------------------------------------------------------
+
+
 def read(root: Path, scope: str | None) -> dict[str, Any] | list[dict[str, Any]]:
+    """Read one validated scope with freshness and digest, or the scope catalog."""
     directory = root / "state"
     if scope is not None:
         stored = storage.load(directory / f"{_scope(scope)}.json")
@@ -396,11 +171,58 @@ def read(root: Path, scope: str | None) -> dict[str, Any] | list[dict[str, Any]]
             "digest": storage.digest(stored),
             "updated_at": record.get("updated_at"),
             "topic_count": len(record.get("topics", {})),
+            "task_count": len(record.get("tasks", {})),
         }
-        if "exam" in record:
-            item["exam"] = record["exam"]
+        for field in ("exam", "current_task"):
+            if record.get(field) is not None:
+                item[field] = record[field]
         catalog.append(item)
     return catalog
+
+
+def _tokens(value: str) -> frozenset[str]:
+    normalized = unicodedata.normalize("NFKD", value.casefold())
+    stripped = "".join(c for c in normalized if not unicodedata.combining(c))
+    return frozenset(
+        part for part in stripped.replace("_", " ").replace("-", " ").split() if part
+    )
+
+
+def resolve_scope(root: Path, value: str) -> str:
+    """Map an exact handle, or an unambiguous course title/alias, to its handle."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("scope must be a nonempty string")
+    if schema.HANDLE.fullmatch(value) and (root / "state" / f"{value}.json").is_file():
+        return value
+    wanted = _tokens(value)
+    catalog = read(root, None)
+    assert isinstance(catalog, list)
+    matches = [
+        item["scope"]
+        for item in catalog
+        if "error" not in item
+        and (
+            _tokens(item["scope"]) == wanted
+            or _tokens(item["title"]) == wanted
+            or any(_tokens(alias) == wanted for alias in item["aliases"])
+        )
+    ]
+    if len(matches) == 1:
+        return str(matches[0])
+    if len(matches) > 1:
+        raise ValueError(
+            f"ambiguous scope {value!r}; use one exact handle: {', '.join(sorted(matches))}"
+        )
+    if schema.HANDLE.fullmatch(value):
+        return value
+    known = ", ".join(sorted(item["scope"] for item in catalog if "error" not in item))
+    raise ValueError(
+        f"no scope matches {value!r}; known scopes: {known or 'none'}. "
+        "Use an existing handle, or a new lowercase handle to create one"
+    )
+
+
+# --- publication helpers ----------------------------------------------------
 
 
 def _aliases(value: Any, aliases: dict[str, str]) -> Any:
@@ -431,22 +253,16 @@ def _aliases(value: Any, aliases: dict[str, str]) -> Any:
 def snapshot_sources(value: dict[str, Any], sources: dict[str, Any]) -> dict[str, Any]:
     """Capture editions on newly ingested source references, including unknown editions."""
     result = deepcopy(value)
-    for ref in result.get("refs", []):
-        if isinstance(ref, dict) and ref.get("source") in sources:
-            if "source_version" not in ref and "fingerprint" in sources[ref["source"]]:
-                ref["source_fingerprint"] = deepcopy(
-                    sources[ref["source"]]["fingerprint"]
-                )
-            ref["source_version"] = sources[ref["source"]].get("version")
-    if "source" in result and result["source"] in sources:
-        if (
-            "source_version" not in result
-            and "fingerprint" in sources[result["source"]]
-        ):
-            result["source_fingerprint"] = deepcopy(
-                sources[result["source"]]["fingerprint"]
-            )
-        result["source_version"] = sources[result["source"]].get("version")
+    parts = [ref for ref in result.get("refs", []) if isinstance(ref, dict)]
+    if "source" in result:
+        parts.append(result)
+    for part in parts:
+        if part.get("source") not in sources:
+            continue
+        stored = sources[part["source"]]
+        if "source_version" not in part and "fingerprint" in stored:
+            part["source_fingerprint"] = deepcopy(stored["fingerprint"])
+        part["source_version"] = stored.get("version")
     return result
 
 
@@ -458,51 +274,84 @@ def _cites(value: Any, source: str) -> bool:
     return isinstance(value, list) and any(_cites(item, source) for item in value)
 
 
-def capture_source_fingerprints(
-    root: Path,
-    scope: str,
-    expected: int,
-    fingerprints: dict[str, dict[str, Any]],
-    *,
-    expected_digest: str,
-) -> dict[str, Any]:
-    """Publish fingerprints computed by the local source inspector for this snapshot."""
-    scope = _scope(scope)
-
-    def transform(current: dict[str, Any]) -> dict[str, Any]:
-        current = _validated(current)
-        sources = current.get("sources", {})
-        validate_references(list(fingerprints), sources, "sources")
-        for key, fingerprint in fingerprints.items():
+def _append_observations(
+    current: dict[str, Any], additions: Any, now: str
+) -> tuple[dict[str, Any], dict[str, str], list[str], int]:
+    if not isinstance(additions, list):
+        raise ValueError("observations patch must be a list of new observations")
+    saved = dict(current.get("observations", {}))
+    next_id = current.get("observation_sequence", 0) + 1
+    aliases: dict[str, str] = {}
+    assigned: list[str] = []
+    for item in additions:
+        if not isinstance(item, dict):
+            raise ValueError("new observations must be objects")
+        if "refs" in item and not isinstance(item["refs"], list):
+            raise ValueError("observation refs must be a list")
+        if "recorded_at" in item:
+            raise ValueError("observation recorded_at is helper-owned")
+        key = f"o{next_id}"
+        alias = item.pop("as", None)
+        if alias is not None:
             if (
-                "fingerprint" in sources[key]
-                and sources[key]["fingerprint"] != fingerprint
+                not isinstance(alias, str)
+                or not schema.ALIAS.fullmatch(alias)
+                or alias in aliases
             ):
                 raise ValueError(
-                    f"sources.{key}: captured fingerprints are immutable; use a new source handle for changed content"
+                    "observation aliases must be distinct short lowercase identifiers"
                 )
-            sources[key]["fingerprint"] = deepcopy(fingerprint)
-        return normalize_record(current)
-
-    with storage.lock(root / ".records.lock"):
-        result = storage.update(
-            root / "state" / f"{scope}.json",
-            expected,
-            transform,
-            expected_digest=expected_digest,
-        )
-    return {
-        "scope": scope,
-        "revision": result["revision"],
-        "digest": storage.digest(result),
-        "updated_at": result.get("updated_at"),
-    }
+            aliases[alias] = key
+        item["recorded_at"] = now
+        item.setdefault("origin", schema.DEFAULT_ORIGIN)
+        saved[key] = item
+        assigned.append(key)
+        next_id += 1
+    return saved, aliases, assigned, next_id - 1
 
 
-class _QualificationReview(Exception):
-    def __init__(self, result: dict[str, Any]) -> None:
-        self.result = result
-        super().__init__("Knowledge changes require review")
+def _patch_sources(current: dict[str, Any], changes: Any) -> dict[str, Any]:
+    if not isinstance(changes, dict):
+        raise ValueError("sources patch must be an object")
+    for key, change in changes.items():
+        if isinstance(change, dict) and "fingerprint" in change:
+            previous = current.get(key, {})
+            if (
+                "fingerprint" not in previous
+                or change["fingerprint"] != previous["fingerprint"]
+            ):
+                raise ValueError(
+                    f"sources.{key}.fingerprint is helper-owned; inspect and capture the local source instead"
+                )
+    return schema.patch_map(current, changes, "sources", clear_null=False)
+
+
+def _patch_topics(current: dict[str, Any], changes: Any, now: str) -> dict[str, Any]:
+    if not isinstance(changes, dict):
+        raise ValueError("topics patch must be an object")
+    stamped = {}
+    for key, change in changes.items():
+        if isinstance(change, dict):
+            change = dict(change)
+            for name in ("assessment", "review"):
+                if name in change:
+                    change[name] = assessments.stamp(
+                        change[name], now, f"topics.{key}.{name}"
+                    )
+        stamped[key] = change
+    return schema.patch_map(current, stamped, "topics", clear_null=False)
+
+
+def _guard_cited_versions(current: dict[str, Any], result: dict[str, Any]) -> None:
+    for key, source in current.get("sources", {}).items():
+        if (
+            key in result["sources"]
+            and source.get("version") != result["sources"][key].get("version")
+            and _cites(current, key)
+        ):
+            raise ValueError(
+                f"sources.{key}: cited content versions are immutable; use a new source handle for a new edition"
+            )
 
 
 def _qualification_changes(
@@ -531,6 +380,77 @@ def _qualification_changes(
     return changes
 
 
+class _QualificationReview(Exception):
+    def __init__(self, result: dict[str, Any]) -> None:
+        self.result = result
+        super().__init__("Knowledge changes require review")
+
+
+def _confirmed(value: Any, expected_digest: str | None) -> list[str]:
+    confirmed = [] if value is None else value
+    if (
+        not isinstance(confirmed, list)
+        or any(not isinstance(key, str) for key in confirmed)
+        or len(set(confirmed)) != len(confirmed)
+    ):
+        raise ValueError("confirm_qualification_changes must be unique entry handles")
+    if confirmed and expected_digest is None:
+        raise ValueError("confirm_qualification_changes requires expected_digest")
+    return confirmed
+
+
+def _apply_patch(
+    root: Path, scope: str, current: dict[str, Any], record: dict[str, Any], now: str
+) -> tuple[dict[str, Any], list[str]]:
+    """Apply one agent patch to a validated record; returns the candidate and new handles."""
+    patch = deepcopy(record)
+    saved, aliases, assigned, sequence = _append_observations(
+        current, patch.get("observations", []), now
+    )
+    patch = _aliases(patch, aliases)
+    for key in assigned:
+        saved[key] = _aliases(saved[key], aliases)
+    result = {**current, **patch}
+    result["sources"] = _patch_sources(
+        current.get("sources", {}), patch.get("sources", {})
+    )
+    result["topics"] = _patch_topics(
+        current.get("topics", {}), patch.get("topics", {}), now
+    )
+    deleted = set(current.get("topics", {})) - set(result["topics"])
+    if deleted:
+        preferences.assert_topics_removable(root, scope, deleted)
+    _guard_cited_versions(current, result)
+    for key in assigned:
+        schema.source_links(saved[key], result["sources"], f"observations.{key}")
+        saved[key] = snapshot_sources(saved[key], result["sources"])
+    task_changes = patch.get("tasks", {})
+    result["tasks"] = schema.patch_map(
+        current.get("tasks", {}), task_changes, "tasks", clear_null=True
+    )
+    if "knowledge" in patch:
+        knowledge = schema.patch_knowledge(
+            current.get("knowledge", {}), patch["knowledge"]
+        )
+        for key, entry in knowledge.items():
+            change = patch["knowledge"].get(key)
+            if isinstance(change, dict):
+                schema.source_links(entry, result["sources"], f"knowledge.{key}")
+                if change.get("refs") is not None and "refs" in change:
+                    knowledge[key] = snapshot_sources(entry, result["sources"])
+        result["knowledge"] = knowledge
+    selected = result.get("current_task")
+    if (
+        isinstance(selected, str)
+        and selected in task_changes
+        and task_changes[selected] is None
+    ):
+        result["current_task"] = None
+    result["observations"] = saved
+    result["observation_sequence"] = sequence
+    return normalize_record(result), assigned
+
+
 def save(
     root: Path,
     scope: str,
@@ -540,6 +460,7 @@ def save(
     expected_digest: str | None = None,
     confirm_qualification_changes: list[str] | None = None,
 ) -> dict[str, Any]:
+    """Publish a field patch at the expected snapshot, or return a review preview."""
     scope = _scope(scope)
     if not isinstance(record, dict):
         raise ValueError("state patch must be a JSON object")
@@ -547,175 +468,30 @@ def save(
         raise ValueError(
             "confirm_qualification_changes belongs outside the state patch"
         )
-    confirmed = confirm_qualification_changes
-    if confirmed is None:
-        confirmed = []
-    if (
-        not isinstance(confirmed, list)
-        or any(not isinstance(key, str) for key in confirmed)
-        or len(set(confirmed)) != len(confirmed)
-    ):
-        raise ValueError("confirm_qualification_changes must be unique entry handles")
-    if confirmed and expected_digest is None:
-        raise ValueError("confirm_qualification_changes requires expected_digest")
-    if {
+    confirmed = _confirmed(confirm_qualification_changes, expected_digest)
+    helper_owned = {
         "revision",
         "updated_at",
         "digest",
         "topic_index",
         "policy_topics",
         "observation_sequence",
-    }.intersection(record):
+    }
+    if helper_owned.intersection(record):
         raise ValueError(
             "record revision, timestamps and retrieval metadata are helper-owned"
         )
     assigned: list[str] = []
 
-    def transform(current: dict[str, Any]) -> dict[str, Any]:
-        snapshot = current
-        current = _validated(current)
-        patch = deepcopy(record)
+    def transform(stored: dict[str, Any]) -> dict[str, Any]:
+        current = _validated(stored)
         now = datetime.now(timezone.utc).isoformat(timespec="microseconds")
-        additions = patch.get("observations", [])
-        if not isinstance(additions, list):
-            raise ValueError("observations patch must be a list of new observations")
-        saved = dict(current.get("observations", {}))
-        next_id = current.get("observation_sequence", 0) + 1
-        aliases = {}
-        for item in additions:
-            if not isinstance(item, dict):
-                raise ValueError("new observations must be objects")
-            if "refs" in item and not isinstance(item["refs"], list):
-                raise ValueError("observation refs must be a list")
-            if "recorded_at" in item:
-                raise ValueError("observation recorded_at is helper-owned")
-            key = f"o{next_id}"
-            alias = item.pop("as", None)
-            if alias is not None:
-                if (
-                    not isinstance(alias, str)
-                    or not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", alias)
-                    or alias in aliases
-                ):
-                    raise ValueError(
-                        "observation aliases must be distinct short lowercase identifiers"
-                    )
-                aliases[alias] = key
-            item["recorded_at"] = now
-            item.setdefault("origin", "unknown")
-            saved[key] = item
-            assigned.append(key)
-            next_id += 1
-        patch = _aliases(patch, aliases)
-        for key in assigned:
-            saved[key] = _aliases(saved[key], aliases)
-        result = {**current, **patch}
-        for field in ("topics", "sources"):
-            changes = patch.get(field, {})
-            if not isinstance(changes, dict):
-                raise ValueError(f"{field} patch must be an object")
-            merged = dict(current.get(field, {}))
-            for key, change in changes.items():
-                if change is None:
-                    merged.pop(key, None)
-                elif isinstance(change, dict):
-                    if field == "sources" and "fingerprint" in change:
-                        previous = merged.get(key, {})
-                        if (
-                            "fingerprint" not in previous
-                            or change["fingerprint"] != previous["fingerprint"]
-                        ):
-                            raise ValueError(
-                                f"sources.{key}.fingerprint is helper-owned; inspect and capture the local source instead"
-                            )
-                    if field == "topics":
-                        change = dict(change)
-                        for name in ("assessment", "review"):
-                            if name in change:
-                                change[name] = assessments.stamp(
-                                    change[name], now, f"topics.{key}.{name}"
-                                )
-                    merged[key] = {**merged.get(key, {}), **change}
-                else:
-                    raise ValueError(f"{field}.{key} must be an object or null")
-            result[field] = merged
-        deleted = set(current.get("topics", {})) - set(result["topics"])
-        if deleted:
-            preferences.assert_topics_removable(root, scope, deleted)
-        for key, source in current.get("sources", {}).items():
-            if (
-                key in result["sources"]
-                and source.get("version") != result["sources"][key].get("version")
-                and _cites(current, key)
-            ):
-                raise ValueError(
-                    f"sources.{key}: cited content versions are immutable; use a new source handle for a new edition"
-                )
-        for key in assigned:
-            _source_links(saved[key], result, f"observations.{key}")
-            saved[key] = snapshot_sources(saved[key], result["sources"])
-        changes = patch.get("tasks", {})
-        if not isinstance(changes, dict):
-            raise ValueError("tasks patch must be an object")
-        tasks = dict(current.get("tasks", {}))
-        for key, change in changes.items():
-            if change is None:
-                tasks.pop(key, None)
-            elif isinstance(change, dict):
-                tasks[key] = {
-                    name: value
-                    for name, value in {**tasks.get(key, {}), **change}.items()
-                    if value is not None
-                }
-            else:
-                raise ValueError(f"tasks.{key} must be an object or null")
-        result["tasks"] = tasks
-        if "knowledge" in patch:
-            knowledge_changes = patch["knowledge"]
-            if not isinstance(knowledge_changes, dict):
-                raise ValueError(
-                    "knowledge patch must be an object; remove individual entries with null"
-                )
-            knowledge = dict(current.get("knowledge", {}))
-            for key, change in knowledge_changes.items():
-                field = f"knowledge.{key}"
-                if not isinstance(key, str) or not re.fullmatch(
-                    r"[a-z0-9][a-z0-9_-]{0,63}", key
-                ):
-                    raise ValueError(
-                        f"{field}: handles must be short lowercase identifiers"
-                    )
-                if change is None:
-                    knowledge.pop(key, None)
-                elif isinstance(change, dict):
-                    if set(change) - KNOWLEDGE_FIELDS:
-                        raise ValueError(f"{field} contains unknown fields")
-                    entry = {
-                        name: value
-                        for name, value in {**knowledge.get(key, {}), **change}.items()
-                        if value is not None or name == "text"
-                    }
-                    _source_links(entry, result, field)
-                    if "refs" in change and change["refs"] is not None:
-                        entry = snapshot_sources(entry, result["sources"])
-                    knowledge[key] = entry
-                else:
-                    raise ValueError(f"knowledge.{key} must be an object or null")
-            result["knowledge"] = knowledge
-        selected = result.get("current_task")
-        if (
-            isinstance(selected, str)
-            and selected in changes
-            and changes[selected] is None
-        ):
-            result["current_task"] = None
-        result["observations"] = saved
-        result["observation_sequence"] = next_id - 1
-        result = normalize_record(result)
-        changes_to_review = _qualification_changes(
+        result, handles = _apply_patch(root, scope, current, record, now)
+        assigned.extend(handles)
+        changes = _qualification_changes(
             current.get("knowledge", {}), result.get("knowledge", {})
         )
-        guarded = {change["entry"] for change in changes_to_review}
+        guarded = {change["entry"] for change in changes}
         if set(confirmed) - guarded:
             raise ValueError(
                 "confirm_qualification_changes must name only entries with guarded changes"
@@ -727,8 +503,8 @@ def save(
                     "status": "needs_confirmation",
                     "scope": scope,
                     "revision": current["revision"],
-                    "digest": storage.digest(snapshot),
-                    "changes": changes_to_review,
+                    "digest": storage.digest(stored),
+                    "changes": changes,
                 }
             )
         return result
@@ -755,3 +531,60 @@ def save(
             if "due" in result.get("topics", {}).get(key, {}).get("review", {})
         },
     }
+
+
+def capture_source_fingerprints(
+    root: Path,
+    scope: str,
+    expected: int,
+    fingerprints: dict[str, dict[str, Any]],
+    *,
+    expected_digest: str,
+) -> dict[str, Any]:
+    """Publish fingerprints computed by the local source inspector for this snapshot."""
+    scope = _scope(scope)
+
+    def transform(current: dict[str, Any]) -> dict[str, Any]:
+        current = _validated(current)
+        sources = current.get("sources", {})
+        links(list(fingerprints), sources, "sources")
+        for key, fingerprint in fingerprints.items():
+            if (
+                "fingerprint" in sources[key]
+                and sources[key]["fingerprint"] != fingerprint
+            ):
+                raise ValueError(
+                    f"sources.{key}: captured fingerprints are immutable; use a new source handle for changed content"
+                )
+            sources[key]["fingerprint"] = deepcopy(fingerprint)
+        return normalize_record(current)
+
+    with storage.lock(root / ".records.lock"):
+        result = storage.update(
+            root / "state" / f"{scope}.json",
+            expected,
+            transform,
+            expected_digest=expected_digest,
+        )
+    return {
+        "scope": scope,
+        "revision": result["revision"],
+        "digest": storage.digest(result),
+        "updated_at": result.get("updated_at"),
+    }
+
+
+def register_sources(
+    root: Path,
+    scope: str,
+    expected: int,
+    entries: dict[str, dict[str, Any]],
+    *,
+    expected_digest: str | None = None,
+) -> dict[str, Any]:
+    """Register new source handles through the ordinary save path."""
+    receipt = save(
+        root, scope, expected, {"sources": entries}, expected_digest=expected_digest
+    )
+    receipt["sources"] = entries
+    return receipt

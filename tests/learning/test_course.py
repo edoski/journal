@@ -87,9 +87,8 @@ def test_course_context_persists_with_valid_sources_and_clears_explicitly(
         1,
         {"tasks": {"work": {"task": "Exercise 1"}}, "current_task": "work"},
     )
-    result = retrieval.context(tmp_path, "course")
-    assert isinstance(result, dict)
-    assert result["course_context"] == course
+    result = retrieval.resume(tmp_path, "course")
+    assert result["briefing"]["course"]["course_context"] == course
     assert result["sources"] == {"syllabus": {"path": "syllabus.pdf"}}
     with pytest.raises(ValueError, match="unknown course_context source"):
         records.save(tmp_path, "course", 2, {"sources": {"syllabus": None}})

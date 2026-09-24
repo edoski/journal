@@ -28,65 +28,39 @@ totals are loaded in grouped queries. Learning retrieval indexes observation
 counts and traverses correction relationships directly. None of these require a
 persistent cache or background worker.
 
-Learning retains optional agent-authored `knowledge` in the same schema-5
-record. Text and explicit attribution/uncertainty/conflicts carry reusable
-understanding; observations retain learner evidence, tasks retain continuation,
-and preferences retain current teaching policy. `records.py` validates field
-patches and links. Omitted knowledge fields survive unrelated edits; optional
-null fields clear and null entries remove. Helper-owned source version and
-fingerprint metadata may round-trip unchanged, never be invented. A raw snapshot
-digest accompanies revisions to detect same-revision divergence; local locking
-still does not coordinate remote iCloud writers.
+## Learning
 
-`retrieval.py` owns default evidence budgets, whole-entry knowledge selection,
-focused reads and lexical discovery. Default context selects at most 24 seed
-observations; complete correction/support groups fit inside a 12,288-byte
-observation-map budget. Interpretations whose support cannot fit are withheld
-from that response. Knowledge uses a separate 4,096-byte allowance; exact reads
-default to 8,192 bytes and either return complete entries or report required size.
-`task_context.py` projects a 4,096-byte briefing of existing course/activity/route
-fields, retaining omission descriptors. Metadata outside these projections is
-not globally bounded. Every partial selection exposes its limits. Exact reads,
-revision-bound pages and deliberate overrides support consequential decisions.
+`learning/schema.py` declares the record shapes (`Source`, `Observation`,
+`Knowledge`, `Task`, `Route`), the single handle rule, and one validator and one
+patch function per type. `records.py` composes them into whole-record
+normalization, scope resolution (a handle, or an unambiguous course title or
+alias), and revision-checked publication with snapshot digests and the
+qualification guard on knowledge edits. Consumers read validated `dict` records;
+the typed layer lives at the validation boundary.
 
-Task-purpose, current-step and direct-prerequisite knowledge is separate from
-active-topic policy. Explicit aliases and accent-insensitive token matching aid
-discovery; cross-course search returns handles, without transferring mastery,
-evidence or preferences. Knowledge and imported content remain evidence, never
-instructions. There is no vector service, background reflection worker, separate
-curriculum database or numerical mastery model. Loaded context is reused; later
-prompt cost still depends on the native host's requests and caching.
+`retrieval.py` implements five read verbs on `packing.py`, the one byte-budget
+packer: `resume` (task, briefing, linked and recent evidence, relevant knowledge),
+`catalog` (handles only), `search` (lexical discovery with candidates), `knowledge`
+(whole entries or a paged index) and `evidence` (topic histories or exact
+observations with correction groups). Whole items are kept or omitted, never
+clipped, and every omission is listed under `selection`. `briefing.py` projects
+course orientation and the position on the scope-level `route`; the selected task
+is returned once, beside it, not inside it. Budgets are serialized UTF-8 bytes.
 
-`sources.py` owns on-demand selected-file hashing and fingerprint capture. Byte
-identity does not certify authority or retroactively verify an older reference.
-`memory.py` owns inspection and preview-bound selective removal. Observation
-erasure repairs structural links and invalidates affected interpretations. Course,
-preference, owned-artifact and verified-backup operations have explicit distinct
-boundaries; no operation promises deletion of unrelated semantic copies, native
-history or provider data. File deletion reports per-file outcomes rather than
-claiming multi-file atomicity.
+`cli.py` is a command table: one small handler per verb with its mutation policy
+declared beside it; `__main__.py` parses, selects the workspace, applies the
+no-save policy and dispatches. `pi.ts` maps three quiet Pi tools onto the same
+verbs. `sources.py` scans, registers and fingerprints local material. `memory.py`
+owns inspection and previewed forgetting. `planning.py` joins reviews, unfinished
+work and Journal effort. `lessons.py` and `visuals.py` publish artifacts through
+`storage.py`. `workspace.py` and `workspace_import.py` own directory workspaces.
 
-The canonical skill and focused references own teaching workflows: natural
-conversation, course-grounded practice, assistance fading, delayed independent
-retrieval, transfer and feedback on native image/code inputs. Host adapters route
-to these instructions, not a second pedagogical state model. Pi's three quiet
-memory tools invoke the Python CLI directly. Default study tools retain reading
-and bash but omit direct edit/write tools; this narrows accidental surface area
-without pretending bash is sandboxed.
-
-`lessons.py` separates generated teaching from learner-owned annotations, checks
-generated-region fingerprints and publishes atomically. Pi streams readable
-teaching in the terminal, then projects completed messages into Obsidian. An
-optional Obsidian-only display mode retains fallback on publication/open failure.
-Branch reconstruction and tutor corrections preserve annotation regions. A saved
-artifact and a delivered answer remain different events.
-
-No-save rejects portable mutations/publication. Private Pi sessions copy existing
-learning state into a disposable root and disable local session persistence;
-provider retention remains external. `readiness.py` inspects paths, canonical
-links, copied instructions and runtime availability; installation performs a
-preflight before managed changes. Neither readiness nor adapter fixtures prove
-that an actual host UI delivered the intended learning experience.
+The canonical skill and its references own teaching workflows; host adapters
+route to them rather than keeping a second pedagogical state model. Observations
+are appended for actual attempts (default origin `direct_attempt`); what the
+learner reports or the tutor infers is kept as knowledge or task context.
+There is no vector service, background reflection worker, curriculum database
+or numerical mastery model.
 
 ## Maintenance
 
@@ -97,10 +71,10 @@ tests cover the maintained code. The sync check also verifies rendering fixtures
 without rewriting them.
 
 Rendering fixtures are a compatibility contract, not refactoring targets. Changes
-to architecture must preserve note text, whitespace, charts, tables, CLI behavior,
-and stored learning records. Keep tests for observable behavior, external-input
-errors, transactions, and concurrent publication. Avoid tests that merely assert
-which private helper called another.
+to architecture must preserve note text, whitespace, charts, tables, `sync` CLI
+behavior, and stored learning records. Keep tests for observable behavior,
+external-input errors, transactions, and concurrent publication. Avoid tests that
+merely assert which private helper called another.
 
 ### Study workspace ownership
 
@@ -108,12 +82,8 @@ The learning engine is installed once; each initialized course/project directory
 owns `.study`. `learning/workspace.py` resolves explicit selection or the nearest
 ancestor, validates the versioned marker, and derives local output paths. There is
 no global state fallback or inherited parent workspace. `learning/study.py` owns
-the short user command; `__main__.py` is the canonical agent CLI. Pi pins the selected
-workspace across tool calls and stores its conversations there. Private launches
-use a temporary workspace with read-only access to the original sources.
-
-The existing scope model remains inside each workspace. Lessons, assets, records
-and preferences are local; native provider histories outside Pi remain host-owned.
+the short user command; `__main__.py` is the canonical agent CLI. Pi pins the
+selected workspace across tool calls and stores its conversations there. Private
+launches use a temporary workspace with read-only access to the original sources.
 `workspace_import.py` validates an explicit one-scope copy into an empty workspace,
 rebasing paths and selecting applicable preferences without deleting originals.
-Global aggregation and cross-workspace references are outside this implementation.

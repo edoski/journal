@@ -136,7 +136,8 @@ test("memory tools preserve patches and share CLI retrieval, preferences and rev
   assert.deepEqual((await context({})).scopes, []);
   const empty = await context({ scope: "course" });
   assert.equal(empty.revision, 0);
-  assert.equal(empty.vault, process.env.STUDY_WORKSPACE);
+  assert.equal(empty.workspace, undefined);
+  assert.equal((await context({})).workspace, process.env.STUDY_WORKSPACE);
   const evidence = "-it's $literal `text`\n日本語 and \\LaTeX";
   const saved = await memoryTool(f, "learning_save", {
     scope: "course", expected_revision: empty.revision,
@@ -159,21 +160,29 @@ test("memory tools preserve patches and share CLI retrieval, preferences and rev
     when: { domain: "mathematics", activity: "proof" },
     values: { pace: { instruction: "Justify each step.", origin: "explicit" } },
   }] }));
+  const routed = await memoryTool(f, "learning_save", { scope: "course", expected_revision: saved.revision, changes: {
+    route: { status: "proposed", current: "systems", nodes: { systems: { label: "Linear systems", topics: ["systems"] } } },
+  } });
+  assert.equal(routed.revision, saved.revision + 1);
   const resumed = await context({ scope: "course", task: "exercise", activity: "proof" });
-  assert.deepEqual(resumed, cli(["context", "course", "--task=exercise", "--activity=proof"]));
+  assert.deepEqual(resumed, cli(["resume", "course", "--task=exercise", "--activity=proof"]));
+  assert.equal(resumed.briefing.route.current.id, "systems");
+  assert.deepEqual(await context({ scope: "Course" }), await context({ scope: "course" }));
   assert.equal(resumed.observations.o1.text, evidence);
   assert.equal(resumed.task.question, "Why unique?");
   assert.equal(resumed.preferences.rules[0].values.pace.instruction, "Justify each step.");
-  assert.deepEqual((await context({ scope: "course", topics: [] })).observations, {});
-  assert.deepEqual(Object.keys((await context({ scope: "course", query: evidence })).observations), ["o1"]);
-  assert.deepEqual(Object.keys((await context({ scope: "course", observations: ["o2"] })).observations), ["o2"]);
-  const page = await context({ scope: "course", topics: ["systems"], limit: 1 });
-  assert.equal(page.complete, false);
-  const next = await context({ scope: "course", topics: ["systems"], limit: 1,
-    offset: page.next_offset, expected_revision: page.revision });
-  assert.equal(next.complete, true);
+  assert.deepEqual((await context({ action: "evidence", scope: "course", topics: [] })).observations, {});
+  assert.deepEqual(Object.keys((await context({ action: "search", scope: "course", query: evidence })).observations), ["o1"]);
+  assert.deepEqual(Object.keys((await context({ action: "evidence", scope: "course", observations: ["o2"] })).observations), ["o2"]);
+  const page = await context({ action: "evidence", scope: "course", topics: ["systems"], limit: 1 });
+  assert.equal(page.selection.evidence.complete, false);
+  const next = await context({ action: "evidence", scope: "course", topics: ["systems"], limit: 1,
+    offset: page.selection.evidence.next_offset, expected_revision: page.revision });
+  assert.equal(next.selection.evidence.complete, true);
   assert.deepEqual(Object.keys(next.observations), ["o2"]);
-  assert.deepEqual(await context({ scope: "course", all: true }), cli(["context", "course", "--all"]));
+  assert.deepEqual(await context({ action: "catalog", scope: "course" }), cli(["catalog", "course"]));
+  await assert.rejects(context({ action: "search", scope: "course" }), /search requires query/);
+  await assert.rejects(context({ action: "evidence", topics: ["systems"] }), /evidence requires scope/);
 });
 
 test("memory tools reject invalid writes and stale revisions without changing evidence", async (t) => {
@@ -190,8 +199,8 @@ test("memory tools reject invalid writes and stale revisions without changing ev
   controller.abort();
   await assert.rejects(save(1, { title: "Cancelled" }, controller.signal), /abort/i);
   assert.equal(await readFile(path, "utf8"), original);
-  await assert.rejects(memoryTool(f, "learning_context", { scope: "course", all: true, query: "x" }), /cannot be combined/);
-  await assert.rejects(memoryTool(f, "learning_context", { scope: "course", expected_revision: 0 }), /revision conflict/);
+  await assert.rejects(memoryTool(f, "learning_context", { action: "knowledge", scope: "course", query: "x" }), /knowledge does not use query/);
+  await assert.rejects(memoryTool(f, "learning_context", { action: "evidence", scope: "course", topics: [], expected_revision: 0 }), /revision conflict/);
 });
 
 test("knowledge tools share focused CLI reads, source metadata and explicit byte-budget errors", async (t) => {
@@ -209,35 +218,34 @@ test("knowledge tools share focused CLI reads, source metadata and explicit byte
     },
   });
   const cli = (args) => JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
-    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, "context", "course", ...args], { cwd: repository, encoding: "utf8" }));
-  const focused = await context({ knowledge: ["notation"], expected_revision: 1 });
-  assert.deepEqual(focused, cli(["--knowledge=notation", "--expect=1"]));
+    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, ...args], { cwd: repository, encoding: "utf8" }));
+  const focused = await context({ action: "knowledge", keys: ["notation"], expected_revision: 1 });
+  assert.deepEqual(focused, cli(["knowledge", "course", "notation", "--expect=1"]));
   assert.equal(focused.knowledge.notation.text, literal);
   assert.equal(focused.knowledge.notation.refs[0].source_version, "edition-1");
   assert.equal(focused.sources.sheet.path, "notes/lecture.md");
   assert.equal(focused.observations, undefined);
-  const index = await context({ knowledge: [], limit: 1 });
-  assert.deepEqual(await context({ knowledge: [], limit: 1, evidence_budget: 2 }), index);
-  assert.deepEqual(await context({ knowledge: ["notation"], expected_revision: 1, evidence_budget: 2 }), focused);
-  assert.deepEqual(index, cli(["--knowledge=", "--limit=1"]));
+  const index = await context({ action: "knowledge", limit: 1 });
+  await assert.rejects(context({ action: "knowledge", limit: 1, evidence_budget: 2 }), /knowledge does not use evidence_budget/);
+  assert.deepEqual(index, cli(["knowledge", "course", "--limit=1"]));
   assert.equal(index.selection.mode, "knowledge_index");
   assert.equal(index.selection.next_offset, 1);
-  const next = await context({ knowledge: [], limit: 1, offset: 1, expected_revision: 1 });
-  assert.deepEqual(next, cli(["--knowledge=", "--limit=1", "--offset=1", "--expect=1"]));
+  const next = await context({ action: "knowledge", limit: 1, offset: 1, expected_revision: 1 });
+  assert.deepEqual(next, cli(["knowledge", "course", "--limit=1", "--offset=1", "--expect=1"]));
   assert.equal(next.selection.complete, true);
-  await assert.rejects(context({ knowledge: ["lengthy"] }),
-    /^Error: knowledge read requires \d+ bytes \(budget \d+\); entries: lengthy=\d+; fetch fewer entries or set --knowledge-budget \d+$/);
-  const enlarged = await context({ knowledge: ["lengthy"], knowledge_budget: 20000 });
-  assert.deepEqual(enlarged, cli(["--knowledge=lengthy", "--knowledge-budget=20000"]));
+  await assert.rejects(context({ action: "knowledge", keys: ["lengthy"] }),
+    /^Error: knowledge read requires \d+ bytes \(budget \d+\); entries: lengthy=\d+; fetch fewer entries or set --budget \d+$/);
+  const enlarged = await context({ action: "knowledge", keys: ["lengthy"], knowledge_budget: 20000 });
+  assert.deepEqual(enlarged, cli(["knowledge", "course", "lengthy", "--budget=20000"]));
   assert.equal(enlarged.knowledge.lengthy.text, "日本語".repeat(1200));
   const bounded = await context({ knowledge_budget: 1024 });
-  assert.deepEqual(bounded, cli(["--knowledge-budget=1024"]));
+  assert.deepEqual(bounded, cli(["resume", "course", "--knowledge-budget=1024"]));
   assert.deepEqual(Object.keys(bounded.knowledge), ["notation"]);
-  assert.equal(bounded.knowledge_selection.omitted, 1);
+  assert.equal(bounded.selection.knowledge.omitted, 1);
   assert.equal((await context({ knowledge_budget: 20000 })).knowledge.lengthy.text,
     "日本語".repeat(1200));
-  await assert.rejects(context({ knowledge: ["notation"], query: "literal" }), /knowledge selection cannot combine/);
-  await assert.rejects(context({ knowledge: [], knowledge_budget: 20000 }), /knowledge.*budget|knowledge-budget/);
+  await assert.rejects(context({ action: "knowledge", keys: ["notation"], query: "literal" }), /knowledge does not use query/);
+  await assert.rejects(context({ action: "knowledge", knowledge_budget: 20000 }), /exact knowledge/);
 });
 
 test("knowledge discovery preserves independent revision-bound candidate paging", async (t) => {
@@ -247,7 +255,7 @@ test("knowledge discovery preserves independent revision-bound candidate paging"
     changes: { knowledge: Object.fromEntries(Array.from({ length: 9 }, (_, index) =>
       [`note-${index}`, { text: `Remembered marker ${index}.` }])) },
   });
-  const context = (args) => memoryTool(f, "learning_context", { scope: "course", query: "Remembered marker", ...args });
+  const context = (args) => memoryTool(f, "learning_context", { action: "search", scope: "course", query: "Remembered marker", ...args });
   const first = await context({});
   assert.equal(first.candidates.items.length, 8);
   assert.equal(first.candidates.complete, false);
@@ -255,7 +263,7 @@ test("knowledge discovery preserves independent revision-bound candidate paging"
   await assert.rejects(context({ candidate_offset: 8 }), /revision|expect/);
   const next = await context({ candidate_offset: 8, expected_revision: first.revision });
   const cli = JSON.parse(execFileSync(process.env.LEARNING_PYTHON,
-    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, "context", "course", "--query=Remembered marker", "--candidate-offset=8", "--expect=1"],
+    ["-m", "learning", "--workspace", process.env.STUDY_WORKSPACE, "search", "--candidate-offset=8", "--expect=1", "--", "course", "Remembered marker"],
     { cwd: repository, encoding: "utf8" }));
   assert.deepEqual(next, cli);
   assert.deepEqual(next.candidates.items.map((item) => [item.kind, item.key, item.discovery_only]),
@@ -663,7 +671,13 @@ test("quiet management shares preferences, source snapshots, memory previews and
   } });
   const inspectedSource = await manage({ action: "sources", scope: "course", sources: ["sheet"] });
   assert.equal(inspectedSource.sources.sheet.status, "unverified");
-  const capture = await manage({ action: "sources", scope: "course", sources: ["sheet"], expected_revision: saved.revision, expected_digest: saved.digest });
+  const scanned = await manage({ action: "sources", scope: "course", scan: true });
+  assert.deepEqual(scanned.files.map((item) => [item.path, item.registered]), [["sheet.md", true]]);
+  await writeFile(join(vault, "extra notes.md"), "More material.\n");
+  const added = await manage({ action: "sources", scope: "course", add: ["extra notes.md"], expected_revision: saved.revision, expected_digest: saved.digest });
+  assert.deepEqual(added.sources, { "extra-notes": { path: "extra notes.md", title: "extra notes" } });
+  await assert.rejects(manage({ action: "sources", scope: "course", scan: true, sources: ["sheet"] }), /exactly one/);
+  const capture = await manage({ action: "sources", scope: "course", sources: ["sheet"], expected_revision: added.revision, expected_digest: added.digest });
   assert.deepEqual(capture.captured, ["sheet"]);
   const inspection = await manage({ action: "inspect", scope: "course" });
   assert.equal(inspection.records[0].record.knowledge.convention.text, "Use lambda for the multiplier.");
@@ -674,7 +688,7 @@ test("quiet management shares preferences, source snapshots, memory previews and
   const preview = await manage({ action: "forget", scope: "course", selection: { knowledge: ["convention"] } });
   assert.equal(preview.applied, false);
   await manage({ action: "forget", scope: "course", selection: { knowledge: ["convention"] }, apply: true, expected_revision: preview.revision, expected_digest: preview.digest });
-  const final = await memoryTool(f, "learning_context", { scope: "course", knowledge: [] });
+  const final = await memoryTool(f, "learning_context", { action: "knowledge", scope: "course" });
   assert.doesNotMatch(JSON.stringify(final), /convention/);
 });
 
@@ -768,9 +782,9 @@ test("save schema allows canonical explicit clearing of optional knowledge and c
   const saved = await memoryTool(f, "learning_save", { ...args, confirm_qualification_changes: ["convention"] });
   assert.equal(saved.status, undefined);
   assert.equal(saved.revision, first.revision + 1);
-  const context = await memoryTool(f, "learning_context", { scope: "course", all: true });
-  assert.deepEqual(context.knowledge.convention, { text: "A denotes the matrix." });
-  assert.equal(context.course_context, undefined);
+  const record = (await memoryTool(f, "learning_manage", { action: "inspect", scope: "course" })).records[0].record;
+  assert.deepEqual(record.knowledge.convention, { text: "A denotes the matrix." });
+  assert.equal(record.course_context, undefined);
 });
 
 

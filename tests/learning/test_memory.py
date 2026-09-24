@@ -1,4 +1,3 @@
-from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
@@ -405,63 +404,6 @@ def test_unowned_and_linked_files_are_not_removable(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="relative"):
         memory.forget(tmp_path, None, {"artifacts": ["lessons/../preferences.json"]})
     assert len(memory.inspect(tmp_path)["unmanaged"]) == 2
-
-
-def backup_fixture(root: Path) -> tuple[str, str]:
-    prefix = "backups/schema4-to5-20260922T010000Z-12345678"
-    target = root / prefix / "state/algebra.json"
-    target.parent.mkdir(parents=True)
-    raw = b'{"schema_version":4,"revision":1,"private":"Learner report"}'
-    target.write_bytes(raw)
-    (root / prefix / "manifest.json").write_text(
-        json.dumps(
-            {
-                "migration": "schema4-to5",
-                "sha256": {"state/algebra.json": sha256(raw).hexdigest()},
-            }
-        ),
-        encoding="utf-8",
-    )
-    return f"{prefix}/state/algebra.json", f"{prefix}/manifest.json"
-
-
-def test_backup_erasure_preserves_manifests_until_all_members_selected(
-    tmp_path: Path,
-) -> None:
-    member, manifest = backup_fixture(tmp_path)
-    assert len(memory.inspect(tmp_path)["backups"]) == 2
-    with pytest.raises(ValueError, match="select all remaining"):
-        memory.forget(tmp_path, None, {"backups": [manifest]})
-    result = apply(tmp_path, None, {"backups": [member, manifest]})
-    assert result["deleted"] == [member, manifest]
-    assert not (tmp_path / member).exists()
-    assert not (tmp_path / manifest).exists()
-
-
-def test_corrupt_backup_is_not_accepted_as_owned(tmp_path: Path) -> None:
-    member, _ = backup_fixture(tmp_path)
-    (tmp_path / member).write_text("Changed backup", encoding="utf-8")
-    with pytest.raises(ValueError, match="checksum differs"):
-        memory.forget(tmp_path, None, {"backups": [member]})
-    assert memory.inspect(tmp_path)["unmanaged"][0]["path"] == member
-
-
-def test_file_erasure_reports_partial_failure_and_keeps_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    member, manifest = backup_fixture(tmp_path)
-    original = Path.unlink
-
-    def fail_member(path: Path, *args: Any, **kwargs: Any) -> None:
-        if path.name == "algebra.json":
-            raise OSError("file busy")
-        original(path, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "unlink", fail_member)
-    result = apply(tmp_path, None, {"backups": [member, manifest]})
-    assert not result["applied"] and not result["complete"]
-    assert len(result["failures"]) == 2
-    assert (tmp_path / manifest).exists()
 
 
 def test_preview_of_missing_root_creates_nothing(tmp_path: Path) -> None:

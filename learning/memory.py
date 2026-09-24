@@ -12,22 +12,20 @@ from uuid import UUID
 
 from learning import preferences, records, storage, visuals
 from learning.observations import correction_links, expand_corrections
+from learning.schema import handle
 
 _RETAINED = {
     "semantic_copies": "Prose copies in other entries, courses and source files are not searched or erased.",
     "artifacts": "Generated lessons and diagrams remain unless their exact artifact paths are selected separately.",
-    "backups": "Migration backups remain unless their exact verified paths are selected separately.",
     "history": "Provider histories, native transcripts, cloud history, snapshots and filesystem recovery copies are outside this operation. Resuming a native transcript can recreate a deleted lesson.",
     "publication": "Local locks and snapshot checks do not coordinate simultaneous writes on different machines.",
 }
+_RECORD_GROUPS = frozenset({"observations", "knowledge", "tasks", "course"})
+_FILE_GROUPS = frozenset({"preferences", "artifacts"})
 
 
 def _scope_path(root: Path, scope: str) -> Path:
-    if not isinstance(scope, str) or not re.fullmatch(
-        r"[a-z0-9][a-z0-9_-]{0,63}", scope
-    ):
-        raise ValueError("invalid memory scope")
-    return root / "state" / f"{scope}.json"
+    return root / "state" / f"{handle(scope, 'memory scope')}.json"
 
 
 def _safe_file(base: Path, relative: str) -> Path:
@@ -98,74 +96,19 @@ def _artifact(
     return path, {"kind": "diagram"}
 
 
-def _backup(root: Path, relative: str) -> tuple[Path, dict[str, Any]]:
-    path = _safe_file(root, relative)
-    parts = Path(relative).parts
-    if (
-        len(parts) not in (3, 4)
-        or parts[0] != "backups"
-        or not parts[1].startswith("schema4-to5-")
-    ):
-        raise ValueError("only manifest-owned migration backup files are removable")
-    manifest_path = _safe_file(root, f"backups/{parts[1]}/manifest.json")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if (
-        not isinstance(manifest, dict)
-        or manifest.get("migration") != "schema4-to5"
-        or not isinstance(manifest.get("sha256"), dict)
-    ):
-        raise ValueError("invalid migration backup manifest")
-    member = "/".join(parts[2:])
-    checksums = manifest["sha256"]
-    for name, checksum in checksums.items():
-        if (
-            not isinstance(name, str)
-            or not (
-                name == "preferences.json"
-                or re.fullmatch(r"state/[a-z0-9][a-z0-9_-]{0,63}\.json", name)
-            )
-            or not isinstance(checksum, str)
-            or not re.fullmatch(r"[a-f0-9]{64}", checksum)
-        ):
-            raise ValueError("invalid migration backup manifest entry")
-    if member == "manifest.json":
-        return path, {"members": sorted(checksums)}
-    if member not in checksums or not (
-        member == "preferences.json"
-        or re.fullmatch(r"state/[a-z0-9][a-z0-9_-]{0,63}\.json", member)
-    ):
-        raise ValueError("backup file is not owned by its migration manifest")
-    current = sha256(path.read_bytes()).hexdigest()
-    if current != checksums[member]:
-        raise ValueError(
-            "backup checksum differs from its manifest; inspect it manually"
-        )
-    return path, {"verified": True, "manifest": str(manifest_path)}
-
-
 def _inventory(root: Path, assets: Path | None) -> dict[str, Any]:
-    result: dict[str, Any] = {"artifacts": [], "backups": [], "unmanaged": []}
+    result: dict[str, Any] = {"artifacts": [], "unmanaged": []}
     candidates = [
-        ("artifacts", f"lessons/{path.name}")
-        for path in sorted((root / "lessons").glob("*.md"))
+        f"lessons/{path.name}" for path in sorted((root / "lessons").glob("*.md"))
     ]
     if assets is not None:
         candidates.extend(
-            ("artifacts", f"assets/{path.name}")
-            for path in sorted(assets.glob("*.svg"))
+            f"assets/{path.name}" for path in sorted(assets.glob("*.svg"))
         )
-    candidates.extend(
-        ("backups", str(path.relative_to(root)))
-        for path in sorted((root / "backups").glob("schema4-to5-*/**/*.json"))
-    )
-    for kind, relative in candidates:
+    for relative in candidates:
         try:
-            path, metadata = (
-                _backup(root, relative)
-                if kind == "backups"
-                else _artifact(root, assets, relative)
-            )
-            result[kind].append(
+            path, metadata = _artifact(root, assets, relative)
+            result["artifacts"].append(
                 {
                     "path": relative,
                     "absolute_path": str(path),
@@ -216,10 +159,10 @@ def inspect(
     if policy_path.exists() or policy_path.is_symlink():
         _safe_file(root, "preferences.json")
     policy = preferences.read(root)
-    result = {
+    return {
         "records": entries,
         "preferences": {
-            "path": str(root / "preferences.json"),
+            "path": str(policy_path),
             "revision": policy["revision"],
             "digest": policy["digest"],
             "entries": _preference_entries(policy),
@@ -229,14 +172,12 @@ def inspect(
         "retained": dict(_RETAINED),
         "assets_directory": str(assets) if assets is not None else None,
     }
-    return result
 
 
 def _selection(value: Any, scope: str | None) -> tuple[str, dict[str, Any]]:
     if not isinstance(value, dict) or not value:
         raise ValueError("forget selection must be a nonempty object")
-    groups = {"observations", "knowledge", "tasks", "course"}
-    if set(value).issubset(groups):
+    if set(value).issubset(_RECORD_GROUPS):
         if scope is None:
             raise ValueError("record forgetting requires a scope")
         if "course" in value:
@@ -244,19 +185,15 @@ def _selection(value: Any, scope: str | None) -> tuple[str, dict[str, Any]]:
                 raise ValueError("course forgetting requires exactly {course: true}")
             return "record", {"course": True}
         kind = "record"
-    elif len(value) == 1 and next(iter(value)) in {
-        "preferences",
-        "artifacts",
-        "backups",
-    }:
+    elif len(value) == 1 and next(iter(value)) in _FILE_GROUPS:
         if scope is not None:
             raise ValueError(
-                "preferences, artifacts and backups are separate unscoped operations"
+                "preferences and artifacts are separate unscoped operations"
             )
         kind = next(iter(value))
     else:
         raise ValueError(
-            "forget selections cannot mix record, preference, artifact or backup ownership"
+            "forget selections cannot mix record, preference or artifact ownership"
         )
     result = {}
     for name, handles in value.items():
@@ -330,8 +267,8 @@ def _redact(
                 value.pop(field)
                 invalidated.append(f"topics.{topic}.{field}")
     for field, handles in selection.items():
-        for handle in handles:
-            del record[field][handle]
+        for key in handles:
+            del record[field][key]
     if record.get("current_task") in selection.get("tasks", []):
         record.pop("current_task")
     record = _strip_links(record, removed)
@@ -344,11 +281,7 @@ def _redact(
 
 
 def _token(
-    root: Path,
-    kind: str,
-    targets: list[Path],
-    snapshot: Any,
-    selection: dict[str, Any],
+    root: Path, kind: str, targets: list[Path], snapshot: Any, selection: dict[str, Any]
 ) -> str:
     return sha256(
         json.dumps(
@@ -397,27 +330,6 @@ def forget(
 ) -> dict[str, Any]:
     """Preview exact redaction; apply only against that selection and snapshot."""
     kind, selected = _selection(selection, scope)
-    lock = ".lessons.lock" if kind == "artifacts" else ".records.lock"
-    if not apply:
-        return _forget(
-            root, scope, kind, selected, expected, expected_digest, False, assets
-        )
-    with storage.lock(root / lock):
-        return _forget(
-            root, scope, kind, selected, expected, expected_digest, True, assets
-        )
-
-
-def _forget(
-    root: Path,
-    scope: str | None,
-    kind: str,
-    selected: dict[str, Any],
-    expected: int | None,
-    expected_digest: str | None,
-    apply: bool,
-    assets: Path | None,
-) -> dict[str, Any]:
     result: dict[str, Any] = {
         "applied": False,
         "kind": kind,
@@ -425,88 +337,106 @@ def _forget(
         "selection": selected,
         "retained": dict(_RETAINED),
     }
-    if kind in {"artifacts", "backups"}:
-        files = {}
-        for relative in selected[kind]:
-            path, metadata = (
-                _backup(root, relative)
-                if kind == "backups"
-                else _artifact(root, assets, relative)
+    if kind == "artifacts":
+        if not apply:
+            return _forget_files(
+                root,
+                selected["artifacts"],
+                expected,
+                expected_digest,
+                False,
+                assets,
+                result,
             )
-            if kind == "backups" and "members" in metadata:
-                prefix = str(Path(relative).parent)
-                missing = [
-                    f"{prefix}/{member}"
-                    for member in metadata["members"]
-                    if (root / prefix / member).exists()
-                    and f"{prefix}/{member}" not in selected[kind]
-                ]
-                if missing:
-                    raise ValueError(
-                        "select all remaining backup members before deleting their manifest"
-                    )
-            files[relative] = {
-                "path": str(path),
-                "sha256": sha256(path.read_bytes()).hexdigest(),
-            }
-        token = _token(
-            root,
-            kind,
-            [Path(item["path"]) for item in files.values()],
-            {relative: item["sha256"] for relative, item in files.items()},
-            selected,
-        )
-        _check(0, token, expected, expected_digest, apply)
-        result.update(
-            revision=0,
-            digest=token,
-            files=files,
-            effects={
-                "deletes_entire_files": True,
-                "consequence": (
-                    "Selected notes include any learner annotations; retained native histories can recreate generated lessons."
-                    if kind == "artifacts"
-                    else "Selected backup files will no longer be available for restoration."
-                ),
-            },
-        )
-        if apply:
-            deleted = []
-            failures: list[dict[str, str]] = []
-            # A manifest survives any failed member deletion.
-            for relative in sorted(
-                files, key=lambda value: (value.endswith("/manifest.json"), value)
-            ):
-                if relative.endswith("/manifest.json") and failures:
-                    failures.append(
-                        {
-                            "path": relative,
-                            "error": "retained after a member deletion failed",
-                        }
-                    )
-                    continue
-                try:
-                    path = Path(files[relative]["path"])
-                    if (
-                        path.is_symlink()
-                        or sha256(path.read_bytes()).hexdigest()
-                        != files[relative]["sha256"]
-                    ):
-                        raise ValueError(
-                            "file changed during forgetting; preview again"
-                        )
-                    path.unlink()
-                    deleted.append(relative)
-                except (ValueError, OSError) as error:
-                    failures.append({"path": relative, "error": str(error)})
-            result.update(
-                applied=bool(deleted),
-                deleted=deleted,
-                failures=failures,
-                complete=not failures,
-                atomic=False,
+        with storage.lock(root / ".lessons.lock"):
+            return _forget_files(
+                root,
+                selected["artifacts"],
+                expected,
+                expected_digest,
+                True,
+                assets,
+                result,
             )
+    if not apply:
+        return _forget_record(
+            root, scope, kind, selected, expected, expected_digest, False, result
+        )
+    with storage.lock(root / ".records.lock"):
+        return _forget_record(
+            root, scope, kind, selected, expected, expected_digest, True, result
+        )
+
+
+def _forget_files(
+    root: Path,
+    relatives: list[str],
+    expected: int | None,
+    expected_digest: str | None,
+    apply: bool,
+    assets: Path | None,
+    result: dict[str, Any],
+) -> dict[str, Any]:
+    files = {}
+    for relative in relatives:
+        path, _ = _artifact(root, assets, relative)
+        files[relative] = {
+            "path": str(path),
+            "sha256": sha256(path.read_bytes()).hexdigest(),
+        }
+    token = _token(
+        root,
+        "artifacts",
+        [Path(item["path"]) for item in files.values()],
+        {relative: item["sha256"] for relative, item in files.items()},
+        {"artifacts": relatives},
+    )
+    _check(0, token, expected, expected_digest, apply)
+    result.update(
+        revision=0,
+        digest=token,
+        files=files,
+        effects={
+            "deletes_entire_files": True,
+            "consequence": "Selected notes include any learner annotations; retained native histories can recreate generated lessons.",
+        },
+    )
+    if not apply:
         return result
+    deleted = []
+    failures: list[dict[str, str]] = []
+    for relative in sorted(files):
+        try:
+            path = Path(files[relative]["path"])
+            if (
+                path.is_symlink()
+                or sha256(path.read_bytes()).hexdigest() != files[relative]["sha256"]
+            ):
+                raise ValueError("file changed during forgetting; preview again")
+            path.unlink()
+            deleted.append(relative)
+        except (ValueError, OSError) as error:
+            failures.append({"path": relative, "error": str(error)})
+    result.update(
+        applied=bool(deleted),
+        deleted=deleted,
+        failures=failures,
+        complete=not failures,
+        atomic=False,
+    )
+    return result
+
+
+def _forget_record(
+    root: Path,
+    scope: str | None,
+    kind: str,
+    selected: dict[str, Any],
+    expected: int | None,
+    expected_digest: str | None,
+    apply: bool,
+    result: dict[str, Any],
+) -> dict[str, Any]:
     path = (
         _scope_path(root, scope)
         if kind == "record" and scope is not None
@@ -535,13 +465,12 @@ def _forget(
                 )
         revised, effects = _redact(current, selected)
     else:
-        policy = current
-        entries = _preference_entries(policy)
+        entries = _preference_entries(current)
         if set(selected["preferences"]) - set(entries):
             raise ValueError("unknown preference handles; inspect current memory")
         erased = [entries[key] for key in selected["preferences"]]
         rules = []
-        for rule in policy["rules"]:
+        for rule in current["rules"]:
             dimensions = {
                 item["dimension"] for item in erased if item["when"] == rule["when"]
             }

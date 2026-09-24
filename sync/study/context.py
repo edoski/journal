@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from datetime import date, timedelta
 from pathlib import Path
 
+from sync.config import PATHS
 from sync.constants import STUDY_SECTION_HEADER
 from sync.contracts.schedule import DayScheduleProfile
 from sync.notes.markdown import extract_block
@@ -45,6 +46,11 @@ def _scheduled_day(day: date, profile: DayScheduleProfile) -> dict[str, object]:
         if profile.is_off_day
         else profile.workout_start.strftime("%H:%M"),
     }
+
+
+def journal_vault() -> Path:
+    """The vault that holds the Journal notes, independent of any study workspace."""
+    return Path(PATHS.vault_dir)
 
 
 def journal_summary(

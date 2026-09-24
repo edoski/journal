@@ -328,7 +328,12 @@ def test_planning_selects_knowledge_for_active_work_and_catalog_only_counts(
     )
     course = plan(root, tmp_path, "course")["scopes"][0]
     assert set(course["knowledge"]) == {"focus", "active", "general"}
-    assert course["knowledge_selection"] == {"eligible": 4, "included": 3, "omitted": 1}
+    selection = course["selection"]["knowledge"]
+    assert (selection["eligible"], selection["included"], selection["omitted"]) == (
+        4,
+        3,
+        1,
+    )
     assert course["sources"] == {"notes": {"path": "notes.md", "version": "v1"}}
     expanded = plan(root, tmp_path, "course", knowledge_budget=8192)["scopes"][0]
     assert "large" in expanded["knowledge"]
@@ -379,8 +384,8 @@ def test_plan_bounds_whole_support_and_does_not_present_unsupported_assessment(
     course = result["scopes"][0]
     assert course["observations"] == {}
     assert "assessment" not in course["topics"]["a"]
-    assert course["evidence_selection"]["complete"] is False
-    assert course["evidence_selection"]["scope_complete"] is False
+    assert course["selection"]["evidence"]["complete"] is False
+    assert course["selection"]["evidence"]["scope_complete"] is False
     assert result["reviews"][0]["support_in_context"] is False
     expanded = plan(root, tmp_path, "course", evidence_budget=4000)
     assert set(expanded["scopes"][0]["observations"]) == {"o1", "o2"}

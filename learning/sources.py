@@ -1,15 +1,35 @@
-"""On-demand byte identity checks for explicitly selected local course sources."""
+"""Local course material: discovery, registration and on-demand byte identity."""
 
 from __future__ import annotations
 
 import hashlib
 import os
 from pathlib import Path
+import re
 import stat
 from typing import Any
 from urllib.parse import urlsplit
 
 from learning import records
+from learning.schema import HANDLE
+
+MATERIAL_SUFFIXES = frozenset(
+    {
+        ".pdf",
+        ".md",
+        ".txt",
+        ".tex",
+        ".ipynb",
+        ".py",
+        ".html",
+        ".pptx",
+        ".docx",
+        ".csv",
+        ".org",
+        ".rst",
+    }
+)
+SCAN_LIMIT = 200
 
 
 def _identity(value: os.stat_result) -> tuple[int, int, int, int, int]:
@@ -52,6 +72,124 @@ def _unverified_references(value: Any, source: str) -> int:
     return 0
 
 
+def _location(source: dict[str, Any], vault: Path) -> Path | None:
+    """Resolve a registered path; None for remote or malformed locations."""
+    try:
+        if urlsplit(source["path"]).scheme:
+            return None
+    except ValueError:
+        return None
+    path = Path(source["path"]).expanduser()
+    return path if path.is_absolute() else vault / path
+
+
+def scan(vault: Path, registered: dict[str, Any]) -> dict[str, Any]:
+    """List course material under the workspace, naming registered handles."""
+    known: dict[Path, str] = {}
+    for handle, source in registered.items():
+        location = _location(source, vault)
+        if location is None:
+            continue
+        try:
+            known[location.resolve()] = handle
+        except OSError:
+            continue
+    found: list[dict[str, Any]] = []
+    truncated = False
+    for directory, directories, files in os.walk(vault, followlinks=False):
+        directories[:] = sorted(
+            name for name in directories if not name.startswith(".")
+        )
+        for name in sorted(files):
+            path = Path(directory) / name
+            if name.startswith(".") or path.suffix.lower() not in MATERIAL_SUFFIXES:
+                continue
+            if len(found) >= SCAN_LIMIT:
+                truncated = True
+                break
+            try:
+                resolved = path.resolve()
+                size = path.stat().st_size
+            except OSError:
+                continue
+            item: dict[str, Any] = {
+                "path": os.path.relpath(path, vault),
+                "bytes": size,
+                "registered": resolved in known,
+            }
+            if resolved in known:
+                item["handle"] = known[resolved]
+            else:
+                item["suggested_handle"] = suggest_handle(path, registered)
+            found.append(item)
+        if truncated:
+            break
+    found.sort(key=lambda item: item["path"])
+    return {"directory": str(vault), "files": found, "truncated": truncated}
+
+
+def suggest_handle(path: Path, registered: dict[str, Any]) -> str:
+    stem = re.sub(r"[^a-z0-9]+", "-", path.stem.lower()).strip("-")[:48] or "source"
+    if not HANDLE.fullmatch(stem):
+        stem = f"s-{stem}"[:64]
+    candidate = stem
+    counter = 2
+    while candidate in registered:
+        candidate = f"{stem}-{counter}"
+        counter += 1
+    return candidate
+
+
+def register(
+    root: Path,
+    vault: Path,
+    scope: str,
+    paths: list[str],
+    expected: int,
+    *,
+    expected_digest: str | None = None,
+) -> dict[str, Any]:
+    """Register local files as sources under derived handles and return the mapping."""
+    if not paths:
+        raise ValueError("register at least one source path")
+    record = records.read(root, scope)
+    assert isinstance(record, dict)
+    registered = dict(record.get("sources", {}))
+    entries: dict[str, dict[str, Any]] = {}
+    for value in paths:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("source paths must be nonempty strings")
+        path = Path(value).expanduser()
+        absolute = path if path.is_absolute() else vault / path
+        if not absolute.is_file():
+            raise ValueError(f"source file does not exist: {value}")
+        try:
+            stored = os.path.relpath(absolute.resolve(), vault.resolve())
+            if stored.startswith(".."):
+                stored = str(absolute.resolve())
+        except ValueError:
+            stored = str(absolute.resolve())
+        existing = next(
+            (
+                key
+                for key, source in registered.items()
+                if _location(source, vault) == absolute
+            ),
+            None,
+        )
+        if existing is not None:
+            raise ValueError(
+                f"{value} is already registered as source handle {existing!r}"
+            )
+        handle = suggest_handle(absolute, {**registered, **entries})
+        entries[handle] = {"path": stored}
+        if absolute.suffix.lower() in {".pdf", ".md", ".txt", ".tex", ".html"}:
+            entries[handle]["title"] = absolute.stem
+    return records.register_sources(
+        root, scope, expected, entries, expected_digest=expected_digest
+    )
+
+
 def inspect_sources(
     root: Path,
     vault: Path,
@@ -88,19 +226,12 @@ def inspect_sources(
             "unverified_references": _unverified_references(record, key),
         }
         inspected[key] = item
-        try:
-            remote = bool(urlsplit(source["path"]).scheme)
-        except ValueError:
-            item["reason"] = "invalid source location"
-            continue
-        if remote:
+        location = _location(source, vault)
+        if location is None:
             item["reason"] = "only local file paths are inspected"
             continue
-        path = Path(source["path"]).expanduser()
-        if not path.is_absolute():
-            path = vault / path
         try:
-            fingerprint = _fingerprint(path)
+            fingerprint = _fingerprint(location)
         except FileNotFoundError:
             item["status"] = "missing"
             continue

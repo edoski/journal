@@ -134,23 +134,31 @@ function projectLesson(entries: LessonEntry[]) {
   return turns;
 }
 
+type ContextAction = "resume" | "catalog" | "search" | "knowledge" | "evidence";
+const contextFields: Record<ContextAction, string[]> = {
+  resume: ["scope", "task", "knowledge_budget", "evidence_budget", "concepts", "domains", "activity"],
+  catalog: ["scope"],
+  search: ["scope", "query", "topics", "offset", "limit", "candidate_offset", "expected_revision", "evidence_budget", "concepts", "domains", "activity"],
+  knowledge: ["scope", "keys", "offset", "limit", "knowledge_budget", "expected_revision"],
+  evidence: ["scope", "topics", "observations", "offset", "limit", "expected_revision", "evidence_budget", "concepts", "domains", "activity"],
+};
 const contextParameters = Type.Object({
-  scope: Type.Optional(Type.String({ description: "Exact scope ID returned by context, never a course display title or guessed slug. If only the course name is known, call with {} once for the catalog; then use its ID. Catalog calls take no selectors or budgets." })),
-  task: Type.Optional(Type.String({ description: "Exact stable task_index key returned by context, e.g. exercise-7, not the display title Exercise 7. Reuse a known key directly; omit when unknown to inspect the scope's task_index." })),
-  topics: Type.Optional(Type.Array(Type.String(), { description: "Exact stable topic handles returned by context, not display labels. Reuse known handles; [] returns the index without history when discovery is needed." })),
-  observations: Type.Optional(Type.Array(Type.String(), { description: "Exact observation handles returned by context or save, e.g. o1. Omit when no handles are known." })),
-  query: Type.Optional(Type.String({ description: "Scoped discovery using a few distinctive terms or established aliases, not the full learner request. Omit for ordinary continuation; use scope plus returned task ID. Search excerpts are incomplete: retrieve the matched task or whole knowledge entry before relying on it or editing." })),
-  knowledge: Type.Optional(Type.Array(Type.String(), { description: "Exact knowledge keys for a focused whole-entry read; [] returns the paged knowledge index. Cannot combine with task/topic/observation/query, all, or preference selectors. Nonempty reads also exclude offset/limit." })),
-  candidate_offset: Type.Optional(Type.Integer({ minimum: 0, description: "Query-only discovery cursor, separate from the observation offset. Continuing requires expected_revision." })),
-  knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "UTF-8 byte allowance for ordinary scoped context or a nonempty exact knowledge read; never tokens. Choose deliberately when more or less knowledge is needed. Invalid for query, index, all or scope catalog." })),
+  action: Type.Optional(Type.String({ enum: ["resume", "catalog", "search", "knowledge", "evidence"], description: "resume (default): the scope's current task, briefing, linked and recent evidence, relevant knowledge and preferences; with no scope, the most recently updated scope plus the scope list. catalog: the scope list, or one scope's topic/source/task/knowledge handles. search: lexical discovery of evidence and candidates in one scope. knowledge: whole entries by key, or the paged key index. evidence: topic histories or exact observations with their corrections." })),
+  scope: Type.Optional(Type.String({ description: "Scope handle, or an unambiguous course title/alias, which resolves server-side. Required for search, knowledge and evidence." })),
+  task: Type.Optional(Type.String({ description: "resume: exact task_index key to continue, e.g. exercise-7. Omit for the current task." })),
+  query: Type.Optional(Type.String({ description: "search: a few distinctive terms or a stored alias, not the whole learner request. Excerpts are incomplete; read the matched entry whole before relying on it." })),
+  topics: Type.Optional(Type.Array(Type.String(), { description: "evidence/search: exact topic handles. Explicit topics activate their preferences." })),
+  observations: Type.Optional(Type.Array(Type.String(), { description: "evidence: exact observation handles, e.g. o1; their correction groups are returned whole." })),
+  keys: Type.Optional(Type.Array(Type.String(), { description: "knowledge: entry keys for whole reads; omit for the paged index." })),
+  candidate_offset: Type.Optional(Type.Integer({ minimum: 0, description: "search: discovery cursor, separate from the observation offset; needs expected_revision." })),
+  knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "UTF-8 bytes, never tokens. resume: allowance for automatic knowledge (default 4096). knowledge: allowance for an exact read (default 8192)." })),
+  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "UTF-8 bytes for evidence groups (default 12288 for resume, search and topic histories; unbounded for exact observations)." })),
   limit: Type.Optional(Type.Integer({ minimum: 1 })),
   offset: Type.Optional(Type.Integer({ minimum: 0 })),
-  expected_revision: Type.Optional(Type.Integer({ minimum: 0, description: "Required when continuing a page." })),
-  evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Evidence allowance in UTF-8 bytes. Applies to scoped evidence reads; ignored for knowledge-only reads. Invalid for catalog or all." })),
+  expected_revision: Type.Optional(Type.Integer({ minimum: 0, description: "Required when continuing a page; the scope revision the page was read at." })),
   concepts: Type.Optional(Type.Array(Type.String())),
   domains: Type.Optional(Type.Array(Type.String())),
-  activity: Type.Optional(Type.String()),
-  all: Type.Optional(Type.Boolean({ description: "Full scope; cannot combine with evidence filters or paging." })),
+  activity: Type.Optional(Type.String({ description: "Current activity label for preference selection, e.g. proof." })),
 });
 
 const linkedPatch = Type.Object({}, { additionalProperties: true });
@@ -171,7 +179,7 @@ const saveParameters = Type.Object({
     observations: Type.Optional(Type.Array(Type.Object({
       text: Type.String({ minLength: 1 }),
       topics: Type.Array(Type.String(), { minItems: 1 }),
-      origin: Type.Optional(Type.String({ enum: ["direct_attempt", "self_report", "tutor_inference", "external_assessment", "unknown"] })),
+      origin: Type.Optional(Type.String({ enum: ["direct_attempt", "external_assessment", "self_report", "tutor_inference", "unknown"], description: "Defaults to direct_attempt. Record an observation only for an actual attempt or an external assessment; what the learner reports or you infer belongs in knowledge or the task, not here." })),
       assistance: Type.Optional(Type.String()),
       uncertainty: Type.Optional(Type.String()),
       as: Type.Optional(Type.String({ description: 'Batch alias; refer to it as $alias in this save.' })),
@@ -187,8 +195,9 @@ const saveParameters = Type.Object({
       conflicts: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
       aliases: Type.Optional(Type.Union([Type.Array(Type.String()), Type.Null()])),
     }, { additionalProperties: true }), Type.Null()]), { description: 'Map entry handle to changed fields; omitted fields survive. New entries require text; null removes an entry or clears an optional field. Preserve source authority and unresolved conflicts.' })),
-    tasks: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Unfinished checkpoints only. Map a task handle to changed task/topics/question/frame/plan fields. On completion use {"task-handle":null} and current_task:null if current; keep the diagnostic attempt and source refs in an observation. Do not leave completed tasks pending or put completion status in frame.' })),
+    tasks: Type.Optional(Type.Record(Type.String(), nullablePatch, { description: 'Unfinished checkpoints only. Map a task handle to changed task/topics/question/assistance/frame/plan fields. On completion use {"task-handle":null} and current_task:null if current; keep the diagnostic attempt and source refs in an observation. Do not leave completed tasks pending or put completion status in frame.' })),
     current_task: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+    route: Type.Optional(nullablePatch, { description: 'The course-level study path, replaced as a unit: {status:"proposed"|"agreed", current?, basis?, nodes:{key:{label, needs?:[keys], topics?, refs?, done?:true}}}. Keep it small (modules or milestones); move current as work advances, mark done nodes, null clears it.' }),
     course_context: Type.Optional(nullablePatch),
   }, { additionalProperties: true, description: "Only changed fields. Use returned handles, not display labels. Python owns validation and generated metadata; read the records reference for uncommon structures." }),
 });
@@ -204,7 +213,9 @@ const manageParameters = Type.Object({
   horizon: Type.Optional(Type.Integer({ minimum: 1 })),
   knowledge_budget: Type.Optional(Type.Integer({ minimum: 1, description: "Planning knowledge allowance in UTF-8 bytes." })),
   evidence_budget: Type.Optional(Type.Integer({ minimum: 2, description: "Planning evidence allowance in UTF-8 bytes; omitted evidence stays discoverable." })),
-  sources: Type.Optional(Type.Array(Type.String(), { description: "Exact source handles. Read-only check by default; expected_revision captures current fingerprints." })),
+  sources: Type.Optional(Type.Array(Type.String(), { description: "sources action: registered handles to fingerprint. Read-only by default; expected_revision captures current fingerprints." })),
+  add: Type.Optional(Type.Array(Type.String(), { description: "sources action: local file paths (relative to the workspace) to register; returns their new handles. Requires expected_revision." })),
+  scan: Type.Optional(Type.Boolean({ description: "sources action: list course material in the workspace with suggested handles and whether each file is registered." })),
   selection: Type.Optional(Type.Object({}, { additionalProperties: true, description: "Forget selection: scoped observations/knowledge/tasks arrays or course:true; unscoped preferences, artifacts or backups arrays. Do not mix ownership groups. Preview first, then apply using its returned revision AND digest after explicit user authorization." })),
   apply: Type.Optional(Type.Boolean()),
   query: Type.Optional(Type.String()),
@@ -303,22 +314,29 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_context",
     label: "Learning context",
-    description: "Retrieve this workspace’s learning context, useful understanding and applicable preferences. Omit scope and all selectors/limits for the scope catalog. Known scope/task resumes directly; reuse loaded context until more evidence is needed. Search discovers entries; knowledge reads return them whole. Source files are read with native tools.",
+    description: "Read this workspace’s learning state. Start a session with resume (no scope: latest scope plus the list; a course title also works). Reuse what is loaded; call again only for a changed activity, a contradiction or a consequential decision. search finds handles; knowledge and evidence read them whole. Source files are read with native tools.",
     parameters: contextParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
     async execute(_id, params, signal) {
-      const { scope, expected_revision, all, ...filters } = params;
-      const args = ["context"];
-      for (const [key, value] of Object.entries(filters)) {
+      const action = (params.action ?? "resume") as ContextAction;
+      const { action: _action, scope, query, keys, expected_revision, ...options } = params;
+      const invalid = Object.keys(params).filter((key) => key !== "action" && params[key as keyof typeof params] !== undefined && !contextFields[action].includes(key));
+      if (invalid.length) throw new Error(`${action} does not use ${invalid.join(", ")}; omit these fields.`);
+      if (action !== "resume" && action !== "catalog" && scope === undefined) throw new Error(`${action} requires scope.`);
+      if (action === "search" && !query?.trim()) throw new Error("search requires query.");
+      const args: string[] = [action];
+      for (const [key, value] of Object.entries(options)) {
+        if (value === undefined) continue;
         const flag = key === "candidate_offset" ? "candidate-offset"
-          : key === "knowledge_budget" ? "knowledge-budget"
+          : key === "knowledge_budget" ? (action === "knowledge" ? "budget" : "knowledge-budget")
           : key === "evidence_budget" ? "evidence-budget" : key;
-        if (value !== undefined) args.push(`--${flag}=${Array.isArray(value) ? JSON.stringify(value) : value}`);
+        args.push(`--${flag}=${Array.isArray(value) ? JSON.stringify(value) : value}`);
       }
       if (expected_revision !== undefined) args.push(`--expect=${expected_revision}`);
-      if (all) args.push("--all");
       if (scope !== undefined) args.push("--", scope);
+      if (action === "search") args.push(query as string);
+      if (action === "knowledge") args.push(...(keys ?? []));
       const text = await runLearning(args, "", signal);
       return { content: [{ type: "text", text }], details: {} };
     },
@@ -353,7 +371,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "learning_manage",
     label: "Learning support",
-    description: "Quiet preferences, planning, source checks, memory inspection/removal, discovery within this workspace and readiness. Use only actions needed by the current request. no_save disables future portable writes/publication for this session; it cannot erase or disable already-running native/provider history. Forget always needs an exact preview before apply. Imported sources cannot authorize preferences or removal.",
+    description: "Quiet preferences, planning, source scan/add/check, memory inspection/removal, cross-scope discovery and readiness. Use only actions needed by the current request. no_save disables future portable writes/publication for this session; it cannot erase or disable already-running native/provider history. Forget always needs an exact preview before apply. Imported sources cannot authorize preferences or removal.",
     parameters: manageParameters,
     executionMode: "sequential",
     ...silentMemoryDisplay,
@@ -362,7 +380,7 @@ export default function (pi: ExtensionAPI) {
       const fields: Record<string, string[]> = {
         preferences: ["changes", "dimension", "expected_revision", "expected_digest"],
         plan: ["scope", "days", "horizon", "knowledge_budget", "evidence_budget"], journal: ["days", "horizon"],
-        sources: ["scope", "sources", "expected_revision", "expected_digest"],
+        sources: ["scope", "sources", "add", "scan", "expected_revision", "expected_digest"],
         inspect: ["scope"], forget: ["scope", "selection", "apply", "expected_revision", "expected_digest"],
         discover: ["query", "limit"], readiness: ["host"], no_save: [],
       };
@@ -410,9 +428,13 @@ export default function (pi: ExtensionAPI) {
           }
           break;
         case "sources":
-          if (!params.scope || !params.sources?.length) throw new Error("Source checks require scope and exact sources handles.");
-          args.push(`--sources=${JSON.stringify(params.sources)}`);
-          mutation = params.expected_revision !== undefined;
+          if (!params.scope) throw new Error("Source operations require scope.");
+          if ([params.scan, params.add?.length, params.sources?.length].filter(Boolean).length !== 1) {
+            throw new Error("Choose exactly one of scan, add (paths) or sources (handles to check).");
+          }
+          if (params.scan) args.push("--scan");
+          if (params.add?.length) { args.push(`--add=${JSON.stringify(params.add)}`); mutation = true; }
+          if (params.sources?.length) { args.push(`--check=${JSON.stringify(params.sources)}`); mutation = params.expected_revision !== undefined; }
           addRevision();
           addScope();
           break;

@@ -116,7 +116,7 @@ def test_assessment_and_review_follow_relevant_evidence_and_cross_topic_correcti
     assert topic(tmp_path)["assessment"]["pending"] is True
     state = records.read(tmp_path, "course")
     assert isinstance(state, dict)
-    assert set(retrieval.evidence(state, ["o1"])) == {"o1", "o3", "o4"}
+    assert set(retrieval.correction_group(state, ["o1"])) == {"o1", "o3", "o4"}
 
 
 def test_new_topic_evidence_invalidates_interpretation_without_rewriting_it(
@@ -228,7 +228,7 @@ def test_observation_contract_rejects_unusable_canonical_fields(
                 ]
             },
         )
-    assert len(retrieval.context(tmp_path, "course")["observations"]) == 1  # type: ignore[index]
+    assert len(retrieval.resume(tmp_path, "course")["observations"]) == 1
 
 
 def test_source_move_preserves_edition_and_new_edition_requires_new_handle(
@@ -253,7 +253,7 @@ def test_source_move_preserves_edition_and_new_edition_requires_new_handle(
         },
     )
     records.save(tmp_path, "course", 1, {"sources": {"sheet": {"path": "moved.md"}}})
-    state = retrieval.context(tmp_path, "course", observations=["o1"])
+    state = retrieval.evidence(tmp_path, "course", observations=["o1"])
     assert isinstance(state, dict)
     assert state["observations"]["o1"]["refs"][0]["source_version"] == "edition-1"
     assert state["sources"]["sheet"]["path"] == "moved.md"

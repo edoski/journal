@@ -1,35 +1,19 @@
 # Learning records
 
-One scope is one course or coherent learning interest. Schema 5 keeps observations separate from current assessments, reviews, unfinished tasks and optional reusable knowledge. The helper owns versions, observation handles, the observation sequence, revisions, timestamps and freshness fields. Forward returned snapshot digests unchanged; do not recompute them from context projections or freshness-normalized records. Use `learning_save` with `scope`, `expected_revision`, the returned `expected_digest`, and a `changes` patch, or pipe the same patch to `scripts/learn save SCOPE --expect REV --expect-digest DIGEST`. Revision 0 creates a scope; read existing state before patching. The digest detects a changed snapshot even if another machine kept the same revision; it does not provide distributed locking.
+One scope is one course. Its record holds `sources`, `topics`, `observations` (learner evidence), `knowledge` (reusable understanding), `tasks` (unfinished work), an optional course `route`, and course facts (`title`, `goal`, `exam`, `coverage`, `course_context`, `focus`, `aliases`, `journal_activity`). The helper owns revisions, digests, timestamps, observation handles and freshness.
+
+`save SCOPE --expect REV --expect-digest DIGEST` takes a JSON patch on stdin (Pi: `learning_save` with `expected_revision`, `expected_digest`, `changes`). Revision 0 creates a scope. Send changed fields only. A receipt returns `revision`, `digest`, `assigned_observations` and resolved `review_dates`; no confirming read is needed.
 
 ```json
 {
   "title": "Course title",
   "sources": {"worksheet": {"path": "university/course/worksheet.md", "version": "2026-09 edition"}},
-  "refs": [{"source": "worksheet"}],
-  "topics": {
-    "linear-systems": {
-      "assessment": {
-        "summary": "Recognized coincident equations after a hint",
-        "gap": "Independent classification remains untested",
-        "observations": ["$attempt"],
-        "considered_observations": ["$attempt"]
-      },
-      "review": {
-        "in_days": 2,
-        "reason": "Check independent use after assisted success",
-        "task": "Classify a new singular system and justify its solution count",
-        "observations": ["$attempt"],
-        "considered_observations": ["$attempt"]
-      }
-    }
-  },
+  "topics": {"linear-systems": {"title": "Linear systems"}},
   "focus": ["linear-systems"],
   "observations": [{
     "as": "attempt",
     "topics": ["linear-systems"],
     "text": "Recognized infinitely many solutions after the hint",
-    "origin": "direct_attempt",
     "response": "The two equations describe the same line",
     "assistance": "Pointed out that the equations coincide",
     "refs": [{"source": "worksheet", "locator": "Exercise 5(b)"}]
@@ -39,53 +23,55 @@ One scope is one course or coherent learning interest. Schema 5 keeps observatio
 }
 ```
 
-Send changed fields only. Scope metadata survives omission. `sources` and `topics` merge by handle; topic metadata merges. A topic's `assessment` and `review` replace as complete objects (`null` clears one). Store learner interpretations under `assessment`, never flat topic `summary`, `gap` or `status`. Assessment prose fields are `summary`, `gap`, `status` and `uncertainty`; `observations` identifies the supporting evidence. An explicitly uncertain assessment may have no support and remains pending. No numeric mastery score is inferred or validated.
+## Patch semantics
 
-Every replacement assessment/review declares `considered_observations`: the exact distinct evidence handles you reviewed, including contrary evidence, with all supporting `observations` included. Same-patch aliases work in both lists. The helper assigns `assessed_at` and computes `pending`; do not submit either field. An interpretation remains pending when consideration is unknown, its timestamp is historical/unknown, support is absent, or the declaration omits any topic observation or correction connected to that topic evidence or cited support. Cross-topic support does not require unrelated history from the other topic.
+| Field | Patch rule |
+| --- | --- |
+| `sources`, `topics` | merge by handle; an object patches fields; `null` removes the entry |
+| `tasks` | patch fields; `null` field clears it; `null` task removes it (and clears `current_task` if it pointed there); `frame` and `plan` replace as units |
+| `knowledge` | patch fields; omitted fields survive; `null` optional field clears; `null` entry removes; `text` is required |
+| `observations` | a list of new entries only; never edited in place |
+| `route`, `course_context`, `topics[k].assessment`, `topics[k].review` | replace as whole objects; `null` clears |
+| `title`, `goal`, `exam`, `coverage`, `focus`, `aliases`, `current_task` | replace |
 
-Before relying on a pending interpretation for a consequential decision, retrieve the relevant evidence and corrections, then replace it with your supported interpretation and actual considered handles. Partial interpretations may be saved and remain pending. This declaration does not prove attention, understanding or a sound judgment. Ordinary attempts and task checkpoints need no assessment update; unrelated activity does not require reassessment.
+Handles are 1–64 lowercase letters, digits, `-` or `_`, starting with a letter or digit. Use the handles the helper returned, not display titles.
 
-Schema-4 migration preserves existing evidence and interpretations, removes the old watermark, and marks historical consideration as `null`. Unknown coverage remains pending until explicit reassessment; never infer consideration from old support or the stored snapshot, and never submit `null` as new consideration.
+## Observations
 
-`observations` appends meaningful evidence about learner performance or understanding and is keyed by handles on read. A self-report of difficulty, confidence or an earlier attempt can be relevant evidence, with its limits preserved. Resource comparisons and course-fact corrections update the appropriate existing context fields or knowledge, without duplicate learner observations. Keep dates in `exam`, coverage in `coverage`, and assessment requirements in `course_context` as described in [course.md](course.md). Submit each event once. Optional `as` names a local alias for that addition; `$attempt` can appear in reference lists in the same patch and is resolved to its assigned handle. Aliases do not persist. Preserve the actual response, assistance, task and uncertainty when diagnostic, without repeating the same prose across fields. Shared observations may name several topics.
+Append one entry when the learner actually attempts something or an external assessment happens. Give `text`, `topics`, and when diagnostic `response`, `assistance`, `uncertainty`, `task`, `date` (the known event date) and `refs` with a `locator`. `origin` defaults to `direct_attempt`; use `external_assessment` for graded work. What the learner tells you and what you infer belong in `knowledge` or the task's `assistance`, not in observations. Missing `assistance` means unknown, never independent.
 
-Observation `origin` is `direct_attempt`, `self_report`, `tutor_inference`, `external_assessment` or `unknown`; omission means unknown. These labels describe where the evidence came from, not its reliability. Optional `provenance` preserves additional source context as text. The helper assigns UTC `recorded_at`; optional `date` is the known event date, not an invented date copied from the save time. Do not submit `recorded_at`. Missing assistance means unknown, never independent performance. Dates, task, response, assistance and uncertainty must use their canonical date/string types when present.
+`as` names an alias for this patch: `$attempt` may appear in any `observations`, `considered_observations` or `corrects` list of the same save. To correct a misrecorded event, append a new observation with `corrects: ["o1"]`; the original stays. Your own factual error never becomes a learner observation: fix the explanation, the knowledge and any assessment that relied on it.
 
-A real improvement is a new observation. Correct an incorrectly recorded event with a new observation containing `corrects: ["o1"]`, explaining the supported correction. Later learning does not erase an earlier genuine mistake. A tutor's factual error must not become a learner misconception: correct affected assessments, reviews and task assumptions too. A removed task is a completed workflow checkpoint, not evidence of mastery. When an activity is actually finished, append any meaningful final attempt with its exact source locator and actual assistance, then remove `tasks[key]` with null in the same patch. Do not keep a completed activity as the current unfinished task, leave its old question/plan active, or repurpose its frame into a completion summary.
+## Sources
 
-Source handles identify cited content. Optional `version` is an established edition/revision label, or null/omitted when unknown. Once cited, the handle's version cannot change; use a new handle for changed content. A path relocation may update the existing handle. References use `source`, optional `locator` and optional short `excerpt`; the helper captures `source_version` and any known `source_fingerprint`. Omit helper-owned fields in new references. Exact values from a retrieved reference can round-trip; invented or mismatched values are rejected. Do not invent versions or copy whole sources into memory. Reuse the exact returned source handle; a task-index label is not a source. Unknown handles are errors: inspect the existing source map or register the actual source, then repair the reference. Never drop a diagnostic source locator merely to make a rejected patch pass.
+`sources SCOPE --scan` lists course files under the workspace with suggested handles; `sources SCOPE --add '["lectures/week3.pdf"]' --expect REV` registers them and returns their handles. You may also register `{"path": ..., "version": ...}` directly in a save. A reference is `{"source": handle, "locator": "...", "excerpt": "..."}`; the helper captures `source_version` and any fingerprint. Once cited, a handle's `version` is immutable: new content gets a new handle. A moved file keeps its handle by updating `path`.
 
-## Reusable understanding
+## Knowledge
 
-Optional `knowledge` stores the agent's useful current understanding independently of exercises and learner judgments. Each agent-chosen key is 1–64 lowercase letters, digits, underscores or hyphens, beginning with a letter or digit. An entry requires nonempty `text` in its resulting state. Optional fields are existing `topics`, source `refs`, nonempty `attribution` and `uncertainty` strings, and unique nonempty-string arrays `conflicts` and `aliases`. Aliases capture established alternative terms, including another language, for discovery; they are not a new taxonomy. Missing knowledge means none; no migration or initial course survey is needed.
+Keep understanding that is useful later and costly to rebuild: notation correspondences, which resource is authoritative for what, conventions the learner chose, unresolved conflicts between documents. Fields: `text` (required), `topics`, `refs`, `attribution`, `uncertainty`, `conflicts`, `aliases` (alternative terms, including other languages, for search).
 
 ```json
-{
-  "knowledge": {
-    "notation": {"text": "The lecturer uses g where the textbook uses h.", "attribution": "Learner report", "uncertainty": "The correspondence has not yet been checked in the slides", "aliases": ["notation correspondence"]},
-    "resource-context": {"text": "The inspected sample uses continuous time. Whether it reflects the current lab remains unresolved.", "topics": ["linear-systems"], "refs": [{"source": "worksheet", "locator": "Introduction"}]}
-  }
-}
+{"knowledge": {"notation": {"text": "The lecturer uses g where the textbook uses h.", "attribution": "Learner report", "uncertainty": "Not yet checked in the slides", "aliases": ["notation correspondence"]}}}
 ```
 
-Add distinct new facts without rewriting unrelated assertions. Revise existing assertions when relevant evidence corrects, clarifies or supersedes them; retain still-applicable attribution and qualifications in their explicit fields. They can also remain in prose when that preserves the meaning clearly. Read all fields together; `text` alone is not the complete claim. A source handle establishes a reference, not truth; cite only what actually supports the claim. A resource list cannot certify a later report about what a lecturer said. Source versions are captured on new references, including unknown versions. Use on-demand fingerprint inspection from [lifecycle.md](lifecycle.md) when source freshness matters. A byte fingerprint establishes identity, not authority, and older unverified references remain unknown. Read the relevant material when the decision warrants it.
+Read the whole entry (`knowledge SCOPE KEY`) before revising its meaning; a search excerpt is not enough. Add distinct facts as new entries rather than rewriting neighbours. Replacing or removing `attribution`, `uncertainty`, `conflicts`, `refs` or a whole entry returns `status: "needs_confirmation"` with the exact before/after and saves nothing. Then either repair the patch so the qualification survives, or resend it with `confirm_qualification_changes: ["key"]` and the current digest because the evidence really resolved it. Never acknowledge blindly. Text-only edits are not guarded; their fidelity is your judgement.
 
-An omitted entry survives; an object patches only supplied fields; `"key": null` removes that entry. Optional fields accept null to clear them; `text: null` and top-level `"knowledge": null` are invalid. For example, `{"knowledge":{"notation":{"text":"Revised correspondence"}}}` preserves existing attribution, uncertainty and links. A supplied string/array replaces that entire field: include every still-relevant qualification if changing it. Omit unchanged fields and entries, including nearby notation or references. Explicitly resolve or clear a qualification only when evidence addresses that particular issue; replacing one unresolved uncertainty with a different one loses information. Fetch the complete entry before revising its meaning; a search excerpt or remembered paraphrase is insufficient. Rename, split or merge through field patches/additions/removals in one patch. Clear or replace links in the same patch when removing referenced topics or sources. New sources/topics and knowledge can be saved together. Completing a task preserves knowledge.
+## Tasks and the route
 
-When contrary evidence matters, inspect the relevant basis and adjudicate its authority and applicability. Newer information is not automatically truer: the learner can clarify their own intent, while a disputed exam requirement may need the current official source. Distinguish the working choice from source verification. The learner may choose a convention for this lesson, and a reported clarification may change resource advice, while the date, identity or applicability of a particular document remains unverified. A document sharing the assumptions of a reported former convention does not establish that it is the former edition. Until evidence identifies the file, refer to its neutral title or handle; an “old” or “current” label still asserts chronology even when accompanied by “undated.” Preserve unresolved disagreement and its practical consequence. Replace the affected understanding without discarding unrelated facts or caveats; remove obsolete duplicate entries when known. Search for a duplicated consequential claim when there is reason to suspect one, not as a routine memory audit. Update affected task assumptions in the same patch when needed. If a real learner observation was misrecorded, append its linked correction separately; changing knowledge must not manufacture attempts or automatically revise mastery/considered evidence.
+A task is one unfinished activity: `task` (label), `topics`, `question` or `pending_question`, `assistance` given so far, `why` for a detour, optional `instructions` for a temporary handoff, `observations`, `refs`. `frame` holds the stable purpose (`within`, `goal`, `completion`, `topics`, `refs`, `observations`); `plan` is a small route inside the activity. `current_task` is the default continuation, never an override of what the learner asks. On completion set the task to `null` and keep the final attempt as an observation.
 
-Keep useful local understanding, not whole lessons or textbook material that is easy to reconstruct. There is no mandatory taxonomy, course map, background reflection or knowledge archive. Current knowledge supersedes older conversational summaries after retrieval; already-running clients can retain stale context until a meaningful refresh. Use the receipt after a successful save. On stale revision, fetch the affected current entries and reconcile before retrying; uncertain completion requires checking actual state before resubmission.
+`route` is the course-level path, kept small (modules or milestones): `{"status": "proposed"|"agreed", "current": key, "basis": "...", "nodes": {key: {"label", "needs": [keys], "topics", "refs", "done": true}}}`. Dependencies must be acyclic. `resume` returns its position (current node, prerequisites, done nodes, topological order) in the briefing. Details in [lessons.md](lessons.md).
 
-Use `context SCOPE --knowledge '["key1","key2"]'` for whole entries, or `--knowledge '[]'` for a compact paged index. General `--query` searches knowledge and other metadata, returning discovery-only candidates. Automatic context is bounded and may omit relevant entries for size; omission does not imply irrelevance or absence. Exact reads return complete entries or a size error, never clipped qualifications. See [retrieval.md](retrieval.md) for budgets and independent pagination.
+## Assessments and reviews
 
-## Tasks, reviews and publication
+`topics[k].assessment` is your current interpretation of the learner's understanding of that topic: prose in `summary`, `gap`, `status` or `uncertainty`; `observations` lists the supporting evidence; `considered_observations` lists every observation you actually reviewed, including contrary evidence and corrections. Both replace as a unit. The helper stamps `assessed_at` and computes `pending`: an interpretation is pending when a related observation or correction was not in its considered set. Reconcile a pending interpretation before relying on it for a consequential decision.
 
-Tasks use stable logical keys across providers. Fields patch independently: omitted fields survive, null clears a field, and a null task removes it. Nested `frame` and `plan` replace as units. Other tasks survive; removing the current one clears its pointer. `current_task` is the default continuation, never an override of the learner's request. Keep the enduring task label, original purpose, current question and actual assistance clear. See [lessons.md](lessons.md) for frames and routes. Temporary handoff instructions belong in that task's `instructions`.
+`topics[k].review` schedules retrieval practice: `due` or `in_days`, `reason`, `task`, `observations`, `considered_observations`, optional `retain: true`. The helper caps a new interval before the exam and returns the resolved date; do not resend an unchanged interval.
 
-New reviews require `due: "YYYY-MM-DD"` or `in_days`, nonempty `reason` and retrieval `task`, at least one supporting observation, and the exact `considered_observations`. Optional `retain: true` keeps lasting fundamentals in view. The tutor chooses pacing; the helper computes dates and caps a new interval before an upcoming exam. Use the resolved date from the receipt; do not resend an unchanged interval. Record meaningful review performance as an observation before revising its schedule. Migrated reviews with missing support or rationale remain pending.
+## Failures
 
-`journal_activity` uses the exact established Journal label; an unmapped course is not zero study. `plan [SCOPE] --days N --horizon N` combines assessments, evidence, reviews, assessment context and recorded effort with scheduled study windows. Planning also bounds observation support (adjust with `--evidence-budget`), reports `evidence_selection`, and marks reviews with `support_in_context`; expand omitted evidence before relying on a recommendation. Windows are not confirmed availability; hours are not mastery.
-
-Use the receipt's revision and digest for the next patch. A `needs_confirmation` result is not a save: the entire patch remains unpublished. Review the exact changes, then repair the patch to preserve qualifications or acknowledge only justified replacements/deletions with top-level `confirm_qualification_changes: ["entry-handle"]` and the returned revision/digest (CLI: `--confirm-qualification-changes='["entry-handle"]'`). Omit acknowledgment by default; never add it blindly to make a retry pass. Existing attribution/uncertainty replacements, removed conflicts/references and entry deletion are guarded; omitted fields, new entries and additive array members are not. Text-only changes still require your semantic judgment. Handle this internally without asking the learner to approve storage mechanics. Validation rejection means the patch was not published: repair the identified shape or reference without dropping evidence. A revision/digest conflict requires retrieving the affected state and reconciling concurrent changes. Interrupted execution or a missing receipt has uncertain completion: inspect whether the event committed before resubmitting it. Do not retry every error as though nothing happened. A successful receipt needs no confirming read. For a requested standalone artifact outside Pi's automatic lesson, pipe Markdown to `scripts/learn note --title 'Title'` and link its path; do not duplicate the mirrored lesson.
-
-A valid `evidence_budget` (integer, at least 2 UTF-8 bytes) is ignored on scoped knowledge-only reads, including the knowledge index. It still applies to scoped evidence/query reads and is invalid for the scope catalog or `--all`.
+- **validation**: the patch was not published; the message names the field. Repair it without dropping evidence.
+- **conflict**: the scope changed since you read it; `resume` again and reconcile.
+- **needs_confirmation**: nothing was saved; review the listed changes.
+- **interrupted / no receipt**: the save may have completed; read before resubmitting an observation.
+- **no_save**: this session does not persist; keep teaching.

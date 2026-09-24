@@ -13,14 +13,16 @@ This repository syncs Flow app focus data into an Obsidian journal and builds da
   - `daily/`, `periods/`: note composition and period-specific presentation.
   - `notes/`: Markdown operations and note locking.
   - `run/`: CLI parsing, direct dispatch, and integration construction.
-- `learning/`: records, retrieval, preferences, planning, lessons, and clients.
+- `learning/`: study workspaces, records, retrieval, preferences, planning, lessons, and clients.
 - `tests/`: behavior, external integrations, and rendering fixtures.
 - `tools/check.py`: full or package-focused quality checks.
 - `macos/Journal/`: native app and bundled sync runtime.
 
 See [docs/architecture.md](docs/architecture.md) for module ownership and the
-learning integration. Existing command lines and rendered notes are compatibility
-requirements; internal Python helpers do not need compatibility aliases.
+learning integration. Existing `sync` command lines and rendered notes are
+compatibility requirements; the learning agent CLI is an internal interface owned
+by the skill and adapter, and internal Python helpers do not need compatibility
+aliases.
 
 ## Architecture Rules
 
@@ -44,8 +46,10 @@ requirements; internal Python helpers do not need compatibility aliases.
 - `sync` must not import `learning`.
 - Learning reads journal activity and schedules through
   `sync.study.context.journal_summary`; it does not import other sync internals.
-- Learning record validation/publication belongs to `learning/records.py`;
-  context selection belongs to `learning/retrieval.py`.
+- Learning record shapes and per-type validation/patching belong to
+  `learning/schema.py`; whole-record publication to `learning/records.py`;
+  retrieval to `learning/retrieval.py` on the single packer in
+  `learning/packing.py`; the CLI verb table to `learning/cli.py`.
 
 ### Rendering architecture
 
@@ -194,7 +198,7 @@ be on `PATH`; Pi tests use this repository's `.venv/bin/python`.
 Add `--coverage` when coverage diagnostics are useful. For failure detail, run
 `python -m pytest tests/ -v --tb=short`. These deterministic checks establish code
 behavior, not teaching efficacy; native-host acceptance is documented in
-`docs/learning-behavioral-acceptance.md`.
+`docs/learning/behavioral-acceptance.md`.
 
 ## Testing Guidance
 

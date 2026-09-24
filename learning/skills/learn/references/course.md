@@ -1,10 +1,8 @@
 # Course and exam context
 
-When a course is new, or exam preparation or planning needs missing information, consult the relevant syllabus, assessment instructions or past papers already in the vault. Read only what the task needs. Keep useful findings in the existing scope through the usual `save`; do not interrupt an exercise for a course intake or survey unrelated courses.
+When a course is new, or exam preparation needs missing information, read the syllabus, assessment instructions or past papers that are already in the workspace (`sources SCOPE --scan` finds them; `--add` registers them). Read what the task needs; do not run an intake survey. Keep what you learn in the existing scope through the usual save.
 
-Let understanding of the course emerge through study. Resource advice, notation correspondences, tentative relationships and unresolved interpretations belong in ordinary `knowledge` prose when useful later; see [records.md](records.md). Do not create a compulsory course map, module taxonomy, progress dashboard or orientation task. A requested map is a provisional view of current understanding, revised as evidence changes. Existing topic relationships are optional aids, not a form to complete. Save a standalone map only when the learner asks for that artifact, and register its source when useful.
-
-`course_context` is optional and replaces its previous object when saved (`null` clears it). Omit unknown fields; use `unknowns` only for unresolved details that affect the task. Save actual requirements from primary material or the user's explicit information. Label patterns inferred from past papers as indications, not requirements. A conflicting or outdated source remains uncertain until resolved; ask only if the answer matters now.
+Course facts have fixed homes. The deadline is top-level `exam`; examinable material is top-level `coverage` (text, or `{"text", "refs"}`); the overall aim is `goal`; the path is `route` ([lessons.md](lessons.md)). Assessment requirements are `course_context`, which replaces as a unit (`null` clears it):
 
 ```json
 {
@@ -20,19 +18,14 @@ Let understanding of the course emerge through study. Resource advice, notation 
     "refs": [{"source": "syllabus", "locator": "Assessment section"}],
     "checked_on": "2026-09-18"
   },
-  "coverage": {
-    "text": "Examinable: chapters 1–4; chapter 5 excluded",
-    "refs": [{"source": "syllabus", "locator": "Programme"}]
-  }
+  "coverage": {"text": "Examinable: chapters 1–4; chapter 5 excluded", "refs": [{"source": "syllabus", "locator": "Programme"}]}
 }
 ```
 
-Keep the deadline in top-level `exam`, and examinable material in top-level `coverage`; do not copy them into `course_context`. Reference representative exercises through ordinary source/topic records when useful. `checked_on` means when you actually checked the supporting material, not an automatic freshness guarantee. Recheck when new information, a changed assessment or a consequential uncertainty warrants it, not every session.
+Record requirements from primary material or the learner's explicit statement. Label patterns inferred from past papers as indications. `checked_on` is when you actually checked; recheck when new information or a consequential uncertainty warrants it. A conflicting or undated source stays uncertain until resolved; a learner's report can guide the working convention without establishing a document's date or edition. Preserve each independent uncertainty until evidence addresses it. Do not assume an undated file is the "old" or "current" edition.
 
-Use established fields for these concrete requirements without duplicating them into knowledge. Knowledge can retain the basis of a consequential uncertainty or interpretation not already expressed there. Distinguish inspected requirements, learner reports and tentative inference; a reported clarification can guide the working convention without verifying a document's date, edition or identity. Preserve each independent uncertainty until specific evidence resolves it; do not assume an undated file is the reported old or current edition. Resolve a conflict before relying on it to skip examinable material, or preserve the uncertainty if unresolved. A notation convention already established in context need not trigger another source check.
+Notation correspondences, resource advice and tentative relationships belong in `knowledge` with attribution and uncertainty ([records.md](records.md)). Do not duplicate `exam`, `coverage` or requirements into knowledge.
 
-Use this context to choose useful explanation depth, practice and review. It does not establish the learner's understanding. Sources identify cited content: record a known edition/version when available and use a new handle for changed content; a path move preserves the existing handle. Reuse loaded context; course administration should stay out of the teaching response unless it helps the user decide what to study.
+Use this context to choose explanation depth, practice and review timing. It says nothing about the learner's understanding. For a time-bounded oral or mock examination, use the recorded format, criteria, notation, methods and permitted aids; if requirements are unverified, describe the practice as provisional. See [practice.md](practice.md).
 
-For a time-bounded oral or mock examination, use these actual requirements to choose questions and feedback timing. Match permitted aids and requested assistance; distinguish an independent attempt from a coached one. Interpret a rubric only within its stated scope. See [practice.md](practice.md) for the interaction and evidence rules.
-
-Use established aliases for equivalent terminology across sources or languages. For a deliberate connection to another course, discover the relevant scope and retrieve exact knowledge; compare assumptions and notation before using the analogy. No match transfers assessment, preference or mastery from one course to another.
+For a deliberate connection to another course, `discover "terms"` returns handles across scopes; read the exact knowledge, compare assumptions and notation, and transfer nothing else.

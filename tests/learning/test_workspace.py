@@ -114,7 +114,7 @@ def test_selected_workspace_isolates_catalog_preferences_and_generated_files(
     def context(directory: Path, *args: str) -> dict:
         return json.loads(
             subprocess.check_output(
-                [str(script), "--workspace", str(directory), "context", *args],
+                [str(script), "--workspace", str(directory), *(args or ("catalog",))],
                 cwd=tmp_path,
                 text=True,
             )
@@ -124,7 +124,7 @@ def test_selected_workspace_isolates_catalog_preferences_and_generated_files(
     assert context(second.directory)["scopes"][0]["title"] == "Second"
     assert context(first.directory)["preferences"]["rules"]
     assert not context(second.directory)["preferences"]["rules"]
-    assert context(second.directory, "course")["knowledge"] == {}
+    assert context(second.directory, "resume", "course")["knowledge"] == {}
     lesson = lessons.publish(first.root, str(uuid4()), "A focused explanation.")
     assert lesson.parent == first.root / "lessons"
     assert not (second.root / "lessons").exists()

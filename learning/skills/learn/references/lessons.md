@@ -1,10 +1,8 @@
-# Lesson purpose and route
+# Tasks, frames and the study route
 
-Keep the underlying activity stable while the teaching moves. A task's `frame` explains where the activity belongs, its goal and what finishing means. Its ordinary checkpoint fields hold the changing question, assistance and reason for a detour. A short answer needs no plan object; a substantive learning block benefits from a small route whose dependencies can be rendered as Mermaid when useful.
+Two levels of path exist. A **task** is one activity (an exercise, a proof, a chapter's questions) with a stable `frame` and a small `plan` inside it. The **route** is the course-level path: a handful of modules or milestones toward the exam, kept in the scope record and shown in every `resume` briefing. Neither is a dashboard; both exist so that the next session can continue where this one stopped.
 
-Enduring understanding about material, resources, notation or useful relationships belongs in `knowledge`; current exercise goals, routes and continuation details belong in tasks. A request for a rough course picture does not require a formal route or a persistent orientation task. Let a useful map emerge from the material and conversation, preserve uncertainty, and revise it when later evidence changes the picture. Draw it when requested; do not create a compulsory curriculum structure, progress dashboard or intake interview. Completing an exercise does not remove reusable knowledge.
-
-Before planning, use the request, relevant materials, evidence and preferences already available. Ask when a consequential uncertainty remains—for example, conceptual understanding versus exam practice would lead to different lessons. Recommend an approach alongside a focused question. Do not ask the learner to design the curriculum or repeat known preferences. A specific request may already settle the approach. Retain an unresolved choice in the task if interrupted; clear it when resolved.
+## Task frame and plan
 
 ```json
 {
@@ -16,17 +14,16 @@ Before planning, use the request, relevant materials, evidence and preferences a
         "goal": "Explain why the solution is unique",
         "completion": "Justify uniqueness for the original system",
         "topics": ["uniqueness"],
-        "observations": ["o5"],
         "refs": [{"source": "sheet", "locator": "Exercise 5"}]
       },
       "plan": {
         "status": "proposed",
+        "current": "collisions",
         "nodes": {
           "columns": {"label": "Read Ax as a combination of columns"},
           "collisions": {"label": "Understand information loss", "needs": ["columns"]},
           "uniqueness": {"label": "Return to the original uniqueness argument", "needs": ["collisions"]}
-        },
-        "current": "collisions"
+        }
       },
       "topics": ["invertibility"],
       "why": "Build the concrete meaning needed for the uniqueness argument",
@@ -36,14 +33,33 @@ Before planning, use the request, relevant materials, evidence and preferences a
 }
 ```
 
-Use existing source/topic/observation handles; the example names are illustrative. Frame fields are optional: retain only what matters. Plan node keys are local to the task; `needs` names prerequisites, not every preceding presentation step. Nodes may reference `topics`, `observations` and `refs` when needed. Dependencies must be acyclic. Default context includes the frame and current node's direct prerequisites, with relevant knowledge and bounded linked evidence; selection metadata identifies omitted evidence. Deeper retrieval remains available without activating incidental-topic preferences.
+The frame is what the activity is for and what finishing means; it survives detours. The plan's `current` node is the position; `needs` are true prerequisites, not presentation order. `proposed` is your suggestion; `agreed` means the learner's request or response supports it. Update the plan when the route changes, not every message. When the completion condition is met, set the task to `null` and keep the final attempt, its assistance and its locator in an observation. Do not leave a solved question active or turn the frame into a result summary.
 
-`proposed` is a suggested route; `agreed` requires the learner's request or response to support that route. An inferred reconstruction stays proposed, with a brief `basis` if helpful. Showing a plan does not establish agreement. A changed route replaces the current plan rather than accumulating versions. Preserve unaffected steps and the destination when adding a detour. Update at meaningful changes, not every message.
+## The course route
 
-The plan describes intended teaching, not mastery. Link to observations for what was explained, attempted with help, independently demonstrated or remains uncertain; current learner interpretations belong in topic assessments, not node mastery flags. When the task's completion condition is met, remove its checkpoint with `tasks: {"exact-task-key": null}`; retain any diagnostic final response, actual assistance and source locator as an observation. Do not replace a frame with status/result fields or leave its solved question active. Completing a task does not establish understanding. Draw the visible diagram from the saved route and evidence when needed. On ordinary continuation, teach the next useful step without replaying the plan. When the learner asks where they are, connect the current step back to its purpose and distinguish established progress from proposed next steps.
+When the learner asks for a plan, a study map, a path to the exam, or hands you the syllabus and slides, build the route from the material and save it:
 
-If the learner explicitly requests a standalone course map or another document, publish it through the available file tools and register its source when useful. Automatic lesson mirroring is a reading surface; it does not replace durable knowledge or require indexing every generated lesson.
+```json
+{
+  "route": {
+    "status": "proposed",
+    "basis": "Syllabus order; weeks 1–4 examinable",
+    "current": "rank",
+    "nodes": {
+      "systems": {"label": "Linear systems", "topics": ["linear-systems"], "done": true},
+      "rank": {"label": "Rank and nullity", "needs": ["systems"], "topics": ["rank"], "refs": [{"source": "slides", "locator": "week 3"}]},
+      "eigen": {"label": "Eigenvalues", "needs": ["rank"], "topics": ["eigen"]}
+    }
+  }
+}
+```
 
-Keep the wider course destination in existing scope fields and concise knowledge when useful: the current module, relevant prerequisites, notation and consequential unresolved choices. A task frame positions a particular activity within that understanding. Maintain only facts that help the next lesson; do not duplicate exam dates, coverage or every exercise into a separate course model. The internal briefing makes continuation quiet; show the route only when it helps the learner or they ask where they are.
+Keep it to the nodes that change what you teach next: five to fifteen, not every exercise. Register the sources first (`sources --scan`, `--add`) and create the topics the nodes reference. Move `current` as the learner advances and mark `done` nodes; a `done` node is covered, not mastered. Revise the route when evidence or the learner changes the picture; replace it as a unit. `resume` returns the position (current node, its prerequisites, done nodes, order) in `briefing.route`, and knowledge linked to the current node's topics is included automatically.
 
-In Pi, preserve learner annotations in the protected annotation section of the lesson. Assistant corrections update authored teaching, not the learner's annotation region. Do not treat a personal annotation as an endorsed new attempt unless the learner has actually provided it for assessment. If the publisher reports an ownership or annotation conflict, keep teaching readable and resolve the specific conflict without overwriting user text.
+Show the route only when it helps or when asked where they are; then connect the current step to its purpose and distinguish covered ground from proposed next steps. A learner asking for a document gets one through the file tools; the automatic lesson mirror is a reading surface, not the plan.
+
+## Continuity
+
+Retrieve the task and briefing once per activity. Teach the next useful step without replaying the plan. Preserve the original purpose across follow-ups and prerequisite detours: a detour patches `why` and `pending_question`, not the frame. Keep the wider course understanding in `knowledge` (notation, resources, unresolved choices) rather than duplicating it into tasks. When asked "what do you remember", answer from the loaded state in plain language.
+
+In Pi, learner annotations live in the protected section of the lesson note; corrections update your teaching, never their notes. If publication reports a conflict, keep teaching readable and resolve it without overwriting learner text.
