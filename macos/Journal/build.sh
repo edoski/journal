@@ -88,6 +88,11 @@ if [ "$install" -eq 1 ]; then
     rm -rf "$install_target"
     cp -R "$app_dir" "$install_target"
     printf 'Installed to %s\n' "$install_target"
+    agent="gui/$(id -u)/com.edo.journal"
+    if launchctl print "$agent" >/dev/null 2>&1; then
+        launchctl kickstart -k "$agent"
+        printf 'Restarted %s\n' "$agent"
+    fi
 else
     printf '%s\n' "$app_dir"
 fi
