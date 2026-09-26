@@ -81,7 +81,10 @@ merely assert which private helper called another.
 The learning engine is installed once; each initialized course/project directory
 owns `.study`. `learning/workspace.py` resolves explicit selection or the nearest
 ancestor, validates the versioned marker, and derives local output paths. There is
-no global state fallback or inherited parent workspace. `learning/study.py` owns
+no global state fallback or inherited parent workspace. A workspace may instead
+study linked material elsewhere: its manifest names the material directory and the
+per-user index maps that directory back, and discovery follows a link only when no
+nearer marker exists and both directions still agree. `learning/study.py` owns
 the short user command; `__main__.py` is the canonical agent CLI. Pi pins the
 selected workspace across tool calls and stores its conversations there. Private
 launches use a temporary workspace with read-only access to the original sources.

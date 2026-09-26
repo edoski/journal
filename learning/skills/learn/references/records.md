@@ -44,7 +44,7 @@ Append one entry when the learner actually attempts something or an external ass
 
 ## Sources
 
-`sources SCOPE --scan` lists course files under the workspace with suggested handles; `sources SCOPE --add '["lectures/week3.pdf"]' --expect REV` registers them and returns their handles. You may also register `{"path": ..., "version": ...}` directly in a save. A reference is `{"source": handle, "locator": "...", "excerpt": "..."}`; the helper captures `source_version` and any fingerprint. Once cited, a handle's `version` is immutable: new content gets a new handle. A moved file keeps its handle by updating `path`.
+`sources SCOPE --scan` lists course files under the workspace's source directory with suggested handles; `sources SCOPE --add '["lectures/week3.pdf"]' --expect REV` registers them and returns their handles. You may also register `{"path": ..., "version": ...}` directly in a save. A reference is `{"source": handle, "locator": "...", "excerpt": "..."}`; the helper captures `source_version` and any fingerprint. Once cited, a handle's `version` is immutable: new content gets a new handle. A moved file keeps its handle by updating `path`.
 
 ## Knowledge
 

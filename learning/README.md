@@ -4,11 +4,14 @@ One installed learning engine supports natural study conversations in Pi and in 
 
 ## Workspace
 
-Each course or project directory owns a hidden `.study/` after `study init`. `.study/state/<scope>.json` is one course record (schema 5), `.study/preferences.json` holds teaching preferences, `.study/lessons/` and `.study/assets/` hold generated notes and diagrams, `.study/conversations/` holds resumable Pi sessions. Material stays where it is; relative source paths resolve from the directory. Running from a descendant finds the nearest workspace; nested workspaces are independent; there is no global fallback.
+Each course or project directory owns a hidden `.study/` after `study init`. `.study/state/<scope>.json` is one course record (schema 5), `.study/preferences.json` holds teaching preferences, `.study/lessons/` and `.study/assets/` hold generated notes and diagrams, `.study/conversations/` holds resumable Pi sessions. Material stays where it is; relative source paths resolve from the directory. Running from a descendant finds the nearest workspace; nested workspaces are independent.
+
+Material that must stay free of study files, such as a code repository, is linked instead: `study init --workspace ~/study/course --sources ~/code/repo` records the material directory in the workspace manifest and in the per-user index `~/Library/Application Support/Learning/workspaces.json`. Relative source paths then resolve from the material, and running from the material or any descendant finds the workspace when no nearer `.study/` exists. A link is used only while the workspace still names the material, so a stale or ambiguous link fails instead of selecting another workspace; one workspace studies one material directory. `study link DIR` relinks moved material and `study unlink` restores the workspace's own directory. Inside a git work tree, `sources --scan` lists only files git does not ignore.
 
 ```sh
 cd /path/to/course
 study init
+study init --workspace ~/study/course --sources /path/to/repo   # study files kept outside the material
 study                      # Pi in this workspace
 study --continue           # resume the latest Pi conversation
 study --private            # disposable copies, no saved session
@@ -30,7 +33,7 @@ study "Continue exercise 5"
 | `sources SCOPE --scan` / `--add PATHS` / `--check HANDLES` | find, register and fingerprint local material |
 | `preferences`, `plan`, `journal`, `discover`, `inspect`, `forget`, `readiness` | policy, scheduling, cross-scope discovery, memory inspection and previewed removal, host checks |
 | `note`, `lesson`, `publish-lesson`, `visual` | generated artifacts |
-| `init`, `import`, `start` | workspace lifecycle and the Pi launcher |
+| `init [--sources DIR]`, `link DIR`, `unlink`, `import`, `start` | workspace lifecycle, material links and the Pi launcher |
 
 A scope argument may be the handle or an unambiguous course title or alias. The [skill](skills/learn/SKILL.md) is the agent's playbook; its references define the [record contract](skills/learn/references/records.md), [retrieval](skills/learn/references/retrieval.md), [tasks and the route](skills/learn/references/lessons.md), [course facts](skills/learn/references/course.md), [practice](skills/learn/references/practice.md), [preferences](skills/learn/references/preferences.md), [lifecycle](skills/learn/references/lifecycle.md), [research](skills/learn/references/research.md) and [visuals](skills/learn/references/visuals.md).
 

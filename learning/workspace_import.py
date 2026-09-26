@@ -61,9 +61,9 @@ def import_scope(
     if original["revision"] == 0:
         raise ValueError(f"No existing scope to import: {scope}")
     raw = storage.load(source / "state" / f"{scope}.json")
-    candidate = _rebase_references(deepcopy(raw), source_directory, workspace.directory)
+    candidate = _rebase_references(deepcopy(raw), source_directory, workspace.sources)
     for entry in candidate.get("sources", {}).values():
-        entry["path"] = _location(entry["path"], source_directory, workspace.directory)
+        entry["path"] = _location(entry["path"], source_directory, workspace.sources)
     policy = preferences.read(source)
     rules = [
         rule

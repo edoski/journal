@@ -19,7 +19,7 @@ def study() -> int:
         if arg.startswith("--workspace="):
             selection.append(arg)
             args.remove(arg)
-    if not args or args[0] not in {"init", "import"}:
+    if not args or args[0] not in {"init", "import", "link", "unlink"}:
         args.insert(0, "start")
     return main([*selection, *args])
 

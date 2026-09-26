@@ -326,6 +326,28 @@ def import_scope(workspace: Workspace, args: argparse.Namespace) -> dict[str, An
     )
 
 
+def link(workspace: Workspace, args: argparse.Namespace) -> dict[str, Any]:
+    from learning.workspace import link as link_material, links_path
+
+    linked = link_material(workspace, args.material)
+    return {
+        "workspace": str(linked.directory),
+        "sources_directory": str(linked.sources),
+        "links": str(links_path()),
+    }
+
+
+def unlink(workspace: Workspace, args: argparse.Namespace) -> dict[str, Any]:
+    from learning.workspace import links_path, unlink as unlink_material
+
+    unlinked = unlink_material(workspace)
+    return {
+        "workspace": str(unlinked.directory),
+        "sources_directory": str(unlinked.sources),
+        "links": str(links_path()),
+    }
+
+
 # --- command table ----------------------------------------------------------
 
 
@@ -463,7 +485,7 @@ def _build_sources(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--scan",
         action="store_true",
-        help="List unregistered material in the workspace",
+        help="List unregistered material in the workspace's source directory",
     )
     _snapshot(parser, required=False)
 
@@ -505,6 +527,16 @@ def _build_visual(parser: argparse.ArgumentParser) -> None:
 
 def _build_note(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--title", default="Study notes")
+
+
+def _build_link(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "material", help="Directory outside any workspace that this workspace studies"
+    )
+
+
+def _build_unlink(parser: argparse.ArgumentParser) -> None:
+    pass
 
 
 def _build_import(parser: argparse.ArgumentParser) -> None:
@@ -621,5 +653,19 @@ COMMANDS: tuple[Command, ...] = (
         import_scope,
         _build_import,
         lambda args: args.apply,
+    ),
+    Command(
+        "link",
+        "Study a material directory elsewhere and be found from it",
+        link,
+        _build_link,
+        lambda args: True,
+    ),
+    Command(
+        "unlink",
+        "Stop studying linked material; sources resolve from the workspace",
+        unlink,
+        _build_unlink,
+        lambda args: True,
     ),
 )

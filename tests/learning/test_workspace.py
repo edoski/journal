@@ -1,15 +1,34 @@
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 from uuid import uuid4
 
 import pytest
 
 from learning import lessons, preferences, records
 from learning.sources import inspect_sources
-from learning.workspace import initialize, resolve
+from learning.workspace import (
+    Workspace,
+    initialize,
+    link,
+    links_path,
+    resolve,
+    unlink,
+)
 from learning.workspace_import import import_scope
+
+LEARN = Path(__file__).resolve().parents[2] / "learning/skills/learn/scripts/learn"
+
+
+def manifest(workspace: Workspace) -> object:
+    return json.loads((workspace.root / "workspace.json").read_text())
+
+
+def links() -> object:
+    return json.loads(links_path().read_text())
 
 
 @pytest.fixture(autouse=True)
@@ -36,7 +55,18 @@ def test_init_is_idempotent_and_nested_workspace_is_independent(
     assert (child.root / ".gitignore").read_text() == "*\n"
 
 
-@pytest.mark.parametrize("contents", ["{", '{"version":2}', '{"version":true}', "[]"])
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "{",
+        '{"version":2}',
+        '{"version":true}',
+        "[]",
+        '{"version":1,"sources":"relative/material"}',
+        '{"version":1,"sources":7}',
+        '{"version":1,"mode":"linked"}',
+    ],
+)
 def test_invalid_nearer_workspace_never_falls_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, contents: str
 ) -> None:
@@ -236,3 +266,166 @@ def test_import_preserves_originals_rebases_sources_and_selects_preferences(
     local = initialize(with_defaults)
     import_scope(local, root, old, "course", include_defaults=True, apply=True)
     assert len(preferences.read(local.root)["rules"]) == 2
+
+
+def test_linked_material_selects_its_external_workspace_and_stays_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    material = tmp_path / "repo"
+    (material / "src/deep").mkdir(parents=True)
+    (material / "notes.md").write_text("Material")
+    study = tmp_path / "study/course"
+    study.mkdir(parents=True)
+    workspace = initialize(study, sources=material)
+    assert workspace == Workspace(study, material)
+    assert manifest(workspace) == {"version": 1, "sources": str(material)}
+    assert links() == {str(material): str(study)}
+    assert sorted(path.name for path in material.iterdir()) == ["notes.md", "src"]
+    monkeypatch.chdir(material / "src/deep")
+    assert resolve() == workspace
+    assert resolve(study).sources == material
+    assert initialize(study, sources=material) == workspace
+    records.save(
+        workspace.root, "course", 0, {"sources": {"notes": {"path": "notes.md"}}}
+    )
+    status = inspect_sources(workspace.root, workspace.sources, "course", ["notes"])
+    assert status["sources"]["notes"]["status"] == "unverified"
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValueError, match="--sources"):
+        resolve()
+
+
+def test_markers_outrank_links_and_ambiguous_links_are_refused_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    material = tmp_path / "repo"
+    module = material / "module"
+    module.mkdir(parents=True)
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    linked = initialize(first, sources=material)
+    local = initialize(module)
+    monkeypatch.chdir(module)
+    assert resolve() == local
+    monkeypatch.chdir(material)
+    assert resolve() == linked
+    with pytest.raises(ValueError, match="inside the study workspace"):
+        initialize(second, sources=module)
+    with pytest.raises(ValueError, match="already linked"):
+        initialize(second, sources=material)
+    with pytest.raises(ValueError, match="needs no link"):
+        initialize(tmp_path, sources=second)
+    with pytest.raises(ValueError, match="does not exist"):
+        initialize(second, sources=tmp_path / "missing")
+    assert list(second.iterdir()) == []
+    assert not (tmp_path / ".study").exists()
+    assert links() == {str(material): str(first)}
+
+
+def test_relinking_unlinking_and_stale_links_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ["old", "new", "study", "other"]:
+        (tmp_path / name).mkdir()
+    old, new, study, other = (
+        tmp_path / name for name in ["old", "new", "study", "other"]
+    )
+    relinked = link(initialize(study, sources=old), new)
+    assert links() == {str(new): str(study)}
+    monkeypatch.chdir(old)
+    with pytest.raises(ValueError, match="study init"):
+        resolve()
+    monkeypatch.chdir(new)
+    assert resolve() == relinked
+    with pytest.raises(ValueError, match="already linked"):
+        link(initialize(other), new)
+    assert unlink(relinked) == Workspace(study)
+    assert manifest(relinked) == {"version": 1}
+    assert links() == {}
+    assert resolve(study).sources == study
+    link(resolve(other), new)
+    assert resolve() == Workspace(other, new)
+    (other / ".study/workspace.json").write_text('{"version": 1}\n')
+    with pytest.raises(ValueError, match="Stale"):
+        resolve()
+    link(resolve(study), new)
+    assert resolve() == Workspace(study, new)
+    shutil.rmtree(study)
+    with pytest.raises(ValueError, match="missing"):
+        resolve()
+    links_path().write_text("[]")
+    with pytest.raises(ValueError, match="links"):
+        resolve()
+    monkeypatch.chdir(other)
+    assert resolve() == Workspace(other)
+
+
+def test_import_into_linked_workspace_keeps_material_paths_relative(
+    tmp_path: Path,
+) -> None:
+    material = tmp_path / "material"
+    material.mkdir()
+    (material / "notes.md").write_text("Original source")
+    root = tmp_path / "old-learn"
+    records.save(root, "course", 0, {"sources": {"notes": {"path": "notes.md"}}})
+    study = tmp_path / "study"
+    study.mkdir()
+    workspace = initialize(study, sources=material)
+    import_scope(workspace, root, material, "course", apply=True)
+    imported = records.read(workspace.root, "course")
+    assert imported["sources"]["notes"]["path"] == "notes.md"
+
+
+def test_study_commands_link_material_that_agents_then_find_from_their_cwd(
+    tmp_path: Path,
+) -> None:
+    material = tmp_path / "repo"
+    (material / "docs").mkdir(parents=True)
+    (material / "docs/lecture.md").write_text("Lecture")
+    study = tmp_path / "study"
+    study.mkdir()
+
+    def learn(cwd: Path, *args: str, stdin: str = "") -> dict:
+        return json.loads(
+            subprocess.check_output(
+                [str(LEARN), *args], cwd=cwd, input=stdin, text=True
+            )
+        )
+
+    created = learn(tmp_path, "--workspace", str(study), "init", "--sources", "repo")
+    assert created["sources_directory"] == str(material)
+    catalog = learn(material / "docs", "catalog")
+    assert catalog["workspace"] == str(study)
+    assert catalog["sources_directory"] == str(material)
+    saved = learn(material, "save", "course", "--expect", "0", stdin='{"title": "C"}')
+    scan = learn(material, "sources", "course", "--scan")
+    assert [item["path"] for item in scan["files"]] == ["docs/lecture.md"]
+    added = learn(
+        material,
+        "sources",
+        "course",
+        "--add",
+        '["docs/lecture.md"]',
+        "--expect",
+        str(saved["revision"]),
+    )
+    assert added["sources"]["lecture"]["path"] == "docs/lecture.md"
+    no_save = subprocess.run(
+        [str(LEARN), "unlink"],
+        cwd=material,
+        env={**os.environ, "LEARNING_NO_SAVE": "1"},
+        capture_output=True,
+        text=True,
+    )
+    assert no_save.returncode == 1
+    assert json.loads(no_save.stderr)["error"]["kind"] == "no_save"
+    assert learn(material, "unlink")["sources_directory"] == str(study)
+    relinked = subprocess.check_output(
+        [sys.executable, "-m", "learning.study", "link", str(material)],
+        cwd=study,
+        env={**os.environ, "PYTHONPATH": str(LEARN.parents[4])},
+        text=True,
+    )
+    assert json.loads(relinked)["sources_directory"] == str(material)
+    assert learn(material, "catalog")["workspace"] == str(study)

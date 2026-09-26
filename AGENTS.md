@@ -256,6 +256,7 @@ commits touching `sync/` or `macos/`. Run the quality gate before such commits.
 ## Data and Cache Files
 
 - media cache: `~/Library/Caches/Journal/media/dates.json`
+- learning workspace links: `~/Library/Application Support/Learning/workspaces.json`
 - flow reminder state: `~/Library/Application Support/Journal/state/flow_reminder_state.json`
 - shortcut pending state: `~/Library/Application Support/Journal/state/daily/status/pending/`
 - shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)

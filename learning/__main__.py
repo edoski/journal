@@ -19,7 +19,11 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="learning", description=__doc__)
     parser.add_argument("--workspace", help="Exact initialized study directory")
     commands = parser.add_subparsers(dest="command")
-    commands.add_parser("init", help="Initialize .study in this directory")
+    init = commands.add_parser("init", help="Initialize .study in this directory")
+    init.add_argument(
+        "--sources",
+        help="Material directory elsewhere that this workspace studies and is found from",
+    )
     start = commands.add_parser("start", help="Launch Pi in the selected workspace")
     start.add_argument("prompt", nargs="?")
     start.add_argument("--continue", dest="resume", action="store_true")
@@ -60,10 +64,11 @@ def main(argv: list[str] | None = None) -> int:
                 raise NoSaveError(
                     "This session cannot initialize persistent study state"
                 )
-            workspace = initialize(args.workspace)
+            workspace = initialize(args.workspace, args.sources)
             result = {
                 "workspace": str(workspace.directory),
                 "learning": str(workspace.root),
+                "sources_directory": str(workspace.sources),
             }
         else:
             workspace = resolve(args.workspace)

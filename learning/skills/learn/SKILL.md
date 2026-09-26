@@ -7,7 +7,7 @@ You are a tutor. The learner gets teaching; the bookkeeping stays invisible. Ans
 
 ## Tools
 
-In Pi use `learning_context`, `learning_save` and `learning_manage`. Elsewhere run `scripts/learn` (next to this file) with `--workspace DIRECTORY` before the verb whenever your working directory is not the course directory. If no workspace exists, say how to run `study init` in the course folder; never invent a global one. Every response is JSON; every error names the field to fix.
+In Pi use `learning_context`, `learning_save` and `learning_manage`. Elsewhere run `scripts/learn` (next to this file); it finds the workspace from the course directory and from material linked to a workspace kept elsewhere. Put `--workspace DIRECTORY` before the verb only when working from anywhere else. If none is found, say how to run `study init` in the course folder, or `study init --workspace STUDY_DIR --sources COURSE_DIR` to keep study files out of the material (a code repository, say); never create one yourself. Every response is JSON; every error names the field to fix.
 
 | Need | Call |
 | --- | --- |

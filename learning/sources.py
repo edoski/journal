@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import hashlib
 import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -83,8 +85,56 @@ def _location(source: dict[str, Any], vault: Path) -> Path | None:
     return path if path.is_absolute() else vault / path
 
 
+def _git_listing(vault: Path) -> list[Path] | None:
+    """Files git does not ignore under vault; None when git does not manage it."""
+
+    def git(*args: str) -> subprocess.CompletedProcess[bytes]:
+        # Repository configuration must not run commands during a listing.
+        return subprocess.run(
+            ["git", "-c", "core.fsmonitor=false", "-C", str(vault), *args],
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+
+    try:
+        # Exit 1 means inside a work tree and not ignored; 0 ignored; 128 no repo.
+        if git("check-ignore", "-q", ".").returncode != 1:
+            return None
+        listed = git("ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if listed.returncode:
+        return None
+    names = dict.fromkeys(os.fsdecode(name) for name in listed.stdout.split(b"\0"))
+    return sorted(vault / name for name in names if name)
+
+
+def _material(vault: Path) -> Iterator[Path]:
+    """Candidate files in listing order, skipping hidden files and directories."""
+    listed = _git_listing(vault)
+    if listed is not None:
+        for path in listed:
+            if not any(part.startswith(".") for part in path.relative_to(vault).parts):
+                yield path
+        return
+    for directory, directories, files in os.walk(vault, followlinks=False):
+        directories[:] = sorted(
+            name for name in directories if not name.startswith(".")
+        )
+        for name in sorted(files):
+            if not name.startswith("."):
+                yield Path(directory) / name
+
+
 def scan(vault: Path, registered: dict[str, Any]) -> dict[str, Any]:
-    """List course material under the workspace, naming registered handles."""
+    """List course material under the source directory, naming registered handles.
+
+    Inside a git work tree only files git does not ignore are listed, so
+    dependency and build directories never crowd out the material.
+    """
+    if not vault.is_dir():
+        raise ValueError(f"source directory does not exist: {vault}")
     known: dict[Path, str] = {}
     for handle, source in registered.items():
         location = _location(source, vault)
@@ -96,34 +146,27 @@ def scan(vault: Path, registered: dict[str, Any]) -> dict[str, Any]:
             continue
     found: list[dict[str, Any]] = []
     truncated = False
-    for directory, directories, files in os.walk(vault, followlinks=False):
-        directories[:] = sorted(
-            name for name in directories if not name.startswith(".")
-        )
-        for name in sorted(files):
-            path = Path(directory) / name
-            if name.startswith(".") or path.suffix.lower() not in MATERIAL_SUFFIXES:
-                continue
-            if len(found) >= SCAN_LIMIT:
-                truncated = True
-                break
-            try:
-                resolved = path.resolve()
-                size = path.stat().st_size
-            except OSError:
-                continue
-            item: dict[str, Any] = {
-                "path": os.path.relpath(path, vault),
-                "bytes": size,
-                "registered": resolved in known,
-            }
-            if resolved in known:
-                item["handle"] = known[resolved]
-            else:
-                item["suggested_handle"] = suggest_handle(path, registered)
-            found.append(item)
-        if truncated:
+    for path in _material(vault):
+        if path.suffix.lower() not in MATERIAL_SUFFIXES:
+            continue
+        if len(found) >= SCAN_LIMIT:
+            truncated = True
             break
+        try:
+            resolved = path.resolve()
+            size = path.stat().st_size
+        except OSError:
+            continue
+        item: dict[str, Any] = {
+            "path": os.path.relpath(path, vault),
+            "bytes": size,
+            "registered": resolved in known,
+        }
+        if resolved in known:
+            item["handle"] = known[resolved]
+        else:
+            item["suggested_handle"] = suggest_handle(path, registered)
+        found.append(item)
     found.sort(key=lambda item: item["path"])
     return {"directory": str(vault), "files": found, "truncated": truncated}
 

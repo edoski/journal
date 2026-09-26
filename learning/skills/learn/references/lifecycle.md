@@ -25,7 +25,7 @@ For "don't save this", enable the Pi `no_save` action; continue from loaded cont
 
 ## Sources
 
-`sources SCOPE --scan` lists course material under the workspace with a suggested handle per file and whether it is registered. `sources SCOPE --add '["path", ...]' --expect REV [--expect-digest D]` registers files and returns their handles. `sources SCOPE --check '["handle"]'` reports each source as `unverified`, `unchanged`, `changed` or `missing` by SHA-256 and size; adding `--expect REV --expect-digest D` captures an uncaptured fingerprint. Changed content is never silently recaptured: inspect it and register a new handle. A fingerprint establishes byte identity, not authority or edition. Check sources when new information or a consequential decision warrants it, not every session.
+`sources SCOPE --scan` lists course material under the workspace's source directory (the linked material, when there is one; inside a git work tree, only files git does not ignore) with a suggested handle per file and whether it is registered. `sources SCOPE --add '["path", ...]' --expect REV [--expect-digest D]` registers files and returns their handles. `sources SCOPE --check '["handle"]'` reports each source as `unverified`, `unchanged`, `changed` or `missing` by SHA-256 and size; adding `--expect REV --expect-digest D` captures an uncaptured fingerprint. Changed content is never silently recaptured: inspect it and register a new handle. A fingerprint establishes byte identity, not authority or edition. Check sources when new information or a consequential decision warrants it, not every session.
 
 ## Readiness and conflicts
 

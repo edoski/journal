@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -245,3 +246,31 @@ def test_source_changing_during_read_is_unverified(
     result = sources.inspect_sources(tmp_path, tmp_path, "course", ["sheet"])
     assert result["sources"]["sheet"]["status"] == "unverified"
     assert "changed while being inspected" in result["sources"]["sheet"]["reason"]
+
+
+def test_scan_lists_only_material_git_does_not_ignore(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    for name in [
+        "docs/guide.md",
+        "draft.md",
+        "build.md",
+        "node_modules/pkg/README.md",
+        ".github/notes.md",
+    ]:
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(name)
+    (repo / ".gitignore").write_text("node_modules/\nbuild.md\n")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "docs/guide.md"], check=True)
+
+    def listed(vault: Path) -> list[str]:
+        return [item["path"] for item in sources.scan(vault, {})["files"]]
+
+    assert listed(repo) == ["docs/guide.md", "draft.md"]
+    assert listed(repo / "docs") == ["guide.md"]
+    # A directory the repository ignores is not git-managed material: walk it.
+    assert listed(repo / "node_modules") == ["pkg/README.md"]
+    (repo / "docs/guide.md").unlink()
+    assert listed(repo) == ["draft.md"]
+    with pytest.raises(ValueError, match="does not exist"):
+        sources.scan(tmp_path / "missing", {})
