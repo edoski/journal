@@ -27,7 +27,7 @@ def installed(
 ) -> tuple[Workspace, Path]:
     repo = tmp_path / "repo"
     package = repo / "learning"
-    for name in ("__main__.py", "mcp.py", "skills/learn/SKILL.md"):
+    for name in ("__main__.py", "mcp.py", "skills/tutor/SKILL.md"):
         (package / name).parent.mkdir(parents=True, exist_ok=True)
         (package / name).write_text("x\n")
     python = install.interpreter(repo)
@@ -85,7 +85,7 @@ def test_an_installed_host_is_ready_and_the_check_is_read_only(
         ),
         (
             "claude-desktop",
-            lambda p: (p / "skills/learn/SKILL.md").write_text("changed\n"),
+            lambda p: (p / "skills/tutor/SKILL.md").write_text("changed\n"),
             {"claude_skill_archive"},
         ),
         (

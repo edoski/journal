@@ -24,7 +24,7 @@ dev = [
 include = ["sync*", "learning*"]
 
 [tool.setuptools.package-data]
-learning = ["skills/learn/SKILL.md", "skills/learn/references/*.md"]
+learning = ["skills/tutor/SKILL.md", "skills/tutor/references/*.md"]
 
 [tool.coverage.run]
 branch = true

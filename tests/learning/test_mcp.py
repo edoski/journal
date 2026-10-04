@@ -274,7 +274,7 @@ def test_tools_map_onto_the_cli_in_the_course_of_the_working_directory(
     assert "o1" not in cli(home, folder, "show", "--all")["observations"]
     assert (
         server.tool("guide", topic="records")
-        == (REPOSITORY / "learning/skills/learn/references/records.md").read_text()
+        == (REPOSITORY / "learning/skills/tutor/references/records.md").read_text()
     )
     [listed] = server.tool("courses")["courses"]
     assert listed == {
@@ -375,10 +375,10 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
         return body
 
     study = text("study", request="Explain rank")
-    skill = (REPOSITORY / "learning/skills/learn/SKILL.md").read_text()
+    skill = (REPOSITORY / "learning/skills/tutor/SKILL.md").read_text()
     body = skill.split("\n---", 1)[1].strip() if skill.startswith("---") else skill
     assert study.startswith(body)
-    assert "name: learn" not in study
+    assert "name: tutor" not in study
     resume = json.dumps(
         cli(home, folder, "resume"), ensure_ascii=False, separators=(",", ":")
     )

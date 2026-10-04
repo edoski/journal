@@ -142,10 +142,10 @@ def _archive(package: Path) -> dict[str, str]:
     return _check(
         "claude_skill_archive",
         "pass" if current else "warning",
-        "learn-claude.zip matches the skill; upload it in Claude Desktop "
+        "tutor-claude.zip matches the skill; upload it in Claude Desktop "
         "(Settings > Capabilities > Skills) after it changes."
         if current
-        else "learn-claude.zip is missing or older than the skill; run the "
+        else "tutor-claude.zip is missing or older than the skill; run the "
         "installer and upload it again in Claude Desktop.",
         path,
     )
@@ -248,7 +248,7 @@ def check(
     repo = package.parent
     root = workspace.root.expanduser().absolute()
     material = workspace.sources.expanduser().absolute()
-    skill = package / "skills/learn"
+    skill = package / "skills/tutor"
     links = install.skill_links()
     checks = [
         _directory("learning_root", root, allow_missing=True),

@@ -3,7 +3,7 @@
 The current contract lives next to the code:
 
 - [learning/README.md](../../learning/README.md): workspace, agent verbs, record model, module ownership.
-- [learning/skills/learn/SKILL.md](../../learning/skills/learn/SKILL.md): the tutor's playbook, with references for [the record and patch rule](../../learning/skills/learn/references/records.md), [practice and reviews](../../learning/skills/learn/references/practice.md), [course, exam and path](../../learning/skills/learn/references/course.md), [memory, planning and hosts](../../learning/skills/learn/references/lifecycle.md) and [research](../../learning/skills/learn/references/research.md).
+- [learning/skills/tutor/SKILL.md](../../learning/skills/tutor/SKILL.md): the tutor's playbook, with references for [the record and patch rule](../../learning/skills/tutor/references/records.md), [practice and reviews](../../learning/skills/tutor/references/practice.md), [course, exam and path](../../learning/skills/tutor/references/course.md), [memory, planning and hosts](../../learning/skills/tutor/references/lifecycle.md) and [research](../../learning/skills/tutor/references/research.md).
 - [architecture.md](../architecture.md): how learning relates to the journal sync package.
 - [behavioral-acceptance.md](behavioral-acceptance.md): the bounded native-host acceptance protocol.
 

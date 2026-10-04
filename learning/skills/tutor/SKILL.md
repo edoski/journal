@@ -1,5 +1,5 @@
 ---
-name: learn
+name: tutor
 description: Teach, explain, practise, review, or continue learning any topic, carrying understanding and unfinished work across conversations through the current study workspace.
 ---
 

@@ -23,13 +23,13 @@ from learning.workspace import Workspace, registered, resolve
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "learning", "title": "Learning", "version": "6"}
 PACKAGE = Path(__file__).resolve().parent
-SKILL = PACKAGE / "skills" / "learn"
+SKILL = PACKAGE / "skills" / "tutor"
 GUIDES = ("records", "practice", "course", "lifecycle", "research")
 TIMEOUT = 60
 
 INSTRUCTIONS = (
     "Study memory for the learner's courses. For any request to learn, explain, "
-    "practise, review, continue or plan study, follow the learn skill (or the "
+    "practise, review, continue or plan study, follow the tutor skill (or the "
     "`study` prompt): start with `resume`, teach, then `save` once per turn, "
     'recording every attempt as an observation with `help` ("none" if unaided) and '
     "`result`. Keep bookkeeping silent: never narrate tool calls or saves. `guide` "
@@ -426,7 +426,7 @@ def tool_list() -> list[Json]:
 COURSE_ARGUMENT = {"name": "course", "description": COURSE["description"]}
 PROMPTS: dict[str, tuple[str, list[Json]]] = {
     "study": (
-        "Study with the tutor: the learn skill plus a fresh resume of the course",
+        "Study with the tutor: the tutor skill plus a fresh resume of the course",
         [COURSE_ARGUMENT, {"name": "request", "description": "What to study"}],
     ),
     "review": (

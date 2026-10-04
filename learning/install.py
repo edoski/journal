@@ -1,10 +1,10 @@
-"""Install the learning MCP server, the `learn` skill and the `study` command.
+"""Install the learning MCP server, the `tutor` skill and the `study` command.
 
 Hosts:
 
 - Claude Desktop: ``mcpServers.learning`` merged into
   ``~/Library/Application Support/Claude/claude_desktop_config.json``; the skill
-  is uploaded by hand from ``learn-claude.zip``.
+  is uploaded by hand from ``tutor-claude.zip``.
 - Claude Code: ``claude mcp add --scope user``. The CLI owns ``~/.claude.json``,
   which running Claude Code sessions rewrite at any moment, so this installer
   never edits that file itself; without the CLI, Claude Code is skipped.
@@ -38,7 +38,7 @@ CODEX_END = "# End learning MCP server\n"
 _OLD_CODEX = re.compile(
     r"# Learning communication\n.*?# End learning communication\n", re.DOTALL
 )
-_SOURCES = ("__main__.py", "mcp.py", "skills/learn/SKILL.md")
+_SOURCES = ("__main__.py", "mcp.py", "skills/tutor/SKILL.md")
 
 
 # --- locations ----------------------------------------------------------------
@@ -76,8 +76,8 @@ def codex_config() -> Path:
 
 def skill_links() -> dict[str, Path]:
     return {
-        "claude-code": Path.home() / ".claude/skills/learn",
-        "codex": Path.home() / ".agents/skills/learn",
+        "claude-code": Path.home() / ".claude/skills/tutor",
+        "codex": Path.home() / ".agents/skills/tutor",
     }
 
 
@@ -86,7 +86,7 @@ def command_path() -> Path:
 
 
 def archive_path(support: Path) -> Path:
-    return support / "learn-claude.zip"
+    return support / "tutor-claude.zip"
 
 
 # --- pure content ---------------------------------------------------------------
@@ -185,10 +185,10 @@ def command_content(repo: Path) -> str:
 
 
 def skill_files(package: Path) -> dict[str, bytes]:
-    """The skill folder as archive members under ``learn/``."""
-    skill = package / "skills/learn"
+    """The skill folder as archive members under ``tutor/``."""
+    skill = package / "skills/tutor"
     return {
-        f"learn/{path.relative_to(skill).as_posix()}": path.read_bytes()
+        f"tutor/{path.relative_to(skill).as_posix()}": path.read_bytes()
         for path in sorted(skill.rglob("*"))
         if path.is_file()
         and not any(
@@ -350,12 +350,12 @@ def install_codex(repo: Path, backup: Backup) -> str:
 
 
 def install_links(package: Path, backup: Backup) -> str:
-    skill = package / "skills/learn"
+    skill = package / "skills/tutor"
     changed = []
     for host, target in skill_links().items():
         if target.is_symlink() and target.resolve() == skill:
             continue
-        backup.keep(target, f"{host}-learn")
+        backup.keep(target, f"{host}-tutor")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.symlink_to(skill, target_is_directory=True)
         changed.append(host)
@@ -382,7 +382,7 @@ def install_command(repo: Path, backup: Backup) -> str:
 
 
 def install_archive(package: Path, support: Path) -> str:
-    """``learn-claude.zip``: the real skill folder, for upload to Claude Desktop."""
+    """``tutor-claude.zip``: the real skill folder, for upload to Claude Desktop."""
     archive = archive_path(support)
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as output:
         for name, data in skill_files(package).items():

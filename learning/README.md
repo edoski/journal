@@ -16,7 +16,7 @@ python -m learning.install                                       # register the 
 
 ## Agent interface
 
-`python -m learning.mcp` is a stdlib MCP server over stdio. Its tools (`courses`, `resume`, `show`, `search`, `plan`, `list_sources`, `guide` read-only; `save`, `add_sources`, `write_note`; `forget`, destructive) take an optional `course` (title or workspace directory; omitted inside a course folder or with a single course) and run the CLI below; its prompts (`study`, `review`, `mock_exam`, `plan_week`) load the playbook with a fresh `resume`. The installer also links the `learn` skill for Claude Code and Codex and builds `learn-claude.zip` for upload to Claude Desktop.
+`python -m learning.mcp` is a stdlib MCP server over stdio. Its tools (`courses`, `resume`, `show`, `search`, `plan`, `list_sources`, `guide` read-only; `save`, `add_sources`, `write_note`; `forget`, destructive) take an optional `course` (title or workspace directory; omitted inside a course folder or with a single course) and run the CLI below; its prompts (`study`, `review`, `mock_exam`, `plan_week`) load the playbook with a fresh `resume`. The installer also links the `tutor` skill for Claude Code and Codex and builds `tutor-claude.zip` for upload to Claude Desktop.
 
 `python -m learning [--workspace DIR] VERB` is the underlying CLI. Every response is JSON on stdout; every failure is `{"error": {"kind": validation|io, "message"}}` on stderr with exit 1, and the message names the field, the fix and close matches.
 
@@ -32,7 +32,7 @@ python -m learning.install                                       # register the 
 | `note --title T` | write a Markdown note from stdin to `study-notes/` |
 | `init`, `link`, `unlink`, `readiness` | workspace lifecycle and host checks |
 
-The [skill](skills/learn/SKILL.md) is the agent's playbook; its references define the [record and patch rule](skills/learn/references/records.md), [practice and reviews](skills/learn/references/practice.md), [course, exam and path](skills/learn/references/course.md), [memory, planning and hosts](skills/learn/references/lifecycle.md) and [research](skills/learn/references/research.md).
+The [skill](skills/tutor/SKILL.md) is the agent's playbook; its references define the [record and patch rule](skills/tutor/references/records.md), [practice and reviews](skills/tutor/references/practice.md), [course, exam and path](skills/tutor/references/course.md), [memory, planning and hosts](skills/tutor/references/lifecycle.md) and [research](skills/tutor/references/research.md).
 
 ## Record model
 

@@ -64,7 +64,7 @@ def installation(
         (package / name).parent.mkdir(parents=True, exist_ok=True)
         (package / name).write_text("# module\n")
     for name, text in SKILL.items():
-        path = package / "skills/learn" / name
+        path = package / "skills/tutor" / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
     python = install.interpreter(repo)
@@ -120,10 +120,10 @@ def test_install_configures_every_host_and_is_idempotent(
     codex = tomllib.loads(install.codex_config().read_text())
     assert codex == {"mcp_servers": {"learning": entry}}
     for link in install.skill_links().values():
-        assert link.resolve() == package / "skills/learn"
+        assert link.resolve() == package / "skills/tutor"
     with zipfile.ZipFile(result["skill_archive"]) as archive:
         assert {name: archive.read(name).decode() for name in archive.namelist()} == {
-            f"learn/{name}": text for name, text in SKILL.items()
+            f"tutor/{name}": text for name, text in SKILL.items()
         }
     command = home / ".local/bin/study"
     assert command.read_text() == install.command_content(repo)
