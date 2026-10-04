@@ -327,11 +327,12 @@ def install_code(repo: Path) -> str:
             claude,
             "mcp",
             "add",
+            # The name precedes the options: `-e` is variadic and would swallow it.
+            SERVER,
             "--scope",
             "user",
             "-e",
             f"PYTHONPATH={entry['env']['PYTHONPATH']}",
-            SERVER,
             "--",
             entry["command"],
             *entry["args"],

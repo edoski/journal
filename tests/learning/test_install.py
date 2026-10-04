@@ -31,9 +31,20 @@ class FakeClaude:
         if command[2] == "remove":
             del servers[command[-1]]
         else:
+            # Like the real CLI: the name follows `add`, and `-e` consumes every
+            # value up to the next option or `--`, so each must be KEY=value.
             separator = command.index("--")
-            env = dict([command[command.index("-e") + 1].split("=", 1)])
-            servers[command[separator - 1]] = {
+            options = command[4:separator]
+            values = options[options.index("-e") + 1 :]
+            values = values[
+                : next(
+                    (i for i, v in enumerate(values) if v.startswith("-")), len(values)
+                )
+            ]
+            if any("=" not in value for value in values):
+                raise subprocess.CalledProcessError(1, command)
+            env = dict(value.split("=", 1) for value in values)
+            servers[command[3]] = {
                 "type": "stdio",
                 "command": command[separator + 1],
                 "args": command[separator + 2 :],
@@ -95,11 +106,11 @@ def test_install_configures_every_host_and_is_idempotent(
         [
             "mcp",
             "add",
+            "learning",
             "--scope",
             "user",
             "-e",
             f"PYTHONPATH={repo}",
-            "learning",
             "--",
             entry["command"],
             "-m",
