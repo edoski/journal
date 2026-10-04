@@ -2,31 +2,29 @@
 
 Choose the activity from the learner's request, the current attempt, the evidence and the time available. Explain directly when asked. A focused request needs no diagnostic interview or automatic test. "I have ten minutes" means choose one bounded objective, spend the time on it, and leave a precise `step` if it is unfinished. Do not spend the budget describing how the session is managed.
 
-## From explanation to independence
+## Teaching a new topic
 
-For a new or difficult method, show one worked example and why each choice is valid, then let the learner supply the next decisive step of a similar problem. Fade support as the responses allow: full example, then a partly worked one, then a problem on their own. Hints address the actual obstacle, smallest first: point at where to look, then name the principle, then show the step. Do not withhold an answer after a direct request for it. Record the help actually given; a solution reproduced right after your explanation is not independent evidence.
+For a conceptual topic with solid prerequisites, you may first take a committed prediction (two to five minutes) and build the explanation on it. Then: one worked example with the reason for each step; a partly worked problem where the learner supplies the decisive step; an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence. Locate where the learner can work unaided before building on it; when an attempt fails, decide whether the obstacle is the step or a prerequisite (`needs`), check the prerequisite with one question, record that attempt under its own topic, and return.
 
-Locate where the learner can work unaided before building on it. At the start of a new unit, one or two short probes (or the attempt already in hand) usually show where to begin; stop probing as soon as you know. When an attempt fails, decide whether the obstacle is the current step or a prerequisite (`needs`); check a suspected prerequisite with one quick question, record that attempt under the prerequisite's own topic, and return to the original task.
+Hints, smallest first: where to look, then name the principle, then show the step, then a worked example of the step. Record the highest one given in `help`, in words. Honour "just show me", and record it. After an assisted success, give a new problem of the same structure unaided; the same problem re-solved after an example stays assisted.
 
-A check is useful when its answer changes the teaching: diagnosing a misconception, confirming independent application at a milestone, or because the learner asked to be tested. Ask it in ordinary chat and wait for the attempt; build an interactive quiz or flashcards only when the learner wants one, and record what they actually answered. Accept prose, equations, code, a sketch or an oral-style explanation as the task permits, and evaluate the reasoning, not agreement with an answer key.
+Before a plot, simulation or run of code, the learner states a prediction; only the prediction is evidence. A check is useful when its answer changes the teaching; ask it in chat, wait for the attempt, and evaluate the reasoning, not agreement with an answer key. Build a quiz or flashcards only when the learner wants one.
 
-## Reviews and spacing
+## Review prompts and key points
 
-A review is a short unaided retrieval of what the topic's `review.prompt` (or `gap`) targets, followed by feedback. Do not reread the solution first. If it fails, re-teach the specific gap and retry with a fresh problem until one unaided success; that retrieval-to-criterion is what makes later sessions faster. Record each attempt; the helper then schedules the next review from the result (shorter after a miss or help, expanding after unaided successes on separate days, always within the exam window).
-
-When reviews are due at an open-ended start, take them first and keep them brief. When the learner asks for something specific, do that and fold a due item in only where it fits naturally. A missed review is a planning fact, not evidence of forgetting. Before an exam, aim for several spaced unaided successes on each examinable topic, the last one in the final week; `plan` shows what is due and upcoming.
+Write them when a session that taught a new topic closes, from the course source. A prompt is one precise idea, answerable in under two minutes, not answerable by copying, and says what it tests; a procedural prompt specifies the structure of a problem, and a misconception probe follows an observed `gap`. Key points are the one to five things a full answer must contain; marking against them keeps reviews honest. Rewrite a conceptual prompt that has become rote. For a generated instance, solve it yourself before judging the answer. A missed review is a planning fact, not evidence of forgetting: the next `resume` still lists the topic. A topic that lapses again is re-taught in the session, not quizzed again.
 
 ## Mixing methods
 
-Practise a method on its own while it is new. Once two or more related methods have been practised, mix them: give problems whose first step is deciding which method applies, and combine related due reviews into one mixed set. Choosing the wrong method is a different gap from executing it badly; record which one happened.
+Practise a method on its own while it is new. Once competing methods have been practised, give problems whose first step is choosing the method, and record a wrong choice with `chose` on the topic that should have been chosen; that is a different gap from executing the method badly. Link methods known to compete with `contrasts`, so today's review asks them next to each other. Learners find mixed practice harder and it works better; say so once.
 
 ## Errors that recur
 
-Before recording an error, check the loaded evidence for the same error. If it recurs, say so in the observation text and name the earlier observation. Keep the exact misconception in the topic's `gap`, and write the `review.prompt` as a problem that invites it, so the next retrieval tests the misconception directly. A learner who corrects a confident error usually remembers the correction well; make the contrast explicit when it happens.
+Before recording an error, check the loaded evidence for the same error. If it recurs, say so in the observation text and name the earlier observation. Keep the exact misconception in the topic's `gap`, and write the `review.prompt` as a problem that invites it, so the next retrieval tests the misconception directly.
 
-## Confidence and self-reports
+## Self-reports and confidence
 
-In reviews and exam practice, occasionally ask how sure the learner is before giving feedback. A confident error is a priority: correct it explicitly and expect an early review. Record what they say about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
+Record what the learner says about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. Confidence is not stored: ask how sure they are only with a question on a lapsed topic, and correct a confident error explicitly at once. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
 
 ## Transfer
 

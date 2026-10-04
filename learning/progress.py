@@ -8,7 +8,7 @@ verdicts. Nothing here is stored except the reviews ``schedule`` sets.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import heapq
@@ -23,6 +23,9 @@ FIRST_RETRIEVAL_DAYS = 1
 RETAINED_VERDICTS = 2
 EXAM_SHARE = 3
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+DUE_LIMIT = 5
+RUNUP_DAYS = 21
+RECENT_SOLID_DAYS = 14
 # Grades from worst to best.
 GRADES = ("missed", "helped", "solid")
 LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
@@ -211,6 +214,19 @@ def _lapsed(replayed: Replay) -> bool:
     return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
 
 
+def _choice_errors(attempts: list[Attempt], replayed: Replay) -> dict[str, int]:
+    """Wrongly chosen methods since the last ``solid`` verdict, with their counts."""
+    since = max(
+        (day for day, verdict in replayed.verdicts if verdict == "solid"), default=""
+    )
+    errors = Counter(
+        item["chose"]
+        for _, item in attempts
+        if "chose" in item and item["date"] > since
+    )
+    return dict(sorted(errors.items()))
+
+
 def _standing(
     topic: dict[str, Any], history: _History, exam: date | None
 ) -> dict[str, Any]:
@@ -227,6 +243,9 @@ def _standing(
         result["last"] = {**last, "unaided": unaided(item)}
     if _lapsed(replayed):
         result["lapsed"] = True
+    errors = _choice_errors(attempts, replayed)
+    if errors:
+        result["choice_errors"] = errors
     judged = topic.get("judged")
     if judged is not None and history.latest > judged:
         result["stale"] = True
@@ -454,19 +473,24 @@ def _ranked(record: dict[str, Any], order: list[str] | None) -> dict[str, int]:
     return {key: index for index, key in enumerate(order or path_order(record))}
 
 
-def due(
-    record: dict[str, Any],
-    today: date,
-    *,
-    levels: dict[str, dict[str, Any]] | None = None,
-    order: list[str] | None = None,
+def contrasts(record: dict[str, Any]) -> dict[str, list[str]]:
+    """Competing methods, symmetric: a topic's own list, then topics that list it."""
+    topics = record["topics"]
+    partners = {key: list(topic.get("contrasts", ())) for key, topic in topics.items()}
+    for key, topic in topics.items():
+        for other in topic.get("contrasts", ()):
+            if key not in partners[other]:
+                partners[other].append(key)
+    return partners
+
+
+def _due_items(
+    record: dict[str, Any], today: date, current: dict[str, dict[str, Any]]
 ) -> list[dict[str, Any]]:
-    """Reviews due on or before ``today``, by due day then path order."""
-    current = levels or standings(record)
-    rank = _ranked(record, order)
     items = []
     for key, topic in record["topics"].items():
-        when = topic.get("review", {}).get("due")
+        review = topic.get("review", {})
+        when = review.get("due")
         if when is None or when > today.isoformat():
             continue
         item: dict[str, Any] = {"topic": key}
@@ -475,13 +499,85 @@ def due(
         item["due"] = when
         item["overdue"] = (today - date.fromisoformat(when)).days
         item["level"] = current[key]["level"]
-        if "prompt" in topic["review"]:
-            item["prompt"] = topic["review"]["prompt"]
+        for name in ("prompt", "points"):
+            if name in review:
+                item[name] = review[name]
         if "gap" in topic:
             item["gap"] = topic["gap"]
         items.append(item)
-    items.sort(key=lambda item: (item["due"], rank[item["topic"]]))
     return items
+
+
+def _unready(record: dict[str, Any], today: date) -> set[str]:
+    """Within the exam run-up, topics without a ``solid`` verdict in 14 days."""
+    exam = _exam(record)
+    if exam is None or not 0 <= (exam - today).days <= RUNUP_DAYS:
+        return set()
+    recent = (today - timedelta(days=RECENT_SOLID_DAYS)).isoformat()
+    return {
+        key
+        for key, replayed in replays(record).items()
+        if not any(
+            verdict == "solid" and day > recent for day, verdict in replayed.verdicts
+        )
+    }
+
+
+def _interleaved(
+    record: dict[str, Any], chosen: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Prerequisites first; each topic followed by its first ready competing method."""
+    topics = record["topics"]
+    partners = contrasts(record)
+    pending = {item["topic"]: item for item in chosen}
+    placed: list[dict[str, Any]] = []
+
+    def ready(key: str) -> bool:
+        return all(need not in pending for need in topics[key].get("needs", ()))
+
+    def place(key: str) -> None:
+        placed.append(pending.pop(key))
+
+    while pending:
+        key = next(key for key in pending if ready(key))
+        place(key)
+        partner = next(
+            (other for other in partners[key] if other in pending and ready(other)),
+            None,
+        )
+        if partner is not None:
+            place(partner)
+    return placed
+
+
+def due(
+    record: dict[str, Any],
+    today: date,
+    *,
+    levels: dict[str, dict[str, Any]] | None = None,
+    order: list[str] | None = None,
+    limit: int = DUE_LIMIT,
+) -> list[dict[str, Any]]:
+    """Reviews due on or before ``today``: today's review first, then the rest.
+
+    Priority: lapsed topics, then (within 21 days of the exam) topics without a
+    recent ``solid`` verdict, then the most overdue, then path order. The first
+    ``limit`` by priority are today's review, ordered so prerequisites come first
+    and competing methods sit together; the rest follow by priority.
+    """
+    current = levels or standings(record)
+    rank = _ranked(record, order)
+    unready = _unready(record, today)
+    items = _due_items(record, today, current)
+    items.sort(
+        key=lambda item: (
+            not current[item["topic"]].get("lapsed"),
+            item["topic"] not in unready,
+            -item["overdue"],
+            rank[item["topic"]],
+        )
+    )
+    return _interleaved(record, items[:limit]) + items[limit:]
 
 
 def upcoming(

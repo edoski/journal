@@ -344,7 +344,7 @@ def test_path_order_is_topological_with_order_then_handle_ties() -> None:
     ]
 
 
-def test_due_and_upcoming_lists_sort_by_day_then_path() -> None:
+def test_due_puts_prerequisites_first_and_upcoming_sorts_by_day() -> None:
     record = path_course(["systems", "rank", "eigen"])
     record = schema.apply_patch(
         record,
@@ -365,8 +365,8 @@ def test_due_and_upcoming_lists_sort_by_day_then_path() -> None:
         now=NOW,
     )[0]
     due = progress.due(record, TODAY)
-    assert [item["topic"] for item in due] == ["rank", "eigen", "systems"]
-    assert due[1] == {
+    assert [item["topic"] for item in due] == ["systems", "rank", "eigen"]
+    assert due[2] == {
         "topic": "eigen",
         "title": "Eigenvalues",
         "due": day(-2),
@@ -375,6 +375,6 @@ def test_due_and_upcoming_lists_sort_by_day_then_path() -> None:
         "prompt": "Diagonalize",
         "gap": "Signs",
     }
-    assert due[2]["overdue"] == 0
+    assert due[0]["overdue"] == 0
     assert progress.upcoming(record, TODAY, 7) == [{"topic": "basis", "due": day(1)}]
     assert len(progress.upcoming(record, TODAY, 9)) == 2

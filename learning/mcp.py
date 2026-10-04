@@ -41,8 +41,8 @@ INSTRUCTIONS = (
 
 SAVE_RULES = "\n".join(
     (
-        "Record what happened, once per turn after your teaching. changes is one "
-        "patch of only what changed:",
+        "Record what happened, once per turn after your teaching (a review saves "
+        "once at its end). changes is one patch of only what changed:",
         "- title, goal, journal, focus (a task key): replace; null clears.",
         "- exam {date, format, coverage, criteria, constraints, unknowns, refs} and "
         "path {current, order, basis}: merge by field; null clears a field or the "
@@ -50,17 +50,21 @@ SAVE_RULES = "\n".join(
         "- topics, knowledge, tasks, sources: maps by handle (a-z0-9_-, one "
         "namespace); an entry merges by field, a null field clears it, a null entry "
         "removes it. Create a topic in the patch that first uses it.",
-        "  topic {title, needs, refs, aliases, introduced: true, gap, note, review: "
-        "{in_days|due, prompt} or null}; knowledge {text, topics, refs, aliases, "
+        "  topic {title, needs, contrasts, refs, aliases, introduced: true, gap, "
+        "note, review: {in_days|due, prompt, points: 1-5 key points} or null}; "
+        "knowledge {text, topics, refs, aliases, "
         "uncertain, pinned}; task {title, topics, goal, step, help, note, refs}; "
         "source {path, title}",
         "- Lists replace whole; refs are [{source, locator}].",
         "- observations: new entries, appended: {topics, text, kind, help, result, "
-        "response, transfer, date, task, refs, corrects, uncertain}. kind attempt "
+        "response, chose, transfer, date, task, refs, corrects, uncertain}. kind attempt "
         '(default) needs help ("none" if unaided) and result correct|partial|'
         "incorrect; exam needs result; self_report (the learner's own statement) "
-        'takes neither. transfer: true only when correct. corrects: ["oN"] '
-        "supersedes earlier ones and, without a date, takes the earliest one's day.",
+        "takes neither. transfer: true only when correct. chose: the topic of a "
+        "wrongly chosen method, on an attempt that was not correct, recorded on "
+        'the topic that should have been chosen. corrects: ["oN"] supersedes '
+        "earlier ones and, without a date, takes the earliest one's day. Work you "
+        "did not see produced is uncertain.",
         "- preferences (this course), global_preferences (every course): "
         "{dimension: instruction}; null deletes.",
         "Attempts schedule reviews; only the first try on a due day counts, retries "
@@ -240,8 +244,9 @@ TOOLS: dict[str, tuple[str, Json, Json, Builder | None]] = {
         None,
     ),
     "resume": (
-        "Open or continue a session: due reviews, study path, weak topics, the open "
-        "task, active topics, recent evidence, knowledge and preferences.",
+        "Open or continue a session: today's review (due, up to five topics with "
+        "prompt and key points), new_week, study path, weak topics, the open task, "
+        "active topics, recent evidence, knowledge and preferences.",
         _schema(task={"type": "string", "description": "Another open task's key"}),
         READ,
         lambda a: (["resume", *_flags(a, "task")], ""),
@@ -454,6 +459,14 @@ def skill_body() -> str:
     return text.strip()
 
 
+def skill_section(title: str) -> str:
+    """One ``## title`` section of the skill body, without its heading."""
+    body = skill_body()
+    start = body.index(f"## {title}\n") + len(title) + 4
+    end = body.find("\n## ", start)
+    return body[start : end if end >= 0 else None].strip()
+
+
 def _resume(value: str | None) -> str:
     try:
         text, _failed = run(course(value), ["resume"])
@@ -472,12 +485,10 @@ def get_prompt(name: str, arguments: Any) -> Json:
         parts = [skill_body(), _resume(chosen), f"The learner asks: {request}"]
     elif name == "review":
         parts = [
-            "Run today's review from the due list below: one unaided retrieval at a "
-            "time using each item's prompt, interleaving items that could be confused. "
-            "Wait for each answer, give brief feedback, and ask a missed topic again "
-            "later with a different question; only the first try counts, retries are "
-            "relearning. Save once at the end, one attempt per answer with response, "
-            "help and result.",
+            "You are the learner's tutor. Run today's review of the `due` topics "
+            "below, in that order, with this protocol; answer in the learner's "
+            "language and keep bookkeeping silent.",
+            skill_section("Today's review"),
             _resume(chosen),
         ]
     elif name == "mock_exam":

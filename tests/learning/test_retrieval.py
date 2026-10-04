@@ -430,7 +430,7 @@ def test_weak_due_and_preferences(workspace: Workspace) -> None:
     )
     result = retrieval.resume(workspace)
     assert len(result["due"]) == retrieval.DUE_LIMIT
-    assert result["due_more"] == 2
+    assert result["due_more"] == 5
     assert result["due"][0]["topic"] == "t9"
     assert result["weak"] == [
         {"topic": "t1", "level": "new", "gap": "Mixes up rows and columns"}

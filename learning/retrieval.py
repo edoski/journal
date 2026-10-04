@@ -20,14 +20,14 @@ from learning.workspace import Workspace
 
 EVIDENCE_BYTES = 6144
 KNOWLEDGE_BYTES = 3072
-DUE_LIMIT = 8
+DUE_LIMIT = progress.DUE_LIMIT
 WEAK_LIMIT = 6
 TASK_OBSERVATIONS = 5
 TOPIC_OBSERVATIONS = 3
 OMITTED_LIMIT = 12
 RECENT_OBSERVATIONS = 3
 # Shown once under ``topics``; due and weak entries for those topics omit them.
-TOPIC_DETAIL = frozenset({"title", "prompt", "gap", "last"})
+TOPIC_DETAIL = frozenset({"title", "prompt", "points", "gap", "last", "choice_errors"})
 SHOW_LIMIT = 30
 SEARCH_LIMIT = 12
 EXCERPT_CHARS = 160
@@ -58,6 +58,14 @@ def last_activity(record: dict[str, Any], today: date) -> dict[str, Any] | None:
         return None
     day = clock.local_day(record["updated_at"])
     return {"date": day.isoformat(), "days_ago": (today - day).days}
+
+
+def new_week(record: dict[str, Any], today: date) -> bool:
+    """Whether the last save fell in an earlier ISO week than ``today``."""
+    if "updated_at" not in record:
+        return False
+    day = clock.local_day(record["updated_at"])
+    return day.isocalendar()[:2] < today.isocalendar()[:2]
 
 
 def selected_task(
@@ -240,12 +248,13 @@ def _weak(
     weak = []
     for key in order:
         topic, standing = record["topics"][key], levels[key]
-        if not (standing.get("lapsed") or standing.get("stale") or "gap" in topic):
+        flags = ("lapsed", "stale", "choice_errors")
+        if not ("gap" in topic or any(flag in standing for flag in flags)):
             continue
         item = {"topic": key, "level": standing["level"]}
         if "gap" in topic:
             item["gap"] = topic["gap"]
-        for flag in ("lapsed", "stale", "last"):
+        for flag in (*flags, "last"):
             if flag in standing:
                 item[flag] = standing[flag]
         weak.append(_brief(item, shown))
@@ -313,6 +322,7 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         "new_course": True if "revision" not in record else None,
         "course": _course(record, today),
         "last_activity": last_activity(record, today),
+        "new_week": True if new_week(record, today) else None,
         "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
         "due_more": max(0, len(due) - DUE_LIMIT) or None,
         "path": compact(

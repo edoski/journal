@@ -40,7 +40,7 @@ The receipt returns new observation ids, the reviews it set, level changes, the 
 
 ## Observations
 
-One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `result`, `transfer`, `date` (the event day when it is not today), `task`, `refs`, `corrects`, `uncertain`.
+One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `result`, `chose`, `transfer`, `date` (the event day when it is not today), `task`, `refs`, `corrects`, `uncertain`.
 
 | `kind` | When | Required |
 | --- | --- | --- |
@@ -48,18 +48,18 @@ One entry per actual attempt, external result or explicit self-report. Fields: `
 | `exam` | graded work from outside the session | `result`, no `help`; counts as unaided |
 | `self_report` | the learner's statement about their own understanding or confidence | no `result`, `help` or `transfer` |
 
-`help` describes what you gave before or during the attempt: a hint, a worked example of the same step, a reminder of the method. A solution reproduced right after your explanation is assisted. `transfer: true` marks success on a meaningfully different problem, representation or context than the one taught. `uncertain` records doubt about the evidence (the answer may have been read from notes, a symbol was illegible).
+`help` describes what you gave before or during the attempt: a hint, a worked example of the same step, a reminder of the method. A solution reproduced right after your explanation is assisted. `transfer: true` marks success on a meaningfully different problem, representation or context than the one taught. `chose` names the topic of a method the learner wrongly chose; record the attempt on the topic that should have been chosen, with a result that is not `correct`. `uncertain` records doubt about the evidence (the answer may have been read from notes, a symbol was illegible, the work was done where you could not see it); an `uncertain` attempt is never `solid`.
 
 Corrections: when an observation was misrecorded, append a new one describing what really happened with `corrects: ["o7"]`; the original stays visible but stops counting. Without a `date`, a correction takes the day of the earliest observation it corrects, and it takes that observation's place in the day's order. Later improvement is simply a new observation. Delete only on the learner's explicit request ([lifecycle.md](lifecycle.md)).
 
 ## Topics and the knowledge path
 
-A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
+A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `contrasts` (topics whose methods are known to compete; symmetric), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
 
 - `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
 - `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved.
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
-- `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then. Pin only for a reason; otherwise the helper schedules.
+- `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then and `{"points": ["...", "..."]}` lists the one to five key points an answer is marked against. The fields merge; pin only for a reason, otherwise the helper schedules.
 
 How the helper judges and schedules. Each attempt gets a grade: `solid` (correct, unaided, no `uncertain`), `helped` (correct with help, partial, or correct but `uncertain`) or `missed` (incorrect). Each day of attempts on a topic counts at most once, as one verdict:
 
@@ -69,7 +69,9 @@ How the helper judges and schedules. Each attempt gets a grade: `solid` (correct
 
 After a verdict the next expected review is 1 day after `missed`, 2 after `helped`, and 3, 7, 16, 35, 75 then 160 days after consecutive `solid` verdicts. Before an exam the gap stays within a third of the time left. A save that creates or changes a verdict sets the review to that date; practice on a day when the review was already due moves it there too. A date you pin wins, but an attempt before the expected review is still practice. A `self_report` does not reschedule.
 
-The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
+The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one), `choice_errors` (wrongly chosen methods since the last `solid` verdict, with counts) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
+
+`resume.due` is today's review: at most five topics whose review date has come (`due_more` counts the rest, which carry over). Lapsed topics come first, then, in the 21 days before an exam, topics without a `solid` verdict in the last two weeks, then the most overdue, then path order. Prerequisites are listed before the topics that need them, and a competing method follows its partner. A topic leaves the list when a save gives it a verdict.
 
 ## Path and tasks
 

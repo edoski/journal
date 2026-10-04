@@ -389,7 +389,10 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
     mock = text("mock_exam", minutes="45")
     assert "kind exam" not in mock and "kind: exam" not in mock
     assert "ordinary attempt" in mock
-    assert "only the first try counts" in text("review", course="algebra")
+    review = text("review", course="algebra")
+    assert mcp.skill_section("Today's review") in review
+    assert "Mark against `points`" in review
+    assert "Only the first try on a due day counts" in review
     assert '"courses"' in text("plan_week")
     bad = server.request(
         "prompts/get", {"name": "mock_exam", "arguments": {"minutes": "soon"}}
@@ -400,3 +403,5 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
 def test_save_rules_state_the_30_minute_duplicate_window() -> None:
     assert "within 30 minutes is skipped" in mcp.SAVE_RULES
     assert "within a day" not in mcp.SAVE_RULES
+    for field in ("points", "contrasts", "chose"):
+        assert field in mcp.SAVE_RULES

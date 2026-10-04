@@ -108,6 +108,9 @@ _INTRODUCED = "introduced"
 _REVIEW = "review"
 _BY = "by"
 _STAMP = "stamp"
+_POINTS = "points"
+MAX_POINTS = 5
+POINT_CHARS = 200
 
 FIELDS: dict[str, dict[str, str]] = {
     "exam": {
@@ -123,6 +126,7 @@ FIELDS: dict[str, dict[str, str]] = {
     "topic": {
         "title": _TEXT,
         "needs": _HANDLES,
+        "contrasts": _HANDLES,
         "refs": _REFS,
         "aliases": _TEXTS,
         "introduced": _INTRODUCED,
@@ -130,7 +134,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "note": _TEXT,
         "review": _REVIEW,
     },
-    "review": {"due": _DAY, "prompt": _TEXT},
+    "review": {"due": _DAY, "prompt": _TEXT, "points": _POINTS},
     "observation": {
         "kind": _KIND,
         "topics": _HANDLES,
@@ -138,6 +142,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "response": _TEXT,
         "help": _HELP,
         "result": _RESULT,
+        "chose": _HANDLE,
         "transfer": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
@@ -178,7 +183,12 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "knowledge": ("text",),
     "ref": ("source",),
 }
-_REVIEW_PATCH = {"due": _DAY, "in_days": "in_days", "prompt": _TEXT}
+_REVIEW_PATCH = {
+    "due": _DAY,
+    "in_days": "in_days",
+    "prompt": _TEXT,
+    "points": _POINTS,
+}
 _MAP_KINDS = {
     "sources": "source",
     "topics": "topic",
@@ -203,12 +213,14 @@ class Source(TypedDict, total=False):
 class Review(TypedDict, total=False):
     due: str
     prompt: str
+    points: list[str]
     by: str
 
 
 class Topic(TypedDict, total=False):
     title: str
     needs: list[str]
+    contrasts: list[str]
     refs: list[Reference]
     aliases: list[str]
     introduced: str
@@ -225,6 +237,7 @@ class Observation(TypedDict, total=False):
     response: str
     help: str
     result: str
+    chose: str
     transfer: bool
     date: str
     task: str
@@ -383,6 +396,22 @@ def _texts(value: Any, path: str, patch: bool) -> list[str] | None:
     return list(dict.fromkeys(texts)) or None
 
 
+def _points(value: Any, path: str, patch: bool) -> list[str] | None:
+    points = _texts(value, path, patch)
+    if points is not None and len(points) > MAX_POINTS:
+        raise ValueError(
+            f"{path} takes 1-{MAX_POINTS} key points, not {len(points)}; keep the "
+            "ones an answer must contain"
+        )
+    for index, point in enumerate(points or ()):
+        if len(point) > POINT_CHARS:
+            raise ValueError(
+                f"{path}[{index}] is {len(point)} characters; keep each key point "
+                f"under {POINT_CHARS}"
+            )
+    return points
+
+
 def _handle(value: Any, path: str, patch: bool) -> str:
     if isinstance(value, str) and HANDLE.fullmatch(value):
         return value
@@ -510,6 +539,7 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _REVIEW: _review,
     _BY: _choice(REVIEWERS),
     _STAMP: _stamp,
+    _POINTS: _points,
     "in_days": _in_days,
 }
 
@@ -602,7 +632,11 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 "helped attempt with kind attempt"
             )
     else:
-        given = [name for name in ("result", "help", "transfer") if name in observation]
+        given = [
+            name
+            for name in ("result", "help", "transfer", "chose")
+            if name in observation
+        ]
         if given:
             raise ValueError(
                 f"{path}: a self_report is the learner's own statement and takes "
@@ -610,6 +644,18 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
             )
     if observation.get("transfer") and observation.get("result") != "correct":
         raise ValueError(f'{path}.transfer is allowed only with result "correct"')
+    if "chose" in observation:
+        if observation.get("result") == "correct":
+            raise ValueError(
+                f"{path}.chose names a wrongly chosen method; a correct result "
+                "takes none"
+            )
+        if observation["chose"] in observation["topics"]:
+            raise ValueError(
+                f"{path}.chose must name the method wrongly chosen, not one of the "
+                "observation's own topics; record the attempt on the topic that "
+                "should have been chosen"
+            )
 
 
 def observation(value: Any, path: str) -> dict[str, Any]:
@@ -690,10 +736,11 @@ def _check_links(record: dict[str, Any]) -> None:
     _check_refs(record.get("exam", {}), "exam", sources)
     for key, topic in topics.items():
         path = f"topics.{key}"
-        needs = topic.get("needs", [])
-        if key in needs:
-            raise ValueError(f"{path}.needs must not include the topic itself")
-        _check_topic_list(needs, f"{path}.needs", topics)
+        for name in ("needs", "contrasts"):
+            linked = topic.get(name, [])
+            if key in linked:
+                raise ValueError(f"{path}.{name} must not include the topic itself")
+            _check_topic_list(linked, f"{path}.{name}", topics)
         _check_refs(topic, path, sources)
     for name in ("knowledge", "tasks"):
         for key, item in record[name].items():
@@ -703,6 +750,8 @@ def _check_links(record: dict[str, Any]) -> None:
     for key, item in observations.items():
         path = f"observations.{key}"
         _check_topic_list(item["topics"], f"{path}.topics", topics)
+        if "chose" in item and item["chose"] not in topics:
+            raise _missing_topic(item["chose"], f"{path}.chose", topics)
         _check_refs(item, path, sources)
         for target in item.get("corrects", []):
             if target not in observations or number(target) >= number(key):
@@ -843,9 +892,10 @@ def _without(
 
 
 def _strip_topics(record: dict[str, Any], removed: Collection[str]) -> None:
-    """Remove topic handles from needs, the path, and knowledge/task topics."""
+    """Remove topic handles from needs, contrasts, the path and knowledge/task topics."""
     for name, field_name in (
         ("topics", "needs"),
+        ("topics", "contrasts"),
         ("knowledge", "topics"),
         ("tasks", "topics"),
     ):
@@ -875,9 +925,14 @@ def _citations(record: dict[str, Any], sources: Collection[str]) -> list[str]:
     return paths
 
 
+def _mentions(item: dict[str, Any]) -> set[str]:
+    """Topics an observation references: its own and a wrongly chosen method."""
+    return {*item["topics"], *([item["chose"]] if "chose" in item else [])}
+
+
 def _referencing(observations: dict[str, Any], topics: Collection[str]) -> list[str]:
     wanted = set(topics)
-    return [key for key, item in observations.items() if wanted & set(item["topics"])]
+    return [key for key, item in observations.items() if wanted & _mentions(item)]
 
 
 def _shallow(record: dict[str, Any]) -> dict[str, Any]:
@@ -1013,8 +1068,10 @@ def _patched_review(
         else:
             review["due"] = change["due"]
             tutor = True
-    if "prompt" in change:
-        review = _merged(review, {"prompt": change["prompt"]})
+    review = _merged(
+        review,
+        {name: change[name] for name in ("prompt", "points") if name in change},
+    )
     if tutor:
         review["by"] = "tutor"
     elif "due" not in review:
@@ -1141,6 +1198,8 @@ def _check_new(
     if item["date"] > today.isoformat():
         raise ValueError(f"{path}.date must not be after today ({today.isoformat()})")
     _check_topic_list(item["topics"], f"{path}.topics", record["topics"])
+    if "chose" in item and item["chose"] not in record["topics"]:
+        raise _missing_topic(item["chose"], f"{path}.chose", record["topics"])
     if "task" in item and item["task"] not in tasks:
         raise _missing_task(item["task"], f"{path}.task", tasks)
     for target in item.get("corrects", []):
@@ -1215,7 +1274,7 @@ def apply_patch(
         blocking = _referencing(record["observations"], removed) + [
             f"observations[{index}]"
             for index, item in enumerate(changes.get("observations", []))
-            if removed & set(item["topics"])
+            if removed & _mentions(item)
         ]
         if blocking:
             listed = " ".join(blocking[:12]) + (" ..." if len(blocking) > 12 else "")
