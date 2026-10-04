@@ -57,7 +57,7 @@ def test_a_missing_course_loads_empty_and_the_first_save_creates_it(
         "observations": ["o1"],
         "duplicates": [],
         "reviews": {"rank": {"due": "2026-10-12", "by": "engine"}},
-        "levels": {"rank": {"from": "new", "to": "attempted"}},
+        "levels": {"rank": {"from": "new", "to": "assisted"}},
         "focus": "ex5",
         "path_current": "rank",
         "due_count": 0,

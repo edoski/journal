@@ -481,25 +481,54 @@ def test_corrections_name_earlier_observations() -> None:
         schema.validate_record(stored)
 
 
-def test_identical_observations_within_a_day_are_skipped_and_reported() -> None:
+@pytest.mark.parametrize(("minutes", "skipped"), [(5, True), (30, True), (31, False)])
+def test_identical_observations_within_30_minutes_are_skipped(
+    minutes: int, skipped: bool
+) -> None:
     record = apply(course(BASE), {"observations": [attempt("rank")]})[0]
-    retried, outcome = apply(record, {"observations": [attempt("rank")]}, now=LATER)
-    assert outcome.observations == []
-    assert outcome.duplicates == ["o1"]
-    assert retried == record
-    later, outcome = apply(
-        record,
-        {"observations": [attempt("rank")]},
-        now=NEXT_DAY,
-        today=date(2026, 10, 11),
-    )
-    assert outcome.observations == ["o2"]
-    different, outcome = apply(
-        record, {"observations": [attempt("rank", date="2026-10-09")]}, now=LATER
+    later = f"2026-10-10T09:{minutes:02d}:00+00:00"
+    retried, outcome = apply(record, {"observations": [attempt("rank")]}, now=later)
+    if skipped:
+        assert (outcome.observations, outcome.duplicates) == ([], ["o1"])
+        assert retried == record
+    else:
+        assert (outcome.observations, outcome.duplicates) == (["o2"], [])
+
+
+def test_only_identical_content_is_a_duplicate() -> None:
+    record = apply(course(BASE), {"observations": [attempt("rank")]})[0]
+    _, outcome = apply(
+        record, {"observations": [attempt("rank", date="2026-10-09")]}, now=NOW
     )
     assert outcome.observations == ["o2"]
     twice = apply(course(BASE), {"observations": [attempt("rank"), attempt("rank")]})[1]
     assert (twice.observations, twice.duplicates) == (["o1"], ["o1"])
+
+
+def test_a_correction_without_a_date_takes_the_corrected_day() -> None:
+    record = apply(
+        course(BASE),
+        {
+            "observations": [
+                attempt("rank", date="2026-10-03", text="Early"),
+                attempt("rank", date="2026-10-05", text="Later"),
+            ]
+        },
+    )[0]
+    record = apply(
+        record,
+        {"observations": [attempt("rank", text="Regraded", corrects=["o2", "o1"])]},
+    )[0]
+    assert record["observations"]["o3"]["date"] == "2026-10-03"
+    dated = apply(
+        record,
+        {
+            "observations": [
+                attempt("rank", text="Dated", date="2026-10-09", corrects=["o3"])
+            ]
+        },
+    )[0]
+    assert dated["observations"]["o4"]["date"] == "2026-10-09"
 
 
 def test_gap_and_note_changes_stamp_judged() -> None:

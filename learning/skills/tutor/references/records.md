@@ -4,7 +4,7 @@ A workspace holds one course. Its record has course facts (`title`, `goal`, `exa
 
 ## Saving
 
-`save` takes one JSON patch as `changes` and applies it to the latest record. Send only what changed. There is no revision to pass; a retry of the same observation within a day is skipped as a duplicate, so an uncertain save can simply be repeated.
+`save` takes one JSON patch as `changes` and applies it to the latest record. Send only what changed. There is no revision to pass; an identical observation re-sent within 30 minutes is skipped as a duplicate, so an uncertain save can simply be repeated. A genuine new try is a new observation, even with the same question.
 
 | Field | Rule |
 | --- | --- |
@@ -50,7 +50,7 @@ One entry per actual attempt, external result or explicit self-report. Fields: `
 
 `help` describes what you gave before or during the attempt: a hint, a worked example of the same step, a reminder of the method. A solution reproduced right after your explanation is assisted. `transfer: true` marks success on a meaningfully different problem, representation or context than the one taught. `uncertain` records doubt about the evidence (the answer may have been read from notes, a symbol was illegible).
 
-Corrections: when an observation was misrecorded, append a new one describing what really happened with `corrects: ["o7"]`; the original stays visible but stops counting. Later improvement is simply a new observation. Delete only on the learner's explicit request ([lifecycle.md](lifecycle.md)).
+Corrections: when an observation was misrecorded, append a new one describing what really happened with `corrects: ["o7"]`; the original stays visible but stops counting. Without a `date`, a correction takes the day of the earliest observation it corrects, and it takes that observation's place in the day's order. Later improvement is simply a new observation. Delete only on the learner's explicit request ([lifecycle.md](lifecycle.md)).
 
 ## Topics and the knowledge path
 
@@ -61,9 +61,15 @@ A topic is one idea or method you would check separately: `title`, `needs` (prer
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
 - `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then. Pin only for a reason; otherwise the helper schedules.
 
-How the helper schedules after each attempt on a topic: incorrect → 1 day; assisted or partial → 2 days; unaided correct → 3, 7, 16, 35, 75 then 160 days as unaided successes accumulate on separate days since the last unaided miss, so a failed review starts the ladder again. Before an exam the gap stays within a third of the time left and never reaches past the day before. A `self_report` does not reschedule.
+How the helper judges and schedules. Each attempt gets a grade: `solid` (correct, unaided, no `uncertain`), `helped` (correct with help, partial, or correct but `uncertain`) or `missed` (incorrect). Each day of attempts on a topic counts at most once, as one verdict:
 
-The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days, the last attempt, `lapsed` (failed unaided after an earlier unaided success) and `stale` (the gap or note was judged on an earlier day than the latest evidence).
+- the learning day (the earlier of `introduced` and the first attempt) takes its best grade;
+- a day on or after the expected review, or any day with an `exam`, is a probe: the first try counts, lowered to `missed` only by a later unaided incorrect that day, so retries are relearning;
+- any other day is practice: only an unaided incorrect counts, so help, retries and massed repetition before the review earn nothing.
+
+After a verdict the next expected review is 1 day after `missed`, 2 after `helped`, and 3, 7, 16, 35, 75 then 160 days after consecutive `solid` verdicts. Before an exam the gap stays within a third of the time left. A save that creates or changes a verdict sets the review to that date; practice on a day when the review was already due moves it there too. A date you pin wins, but an attempt before the expected review is still practice. A `self_report` does not reschedule.
+
+The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
 
 ## Path and tasks
 

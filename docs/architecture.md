@@ -35,9 +35,10 @@ One workspace studies one course; its record is `.study/course.json` (schema 6).
 topics, knowledge, tasks and sources, whole-record validation and the single patch
 rule (maps merge by handle, entries by field, `null` removes, lists replace,
 observations append), rejecting unknown fields with close matches. `progress.py`
-derives each topic's standing from the observations (level, unaided days, lapses,
-stale diagnoses) and schedules reviews on the successive-relearning ladder within
-the exam window. `records.py` applies a patch to the latest record under the
+derives each topic's standing from the observations through one verdict per
+counted day (learning, probe or practice day), giving levels, unaided days, lapses
+and stale diagnoses, and schedules reviews on the successive-relearning ladder
+within the exam window. `records.py` applies a patch to the latest record under the
 record lock, schedules, validates and publishes atomically, returning a receipt
 with the consequences; it also forgets exact items. Consumers read validated
 `dict` records; the typed layer lives at the validation boundary.

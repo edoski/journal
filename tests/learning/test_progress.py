@@ -61,10 +61,12 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
             {"introduced": day(0)},
             "introduced",
         ),
-        ([attempt("rank", "incorrect"), attempt("rank", "partial")], {}, "attempted"),
+        ([attempt("rank", "incorrect"), attempt("rank", "incorrect")], {}, "attempted"),
+        ([attempt("rank", "incorrect"), attempt("rank", "partial")], {}, "assisted"),
         ([attempt("rank", "correct", "Hinted at row 3")], {}, "assisted"),
         ([attempt("rank", "incorrect"), attempt("rank")], {}, "independent"),
-        ([attempt("rank", offset=-2), attempt("rank")], {}, "retained"),
+        ([attempt("rank", offset=-3), attempt("rank")], {}, "retained"),
+        ([attempt("rank", offset=-2), attempt("rank")], {}, "independent"),
         ([attempt("rank", offset=-1), attempt("rank")], {}, "independent"),
         (
             [attempt("rank", offset=-3), attempt("rank", "correct", "Hint", offset=0)],
@@ -110,8 +112,8 @@ def test_corrected_observations_do_not_count() -> None:
 def test_standing_reports_counts_last_attempt_and_flags() -> None:
     record = course(
         [
+            attempt("rank", offset=-8),
             attempt("rank", offset=-5),
-            attempt("rank", offset=-3),
             attempt("rank", "incorrect", "Hint", offset=-1),
         ]
     )
@@ -155,25 +157,37 @@ def test_a_judgement_older_than_the_latest_evidence_is_stale() -> None:
 
 
 @pytest.mark.parametrize(
-    ("result", "help", "unaided_days", "expected"),
+    ("verdict", "streak", "expected"),
     [
-        ("incorrect", "none", 0, 1),
-        ("incorrect", "Hint", 0, 1),
-        ("partial", "none", 0, 2),
-        ("correct", "Hint", 0, 2),
-        ("correct", "none", 1, 3),
-        ("correct", "none", 2, 7),
-        ("correct", "none", 3, 16),
-        ("correct", "none", 4, 35),
-        ("correct", "none", 5, 75),
-        ("correct", "none", 6, 160),
-        ("correct", "none", 9, 160),
+        ("missed", 0, 1),
+        ("helped", 0, 2),
+        ("solid", 1, 3),
+        ("solid", 2, 7),
+        ("solid", 3, 16),
+        ("solid", 4, 35),
+        ("solid", 5, 75),
+        ("solid", 6, 160),
+        ("solid", 9, 160),
     ],
 )
-def test_review_ladder_intervals(
-    result: str, help: str, unaided_days: int, expected: int
-) -> None:
-    assert progress.interval({"result": result, "help": help}, unaided_days) == expected
+def test_review_ladder_intervals(verdict: str, streak: int, expected: int) -> None:
+    assert progress.interval(verdict, streak) == expected
+
+
+@pytest.mark.parametrize(
+    ("observation", "expected"),
+    [
+        ({"result": "correct", "help": "none"}, "solid"),
+        ({"result": "correct", "help": "none", "uncertain": "Notes open"}, "helped"),
+        ({"result": "correct", "help": "Hint"}, "helped"),
+        ({"result": "partial", "help": "none"}, "helped"),
+        ({"result": "incorrect", "help": "none"}, "missed"),
+        ({"result": "incorrect", "help": "none", "uncertain": "x"}, "missed"),
+        ({"kind": "exam", "result": "correct"}, "solid"),
+    ],
+)
+def test_grades(observation: dict[str, Any], expected: str) -> None:
+    assert progress.grade(observation) == expected
 
 
 def test_exam_pulls_reviews_in_but_never_before_the_attempt() -> None:
@@ -189,49 +203,6 @@ def test_exam_pulls_reviews_in_but_never_before_the_attempt() -> None:
 def test_an_exam_tomorrow_puts_the_review_on_the_exam_day(days: int) -> None:
     base = date(2026, 10, 10)
     assert progress.review_day(base, days, date(2026, 10, 11)) == date(2026, 10, 11)
-
-
-def test_the_ladder_climbs_on_the_current_unaided_streak() -> None:
-    history = [
-        attempt("rank", offset=-33),
-        attempt("rank", offset=-30),
-        attempt("rank", offset=-23),
-        attempt("rank", "incorrect", offset=0),
-    ]
-    record = course(history)
-    record, scheduled = save(record, {"observations": [attempt("rank", text="Again")]})
-    assert scheduled.reviews == {"rank": {"due": day(3), "by": "engine"}}
-    standing = progress.standing(record, "rank")
-    assert standing["level"] == "retained"
-    assert standing["unaided_days"] == 4
-
-
-@pytest.mark.parametrize(
-    ("results", "expected"),
-    [
-        ([], 0),
-        ([("correct", "none", -3), ("correct", "none", -1)], 2),
-        ([("correct", "none", -3), ("partial", "none", -2), ("correct", "none", 0)], 1),
-        (
-            [
-                ("correct", "none", -3),
-                ("incorrect", "Hint", -2),
-                ("correct", "none", 0),
-            ],
-            2,
-        ),
-        ([("correct", "none", -3), ("incorrect", "none", -2)], 0),
-        ([("correct", "none", 0), ("correct", "none", 0)], 1),
-    ],
-)
-def test_streak_days_restart_after_an_unaided_miss(
-    results: list[tuple[str, str, int]], expected: int
-) -> None:
-    attempts = [
-        (f"o{index + 1}", attempt("rank", result, help, offset))
-        for index, (result, help, offset) in enumerate(results)
-    ]
-    assert progress.streak_days(attempts) == expected
 
 
 def test_new_attempts_climb_the_ladder_and_keep_the_prompt() -> None:

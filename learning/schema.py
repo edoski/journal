@@ -29,7 +29,7 @@ KINDS = ("attempt", "exam", "self_report")
 RESULTS = ("correct", "partial", "incorrect")
 REVIEWERS = ("engine", "tutor")
 UNAIDED = "none"
-DUPLICATE_WINDOW = timedelta(hours=24)
+DUPLICATE_WINDOW = timedelta(minutes=30)
 MAX_REVIEW_DAYS = 3650
 HANDLE_RULE = (
     "handles are 1-64 lowercase letters, digits, '_' or '-' starting with a "
@@ -1152,6 +1152,13 @@ def _check_new(
     _check_refs(item, path, record["sources"])
 
 
+def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> str:
+    """A correction takes the day of the earliest observation it corrects."""
+    stored = record["observations"]
+    days = [stored[key]["date"] for key in item.get("corrects", ()) if key in stored]
+    return min(days, default=today.isoformat())
+
+
 def _content(observation: dict[str, Any]) -> dict[str, Any]:
     return {name: value for name, value in observation.items() if name != "recorded"}
 
@@ -1169,7 +1176,7 @@ def _append_observations(
     for index, addition in enumerate(additions):
         path = f"observations[{index}]"
         item = {**addition}
-        item.setdefault("date", today.isoformat())
+        item.setdefault("date", _default_day(item, record, today))
         _check_new(item, path, record, tasks, today)
         duplicate = next(
             (

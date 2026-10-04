@@ -1,8 +1,9 @@
-"""Derived progress: standings, the review ladder, due lists and the path order.
+"""Derived progress: verdicts, standings, the review ladder, due lists, path order.
 
 Pure functions over a validated course record (``schema.validate_record``).
-Standings are computed on read and never stored; ``schedule`` is the only
-function that changes a record, and only its reviews.
+Each counted day of a topic gets one verdict (``solid``, ``helped`` or
+``missed``); levels, lapses and the next expected review are replayed from the
+verdicts. Nothing here is stored except the reviews ``schedule`` sets.
 """
 
 from __future__ import annotations
@@ -11,26 +12,45 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import heapq
+from itertools import groupby
 from typing import Any
 
 from learning.schema import PatchResult, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
-INCORRECT_DAYS = 1
-HELPED_DAYS = 2
+INTERVALS = {"missed": 1, "helped": 2}
 FIRST_RETRIEVAL_DAYS = 1
-RETAINED_DAYS = 2
-RETAINED_SPAN = 2
+RETAINED_VERDICTS = 2
 EXAM_SHARE = 3
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+# Grades from worst to best.
+GRADES = ("missed", "helped", "solid")
+LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
+
+Attempt = tuple[str, dict[str, Any]]
 
 
 @dataclass
 class _History:
-    """A topic's effective attempts in (date, id) order and its latest evidence day."""
+    """A topic's effective attempts in day order and its latest evidence day."""
 
-    attempts: list[tuple[str, dict[str, Any]]] = field(default_factory=list)
+    attempts: list[Attempt] = field(default_factory=list)
     latest: str = ""
+
+
+@dataclass
+class Replay:
+    """A topic's counted days replayed in order.
+
+    ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
+    every attempted day as learning, probe or practice; ``expected`` is the next
+    expected review day after the last verdict.
+    """
+
+    verdicts: list[tuple[str, str]] = field(default_factory=list)
+    days: dict[str, str] = field(default_factory=dict)
+    expected: date | None = None
+    streak: int = 0
 
 
 @dataclass
@@ -54,120 +74,61 @@ def effective(observations: dict[str, Any]) -> dict[str, Any]:
     return {key: item for key, item in observations.items() if key not in superseded}
 
 
-def _histories(record: dict[str, Any]) -> dict[str, _History]:
+def positions(observations: dict[str, Any]) -> dict[str, int]:
+    """Order within a day: a correction takes the place of what it replaced."""
+    result: dict[str, int] = {}
+    for key in sorted(observations, key=number):
+        targets = observations[key].get("corrects", ())
+        result[key] = min([number(key), *(result[target] for target in targets)])
+    return result
+
+
+def _histories(observations: dict[str, Any]) -> dict[str, _History]:
     histories: dict[str, _History] = defaultdict(_History)
-    for key, item in effective(record["observations"]).items():
+    place = positions(observations)
+    for key, item in effective(observations).items():
         for topic in item["topics"]:
             history = histories[topic]
             history.latest = max(history.latest, item["date"])
             if item["kind"] in SCHEDULING_KINDS:
                 history.attempts.append((key, item))
     for history in histories.values():
-        history.attempts.sort(key=lambda pair: (pair[1]["date"], number(pair[0])))
+        history.attempts.sort(
+            key=lambda pair: (pair[1]["date"], place[pair[0]], number(pair[0]))
+        )
     return histories
 
 
-def _unaided_days(attempts: list[tuple[str, dict[str, Any]]]) -> list[str]:
-    return sorted(
-        {
-            item["date"]
-            for _, item in attempts
-            if item.get("result") == "correct" and unaided(item)
-        }
-    )
+def grade(observation: dict[str, Any]) -> str:
+    """``solid`` (correct, unaided, certain), ``helped`` or ``missed``."""
+    result = observation["result"]
+    if result == "incorrect":
+        return "missed"
+    if result == "correct" and unaided(observation) and "uncertain" not in observation:
+        return "solid"
+    return "helped"
 
 
-def streak_days(attempts: list[tuple[str, dict[str, Any]]]) -> int:
-    """Distinct days of unaided correct attempts since the last unaided miss.
-
-    ``attempts`` are a topic's effective attempts in (date, id) order. The review
-    ladder climbs on this current streak, so a lapse restarts it.
-    """
-    days: set[str] = set()
-    for _, item in attempts:
-        if not unaided(item):
-            continue
-        if item.get("result") == "correct":
-            days.add(item["date"])
-        else:
-            days.clear()
-    return len(days)
+def _unaided_miss(observation: dict[str, Any]) -> bool:
+    return unaided(observation) and observation["result"] == "incorrect"
 
 
-def _level(topic: dict[str, Any], attempts: list[tuple[str, dict[str, Any]]]) -> str:
-    if not attempts:
-        return "introduced" if "introduced" in topic else "new"
-    correct = [item for _, item in attempts if item.get("result") == "correct"]
-    if not correct:
-        return "attempted"
-    alone = [item for item in correct if unaided(item)]
-    if not alone:
-        return "assisted"
-    if any(item.get("transfer") for item in alone):
-        return "transferred"
-    days = _unaided_days(attempts)
-    span = (date.fromisoformat(days[-1]) - date.fromisoformat(days[0])).days
-    if len(days) >= RETAINED_DAYS and span >= RETAINED_SPAN:
-        return "retained"
-    return "independent"
+def _probe(items: list[dict[str, Any]]) -> str:
+    """The first try's grade, lowered only by a later unaided incorrect."""
+    if any(_unaided_miss(item) for item in items[1:]):
+        return "missed"
+    return grade(items[0])
 
 
-def _lapsed(attempts: list[tuple[str, dict[str, Any]]]) -> bool:
-    alone = [item for _, item in attempts if unaided(item)]
-    return (
-        bool(alone)
-        and alone[-1].get("result") != "correct"
-        and any(item.get("result") == "correct" for item in alone[:-1])
-    )
+def _best(items: list[dict[str, Any]]) -> str:
+    return max((grade(item) for item in items), key=GRADES.index)
 
 
-def _standing(topic: dict[str, Any], history: _History) -> dict[str, Any]:
-    attempts = history.attempts
-    result: dict[str, Any] = {
-        "level": _level(topic, attempts),
-        "attempts": len(attempts),
-        "unaided_days": len(_unaided_days(attempts)),
-    }
-    if attempts:
-        key, item = attempts[-1]
-        last = {"id": key, "date": item["date"], "result": item["result"]}
-        result["last"] = {**last, "unaided": unaided(item)}
-    if _lapsed(attempts):
-        result["lapsed"] = True
-    judged = topic.get("judged")
-    if judged is not None and history.latest > judged:
-        result["stale"] = True
-    return result
-
-
-def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Every topic's standing, in one pass over the observations."""
-    histories = _histories(record)
-    return {
-        key: _standing(topic, histories.get(key, _History()))
-        for key, topic in record["topics"].items()
-    }
-
-
-def standing(record: dict[str, Any], topic: str) -> dict[str, Any]:
-    """One topic's standing."""
-    return standings(record)[topic]
-
-
-# --- the review ladder --------------------------------------------------------
-
-
-def interval(attempt: dict[str, Any], streak: int) -> int:
-    """Days until the next retrieval after ``attempt``.
-
-    ``streak`` is the current run of unaided-correct days (``streak_days``).
-    """
-    result = attempt.get("result")
-    if result == "correct" and unaided(attempt):
+def interval(verdict: str, streak: int) -> int:
+    """Days from a verdict to the next expected review; ``solid`` climbs the ladder."""
+    if verdict == "solid":
         return LADDER[min(max(streak, 1), len(LADDER)) - 1]
-    if result in ("correct", "partial"):
-        return HELPED_DAYS
-    return INCORRECT_DAYS
+    return INTERVALS[verdict]
 
 
 def review_day(base: date, days: int, exam: date | None) -> date:
@@ -180,6 +141,124 @@ def review_day(base: date, days: int, exam: date | None) -> date:
     days = min(days, max(1, (exam - base).days // EXAM_SHARE))
     pulled = min(base + timedelta(days=days), exam - timedelta(days=1))
     return max(base + timedelta(days=1), pulled)
+
+
+def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) -> Replay:
+    """Classify each attempted day and replay the verdicts in day order.
+
+    The learning day (the earlier of ``introduced`` and the first attempt) takes
+    its best grade. A later day on or after the expected review, or any day with
+    an ``exam``, is a probe: the first try counts, lowered only by a later unaided
+    incorrect. Any other day is practice: only an unaided incorrect counts.
+    """
+    result = Replay()
+    days = [item["date"] for _, item in attempts]
+    if "introduced" in topic:
+        days.append(topic["introduced"])
+    if not days:
+        return result
+    learning = min(days)
+    result.expected = review_day(
+        date.fromisoformat(learning), FIRST_RETRIEVAL_DAYS, exam
+    )
+    for day, group in groupby(attempts, key=lambda pair: pair[1]["date"]):
+        items = [item for _, item in group]
+        verdict: str | None
+        if any(item["kind"] == "exam" for item in items) or (
+            day != learning and day >= result.expected.isoformat()
+        ):
+            result.days[day], verdict = PROBE, _probe(items)
+        elif day == learning:
+            result.days[day], verdict = LEARNING, _best(items)
+        else:
+            missed = any(_unaided_miss(item) for item in items)
+            result.days[day], verdict = PRACTICE, "missed" if missed else None
+        if verdict is None:
+            continue
+        result.verdicts.append((day, verdict))
+        result.streak = result.streak + 1 if verdict == "solid" else 0
+        result.expected = review_day(
+            date.fromisoformat(day), interval(verdict, result.streak), exam
+        )
+    return result
+
+
+def _transferred(attempts: list[Attempt], replayed: Replay) -> bool:
+    missed = {day for day, verdict in replayed.verdicts if verdict == "missed"}
+    return any(
+        item.get("transfer") and grade(item) == "solid" and item["date"] not in missed
+        for _, item in attempts
+    )
+
+
+def _level(topic: dict[str, Any], attempts: list[Attempt], replayed: Replay) -> str:
+    if not attempts:
+        return "introduced" if "introduced" in topic else "new"
+    grades = [verdict for _, verdict in replayed.verdicts]
+    if all(verdict == "missed" for verdict in grades):
+        return "attempted"
+    if "solid" not in grades:
+        return "assisted"
+    if _transferred(attempts, replayed):
+        return "transferred"
+    if grades.count("solid") >= RETAINED_VERDICTS:
+        return "retained"
+    return "independent"
+
+
+def _lapsed(replayed: Replay) -> bool:
+    grades = [verdict for _, verdict in replayed.verdicts]
+    return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
+
+
+def _standing(
+    topic: dict[str, Any], history: _History, exam: date | None
+) -> dict[str, Any]:
+    attempts = history.attempts
+    replayed = replay(topic, attempts, exam)
+    result: dict[str, Any] = {
+        "level": _level(topic, attempts, replayed),
+        "attempts": len(attempts),
+        "unaided_days": sum(verdict == "solid" for _, verdict in replayed.verdicts),
+    }
+    if attempts:
+        key, item = attempts[-1]
+        last = {"id": key, "date": item["date"], "result": item["result"]}
+        result["last"] = {**last, "unaided": unaided(item)}
+    if _lapsed(replayed):
+        result["lapsed"] = True
+    judged = topic.get("judged")
+    if judged is not None and history.latest > judged:
+        result["stale"] = True
+    return result
+
+
+def replays(record: dict[str, Any]) -> dict[str, Replay]:
+    """Every topic's replayed verdicts and next expected review."""
+    histories = _histories(record["observations"])
+    exam = _exam(record)
+    return {
+        key: replay(topic, histories.get(key, _History()).attempts, exam)
+        for key, topic in record["topics"].items()
+    }
+
+
+def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Every topic's standing, in one pass over the observations."""
+    histories = _histories(record["observations"])
+    exam = _exam(record)
+    return {
+        key: _standing(topic, histories.get(key, _History()), exam)
+        for key, topic in record["topics"].items()
+    }
+
+
+def standing(record: dict[str, Any], topic: str) -> dict[str, Any]:
+    """One topic's standing."""
+    return standings(record)[topic]
+
+
+# --- scheduling ---------------------------------------------------------------
 
 
 def _exam(record: dict[str, Any]) -> date | None:
@@ -215,31 +294,56 @@ def _clamp_tutor_dates(
         scheduled.reviews[key] = _with_review(record, key, due, "tutor")
 
 
-def _new_attempt_topics(record: dict[str, Any], changes: PatchResult) -> list[str]:
-    superseded = corrected(record["observations"])
+def _touched(record: dict[str, Any], changes: PatchResult) -> list[str]:
+    """Topics of the attempts and exams this save added."""
     topics: dict[str, None] = {}
     for key in changes.observations:
         item = record["observations"][key]
-        if key not in superseded and item["kind"] in SCHEDULING_KINDS:
+        if item["kind"] in SCHEDULING_KINDS:
             topics.update(dict.fromkeys(item["topics"]))
     return list(topics)
 
 
-def _climb_ladder(
+def _practice_moved(
+    topic: dict[str, Any],
+    days: set[str],
+    replayed: Replay,
+) -> bool:
+    """A practice day without a verdict on or after the stored due date."""
+    due = topic.get("review", {}).get("due")
+    return due is not None and any(
+        replayed.days.get(day) == PRACTICE and due <= day for day in days
+    )
+
+
+def _reschedule(
     record: dict[str, Any],
     changes: PatchResult,
     histories: dict[str, _History],
     scheduled: Scheduled,
 ) -> None:
+    """Set the next expected review where this save created or changed a verdict.
+
+    A practice day that leaves the verdicts unchanged moves a review due on or
+    before it to the expected day, so a topic cannot stay due forever.
+    """
+    new = set(changes.observations)
+    before = _histories(
+        {key: item for key, item in record["observations"].items() if key not in new}
+    )
     exam = _exam(record)
-    for key in _new_attempt_topics(record, changes):
+    for key in _touched(record, changes):
         if key in changes.tutor_reviews:
             continue
-        attempts = histories[key].attempts
-        _, newest = attempts[-1]
-        days = interval(newest, streak_days(attempts))
-        due = review_day(date.fromisoformat(newest["date"]), days, exam)
-        scheduled.reviews[key] = _with_review(record, key, due, "engine")
+        topic = record["topics"][key]
+        after = replay(topic, histories[key].attempts, exam)
+        previous = replay(topic, before.get(key, _History()).attempts, exam)
+        days = {item["date"] for name, item in histories[key].attempts if name in new}
+        changed = after.verdicts != previous.verdicts
+        if after.expected is not None and (
+            changed or _practice_moved(topic, days, after)
+        ):
+            scheduled.reviews[key] = _with_review(record, key, after.expected, "engine")
 
 
 def _first_retrievals(
@@ -296,19 +400,18 @@ def schedule(
 ) -> tuple[dict[str, Any], Scheduled]:
     """Apply a save's engine consequences; returns the new record and what moved.
 
-    Tutor-set dates on or after the exam move to the day before it. Topics that
-    gained an effective attempt or exam climb the ladder from their newest
-    attempt, by their current unaided streak, unless the same patch dated their
-    review. Gap or note judged on an earlier day than the new evidence gets a
-    note. Newly introduced topics
-    without attempts or a date get a first retrieval. Self-reports never
-    reschedule.
+    Tutor-set dates on or after the exam move to the day before it. A topic whose
+    verdicts this save created or changed is due on its next expected review day,
+    unless the same patch dated its review; a practice day leaves the date alone
+    unless the review was already due by then. Newly introduced topics without
+    attempts or a date get a first retrieval. Gap or note judged on an earlier
+    day than the new evidence gets a note. Self-reports never reschedule.
     """
     result = {**record, "topics": dict(record["topics"])}
     scheduled = Scheduled()
-    histories = _histories(result)
+    histories = _histories(result["observations"])
     _clamp_tutor_dates(result, changes, today, scheduled)
-    _climb_ladder(result, changes, histories, scheduled)
+    _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)
     _stale_notes(result, changes, histories, scheduled)
     return result, scheduled

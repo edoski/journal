@@ -386,8 +386,17 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
     assert study.endswith("The learner asks: Explain rank")
     assert "Linear Algebra" in text("review", course="algebra")
     assert "45-minute" in text("mock_exam", minutes="45")
+    mock = text("mock_exam", minutes="45")
+    assert "kind exam" not in mock and "kind: exam" not in mock
+    assert "ordinary attempt" in mock
+    assert "only the first try counts" in text("review", course="algebra")
     assert '"courses"' in text("plan_week")
     bad = server.request(
         "prompts/get", {"name": "mock_exam", "arguments": {"minutes": "soon"}}
     )
     assert bad["error"]["code"] == -32602
+
+
+def test_save_rules_state_the_30_minute_duplicate_window() -> None:
+    assert "within 30 minutes is skipped" in mcp.SAVE_RULES
+    assert "within a day" not in mcp.SAVE_RULES

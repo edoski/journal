@@ -60,12 +60,14 @@ SAVE_RULES = "\n".join(
         '(default) needs help ("none" if unaided) and result correct|partial|'
         "incorrect; exam needs result; self_report (the learner's own statement) "
         'takes neither. transfer: true only when correct. corrects: ["oN"] '
-        "supersedes earlier ones.",
+        "supersedes earlier ones and, without a date, takes the earliest one's day.",
         "- preferences (this course), global_preferences (every course): "
         "{dimension: instruction}; null deletes.",
-        "Attempts schedule reviews. Helper fields (revision, recorded, judged, "
-        "updated, created, by, standing, level) are rejected. A repeated save is "
-        "safe. The receipt needs no reread.",
+        "Attempts schedule reviews; only the first try on a due day counts, retries "
+        "are relearning. Helper fields (revision, recorded, judged, updated, "
+        "created, by, standing, level) are rejected. An identical observation "
+        "re-sent within 30 minutes is skipped, so a re-sent save is safe. The "
+        "receipt needs no reread.",
     )
 )
 
@@ -470,9 +472,12 @@ def get_prompt(name: str, arguments: Any) -> Json:
         parts = [skill_body(), _resume(chosen), f"The learner asks: {request}"]
     elif name == "review":
         parts = [
-            "Run a review session from the due list below: one unaided retrieval at a "
-            "time using each item's prompt, interleaving items that could be confused; "
-            "give feedback after each attempt and save it with help and result.",
+            "Run today's review from the due list below: one unaided retrieval at a "
+            "time using each item's prompt, interleaving items that could be confused. "
+            "Wait for each answer, give brief feedback, and ask a missed topic again "
+            "later with a different question; only the first try counts, retries are "
+            "relearning. Save once at the end, one attempt per answer with response, "
+            "help and result.",
             _resume(chosen),
         ]
     elif name == "mock_exam":
@@ -481,8 +486,11 @@ def get_prompt(name: str, arguments: Any) -> Json:
             raise ProtocolError(-32602, "minutes must be a positive whole number")
         parts = [
             f"Give a {minutes}-minute mock exam in the course's recorded exam format, "
-            "covering the study path; read guide('practice') first. Collect all "
-            "answers before marking, then save each answer as kind exam with its result.",
+            "covering the study path; read guide('practice') first. Give no hints "
+            "and collect all answers before marking. Then save one ordinary attempt "
+            "per question and per topic it genuinely exercised, with help none unless "
+            "help was given; graded work from outside the session is the only exam "
+            "evidence.",
             _resume(chosen),
         ]
     else:

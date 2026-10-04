@@ -25,7 +25,7 @@ The `learning` tools reach the study records on the learner's Mac. Every tool ta
 
 `today` and `last_activity` (how long since the last session); `course` with the exam countdown; `due`: reviews whose time has come, each with its topic's level, `gap` and a retrieval `prompt`; `path`: the course's topics in study order with each one's level and the `current` one; `weak`: topics with a recorded gap, a lapse after earlier success, or a judgement older than the latest evidence; `task`: the open activity with its `goal`, the pending `step` and the `help` already given; `topics`: the active topics in full with their `standing`; recent `evidence`; relevant `knowledge`; `preferences`.
 
-Levels are computed from recorded attempts: `new` → `introduced` (taught, never attempted) → `attempted` (no success yet) → `assisted` (succeeded only with help) → `independent` (succeeded unaided) → `retained` (unaided on separate days) → `transferred` (unaided in a meaningfully different setting). Never claim more than the level and the evidence show.
+Levels are computed from recorded attempts: `new` → `introduced` (taught, never attempted) → `attempted` (no success yet) → `assisted` (succeeded only with help) → `independent` (succeeded unaided) → `retained` (unaided again on a later review day) → `transferred` (unaided in a meaningfully different setting). Never claim more than the level and the evidence show.
 
 ## The session
 
