@@ -1,24 +1,11 @@
 import json
 from pathlib import Path
-import subprocess
 from typing import Any
 
 import pytest
 
 from learning import install, preferences, readiness
 from learning.workspace import Workspace, initialize
-
-
-def fake_claude(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-    separator = command.index("--")
-    entry = {
-        "type": "stdio",
-        "command": command[separator + 1],
-        "args": command[separator + 2 :],
-        "env": dict([command[command.index("-e") + 1].split("=", 1)]),
-    }
-    install.code_config().write_text(json.dumps({"mcpServers": {"learning": entry}}))
-    return subprocess.CompletedProcess(command, 0)
 
 
 @pytest.fixture
@@ -38,12 +25,23 @@ def installed(
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setattr(install, "package_directory", lambda: package)
-    monkeypatch.setattr(install.shutil, "which", lambda name: f"/bin/{name}")
-    monkeypatch.setattr(install.subprocess, "run", fake_claude)
-    install.install()
-    course = tmp_path / "course"
-    course.mkdir()
-    return initialize(course), package
+    monkeypatch.setattr(install.shutil, "which", lambda name: None)
+    install.codex_config().parent.mkdir()
+    install.codex_config().write_text("")
+    course = tmp_path / "vault/msc/course"
+    course.mkdir(parents=True)
+    workspace = initialize(course)
+    install.install([course.parent])
+    return workspace, package
+
+
+def root(workspace: Workspace) -> Path:
+    return workspace.directory.parent
+
+
+def without_trust(path: Path) -> None:
+    text = path.read_text()
+    path.write_text(text.partition(install.TRUST_START)[0])
 
 
 def names(result: dict[str, Any]) -> set[str]:
@@ -61,9 +59,12 @@ def test_an_installed_host_is_ready_and_the_check_is_read_only(
     assert {
         "claude_desktop_mcp",
         "claude_skill_archive",
-        "claude_code_mcp",
+        "study_roots",
+        "claude_code_root",
+        "claude_code_user_scope",
         "claude_code_skill",
-        "codex_mcp",
+        "codex_global",
+        "codex_course",
         "codex_skill",
         "course_record",
         "registry",
@@ -90,25 +91,55 @@ def test_an_installed_host_is_ready_and_the_check_is_read_only(
         ),
         (
             "claude-code",
-            lambda p: install.code_config().write_text("{}"),
-            {"claude_code_mcp"},
+            lambda w: install.project_config(root(w)).write_text("{}"),
+            {"claude_code_root"},
         ),
         (
             "claude-code",
-            lambda p: install.skill_links()["claude-code"].unlink(),
+            lambda w: install.code_config().write_text(
+                '{"mcpServers": {"learning": {"command": "x"}}}'
+            ),
+            {"claude_code_user_scope"},
+        ),
+        (
+            "claude-code",
+            lambda w: install.settings_path().unlink(),
+            {"study_roots"},
+        ),
+        (
+            "claude-code",
+            lambda w: install.skill_links()["claude-code"].unlink(),
             {"claude_code_skill"},
         ),
         (
             "codex",
-            lambda p: install.codex_config().write_text(
+            lambda w: install.codex_config().write_text(
                 "# Learning communication\n" + install.codex_config().read_text()
             ),
-            {"codex_mcp"},
+            {"codex_global"},
         ),
         (
             "codex",
-            lambda p: install.codex_config().write_text("not = [toml"),
-            {"codex_mcp"},
+            lambda w: install.codex_config().write_text(
+                '[mcp_servers.learning]\ncommand = "x"\n'
+                + install.codex_config().read_text()
+            ),
+            {"codex_global"},
+        ),
+        (
+            "codex",
+            lambda w: install.course_codex_config(w.directory).unlink(),
+            {"codex_course"},
+        ),
+        (
+            "codex",
+            lambda w: without_trust(install.codex_config()),
+            {"codex_course"},
+        ),
+        (
+            "codex",
+            lambda w: install.codex_config().write_text("not = [toml"),
+            {"codex_config"},
         ),
     ],
 )
@@ -116,7 +147,7 @@ def test_host_problems_are_reported_for_the_selected_host(
     installed: tuple[Workspace, Path], host: str, breakage: Any, expected: set[str]
 ) -> None:
     workspace, package = installed
-    breakage(package)
+    breakage(package if host == "claude-desktop" else workspace)
     result = readiness.check(workspace, host, package=package)
     assert names(result) == expected
     others = [name for name in readiness.HOSTS if name != host]

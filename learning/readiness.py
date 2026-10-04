@@ -96,27 +96,96 @@ def _desktop(repo: Path) -> dict[str, str]:
     return _server("claude_desktop_mcp", entry == install.server(repo), path)
 
 
-def _code(repo: Path) -> dict[str, str]:
-    return _server(
-        "claude_code_mcp", install.code_registered(repo), install.code_config()
+def _roots() -> tuple[list[Path], dict[str, str]]:
+    path = install.settings_path()
+    try:
+        roots = install.study_roots()
+    except ValueError as error:
+        return [], _check("study_roots", "fail", str(error), path)
+    missing = [root for root in roots if not root.is_dir()]
+    if not roots:
+        detail = (
+            "No study roots are configured; run `python -m learning.install "
+            "--study-root DIR` with the folder above your courses."
+        )
+        return roots, _check("study_roots", "fail", detail, path)
+    if missing:
+        detail = "Study roots no longer exist: " + ", ".join(map(str, missing))
+        return roots, _check("study_roots", "fail", detail, path)
+    return roots, _check(
+        "study_roots", "pass", f"{len(roots)} study root(s) configured.", path
     )
 
 
-def _codex(repo: Path) -> dict[str, str]:
+def _code(repo: Path, roots: list[Path]) -> list[dict[str, str]]:
+    checks = [
+        _server(
+            "claude_code_root",
+            install.project_registered(root, repo),
+            install.project_config(root),
+        )
+        for root in roots
+    ]
+    leftover = install.user_scope_registered()
+    checks.append(
+        _check(
+            "claude_code_user_scope",
+            "fail" if leftover else "pass",
+            "A user-scope learning server offers it in every folder; run the installer."
+            if leftover
+            else "No user-scope learning server: Claude Code offers it only below "
+            "study roots.",
+            install.code_config(),
+        )
+    )
+    return checks
+
+
+def _course_codex(directory: Path, repo: Path, trusted: set[str]) -> dict[str, str]:
+    config = install.course_codex_config(directory)
+    try:
+        entry = install.codex_entry(config.read_text(encoding="utf-8"), config)
+    except (OSError, ValueError):
+        entry = None
+    configured = entry == install.server(repo) and str(directory) in trusted
+    return _check(
+        "codex_course",
+        "pass" if configured else "fail",
+        "The folder has the learning server and is trusted."
+        if configured
+        else "The folder's Codex server entry or trust entry is missing or stale; "
+        "run the installer.",
+        config,
+    )
+
+
+def _codex(repo: Path, roots: list[Path]) -> list[dict[str, str]]:
     path = install.codex_config()
     try:
         text = path.read_text(encoding="utf-8")
-        matches = install.codex_entry(text) == install.server(repo)
-    except (OSError, ValueError):
-        return _server("codex_mcp", False, path)
-    if "# Learning communication" in text:
-        return _check(
-            "codex_mcp",
-            "fail",
-            "The old learning developer-instructions block remains; run the installer.",
-            path,
-        )
-    return _server("codex_mcp", matches, path)
+        global_entry = install.codex_entry(text, path)
+        trusted = install.trusted(text, path)
+    except FileNotFoundError:
+        return [_check("codex_config", "warning", "Codex is not installed.", path)]
+    except (OSError, ValueError) as error:
+        return [_check("codex_config", "fail", str(error), path)]
+    clean = global_entry is None and "# Learning communication" not in text
+    global_check = _check(
+        "codex_global",
+        "pass" if clean else "fail",
+        "No global learning server: Codex offers it only in study folders."
+        if clean
+        else "A global learning server or the old instructions block remains; "
+        "run the installer.",
+        path,
+    )
+    return [
+        global_check,
+        *(
+            _course_codex(directory, repo, trusted)
+            for directory in install.course_directories(roots)
+        ),
+    ]
 
 
 def _server(name: str, matches: bool, path: Path) -> dict[str, str]:
@@ -267,10 +336,13 @@ def check(
     ]
     if host in {"all", "claude-desktop"}:
         checks += [_desktop(repo), _archive(package)]
+    roots, configured = _roots()
     if host in {"all", "claude-code"}:
-        checks += [_code(repo), _link("claude_code_skill", links["claude-code"], skill)]
+        checks += [configured, *_code(repo, roots)]
+        checks.append(_link("claude_code_skill", links["claude-code"], skill))
     if host in {"all", "codex"}:
-        checks += [_codex(repo), _link("codex_skill", links["codex"], skill)]
+        checks += _codex(repo, roots)
+        checks.append(_link("codex_skill", links["codex"], skill))
     checks.extend(_cloud_conflicts(root))
     return {
         "ready": all(item["status"] != "fail" for item in checks),

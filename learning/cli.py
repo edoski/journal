@@ -109,13 +109,28 @@ def forget(args: argparse.Namespace) -> dict[str, Any]:
     return records.forget(_workspace(args), args.handles, course=args.course)
 
 
+def _hosts(workspace: Workspace) -> dict[str, str]:
+    """Make the course reachable from Codex and say whether Claude Code reaches it."""
+    from learning import install
+
+    return {
+        "codex": install.configure_course(workspace),
+        "claude_code": install.claude_code_reach(workspace),
+    }
+
+
 def init(args: argparse.Namespace) -> dict[str, Any]:
-    return _directories(workspaces.initialize(args.workspace, args.sources))
+    workspace = workspaces.initialize(args.workspace, args.sources)
+    return {**_directories(workspace), "hosts": _hosts(workspace)}
 
 
 def link(args: argparse.Namespace) -> dict[str, Any]:
     linked = workspaces.link(_workspace(args), args.material)
-    return {**_directories(linked), "registry": str(workspaces.registry_path())}
+    return {
+        **_directories(linked),
+        "registry": str(workspaces.registry_path()),
+        "hosts": _hosts(linked),
+    }
 
 
 def unlink(args: argparse.Namespace) -> dict[str, Any]:

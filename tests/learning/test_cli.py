@@ -10,7 +10,7 @@ import pytest
 
 from learning import study
 from learning.__main__ import main
-from learning.workspace import initialize
+from learning.workspace import Workspace, initialize
 
 TODAY = "2026-10-10"
 
@@ -282,3 +282,37 @@ def test_all_with_a_named_invalid_workspace_fails(
         code, error = run(capsys, monkeypatch, missing, *verb)
         assert code == 1, verb
         assert error["kind"] == "validation"
+
+
+def test_init_and_link_configure_codex_and_report_claude_code_reach(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    from learning import install
+
+    vault = tmp_path_factory.mktemp("vault")
+    course, outside, material = vault / "msc/new", vault / "other", vault / "slides"
+    for directory in (course, outside, material):
+        directory.mkdir(parents=True)
+    _, created = run(capsys, monkeypatch, outside, "init")
+    assert created["hosts"] == {
+        "codex": "skipped: Codex is not installed",
+        "claude_code": install.claude_code_reach(Workspace(outside)),
+    }
+    assert created["hosts"]["claude_code"].startswith("not reachable")
+    install.codex_config().parent.mkdir(parents=True)
+    install.codex_config().write_text("")
+    install.settings_path().write_text(
+        json.dumps({"schema": 1, "study_roots": [str(vault / "msc")]})
+    )
+    _, created = run(capsys, monkeypatch, course, "init")
+    assert created["hosts"] == {
+        "codex": "configured",
+        "claude_code": f"reachable through {vault / 'msc/.mcp.json'}",
+    }
+    assert str(course) in install.trusted(install.codex_config().read_text())
+    assert install.course_codex_config(course).is_file()
+    _, linked = run(capsys, monkeypatch, course, "link", str(material))
+    assert linked["hosts"]["codex"] == "unchanged"
+    assert not install.course_codex_config(material).exists()

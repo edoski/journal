@@ -11,12 +11,12 @@ Material that must stay free of study files, such as a code repository, is linke
 ```sh
 cd /path/to/course && study init
 study init --workspace ~/study/course --sources /path/to/repo   # study files kept outside the material
-python -m learning.install                                       # register the MCP server with Claude Desktop, Claude Code and Codex
+python -m learning.install --study-root DIR                      # offer the MCP server in Claude Desktop and, below DIR, Claude Code and Codex
 ```
 
 ## Agent interface
 
-`python -m learning.mcp` is a stdlib MCP server over stdio. Its tools (`courses`, `resume`, `show`, `search`, `plan`, `list_sources`, `guide` read-only; `save`, `add_sources`, `write_note`; `forget`, destructive) take an optional `course` (title or workspace directory; omitted inside a course folder or with a single course) and run the CLI below; its prompts (`study`, `review`, `mock_exam`, `plan_week`) load the playbook with a fresh `resume`. The installer also links the `tutor` skill for Claude Code and Codex and builds `tutor-claude.zip` for upload to Claude Desktop.
+`python -m learning.mcp` is a stdlib MCP server over stdio. Its tools (`courses`, `resume`, `show`, `search`, `plan`, `list_sources`, `guide` read-only; `save`, `add_sources`, `write_note`; `forget`, destructive) take an optional `course` (title or workspace directory; omitted inside a course folder or with a single course) and run the CLI below; its prompts (`study`, `review`, `mock_exam`, `plan_week`) load the playbook with a fresh `resume`. The installer offers the server only in study folders: Claude Code finds it through `.mcp.json` in each study root (`--study-root DIR`, repeatable and remembered), and Codex through a `.codex/config.toml` in each study root and course folder that the installer marks trusted; `init` and `link` configure Codex for new courses. It also links the `tutor` skill for Claude Code and Codex and builds `tutor-claude.zip` for upload to Claude Desktop.
 
 `python -m learning [--workspace DIR] VERB` is the underlying CLI. Every response is JSON on stdout; every failure is `{"error": {"kind": validation|io, "message"}}` on stderr with exit 1, and the message names the field, the fix and close matches.
 
