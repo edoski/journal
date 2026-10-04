@@ -28,9 +28,12 @@ GUIDES = ("records", "practice", "course", "lifecycle", "research")
 TIMEOUT = 60
 
 INSTRUCTIONS = (
-    "Study memory for the learner's courses. For any request to learn, explain, "
-    "practise, review, continue or plan study, follow the tutor skill (or the "
-    "`study` prompt): start with `resume`, teach, then `save` once per turn, "
+    "Study memory for the learner's courses. Use these tools only when the learner "
+    "asks to study, be taught or quizzed, practise, review, continue or plan a "
+    "course; never during ordinary development or other work, even inside a "
+    "course's folder (explaining code while working is not study). When studying, "
+    "follow the tutor skill (or the `study` prompt): start with `resume`, teach, "
+    "then `save` once per turn, "
     'recording every attempt as an observation with `help` ("none" if unaided) and '
     "`result`. Keep bookkeeping silent: never narrate tool calls or saves. `guide` "
     "returns the detailed rules; `courses` lists the learner's courses."
