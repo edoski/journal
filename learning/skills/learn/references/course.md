@@ -1,31 +1,46 @@
-# Course and exam context
+# Course, exam and path
 
-When a course is new, or exam preparation needs missing information, read the syllabus, assessment instructions or past papers that are already in the workspace (`sources SCOPE --scan` finds them; `--add` registers them). Read what the task needs; do not run an intake survey. Keep what you learn in the existing scope through the usual save.
+When a course is new, or exam preparation needs missing information, read the syllabus, assessment instructions or past papers already in the course directory (`list_sources` finds them; `add_sources` registers them). Read what the task needs; do not run an intake survey.
 
-Course facts have fixed homes. The deadline is top-level `exam`; examinable material is top-level `coverage` (text, or `{"text", "refs"}`); the overall aim is `goal`; the path is `route` ([lessons.md](lessons.md)). Assessment requirements are `course_context`, which replaces as a unit (`null` clears it):
+## Exam facts
+
+The exam lives in one object, merged by field:
+
+```json
+{"exam": {
+  "date": "2026-11-02",
+  "format": "Written problems followed by an oral discussion",
+  "coverage": "Chapters 1–4; chapter 5 excluded",
+  "criteria": ["Explain method choice and justify assumptions"],
+  "constraints": ["No calculator in the written part"],
+  "unknowns": ["Whether the sample paper reflects this year's exam"],
+  "refs": [{"source": "syllabus", "locator": "Assessment"}]
+}}
+```
+
+Record requirements from primary material or the learner's explicit statement; label patterns inferred from past papers as indications. Keep each unresolved doubt in `unknowns` until evidence settles it; a learner's report can set the working convention without establishing which document is current. The `date` drives review scheduling: reviews stay within the time left and never fall after the day before. For a course with several exam sessions, keep the next one the learner is aiming for.
+
+Notation correspondences, resource advice and tentative relationships go in `knowledge` with `uncertain` where unverified; do not duplicate exam facts there. None of this says anything about the learner's understanding; use it to choose depth, practice and review timing.
+
+## Building the path
+
+When the learner asks for a plan, a study map or a path to the exam, or hands you the syllabus and slides, build the path from the material in one save:
+
+1. Register the sources you used.
+2. Create the topics: one per idea or method you would check separately, with `title`, `refs` to where it is taught and `needs` for true prerequisites (not presentation order). Ten to forty topics is typical for a course; group fine details under one topic.
+3. Set `path`: `order` for the intended sequence, `current` for where to start, `basis` saying where the order comes from.
 
 ```json
 {
-  "sources": {
-    "syllabus": {"path": "university/course/syllabus.pdf"},
-    "sample": {"path": "university/course/sample-exam.pdf"}
+  "topics": {
+    "systems": {"title": "Linear systems", "refs": [{"source": "slides", "locator": "week 1"}]},
+    "rank": {"title": "Rank and nullity", "needs": ["systems"], "refs": [{"source": "slides", "locator": "week 3"}]},
+    "eigen": {"title": "Eigenvalues", "needs": ["rank"]}
   },
-  "course_context": {
-    "assessment": "Written problems followed by an oral discussion",
-    "criteria": ["Explain method choice and justify assumptions"],
-    "constraints": ["No calculator in the written exam"],
-    "unknowns": ["Whether the sample paper reflects this year's exam"],
-    "refs": [{"source": "syllabus", "locator": "Assessment section"}],
-    "checked_on": "2026-09-18"
-  },
-  "coverage": {"text": "Examinable: chapters 1–4; chapter 5 excluded", "refs": [{"source": "syllabus", "locator": "Programme"}]}
+  "path": {"order": ["systems", "rank", "eigen"], "current": "systems", "basis": "Syllabus order; weeks 1–4 examinable"}
 }
 ```
 
-Record requirements from primary material or the learner's explicit statement. Label patterns inferred from past papers as indications. `checked_on` is when you actually checked; recheck when new information or a consequential uncertainty warrants it. A conflicting or undated source stays uncertain until resolved; a learner's report can guide the working convention without establishing a document's date or edition. Preserve each independent uncertainty until evidence addresses it. Do not assume an undated file is the "old" or "current" edition.
+Revise it when the material or the learner changes the picture. Show the path only when it helps or when asked where they are; then connect the current step to its purpose and distinguish what was demonstrated from what was only covered, using the levels.
 
-Notation correspondences, resource advice and tentative relationships belong in `knowledge` with attribution and uncertainty ([records.md](records.md)). Do not duplicate `exam`, `coverage` or requirements into knowledge.
-
-Use this context to choose explanation depth, practice and review timing. It says nothing about the learner's understanding. For a time-bounded oral or mock examination, use the recorded format, criteria, notation, methods and permitted aids; if requirements are unverified, describe the practice as provisional. See [practice.md](practice.md).
-
-For a deliberate connection to another course, `discover "terms"` returns handles across scopes; read the exact knowledge, compare assumptions and notation, and transfer nothing else.
+For a deliberate connection to another course, `search` with `all` finds handles in other courses; read the exact item there, compare assumptions and notation, and transfer nothing else.

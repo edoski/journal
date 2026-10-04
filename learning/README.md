@@ -1,50 +1,47 @@
 # Learning
 
-One installed learning engine supports natural study conversations in Pi and in native agents (Claude, Codex). The learner asks to explain, continue, practise, review or plan; the tutor teaches and keeps memory quietly. There are no management commands for the learner, no compulsory intake, no dashboard.
+One installed learning engine supports natural study conversations in Claude Desktop, Claude Code and Codex through one local MCP server. The learner asks to explain, continue, practise, review or plan; the tutor teaches and keeps memory quietly. There are no management commands for the learner, no compulsory intake, no dashboard.
 
 ## Workspace
 
-Each course or project directory owns a hidden `.study/` after `study init`. `.study/state/<scope>.json` is one course record (schema 5), `.study/preferences.json` holds teaching preferences, `.study/lessons/` and `.study/assets/` hold generated notes and diagrams, `.study/conversations/` holds resumable Pi sessions. Material stays where it is; relative source paths resolve from the directory. Running from a descendant finds the nearest workspace; nested workspaces are independent.
+A course or project directory owns a hidden `.study/` after `study init`; `.study/course.json` is the course record (schema 6). One workspace studies one course. Notes the learner asks to keep are written to `study-notes/` beside it, where Obsidian sees them. Material stays where it is; relative source paths resolve from the directory. Running from a descendant finds the nearest workspace.
 
-Material that must stay free of study files, such as a code repository, is linked instead: `study init --workspace ~/study/course --sources ~/code/repo` records the material directory in the workspace manifest and in the per-user index `~/Library/Application Support/Learning/workspaces.json`. Relative source paths then resolve from the material, and running from the material or any descendant finds the workspace when no nearer `.study/` exists. A link is used only while the workspace still names the material, so a stale or ambiguous link fails instead of selecting another workspace; one workspace studies one material directory. `study link DIR` relinks moved material and `study unlink` restores the workspace's own directory. Inside a git work tree, `sources --scan` lists only files git does not ignore.
+Material that must stay free of study files, such as a code repository, is linked instead: `study init --workspace ~/study/course --sources ~/code/repo` records the material directory in the workspace manifest and in the per-user registry `~/Library/Application Support/Learning/workspaces.json`, which lists every workspace. Relative source paths then resolve from the material, and running from the material or any descendant finds the workspace when no nearer `.study/` exists. A link is used only while the workspace still names the material. `study link DIR` relinks moved material and `study unlink` restores the workspace's own directory. Preferences that apply to every course live beside the registry in `preferences.json`.
 
 ```sh
-cd /path/to/course
-study init
+cd /path/to/course && study init
 study init --workspace ~/study/course --sources /path/to/repo   # study files kept outside the material
-study                      # Pi in this workspace
-study --continue           # resume the latest Pi conversation
-study --private            # disposable copies, no saved session
-study "Continue exercise 5"
+python -m learning.install                                       # register the MCP server with Claude Desktop, Claude Code and Codex
 ```
 
 ## Agent interface
 
-`python -m learning [--workspace DIR] VERB` is the agent CLI; `learning/skills/learn/scripts/learn` is the same entry point for native agents; Pi exposes `learning_context`, `learning_save` and `learning_manage` over it. Every response is JSON on stdout; every failure is `{"error": {"kind": validation|conflict|io|no_save, "message"}}` on stderr with exit 1.
+`python -m learning.mcp` is a stdlib MCP server over stdio. Its tools (`courses`, `resume`, `show`, `search`, `plan`, `list_sources`, `guide` read-only; `save`, `add_sources`, `write_note`; `forget`, destructive) take an optional `course` (title or workspace directory; omitted inside a course folder or with a single course) and run the CLI below; its prompts (`study`, `review`, `mock_exam`, `plan_week`) load the playbook with a fresh `resume`. The installer also links the `learn` skill for Claude Code and Codex and builds `learn-claude.zip` for upload to Claude Desktop.
+
+`python -m learning [--workspace DIR] VERB` is the underlying CLI. Every response is JSON on stdout; every failure is `{"error": {"kind": validation|io, "message"}}` on stderr with exit 1, and the message names the field, the fix and close matches.
 
 | Verb | Purpose |
 | --- | --- |
-| `resume [SCOPE] [--task KEY]` | one call to continue: task, briefing, evidence, knowledge, preferences; no scope selects the latest course and lists the others |
-| `catalog [SCOPE]` | scope list with workspace paths, or one scope's topic/source/task/knowledge handles and route position |
-| `search SCOPE QUERY` | lexical discovery: matching evidence plus handle candidates with excerpts |
-| `knowledge SCOPE [KEY...]` | whole entries, or the paged key index |
-| `evidence SCOPE --topics …` / `--observations …` | topic histories or exact observations with correction groups |
-| `save SCOPE --expect REV [--expect-digest D]` | publish a field patch from stdin; returns a receipt or a `needs_confirmation` preview |
-| `sources SCOPE --scan` / `--add PATHS` / `--check HANDLES` | find, register and fingerprint local material |
-| `preferences`, `plan`, `journal`, `discover`, `inspect`, `forget`, `readiness` | policy, scheduling, cross-scope discovery, memory inspection and previewed removal, host checks |
-| `note`, `lesson`, `publish-lesson`, `visual` | generated artifacts |
-| `init [--sources DIR]`, `link DIR`, `unlink`, `import`, `start` | workspace lifecycle, material links and the Pi launcher |
+| `resume [--task KEY]` | the session opener: today, last activity, exam countdown, due reviews, the path with levels, weak topics, the open task, active topics, recent evidence, relevant knowledge, preferences |
+| `show HANDLE...` / `show --all` | whole items: a topic with its standing and history, an observation, a knowledge entry, a task, a source; or everything |
+| `search QUERY [--all]` | accent-insensitive lexical discovery with light stemming, in this course or every registered course |
+| `plan [--all] [--days N]` | due and upcoming reviews, open work, exam countdown, Journal study time |
+| `save` | apply a JSON patch from stdin; returns observation ids, review dates, level changes and notes |
+| `sources --scan` / `--add PATH...` | find and register course material |
+| `forget HANDLE...` / `--course` | remove exactly what the learner asked to forget |
+| `note --title T` | write a Markdown note from stdin to `study-notes/` |
+| `init`, `link`, `unlink`, `readiness` | workspace lifecycle and host checks |
 
-A scope argument may be the handle or an unambiguous course title or alias. The [skill](skills/learn/SKILL.md) is the agent's playbook; its references define the [record contract](skills/learn/references/records.md), [retrieval](skills/learn/references/retrieval.md), [tasks and the route](skills/learn/references/lessons.md), [course facts](skills/learn/references/course.md), [practice](skills/learn/references/practice.md), [preferences](skills/learn/references/preferences.md), [lifecycle](skills/learn/references/lifecycle.md), [research](skills/learn/references/research.md) and [visuals](skills/learn/references/visuals.md).
+The [skill](skills/learn/SKILL.md) is the agent's playbook; its references define the [record and patch rule](skills/learn/references/records.md), [practice and reviews](skills/learn/references/practice.md), [course, exam and path](skills/learn/references/course.md), [memory, planning and hosts](skills/learn/references/lifecycle.md) and [research](skills/learn/references/research.md).
 
 ## Record model
 
-A course record separates four things. `observations` are learner evidence: appended once per actual attempt or external assessment, with response, assistance and source locator, corrected by linked follow-ups rather than edits. `knowledge` is the tutor's reusable understanding of the course with attribution, uncertainty and conflicts; field patches preserve omitted qualifications and removing one requires an explicit acknowledgment. `tasks` are unfinished activities with a stable frame and a small plan; `route` is the course-level path with a current node. Preferences live outside the record and apply only to the active topics and explicit selectors.
+`topics` are the knowledge path: each is one idea or method with prerequisite `needs`, an optional diagnosis (`gap`, `note`) and a `review`. `observations` are learner evidence: one per attempt (with the `help` given and the `result`), external exam result, or explicit self-report; misrecordings are superseded by a correcting observation, never edited. From them the engine derives each topic's level (`new`, `introduced`, `attempted`, `assisted`, `independent`, `retained`, `transferred`), lapses after earlier success, and stale diagnoses. Every attempt reschedules the topic's next retrieval on a successive-relearning ladder (1 day after a miss, 2 after help, then 3, 7, 16, 35, 75 and 160 days as unaided successes accumulate on separate days since the last unaided miss), kept within a third of the time to the exam and never after the day before; the tutor can pin a date and a retrieval prompt. `path` orders the topics and marks the current one; `tasks` hold unfinished activities with their goal, next step and help given; `knowledge` holds what the tutor knows about the course; course facts and course preferences complete the record.
 
-`resume` returns whole items within byte budgets and lists what it omitted. Nothing is clipped; a consequential judgement expands exact evidence or stays qualified. Writes use locks, revisions, snapshot digests, no-op detection and atomic replacement; conflicts are reported, never merged silently. A no-save session or `LEARNING_NO_SAVE=1` rejects every mutating verb.
+Saves are merge patches applied to the latest record under a lock and published atomically; unchanged results publish nothing, and a repeated observation within a day is skipped, so an uncertain save is safe to retry. Two sessions changing the same field: the later one wins. `resume` returns whole items within byte budgets and lists what it left out.
 
 ## Code
 
-`schema.py` defines record shapes, one handle rule, and per-type validation and patching. `records.py` composes them into whole-record validation, scope resolution and publication. `retrieval.py` implements the five read verbs on one packer, `packing.py`. `briefing.py` projects course orientation and route position. `planning.py` joins reviews, unfinished work and read-only Journal effort through `sync.study.context.journal_summary`. `sources.py` scans, registers and fingerprints material. `memory.py` owns inspection and previewed forgetting. `lessons.py` and `visuals.py` publish artifacts through `storage.py`. `cli.py` is the command table and `__main__.py` the entry point; `pi.ts` is the Pi adapter; `runtime.py` launches Pi; `workspace.py` and `workspace_import.py` own directory workspaces.
+`schema.py` defines record shapes, the shared handle namespace, whole-record validation and the patch rule. `progress.py` derives standings and levels and schedules reviews. `records.py` loads the course, publishes saves and receipts, and forgets. `retrieval.py` builds `resume`, `show` and `search` on the one packer in `packing.py`. `planning.py` joins reviews and open work with read-only Journal effort through `sync.study.context.journal_summary`. `preferences.py` merges global and course preferences. `sources.py` scans and registers material. `notes.py` writes requested notes to `study-notes/`. `storage.py` publishes atomically under locks; `clock.py` owns the study day (`LEARNING_TODAY` pins it for simulations). `cli.py` is the command table and `__main__.py` the entry point; `mcp.py` is the MCP server; `install.py` and `readiness.py` set up and check the hosts; `workspace.py` owns discovery, links and the registry.
 
-Run `python tools/check.py learning` for the focused gate (Ruff, strict mypy, import contracts, Python tests, Pi adapter tests). Tests use synthetic state only. The behavioral acceptance protocol and the dated evaluation reports are under [docs/learning](../docs/learning/README.md).
+Run `python tools/check.py learning` for the focused gate (Ruff, strict mypy, import contracts, Python tests). Tests use synthetic state only. The behavioral acceptance protocol and the dated design reports are under [docs/learning](../docs/learning/README.md).

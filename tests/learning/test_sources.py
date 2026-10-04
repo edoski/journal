@@ -1,270 +1,33 @@
-import hashlib
-import json
-import os
 from pathlib import Path
 import subprocess
 
 import pytest
 
-from learning import records, sources, storage
+from learning import sources
 
 
-def test_source_capture_detects_changed_bytes_without_restamping_old_refs(
-    tmp_path: Path,
-) -> None:
-    vault = tmp_path / "vault"
-    vault.mkdir()
-    source = vault / "sheet.pdf"
-    source.write_bytes(b"first edition")
-    root = tmp_path / "learning"
-    records.save(
-        root,
-        "course",
-        0,
-        {
-            "sources": {"sheet": {"path": "sheet.pdf"}},
-            "knowledge": {
-                "notation": {
-                    "text": "Undated convention",
-                    "refs": [{"source": "sheet"}],
-                }
-            },
-        },
-    )
-    path = root / "state/course.json"
-    before = path.read_bytes()
-    result = sources.inspect_sources(root, vault, "course", ["sheet"])
-    assert result["sources"]["sheet"]["status"] == "unverified"
-    assert result["sources"]["sheet"]["unverified_references"] == 1
-    assert path.read_bytes() == before
-    captured = sources.inspect_sources(
-        root, vault, "course", ["sheet"], expected=1, expected_digest=result["digest"]
-    )
-    fingerprint = {"sha256": hashlib.sha256(b"first edition").hexdigest(), "size": 13}
-    assert captured["revision"] == 2
-    assert captured["captured"] == ["sheet"]
-    assert captured["sources"]["sheet"]["stored_fingerprint"] == fingerprint
-    assert captured["sources"]["sheet"]["unverified_references"] == 1
-    assert (
-        sources.inspect_sources(root, vault, "course", ["sheet"], expected=2)[
-            "revision"
-        ]
-        == 2
-    )
-    state = records.read(root, "course")
-    assert isinstance(state, dict)
-    old_entry = state["knowledge"]["notation"]
-    records.save(root, "course", 2, {"knowledge": {"notation": old_entry}})
-    assert (
-        sources.inspect_sources(root, vault, "course", ["sheet"])["sources"]["sheet"][
-            "unverified_references"
-        ]
-        == 1
-    )
-    records.save(
-        root,
-        "course",
-        2,
-        {
-            "knowledge": {
-                "fresh": {"text": "Read this edition", "refs": [{"source": "sheet"}]}
-            }
-        },
-    )
-    state = records.read(root, "course")
-    assert isinstance(state, dict)
-    assert state["knowledge"]["fresh"]["refs"][0]["source_fingerprint"] == fingerprint
-    source.write_bytes(b"second edition")
-    changed = sources.inspect_sources(root, vault, "course", ["sheet"])
-    assert changed["sources"]["sheet"]["status"] == "changed"
-    before = path.read_bytes()
-    with pytest.raises(ValueError, match="new handle for changed content"):
-        sources.inspect_sources(root, vault, "course", ["sheet"], expected=3)
-    assert path.read_bytes() == before
-    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
-        records.save(
-            root,
-            "course",
-            3,
-            {
-                "sources": {
-                    "sheet": {
-                        "fingerprint": changed["sources"]["sheet"][
-                            "current_fingerprint"
-                        ]
-                    }
-                }
-            },
-        )
-
-
-def test_public_save_cannot_introduce_fabricated_fingerprints(tmp_path: Path) -> None:
-    forged = {"sha256": "0" * 64, "size": 12345}
-    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
-        records.save(
-            tmp_path,
-            "course",
-            0,
-            {
-                "sources": {"missing": {"path": "missing.pdf", "fingerprint": forged}},
-                "knowledge": {
-                    "claim": {"text": "Claim", "refs": [{"source": "missing"}]}
-                },
-            },
-        )
-    path = tmp_path / "state/course.json"
-    assert not path.exists()
-    records.save(
-        tmp_path,
-        "course",
-        0,
-        {
-            "sources": {"missing": {"path": "missing.pdf"}},
-            "knowledge": {"claim": {"text": "Claim", "refs": [{"source": "missing"}]}},
-        },
-    )
-    before = path.read_bytes()
-    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
-        records.save(
-            tmp_path, "course", 1, {"sources": {"missing": {"fingerprint": forged}}}
-        )
-    assert path.read_bytes() == before
-    inspected = sources.inspect_sources(tmp_path, tmp_path, "course", ["missing"])
-    assert inspected["sources"]["missing"]["status"] == "missing"
-    assert inspected["sources"]["missing"]["unverified_references"] == 1
-
-
-def test_public_save_only_roundtrips_captured_fingerprints_even_when_uncited(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "sheet.pdf").write_bytes(b"actual source")
-    records.save(tmp_path, "course", 0, {"sources": {"sheet": {"path": "sheet.pdf"}}})
-    sources.inspect_sources(tmp_path, tmp_path, "course", ["sheet"], expected=1)
-    state = records.read(tmp_path, "course")
-    assert isinstance(state, dict)
-    captured = state["sources"]["sheet"]
-    assert captured["fingerprint"] == {
-        "sha256": hashlib.sha256(b"actual source").hexdigest(),
-        "size": 13,
-    }
-    assert (
-        records.save(tmp_path, "course", 2, {"sources": {"sheet": captured}})[
-            "revision"
-        ]
-        == 2
-    )
-    path = tmp_path / "state/course.json"
-    before = path.read_bytes()
-    with pytest.raises(ValueError, match="fingerprint is helper-owned"):
-        records.save(
-            tmp_path,
-            "course",
-            2,
-            {"sources": {"sheet": {"fingerprint": {"sha256": "0" * 64, "size": 13}}}},
-        )
-    assert path.read_bytes() == before
-
-
-def test_only_selected_local_regular_sources_are_inspected(tmp_path: Path) -> None:
-    root = tmp_path / "learning"
-    present = tmp_path / "local.md"
-    present.write_text("source", encoding="utf-8")
-    records.save(
-        root,
-        "course",
-        0,
-        {
-            "sources": {
-                "local": {"path": str(present)},
-                "missing": {"path": "missing.md"},
-                "remote": {"path": "https://example.invalid/course.pdf"},
-                "directory": {"path": str(tmp_path)},
-            }
-        },
-    )
-    local = sources.inspect_sources(root, tmp_path, "course", ["local"])
-    assert set(local["sources"]) == {"local"}
-    unavailable = sources.inspect_sources(
-        root, tmp_path, "course", ["missing", "remote", "directory"]
-    )
-    assert unavailable["sources"]["missing"]["status"] == "missing"
-    assert unavailable["sources"]["remote"]["status"] == "unverified"
-    assert "current_fingerprint" not in unavailable["sources"]["remote"]
-    assert unavailable["sources"]["directory"]["status"] == "unverified"
-    with pytest.raises(ValueError, match="unavailable sources"):
-        sources.inspect_sources(
-            root, tmp_path, "course", ["local", "missing"], expected=1
-        )
-    with pytest.raises(ValueError, match="select at least one"):
-        sources.inspect_sources(root, tmp_path, "course", [])
-
-
-def test_source_capture_guards_snapshot_and_keeps_original_metadata(
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "sheet.pdf"
-    source.write_bytes(b"source")
-    receipt = records.save(
-        tmp_path, "course", 0, {"sources": {"sheet": {"path": "sheet.pdf"}}}
-    )
-    path = tmp_path / "state/course.json"
-    modified = json.loads(path.read_text())
-    modified["title"] = "Other device"
-    path.write_text(json.dumps(modified))
-    with pytest.raises(storage.RevisionConflict, match="snapshot conflict"):
-        sources.inspect_sources(
-            tmp_path,
-            tmp_path,
-            "course",
-            ["sheet"],
-            expected=1,
-            expected_digest=receipt["digest"],
-        )
-    assert "fingerprint" not in json.loads(path.read_text())["sources"]["sheet"]
-    with pytest.raises(ValueError, match="requires expected revision"):
-        sources.inspect_sources(
-            tmp_path, tmp_path, "course", ["sheet"], expected_digest=receipt["digest"]
-        )
-
-
-def test_source_changing_during_read_is_unverified(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    source = tmp_path / "sheet.pdf"
-    source.write_bytes(b"source")
-    records.save(tmp_path, "course", 0, {"sources": {"sheet": {"path": "sheet.pdf"}}})
-    original_stat = Path.stat
-
-    def change_before_stat(
-        path: Path, *, follow_symlinks: bool = True
-    ) -> os.stat_result:
-        if path == source:
-            path.write_bytes(b"changed")
-        return original_stat(path, follow_symlinks=follow_symlinks)
-
-    monkeypatch.setattr(Path, "stat", change_before_stat)
-    result = sources.inspect_sources(tmp_path, tmp_path, "course", ["sheet"])
-    assert result["sources"]["sheet"]["status"] == "unverified"
-    assert "changed while being inspected" in result["sources"]["sheet"]["reason"]
+def files(root: Path, *names: str) -> None:
+    for name in names:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(name)
 
 
 def test_scan_lists_only_material_git_does_not_ignore(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
-    for name in [
+    files(
+        repo,
         "docs/guide.md",
         "draft.md",
         "build.md",
         "node_modules/pkg/README.md",
         ".github/notes.md",
-    ]:
-        (repo / name).parent.mkdir(parents=True, exist_ok=True)
-        (repo / name).write_text(name)
+    )
     (repo / ".gitignore").write_text("node_modules/\nbuild.md\n")
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "add", "docs/guide.md"], check=True)
 
-    def listed(vault: Path) -> list[str]:
-        return [item["path"] for item in sources.scan(vault, {})["files"]]
+    def listed(material: Path) -> list[str]:
+        return [item["path"] for item in sources.scan(material, {})["files"]]
 
     assert listed(repo) == ["docs/guide.md", "draft.md"]
     assert listed(repo / "docs") == ["guide.md"]
@@ -274,3 +37,101 @@ def test_scan_lists_only_material_git_does_not_ignore(tmp_path: Path) -> None:
     assert listed(repo) == ["draft.md"]
     with pytest.raises(ValueError, match="does not exist"):
         sources.scan(tmp_path / "missing", {})
+
+
+def test_scan_names_registered_files_and_suggests_free_course_handles(
+    tmp_path: Path,
+) -> None:
+    files(tmp_path, "slides.pdf", "a/notes.md", "b/notes.md", "o1.md", "code.bin")
+    registered = {
+        "slides": {"path": "slides.pdf"},
+        "remote": {"path": "https://example.invalid/course.pdf"},
+        "outside": {"path": str(tmp_path.parent / "elsewhere.pdf")},
+    }
+    result = sources.scan(tmp_path, registered, taken={"notes"})
+    assert result == {
+        "directory": str(tmp_path),
+        "files": [
+            {"path": "a/notes.md", "bytes": 10, "suggested_handle": "notes-2"},
+            {"path": "b/notes.md", "bytes": 10, "suggested_handle": "notes-3"},
+            {"path": "o1.md", "bytes": 5, "suggested_handle": "s-o1"},
+            {"path": "slides.pdf", "bytes": 10, "handle": "slides"},
+        ],
+        "truncated": False,
+    }
+
+
+def test_scan_stops_at_its_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    files(tmp_path, "a.md", "b.md", "c.md")
+    monkeypatch.setattr(sources, "SCAN_LIMIT", 2)
+    result = sources.scan(tmp_path, {})
+    assert [item["path"] for item in result["files"]] == ["a.md", "b.md"]
+    assert result["truncated"] is True
+
+
+def test_prepare_registers_new_files_under_free_handles(tmp_path: Path) -> None:
+    material = tmp_path / "material"
+    files(material, "Week 1/Lecture Notes.pdf", "data.csv", "o12.md")
+    outside = tmp_path / "Elsewhere.TXT"
+    outside.write_text("x")
+    new, existing = sources.prepare(
+        material,
+        ["Week 1/Lecture Notes.pdf", "data.csv", str(outside), "o12.md"],
+        {},
+        taken={"lecture-notes"},
+    )
+    assert existing == {}
+    assert new == {
+        "lecture-notes-2": {
+            "path": "Week 1/Lecture Notes.pdf",
+            "title": "Lecture Notes",
+        },
+        "data": {"path": "data.csv"},
+        "elsewhere": {"path": str(outside.resolve()), "title": "Elsewhere"},
+        "s-o12": {"path": "o12.md", "title": "o12"},
+    }
+
+
+def test_prepare_is_idempotent_and_never_gives_one_file_two_handles(
+    tmp_path: Path,
+) -> None:
+    material = tmp_path / "material"
+    files(material, "notes.md", "sub/other.md")
+    (material / "alias.md").symlink_to(material / "notes.md")
+    registered = {"notes": {"path": "notes.md", "title": "notes"}}
+    new, existing = sources.prepare(
+        material,
+        [
+            "notes.md",
+            "sub/../notes.md",
+            str(material / "notes.md"),
+            "alias.md",
+            "sub/other.md",
+            "./sub/other.md",
+        ],
+        registered,
+    )
+    assert existing == {
+        "notes.md": "notes",
+        "sub/../notes.md": "notes",
+        str(material / "notes.md"): "notes",
+        "alias.md": "notes",
+    }
+    assert new == {"other": {"path": "sub/other.md", "title": "other"}}
+
+
+def test_prepare_rejects_missing_files_with_close_names(tmp_path: Path) -> None:
+    files(tmp_path, "lecture-01.pdf")
+    with pytest.raises(ValueError, match="did you mean lecture-01.pdf"):
+        sources.prepare(tmp_path, ["lecture-1.pdf"], {})
+    with pytest.raises(ValueError, match="does not exist: missing/x.md$"):
+        sources.prepare(tmp_path, ["missing/x.md"], {})
+    with pytest.raises(ValueError, match="at least one"):
+        sources.prepare(tmp_path, [], {})
+    with pytest.raises(ValueError, match="nonempty strings"):
+        sources.prepare(tmp_path, [" "], {})
+    (tmp_path / "folder").mkdir()
+    with pytest.raises(ValueError, match="does not exist"):
+        sources.prepare(tmp_path, ["folder"], {})

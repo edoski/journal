@@ -18,56 +18,60 @@ and constructs the integrations needed by the selected command. Small protocols
 remain where they isolate real filesystem, database, and status inputs.
 
 Note publication owns locking, conflict detection, no-op comparison, and atomic
-replacement. Learning storage separately owns revision-checked JSON publication;
+replacement. Learning storage separately owns locked, atomic JSON publication;
 its evidence and lesson-ownership rules belong to learning. Raw files, shortcuts,
 and model-generated JSON are validated on entry. Internal typed values are not
 repeatedly converted back into generic mappings and validated again.
 
 Each period synchronization reads its required dates once. Flow interruption
-totals are loaded in grouped queries. Learning retrieval indexes observation
-counts and traverses correction relationships directly. None of these require a
-persistent cache or background worker.
+totals are loaded in grouped queries. Learning derives topic standings from the
+observations in one pass per read. None of these require a persistent cache or
+background worker.
 
 ## Learning
 
-`learning/schema.py` declares the record shapes (`Source`, `Observation`,
-`Knowledge`, `Task`, `Route`), the single handle rule, and one validator and one
-patch function per type. `records.py` composes them into whole-record
-normalization, scope resolution (a handle, or an unambiguous course title or
-alias), and revision-checked publication with snapshot digests and the
-qualification guard on knowledge edits. Consumers read validated `dict` records;
-the typed layer lives at the validation boundary.
+One workspace studies one course; its record is `.study/course.json` (schema 6).
+`learning/schema.py` declares the record shapes, the handle namespace shared by
+topics, knowledge, tasks and sources, whole-record validation and the single patch
+rule (maps merge by handle, entries by field, `null` removes, lists replace,
+observations append), rejecting unknown fields with close matches. `progress.py`
+derives each topic's standing from the observations (level, unaided days, lapses,
+stale diagnoses) and schedules reviews on the successive-relearning ladder within
+the exam window. `records.py` applies a patch to the latest record under the
+record lock, schedules, validates and publishes atomically, returning a receipt
+with the consequences; it also forgets exact items. Consumers read validated
+`dict` records; the typed layer lives at the validation boundary.
 
-`retrieval.py` implements five read verbs on `packing.py`, the one byte-budget
-packer: `resume` (task, briefing, linked and recent evidence, relevant knowledge),
-`catalog` (handles only), `search` (lexical discovery with candidates), `knowledge`
-(whole entries or a paged index) and `evidence` (topic histories or exact
-observations with correction groups). Whole items are kept or omitted, never
-clipped, and every omission is listed under `selection`. `briefing.py` projects
-course orientation and the position on the scope-level `route`; the selected task
-is returned once, beside it, not inside it. Budgets are serialized UTF-8 bytes.
+`retrieval.py` builds `resume` (the session opener: time, due reviews, the path
+with levels, weak topics, the open task, evidence and knowledge within byte
+budgets), `show` (whole items) and `search` (accent-insensitive lexical
+discovery with light stemming) on the one packer in `packing.py`. Whole items are
+kept or omitted, never clipped, and omissions are reported. `planning.py` joins
+reviews and open work across registered workspaces with Journal effort.
 
 `cli.py` is a command table: one small handler per verb with its mutation policy
-declared beside it; `__main__.py` parses, selects the workspace, applies the
-no-save policy and dispatches. `pi.ts` maps three quiet Pi tools onto the same
-verbs. `sources.py` scans, registers and fingerprints local material. `memory.py`
-owns inspection and previewed forgetting. `planning.py` joins reviews, unfinished
-work and Journal effort. `lessons.py` and `visuals.py` publish artifacts through
-`storage.py`. `workspace.py` and `workspace_import.py` own directory workspaces.
+declared beside it; `__main__.py` parses, selects the workspace and dispatches.
+`mcp.py` is a stdlib MCP server over stdio that exposes the same verbs as typed
+tools and prompts to Claude Desktop, Claude Code and Codex, running each verb as a
+CLI subprocess so the CLI stays the contract. `workspace.py` owns discovery,
+material links and the per-user registry; `preferences.py` merges global and
+course preferences; `sources.py` scans and registers material; `storage.py`
+publishes atomically under locks; `clock.py` owns the study day; `install.py` and
+`readiness.py` register and check the hosts.
 
 The canonical skill and its references own teaching workflows; host adapters
 route to them rather than keeping a second pedagogical state model. Observations
-are appended for actual attempts (default origin `direct_attempt`); what the
-learner reports or the tutor infers is kept as knowledge or task context.
-There is no vector service, background reflection worker, curriculum database
-or numerical mastery model.
+are appended for actual attempts (with the help given and the result), external
+results and explicit self-reports; the tutor's own explanations are not evidence.
+Levels and review dates are computed, not asserted. There is no vector service,
+background reflection worker or curriculum database.
 
 ## Maintenance
 
 Run `python tools/check.py` from the project environment. Use `sync` or `learning`
 as an optional argument for focused checks, and `--coverage` when coverage detail
-is useful. Ruff, strict mypy, import contracts, Python tests, and the Pi adapter
-tests cover the maintained code. The sync check also verifies rendering fixtures
+is useful. Ruff, strict mypy, import contracts and Python tests cover the
+maintained code. The sync check also verifies rendering fixtures
 without rewriting them.
 
 Rendering fixtures are a compatibility contract, not refactoring targets. Changes
@@ -83,10 +87,9 @@ owns `.study`. `learning/workspace.py` resolves explicit selection or the neares
 ancestor, validates the versioned marker, and derives local output paths. There is
 no global state fallback or inherited parent workspace. A workspace may instead
 study linked material elsewhere: its manifest names the material directory and the
-per-user index maps that directory back, and discovery follows a link only when no
-nearer marker exists and both directions still agree. `learning/study.py` owns
-the short user command; `__main__.py` is the canonical agent CLI. Pi pins the
-selected workspace across tool calls and stores its conversations there. Private
-launches use a temporary workspace with read-only access to the original sources.
-`workspace_import.py` validates an explicit one-scope copy into an empty workspace,
-rebasing paths and selecting applicable preferences without deleting originals.
+per-user registry maps that directory back, and discovery follows a link only when
+no nearer marker exists and both directions still agree. The registry lists every
+workspace so planning and search can span courses. `learning/study.py` owns
+the short user command (`init`, `link`, `unlink`); `__main__.py` is the canonical
+agent CLI. The MCP server resolves a course per tool call from its argument, the
+server's working directory or the registry.

@@ -1,186 +1,293 @@
+import json
+import os
 from pathlib import Path
-import sys
+import subprocess
+import tomllib
+from typing import Any
+import zipfile
 
 import pytest
 
 from learning import install
+from learning.workspace import support_directory
+
+SKILL = {"SKILL.md": "Learn.\n", "references/records.md": "Records.\n"}
+
+
+class FakeClaude:
+    """Records `claude mcp` calls and writes ~/.claude.json the way the CLI does."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+
+    def __call__(
+        self, command: list[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        assert kwargs["check"] is True
+        self.calls.append(command[1:])
+        path = install.code_config()
+        data = json.loads(path.read_text()) if path.exists() else {}
+        servers = data.setdefault("mcpServers", {})
+        if command[2] == "remove":
+            del servers[command[-1]]
+        else:
+            separator = command.index("--")
+            env = dict([command[command.index("-e") + 1].split("=", 1)])
+            servers[command[separator - 1]] = {
+                "type": "stdio",
+                "command": command[separator + 1],
+                "args": command[separator + 2 :],
+                "env": env,
+            }
+        path.write_text(json.dumps(data))
+        return subprocess.CompletedProcess(command, 0)
 
 
 @pytest.fixture
-def installation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
-    package = tmp_path / "repo/learning"
-    for name in (
-        "__main__.py",
-        "pi.ts",
-        "skills/learn/SKILL.md",
-        "skills/learn/scripts/learn",
-        "clients/codex/instructions.md",
-        "clients/claude/teach/SKILL.md",
-    ):
-        source = package / name
-        source.parent.mkdir(parents=True, exist_ok=True)
-        source.write_text("Learning instructions.\n")
-    (package / "skills/learn/scripts/learn").chmod(0o755)
+def installation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, FakeClaude]:
+    repo = tmp_path / "repo"
+    package = repo / "learning"
+    for name in ("__main__.py", "mcp.py"):
+        (package / name).parent.mkdir(parents=True, exist_ok=True)
+        (package / name).write_text("# module\n")
+    for name, text in SKILL.items():
+        path = package / "skills/learn" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    python = install.interpreter(repo)
+    python.parent.mkdir(parents=True)
+    python.write_text("#!/bin/sh\n")
+    python.chmod(0o755)
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setattr(install, "__file__", str(package / "install.py"))
-    monkeypatch.setattr(install.shutil, "which", lambda _: sys.executable)
-    return package, home
+    monkeypatch.setattr(install, "package_directory", lambda: package)
+    claude = FakeClaude()
+    monkeypatch.setattr(install.shutil, "which", lambda name: f"/bin/{name}")
+    monkeypatch.setattr(install.subprocess, "run", claude)
+    return package, home, claude
 
 
-@pytest.mark.parametrize("missing", ["pi", "node"])
-def test_missing_runtime_cannot_leave_partial_installation(
-    installation: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, missing: str
+def snapshot(home: Path) -> dict[str, int]:
+    return {str(path): path.stat().st_mtime_ns for path in home.rglob("*")}
+
+
+def test_install_configures_every_host_and_is_idempotent(
+    installation: tuple[Path, Path, FakeClaude],
 ) -> None:
-    _, home = installation
-    monkeypatch.setattr(
-        install.shutil,
-        "which",
-        lambda name: None if name == missing else sys.executable,
+    package, home, claude = installation
+    repo = package.parent
+    entry = install.server(repo)
+    assert entry == {
+        "command": str(repo / ".venv/bin/python"),
+        "args": ["-m", "learning.mcp"],
+        "env": {"PYTHONPATH": str(repo)},
+    }
+    result = install.install()
+    assert result["claude-desktop"] == result["claude-code"] == "updated"
+    assert result["codex"] == "updated" and result["study_command"] == "updated"
+    assert result["skill_links"] == "updated: claude-code, codex"
+    desktop = json.loads(install.desktop_config().read_text())
+    assert desktop == {"mcpServers": {"learning": entry}}
+    assert claude.calls == [
+        [
+            "mcp",
+            "add",
+            "--scope",
+            "user",
+            "-e",
+            f"PYTHONPATH={repo}",
+            "learning",
+            "--",
+            entry["command"],
+            "-m",
+            "learning.mcp",
+        ]
+    ]
+    codex = tomllib.loads(install.codex_config().read_text())
+    assert codex == {"mcp_servers": {"learning": entry}}
+    for link in install.skill_links().values():
+        assert link.resolve() == package / "skills/learn"
+    with zipfile.ZipFile(result["skill_archive"]) as archive:
+        assert {name: archive.read(name).decode() for name in archive.namelist()} == {
+            f"learn/{name}": text for name, text in SKILL.items()
+        }
+    command = home / ".local/bin/study"
+    assert command.read_text() == install.command_content(repo)
+    assert os.access(command, os.X_OK)
+    assert result["backups"] == "none"
+    before = snapshot(home)
+    again = install.install()
+    assert {key: again[key] for key in ("claude-desktop", "claude-code", "codex")} == {
+        "claude-desktop": "unchanged",
+        "claude-code": "unchanged",
+        "codex": "unchanged",
+    }
+    assert again["skill_links"] == again["study_command"] == "unchanged"
+    assert len(claude.calls) == 1
+    archive = Path(result["skill_archive"])
+    assert {
+        path: stamp for path, stamp in snapshot(home).items() if path != str(archive)
+    } == {path: stamp for path, stamp in before.items() if path != str(archive)}
+
+
+def test_existing_configs_are_merged_and_backed_up(
+    installation: tuple[Path, Path, FakeClaude],
+) -> None:
+    package, _, claude = installation
+    desktop = install.desktop_config()
+    desktop.parent.mkdir(parents=True)
+    original_desktop = {
+        "theme": "dark",
+        "mcpServers": {"other": {"command": "x"}, "learning": {"command": "old"}},
+    }
+    desktop.write_text(json.dumps(original_desktop))
+    codex = install.codex_config()
+    codex.parent.mkdir()
+    original_codex = (
+        '# Learning communication\ndeveloper_instructions = "Teach quietly."\n'
+        '# End learning communication\nmodel = "gpt"\n\n'
+        '[mcp_servers.other]\ncommand = "other"\n'
     )
-    with pytest.raises(ValueError, match=f"{missing} must already be installed"):
-        install.install()
-    assert list(home.iterdir()) == []
+    codex.write_text(original_codex)
+    install.code_config().write_text(
+        json.dumps({"projects": {}, "mcpServers": {"learning": {"command": "old"}}})
+    )
+    result = install.install()
+    merged = json.loads(desktop.read_text())
+    assert merged["theme"] == "dark"
+    assert merged["mcpServers"]["other"] == {"command": "x"}
+    assert merged["mcpServers"]["learning"] == install.server(package.parent)
+    text = codex.read_text()
+    assert "developer_instructions" not in text and "Learning communication" not in text
+    parsed = tomllib.loads(text)
+    assert parsed["model"] == "gpt"
+    assert parsed["mcp_servers"]["other"] == {"command": "other"}
+    assert parsed["mcp_servers"]["learning"] == install.server(package.parent)
+    assert [call[1] for call in claude.calls] == ["remove", "add"]
+    assert json.loads(install.code_config().read_text())["projects"] == {}
+    backups = Path(result["backups"])
+    assert json.loads((backups / "claude_desktop_config.json").read_text()) == (
+        original_desktop
+    )
+    assert (backups / "codex-config.toml").read_text() == original_codex
 
 
-def test_invalid_config_is_detected_before_any_other_installation_write(
-    installation: tuple[Path, Path],
+def test_claude_code_is_skipped_without_its_cli(
+    installation: tuple[Path, Path, FakeClaude], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _, home = installation
-    config = home / ".codex/config.toml"
-    config.parent.mkdir()
-    original = '# Learning communication\ndeveloper_instructions = "incomplete"\n'
-    config.write_text(original)
-    with pytest.raises(ValueError, match="incomplete"):
-        install.install()
-    assert config.read_text() == original
-    assert list(home.iterdir()) == [config.parent]
-    assert list(config.parent.iterdir()) == [config]
+    _, _, claude = installation
+    monkeypatch.setattr(install.shutil, "which", lambda name: None)
+    assert install.install()["claude-code"].startswith("skipped")
+    assert claude.calls == []
+    assert not install.code_config().exists()
 
 
-def test_missing_source_prevents_all_installation_changes(
-    installation: tuple[Path, Path],
+@pytest.mark.parametrize(
+    ("setup", "message"),
+    [
+        (lambda p, h: install.interpreter(p.parent).unlink(), "virtual environment"),
+        (lambda p, h: (p / "mcp.py").unlink(), "installation source"),
+        (
+            lambda p, h: (
+                install.desktop_config().parent.mkdir(parents=True),
+                install.desktop_config().write_text("{"),
+            ),
+            "cannot read",
+        ),
+        (
+            lambda p, h: (
+                install.codex_config().parent.mkdir(),
+                install.codex_config().write_text(
+                    '[mcp_servers.learning]\ncommand = "x"\n'
+                ),
+            ),
+            "outside the installer's markers",
+        ),
+        (
+            lambda p, h: (
+                install.codex_config().parent.mkdir(),
+                install.codex_config().write_text("# Learning communication\nx = 1\n"),
+            ),
+            "incomplete old learning communication block",
+        ),
+        (lambda p, h: (h / ".agents").write_text("a file"), "not writable"),
+    ],
+)
+def test_preflight_failures_change_nothing(
+    installation: tuple[Path, Path, FakeClaude], setup: Any, message: str
 ) -> None:
-    package, home = installation
-    (package / "clients/claude/teach/SKILL.md").unlink()
-    with pytest.raises(ValueError, match="installation source"):
+    package, home, claude = installation
+    setup(package, home)
+    before = {path: path.read_bytes() for path in home.rglob("*") if path.is_file()}
+    with pytest.raises(ValueError, match=message):
         install.install()
-    assert list(home.iterdir()) == []
+    assert before == {
+        path: path.read_bytes() for path in home.rglob("*") if path.is_file()
+    }
+    assert not support_directory().exists()
+    assert claude.calls == []
 
 
-def test_valid_preflight_is_read_only_and_install_preserves_existing_config(
-    installation: tuple[Path, Path],
-) -> None:
-    package, home = installation
-    support = home / "Library/Application Support/Learning"
-    install.preflight(package, support)
-    assert list(home.iterdir()) == []
-    config = home / ".codex/config.toml"
-    config.parent.mkdir()
-    original = 'model = "configured-model"\n'
-    config.write_text(original)
-    install.install()
-    assert config.read_text() == install.codex_block(package) + original
-    backups = list((support / "backups").glob("*/codex-config.toml"))
-    assert len(backups) == 1
-    assert backups[0].read_text() == original
-    for host in (".agents", ".claude"):
-        assert (home / host / "skills/learn").resolve() == package / "skills/learn"
-    assert (home / ".local/bin/study").is_file()
-    assert (support / "learn-claude.zip").is_file()
-
-
-def test_conflicting_destination_fails_preflight_without_mutation(
-    installation: tuple[Path, Path],
-) -> None:
-    _, home = installation
-    destination = home / ".agents"
-    destination.write_text("An existing file, not a configuration directory.")
-    with pytest.raises(ValueError, match="destination is not writable"):
-        install.install()
-    assert list(home.iterdir()) == [destination]
+def test_codex_block_is_appended_after_existing_tables(tmp_path: Path) -> None:
+    original = 'model = "gpt"\n[profiles.fast]\nmodel = "mini"'
+    updated = install.codex_content(original, tmp_path)
+    parsed = tomllib.loads(updated)
+    assert parsed["profiles"] == {"fast": {"model": "mini"}}
+    assert parsed["mcp_servers"]["learning"] == install.server(tmp_path)
+    assert install.codex_content(updated, tmp_path) == updated
+    moved = install.codex_content(updated, tmp_path / "moved")
+    assert moved.count(install.CODEX_START) == 1
+    assert tomllib.loads(moved)["mcp_servers"]["learning"]["command"].startswith(
+        str(tmp_path / "moved")
+    )
 
 
 def test_study_symlink_target_is_never_modified(
-    installation: tuple[Path, Path],
+    installation: tuple[Path, Path, FakeClaude],
 ) -> None:
-    _, home = installation
+    _, home, _ = installation
     target = home / "personal-script"
     target.write_text("Keep this unrelated command.")
     target.chmod(0o600)
     command = home / ".local/bin/study"
     command.parent.mkdir(parents=True)
     command.symlink_to(target)
-    install.install()
+    result = install.install()
     assert not command.is_symlink()
     assert target.read_text() == "Keep this unrelated command."
     assert target.stat().st_mode & 0o777 == 0o600
+    assert (Path(result["backups"]) / "study").is_symlink()
 
 
-@pytest.mark.parametrize("kind", ["directory", "unwritable"])
-def test_invalid_archive_destination_stops_before_other_installation_changes(
-    installation: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, kind: str
-) -> None:
-    _, home = installation
-    support = home / "Library/Application Support/Learning"
-    support.mkdir(parents=True)
-    archive = support / "learn-claude.zip"
-    if kind == "directory":
-        archive.mkdir()
-    else:
-        archive.write_text("Existing archive.")
-        actual_access = install.os.access
-        monkeypatch.setattr(
-            install.os,
-            "access",
-            lambda path, mode: (
-                False if Path(path) == archive else actual_access(path, mode)
-            ),
-        )
-    before = {str(path): path.stat().st_mtime_ns for path in home.rglob("*")}
-    with pytest.raises(ValueError, match="not a readable, writable file"):
-        install.install()
-    assert before == {str(path): path.stat().st_mtime_ns for path in home.rglob("*")}
-    assert not (home / ".codex").exists()
-    assert not (home / ".agents").exists()
-    assert not (home / ".local/bin/study").exists()
-
-
-def test_installed_command_preserves_cwd_for_init_and_workspace_resume(
+def test_installed_study_command_initializes_and_links(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import json
-    import subprocess
-
     home = tmp_path / "home"
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.delenv("STUDY_WORKSPACE", raising=False)
-    fake_pi = tmp_path / "pi"
-    fake_pi.write_text(
-        f"#!{sys.executable}\n"
-        "import json, os, sys\n"
-        "print(json.dumps({'cwd': os.getcwd(), 'workspace': os.environ['STUDY_WORKSPACE'], 'args': sys.argv[1:]}))\n"
-    )
-    fake_pi.chmod(0o755)
-    monkeypatch.setattr(install.shutil, "which", lambda _: str(fake_pi))
     repo = Path(__file__).resolve().parents[2]
-    install.install_command(repo, home / "support")
+    if not install.interpreter(repo).exists():
+        pytest.skip("the repository virtual environment is not installed")
+    install.install_command(repo, install.Backup(tmp_path / "support"))
     command = home / ".local/bin/study"
     course = tmp_path / "course with spaces"
     course.mkdir()
+    environment = {**os.environ, "HOME": str(home)}
     result = json.loads(
-        subprocess.check_output([str(command), "init"], cwd=course, text=True)
+        subprocess.check_output(
+            [str(command), "init"], cwd=course, text=True, env=environment
+        )
     )
     assert result["workspace"] == str(course)
-    nested = course / "module"
-    nested.mkdir()
-    result = json.loads(
-        subprocess.check_output([str(command), "--continue"], cwd=nested, text=True)
+    unknown = subprocess.run(
+        [str(command), "resume"],
+        cwd=course,
+        env=environment,
+        capture_output=True,
+        text=True,
     )
-    assert result["cwd"] == result["workspace"] == str(course)
-    args = result["args"]
-    assert args[args.index("--session-dir") + 1] == str(course / ".study/conversations")
-    assert "--continue" in args
+    assert unknown.returncode == 2 and "MCP server" in unknown.stderr
     assert not (repo / ".study").exists()

@@ -1,78 +1,66 @@
-"""One byte-budget packer for every bounded projection the agent receives."""
+"""Byte budgets: serialized sizes and one linear packer of whole entries."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
 import json
-from typing import Any, TypeVar
+from typing import Any
 
-T = TypeVar("T")
-R = TypeVar("R")
+EMPTY_OBJECT = 2
+SMALLEST_ENTRY = len('"":0')
 
 
 def size(value: Any) -> int:
-    """Serialized UTF-8 byte size, the unit of every learning budget."""
+    """Compact UTF-8 JSON size, the unit of every learning budget."""
     return len(
         json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     )
 
 
-def pack(
-    items: Sequence[T],
-    budget: int | None,
-    render: Callable[[list[T]], R],
-    *,
-    contiguous: bool = False,
-    error: str = "budget must fit the empty selection",
-) -> tuple[list[T], list[T], R]:
-    """Greedily keep items, in order, while the rendered whole fits the budget.
+@dataclass
+class Packed:
+    """Kept entries in offer order, the keys left out, and the bytes used."""
 
-    ``render`` builds the complete projection for a selection, so envelopes and
-    already-included material are counted exactly. Items are never clipped: one
-    that does not fit is omitted whole. ``contiguous`` stops at the first miss,
-    which paged results need so that offsets stay meaningful. A ``None`` budget
-    keeps everything. Returns the kept items, the omitted items and the result.
+    items: dict[str, Any] = field(default_factory=dict)
+    omitted: list[str] = field(default_factory=list)
+    used: int = EMPTY_OBJECT
+
+
+def pack(groups: Iterable[Sequence[tuple[str, Any]]], budget: int) -> Packed:
+    """Keep whole groups of entries, in order, while their JSON object fits ``budget``.
+
+    The object ``{"k":v,...}`` costs two braces, each ``"k":v`` entry and a comma
+    between entries, so every entry is measured once and the running total is
+    exact. A group shares bytes with entries already kept (an observation and its
+    correction partners), never splits, and is omitted whole when it does not
+    fit; later, smaller groups may still fit.
     """
-    if budget is None:
-        selected = list(items)
-        return selected, [], render(selected)
-    kept: list[T] = []
-    omitted: list[T] = []
-    result = render(kept)
-    if type(budget) is not int or size(result) > budget:
-        raise ValueError(error)
-    for index, item in enumerate(items):
-        candidate = render([*kept, item])
-        if size(candidate) <= budget:
-            kept.append(item)
-            result = candidate
+    if type(budget) is not int or budget < EMPTY_OBJECT:
+        raise ValueError(f"budget must be at least {EMPTY_OBJECT} bytes")
+    packed = Packed()
+    sizes: dict[str, int] = {}
+    left_out: dict[str, None] = {}
+    for group in groups:
+        fresh: dict[str, Any] = {}
+        for key, value in group:
+            if key not in packed.items:
+                fresh.setdefault(key, value)
+        if not fresh:
             continue
-        omitted.append(item)
-        if contiguous:
-            omitted.extend(items[index + 1 :])
-            break
-    return kept, omitted, result
-
-
-def fit(
-    items: Sequence[T],
-    budget: int,
-    render: Callable[[list[T], list[T]], R],
-    *,
-    error: str = "budget must fit the omission descriptors",
-) -> R:
-    """Pack whole items and always render the omitted ones as descriptors."""
-    kept: list[T] = []
-    omitted = list(items)
-    result = render(kept, omitted)
-    if type(budget) is not int or size(result) > budget:
-        raise ValueError(error)
-    for item in items:
-        candidate = render(
-            [*kept, item], [other for other in omitted if other is not item]
-        )
-        if size(candidate) <= budget:
-            kept.append(item)
-            omitted = [other for other in omitted if other is not item]
-            result = candidate
-    return result
+        room = budget - packed.used
+        cost = len(fresh) - (0 if packed.items else 1)
+        for key, value in fresh.items():
+            if room < cost + SMALLEST_ENTRY:
+                cost = room + 1
+                break
+            if key not in sizes:
+                sizes[key] = size(key) + 1 + size(value)
+            cost += sizes[key]
+        if cost <= room:
+            packed.items.update(fresh)
+            packed.used += cost
+        else:
+            left_out.update(dict.fromkeys(fresh))
+    packed.omitted = [key for key in left_out if key not in packed.items]
+    return packed

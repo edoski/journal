@@ -1,4 +1,4 @@
-"""Locate and initialize the directory that owns a study session."""
+"""Locate, initialize, register and link the directory that owns a study course."""
 
 from __future__ import annotations
 
@@ -8,10 +8,16 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from typing import Any
 
 from learning import storage
 
 _VERSION = 1
+_REGISTRY_SCHEMA = 2
+# Local study outputs: a symlink here would publish learner data somewhere else.
+_LOCAL = ("course.json",)
+
+Registry = dict[str, dict[str, str]]
 
 
 @dataclass(frozen=True)
@@ -24,21 +30,31 @@ class Workspace:
         return self.directory / ".study"
 
     @property
-    def assets(self) -> Path:
-        return self.root / "assets"
+    def record(self) -> Path:
+        """The course record: one course per workspace."""
+        return self.root / "course.json"
 
     @property
-    def conversations(self) -> Path:
-        return self.root / "conversations"
+    def notes(self) -> Path:
+        """Standalone study notes, beside the material so Obsidian shows them."""
+        return self.directory / "study-notes"
 
     @property
     def sources(self) -> Path:
         return self.source_directory or self.directory
 
 
-def links_path() -> Path:
-    """Per-user index from linked material directories to their study workspaces."""
-    return Path.home() / "Library/Application Support/Learning/workspaces.json"
+def support_directory() -> Path:
+    """Per-user learning data shared by every workspace."""
+    return Path.home() / "Library/Application Support/Learning"
+
+
+def registry_path() -> Path:
+    """Per-user registry of study workspaces and the material they are linked to."""
+    return support_directory() / "workspaces.json"
+
+
+# --- manifests ---------------------------------------------------------------
 
 
 def _manifest(sources: Path | None) -> str:
@@ -77,7 +93,7 @@ def _load(directory: Path) -> Workspace:
             f"Invalid linked material directory in the study workspace at {directory}"
         )
     workspace = Workspace(directory, None if sources is None else Path(sources))
-    for name in ("state", "preferences.json", "lessons", "assets", "conversations"):
+    for name in _LOCAL:
         if (workspace.root / name).is_symlink():
             raise ValueError(
                 f"Study output must stay local; linked path: {workspace.root / name}"
@@ -85,44 +101,140 @@ def _load(directory: Path) -> Workspace:
     return workspace
 
 
-def _read_links(path: Path) -> dict[str, str]:
+def _claims(directory: Path, material: Path) -> bool:
+    """Whether the workspace at directory still names material as its sources."""
+    try:
+        return _load(directory).source_directory == material
+    except ValueError:
+        return False
+
+
+# --- registry ----------------------------------------------------------------
+
+
+def _absolute(value: Any) -> bool:
+    return isinstance(value, str) and Path(value).is_absolute()
+
+
+def _entries(path: Path, value: Any) -> Registry:
+    workspaces = value.get("workspaces") if isinstance(value, dict) else None
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != _REGISTRY_SCHEMA
+        or set(value) != {"schema", "workspaces"}
+        or not isinstance(workspaces, dict)
+    ):
+        raise ValueError(
+            f"Unsupported study workspace registry at {path}; expected "
+            '{"schema": 2, "workspaces": {"/abs/workspace": {"sources"?: "/abs/material"}}}'
+        )
+    for directory, entry in workspaces.items():
+        if (
+            not _absolute(directory)
+            or not isinstance(entry, dict)
+            or not set(entry) <= {"sources"}
+            or ("sources" in entry and not _absolute(entry["sources"]))
+        ):
+            raise ValueError(f"Invalid study workspace registry entry: {directory}")
+    return {directory: dict(entry) for directory, entry in workspaces.items()}
+
+
+def _read_registry() -> Registry:
+    """Every stored entry, including entries whose workspace no longer exists."""
+    path = registry_path()
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
     except (OSError, ValueError) as error:
-        raise ValueError(f"Invalid study workspace links at {path}: {error}") from error
-    if not isinstance(value, dict) or any(
-        not isinstance(item, str) or not Path(item).is_absolute()
-        for pair in value.items()
-        for item in pair
-    ):
-        raise ValueError(f"Invalid study workspace links at {path}")
-    return value
+        raise ValueError(
+            f"Invalid study workspace registry at {path}: {error}"
+        ) from error
+    return _entries(path, value)
+
+
+def _exists(directory: str) -> bool:
+    return (Path(directory) / ".study/workspace.json").exists()
+
+
+def _write_registry(entries: Registry) -> None:
+    """Publish schema 2, pruning workspaces whose manifest is gone; caller holds the lock."""
+    path = registry_path()
+    kept = {
+        directory: entries[directory]
+        for directory in sorted(entries)
+        if _exists(directory)
+    }
+    content = (
+        json.dumps({"schema": _REGISTRY_SCHEMA, "workspaces": kept}, indent=2) + "\n"
+    )
+    try:
+        current = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        current = None
+    if content != current:
+        storage.publish_text(path, content)
+
+
+def _register(directory: Path) -> None:
+    """Record the workspace with its manifest's material; caller holds the lock."""
+    sources = _load(directory).source_directory
+    entries = _read_registry()
+    entries[str(directory)] = {} if sources is None else {"sources": str(sources)}
+    _write_registry(entries)
+
+
+def register(workspace: Workspace) -> None:
+    """Make the workspace visible to every-course reads such as `plan --all`."""
+    with storage.lock(storage.lock_path(registry_path())):
+        _register(workspace.directory)
+
+
+def registered() -> list[Workspace]:
+    """Valid registered workspaces, sorted by directory; stale entries are ignored."""
+    result = []
+    for directory in sorted(_read_registry()):
+        if not _exists(directory):
+            continue
+        try:
+            result.append(_load(Path(directory)))
+        except ValueError:
+            continue
+    return result
+
+
+# --- discovery ---------------------------------------------------------------
 
 
 def _linked(start: Path) -> Workspace | None:
     """The workspace linked to start's nearest linked ancestor, verified both ways."""
-    links = _read_links(links_path())
-    material = max(
-        (Path(path) for path in links if start.is_relative_to(path)),
-        key=lambda path: len(path.parts),
-        default=None,
-    )
-    if material is None:
+    links = [
+        (Path(entry["sources"]), Path(directory))
+        for directory, entry in _read_registry().items()
+        if "sources" in entry and _exists(directory)
+    ]
+    candidates = [link for link in links if start.is_relative_to(link[0])]
+    if not candidates:
         return None
-    directory = Path(links[str(material)])
-    if not _marked(directory):
+    material = max((link[0] for link in candidates), key=lambda path: len(path.parts))
+    directories = sorted(
+        directory for source, directory in candidates if source == material
+    )
+    workspaces = [_load(directory) for directory in directories]
+    verified = [item for item in workspaces if item.source_directory == material]
+    if len(verified) == 1:
+        return verified[0]
+    if verified:
         raise ValueError(
-            f"The study workspace linked to {material} is missing: {directory}"
+            f"{material} is linked to several study workspaces: "
+            + ", ".join(str(item.directory) for item in verified)
+            + "; select one with --workspace and unlink the others"
         )
-    workspace = _load(directory)
-    if workspace.source_directory != material:
-        raise ValueError(
-            f"Stale study workspace link: {directory} no longer studies {material}. "
-            f"Run `study link {material} --workspace {directory}` to restore it."
-        )
-    return workspace
+    directory = directories[0]
+    raise ValueError(
+        f"Stale study workspace link: {directory} no longer studies {material}. "
+        f"Run `study link {material} --workspace {directory}` to restore it."
+    )
 
 
 def resolve(directory: str | Path | None = None) -> Workspace:
@@ -147,14 +259,10 @@ def resolve(directory: str | Path | None = None) -> Workspace:
             f"`study init --workspace STUDY_DIRECTORY --sources {start}` to keep study "
             "files elsewhere, or select `--workspace DIRECTORY`."
         )
-    if os.environ.get("LEARNING_PRIVATE") == "1" and os.environ.get(
-        "LEARNING_SOURCE_ROOT"
-    ):
-        return Workspace(
-            workspace.directory,
-            Path(os.environ["LEARNING_SOURCE_ROOT"]).resolve(),
-        )
     return workspace
+
+
+# --- links -------------------------------------------------------------------
 
 
 def _check_link(directory: Path, material: Path) -> None:
@@ -177,24 +285,16 @@ def _check_link(directory: Path, material: Path) -> None:
             f"{material} is inside the study workspace {owner}; "
             "discovery would select that workspace before any link"
         )
-    claimed = _read_links(links_path()).get(str(material))
-    if (
-        claimed is not None
-        and Path(claimed) != directory
-        and _claims(Path(claimed), material)
-    ):
-        raise ValueError(
-            f"{material} is already linked to the study workspace {claimed}; "
-            f"run `study unlink --workspace {claimed}` first"
-        )
-
-
-def _claims(directory: Path, material: Path) -> bool:
-    """Whether the workspace at directory still names material as its sources."""
-    try:
-        return _load(directory).source_directory == material
-    except ValueError:
-        return False
+    for other, entry in sorted(_read_registry().items()):
+        if (
+            entry.get("sources") == str(material)
+            and Path(other) != directory
+            and _claims(Path(other), material)
+        ):
+            raise ValueError(
+                f"{material} is already linked to the study workspace {other}; "
+                f"run `study unlink --workspace {other}` first"
+            )
 
 
 def link(workspace: Workspace, material: str | Path) -> Workspace:
@@ -202,43 +302,38 @@ def link(workspace: Workspace, material: str | Path) -> Workspace:
 
     One workspace studies one material directory: relinking replaces the previous
     link, and material still claimed by another workspace is refused. A link whose
-    workspace no longer names the material is stale and may be replaced.
+    workspace no longer names the material is stale and is cleared.
     """
     target = Path(material).expanduser().resolve()
-    path = links_path()
-    with storage.lock(path.with_suffix(".lock")):
-        _check_link(workspace.directory, target)
-        links = _read_links(path)
-        updated = {
-            source: owner
-            for source, owner in links.items()
-            if Path(owner) != workspace.directory and source != str(target)
-        }
-        updated[str(target)] = str(workspace.directory)
-        # The manifest is published first: an interrupted link leaves no index
-        # entry rather than one that points at a workspace without a back-reference.
-        if not _claims(workspace.directory, target):
+    directory = workspace.directory
+    with storage.lock(storage.lock_path(registry_path())):
+        _check_link(directory, target)
+        # The manifest is published first: an interrupted link leaves no registry
+        # link rather than one that points at a workspace without a back-reference.
+        if not _claims(directory, target):
             storage.publish_text(workspace.root / "workspace.json", _manifest(target))
-        if updated != links:
-            storage.publish_text(path, json.dumps(updated, indent=2) + "\n")
-    return Workspace(workspace.directory, target)
+        entries = {
+            other: {} if entry.get("sources") == str(target) else entry
+            for other, entry in _read_registry().items()
+        }
+        entries[str(directory)] = {"sources": str(target)}
+        _write_registry(entries)
+    return Workspace(directory, target)
 
 
 def unlink(workspace: Workspace) -> Workspace:
     """Remove this workspace's material link; relative sources resolve locally again."""
-    path = links_path()
-    with storage.lock(path.with_suffix(".lock")):
-        links = _read_links(path)
-        updated = {
-            source: owner
-            for source, owner in links.items()
-            if Path(owner) != workspace.directory
-        }
-        if updated != links:
-            storage.publish_text(path, json.dumps(updated, indent=2) + "\n")
-        if _load(workspace.directory).source_directory is not None:
+    directory = workspace.directory
+    with storage.lock(storage.lock_path(registry_path())):
+        entries = _read_registry()
+        entries[str(directory)] = {}
+        _write_registry(entries)
+        if _load(directory).source_directory is not None:
             storage.publish_text(workspace.root / "workspace.json", _manifest(None))
-    return Workspace(workspace.directory)
+    return Workspace(directory)
+
+
+# --- initialization ----------------------------------------------------------
 
 
 def _create(target: Path) -> Workspace:
@@ -269,7 +364,7 @@ def _create(target: Path) -> Workspace:
 def initialize(
     directory: str | Path | None = None, sources: str | Path | None = None
 ) -> Workspace:
-    """Create an empty workspace without replacing existing files or adopting data.
+    """Create or reopen a workspace without replacing existing files, and register it.
 
     With sources, the workspace studies that material directory: relative source
     paths resolve there, and discovery from it selects this workspace.
@@ -282,7 +377,11 @@ def initialize(
     if not target.is_dir():
         raise ValueError(f"Study directory does not exist: {target}")
     if sources is None:
-        return _create(target)
+        with storage.lock(storage.lock_path(registry_path())):
+            _read_registry()  # Refuse an unreadable registry before creating anything.
+            workspace = _create(target)
+            _register(target)
+        return workspace
     material = Path(sources).expanduser().resolve()
     # Refuse an invalid link before creating anything; link() re-checks under its lock.
     _check_link(target, material)

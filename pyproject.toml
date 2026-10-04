@@ -24,7 +24,7 @@ dev = [
 include = ["sync*", "learning*"]
 
 [tool.setuptools.package-data]
-learning = ["pi.ts", "skills/learn/SKILL.md", "skills/learn/scripts/learn", "skills/learn/references/*.md", "clients/claude/teach/SKILL.md", "clients/claude/instructions.md", "clients/codex/instructions.md"]
+learning = ["skills/learn/SKILL.md", "skills/learn/references/*.md"]
 
 [tool.coverage.run]
 branch = true

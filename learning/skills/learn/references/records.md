@@ -1,77 +1,89 @@
-# Learning records
+# The course record
 
-One scope is one course. Its record holds `sources`, `topics`, `observations` (learner evidence), `knowledge` (reusable understanding), `tasks` (unfinished work), an optional course `route`, and course facts (`title`, `goal`, `exam`, `coverage`, `course_context`, `focus`, `aliases`, `journal_activity`). The helper owns revisions, digests, timestamps, observation handles and freshness.
+A workspace holds one course. Its record has course facts (`title`, `goal`, `exam`, `journal`), `sources`, `topics` (the knowledge path), `observations` (learner evidence), `knowledge` (what you know about the course), `tasks` (unfinished activities), `focus` (the current task), `path` (study order and position) and course `preferences`. The helper owns ids, dates, revisions and everything it computes.
 
-`save SCOPE --expect REV --expect-digest DIGEST` takes a JSON patch on stdin (Pi: `learning_save` with `expected_revision`, `expected_digest`, `changes`). Revision 0 creates a scope. Send changed fields only. A receipt returns `revision`, `digest`, `assigned_observations` and resolved `review_dates`; no confirming read is needed.
+## Saving
+
+`save` takes one JSON patch as `changes` and applies it to the latest record. Send only what changed. There is no revision to pass; a retry of the same observation within a day is skipped as a duplicate, so an uncertain save can simply be repeated.
+
+| Field | Rule |
+| --- | --- |
+| `title`, `goal`, `journal`, `focus` | replace; `null` clears |
+| `exam`, `path` | merge by field; a `null` field clears it; `null` clears the whole object |
+| `sources`, `topics`, `knowledge`, `tasks` | merge by handle; an entry merges by field; a `null` field clears it; a `null` entry removes it |
+| `topics[k].review` | merges by field; `null` removes the review |
+| `preferences`, `global_preferences` | merge by dimension; `null` deletes; `global_preferences` applies to every course |
+| lists (`needs`, `topics`, `refs`, `aliases`, `order`, …) | replace |
+| `observations` | a list of new entries, appended |
+
+Handles are 1–64 lowercase letters, digits, `-` or `_`, starting with a letter or digit. Topics, knowledge entries, tasks and sources share one set of handles; `o` followed by digits is reserved for observations. Anything you reference (a topic in an observation, a source in a ref) must exist or be created in the same patch.
+
+A typical turn after a hinted attempt on an exercise:
 
 ```json
 {
-  "title": "Course title",
-  "sources": {"worksheet": {"path": "university/course/worksheet.md", "version": "2026-09 edition"}},
-  "topics": {"linear-systems": {"title": "Linear systems"}},
-  "focus": ["linear-systems"],
+  "topics": {"rank": {"gap": "Counts vectors instead of the dimension of their span"}},
   "observations": [{
-    "as": "attempt",
-    "topics": ["linear-systems"],
-    "text": "Recognized infinitely many solutions after the hint",
-    "response": "The two equations describe the same line",
-    "assistance": "Pointed out that the equations coincide",
-    "refs": [{"source": "worksheet", "locator": "Exercise 5(b)"}]
+    "topics": ["rank"],
+    "text": "Gave rank 3 for a matrix with a dependent third row; corrected it after a hint",
+    "response": "rank = 3",
+    "help": "Pointed at the third row",
+    "result": "correct",
+    "task": "exercise-5",
+    "refs": [{"source": "sheet", "locator": "Exercise 5(b)"}]
   }],
-  "tasks": {"exercise-5b": {"task": "Exercise 5(b)", "topics": ["linear-systems"], "question": "Justify the solution count for a new system", "assistance": "Coincident equations already explained"}},
-  "current_task": "exercise-5b"
+  "tasks": {"exercise-5": {"step": "Justify why the third row adds nothing", "help": "Hint about the dependent row"}}
 }
 ```
 
-## Patch semantics
-
-| Field | Patch rule |
-| --- | --- |
-| `sources`, `topics` | merge by handle; an object patches fields; `null` removes the entry |
-| `tasks` | patch fields; `null` field clears it; `null` task removes it (and clears `current_task` if it pointed there); `frame` and `plan` replace as units |
-| `knowledge` | patch fields; omitted fields survive; `null` optional field clears; `null` entry removes; `text` is required |
-| `observations` | a list of new entries only; never edited in place |
-| `route`, `course_context`, `topics[k].assessment`, `topics[k].review` | replace as whole objects; `null` clears |
-| `title`, `goal`, `exam`, `coverage`, `focus`, `aliases`, `current_task` | replace |
-
-Handles are 1–64 lowercase letters, digits, `-` or `_`, starting with a letter or digit. Use the handles the helper returned, not display titles.
+The receipt returns new observation ids, the reviews it set, level changes, the current `focus` and `path_current`, the number of due reviews, and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
 
 ## Observations
 
-Append one entry when the learner actually attempts something or an external assessment happens. Give `text`, `topics`, and when diagnostic `response`, `assistance`, `uncertainty`, `task`, `date` (the known event date) and `refs` with a `locator`. `origin` defaults to `direct_attempt`; use `external_assessment` for graded work. What the learner tells you and what you infer belong in `knowledge` or the task's `assistance`, not in observations. Missing `assistance` means unknown, never independent.
+One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `result`, `transfer`, `date` (the event day when it is not today), `task`, `refs`, `corrects`, `uncertain`.
 
-`as` names an alias for this patch: `$attempt` may appear in any `observations`, `considered_observations` or `corrects` list of the same save. To correct a misrecorded event, append a new observation with `corrects: ["o1"]`; the original stays. Your own factual error never becomes a learner observation: fix the explanation, the knowledge and any assessment that relied on it.
+| `kind` | When | Required |
+| --- | --- | --- |
+| `attempt` (default) | the learner tried something with you | `help` (`"none"` when unaided) and `result` (`correct`, `partial`, `incorrect`) |
+| `exam` | graded work from outside the session | `result`, no `help`; counts as unaided |
+| `self_report` | the learner's statement about their own understanding or confidence | no `result`, `help` or `transfer` |
 
-## Sources
+`help` describes what you gave before or during the attempt: a hint, a worked example of the same step, a reminder of the method. A solution reproduced right after your explanation is assisted. `transfer: true` marks success on a meaningfully different problem, representation or context than the one taught. `uncertain` records doubt about the evidence (the answer may have been read from notes, a symbol was illegible).
 
-`sources SCOPE --scan` lists course files under the workspace's source directory with suggested handles; `sources SCOPE --add '["lectures/week3.pdf"]' --expect REV` registers them and returns their handles. You may also register `{"path": ..., "version": ...}` directly in a save. A reference is `{"source": handle, "locator": "...", "excerpt": "..."}`; the helper captures `source_version` and any fingerprint. Once cited, a handle's `version` is immutable: new content gets a new handle. A moved file keeps its handle by updating `path`.
+Corrections: when an observation was misrecorded, append a new one describing what really happened with `corrects: ["o7"]`; the original stays visible but stops counting. Later improvement is simply a new observation. Delete only on the learner's explicit request ([lifecycle.md](lifecycle.md)).
+
+## Topics and the knowledge path
+
+A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
+
+- `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
+- `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved.
+- `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
+- `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then. Pin only for a reason; otherwise the helper schedules.
+
+How the helper schedules after each attempt on a topic: incorrect → 1 day; assisted or partial → 2 days; unaided correct → 3, 7, 16, 35, 75 then 160 days as unaided successes accumulate on separate days since the last unaided miss, so a failed review starts the ladder again. Before an exam the gap stays within a third of the time left and never reaches past the day before. A `self_report` does not reschedule.
+
+The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days, the last attempt, `lapsed` (failed unaided after an earlier unaided success) and `stale` (the gap or note was judged on an earlier day than the latest evidence).
+
+## Path and tasks
+
+`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
+
+A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 
 ## Knowledge
 
-Keep understanding that is useful later and costly to rebuild: notation correspondences, which resource is authoritative for what, conventions the learner chose, unresolved conflicts between documents. Fields: `text` (required), `topics`, `refs`, `attribution`, `uncertainty`, `conflicts`, `aliases` (alternative terms, including other languages, for search).
+Understanding of the course that is costly to rebuild: notation correspondences, which resource is authoritative for what, conventions the learner chose, unresolved conflicts between documents. Fields: `text` (required), `topics`, `refs`, `uncertain` (what is unverified or conflicting), `pinned` (load it in every session, for standing conventions), `aliases`. Add distinct facts as separate entries. Before rewriting an entry's meaning, read it whole with `show`; keep its `uncertain` unless evidence resolved it.
 
-```json
-{"knowledge": {"notation": {"text": "The lecturer uses g where the textbook uses h.", "attribution": "Learner report", "uncertainty": "Not yet checked in the slides", "aliases": ["notation correspondence"]}}}
-```
+## Preferences
 
-Read the whole entry (`knowledge SCOPE KEY`) before revising its meaning; a search excerpt is not enough. Add distinct facts as new entries rather than rewriting neighbours. Replacing or removing `attribution`, `uncertainty`, `conflicts`, `refs` or a whole entry returns `status: "needs_confirmation"` with the exact before/after and saves nothing. Then either repair the patch so the qualification survives, or resend it with `confirm_qualification_changes: ["key"]` and the current digest because the evidence really resolved it. Never acknowledge blindly. Text-only edits are not guarded; their fidelity is your judgement.
+`{"preferences": {"explanation_depth": "Short first, details on request"}}` sets a course preference; `global_preferences` sets one for every course. One instruction per dimension (`response_format`, `explanation_depth`, `lesson_pace`, `question_style`, `teaching_style`, or another short name); `null` deletes. Record them from the learner's explicit feedback, or a narrow one from repeated feedback; never from silence or praise. A one-answer request ("bullets this time") stays in the conversation; a condition for one unfinished task goes in that task's `note`.
 
-## Tasks and the route
+## Sources
 
-A task is one unfinished activity: `task` (label), `topics`, `question` or `pending_question`, `assistance` given so far, `why` for a detour, optional `instructions` for a temporary handoff, `observations`, `refs`. `frame` holds the stable purpose (`within`, `goal`, `completion`, `topics`, `refs`, `observations`); `plan` is a small route inside the activity. `current_task` is the default continuation, never an override of what the learner asks. On completion set the task to `null` and keep the final attempt as an observation.
-
-`route` is the course-level path, kept small (modules or milestones): `{"status": "proposed"|"agreed", "current": key, "basis": "...", "nodes": {key: {"label", "needs": [keys], "topics", "refs", "done": true}}}`. Dependencies must be acyclic. `resume` returns its position (current node, prerequisites, done nodes, topological order) in the briefing. Details in [lessons.md](lessons.md).
-
-## Assessments and reviews
-
-`topics[k].assessment` is your current interpretation of the learner's understanding of that topic: prose in `summary`, `gap`, `status` or `uncertainty`; `observations` lists the supporting evidence; `considered_observations` lists every observation you actually reviewed, including contrary evidence and corrections. Both replace as a unit. The helper stamps `assessed_at` and computes `pending`: an interpretation is pending when a related observation or correction was not in its considered set. Reconcile a pending interpretation before relying on it for a consequential decision.
-
-`topics[k].review` schedules retrieval practice: `due` or `in_days`, `reason`, `task`, `observations`, `considered_observations`, optional `retain: true`. The helper caps a new interval before the exam and returns the resolved date; do not resend an unchanged interval.
+`list_sources` lists material in the course directory (inside a git work tree, only files git does not ignore) with suggested handles; `add_sources` registers them, and an already registered file returns its handle. A save may also register `{"sources": {"syllabus": {"path": "admin/syllabus.pdf", "title": "Syllabus"}}}`. A ref is `{"source": handle, "locator": "page, slide, exercise"}`.
 
 ## Failures
 
-- **validation**: the patch was not published; the message names the field. Repair it without dropping evidence.
-- **conflict**: the scope changed since you read it; `resume` again and reconcile.
-- **needs_confirmation**: nothing was saved; review the listed changes.
-- **interrupted / no receipt**: the save may have completed; read before resubmitting an observation.
-- **no_save**: this session does not persist; keep teaching.
+- **validation**: nothing was saved; the message names the field and the fix. Repair and resend.
+- **io**: the record could not be read or written; say so only if it changes what you can teach.

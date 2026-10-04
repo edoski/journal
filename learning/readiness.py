@@ -6,8 +6,13 @@ import json
 import os
 from pathlib import Path
 import re
-import shutil
 import sys
+import zipfile
+
+from learning import install, preferences, records
+from learning.workspace import Workspace, registered, registry_path, support_directory
+
+HOSTS = ("claude-desktop", "claude-code", "codex")
 
 
 def _check(
@@ -81,64 +86,68 @@ def _link(name: str, target: Path, skill: Path) -> dict[str, str]:
     )
 
 
-def _codex_instructions(package: Path) -> dict[str, str]:
-    target = Path.home() / ".codex/config.toml"
-    canonical = package / "clients/codex/instructions.md"
-    name = "codex_instructions"
-    start, end = "# Learning communication", "# End learning communication"
-    blocks: list[str] = []
-    block: list[str] | None = None
+def _desktop(repo: Path) -> dict[str, str]:
+    path = install.desktop_config()
     try:
-        expected = "developer_instructions = " + json.dumps(
-            canonical.read_text(encoding="utf-8").strip()
-        )
-        # Only the marked integration is interpreted or retained; never return config.
-        with target.open(encoding="utf-8") as config:
-            for line in config:
-                marker = line.rstrip("\r\n")
-                if marker == start:
-                    if block is not None:
-                        return _check(
-                            name,
-                            "fail",
-                            "Learning instruction markers are malformed.",
-                            target,
-                        )
-                    block = []
-                elif marker == end:
-                    if block is None:
-                        return _check(
-                            name,
-                            "fail",
-                            "Learning instruction markers are malformed.",
-                            target,
-                        )
-                    blocks.append("".join(block).strip())
-                    block = None
-                elif block is not None:
-                    block.append(line)
-    except (OSError, UnicodeError):
+        servers = json.loads(path.read_text(encoding="utf-8")).get("mcpServers", {})
+        entry = servers.get(install.SERVER) if isinstance(servers, dict) else None
+    except (OSError, ValueError, AttributeError):
+        entry = None
+    return _server("claude_desktop_mcp", entry == install.server(repo), path)
+
+
+def _code(repo: Path) -> dict[str, str]:
+    return _server(
+        "claude_code_mcp", install.code_registered(repo), install.code_config()
+    )
+
+
+def _codex(repo: Path) -> dict[str, str]:
+    path = install.codex_config()
+    try:
+        text = path.read_text(encoding="utf-8")
+        matches = install.codex_entry(text) == install.server(repo)
+    except (OSError, ValueError):
+        return _server("codex_mcp", False, path)
+    if "# Learning communication" in text:
         return _check(
-            name,
+            "codex_mcp",
             "fail",
-            "Canonical instructions or the marked Codex integration are unavailable.",
-            target,
+            "The old learning developer-instructions block remains; run the installer.",
+            path,
         )
-    if block is not None or len(blocks) != 1:
-        return _check(
-            name,
-            "fail",
-            "Exactly one complete learning instruction block is required.",
-            target,
-        )
-    matches = blocks[0] == expected
+    return _server("codex_mcp", matches, path)
+
+
+def _server(name: str, matches: bool, path: Path) -> dict[str, str]:
     return _check(
         name,
         "pass" if matches else "fail",
-        "Copied learning instructions match the canonical package."
+        "The learning MCP server entry matches this repository."
         if matches
-        else "Copied learning instructions have drifted; refresh the learning installation.",
-        target,
+        else "The learning MCP server entry is missing or stale; run "
+        "`python -m learning.install`.",
+        path,
+    )
+
+
+def _archive(package: Path) -> dict[str, str]:
+    path = install.archive_path(support_directory())
+    try:
+        with zipfile.ZipFile(path) as archive:
+            packed = {name: archive.read(name) for name in archive.namelist()}
+    except (OSError, zipfile.BadZipFile, KeyError):
+        packed = None
+    current = packed == install.skill_files(package)
+    return _check(
+        "claude_skill_archive",
+        "pass" if current else "warning",
+        "learn-claude.zip matches the skill; upload it in Claude Desktop "
+        "(Settings > Capabilities > Skills) after it changes."
+        if current
+        else "learn-claude.zip is missing or older than the skill; run the "
+        "installer and upload it again in Claude Desktop.",
+        path,
     )
 
 
@@ -181,58 +190,87 @@ def _cloud_conflicts(root: Path) -> list[dict[str, str]]:
     ]
 
 
+def _course(workspace: Workspace) -> dict[str, str]:
+    """Whether the course record validates, or is not created yet."""
+    path = workspace.record
+    if not path.exists() and not path.is_symlink():
+        return _check(
+            "course_record", "pass", "No course yet; the first save creates it.", path
+        )
+    try:
+        records.load(workspace)
+    except (OSError, ValueError) as error:
+        return _check(
+            "course_record", "fail", f"Course record is invalid: {error}", path
+        )
+    return _check("course_record", "pass", "Course record is valid.", path)
+
+
+def _registration(workspace: Workspace) -> dict[str, str]:
+    path = registry_path()
+    try:
+        known = any(item.directory == workspace.directory for item in registered())
+    except ValueError as error:
+        return _check("registry", "fail", str(error), path)
+    return _check(
+        "registry",
+        "pass" if known else "warning",
+        "Workspace is registered for every-course plans and searches."
+        if known
+        else "Workspace is not registered; run `init` here to include it in "
+        "`plan --all` and `search --all`.",
+        path,
+    )
+
+
+def _global_preferences() -> dict[str, str]:
+    path = preferences.global_path()
+    try:
+        preferences.read_global()
+    except (OSError, ValueError) as error:
+        return _check("global_preferences", "fail", str(error), path)
+    return _check(
+        "global_preferences", "pass", "Global preferences are readable.", path
+    )
+
+
 def check(
-    root: Path, vault: Path, package: Path | None = None, host: str = "all"
+    workspace: Workspace, host: str = "all", *, package: Path | None = None
 ) -> dict[str, object]:
     """Report local readiness without creating files, launching hosts or reading secrets.
 
     ``ready`` means no failed check; warnings remain actionable in ``issues``.
-    It does not establish remote access, authentication or conflict-free cloud sync.
+    It does not establish that a host has loaded the server or the skill.
     """
-    if host not in {"all", "pi", "codex", "claude"}:
-        raise ValueError("host must be all, pi, codex or claude")
-    package = package or Path(__file__).resolve().parent
-    root, vault, package = (
-        path.expanduser().absolute() for path in (root, vault, package)
-    )
+    if host not in {"all", *HOSTS}:
+        raise ValueError(f"host must be all, {', '.join(HOSTS)}")
+    package = (package or install.package_directory()).expanduser().absolute()
+    repo = package.parent
+    root = workspace.root.expanduser().absolute()
+    material = workspace.sources.expanduser().absolute()
     skill = package / "skills/learn"
-    assets = root / "assets"
+    links = install.skill_links()
     checks = [
         _directory("learning_root", root, allow_missing=True),
-        _directory("vault", vault, allow_missing=False),
-        _directory("learning_assets", assets, allow_missing=True),
+        _directory("sources_directory", material, allow_missing=False),
+        _course(workspace),
+        _registration(workspace),
+        _global_preferences(),
         _file("canonical_skill", skill / "SKILL.md"),
-        _file("learning_command", skill / "scripts/learn", executable=True),
-        _file("python_runtime", Path(sys.executable), executable=True),
+        _file("mcp_server", package / "mcp.py"),
+        _file("python_runtime", install.interpreter(repo), executable=True),
         _check(
             "python_version",
-            "pass" if sys.version_info >= (3, 10) else "fail",
-            "Python 3.10 or newer is required.",
+            "pass" if sys.version_info >= (3, 11) else "fail",
+            "Python 3.11 or newer is required.",
         ),
     ]
-    if host in {"all", "pi"}:
-        sessions = root / "conversations"
-        checks.append(_directory("pi_sessions", sessions, allow_missing=True))
-        checks.append(_file("pi_extension", package / "pi.ts"))
-        for command in ("pi", "node"):
-            executable = shutil.which(command)
-            checks.append(
-                _check(
-                    f"{command}_runtime",
-                    "pass" if executable else "fail",
-                    f"{command} is available on PATH."
-                    if executable
-                    else f"Install {command} or make it available on PATH.",
-                    Path(executable) if executable else None,
-                )
-            )
+    if host in {"all", "claude-desktop"}:
+        checks += [_desktop(repo), _archive(package)]
+    if host in {"all", "claude-code"}:
+        checks += [_code(repo), _link("claude_code_skill", links["claude-code"], skill)]
     if host in {"all", "codex"}:
-        checks.append(_link("codex_skill", Path.home() / ".agents/skills/learn", skill))
-        checks.append(_codex_instructions(package))
-    if host in {"all", "claude"}:
-        checks.append(
-            _link("claude_skill", Path.home() / ".claude/skills/learn", skill)
-        )
+        checks += [_codex(repo), _link("codex_skill", links["codex"], skill)]
     checks.extend(_cloud_conflicts(root))
     return {
         "ready": all(item["status"] != "fail" for item in checks),
@@ -250,11 +288,11 @@ def check(
             },
             {
                 "name": "host_access",
-                "detail": "Local files do not establish provider authentication, remote skill upload, host permissions or equivalent tutoring behaviour.",
+                "detail": "Local configuration does not establish that a host has restarted, loaded the server, or received the uploaded skill.",
             },
             {
                 "name": "privacy_scope",
-                "detail": "Portable records, generated artifacts and provider or native session histories have separate lifecycles; no-save study does not erase host history.",
+                "detail": "The course record, study notes and each host's conversation history have separate lifecycles; forgetting a record does not erase host history.",
             },
         ],
     }

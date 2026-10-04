@@ -42,8 +42,6 @@ def main() -> int:
     commands.append(tests)
     if "sync" in packages:
         commands.append([python, "tools/regenerate_baselines.py", "--check"])
-    if "learning" in packages:
-        commands.append(["node", "--test", "tests/learning/test_pi.mjs"])
     for command in commands:
         print(f"\n{shlex.join(command)}", flush=True)
         result = subprocess.run(command, cwd=root, check=False)

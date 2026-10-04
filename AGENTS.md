@@ -13,7 +13,7 @@ This repository syncs Flow app focus data into an Obsidian journal and builds da
   - `daily/`, `periods/`: note composition and period-specific presentation.
   - `notes/`: Markdown operations and note locking.
   - `run/`: CLI parsing, direct dispatch, and integration construction.
-- `learning/`: study workspaces, records, retrieval, preferences, planning, lessons, and clients.
+- `learning/`: study workspaces, records, retrieval, preferences, planning, notes, and the MCP server.
 - `tests/`: behavior, external integrations, and rendering fixtures.
 - `tools/check.py`: full or package-focused quality checks.
 - `macos/Journal/`: native app and bundled sync runtime.
@@ -46,9 +46,10 @@ aliases.
 - `sync` must not import `learning`.
 - Learning reads journal activity and schedules through
   `sync.study.context.journal_summary`; it does not import other sync internals.
-- Learning record shapes and per-type validation/patching belong to
-  `learning/schema.py`; whole-record publication to `learning/records.py`;
-  retrieval to `learning/retrieval.py` on the single packer in
+- Learning record shapes, validation and the patch rule belong to
+  `learning/schema.py`; derived standings and review scheduling to
+  `learning/progress.py`; publication and receipts to `learning/records.py`;
+  `resume`/`show`/`search` to `learning/retrieval.py` on the single packer in
   `learning/packing.py`; the CLI verb table to `learning/cli.py`.
 
 ### Rendering architecture
@@ -191,9 +192,7 @@ python tools/check.py learning
 ```
 
 The gate runs Ruff lint/format checks, strict mypy, import-linter, and Python
-behavior tests. Sync checks also verify unchanged rendering fixtures; learning
-checks run the Node Pi adapter suite. Node and the installed Pi executable must
-be on `PATH`; Pi tests use this repository's `.venv/bin/python`.
+behavior tests. Sync checks also verify unchanged rendering fixtures.
 
 Add `--coverage` when coverage diagnostics are useful. For failure detail, run
 `python -m pytest tests/ -v --tb=short`. These deterministic checks establish code
@@ -245,7 +244,7 @@ Operational guidance:
 
 Repository relocation:
 
-- Recreate `.venv` in the new root and refresh the learning launcher/skill links.
+- Recreate `.venv` in the new root and re-run `python -m learning.install` (MCP server entries and skill links).
 - Build and install the native bundle with `macos/Journal/build.sh --install`.
 - LaunchAgents keep using `/Applications/Journal.app`; source edits alone do not
   update their bundled Python code.
@@ -256,7 +255,8 @@ commits touching `sync/` or `macos/`. Run the quality gate before such commits.
 ## Data and Cache Files
 
 - media cache: `~/Library/Caches/Journal/media/dates.json`
-- learning workspace links: `~/Library/Application Support/Learning/workspaces.json`
+- learning workspace registry and links: `~/Library/Application Support/Learning/workspaces.json`
+- learning global preferences: `~/Library/Application Support/Learning/preferences.json`
 - flow reminder state: `~/Library/Application Support/Journal/state/flow_reminder_state.json`
 - shortcut pending state: `~/Library/Application Support/Journal/state/daily/status/pending/`
 - shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)

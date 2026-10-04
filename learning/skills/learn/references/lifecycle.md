@@ -1,34 +1,29 @@
-# Memory, sources and host boundaries
+# Memory, planning and host boundaries
 
-These operations serve natural requests: "what do you remember?", "forget that mistaken record", "don't save this". In Pi use `learning_manage`; elsewhere the commands below. Keep routine inspection quiet; explain a retention limit only when it matters to the request.
+These operations serve natural requests: "what do you remember?", "forget that", "don't save this", "what should I study today?". They use the same `learning` tools as teaching. Keep routine inspection quiet.
 
-## Inspection and forgetting
+## Memory questions
 
-`inspect [SCOPE]` inventories portable memory: the full course record, preference handles for this snapshot, owned generated files, and what the operation cannot reach. Answer a memory question in ordinary language, distinguishing evidence, interpretation and uncertainty.
+Answer "what do you remember?" or "what am I weak at?" in plain language from `resume` (`path` with levels, `weak`, `due`, the open task and evidence), separating what the learner did, your interpretation, and what is uncertain. `show` with a topic handle reads its full history; `show` with `all` returns the whole record when the learner wants everything.
 
-Translate an explicit forgetting request into exact handles, preview with `forget [SCOPE]` and the selection on stdin, then apply with the preview's revision **and digest**: `forget [SCOPE] --apply --expect REV --expect-digest DIGEST`. The digest binds the exact selection and snapshot; a context receipt cannot substitute. If the request clearly authorises the removal, the preview is an internal safety step; ask only when the scope or collateral effects are unclear. Never expand a request silently.
+## Forgetting
 
-| Selection | Scope | Effect |
-| --- | --- | --- |
-| `{"observations":["o1"],"knowledge":["notation"],"tasks":["exercise-5"]}` | required | remove exact entries; these lists can combine |
-| `{"course":true}` | required | clear the course, keeping its revision and observation high-water mark |
-| `{"preferences":["p1"]}` | omitted | remove exact preference rules from the inspected snapshot |
-| `{"artifacts":["lessons/UUID.md","assets/name-HASH.svg"]}` | omitted | remove exact owned generated files |
+Translate an explicit request into exact handles and remove them with `forget` and those `handles` (observations, knowledge entries, tasks, sources nothing cites; a topic only together with its observations). `forget` with `course_record` deletes the whole course record; notes in `study-notes/` are ordinary files the learner deletes. There is no preview: remove exactly what was asked, and ask first only when the request is ambiguous about what it covers. A correction is not erasure: when a record is wrong rather than unwanted, append an observation that `corrects` it.
 
-Groups cannot mix. Course removal requires removing its scoped preferences first. Observation removal drops affected references and invalidates assessments and reviews that depended on it; unrelated evidence stays. File removal reports per-file outcomes and is not atomic. After an interrupted apply, inspect rather than assume.
+Forgetting does not reach copies in other notes or source files, native transcripts, provider history, device backups or cloud recovery; say so when a broad request needs it.
 
-A correction is not erasure: preserve history with an observation that `corrects` the wrong one, or patch the affected knowledge fields. Forgetting does not search semantic copies in other prose, source files, native transcripts, provider history, device backups or cloud recovery; say so when a broad request needs it.
+## Not saving
 
-## No-save and private study
+For "don't save this", stop calling `save` for the rest of the conversation and keep teaching from what is loaded; if an attempt was already saved, forget exactly that observation. In Claude Desktop the learner can also block the `save` tool in the connector's settings, or study in an incognito chat. None of this erases what was saved earlier or controls provider retention.
 
-For "don't save this", enable the Pi `no_save` action; continue from loaded context without publishing observations, preferences, sources, lessons or assets. Other hosts honour the same intent through their controls; `LEARNING_NO_SAVE=1` makes every mutating command reject. `study --private` starts Pi on disposable copies of the workspace's records with no saved Pi session. Neither control erases what was saved earlier or controls provider retention.
+## Planning
+
+`plan` shows this course's due and upcoming reviews, the open task, the current path position, the exam countdown and recent study time from the Journal; `plan` with `all` covers every registered course. Use it for "what should I study today/this week?" and to balance courses before exams. It informs a suggestion; the learner decides.
 
 ## Sources
 
-`sources SCOPE --scan` lists course material under the workspace's source directory (the linked material, when there is one; inside a git work tree, only files git does not ignore) with a suggested handle per file and whether it is registered. `sources SCOPE --add '["path", ...]' --expect REV [--expect-digest D]` registers files and returns their handles. `sources SCOPE --check '["handle"]'` reports each source as `unverified`, `unchanged`, `changed` or `missing` by SHA-256 and size; adding `--expect REV --expect-digest D` captures an uncaptured fingerprint. Changed content is never silently recaptured: inspect it and register a new handle. A fingerprint establishes byte identity, not authority or edition. Check sources when new information or a consequential decision warrants it, not every session.
+`list_sources` lists course material in the course directory (the linked material when the workspace is kept elsewhere; inside a git work tree only files git does not ignore) with suggested handles. `add_sources` registers files; registering an already registered file returns its handle.
 
-## Readiness and conflicts
+## Concurrency and hosts
 
-`readiness --host codex|claude|pi|all` checks paths, skill links, copied-instruction drift and runtime availability without changing anything. Use it for installation, relocation or a concrete access problem.
-
-Writes use local locks, revisions, snapshot digests and atomic replacement. Digests catch same-revision divergence before publication; they do not coordinate simultaneous writers on different machines. Report a detected conflict and reconcile before retrying. Shared records give portable continuity, not identical behaviour on every provider.
+Saves apply to the latest record under a local lock. Two sessions changing the same field at once: the later one wins, so after working in parallel conversations, `resume` before relying on what the other changed. Shared records give portable continuity, not identical behaviour on every provider. `python -m learning readiness` checks the installed hosts, skill links, registry and course records without changing anything; use it for installation, relocation or a concrete access problem.

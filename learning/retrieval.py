@@ -1,840 +1,647 @@
-"""Bounded, whole-item retrieval: catalog, resume, search, knowledge and evidence."""
+"""Read projections of the course: resume (the session opener), show and search.
+
+Every projection carries whole stored items, never clipped ones; budgets decide
+which items fit. Keys with no content are omitted, so absent means "none".
+"""
 
 from __future__ import annotations
 
-from collections import Counter
-from collections.abc import Iterator
-from pathlib import Path
+from collections import defaultdict
+from collections.abc import Collection, Iterable, Iterator
+from dataclasses import dataclass
+from datetime import date
 import re
 from typing import Any
 import unicodedata
 
-from learning.briefing import briefing
-from learning.observations import correction_links, expand_corrections
-from learning.packing import pack, size
-from learning.records import read
-from learning.schema import links, route_parts, source_ids, task_parts
-from learning.storage import RevisionConflict
+from learning import clock, packing, progress, records, schema
+from learning import workspace as workspaces
+from learning.workspace import Workspace
 
-AUTOMATIC_KNOWLEDGE_BYTES = 4096
-EXACT_KNOWLEDGE_BYTES = 8192
-DISCOVERY_BYTES = 4096
-AUTOMATIC_EVIDENCE_BYTES = 12288
-AUTOMATIC_OBSERVATIONS = 24
-INDEX_PAGE = 20
-CANDIDATE_PAGE = 8
-IDENTITY_FIELDS = (
-    "title",
-    "aliases",
-    "focus",
-    "current_task",
-    "journal_activity",
-    "status",
-)
-
-
-def _number(handle: str) -> int:
-    return int(handle[1:])
+EVIDENCE_BYTES = 6144
+KNOWLEDGE_BYTES = 3072
+DUE_LIMIT = 8
+WEAK_LIMIT = 6
+TASK_OBSERVATIONS = 5
+TOPIC_OBSERVATIONS = 3
+OMITTED_LIMIT = 12
+RECENT_OBSERVATIONS = 3
+# Shown once under ``topics``; due and weak entries for those topics omit them.
+TOPIC_DETAIL = frozenset({"title", "prompt", "gap", "last"})
+SHOW_LIMIT = 30
+SEARCH_LIMIT = 12
+EXCERPT_CHARS = 160
+EXCERPT_LEAD = 40
+STEM_KEEP = 4
+STEM_ENDINGS = frozenset("saeiou")
+SEARCH_KINDS = ("topic", "knowledge", "task", "source", "observation")
+ITEM_KINDS = {"knowledge": "knowledge", "tasks": "task", "sources": "source"}
+_WORD = re.compile(r"[^\W_]+")
 
 
-def _load(root: Path, scope: str, expected: int | None) -> dict[str, Any]:
-    record = read(root, scope)
-    assert isinstance(record, dict)
-    if expected is not None and record["revision"] != expected:
-        raise RevisionConflict(
-            f"revision conflict for {scope}: expected {expected}, found {record['revision']}"
-        )
-    return record
+# --- shared projections -------------------------------------------------------
 
 
-def _paging(
-    offset: int, limit: int | None, expected: int | None, candidate_offset: int = 0
-) -> None:
-    if (
-        type(offset) is not int
-        or offset < 0
-        or type(candidate_offset) is not int
-        or candidate_offset < 0
-        or (limit is not None and (type(limit) is not int or limit < 1))
-    ):
-        raise ValueError("offset must be nonnegative and limit must be positive")
-    if expected is not None and (type(expected) is not int or expected < 0):
-        raise ValueError("expected revision must be a nonnegative integer")
-    if (offset or candidate_offset) and expected is None:
-        raise ValueError("continued pages require an expected revision")
-
-
-def _evidence_budget(value: int | None) -> None:
-    if value is not None and (type(value) is not int or value < 2):
-        raise ValueError("evidence_budget must be at least 2 bytes")
-
-
-# --- knowledge --------------------------------------------------------------
-
-
-def _knowledge_sources(
-    record: dict[str, Any], entries: dict[str, Any], available: dict[str, Any]
-) -> dict[str, Any]:
-    handles = {key for entry in entries.values() for key in source_ids(entry)}
+def compact(value: dict[str, Any], *, keep: Iterable[str] = ()) -> dict[str, Any]:
+    """Drop keys whose value is None or an empty list/object, except ``keep``."""
+    kept = set(keep)
     return {
-        key: {
-            field: value
-            for field, value in record["sources"][key].items()
-            if field in {"path", "version"}
-        }
-        for key in sorted(handles - available.keys())
+        key: item
+        for key, item in value.items()
+        if key in kept or (item is not None and item != [] and item != {})
     }
 
 
-def knowledge_context(
-    record: dict[str, Any],
-    active_topics: list[str],
-    available_sources: dict[str, Any] | None = None,
-    *,
-    budget: int = AUTOMATIC_KNOWLEDGE_BYTES,
-) -> dict[str, Any]:
-    """Select whole relevant entries, counting newly needed source locations once."""
-    active = set(active_topics)
-    stored = record.get("knowledge", {})
-    related = sorted(
-        key
-        for key, entry in stored.items()
-        if active.intersection(entry.get("topics", []))
-    )
-    general = sorted(key for key, entry in stored.items() if not entry.get("topics"))
-    eligible = sorted(
-        related + general,
-        key=lambda key: (
-            key not in related,
-            not any(
-                stored[key].get(name)
-                for name in ("uncertainty", "conflicts", "attribution")
-            ),
-            key,
-        ),
-    )
-    available = available_sources or {}
-
-    def render(keys: list[str]) -> dict[str, Any]:
-        entries = {key: stored[key] for key in keys}
-        return {
-            "knowledge": entries,
-            "selection": {
-                "eligible": len(eligible),
-                "included": len(keys),
-                "omitted": len(eligible) - len(keys),
-            },
-            "sources": _knowledge_sources(record, entries, available),
-        }
-
-    envelope = size(render([]))
-    if type(budget) is not int or budget < envelope:
-        raise ValueError("knowledge budget must fit the selection envelope")
-    total = sum(size(stored[key]) + size(key) + 2 for key in eligible) + envelope
-    reserve = min(1024, budget // 3) if total > budget else 0
-    _, omitted, result = pack(eligible, max(budget - reserve, envelope), render)
-    if not omitted:
-        return result
-    descriptors = [{"key": key, "bytes": size(stored[key])} for key in omitted[:8]]
-
-    def with_omissions(items: list[dict[str, Any]]) -> dict[str, Any]:
-        selection = {
-            **result["selection"],
-            "omissions": items,
-            "remaining": len(omitted) - len(items),
-            "expand": "knowledge SCOPE KEY... reads whole entries",
-        }
-        return {**result, "selection": selection}
-
-    try:
-        return pack(descriptors, budget, with_omissions)[2]
-    except ValueError:
-        return result
+def last_activity(record: dict[str, Any], today: date) -> dict[str, Any] | None:
+    """The local day of the last save and how long ago it was."""
+    if "updated_at" not in record:
+        return None
+    day = clock.local_day(record["updated_at"])
+    return {"date": day.isoformat(), "days_ago": (today - day).days}
 
 
-def _knowledge_index(
-    record: dict[str, Any], scope: str, offset: int, limit: int | None
-) -> dict[str, Any]:
-    stored = record.get("knowledge", {})
-    ordered = sorted(stored)
-    if offset > len(ordered):
-        raise ValueError("offset exceeds knowledge entry count")
-    total = len(ordered)
-    window = ordered[offset : offset + (INDEX_PAGE if limit is None else limit)]
-    descriptors = [{"key": key, "bytes": size(stored[key])} for key in window]
-
-    def render(items: list[dict[str, Any]]) -> dict[str, Any]:
-        next_offset = offset + len(items)
-        return {
-            "scope": scope,
-            "revision": record["revision"],
-            "digest": record["digest"],
-            "knowledge_index": items,
-            "selection": {
-                "mode": "knowledge_index",
-                "total": total,
-                "returned": len(items),
-                "offset": offset,
-                "next_offset": None if next_offset == total else next_offset,
-                "complete": next_offset == total,
-            },
-        }
-
-    kept, _, result = pack(descriptors, DISCOVERY_BYTES, render, contiguous=True)
-    if window and not kept:
-        raise ValueError("knowledge index descriptor exceeds discovery byte budget")
-    return result
-
-
-def knowledge(
-    root: Path,
-    scope: str,
-    keys: list[str],
-    *,
-    offset: int = 0,
-    limit: int | None = None,
-    budget: int | None = None,
-    expected: int | None = None,
-) -> dict[str, Any]:
-    """Whole selected entries, or a paged handle index when ``keys`` is empty."""
-    _paging(offset, limit, expected)
-    if keys:
-        if offset or limit is not None:
-            raise ValueError("exact knowledge reads cannot use offset or limit")
-    elif limit is not None and limit > INDEX_PAGE:
-        raise ValueError(f"knowledge index limit must not exceed {INDEX_PAGE}")
-    if budget is not None and (not keys or type(budget) is not int or budget < 1):
-        raise ValueError(
-            "budget must be positive and applies only to exact knowledge reads"
-        )
-    record = _load(root, scope, expected)
-    stored = record.get("knowledge", {})
-    if not keys:
-        return _knowledge_index(record, scope, offset, limit)
-    links(keys, stored, "knowledge")
-    entries = {key: stored[key] for key in sorted(set(keys))}
-    result = {
-        "scope": scope,
-        "revision": record["revision"],
-        "digest": record["digest"],
-        "knowledge": entries,
-        "sources": _knowledge_sources(record, entries, {}),
-    }
-    required = size(result)
-    allowance = EXACT_KNOWLEDGE_BYTES if budget is None else budget
-    if required > allowance:
-        sizes = ", ".join(f"{key}={size(entry)}" for key, entry in entries.items())
-        raise ValueError(
-            f"knowledge read requires {required} bytes (budget {allowance}); entries: {sizes}; "
-            f"fetch fewer entries or set --budget {required}"
-        )
-    return result
-
-
-# --- lexical matching -------------------------------------------------------
-
-
-def _excerpt(text: str, needle: str) -> str:
-    # Split only at Unicode boundaries; descriptors are never editable originals.
-    folded_position = text.casefold().find(needle)
-    position = 0
-    folded_length = 0
-    for position, character in enumerate(text):
-        folded_length += len(character.casefold())
-        if folded_length > folded_position:
-            break
-    start = max(0, position - 40)
-    body = text[start:]
-    prefix = "…" if start else ""
-    encoded = (prefix + body).encode("utf-8")
-    if len(encoded) <= 256:
-        return prefix + body
-    return encoded[:253].decode("utf-8", errors="ignore") + "…"
-
-
-def _tokens(text: str) -> set[str]:
-    normalized = unicodedata.normalize("NFKD", text.casefold())
-    return set(
-        re.findall(
-            r"[^\W_]+",
-            "".join(c for c in normalized if not unicodedata.combining(c)),
-        )
-    )
-
-
-def _match(texts: list[str], query: str) -> str | None:
-    """Match phrases or reordered words, including explicit stored aliases."""
-    needle = query.casefold()
-    exact = next((text for text in texts if needle in text.casefold()), None)
-    if exact is not None:
-        return exact
-    wanted = _tokens(query)
-    if wanted and wanted <= {token for text in texts for token in _tokens(text)}:
-        return next((text for text in texts if wanted & _tokens(text)), texts[0])
-    return None
-
-
-def _strings(value: Any) -> Iterator[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _strings(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _strings(item)
-
-
-def _discovery_collections(record: dict[str, Any], scope: str) -> dict[str, Any]:
-    return {
-        "knowledge": record.get("knowledge", {}),
-        "topic": {
-            key: {
-                name: value
-                for name, value in item.items()
-                if name not in {"assessment", "review"}
-            }
-            for key, item in record.get("topics", {}).items()
-        },
-        "scope": {
-            scope: {
-                key: record[key]
-                for key in ("title", "aliases", "goal", "coverage", "course_context")
-                if key in record
-            }
-        },
-    }
-
-
-def discover(root: Path, query: str, *, limit: int = 8) -> dict[str, Any]:
-    """Find cross-course handles deliberately; never transfer evidence or policy."""
-    if not isinstance(query, str) or not query.strip():
-        raise ValueError("query must be a nonempty string")
-    if type(limit) is not int or not 1 <= limit <= 20:
-        raise ValueError("discovery limit must be between 1 and 20")
-    catalog = read(root, None)
-    assert isinstance(catalog, list)
-    matches: list[dict[str, Any]] = []
-    errors = []
-    for entry in catalog:
-        if "error" in entry:
-            errors.append(entry["scope"])
-            continue
-        scope = entry["scope"]
-        try:
-            record = read(root, scope)
-        except (ValueError, OSError):
-            errors.append(scope)
-            continue
-        assert isinstance(record, dict)
-        for kind, collection in _discovery_collections(record, scope).items():
-            for key, value in sorted(collection.items()):
-                if _match([key, *_strings(value)], query) is not None:
-                    matches.append(
-                        {
-                            "scope": scope,
-                            "revision": record["revision"],
-                            "kind": kind,
-                            "key": key,
-                        }
-                    )
-    items, _, _ = pack(
-        matches[:limit], DISCOVERY_BYTES - 512, lambda kept: kept, contiguous=True
-    )
-    return {
-        "items": items,
-        "total": len(matches),
-        "complete": len(items) == len(matches) and not errors,
-        "discovery_only": True,
-        "unreadable_scopes": errors[:8],
-        "additional_unreadable_scopes": max(0, len(errors) - 8),
-    }
-
-
-def _candidates(
-    record: dict[str, Any], scope: str, query: str, offset: int
-) -> dict[str, Any]:
-    collections = {
-        **_discovery_collections(record, scope),
-        "source": record.get("sources", {}),
-        "task": record.get("tasks", {}),
-    }
-    matches = []
-    for kind, entities in sorted(collections.items()):
-        for key, value in sorted(entities.items()):
-            matched = _match([key, *_strings(value)], query)
-            if matched is not None:
-                matches.append(
-                    {
-                        "kind": kind,
-                        "key": key,
-                        "excerpt": _excerpt(matched, query.casefold()),
-                        "discovery_only": True,
-                    }
-                )
-    total = len(matches)
-    if offset > total:
-        raise ValueError("candidate offset exceeds candidate count")
-    window = matches[offset : offset + CANDIDATE_PAGE]
-
-    def render(items: list[dict[str, Any]]) -> dict[str, Any]:
-        next_offset = offset + len(items)
-        return {
-            "candidates": {
-                "items": items,
-                "offset": offset,
-                "total": total,
-                "next_offset": None if next_offset == total else next_offset,
-                "complete": next_offset == total,
-            }
-        }
-
-    kept, _, result = pack(window, DISCOVERY_BYTES, render, contiguous=True)
-    if window and not kept:
-        raise ValueError("candidate descriptor exceeds discovery byte budget")
-    page: dict[str, Any] = result["candidates"]
-    return page
-
-
-# --- evidence ---------------------------------------------------------------
-
-
-def _topic_index(record: dict[str, Any]) -> dict[str, Any]:
-    fields = {
-        "title",
-        "aliases",
-        "tags",
-        "concepts",
-        "domains",
-        "parent",
-        "prerequisites",
-        "refs",
-        "source",
-    }
-    counts = Counter(
-        topic
-        for observation in record.get("observations", {}).values()
-        for topic in observation["topics"]
-    )
-    return {
-        key: {
-            **{name: value for name, value in topic.items() if name in fields},
-            "observation_count": counts[key],
-        }
-        for key, topic in record.get("topics", {}).items()
-    }
-
-
-def correction_group(
-    record: dict[str, Any], observation_ids: list[str]
-) -> dict[str, Any]:
-    """Return selected observations together with their complete correction links."""
-    stored = record.get("observations", {})
-    links(observation_ids, stored, "observations")
-    group = expand_corrections(correction_links(stored), observation_ids)
-    return {key: stored[key] for key in sorted(group, key=_number)}
-
-
-def select_evidence(
-    record: dict[str, Any],
-    observation_ids: list[str],
-    *,
-    topics: dict[str, Any] | None = None,
-    budget: int | None = AUTOMATIC_EVIDENCE_BYTES,
-) -> dict[str, Any]:
-    """Fit complete correction/support groups, exposing every omitted selection."""
-    _evidence_budget(budget)
-    stored = record.get("observations", {})
-    linked = correction_links(stored)
-    visible_topics = {key: dict(value) for key, value in (topics or {}).items()}
-    groups: list[tuple[dict[str, Any], set[str]]] = []
-    for topic, value in visible_topics.items():
-        for field in ("assessment", "review"):
-            decision = value.get(field)
-            if decision is not None:
-                group = expand_corrections(linked, decision.get("observations", []))
-                groups.append(({"topic": topic, "field": field}, group))
-    for key in observation_ids:
-        groups.append(({"observation": key}, expand_corrections(linked, [key])))
-
-    def render(selected: list[tuple[dict[str, Any], set[str]]]) -> dict[str, Any]:
-        handles: set[str] = (
-            set().union(*(group for _, group in selected)) if selected else set()
-        )
-        return {key: stored[key] for key in sorted(handles, key=_number)}
-
-    _, omitted, items = pack(
-        groups, budget, render, error="evidence_budget must be at least 2 bytes"
-    )
-    omissions = []
-    for descriptor, group in omitted:
-        if "topic" in descriptor:
-            visible_topics[descriptor["topic"]].pop(descriptor["field"])
-        omissions.append(
-            {**descriptor, "bytes": size({key: stored[key] for key in group})}
-        )
-    selection: dict[str, Any] = {
-        "complete": not omitted,
-        "budget": budget,
-        "bytes": size(items),
-        "omitted_groups": len(omitted),
-        "omissions": omissions[:8],
-        "additional_omissions": max(0, len(omissions) - 8),
-    }
-    if omitted:
-        selection["expand"] = (
-            "evidence SCOPE --observations HANDLES reads whole groups; a larger --evidence-budget keeps more"
-        )
-    return {"observations": items, "topics": visible_topics, "selection": selection}
-
-
-def _select_task(
-    record: dict[str, Any], task: str | None
+def selected_task(
+    record: dict[str, Any], task: str | None = None
 ) -> tuple[str | None, dict[str, Any]]:
-    tasks = record.get("tasks", {})
+    """The requested task, else the focused one, else the only one."""
+    tasks = record["tasks"]
     if task is not None:
-        links([task], tasks, "task")
+        if task not in tasks:
+            listed = ", ".join(sorted(tasks)) or "none"
+            raise ValueError(
+                f'--task: unknown task "{task}"{schema.did_you_mean(task, tasks)}; '
+                f"open tasks: {listed}"
+            )
         return task, tasks[task]
-    selected = record.get("current_task")
-    if selected is None and len(tasks) == 1:
-        selected = next(iter(tasks))
-    return selected, tasks.get(selected, {}) if selected else {}
+    key = record.get("focus")
+    if key is None and len(tasks) == 1:
+        key = next(iter(tasks))
+    return key, tasks.get(key, {}) if key else {}
 
 
-def _activity(
-    record: dict[str, Any], checkpoint: dict[str, Any], active_topics: list[str]
-) -> tuple[set[str], set[str], set[str]]:
-    """Topics and evidence linked to the selected activity and the route position."""
-    parts = task_parts(checkpoint, active_only=True)
-    route = record.get("route")
-    route_active = route_parts(route, active_only=True) if route else []
-    context_topics = {key for part in parts for key in part.get("topics", [])}
-    context_observations = set(checkpoint.get("observations", []))
-    context_observations.update(
-        key for part in parts for key in part.get("observations", [])
-    )
-    knowledge_topics = set(active_topics) | context_topics
-    knowledge_topics.update(
-        key for part in route_active for key in part.get("topics", [])
-    )
-    stored_topics = record.get("topics", {})
-    knowledge_topics.update(
-        prerequisite
-        for key in list(knowledge_topics)
-        for prerequisite in stored_topics.get(key, {}).get("prerequisites", [])
-    )
-    return context_topics, context_observations, knowledge_topics
-
-
-def _sources(
-    record: dict[str, Any],
-    checkpoint: dict[str, Any],
-    items: dict[str, Any],
-    topics: dict[str, Any],
-) -> dict[str, Any]:
-    selected = set(source_ids(record))
-    for field in ("course_context", "coverage"):
-        if isinstance(record.get(field), dict):
-            selected.update(source_ids(record[field]))
-    for part in (checkpoint, *task_parts(checkpoint, active_only=True)):
-        selected.update(source_ids(part))
-    route = record.get("route")
-    if route:
-        for part in route_parts(route, active_only=True):
-            selected.update(source_ids(part))
-    for value in [*items.values(), *topics.values()]:
-        selected.update(source_ids(value))
-    return {
-        key: value
-        for key, value in record.get("sources", {}).items()
-        if key in selected
-    }
-
-
-def _assemble(
-    record: dict[str, Any],
-    scope: str,
-    *,
-    mode: str,
-    task_id: str | None,
-    checkpoint: dict[str, Any],
-    active_topics: list[str],
-    topics: list[str] | None,
-    observations: list[str] | None,
-    seeds: list[str],
-    page_limit: int | None,
-    offset: int,
-    order: str,
-    budget: int | None,
-    query: str | None = None,
-    candidate_offset: int = 0,
-    exhausted: bool = False,
-    knowledge_budget: int | None = None,
-    orientation: bool = False,
-) -> dict[str, Any]:
-    stored = record.get("observations", {})
-    stored_topics = record.get("topics", {})
-    total = len(seeds)
-    if offset > total:
-        raise ValueError("offset exceeds selected observation count")
-    page = seeds[offset : None if page_limit is None else offset + page_limit]
-    context_topics, context_observations, knowledge_topics = _activity(
-        record, checkpoint, active_topics
-    )
-    expanded = expand_corrections(correction_links(stored), page)
-    selected_topics = set(topics or []) | set(active_topics)
-    selected_topics.update(checkpoint.get("topics", []))
-    if orientation:
-        selected_topics |= context_topics
-    for key in expanded:
-        selected_topics.update(stored[key]["topics"])
-    relevant_topics = (
-        {}
-        if exhausted
-        else {
-            key: value for key, value in stored_topics.items() if key in selected_topics
-        }
-    )
-    bounded = select_evidence(record, page, topics=relevant_topics, budget=budget)
-    items = bounded["observations"]
-    next_offset = offset + len(page)
-    evidence_selection = {
-        **bounded["selection"],
-        "total": total,
-        "returned": len(items),
-        "offset": offset,
-        "next_offset": None if next_offset == total else next_offset,
-        "complete": next_offset == total and bounded["selection"]["complete"],
-        "scope_complete": len(items) == len(stored),
-        "omitted_observations": len(set(seeds) - items.keys()),
-        "order": order,
-        "expanded": [key for key in items if key not in page],
-    }
-    result: dict[str, Any] = {
-        "scope": scope,
-        "revision": record["revision"],
-        "digest": record["digest"],
-        "updated_at": record.get("updated_at"),
-        **{field: record[field] for field in IDENTITY_FIELDS if field in record},
-        "task": {"id": task_id, **checkpoint} if task_id else None,
-        "task_index": {
-            key: {field: value[field] for field in ("task", "topics") if field in value}
-            for key, value in record.get("tasks", {}).items()
-        },
-        "topics": bounded["topics"],
-        "sources": _sources(
-            record, checkpoint if orientation else {}, items, bounded["topics"]
-        ),
-        "observations": items,
-    }
-    selection: dict[str, Any] = {
-        "mode": mode,
-        "task": task_id,
-        "active_topics": list(active_topics),
-        "topics": topics,
-        "observations": observations,
-        "query": query,
-        "context_topics": sorted(context_topics) if orientation else [],
-        "context_observations": sorted(context_observations, key=_number)
-        if orientation
-        else [],
-        "evidence": evidence_selection,
-    }
-    if orientation:
-        chosen = knowledge_context(
-            record,
-            sorted(knowledge_topics),
-            result["sources"],
-            budget=AUTOMATIC_KNOWLEDGE_BYTES
-            if knowledge_budget is None
-            else knowledge_budget,
-        )
-        result["sources"].update(chosen.pop("sources"))
-        result["knowledge"] = chosen["knowledge"]
-        selection["knowledge"] = chosen["selection"]
-        result["briefing"] = briefing(
-            record, checkpoint, sorted(set(active_topics) | context_topics)
-        )
-    if query is not None:
-        result["candidates"] = _candidates(record, scope, query, candidate_offset)
-    result["selection"] = selection
-    result["policy_topics"] = {key: stored_topics[key] for key in active_topics}
+def exam(record: dict[str, Any], today: date) -> dict[str, Any] | None:
+    """The exam with its countdown."""
+    if "exam" not in record:
+        return None
+    result = dict(record["exam"])
+    if "date" in result:
+        result["days_left"] = (date.fromisoformat(result["date"]) - today).days
     return result
 
 
-def resume(
-    root: Path,
-    scope: str,
-    *,
-    task: str | None = None,
-    knowledge_budget: int | None = None,
-    evidence_budget: int | None = None,
-) -> dict[str, Any]:
-    """Ordinary continuation: task, briefing, linked and recent evidence, knowledge."""
-    _evidence_budget(evidence_budget)
-    if knowledge_budget is not None and (
-        type(knowledge_budget) is not int or knowledge_budget < 1
-    ):
-        raise ValueError("knowledge_budget must be a positive integer")
-    record = _load(root, scope, None)
-    task_id, checkpoint = _select_task(record, task)
-    active_topics = (
-        list(checkpoint.get("topics", [])) if task_id else list(record.get("focus", []))
+def _cited(items: Iterable[dict[str, Any]]) -> set[str]:
+    return {ref["source"] for item in items for ref in item.get("refs", ())}
+
+
+def _sources(record: dict[str, Any], items: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    cited = _cited(items)
+    return {key: record["sources"][key] for key in sorted(cited)}
+
+
+def _newest(observations: dict[str, Any]) -> list[str]:
+    return sorted(
+        observations,
+        key=lambda key: (observations[key]["date"], schema.number(key)),
+        reverse=True,
     )
-    stored = record.get("observations", {})
-    context_topics, context_observations, _ = _activity(
-        record, checkpoint, active_topics
-    )
-    wanted = set(active_topics) | context_topics
-    seeds = {key for key, item in stored.items() if wanted.intersection(item["topics"])}
-    seeds.update(context_observations)
-    ordered = sorted(seeds, key=_number, reverse=True)
-    ordered = [key for key in ordered if key in context_observations] + [
-        key for key in ordered if key not in context_observations
+
+
+def _partners(observations: dict[str, Any]) -> dict[str, set[str]]:
+    links: dict[str, set[str]] = defaultdict(set)
+    for key, item in observations.items():
+        for target in item.get("corrects", ()):
+            links[key].add(target)
+            links[target].add(key)
+    return links
+
+
+def _component(links: dict[str, set[str]], key: str) -> set[str]:
+    found = {key}
+    pending = [key]
+    while pending:
+        for linked in links.get(pending.pop(), ()):
+            if linked not in found:
+                found.add(linked)
+                pending.append(linked)
+    return found
+
+
+# --- resume -----------------------------------------------------------------
+
+
+def _active_topics(
+    record: dict[str, Any], task: dict[str, Any], order: list[str]
+) -> list[str]:
+    topics = record["topics"]
+    core = list(task.get("topics", ()))
+    if not core and "current" in record.get("path", {}):
+        core = [record["path"]["current"]]
+    wanted = set(core)
+    for key in core:
+        wanted.update(topics[key].get("needs", ()))
+    return [key for key in order if key in wanted]
+
+
+def _evidence_keys(
+    observations: dict[str, Any], newest: list[str], task: str | None, active: list[str]
+) -> list[str]:
+    """Selected observations in priority order: the task's, each active topic's, recent."""
+    selected: dict[str, None] = {}
+    if task is not None:
+        work = [key for key in newest if observations[key].get("task") == task]
+        selected.update(dict.fromkeys(work[:TASK_OBSERVATIONS]))
+    remaining = dict.fromkeys(active, TOPIC_OBSERVATIONS)
+    for key in newest:
+        if not any(remaining.values()):
+            break
+        hits = [topic for topic in observations[key]["topics"] if remaining.get(topic)]
+        if hits:
+            selected.setdefault(key)
+            for topic in hits:
+                remaining[topic] -= 1
+    selected.update(dict.fromkeys(newest[:RECENT_OBSERVATIONS]))
+    return list(selected)
+
+
+def _evidence(
+    record: dict[str, Any], task: str | None, active: list[str]
+) -> tuple[dict[str, Any], list[str]]:
+    """Whole observations with their correction partners, within the byte budget.
+
+    Also returns every eligible observation left out, most relevant first: the
+    selected ones that did not fit, then the task's and active topics' older ones.
+    """
+    observations = record["observations"]
+    newest = _newest(observations)
+    links = _partners(observations)
+
+    def group(key: str) -> list[tuple[str, Any]]:
+        members = _component(links, key) if key in links else {key}
+        return [
+            (member, {k: v for k, v in observations[member].items() if k != "recorded"})
+            for member in members
+        ]
+
+    selected = _evidence_keys(observations, newest, task, active)
+    packed = packing.pack(map(group, selected), EVIDENCE_BYTES)
+    wanted = set(active)
+    eligible = [
+        *packed.omitted,
+        *(
+            key
+            for key in newest
+            if task is not None and observations[key].get("task") == task
+        ),
+        *(key for key in newest if wanted.intersection(observations[key]["topics"])),
     ]
-    return _assemble(
-        record,
-        scope,
-        mode="task" if task_id else "focus",
-        task_id=task_id,
-        checkpoint=checkpoint,
-        active_topics=active_topics,
-        topics=None,
-        observations=None,
-        seeds=ordered,
-        page_limit=AUTOMATIC_OBSERVATIONS,
-        offset=0,
-        order="task_links_then_newest",
-        budget=AUTOMATIC_EVIDENCE_BYTES if evidence_budget is None else evidence_budget,
-        knowledge_budget=knowledge_budget,
-        orientation=True,
+    omitted = [key for key in dict.fromkeys(eligible) if key not in packed.items]
+    return {key: packed.items[key] for key in _newest(packed.items)}, omitted
+
+
+def _knowledge(
+    record: dict[str, Any], active: list[str]
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    entries = record["knowledge"]
+    wanted = set(active)
+    pinned = [key for key in sorted(entries) if entries[key].get("pinned")]
+    linked = sorted(
+        (
+            key
+            for key in entries
+            if key not in pinned and wanted.intersection(entries[key].get("topics", ()))
+        ),
+        key=lambda key: ("uncertain" not in entries[key], key),
     )
+    general = [
+        key
+        for key in sorted(entries)
+        if key not in pinned and "topics" not in entries[key]
+    ]
+    eligible = pinned + linked + general
+    packed = packing.pack(([(key, entries[key])] for key in eligible), KNOWLEDGE_BYTES)
+    chosen = set(eligible)
+    index = [key for key in sorted(entries) if key not in chosen]
+    return packed.items, packed.omitted, index
+
+
+def _brief(item: dict[str, Any], shown: Collection[str]) -> dict[str, Any]:
+    """A due or weak entry; topics detailed under ``topics`` keep only list fields."""
+    if item["topic"] not in shown:
+        return item
+    return {name: value for name, value in item.items() if name not in TOPIC_DETAIL}
+
+
+def _weak(
+    record: dict[str, Any],
+    levels: dict[str, dict[str, Any]],
+    order: list[str],
+    shown: Collection[str],
+) -> list[dict[str, Any]]:
+    weak = []
+    for key in order:
+        topic, standing = record["topics"][key], levels[key]
+        if not (standing.get("lapsed") or standing.get("stale") or "gap" in topic):
+            continue
+        item = {"topic": key, "level": standing["level"]}
+        if "gap" in topic:
+            item["gap"] = topic["gap"]
+        for flag in ("lapsed", "stale", "last"):
+            if flag in standing:
+                item[flag] = standing[flag]
+        weak.append(_brief(item, shown))
+        if len(weak) == WEAK_LIMIT:
+            break
+    return weak
+
+
+def _other_tasks(record: dict[str, Any], selected: str | None) -> list[dict[str, Any]]:
+    tasks = record["tasks"]
+    keys = sorted(
+        (key for key in tasks if key != selected),
+        key=lambda key: (tasks[key].get("updated", ""), key),
+        reverse=True,
+    )
+    return [
+        compact(
+            {
+                "key": key,
+                "title": tasks[key].get("title"),
+                "updated": tasks[key].get("updated"),
+            }
+        )
+        for key in keys
+    ]
+
+
+def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
+    return compact(
+        {
+            "title": record.get("title"),
+            "goal": record.get("goal"),
+            "exam": exam(record, today),
+            "journal": record.get("journal"),
+        }
+    )
+
+
+def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
+    """The session opener: where the learner is and what to do next."""
+    record = records.load(workspace)
+    today = clock.today()
+    levels = progress.standings(record)
+    order = progress.path_order(record)
+    key, chosen = selected_task(record, task)
+    active = _active_topics(record, chosen, order)
+    evidence, left_out = _evidence(record, key, active)
+    knowledge, knowledge_omitted, knowledge_index = _knowledge(record, active)
+    due = progress.due(record, today, levels=levels, order=order)
+    topics = {
+        topic: {**record["topics"][topic], "standing": levels[topic]}
+        for topic in active
+    }
+    path = record.get("path", {})
+    cited: list[dict[str, Any]] = [
+        record.get("exam", {}),
+        chosen,
+        *topics.values(),
+        *evidence.values(),
+        *knowledge.values(),
+    ]
+    result = {
+        "today": today.isoformat(),
+        "revision": record.get("revision", 0),
+        "new_course": True if "revision" not in record else None,
+        "course": _course(record, today),
+        "last_activity": last_activity(record, today),
+        "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
+        "due_more": max(0, len(due) - DUE_LIMIT) or None,
+        "path": compact(
+            {
+                "current": path.get("current"),
+                "basis": path.get("basis"),
+                "topics": [[topic, levels[topic]["level"]] for topic in order],
+            }
+        )
+        if order
+        else None,
+        "weak": _weak(record, levels, order, topics),
+        "task": {"key": key, **chosen} if key else None,
+        "tasks": _other_tasks(record, key),
+        "topics": topics,
+        "evidence": evidence,
+        "evidence_omitted": left_out[:OMITTED_LIMIT],
+        "evidence_omitted_more": max(0, len(left_out) - OMITTED_LIMIT) or None,
+        "knowledge": knowledge,
+        "knowledge_omitted": knowledge_omitted,
+        "knowledge_index": knowledge_index,
+        "sources": _sources(record, cited),
+        "preferences": records.effective_preferences(record),
+    }
+    return compact(result, keep=("task",))
+
+
+# --- show -------------------------------------------------------------------
+
+
+def _topic_item(
+    record: dict[str, Any], key: str, standing: dict[str, Any], ids: list[str]
+) -> dict[str, Any]:
+    return compact(
+        {
+            "kind": "topic",
+            **record["topics"][key],
+            "standing": standing,
+            "observations": ids,
+            "tasks": [
+                name
+                for name, task in record["tasks"].items()
+                if key in task.get("topics", ())
+            ],
+            "knowledge": [
+                name
+                for name, entry in record["knowledge"].items()
+                if key in entry.get("topics", ())
+            ],
+        }
+    )
+
+
+def show(
+    workspace: Workspace, handles: list[str], limit: int = SHOW_LIMIT, all: bool = False
+) -> dict[str, Any]:
+    """Whole items by handle; ``all`` is the whole record with standings."""
+    record = records.load(workspace)
+    if all:
+        if handles:
+            raise ValueError("show --all returns the whole record; give no handles")
+        return {
+            **record,
+            "standings": progress.standings(record),
+            "effective_preferences": records.effective_preferences(record),
+        }
+    if not handles:
+        raise ValueError(
+            "show needs handles (topics, observations such as o12, knowledge, "
+            "tasks or sources), or --all"
+        )
+    if type(limit) is not int or limit < 1:
+        raise ValueError("--limit must be a positive number of observations")
+    located = {handle: schema.locate(record, handle) for handle in handles}
+    observations = record["observations"]
+    levels = progress.standings(record) if "topics" in located.values() else {}
+    newest = _newest(observations) if levels else []
+    corrected_by: dict[str, list[str]] = defaultdict(list)
+    for key, item in observations.items():
+        for target in item.get("corrects", ()):
+            corrected_by[target].append(key)
+    items: dict[str, Any] = {}
+    shown: dict[str, None] = {}
+    related: set[str] = set()
+    for handle, where in located.items():
+        if where == "topics":
+            ids = [key for key in newest if handle in observations[key]["topics"]]
+            items[handle] = _topic_item(record, handle, levels[handle], ids)
+            shown.update(dict.fromkeys(ids[:limit]))
+            related.update(ids)
+        elif where == "observations":
+            items[handle] = compact(
+                {**observations[handle], "corrected_by": corrected_by.get(handle)}
+            )
+        else:
+            items[handle] = {"kind": ITEM_KINDS[where], **record[where][handle]}
+    evidence = {
+        key: observations[key]
+        for key in _newest({key: observations[key] for key in shown})
+        if key not in items
+    }
+    result = {
+        "items": items,
+        "evidence": evidence,
+        "evidence_more": len(related - shown.keys() - items.keys()) or None,
+        "sources": _sources(record, [*items.values(), *evidence.values()]),
+    }
+    return compact(result)
+
+
+# --- search -----------------------------------------------------------------
+
+
+def fold(text: str) -> str:
+    """Casefolded text without accents."""
+    if text.isascii():
+        return text.lower()
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def stem(token: str) -> str:
+    """Strip trailing vowels and ``s`` while more than four characters remain."""
+    while len(token) > STEM_KEEP and token[-1] in STEM_ENDINGS:
+        token = token[:-1]
+    return token
+
+
+def words(text: str) -> list[str]:
+    """Folded words: casefolded, without accents, split on non-alphanumerics."""
+    return _WORD.findall(fold(text))
+
+
+def terms(text: str) -> list[str]:
+    """Search terms: folded words, lightly stemmed."""
+    return [stem(word) for word in words(text)]
+
+
+def _spans(text: str) -> list[tuple[int, str]]:
+    """Each folded word of ``text`` with its start index in the original text."""
+    if text.isascii():
+        return [
+            (match.start(), match.group()) for match in _WORD.finditer(text.lower())
+        ]
+    folded: list[str] = []
+    origin: list[int] = []
+    for index, char in enumerate(text):
+        piece = fold(char)
+        folded.append(piece)
+        origin.extend([index] * len(piece))
+    return [
+        (origin[match.start()], match.group())
+        for match in _WORD.finditer("".join(folded))
+    ]
+
+
+def _has_term(found: list[str], term: str) -> bool:
+    return any(word.startswith(term) and stem(word) == term for word in found)
+
+
+def _locate(text: str, query: str) -> int:
+    """Where the query phrase, else its first term, starts in ``text``."""
+    spans = _spans(text)
+    found = [word for _, word in spans]
+    phrase = words(query)
+    width = len(phrase)
+    for index in range(len(found) - width + 1):
+        if width and found[index : index + width] == phrase:
+            return spans[index][0]
+    wanted = set(terms(query))
+    return next((start for start, word in spans if stem(word) in wanted), 0)
+
+
+def excerpt(text: str, query: str) -> str:
+    """At most 160 characters of ``text`` around the first match of ``query``."""
+    position = _locate(text, query)
+    start = max(0, min(position - EXCERPT_LEAD, len(text) - EXCERPT_CHARS + 1))
+    room = EXCERPT_CHARS - (1 if start else 0)
+    body = text[start : start + room]
+    if start + room < len(text):
+        body = body[:-1] + "…"
+    return ("…" if start else "") + " ".join(body.split())
+
+
+@dataclass(frozen=True)
+class _Document:
+    kind: str
+    handle: str
+    title: str | None
+    texts: tuple[str, ...]
+
+
+def _values(item: dict[str, Any], names: Iterable[str]) -> list[str]:
+    values: list[str] = []
+    for name in names:
+        value = item.get(name)
+        if isinstance(value, str):
+            values.append(value)
+        elif isinstance(value, list):
+            values.extend(value)
+    return values
+
+
+def _documents(record: dict[str, Any]) -> Iterator[_Document]:
+    for key in sorted(record["topics"]):
+        topic = record["topics"][key]
+        texts = _values(topic, ("title", "aliases", "gap", "note"))
+        texts += _values(topic.get("review", {}), ("prompt",))
+        yield _Document("topic", key, topic.get("title"), (*texts, key))
+    for key in sorted(record["knowledge"]):
+        entry = record["knowledge"][key]
+        texts = _values(entry, ("text", "aliases", "uncertain"))
+        yield _Document("knowledge", key, None, (*texts, key))
+    for key in sorted(record["tasks"]):
+        task = record["tasks"][key]
+        texts = _values(task, ("title", "goal", "step", "help", "note"))
+        yield _Document("task", key, task.get("title"), (*texts, key))
+    for key in sorted(record["sources"]):
+        source = record["sources"][key]
+        texts = _values(source, ("title", "path"))
+        yield _Document("source", key, source.get("title"), (*texts, key))
+    observations = record["observations"]
+    for key in _newest(observations):
+        texts = _values(observations[key], ("text", "response", "help", "uncertain"))
+        yield _Document("observation", key, None, tuple(texts))
+
+
+def _hits(
+    record: dict[str, Any], query: str
+) -> Iterator[tuple[tuple[int, int, int], dict[str, Any]]]:
+    """Documents holding every query term; whole-word phrase matches rank first."""
+    phrase = f" {' '.join(words(query))} "
+    wanted = list(dict.fromkeys(terms(query)))
+    if not wanted:
+        return
+    for index, document in enumerate(_documents(record)):
+        fields = [(text, words(text)) for text in document.texts]
+        matched = next(
+            (text for text, found in fields if phrase in f" {' '.join(found)} "),
+            None,
+        )
+        is_phrase = matched is not None
+        if matched is None:
+            present = [
+                {term for term in wanted if _has_term(found, term)}
+                for _, found in fields
+            ]
+            if set().union(*present) != set(wanted):
+                continue
+            matched = next(
+                text for (text, _), held in zip(fields, present) if wanted[0] in held
+            )
+        hit = compact(
+            {
+                "kind": document.kind,
+                "handle": document.handle,
+                "title": document.title,
+                "excerpt": excerpt(matched, query),
+            }
+        )
+        rank = (0 if is_phrase else 1, SEARCH_KINDS.index(document.kind), index)
+        yield rank, hit
+
+
+def every_course(workspace: Workspace | None) -> list[Workspace]:
+    """Registered workspaces with a course, plus the selected one, by directory.
+
+    A selected workspace outside the registry, such as a private session over
+    registered material, stands in for the workspaces that study that material.
+    """
+    chosen = {str(item.directory): item for item in workspaces.registered()}
+    if workspace is not None and str(workspace.directory) not in chosen:
+        chosen = {
+            key: item
+            for key, item in chosen.items()
+            if item.sources != workspace.sources
+        }
+        chosen[str(workspace.directory)] = workspace
+    return [chosen[key] for key in sorted(chosen) if chosen[key].record.is_file()]
+
+
+def _searched(
+    workspace: Workspace | None, everywhere: bool
+) -> Iterator[tuple[Workspace, dict[str, Any] | None, str | None]]:
+    if not everywhere:
+        assert workspace is not None
+        yield workspace, records.load(workspace), None
+        return
+    for candidate in every_course(workspace):
+        try:
+            yield candidate, records.load(candidate), None
+        except (ValueError, OSError) as error:
+            yield candidate, None, str(error)
 
 
 def search(
-    root: Path,
-    scope: str,
+    workspace: Workspace | None,
     query: str,
-    *,
-    topics: list[str] | None = None,
-    offset: int = 0,
-    limit: int | None = None,
-    candidate_offset: int = 0,
-    expected: int | None = None,
-    evidence_budget: int | None = None,
+    limit: int = SEARCH_LIMIT,
+    everywhere: bool = False,
 ) -> dict[str, Any]:
-    """Lexical discovery over evidence plus knowledge/topic/source/task candidates."""
+    """Lexical discovery in this course or, with ``everywhere``, every course."""
     if not isinstance(query, str) or not query.strip():
-        raise ValueError("query must be a nonempty string")
-    _paging(offset, limit, expected, candidate_offset)
-    _evidence_budget(evidence_budget)
-    record = _load(root, scope, expected)
-    stored = record.get("observations", {})
-    if topics is not None:
-        links(topics, record.get("topics", {}), "topics")
-    seeds = [
-        key
-        for key in sorted(stored, key=_number)
-        if (topics is None or set(topics).intersection(stored[key]["topics"]))
-        and _match(list(_strings(stored[key])), query) is not None
-    ]
-    return _assemble(
-        record,
-        scope,
-        mode="search",
-        task_id=None,
-        checkpoint={},
-        active_topics=list(topics or []),
-        topics=topics,
-        observations=None,
-        seeds=seeds,
-        page_limit=limit,
-        offset=offset,
-        order="oldest_first",
-        budget=AUTOMATIC_EVIDENCE_BYTES if evidence_budget is None else evidence_budget,
-        query=query,
-        candidate_offset=candidate_offset,
-        exhausted=expected is not None and offset == len(seeds),
-    )
-
-
-def evidence(
-    root: Path,
-    scope: str,
-    *,
-    topics: list[str] | None = None,
-    observations: list[str] | None = None,
-    offset: int = 0,
-    limit: int | None = None,
-    expected: int | None = None,
-    evidence_budget: int | None = None,
-) -> dict[str, Any]:
-    """Topic histories or exact observations with their complete correction groups."""
-    if topics is None and observations is None:
-        raise ValueError("evidence requires topics or observations")
-    _paging(offset, limit, expected)
-    _evidence_budget(evidence_budget)
-    record = _load(root, scope, expected)
-    stored = record.get("observations", {})
-    if topics is not None:
-        links(topics, record.get("topics", {}), "topics")
-    if observations is not None:
-        links(observations, stored, "observations")
-    seeds = sorted(stored if observations is None else observations, key=_number)
-    if topics is not None:
-        seeds = [
-            key for key in seeds if set(topics).intersection(stored[key]["topics"])
-        ]
-    newest_first = observations is None and limit is None
-    if newest_first:
-        seeds = seeds[::-1]
-    return _assemble(
-        record,
-        scope,
-        mode="observations" if observations is not None else "topics",
-        task_id=None,
-        checkpoint={},
-        active_topics=list(topics or []),
-        topics=topics,
-        observations=observations,
-        seeds=seeds,
-        page_limit=limit
-        if limit is not None
-        else (None if observations is not None else AUTOMATIC_OBSERVATIONS),
-        offset=offset,
-        order="newest_first" if newest_first else "oldest_first",
-        budget=evidence_budget
-        if evidence_budget is not None
-        else (None if observations is not None else AUTOMATIC_EVIDENCE_BYTES),
-    )
-
-
-def catalog(root: Path, scope: str | None = None) -> dict[str, Any]:
-    """Handles only: the scope list, or one scope's topic/source/task/knowledge index."""
-    if scope is None:
-        entries = read(root, None)
-        assert isinstance(entries, list)
-        return {
-            "scopes": [item for item in entries if "error" not in item],
-            "errors": [item for item in entries if "error" in item],
-        }
-    record = _load(root, scope, None)
-    return {
-        "scope": scope,
-        "revision": record["revision"],
-        "digest": record["digest"],
-        "updated_at": record.get("updated_at"),
-        **{field: record[field] for field in IDENTITY_FIELDS if field in record},
-        "task_index": {
-            key: {field: value[field] for field in ("task", "topics") if field in value}
-            for key, value in record.get("tasks", {}).items()
-        },
-        "topic_index": _topic_index(record),
-        "sources": record.get("sources", {}),
-        "knowledge_keys": sorted(record.get("knowledge", {})),
-        "route": briefing(record, {}, []).get("route"),
-        "counts": {
-            name: len(record.get(name, {}))
-            for name in ("topics", "observations", "knowledge", "tasks", "sources")
-        },
+        raise ValueError("search needs a nonempty query")
+    if type(limit) is not int or limit < 1:
+        raise ValueError("--limit must be a positive number of hits")
+    ranked: list[tuple[tuple[int, int, int, int], dict[str, Any]]] = []
+    errors = []
+    for position, (candidate, record, error) in enumerate(
+        _searched(workspace, everywhere)
+    ):
+        if record is None:
+            errors.append({"workspace": str(candidate.directory), "error": error})
+            continue
+        for (phrase, kind, index), hit in _hits(record, query):
+            if everywhere:
+                hit = compact(
+                    {
+                        **hit,
+                        "workspace": str(candidate.directory),
+                        "course": record.get("title"),
+                    }
+                )
+            ranked.append(((phrase, kind, position, index), hit))
+    ranked.sort(key=lambda pair: pair[0])
+    result: dict[str, Any] = {
+        "hits": [hit for _, hit in ranked[:limit]],
+        "total": len(ranked),
     }
+    if errors:
+        result["errors"] = errors
+    return result

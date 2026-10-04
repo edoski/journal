@@ -1,39 +1,28 @@
-"""Atomic local JSON publication with revision-checked, no-op-aware updates."""
+"""Atomic local JSON publication under exclusive locks, with no-op detection."""
 
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
-from datetime import datetime, timezone
 import fcntl
-import hashlib
 import json
 import os
 from pathlib import Path
 import tempfile
 from typing import Any
 
+from learning import clock
 
-class RevisionConflict(ValueError):
-    """The record changed after the caller read its expected snapshot."""
+METADATA = frozenset({"revision", "updated_at"})
 
 
-def digest(record: dict[str, Any]) -> str:
-    """Hash raw stored content, excluding publication metadata and the digest itself."""
-    content = {
-        key: value
-        for key, value in record.items()
-        if key not in {"revision", "updated_at", "digest"}
-    }
-    encoded = json.dumps(
-        content,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+class Unreadable(OSError, ValueError):
+    """A stored file exists but cannot be read as what it should hold.
+
+    An I/O failure for callers that report error kinds, so an agent does not
+    retry its request; still a ``ValueError`` for code that only validates.
+    """
 
 
 def reject_constant(value: str) -> None:
@@ -49,21 +38,27 @@ def lock(path: Path) -> Iterator[None]:
         yield
 
 
-def load(path: Path) -> dict[str, Any]:
-    """Read a JSON record; a missing file has revision zero."""
+def load(path: Path) -> dict[str, Any] | None:
+    """Read a JSON object; a missing file is ``None``."""
     try:
-        record = json.loads(
+        value = json.loads(
             path.read_text(encoding="utf-8"), parse_constant=reject_constant
         )
     except FileNotFoundError:
-        return {"revision": 0}
-    if (
-        not isinstance(record, dict)
-        or type(record.get("revision")) is not int
-        or record["revision"] < 1
-    ):
-        raise ValueError(f"invalid stored revision in {path}")
-    return record
+        return None
+    except (UnicodeDecodeError, ValueError) as error:
+        raise Unreadable(f"invalid JSON in {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise Unreadable(f"{path} must contain a JSON object")
+    return value
+
+
+def encode(value: Any) -> str:
+    """The one compact serialization used for stored records."""
+    return (
+        json.dumps(value, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        + "\n"
+    )
 
 
 def publish_text(path: Path, content: str) -> None:
@@ -87,57 +82,38 @@ def publish_text(path: Path, content: str) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def lock_path(path: Path) -> Path:
+    """The lock that serializes every read/modify/write of ``path``."""
+    return path.with_name(f".{path.stem}.lock")
+
+
 def update(
-    path: Path,
-    expected: int,
-    transform: Callable[[dict[str, Any]], dict[str, Any]],
-    *,
-    expected_digest: str | None = None,
-) -> dict[str, Any]:
-    """Validate and publish under one lock, returning the full committed record."""
-    if type(expected) is not int or expected < 0:
-        raise ValueError("expected revision must be a nonnegative integer")
-    if expected_digest is not None and (
-        not isinstance(expected_digest, str)
-        or len(expected_digest) != 64
-        or any(character not in "0123456789abcdef" for character in expected_digest)
-    ):
-        raise ValueError("expected_digest must be a lowercase SHA-256 digest")
-    with lock(path.with_name(f".{path.stem}.lock")):
-        current = load(path)
-        revision = current["revision"]
-        if revision != expected:
-            raise RevisionConflict(
-                f"revision conflict for {path.stem}: expected {expected}, found {revision}; read current state before retrying"
-            )
-        if expected_digest is not None and digest(current) != expected_digest:
-            raise RevisionConflict(
-                f"snapshot conflict for {path.stem}: content changed at revision {revision}; read current state before retrying"
-            )
+    path: Path, transform: Callable[[dict[str, Any]], dict[str, Any]]
+) -> tuple[dict[str, Any], bool]:
+    """Apply ``transform`` to the latest content under the file's lock.
+
+    The transform receives a copy without ``revision``/``updated_at`` (an empty
+    object when the file is missing) and returns the complete new content. An
+    unchanged result publishes nothing, so a missing file stays missing when the
+    transform returns an empty object. Returns the stored record, including
+    its metadata, and whether it changed.
+    """
+    with lock(lock_path(path)):
+        stored = load(path) or {}
+        current = {key: value for key, value in stored.items() if key not in METADATA}
         result = transform(deepcopy(current))
         if not isinstance(result, dict):
             raise ValueError("record must be a JSON object")
-        values = {
-            key: value
-            for key, value in result.items()
-            if key not in {"revision", "updated_at", "digest"}
+        content = {key: value for key, value in result.items() if key not in METADATA}
+        if content == current:
+            return stored, False
+        revision = stored.get("revision", 0)
+        if type(revision) is not int or revision < 0:
+            raise ValueError(f"invalid stored revision in {path}")
+        record = {
+            **content,
+            "revision": revision + 1,
+            "updated_at": clock.now().isoformat(timespec="seconds"),
         }
-        previous = {
-            key: value
-            for key, value in current.items()
-            if key not in {"revision", "updated_at", "digest"}
-        }
-        if values == previous:
-            return current
-        values.update(
-            revision=revision + 1,
-            updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        )
-        content = (
-            json.dumps(
-                values, ensure_ascii=False, separators=(",", ":"), allow_nan=False
-            )
-            + "\n"
-        )
-        publish_text(path, content)
-        return values
+        publish_text(path, encode(record))
+        return record, True
