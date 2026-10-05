@@ -388,12 +388,19 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
     assert "45-minute" in text("mock_exam", minutes="45")
     mock = text("mock_exam", minutes="45")
     assert "kind exam" not in mock and "kind: exam" not in mock
-    assert "ordinary attempt" in mock
+    assert mcp.skill_section("Written mock", "practice") in mock
+    assert "three columns" in mock and "45-minute written mock" in mock
+    oral = text("mock_exam", course="algebra", part="oral")
+    assert mcp.skill_section("Oral mock", "practice") in oral
+    assert "Written mock" not in oral and "photos" not in oral
     review = text("review", course="algebra")
     assert mcp.skill_section("Today's review") in review
     assert "Mark against `points`" in review
     assert "Only the first try on a due day counts" in review
-    assert '"courses"' in text("plan_week")
+    week = text("plan_week")
+    assert '"courses"' in week
+    assert mcp.skill_section("The week", "practice") in week
+    assert "No percentages" in week
     bad = server.request(
         "prompts/get", {"name": "mock_exam", "arguments": {"minutes": "soon"}}
     )

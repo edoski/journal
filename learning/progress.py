@@ -26,6 +26,7 @@ SCHEDULING_KINDS = frozenset({"attempt", "exam"})
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
 RECENT_SOLID_DAYS = 14
+WEEK_DAYS = 7
 # Grades from worst to best.
 GRADES = ("missed", "helped", "solid")
 LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
@@ -508,7 +509,7 @@ def _due_items(
     return items
 
 
-def _unready(record: dict[str, Any], today: date) -> set[str]:
+def unready(record: dict[str, Any], today: date) -> set[str]:
     """Within the exam run-up, topics without a ``solid`` verdict in 14 days."""
     exam = _exam(record)
     if exam is None or not 0 <= (exam - today).days <= RUNUP_DAYS:
@@ -567,12 +568,12 @@ def due(
     """
     current = levels or standings(record)
     rank = _ranked(record, order)
-    unready = _unready(record, today)
+    behind = unready(record, today)
     items = _due_items(record, today, current)
     items.sort(
         key=lambda item: (
             not current[item["topic"]].get("lapsed"),
-            item["topic"] not in unready,
+            item["topic"] not in behind,
             -item["overdue"],
             rank[item["topic"]],
         )
@@ -593,3 +594,62 @@ def upcoming(
     ]
     items.sort(key=lambda item: (item["due"], rank[item["topic"]]))
     return items
+
+
+# --- the week -------------------------------------------------------------------
+
+
+def as_of(record: dict[str, Any], day: date) -> dict[str, Any]:
+    """The record as it stood before ``day``: earlier observations and teaching."""
+    cutoff = day.isoformat()
+    topics = {
+        key: {name: value for name, value in topic.items() if name != "introduced"}
+        if topic.get("introduced", "") >= cutoff
+        else topic
+        for key, topic in record["topics"].items()
+    }
+    observations = {
+        key: item
+        for key, item in record["observations"].items()
+        if item["date"] < cutoff
+    }
+    return {**record, "topics": topics, "observations": observations}
+
+
+def week(record: dict[str, Any], today: date) -> dict[str, Any]:
+    """The last seven days: level changes, first tries, attempts, wrong methods."""
+    start = today - timedelta(days=WEEK_DAYS - 1)
+    first = start.isoformat()
+    before = standings(as_of(record, start))
+    after = standings(record)
+    levels = {
+        key: {"from": before[key]["level"], "to": standing["level"]}
+        for key, standing in after.items()
+        if before[key]["level"] != standing["level"]
+    }
+    probes = [
+        verdict
+        for replayed in replays(record).values()
+        for day, verdict in replayed.verdicts
+        if day >= first and replayed.days[day] == PROBE
+    ]
+    attempts = {"unaided": 0, "assisted": 0}
+    errors: list[dict[str, str]] = []
+    for item in effective(record["observations"]).values():
+        if item["date"] < first or item["kind"] not in SCHEDULING_KINDS:
+            continue
+        attempts["unaided" if unaided(item) else "assisted"] += 1
+        if "chose" in item:
+            errors.extend(
+                {"topic": topic, "chose": item["chose"]} for topic in item["topics"]
+            )
+    result: dict[str, Any] = {}
+    if levels:
+        result["levels"] = levels
+    if probes:
+        result["probes"] = {"total": len(probes), "solid": probes.count("solid")}
+    if any(attempts.values()):
+        result["attempts"] = attempts
+    if errors:
+        result["choice_errors"] = errors
+    return result

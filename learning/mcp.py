@@ -444,10 +444,14 @@ PROMPTS: dict[str, tuple[str, list[Json]]] = {
         [COURSE_ARGUMENT],
     ),
     "mock_exam": (
-        "A timed mock exam in the course's exam format",
-        [COURSE_ARGUMENT, {"name": "minutes", "description": "Length in minutes"}],
+        "A timed written or oral mock exam in the course's exam format",
+        [
+            COURSE_ARGUMENT,
+            {"name": "minutes", "description": "Length in minutes"},
+            {"name": "part", "description": "written (default) or oral"},
+        ],
     ),
-    "plan_week": ("Plan this week's study across every course", []),
+    "plan_week": ("Look back at the week and propose mixed sets", []),
 }
 
 
@@ -459,12 +463,18 @@ def skill_body() -> str:
     return text.strip()
 
 
-def skill_section(title: str) -> str:
-    """One ``## title`` section of the skill body, without its heading."""
-    body = skill_body()
-    start = body.index(f"## {title}\n") + len(title) + 4
-    end = body.find("\n## ", start)
-    return body[start : end if end >= 0 else None].strip()
+def skill_section(title: str, guide: str | None = None) -> str:
+    """One section of the skill or a guide, without its heading.
+
+    A ``##`` section runs to the next ``##`` heading; a ``###`` one also stops
+    at the next ``###``.
+    """
+    body = skill_body() if guide is None else _guide(guide)
+    level = "###" if f"\n### {title}\n" in body else "##"
+    start = body.index(f"{level} {title}\n") + len(f"{level} {title}\n")
+    stops = ["\n## "] + (["\n### "] if level == "###" else [])
+    ends = [end for stop in stops if (end := body.find(stop, start)) >= 0]
+    return body[start : min(ends, default=len(body))].strip()
 
 
 def _resume(value: str | None) -> str:
@@ -495,20 +505,23 @@ def get_prompt(name: str, arguments: Any) -> Json:
         minutes = str(args.get("minutes") or "60")
         if not minutes.isdigit() or int(minutes) < 1:
             raise ProtocolError(-32602, "minutes must be a positive whole number")
+        oral = "oral" in str(args.get("part") or "").casefold()
+        kind = "oral" if oral else "written"
         parts = [
-            f"Give a {minutes}-minute mock exam in the course's recorded exam format, "
-            "covering the study path; read guide('practice') first. Give no hints "
-            "and collect all answers before marking. Then save one ordinary attempt "
-            "per question and per topic it genuinely exercised, with help none unless "
-            "help was given; graded work from outside the session is the only exam "
-            "evidence.",
+            f"You are the learner's tutor. Give a {minutes}-minute {kind} mock in "
+            "the course's recorded exam format, covering the study path and "
+            "weighted to `unready` topics, with this protocol; answer in the "
+            "learner's language and keep bookkeeping silent.",
+            skill_section("Oral mock" if oral else "Written mock", "practice"),
             _resume(chosen),
         ]
     else:
         text, _failed = run(None, ["plan", "--all", "--days=7"])
         parts = [
-            "Propose a realistic study plan for the next 7 days across these courses, "
-            "putting due reviews and near exams first. The learner decides.",
+            "You are the learner's tutor. Look back at the week and propose mixed "
+            "sets across these courses with this protocol; answer in the learner's "
+            "language and keep bookkeeping silent.",
+            skill_section("The week", "practice"),
             f"Plan (`plan --all`):\n{text}",
         ]
     return {

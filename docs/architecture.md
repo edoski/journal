@@ -48,7 +48,9 @@ with levels, weak topics, the open task, evidence and knowledge within byte
 budgets), `show` (whole items) and `search` (accent-insensitive lexical
 discovery with light stemming) on the one packer in `packing.py`. Whole items are
 kept or omitted, never clipped, and omissions are reported. `planning.py` joins
-reviews and open work across registered workspaces with Journal effort.
+reviews and open work across registered workspaces with Journal effort, the week
+in review (replayed from the window start) and, near an exam, the run-up pace
+from the Journal schedule.
 
 `cli.py` is a command table: one small handler per verb with its mutation policy
 declared beside it; `__main__.py` parses, selects the workspace and dispatches.

@@ -1,11 +1,11 @@
 # Study loop: design (2026-10-05)
 
-Status: proposal. This document combines four research reports, the 2026-10-05
-Desktop click-test, the user's decisions and an adversarial review. The reports
-were an engine audit of schema 6, a survey of study tools, a review of the
-learning science, and the MCP Apps platform findings. Nothing here is
-implemented. The contract stays in `learning/README.md` and the tutor skill
-until a phase lands.
+Status: implemented (phases 1–3, with every recommended option), 2026-10-05.
+Deviations are listed in §11. The contract is `learning/README.md` and the tutor
+skill; this document keeps the reasoning. It combines four research reports, the
+2026-10-05 Desktop click-test, the user's decisions and an adversarial review. The
+reports were an engine audit of schema 6, a survey of study tools, a review of
+the learning science, and the MCP Apps platform findings.
 
 Binding decisions:
 
@@ -675,3 +675,44 @@ prototype is in `/tmp/mcp-apps-proto/`.
 7. **Duplicate window:** 30 minutes (*recommended*), or 24 hours plus `event`
    ids.
 8. **Run-up horizon:** 21 days (*recommended*), or 14 for short courses.
+
+## 11. As built
+
+Where the implementation departs from, or settles, the text above:
+
+**Phase 1 (verdicts):**
+
+- A day with an `exam` observation is a probe even when it is the learning day.
+- A review date the tutor pins in the same patch always wins over the engine's;
+  a pinned date is moved later only by the practice-day rule.
+- The interim `review` prompt fix was superseded by Phase 2.
+- `tools/report_verdict_changes.py` ran once (no inflated dates) and was removed.
+
+**Phase 2 (today's review):**
+
+- `resume.new_week` landed here instead of in Phase 3.
+- Each key point is at most 200 characters, to keep `resume` within budget.
+- `standing.choice_errors` maps each wrongly chosen topic to its count
+  (`{"substitution": 2}`), counting observations dated after the last `solid`
+  verdict's day; it is also in `TOPIC_DETAIL`.
+- A topic's competing methods are its own `contrasts` first, then the topics
+  that list it.
+- The `review` prompt carries the SKILL.md section "Today's review", extracted
+  at runtime, so the protocol has one source.
+
+**Phase 3 (week and run-up):**
+
+- `week` metrics: `levels`, `probes` `{total, solid}`, `attempts`
+  `{unaided, assisted}` (per effective attempt or exam observation),
+  `choice_errors` (one `{topic, chose}` per observation and topic) and `minutes`.
+  Empty metrics, and an empty `week`, are omitted. `minutes` always covers seven
+  days; a `plan` with another `--days` reads a second seven-day Journal summary.
+- The window-start replay (`progress.as_of`) drops observations dated on or
+  after the window start and an `introduced` on or after it, and keeps the
+  current exam date.
+- `runup` covers 0–21 days left. `not_introduced` lists path topics at level
+  `new`; `unready` lists every path topic without a `solid` verdict in 14 days,
+  untaught ones included. `pace` is rounded to two decimals.
+- `mock_exam`'s `part` selects the oral mock when it says "oral", else the
+  written one. `mock_exam` and `plan_week` carry their protocols from
+  `practice.md` ("Written mock", "Oral mock", "The week").

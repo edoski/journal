@@ -16,7 +16,7 @@ Write them when a session that taught a new topic closes, from the course source
 
 ## Mixing methods
 
-Practise a method on its own while it is new. Once competing methods have been practised, give problems whose first step is choosing the method, and record a wrong choice with `chose` on the topic that should have been chosen; that is a different gap from executing the method badly. Link methods known to compete with `contrasts`, so today's review asks them next to each other. Learners find mixed practice harder and it works better; say so once.
+Practise a method on its own while it is new. Once competing methods have been practised, give problems whose first step is choosing the method, and record a wrong choice with `chose` on the topic that should have been chosen; that is a different gap from executing the method badly. Link methods known to compete with `contrasts`, so today's review asks them next to each other.
 
 ## Errors that recur
 
@@ -30,11 +30,32 @@ Record what the learner says about their own understanding ("I never really got 
 
 Delayed retrieval means attempting an idea later without rereading. Transfer means applying the same target concept in a meaningfully different problem, representation or context; changing only the numbers is usually not transfer, and switching to an adjacent skill tests something else. Keep internally explicit what reasoning a question is meant to test. Mark `transfer: true` only for an unaided success that meets this bar. A cross-course connection suggests transfer practice; it does not carry mastery or preferences between courses.
 
-## Oral and mock examinations
+## The week
 
-Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam.
+When `resume` has `new_week`, offer a look at the week in one line after today's review. On acceptance, or from the `plan_week` prompt, read `plan` with `all`:
 
-For oral practice, ask one course-relevant question, let the learner develop the answer, then follow up on assumptions, method choice or a concrete consequence. For a mock exam, agree the duration and when feedback comes; give no hints inside an attempt meant to be independent, but pause or help when asked and record that help. Afterwards compare against the known criteria, separating a mathematical error, a missing justification and a presentation issue. Give a score only against a rubric the learner supplied; it is not a mastery estimate.
+1. Look back in four to six plain lines from each course's `week`: what moved (`levels`), what is shaky and why, and the wrong-method pairs (`choice_errors`). No percentages or streaks.
+2. Propose one mixed set per course: four to six problems from the course sheets or past papers on two or three topics linked by `contrasts` or recent wrong-method errors, at level `assisted` or better. Problems do not reveal their type and no two in a row use the same method; each answer starts with the method and a one-line reason, then the solve (paper and photos are fine). Give feedback after each full answer; the set takes 30–45 minutes. The first time, say once that mixing feels harder and works better.
+3. The learner decides whether and when.
+
+## Exam run-up
+
+Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam. Within 21 days of the exam, `plan` adds `runup` with the path topics `not_introduced`, the `unready` ones (no `solid` verdict in two weeks), and, when the Journal has a schedule, `study_days` until a week before the exam and the `pace` of new topics per study day. The phase follows `days_left` (the table in the skill). Each mock answer is an unaided attempt on the topics it genuinely exercised; prerequisites get no implicit credit. A mock replaces the day's review for the topics it covers.
+
+### Written mock
+
+1. Agree the time limit and aids in the conversation. The learner works on paper, times themselves, gets no hints, and sends photos at the end; this counts as watched work.
+2. Transcribe the photos with numbered lines and wait for the learner to confirm.
+3. Mark each question in three columns: mathematical error, missing justification, presentation. Give a score only against a rubric the learner supplied or a registered marking scheme.
+4. Record one `attempt` per question and per topic it genuinely exercised: `help` `"none"` unless help was given after a pause, `refs` to the paper, and `chose` for a wrong method. Graded work from outside the session is the only `exam` evidence.
+5. If marking spans sessions, an open task holds the step.
+
+### Oral mock
+
+1. Ask one opening question from `exam.coverage`, weighted to `unready` topics. The learner answers in voice or text.
+2. Follow with two or three probes on assumptions, conditions and a concrete consequence. No hints.
+3. Give feedback afterwards against `exam.criteria`, in the same three columns.
+4. Record one attempt per topic, `uncertain` when a transcription garbled a formula.
 
 ## Images, handwritten work and code
 

@@ -18,7 +18,7 @@ For "don't save this", stop calling `save` for the rest of the conversation and 
 
 ## Planning
 
-`plan` shows this course's due and upcoming reviews, the open task, the current path position, the exam countdown and recent study time from the Journal; `plan` with `all` covers every registered course. Use it for "what should I study today/this week?" and to balance courses before exams. It informs a suggestion; the learner decides.
+`plan` shows this course's due and upcoming reviews, the open task, the current path position, the exam countdown and recent study time from the Journal; `plan` with `all` covers every registered course. Each course also has `week` for the last seven days (`levels` that changed, first tries on review days as `probes` with how many were `solid`, `unaided` and `assisted` attempts, `choice_errors` and Journal `minutes`) and, within 21 days of the exam, `runup` (`days_left`, `not_introduced`, `unready`, and `study_days` with `pace` when the Journal schedule is known); see [practice.md](practice.md). Use it for "what should I study today/this week?" and to balance courses before exams. It informs a suggestion; the learner decides.
 
 ## Sources
 
