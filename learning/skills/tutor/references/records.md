@@ -4,7 +4,7 @@ A workspace holds one course. Its record has course facts (`title`, `goal`, `exa
 
 ## Saving
 
-`save` takes one JSON patch as `changes` and applies it to the latest record. Send only what changed. There is no revision to pass; an identical observation re-sent within 30 minutes is skipped as a duplicate, so an uncertain save can simply be repeated. A genuine new try is a new observation, even with the same question.
+`save` takes one JSON patch as `changes` and applies it to the latest record. Send only what changed; text with invisible characters (zero-width, bidirectional or control characters other than newline and tab) is refused. There is no revision to pass; an identical observation re-sent within 30 minutes is skipped as a duplicate, so an uncertain save can simply be repeated. A genuine new try is a new observation, even with the same question.
 
 | Field | Rule |
 | --- | --- |
@@ -81,7 +81,7 @@ A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finis
 
 ## Knowledge
 
-Understanding of the course that is costly to rebuild: notation correspondences, which resource is authoritative for what, conventions the learner chose, unresolved conflicts between documents. Fields: `text` (required), `topics`, `refs`, `uncertain` (what is unverified or conflicting), `pinned` (load it in every session, for standing conventions), `aliases`. Add distinct facts as separate entries. Before rewriting an entry's meaning, read it whole with `show`; keep its `uncertain` unless evidence resolved it.
+Understanding of the course that is costly to rebuild: notation correspondences, which resource is authoritative for what, conventions the learner chose, unresolved conflicts between documents. Fields: `text` (required), `topics`, `refs`, `uncertain` (what is unverified or conflicting), `pinned` (load it in every session, for standing conventions), `aliases`. Pinned entries share 1536 bytes: a save that would take them past it is refused with each one's size, so in that same save merge or shorten them, or unpin those that belong to topics and give them `topics`; a save that changes knowledge reports `pinned` usage in its receipt. Add distinct facts as separate entries. Before rewriting an entry's meaning, read it whole with `show`; keep its `uncertain` unless evidence resolved it.
 
 ## Preferences
 

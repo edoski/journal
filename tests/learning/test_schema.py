@@ -664,3 +664,28 @@ def test_remove_forgets_exact_items_and_their_links() -> None:
         schema.remove(record, ["notaton"])
     with pytest.raises(ValueError, match="observation ids run o1-o3"):
         schema.remove(record, ["o7"])
+
+
+def test_patches_with_invisible_characters_are_rejected() -> None:
+    fails(
+        schema.empty(),
+        {"knowledge": {"notation": {"text": "Use dx\u200b last"}}},
+        "knowledge.notation.text",
+        "U+200B (ZERO WIDTH SPACE)",
+    )
+    fails(
+        schema.empty(),
+        {"preferences": {"response_format": "Bullets\u202e"}},
+        "preferences.response_format",
+        "U+202E",
+    )
+    fails(
+        schema.empty(),
+        {"topics": {"rank": {"aliases": ["rango", "r\x07"]}}},
+        "topics.rank.aliases[1]",
+        "U+0007",
+    )
+    record = course(
+        {"knowledge": {"notation": {"text": "Integrale: ∫ f(x) dx\n\tcon dx in fondo"}}}
+    )
+    assert record["knowledge"]["notation"]["text"].endswith("in fondo")

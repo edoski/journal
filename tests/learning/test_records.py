@@ -263,3 +263,55 @@ def test_unreadable_stored_courses_are_io_failures(
     with pytest.raises(storage.Unreadable):
         records.save(workspace, {"title": "x"})
     assert workspace.record.read_text(encoding="utf-8") == content
+
+
+def pinned(text: str, **fields: Any) -> dict[str, Any]:
+    return {"text": text, "pinned": True, **fields}
+
+
+def test_pinned_knowledge_stays_within_its_budget(workspace: Workspace) -> None:
+    note = "Write vectors as columns. " * 20
+    receipt = records.save(
+        workspace, {"knowledge": {"columns": pinned(note), "dx": pinned(note)}}
+    )
+    assert receipt["pinned"]["budget"] == records.PINNED_BYTES
+    assert 2 * len(note) < receipt["pinned"]["bytes"] <= records.PINNED_BYTES
+    assert "pinned" not in records.save(workspace, COURSE)
+    before = workspace.record.read_bytes()
+    with pytest.raises(ValueError) as caught:
+        records.save(workspace, {"knowledge": {"bases": pinned(note)}})
+    message = str(caught.value)
+    assert f"of {records.PINNED_BYTES} bytes" in message
+    assert "bases (" in message and "columns (" in message and "dx (" in message
+    assert workspace.record.read_bytes() == before
+    merged = records.save(
+        workspace,
+        {
+            "knowledge": {
+                "columns": pinned("Vectors are columns; dx comes last"),
+                "dx": None,
+                "bases": pinned(note),
+            }
+        },
+    )
+    assert merged["changed"] and merged["pinned"]["bytes"] <= records.PINNED_BYTES
+
+
+def test_pinned_knowledge_over_budget_may_shrink_but_not_grow(
+    workspace: Workspace,
+) -> None:
+    note = "A standing convention. " * 40
+    storage.publish_text(
+        workspace.record,
+        storage.encode(
+            {
+                "schema": 6,
+                "knowledge": {name: pinned(note) for name in ("a", "b", "c")},
+            }
+        ),
+    )
+    with pytest.raises(ValueError, match="pinned entries would take"):
+        records.save(workspace, {"knowledge": {"a": {"text": note + "More."}}})
+    receipt = records.save(workspace, {"knowledge": {"a": {"pinned": None}}})
+    assert records.PINNED_BYTES < receipt["pinned"]["bytes"]
+    assert "pinned" not in records.load(workspace)["knowledge"]["a"]

@@ -40,7 +40,8 @@ counted day (learning, probe or practice day), giving levels, unaided days, laps
 and stale diagnoses, and schedules reviews on the successive-relearning ladder
 within the exam window. `records.py` applies a patch to the latest record under the
 record lock, schedules, validates and publishes atomically, returning a receipt
-with the consequences; it also forgets exact items. Consumers read validated
+with the consequences, and refuses a save that grows pinned knowledge past its
+budget; it also forgets exact items. Consumers read validated
 `dict` records; the typed layer lives at the validation boundary.
 
 `retrieval.py` builds `resume` (the session opener: time, due reviews, the path

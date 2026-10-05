@@ -339,6 +339,32 @@ def test_knowledge_order_budget_omissions_and_index(workspace: Workspace) -> Non
     assert result["knowledge_index"] == ["elsewhere"]
 
 
+def test_pinned_knowledge_at_its_budget_always_loads(workspace: Workspace) -> None:
+    long = "A long topic note. " * 40
+    conventions = {
+        f"convention-{index}": {"text": "Use column vectors. " * 12, "pinned": True}
+        for index in range(5)
+    }
+    assert size(conventions) <= records.PINNED_BYTES
+    records.save(
+        workspace,
+        {
+            "topics": {"rank": {}},
+            "path": {"current": "rank"},
+            "knowledge": {
+                **conventions,
+                **{
+                    f"huge-{index}": {"text": long, "topics": ["rank"]}
+                    for index in range(4)
+                },
+            },
+        },
+    )
+    result = retrieval.resume(workspace)
+    assert set(conventions) <= set(result["knowledge"])
+    assert result["knowledge_omitted"]
+
+
 def test_evidence_takes_the_newest_few_per_task_and_topic(
     workspace: Workspace,
 ) -> None:

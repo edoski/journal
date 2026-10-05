@@ -1008,12 +1008,36 @@ def _entries(name: str, kind: str, value: Any) -> dict[str, Any]:
     return result
 
 
+# Control, format (zero-width, bidirectional, tag) and surrogate characters: text
+# the learner cannot see would still reach every later session's context.
+_INVISIBLE = frozenset({"Cc", "Cf", "Cs"})
+
+
+def _visible(value: Any, path: str) -> None:
+    """Reject invisible characters anywhere in a patch's text, naming the field."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _visible(item, _at(path, str(key)))
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            _visible(item, f"{path}[{index}]")
+    elif isinstance(value, str):
+        for char in value:
+            if char not in "\n\t" and unicodedata.category(char) in _INVISIBLE:
+                name = unicodedata.name(char, "unnamed")
+                raise ValueError(
+                    f"{path} contains the invisible character U+{ord(char):04X} "
+                    f"({name}); remove it and save again"
+                )
+
+
 def check_patch(patch: Any) -> dict[str, Any]:
     """Validate the shape and values of a ``save`` patch; returns it normalized."""
     if not isinstance(patch, dict):
         raise ValueError(
             'save takes one JSON object of changes, e.g. {"topics": {"rank": {}}}'
         )
+    _visible(patch, "")
     result: dict[str, Any] = {}
     for name, value in patch.items():
         if name not in PATCH_FIELDS:

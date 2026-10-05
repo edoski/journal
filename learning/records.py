@@ -3,7 +3,9 @@
 Writes run under the record lock on the latest content; two sessions editing the
 same field resolve as last writer wins. A save validates the patch before taking
 the lock, applies it, lets the progress engine schedule reviews, validates the
-whole record and publishes it only when something changed.
+whole record and publishes it only when something changed. Pinned knowledge loads
+in every session, so a save may not grow it past ``PINNED_BYTES``; the tutor
+consolidates in the same save instead of ``resume`` dropping entries later.
 """
 
 from __future__ import annotations
@@ -11,8 +13,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from learning import clock, preferences, progress, schema, storage
+from learning import clock, packing, preferences, progress, schema, storage
 from learning.workspace import Workspace
+
+# Half of resume's knowledge budget: every pinned entry loads, with room left for
+# the knowledge of the topics in play.
+PINNED_BYTES = 1536
 
 
 def _readable(workspace: Workspace, stored: dict[str, Any] | None) -> dict[str, Any]:
@@ -62,6 +68,30 @@ def _levels(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     return changed
 
 
+def _pinned(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: item for key, item in record["knowledge"].items() if item.get("pinned")
+    }
+
+
+def _check_pinned(before: dict[str, Any], after: dict[str, Any]) -> None:
+    """Refuse a save that grows pinned knowledge past its budget; shrinking passes."""
+    pinned = _pinned(after)
+    used = packing.size(pinned)
+    if used <= PINNED_BYTES or used <= packing.size(_pinned(before)):
+        return
+    sizes = sorted(
+        ((packing.size(item), key) for key, item in pinned.items()), reverse=True
+    )
+    listed = ", ".join(f"{key} ({size} bytes)" for size, key in sizes)
+    raise ValueError(
+        f"knowledge: pinned entries would take {used} of {PINNED_BYTES} bytes, and "
+        "they load in every session. In this same save, merge overlapping pinned "
+        "entries, shorten them, or unpin ones that belong to topics (give them "
+        f"topics instead), then retry. Pinned: {listed}"
+    )
+
+
 def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     """Apply one patch and return the receipt (see the v6 spec, section 3)."""
     changes = schema.check_patch(patch)
@@ -79,6 +109,7 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         patched, outcome = schema.apply_patch(before, changes, today=today, now=now)
         planned, scheduled = progress.schedule(patched, outcome, today)
         final = schema.validate_record(planned)
+        _check_pinned(before, final)
         if final == before:
             return stored
         levels = _levels(before, final)
@@ -93,7 +124,7 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     if global_changes is not None:
         saved = _global(lambda: preferences.save_global(global_changes))
         changed = saved != previous or changed
-    return {
+    receipt = {
         "revision": record.get("revision", 0),
         "changed": changed,
         "observations": outcome.observations,
@@ -105,6 +136,12 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         "due_count": len(progress.due(final, today)),
         "notes": scheduled.notes,
     }
+    if "knowledge" in changes:
+        receipt["pinned"] = {
+            "bytes": packing.size(_pinned(final)),
+            "budget": PINNED_BYTES,
+        }
+    return receipt
 
 
 def forget(
