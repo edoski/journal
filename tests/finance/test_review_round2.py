@@ -61,25 +61,32 @@ def test_an_unreadable_item_no_longer_hides_the_consent_warning(paths: Paths) ->
     session = load_session(paths.session)
     assert session is not None
     later = NOW + datetime.timedelta(hours=1)
+    store = open_reader(paths.store)
+    assert store is not None
     save_session(
         paths.session,
         session.__class__(
-            **{**session.__dict__, "valid_until": later + datetime.timedelta(days=10)}
+            **{**session.__dict__, "valid_until": later + datetime.timedelta(days=1)}
         ),
     )
-    store = open_reader(paths.store)
-    assert store is not None
+    assert not any("consent" in item for item in cli.problems(paths, store, later))
+    save_session(
+        paths.session,
+        session.__class__(
+            **{**session.__dict__, "valid_until": later + datetime.timedelta(minutes=1)}
+        ),
+    )
     line = cli.problem(paths, store, later)
     found = cli.problems(paths, store, later)
     assert line is not None
-    assert line.startswith("bank consent ends on ")
+    assert line.startswith("bank consent ends today: ")
     assert "1 bank transaction could not be read" in line
     assert len(found) == 2
     stale = later + datetime.timedelta(days=3)
     three = cli.problem(paths, store, stale)
     store.close()
     assert three is not None
-    assert three.startswith("bank consent ends on")
+    assert three.startswith("bank consent ended: ")
     assert three.endswith("(+1 more: see /Applications/Journal.app/Contents/MacOS/Journal --finance status)")
     assert three.count(";") == 1
 

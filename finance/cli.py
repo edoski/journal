@@ -42,7 +42,6 @@ STALE_AFTER = datetime.timedelta(days=2)
 REJECTED_WINDOW = datetime.timedelta(days=30)
 PROBLEMS_SHOWN = 2
 OPENED_SLACK = datetime.timedelta(days=31)
-CONSENT_WARNING = datetime.timedelta(days=14)
 # Most useful first for "what can be paid now".
 BALANCE_PREFERENCE = (
     "ITAV",
@@ -167,9 +166,10 @@ def problems(paths: Paths, store: Store, now: datetime.datetime) -> list[str]:
         )
     elif session.expired(now):
         found.append(f"bank consent ended: run {RECONNECT}")
-    elif session.valid_until - now <= CONSENT_WARNING:
-        end = session.valid_until.astimezone().strftime("%d %b %Y")
-        found.append(f"bank consent ends on {end}: renew it with {RECONNECT}")
+    elif session.valid_until.astimezone().date() <= now.astimezone().date():
+        # Only on the day: a lapse loses nothing, the next fetch reaches back
+        # OVERLAP_DAYS before the last booking.
+        found.append(f"bank consent ends today: renew it with {RECONNECT}")
     last = store.last_run("ok")
     if last is None:
         found.append("no successful bank fetch yet")
