@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from finance.config import (
+    COMMAND,
     Paths,
     SettingsError,
     finance_dir,
@@ -98,7 +99,7 @@ def cmd_setup(paths: Paths, args: argparse.Namespace) -> int:
         print(f"Wrote starter category rules to {paths.rules}")
     if mode & 0o077:
         print(f"Warning: {key} is readable by others (mode {mode:o}); chmod 600 it.")
-    print("Next: python -m finance connect")
+    print(f"Next: {COMMAND} connect")
     return 0
 
 
@@ -192,9 +193,9 @@ def problem(paths: Paths, store: Store, now: datetime.datetime) -> str | None:
         return None
     line = "; ".join(found[:PROBLEMS_SHOWN])
     if len(found) > PROBLEMS_SHOWN:
-        line += f" (+{len(found) - PROBLEMS_SHOWN} more: see python -m finance status)"
+        line += f" (+{len(found) - PROBLEMS_SHOWN} more: see {COMMAND} status)"
     elif any("could not be read" in item for item in found):
-        line += ": see python -m finance status"
+        line += f": see {COMMAND} status"
     return line
 
 

@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from finance.client import PERIOD_ERROR, ApiError, EnableBankingClient, NetworkError
-from finance.config import Paths, Settings
+from finance.config import COMMAND, Paths, Settings
 from finance.files import Busy, exclusive
 from finance.jwt import SigningError
 from finance.session import Session, SessionAccount, load_session, save_session
@@ -357,7 +357,7 @@ def _locked_fetch(
     if session is None:
         return FetchResult(
             "not_connected",
-            "Not connected to the bank yet: run `python -m finance connect`.",
+            f"Not connected to the bank yet: run `{COMMAND} connect`.",
             EXIT_RECONSENT,
         )
     store = open_writer(paths.store)
@@ -380,7 +380,7 @@ def _fetch_with(
     clock: Callable[[], datetime.datetime],
 ) -> FetchResult:
     reconnect = (
-        "run `python -m finance connect` and approve the access in the Fineco app"
+        f"run `{COMMAND} connect` and approve the access in the Fineco app"
     )
     if session.needs_reconsent is None and session.expired(started):
         session = session.flag_reconsent(

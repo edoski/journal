@@ -23,7 +23,7 @@ from collections.abc import Callable
 from typing import Any
 
 from finance.client import ApiError, EnableBankingClient, NetworkError
-from finance.config import Paths, Settings
+from finance.config import COMMAND, Paths, Settings
 from finance.fetch import utc_now
 from finance.files import Busy, exclusive
 from finance.jwt import SigningError
@@ -242,9 +242,9 @@ def _connect(
     write(f"Connected until {local_end}.")
     if installed:
         write(f"Starter category rules written to {paths.rules}.")
-    write("Next: python -m finance fetch")
+    write(f"Next: {COMMAND} fetch")
     write(
-        "If the account is new, then run `python -m finance opened YYYY-MM-DD` with its opening "
+        f"If the account is new, then run `{COMMAND} opened YYYY-MM-DD` with its opening "
         "day, so the days before it count as no spending."
     )
     return 0

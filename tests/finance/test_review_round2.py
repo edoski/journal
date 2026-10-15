@@ -80,7 +80,7 @@ def test_an_unreadable_item_no_longer_hides_the_consent_warning(paths: Paths) ->
     store.close()
     assert three is not None
     assert three.startswith("bank consent ends on")
-    assert three.endswith("(+1 more: see python -m finance status)")
+    assert three.endswith("(+1 more: see /Applications/Journal.app/Contents/MacOS/Journal --finance status)")
     assert three.count(";") == 1
 
 

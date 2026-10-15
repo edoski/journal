@@ -165,7 +165,7 @@ def test_an_unreadable_item_is_kept_aside_and_the_rest_stored(
         "a booked transaction has no date",
     )
     assert cli.problem(paths, store, NOW + datetime.timedelta(hours=7)) == (
-        "1 bank transaction could not be read in the last 30 days: see python -m finance status"
+        "1 bank transaction could not be read in the last 30 days: see /Applications/Journal.app/Contents/MacOS/Journal --finance status"
     )
     store.close()
     monkeypatch.setattr(cli, "_now", lambda: NOW + datetime.timedelta(hours=7))

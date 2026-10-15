@@ -19,6 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Mapping
 
+# How the user runs this package: Journal.app bundles it (`python -m finance` in a checkout).
+COMMAND = "/Applications/Journal.app/Contents/MacOS/Journal --finance"
+
 API_ORIGIN = "https://api.enablebanking.com"
 JWT_ISSUER = "enablebanking.com"
 JWT_AUDIENCE = "api.enablebanking.com"
@@ -101,7 +104,7 @@ def load_settings(paths: Paths) -> Settings:
             data = tomllib.load(handle)
     except FileNotFoundError:
         raise SettingsError(
-            f"{paths.settings} is missing: run `python -m finance setup "
+            f"{paths.settings} is missing: run `{COMMAND} setup "
             "--application-id ID --key PATH` first"
         ) from None
     except (OSError, tomllib.TOMLDecodeError) as exc:

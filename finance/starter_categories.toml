@@ -6,7 +6,7 @@
 # First match wins, top to bottom. A pattern matches when it is a
 # case-insensitive substring of the counterparty name or of the remittance
 # text (whitespace collapsed). Anything unmatched is "Other"; the tool never
-# asks about a transaction. `python -m finance rules unmatched --month YYYY-MM`
+# asks about a transaction. `Journal --finance rules unmatched --month YYYY-MM`
 # lists what fell into Other.
 #
 # Keys: category, match (list), optional flow ("in" or "out"), optional label

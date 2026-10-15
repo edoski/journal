@@ -245,7 +245,7 @@ def test_expired_session_needs_reconsent_and_stops_calling(
     )
     result = fetch(paths, settings, bank)
     assert (result.outcome, result.exit_code) == ("needs_reconsent", 3)
-    assert "python -m finance connect" in result.message
+    assert "Journal --finance connect" in result.message
     again = fetch(paths, settings, bank, now=NOW + datetime.timedelta(days=1))
     assert (again.outcome, again.exit_code) == ("needs_reconsent", 3)
     assert len(bank.calls) == 1
