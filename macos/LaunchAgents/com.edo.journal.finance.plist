@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Bank fetch for the Journal finance package, three times a day (under the
+  bank's limit of about four unattended fetches a day). launchd neither expands
+  a tilde nor creates folders: the log folder /Users/edo/Library/Logs/Journal
+  must exist (mode 700) before this agent is loaded. Umask 63 (077) keeps the
+  logs readable by their owner only. The period notes pick the new data up on
+  the Journal sync's own schedule (com.edo.journal.sync, every 15 minutes).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.edo.journal.finance</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Journal.app/Contents/MacOS/Journal</string>
+        <string>--finance</string>
+        <string>fetch</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>7</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>13</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>19</integer>
+            <key>Minute</key>
+            <integer>30</integer>
+        </dict>
+    </array>
+    <key>Umask</key>
+    <integer>63</integer>
+    <key>StandardErrorPath</key>
+    <string>/Users/edo/Library/Logs/Journal/finance.err</string>
+    <key>StandardOutPath</key>
+    <string>/Users/edo/Library/Logs/Journal/finance.out</string>
+</dict>
+</plist>

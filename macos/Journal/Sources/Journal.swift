@@ -196,7 +196,7 @@ final class JournalUndoRunner {
 }
 
 enum BundledPython {
-    private static func process(arguments: [String]) throws -> Process {
+    private static func process(module: String = "sync.run", arguments: [String]) throws -> Process {
         guard let resources = Bundle.main.resourceURL else {
             throw CocoaError(.fileNoSuchFile)
         }
@@ -205,7 +205,7 @@ enum BundledPython {
         let process = Process()
         process.currentDirectoryURL = resources.appendingPathComponent("JournalSync")
         process.executableURL = pythonHome.appendingPathComponent("bin/python3")
-        process.arguments = ["-m", "sync.run"] + arguments
+        process.arguments = ["-m", module] + arguments
 
         var environment = ProcessInfo.processInfo.environment
         environment["PYTHONHOME"] = pythonHome.path
@@ -243,9 +243,9 @@ enum BundledPython {
         }
     }
 
-    static func runAttached(arguments: [String]) -> Int32 {
+    static func runAttached(module: String = "sync.run", arguments: [String]) -> Int32 {
         do {
-            let process = try process(arguments: arguments)
+            let process = try process(module: module, arguments: arguments)
             try process.run()
             process.waitUntilExit()
             return process.terminationStatus
@@ -969,6 +969,8 @@ final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelega
 let arguments = Array(CommandLine.arguments.dropFirst())
 if arguments.first == "--run" {
     exit(BundledPython.runAttached(arguments: Array(arguments.dropFirst())))
+} else if arguments.first == "--finance" {
+    exit(BundledPython.runAttached(module: "finance", arguments: Array(arguments.dropFirst())))
 } else {
     let app = NSApplication.shared
     let controller = PromptController()

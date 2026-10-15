@@ -1,0 +1,138 @@
+# Categories for bank transactions, applied when the notes are synced: editing
+# this file re-categorises past months the next time their notes are synced.
+# The open week, month and year are synced every 15 minutes; an older note is
+# re-synced by hand, e.g. `python -m sync.run period monthly --month 2026-10`.
+#
+# First match wins, top to bottom. A pattern matches when it is a
+# case-insensitive substring of the counterparty name or of the remittance
+# text (whitespace collapsed). Anything unmatched is "Other"; the tool never
+# asks about a transaction. `python -m finance rules unmatched --month YYYY-MM`
+# lists what fell into Other.
+#
+# Keys: category, match (list), optional flow ("in" or "out"), optional label
+# (shown instead of the bank text), optional holder = true (also matches when
+# the counterparty is the account holder, by the name the bank gives the
+# account, in any word order). A rule's flow applies to its holder match too.
+#
+# Special categories: Income (INCOME in the waterfall), Investing (INVESTED),
+# Transfer (between your own accounts: left out of income, spending and the
+# waterfall, still listed in the transactions note) and Other. Every other
+# category is spending. A refund (money in under a spending category) reduces
+# that category. Money in that no rule matches is shown as Other in the
+# transactions note and counted as INCOME.
+#
+# Transfer text patterns are for money out only: a client or friend paying
+# from Revolut may carry "Revolut" in the text. Add a pattern for money in
+# only if it can never come from someone else; your own incoming transfers
+# are caught by holder = true.
+#
+# These starter patterns are guesses until the bank's real texts are seen.
+
+[[rule]]
+category = "Transfer"
+holder = true
+match = ["GIROCONTO", "GIRO CONTO"]
+
+[[rule]]
+category = "Transfer"
+flow = "out"
+match = ["REVOLUT"]
+
+[[rule]]
+category = "Income"
+flow = "in"
+# Add each client's name as the bank writes it, e.g. match = ["CLIENT LTD"].
+match = ["STIPENDIO", "EMOLUMENTI"]
+
+[[rule]]
+category = "Taxes"
+match = [
+    "F24",
+    "AGENZIA ENTRATE",
+    "AGENZIA DELLE ENTRATE",
+    "INPS",
+    "PAGOPA",
+    "IMPOSTA DI BOLLO",
+]
+
+[[rule]]
+category = "Investing"
+match = [
+    "SCALABLE",
+    "TRADE REPUBLIC",
+    "COMPRAVENDITA TITOLI",
+    "ACQUISTO TITOLI",
+    "PIANO DI ACCUMULO",
+]
+
+[[rule]]
+category = "Bank fees"
+match = ["CANONE", "COMMISSIONI", "COMPETENZE DI CHIUSURA"]
+
+[[rule]]
+category = "Cash"
+match = ["PRELIEVO"]
+
+[[rule]]
+category = "Subscriptions"
+match = [
+    "SPOTIFY",
+    "NETFLIX",
+    "DISNEY PLUS",
+    "YOUTUBE",
+    "APPLE.COM/BILL",
+    "ANTHROPIC",
+    "OPENAI",
+    "AMAZON PRIME",
+    "ILIAD",
+]
+
+[[rule]]
+category = "Transport"
+match = [
+    "TRENITALIA",
+    "ITALO",
+    "TPER",
+    "TRENORD",
+    "TAXI",
+    "UBER",
+    "FREE NOW",
+    "TELEPASS",
+    "AUTOSTRADE",
+]
+
+[[rule]]
+category = "Groceries"
+match = [
+    "ESSELUNGA",
+    "COOP",
+    "CONAD",
+    "LIDL",
+    "CARREFOUR",
+    "EUROSPIN",
+    "ALDI",
+    "NATURASI",
+    "DESPAR",
+]
+
+[[rule]]
+category = "Eating out"
+match = [
+    "RISTORANTE",
+    "PIZZERIA",
+    "TRATTORIA",
+    "OSTERIA",
+    "MCDONALD",
+    "BURGER KING",
+    "DELIVEROO",
+    "JUST EAT",
+    "GLOVO",
+]
+
+[[rule]]
+category = "Health"
+match = ["FARMACIA"]
+
+[[rule]]
+category = "Shopping"
+match = ["AMAZON", "ZALANDO", "IKEA", "DECATHLON", "MEDIAWORLD", "UNIEURO"]

@@ -12,12 +12,15 @@ import sys
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "scope", nargs="?", choices=("all", "sync", "learning"), default="all"
+        "scope",
+        nargs="?",
+        choices=("all", "sync", "learning", "finance"),
+        default="all",
     )
     parser.add_argument("--coverage", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    packages = ["sync", "learning"] if args.scope == "all" else [args.scope]
+    packages = ["sync", "learning", "finance"] if args.scope == "all" else [args.scope]
     paths = (
         ["."]
         if args.scope == "all"

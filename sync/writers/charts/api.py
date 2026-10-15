@@ -8,11 +8,13 @@ from .renderers.grouped_grid import (
     render_weekly_training_grid,
 )
 from .renderers.vertical import render_vertical_bar
+from .renderers.waterfall import render_waterfall
 from .specs import (
     ChartSpec,
     MonthlyTrainingGridSpec,
     TrainingCalendarColumnsSpec,
     VerticalBarSpec,
+    WaterfallSpec,
     WeeklyTrainingGridSpec,
 )
 
@@ -27,6 +29,8 @@ def render_chart(spec: ChartSpec) -> list[str]:
         lines = render_weekly_training_grid(spec)
     elif isinstance(spec, TrainingCalendarColumnsSpec):
         lines = render_training_calendar_columns(spec)
+    elif isinstance(spec, WaterfallSpec):
+        lines = render_waterfall(spec)
     else:
         raise ValueError(f"Unsupported chart spec: {type(spec)!r}")
     return ["```", *lines, "```"] if lines else []

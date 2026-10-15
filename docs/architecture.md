@@ -1,9 +1,10 @@
 # Journal architecture
 
-Journal has two feature packages. `sync` renders journal notes and runs session,
+Journal has three feature packages. `sync` renders journal notes and runs session,
 media, and grade commands. `learning` owns study memory, lesson publication,
-retrieval, and teaching-client integrations. Both belong to the same project;
-neither needs a generic application framework.
+retrieval, and teaching-client integrations. `finance` fetches the owner's bank
+data into a local store. They belong to the same project; none needs a generic
+application framework.
 
 Learning reads recorded study activity and schedules through
 `sync.study.context.journal_summary`. That read-only interface owns knowledge of
@@ -70,10 +71,38 @@ results and explicit self-reports; the tutor's own explanations are not evidence
 Levels and review dates are computed, not asserted. There is no vector service,
 background reflection worker or curriculum database.
 
+## Finance
+
+`finance` reads one bank account through Enable Banking (a PSD2 account
+information provider). `client.py` signs each call with an RS256 JWT made by the
+system `openssl` (`jwt.py`; the key never enters the process) and sends it over a
+verifying TLS context (`tls.py`: Python's default roots, else the macOS system
+roots, else `/etc/ssl/cert.pem`). `connect.py` runs the redirect consent: the
+bank link, the pasted redirected address, its `state` check, and the session
+stored in `session.json`. `fetch.py` is one locked run: the longest history
+first, then from the last booked date minus an overlap, all pages or nothing per
+account (an item it cannot read is kept aside in `rejected`, never fatal),
+upserts keyed on `entry_reference` with booking date, direction, amount and
+occurrence (else a content hash and occurrence), stored rows the bank stops
+returning reported rather than hidden, balances once a day, a 6-hour pause after
+a 429 and a "needs reconsent" stop after a session error. `store.py` owns the SQLite schema; accounts are keyed by
+`identification_hash`, which survives re-consent.
+
+Categories are not stored. `rules.py` validates `categories.toml` and assigns
+categories when the store is read (`read.py`), so editing the rules re-categorises
+history. `read.read_entries` is the single read interface: sync's
+`FinanceStoreSource` adapter is the only sync module that imports finance, and
+finance imports nothing from sync. Period builders turn the `FinanceBundle` into
+the FINANCES section, the SPENT summary row and the monthly transactions notes
+(`sync/periods/finances.py`); with no store they render exactly what they did
+before, and with unreadable bank data FINANCES is one line naming the reason
+while the rest of the note renders as usual. The biz tool asks `python -m finance credits/balance --json` and never
+opens the store itself.
+
 ## Maintenance
 
-Run `python tools/check.py` from the project environment. Use `sync` or `learning`
-as an optional argument for focused checks, and `--coverage` when coverage detail
+Run `python tools/check.py` from the project environment. Use `sync`, `learning`
+or `finance` as an optional argument for focused checks, and `--coverage` when coverage detail
 is useful. Ruff, strict mypy, import contracts and Python tests cover the
 maintained code. The sync check also verifies rendering fixtures
 without rewriting them.
