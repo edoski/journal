@@ -247,7 +247,20 @@ enum BundledPython {
         do {
             let process = try process(module: module, arguments: arguments)
             try process.run()
+            // Process starts the child in its own process group, so reading
+            // the terminal (`--finance connect` asks for a pasted address)
+            // would stop it with SIGTTIN. Hand it the terminal while it runs.
+            let ownsTerminal = isatty(STDIN_FILENO) == 1
+                && tcgetpgrp(STDIN_FILENO) == getpgrp()
+            if ownsTerminal {
+                signal(SIGTTOU, SIG_IGN)
+                tcsetpgrp(STDIN_FILENO, process.processIdentifier)
+                kill(process.processIdentifier, SIGCONT)
+            }
             process.waitUntilExit()
+            if ownsTerminal {
+                tcsetpgrp(STDIN_FILENO, getpgrp())
+            }
             return process.terminationStatus
         } catch {
             FileHandle.standardError.write(
