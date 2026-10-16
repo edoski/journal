@@ -73,13 +73,16 @@ background reflection worker or curriculum database.
 
 ## Finance
 
-`finance` reads one bank account through Enable Banking (a PSD2 account
-information provider). `client.py` signs each call with an RS256 JWT made by the
+`finance` reads the bank accounts of every bank listed in `finance.toml`
+(`[[bank]]` tables; none means FinecoBank) through Enable Banking (a PSD2 account
+information provider), each bank with its own consent file. `client.py` signs each call with an RS256 JWT made by the
 system `openssl` (`jwt.py`; the key never enters the process) and sends it over a
 verifying TLS context (`tls.py`: Python's default roots, else the macOS system
 roots, else `/etc/ssl/cert.pem`). `connect.py` runs the redirect consent: the
+consent length from the bank's `maximum_consent_validity` (GET /aspsps), the
 bank link, the pasted redirected address, its `state` check, and the session
-stored in `session.json`. `fetch.py` is one locked run: the longest history
+stored in `session-<bank key>.json`. `fetch.py` is one locked run over every
+bank, one bank's failure never stopping another: the longest history
 first, then from the last booked date minus an overlap, all pages or nothing per
 account (an item it cannot read is kept aside in `rejected`, never fatal),
 upserts keyed on `entry_reference` with booking date, direction, amount and

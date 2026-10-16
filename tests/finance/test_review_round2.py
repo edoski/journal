@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from finance import cli
-from finance.config import Paths, Settings
+from finance.config import DEFAULT_BANK, Paths, Settings
 from finance.fetch import run_fetch
 from finance.read import FinanceReadError, read_entries
 from finance.session import load_session, save_session
@@ -58,20 +58,20 @@ def test_an_unreadable_item_no_longer_hides_the_consent_warning(paths: Paths) ->
     bad = tx("2026-10-18", "5.00")
     del bad["credit_debit_indicator"]
     fetch(paths, FakeBank(pages={"uid-1": [([bad, tx("2026-10-19", "3.00")], None)]}))
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None
     later = NOW + datetime.timedelta(hours=1)
     store = open_reader(paths.store)
     assert store is not None
     save_session(
-        paths.session,
+        paths.session(DEFAULT_BANK),
         session.__class__(
             **{**session.__dict__, "valid_until": later + datetime.timedelta(days=1)}
         ),
     )
     assert not any("consent" in item for item in cli.problems(paths, store, later))
     save_session(
-        paths.session,
+        paths.session(DEFAULT_BANK),
         session.__class__(
             **{**session.__dict__, "valid_until": later + datetime.timedelta(minutes=1)}
         ),
@@ -87,7 +87,9 @@ def test_an_unreadable_item_no_longer_hides_the_consent_warning(paths: Paths) ->
     store.close()
     assert three is not None
     assert three.startswith("bank consent ended: ")
-    assert three.endswith("(+1 more: see /Applications/Journal.app/Contents/MacOS/Journal --finance status)")
+    assert three.endswith(
+        "(+1 more: see /Applications/Journal.app/Contents/MacOS/Journal --finance status)"
+    )
     assert three.count(";") == 1
 
 

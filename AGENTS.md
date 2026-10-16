@@ -335,7 +335,8 @@ commits touching `sync/`, `finance/` or `macos/`. Run the quality gate before su
 - training state: `~/Library/Application Support/Journal/state/daily/training/YYYY-MM-DD.json` (14-day retention)
 - locks: `~/Library/Application Support/Journal/locks/<shard>/<sha1>.lock` (stable lock files; do not prune by age)
 - finance (folder 700, files 600): `~/Library/Application Support/Journal/finance/`
-  - `finance.toml` (application id, key path), `session.json` (consent, accounts, pauses)
+  - `finance.toml` (application id, key path, `[[bank]]` tables; none means FinecoBank)
+  - `session-<bank key>.json` per bank, e.g. `session-finecobank-it.json` (consent, accounts, pauses)
   - `finance.sqlite3` (transactions with their raw JSON, balances, fetch runs)
   - `categories.toml` (category rules, starter copy written by setup/connect)
   - `fetch.lock`

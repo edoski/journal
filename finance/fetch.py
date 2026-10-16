@@ -1,5 +1,8 @@
 """One fetch run: booked transactions and balances into the store.
 
+- Every bank in finance.toml is fetched in turn with its own session; one
+  bank's failure does not stop the others, and the run reports the most
+  pressing outcome with each bank's message.
 - One run at a time (the fetch lock); a second one exits at once.
 - The first fetch of an account asks for the longest history
   (`strategy=longest`); later ones start `OVERLAP_DAYS` before the last booked
@@ -26,10 +29,16 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from finance.client import PERIOD_ERROR, ApiError, EnableBankingClient, NetworkError
-from finance.config import COMMAND, Paths, Settings
+from finance.config import Bank, Paths, Settings, bank_label, connect_command
 from finance.files import Busy, exclusive
 from finance.jwt import SigningError
-from finance.session import Session, SessionAccount, load_session, save_session
+from finance.session import (
+    Session,
+    SessionAccount,
+    SessionError,
+    load_session,
+    save_session,
+)
 from finance.store import Balance, Run, Store, open_writer
 from finance.tls import TrustError
 from finance.transactions import (
@@ -54,6 +63,15 @@ Outcome = Literal[
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_RECONSENT = 3
+# With several banks the run reports the most pressing outcome among them.
+_URGENCY: tuple[Outcome, ...] = (
+    "needs_reconsent",
+    "not_connected",
+    "error",
+    "rate_limited",
+    "skipped",
+    "ok",
+)
 
 
 @dataclass(frozen=True)
@@ -345,6 +363,11 @@ def _record(
     )
 
 
+def last_ok_key(bank: Bank) -> str:
+    """Store meta: when the bank's last fetch succeeded (UTC)."""
+    return f"last_ok:{bank.key}"
+
+
 def _locked_fetch(
     paths: Paths,
     settings: Settings,
@@ -353,47 +376,102 @@ def _locked_fetch(
     today: datetime.date,
 ) -> FetchResult:
     started = clock()
-    session = load_session(paths.session)
-    if session is None:
-        return FetchResult(
-            "not_connected",
-            f"Not connected to the bank yet: run `{COMMAND} connect`.",
-            EXIT_RECONSENT,
+    sessions: list[tuple[Bank, Session | None, str | None]] = []
+    for bank in settings.banks:
+        try:
+            sessions.append((bank, load_session(paths.session(bank)), None))
+        except SessionError as exc:
+            sessions.append((bank, None, str(exc)))
+    if all(session is None and problem is None for _, session, problem in sessions):
+        return _combine(
+            settings,
+            [(bank, _not_connected(settings, bank)) for bank, _, _ in sessions],
         )
     store = open_writer(paths.store)
     try:
-        return _fetch_with(
-            paths, store, session, settings, client_factory, started, today, clock
-        )
+        results: list[tuple[Bank, FetchResult]] = []
+        for bank, session, problem in sessions:
+            if problem is not None:
+                result = FetchResult("error", f"Fetch failed: {problem}", EXIT_ERROR)
+            elif session is None:
+                result = _not_connected(settings, bank)
+            else:
+                result = _fetch_with(
+                    paths,
+                    store,
+                    settings,
+                    bank,
+                    session,
+                    client_factory,
+                    started,
+                    today,
+                    clock,
+                )
+            results.append((bank, result))
+        return _combine(settings, results)
     finally:
         store.close()
+
+
+def _not_connected(settings: Settings, bank: Bank) -> FetchResult:
+    return FetchResult(
+        "not_connected",
+        f"Not connected to {bank.name} yet: run `{connect_command(settings, bank)}`.",
+        EXIT_RECONSENT,
+    )
+
+
+def _combine(
+    settings: Settings, results: list[tuple[Bank, FetchResult]]
+) -> FetchResult:
+    """One result for the run: each bank's message, the most pressing outcome."""
+    if len(results) == 1:
+        return results[0][1]
+    outcome = min((result.outcome for _, result in results), key=_URGENCY.index)
+    return FetchResult(
+        outcome,
+        " ".join(f"{bank.name}: {result.message}" for bank, result in results),
+        max(result.exit_code for _, result in results),
+        sum(result.added for _, result in results),
+        sum(result.updated for _, result in results),
+        sum(result.calls for _, result in results),
+    )
 
 
 def _fetch_with(
     paths: Paths,
     store: Store,
-    session: Session,
     settings: Settings,
+    bank: Bank,
+    session: Session,
     client_factory: Callable[[Settings], EnableBankingClient],
     started: datetime.datetime,
     today: datetime.date,
     clock: Callable[[], datetime.datetime],
 ) -> FetchResult:
     reconnect = (
-        f"run `{COMMAND} connect` and approve the access in the Fineco app"
+        f"run `{connect_command(settings, bank)}` and approve the access in the "
+        f"{bank.name} app"
     )
+    where = paths.session(bank)
+    # With several banks each run row names its bank.
+    prefix = f"{bank.name}: " if len(settings.banks) > 1 else ""
+
+    def record(result: FetchResult, detail: str) -> None:
+        _record(store, started, result, prefix + detail, clock)
+
     if session.needs_reconsent is None and session.expired(started):
         session = session.flag_reconsent(
             f"the consent ended on {_local(session.valid_until)}", started
         )
-        save_session(paths.session, session)
+        save_session(where, session)
     if session.needs_reconsent is not None:
         result = FetchResult(
             "needs_reconsent",
-            f"The bank consent needs renewing ({session.needs_reconsent}): {reconnect}.",
+            f"The {bank_label(settings, bank)} consent needs renewing ({session.needs_reconsent}): {reconnect}.",
             EXIT_RECONSENT,
         )
-        _record(store, started, result, session.needs_reconsent, clock)
+        record(result, session.needs_reconsent)
         return result
     if session.rate_limited_until is not None and session.paused(started):
         result = FetchResult(
@@ -402,7 +480,7 @@ def _fetch_with(
             f"{_local(session.rate_limited_until)}.",
             EXIT_OK,
         )
-        _record(store, started, result, "rate-limit pause", clock)
+        record(result, "rate-limit pause")
         return result
 
     client = client_factory(settings)
@@ -431,7 +509,7 @@ def _fetch_with(
         partial = "; ".join(notes)
         if exc.rate_limited:
             until = started + RATE_LIMIT_PAUSE - PAUSE_SLACK
-            save_session(paths.session, session.pause(until))
+            save_session(where, session.pause(until))
             result = FetchResult(
                 "rate_limited",
                 f"The bank's rate limit was reached ({exc.status} {exc.error or ''}"
@@ -443,10 +521,10 @@ def _fetch_with(
             )
         elif exc.needs_reconsent:
             reason = f"{exc.error} on {_local(started)}"
-            save_session(paths.session, session.flag_reconsent(reason, started))
+            save_session(where, session.flag_reconsent(reason, started))
             result = FetchResult(
                 "needs_reconsent",
-                f"The bank session has ended ({exc.error}): {reconnect}.",
+                f"The {bank_label(settings, bank)} session has ended ({exc.error}): {reconnect}.",
                 EXIT_RECONSENT,
                 tally.added,
                 tally.updated,
@@ -461,9 +539,7 @@ def _fetch_with(
                 tally.updated,
                 client.calls,
             )
-        _record(
-            store, started, result, "; ".join(filter(None, [str(exc), partial])), clock
-        )
+        record(result, "; ".join(filter(None, [str(exc), partial])))
         return result
     except (
         NetworkError,
@@ -480,10 +556,10 @@ def _fetch_with(
             tally.updated,
             client.calls,
         )
-        _record(store, started, result, "; ".join([str(exc), *notes]), clock)
+        record(result, "; ".join([str(exc), *notes]))
         return result
     if session.rate_limited_until is not None:
-        save_session(paths.session, session.resume())
+        save_session(where, session.resume())
     summary = "; ".join(notes) or "no accounts in the session"
     result = FetchResult(
         "ok",
@@ -493,5 +569,7 @@ def _fetch_with(
         tally.updated,
         client.calls,
     )
-    _record(store, started, result, summary, clock)
+    record(result, summary)
+    with store.transaction():
+        store.set_meta(last_ok_key(bank), _stamp(max(clock(), started)))
     return result

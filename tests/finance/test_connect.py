@@ -8,7 +8,7 @@ import stat
 
 import pytest
 
-from finance.config import Paths, Settings
+from finance.config import DEFAULT_BANK, Paths, Settings
 from finance.connect import ConnectError, code_from, run_connect
 from finance.session import load_session
 
@@ -25,6 +25,7 @@ def connect(
     code = run_connect(
         paths,
         settings,
+        DEFAULT_BANK,
         client_factory=client_factory(bank),
         read_line=lambda prompt: pasted,
         write=out.append,
@@ -58,7 +59,7 @@ def test_connect_asks_the_bank_and_stores_the_session(
     )
     [session_call] = bank.requests("POST", "/sessions")
     assert session_call.body == {"code": "CODE9"}
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None and session.session_id == "session-1"
     assert session.valid_until == datetime.datetime(
         2027, 4, 11, 10, tzinfo=datetime.UTC
@@ -66,7 +67,7 @@ def test_connect_asks_the_bank_and_stores_the_session(
     assert [(a.uid, a.identification_hash, a.iban) for a in session.accounts] == [
         ("uid-1", "hash-1", "IT00X0000000000000000000000")
     ]
-    assert stat.S_IMODE(os.stat(paths.session).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(paths.session(DEFAULT_BANK)).st_mode) == 0o600
     assert stat.S_IMODE(os.stat(paths.root).st_mode) == 0o700
     assert paths.rules.exists()
     text = "\n".join(out)
@@ -83,7 +84,7 @@ def test_reconnecting_replaces_the_session_and_matches_accounts(
     )
     code, out = connect(paths, settings, bank, f"{REDIRECT}?code=C&state=STATE123")
     assert code == 0
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None and session.session_id == "session-2"
     assert session.needs_reconsent is None and session.rate_limited_until is None
     assert any("same account as before" in line for line in out)
@@ -114,7 +115,7 @@ def test_bad_pastes_store_nothing(
     code, out = connect(paths, settings, bank, pasted)
     assert code == 1
     assert message in out[-1]
-    assert not paths.session.exists()
+    assert not paths.session(DEFAULT_BANK).exists()
     assert bank.requests("POST", "/sessions") == []
 
 
@@ -136,10 +137,10 @@ def test_accounts_without_uid_are_skipped_and_none_at_all_is_an_error(
     code, out = connect(paths, settings, bank, f"{REDIRECT}?code=C&state=STATE123")
     assert code == 0 and any("skipped" in line for line in out)
     empty = FakeBank(accounts=[card])
-    paths.session.unlink()
+    paths.session(DEFAULT_BANK).unlink()
     code, out = connect(paths, settings, empty, f"{REDIRECT}?code=C&state=STATE123")
     assert code == 1 and "linked to the application" in out[-1]
-    assert not paths.session.exists()
+    assert not paths.session(DEFAULT_BANK).exists()
 
 
 def test_eof_on_stdin_is_a_clean_failure(paths: Paths, settings: Settings) -> None:
@@ -150,6 +151,7 @@ def test_eof_on_stdin_is_a_clean_failure(paths: Paths, settings: Settings) -> No
     code = run_connect(
         paths,
         settings,
+        DEFAULT_BANK,
         client_factory=client_factory(FakeBank()),
         read_line=eof,
         write=out.append,

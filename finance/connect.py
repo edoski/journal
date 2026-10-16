@@ -9,8 +9,9 @@ the accounts and the confirmed `access.valid_until`.
 
 The redirect URL is https://localhost/..., which nothing serves, so the
 browser shows a connection error: that page's address is what gets pasted.
-Running connect again replaces the session; accounts are matched on their
-`identification_hash` (uids and session ids change with every consent).
+Each bank has its own session; connecting a bank again replaces its session.
+Accounts are matched on their `identification_hash` (uids and session ids
+change with every consent).
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from collections.abc import Callable
 from typing import Any
 
 from finance.client import ApiError, EnableBankingClient, NetworkError
-from finance.config import COMMAND, Paths, Settings
+from finance.config import COMMAND, Bank, Paths, Settings
 from finance.fetch import utc_now
 from finance.files import Busy, exclusive
 from finance.jwt import SigningError
@@ -38,9 +39,26 @@ from finance.session import (
 )
 from finance.tls import TrustError
 
-# Fineco's maximum_consent_validity is 15552000 s (180 days); asking for the
-# exact maximum risks a 422 from rounding or a DST shift, so ask a bit less.
-CONSENT = datetime.timedelta(days=178)
+# The consent asked for is the bank's `maximum_consent_validity` (Fineco 180
+# days, Trade Republic 90) less this margin: asking for the exact maximum risks
+# a 422 from rounding or a DST shift.
+CONSENT_MARGIN = datetime.timedelta(days=2)
+
+
+def consent_length(aspsp: dict[str, Any] | None, bank: Bank) -> datetime.timedelta:
+    """How long a consent to ask for, from the bank's entry in GET /aspsps."""
+    if aspsp is None:
+        raise ConnectError(
+            f"Enable Banking does not list '{bank.name}' in {bank.country}: check the "
+            "[[bank]] name in finance.toml"
+        )
+    seconds = aspsp.get("maximum_consent_validity")
+    if not isinstance(seconds, int) or seconds <= 0:
+        raise ConnectError(f"Enable Banking gives no consent length for {bank.name}")
+    return max(
+        datetime.timedelta(seconds=seconds) - CONSENT_MARGIN,
+        datetime.timedelta(seconds=seconds) / 2,
+    )
 
 
 class ConnectError(RuntimeError):
@@ -129,6 +147,7 @@ def accounts_from(
 def run_connect(
     paths: Paths,
     settings: Settings,
+    bank: Bank,
     *,
     client_factory: Callable[[Settings], EnableBankingClient] = EnableBankingClient,
     read_line: Callable[[str], str] = input,
@@ -139,7 +158,7 @@ def run_connect(
     try:
         with exclusive(paths.lock):
             return _connect(
-                paths, settings, client_factory, read_line, write, now, make_state
+                paths, settings, bank, client_factory, read_line, write, now, make_state
             )
     except Busy:
         write("Not connected: a fetch is running; try again in a minute.")
@@ -158,6 +177,7 @@ def run_connect(
 def _connect(
     paths: Paths,
     settings: Settings,
+    bank: Bank,
     client_factory: Callable[[Settings], EnableBankingClient],
     read_line: Callable[[str], str],
     write: Callable[[str], None],
@@ -165,20 +185,21 @@ def _connect(
     make_state: Callable[[], str],
 ) -> int:
     try:
-        previous = load_session(paths.session)
+        previous = load_session(paths.session(bank))
     except SessionError as exc:
         write(f"The stored session is unreadable and will be replaced ({exc}).")
         previous = None
     client = client_factory(settings)
     state = make_state()
     started = now()
-    requested = (started + CONSENT).isoformat(timespec="microseconds")
-    auth = client.start_authorization(valid_until=requested, state=state)
+    length = consent_length(client.aspsp(bank), bank)
+    requested = (started + length).isoformat(timespec="microseconds")
+    auth = client.start_authorization(bank=bank, valid_until=requested, state=state)
     url = auth.get("url")
     if not isinstance(url, str) or not url:
         raise ConnectError("Enable Banking returned no bank link")
     write(
-        f"1. Open this link, log in to {settings.aspsp_name} and approve the access:\n"
+        f"1. Open this link, log in to {bank.name} and approve the access:\n"
         f"   {url}\n"
         f"2. The bank then sends the browser to {settings.redirect_url}?...; the page\n"
         '   will not load ("can\'t connect" or similar). That is expected: copy the\n'
@@ -207,9 +228,9 @@ def _connect(
         valid_until=valid_until,
         connected_at=started,
         accounts=accounts,
-        aspsp={"name": settings.aspsp_name, "country": settings.aspsp_country},
+        aspsp={"name": bank.name, "country": bank.country},
     )
-    save_session(paths.session, session)
+    save_session(paths.session(bank), session)
     installed = install_starter(paths.rules)
 
     known = {a.identification_hash for a in previous.accounts} if previous else set()
@@ -218,7 +239,8 @@ def _connect(
             "same account as before" if account.identification_hash in known else "new"
         )
         write(
-            f"Account {account.iban or account.identification_hash[:12]} ({state_label})"
+            f"{bank.name} account {account.iban or account.identification_hash[:12]} "
+            f"({state_label})"
         )
     for label in skipped:
         write(
@@ -239,12 +261,13 @@ def _connect(
                     f"The previous session could not be closed ({exc}); it ends by itself."
                 )
     local_end = valid_until.astimezone().strftime("%d %b %Y")
-    write(f"Connected until {local_end}.")
+    write(f"{bank.name} connected until {local_end}.")
     if installed:
         write(f"Starter category rules written to {paths.rules}.")
     write(f"Next: {COMMAND} fetch")
     write(
         f"If the account is new, then run `{COMMAND} opened YYYY-MM-DD` with its opening "
-        "day, so the days before it count as no spending."
+        "day (add --account with its last IBAN digits when there are several accounts), "
+        "so the days before it count as no spending."
     )
     return 0

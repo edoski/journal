@@ -10,7 +10,7 @@ import stat
 import pytest
 
 from finance.client import EnableBankingClient, HttpResponse, NetworkError
-from finance.config import Paths, Settings
+from finance.config import DEFAULT_BANK, Paths, Settings
 from finance.fetch import OVERLAP_DAYS, run_fetch
 from finance.files import exclusive
 from finance.session import SessionAccount, load_session
@@ -106,7 +106,7 @@ def test_first_fetch_asks_for_the_longest_history_and_follows_pages(
     # The store and its folder are private.
     assert stat.S_IMODE(os.stat(paths.store).st_mode) == 0o600
     assert stat.S_IMODE(os.stat(paths.root).st_mode) == 0o700
-    assert stat.S_IMODE(os.stat(paths.session).st_mode) == 0o600
+    assert stat.S_IMODE(os.stat(paths.session(DEFAULT_BANK)).st_mode) == 0o600
 
 
 def test_reruns_are_idempotent_and_later_fetches_overlap(
@@ -191,7 +191,7 @@ def test_rate_limit_is_recorded_without_retry_and_pauses_six_hours(
     result = fetch(paths, settings, bank)
     assert (result.outcome, result.exit_code) == ("rate_limited", 0)
     assert len(bank.calls) == 1
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None
     # 6 hours, ending 5 minutes early so the run scheduled 6 hours later goes ahead
     assert session.rate_limited_until == NOW + datetime.timedelta(hours=6, minutes=-5)
@@ -200,7 +200,7 @@ def test_rate_limit_is_recorded_without_retry_and_pauses_six_hours(
     assert len(bank.calls) == 1
     resumed = fetch(paths, settings, bank, now=NOW + datetime.timedelta(hours=6))
     assert resumed.outcome == "ok"
-    assert load_session(paths.session).rate_limited_until is None  # type: ignore[union-attr]
+    assert load_session(paths.session(DEFAULT_BANK)).rate_limited_until is None  # type: ignore[union-attr]
 
 
 def test_a_failure_on_a_later_page_commits_nothing_for_that_account(
@@ -258,7 +258,7 @@ def test_a_bare_401_is_an_error_not_a_reconsent(
     bank = FakeBank(failures=[("GET", "/accounts/uid-1/transactions", 401, None)])
     result = fetch(paths, settings, bank)
     assert (result.outcome, result.exit_code) == ("error", 1)
-    assert load_session(paths.session).needs_reconsent is None  # type: ignore[union-attr]
+    assert load_session(paths.session(DEFAULT_BANK)).needs_reconsent is None  # type: ignore[union-attr]
 
 
 def test_consent_past_valid_until_needs_reconsent_without_a_call(

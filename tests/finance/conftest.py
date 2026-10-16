@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from finance.config import Paths, Settings
+from finance.config import DEFAULT_BANK, Bank, Paths, Settings, settings_text
 from finance.session import Session, SessionAccount, save_session
 
 
@@ -36,7 +36,16 @@ NOW = datetime.datetime(2026, 10, 20, 7, 30, tzinfo=datetime.UTC)
 TODAY = datetime.date(2026, 10, 20)
 
 
-def connected(paths: Paths, *accounts: SessionAccount, **changes: object) -> Session:
+def connected(
+    paths: Paths,
+    *accounts: SessionAccount,
+    bank: Bank = DEFAULT_BANK,
+    **changes: object,
+) -> Session:
+    """A stored session for `bank`, and a finance.toml when there is none yet."""
+    if not paths.settings.exists():
+        paths.root.mkdir(parents=True, exist_ok=True)
+        paths.settings.write_text(settings_text("test-app-id", "/no-key.pem"))
     session = Session(
         session_id="session-1",
         valid_until=datetime.datetime(2027, 4, 11, 10, tzinfo=datetime.UTC),
@@ -50,5 +59,5 @@ def connected(paths: Paths, *accounts: SessionAccount, **changes: object) -> Ses
     )
     for key, value in changes.items():
         object.__setattr__(session, key, value)
-    save_session(paths.session, session)
+    save_session(paths.session(bank), session)
     return session

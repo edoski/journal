@@ -68,6 +68,21 @@ class FakeBank:
     session_id: str = "session-1"
     valid_until: str = "2027-04-11T10:00:00.000000+00:00"
     auth_url: str = "https://bank.example/authorize?x=1"
+    # GET /aspsps: what Enable Banking lists, per country
+    aspsps: list[dict[str, Any]] = field(
+        default_factory=lambda: [
+            {
+                "name": "FinecoBank",
+                "country": "IT",
+                "maximum_consent_validity": 15552000,
+            },
+            {
+                "name": "Trade Republic",
+                "country": "IT",
+                "maximum_consent_validity": 7776000,
+            },
+        ]
+    )
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         parts = urllib.parse.urlsplit(request.url)
@@ -99,6 +114,11 @@ class FakeBank:
         if method == "POST" and path == "/auth":
             return self._ok(
                 {"url": self.auth_url, "authorization_id": "auth-1", "psu_id_hash": "h"}
+            )
+        if method == "GET" and path == "/aspsps":
+            country = query.get("country")
+            return self._ok(
+                {"aspsps": [a for a in self.aspsps if a["country"] == country]}
             )
         if method == "POST" and path == "/sessions":
             return self._ok(

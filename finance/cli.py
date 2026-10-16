@@ -23,8 +23,12 @@ from typing import Any
 
 from finance.config import (
     COMMAND,
+    Bank,
     Paths,
+    Settings,
     SettingsError,
+    bank_label,
+    connect_command,
     finance_dir,
     load_settings,
     settings_text,
@@ -34,7 +38,7 @@ from finance.fetch import run_fetch
 from finance.files import Busy, ensure_private_dir, exclusive, write_private
 from finance.read import FinanceReadError, categorise, entries_from, holder_names
 from finance.rules import OTHER, RulesError, install_starter, is_holder, load_rules
-from finance.fetch import vanished_keys
+from finance.fetch import last_ok_key, vanished_keys
 from finance.session import SessionError, load_session
 from finance.store import Account, Balance, Store, StoreError, open_reader, open_writer
 
@@ -57,7 +61,8 @@ BALANCE_PREFERENCE = (
     "INFO",
     "OTHR",
 )
-RECONNECT = "Journal --finance connect"
+# The short form in one-line problems (biz shows them).
+SHORT_COMMAND = "Journal --finance"
 
 
 class CliError(RuntimeError):
@@ -111,7 +116,7 @@ def cmd_connect(paths: Paths, args: argparse.Namespace) -> int:
         raise CliError(
             "connect reads the pasted address from a terminal (or pass --stdin)"
         )
-    return run_connect(paths, settings)
+    return run_connect(paths, settings, settings.bank(args.bank))
 
 
 def cmd_fetch(paths: Paths, args: argparse.Namespace) -> int:
@@ -152,29 +157,14 @@ def balance_day(balance: Balance) -> str:
 
 
 def problems(paths: Paths, store: Store, now: datetime.datetime) -> list[str]:
-    """Everything that keeps the bank data from being current, consent first."""
+    """Everything that keeps the bank data from being current, bank by bank."""
     try:
-        session = load_session(paths.session)
-    except SessionError as exc:
-        return [f"bank session file unreadable: {exc}"]
+        settings = load_settings(paths)
+    except SettingsError as exc:
+        return [str(exc)]
     found: list[str] = []
-    if session is None:
-        found.append(f"bank not connected: run {RECONNECT}")
-    elif session.needs_reconsent is not None:
-        found.append(
-            f"bank consent needs renewing ({session.needs_reconsent}): run {RECONNECT}"
-        )
-    elif session.expired(now):
-        found.append(f"bank consent ended: run {RECONNECT}")
-    elif session.valid_until.astimezone().date() <= now.astimezone().date():
-        # Only on the day: a lapse loses nothing, the next fetch reaches back
-        # OVERLAP_DAYS before the last booking.
-        found.append(f"bank consent ends today: renew it with {RECONNECT}")
-    last = store.last_run("ok")
-    if last is None:
-        found.append("no successful bank fetch yet")
-    elif now - datetime.datetime.fromisoformat(last.finished_at) > STALE_AFTER:
-        found.append(f"no successful bank fetch since {_local(last.finished_at)}")
+    for bank in settings.banks:
+        found.extend(_bank_problems(paths, store, settings, bank, now))
     rejected = store.rejected_since(
         (now - REJECTED_WINDOW).isoformat(timespec="seconds")
     )
@@ -183,6 +173,37 @@ def problems(paths: Paths, store: Store, now: datetime.datetime) -> list[str]:
             f"{rejected} bank transaction{'' if rejected == 1 else 's'} could not be read "
             "in the last 30 days"
         )
+    return found
+
+
+def _bank_problems(
+    paths: Paths, store: Store, settings: Settings, bank: Bank, now: datetime.datetime
+) -> list[str]:
+    """One bank's problems, consent first."""
+    who = bank_label(settings, bank)
+    reconnect = connect_command(settings, bank, SHORT_COMMAND)
+    try:
+        session = load_session(paths.session(bank))
+    except SessionError as exc:
+        return [f"{who} session file unreadable: {exc}"]
+    found: list[str] = []
+    if session is None:
+        found.append(f"{who} not connected: run {reconnect}")
+    elif session.needs_reconsent is not None:
+        found.append(
+            f"{who} consent needs renewing ({session.needs_reconsent}): run {reconnect}"
+        )
+    elif session.expired(now):
+        found.append(f"{who} consent ended: run {reconnect}")
+    elif session.valid_until.astimezone().date() <= now.astimezone().date():
+        # Only on the day: a lapse loses nothing, the next fetch reaches back
+        # OVERLAP_DAYS before the last booking.
+        found.append(f"{who} consent ends today: renew it with {reconnect}")
+    last = store.meta(last_ok_key(bank))
+    if last is None:
+        found.append(f"no successful {who} fetch yet")
+    elif now - datetime.datetime.fromisoformat(last) > STALE_AFTER:
+        found.append(f"no successful {who} fetch since {_local(last)}")
     return found
 
 
@@ -322,29 +343,17 @@ def cmd_balance(paths: Paths, args: argparse.Namespace) -> int:
 def cmd_status(paths: Paths, args: argparse.Namespace) -> int:
     now = _now()
     print(f"Finance folder  {paths.root}")
-    try:
-        session = load_session(paths.session)
-    except SessionError as exc:
-        session = None
-        print(f"Consent         ERROR: {exc}")
-    if session is not None:
-        days = (session.valid_until - now).days
-        end = session.valid_until.astimezone().strftime("%d %b %Y")
-        if session.needs_reconsent is not None:
-            print(
-                f"Consent         NEEDS RENEWING: {session.needs_reconsent}; run connect"
-            )
-        elif session.expired(now):
-            print(f"Consent         ENDED on {end}; run connect")
-        else:
-            print(f"Consent         valid until {end} ({days} days left)")
-        if session.rate_limited_until is not None and session.paused(now):
-            until = session.rate_limited_until.astimezone().strftime("%d %b %H:%M")
-            print(f"Paused          after the bank's rate limit, until {until}")
-        for account in session.accounts:
-            print(f"Account         {account.iban or account.identification_hash[:12]}")
-    elif not paths.session.exists():
+    settings: Settings | None = None
+    if not paths.settings.exists():
         print("Consent         not connected (run setup, then connect)")
+    else:
+        try:
+            settings = load_settings(paths)
+        except SettingsError as exc:
+            print(f"Settings        ERROR: {exc}")
+    if settings is not None:
+        for bank in settings.banks:
+            _status_bank(paths, settings, bank, now)
     store = _reader(paths)
     if store is None:
         print("Store           none yet (created by the first fetch)")
@@ -366,6 +375,36 @@ def cmd_status(paths: Paths, args: argparse.Namespace) -> int:
     except RulesError as exc:
         print(f"Rules           ERROR: {exc}")
     return 0
+
+
+def _status_bank(
+    paths: Paths, settings: Settings, bank: Bank, now: datetime.datetime
+) -> None:
+    reconnect = connect_command(settings, bank, SHORT_COMMAND)
+    print(f"Bank            {bank.name} ({bank.country})")
+    try:
+        session = load_session(paths.session(bank))
+    except SessionError as exc:
+        print(f"Consent         ERROR: {exc}")
+        return
+    if session is None:
+        print(f"Consent         not connected (run {reconnect})")
+        return
+    days = (session.valid_until - now).days
+    end = session.valid_until.astimezone().strftime("%d %b %Y")
+    if session.needs_reconsent is not None:
+        print(
+            f"Consent         NEEDS RENEWING: {session.needs_reconsent}; run {reconnect}"
+        )
+    elif session.expired(now):
+        print(f"Consent         ENDED on {end}; run {reconnect}")
+    else:
+        print(f"Consent         valid until {end} ({days} days left)")
+    if session.rate_limited_until is not None and session.paused(now):
+        until = session.rate_limited_until.astimezone().strftime("%d %b %H:%M")
+        print(f"Paused          after the bank's rate limit, until {until}")
+    for account in session.accounts:
+        print(f"Account         {account.iban or account.identification_hash[:12]}")
 
 
 def _status_store(paths: Paths, store: Store, now: datetime.datetime) -> None:
@@ -566,7 +605,10 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument(
         "--key", required=True, help="path of the application's private key (.pem)"
     )
-    connect = commands.add_parser("connect", help="authorise access at the bank")
+    connect = commands.add_parser("connect", help="authorise access at a bank")
+    connect.add_argument(
+        "--bank", help="the bank's name in finance.toml, when there are several"
+    )
     connect.add_argument(
         "--stdin", action="store_true", help="read the address from a pipe"
     )

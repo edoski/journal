@@ -1,4 +1,4 @@
-"""The bank consent: `session.json` (mode 600) in the finance folder.
+"""A bank's consent: `session-<bank key>.json` (mode 600) in the finance folder.
 
 It keeps the Enable Banking session id, the consent's `valid_until`, the
 accounts with their per-session uid, `identification_hash` and IBAN, and two

@@ -16,7 +16,7 @@ import pytest
 
 from finance import cli, tls
 from finance.client import HttpRequest, urllib_transport
-from finance.config import Paths, Settings
+from finance.config import DEFAULT_BANK, Paths, Settings
 from finance.fetch import run_fetch, vanished_keys
 from finance.session import SessionAccount, load_session
 from finance.store import open_reader, open_writer
@@ -327,7 +327,7 @@ def test_a_limit_or_session_error_on_the_balance_call_stops_the_run(
     result = fetch(paths, bank)
     assert (result.outcome, result.exit_code) == (outcome, code)
     assert len(rows(paths)) == 1  # the transactions were already committed
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None
     assert (session.rate_limited_until is not None) == (outcome == "rate_limited")
 

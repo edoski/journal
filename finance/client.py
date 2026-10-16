@@ -18,7 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from finance.config import API_ORIGIN, Settings
+from finance.config import API_ORIGIN, Bank, Settings
 from finance.jwt import TOKEN_SECONDS, make_token
 from finance.tls import default_context
 
@@ -189,7 +189,17 @@ class EnableBankingClient:
             raise ApiError(answer.status, None, "the answer is not a JSON object")
         return payload
 
-    def start_authorization(self, *, valid_until: str, state: str) -> dict[str, Any]:
+    def aspsp(self, bank: Bank) -> dict[str, Any] | None:
+        """GET /aspsps: the bank's entry (with `maximum_consent_validity`), if listed."""
+        listed = self._call("GET", "/aspsps", query={"country": bank.country})
+        for item in listed.get("aspsps") or []:
+            if isinstance(item, dict) and item.get("name") == bank.name:
+                return item
+        return None
+
+    def start_authorization(
+        self, *, bank: Bank, valid_until: str, state: str
+    ) -> dict[str, Any]:
         """POST /auth: returns `url` (the bank link) and `authorization_id`."""
         return self._call(
             "POST",
@@ -200,10 +210,7 @@ class EnableBankingClient:
                     "balances": True,
                     "transactions": True,
                 },
-                "aspsp": {
-                    "name": self._settings.aspsp_name,
-                    "country": self._settings.aspsp_country,
-                },
+                "aspsp": {"name": bank.name, "country": bank.country},
                 "state": state,
                 "redirect_url": self._settings.redirect_url,
                 "psu_type": self._settings.psu_type,

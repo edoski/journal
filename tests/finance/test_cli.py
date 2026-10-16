@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from finance import cli
-from finance.config import Paths, Settings, load_settings
+from finance.config import DEFAULT_BANK, Paths, Settings, load_settings
 from finance.fetch import run_fetch
 from finance.session import load_session, save_session
 
@@ -194,10 +194,11 @@ def test_json_reports_problems_in_one_line(
     monkeypatch.setattr(cli, "_now", lambda: later)
     _, out, _ = run(capsys, paths, "balance", "--json")
     assert json.loads(out)["problem"].startswith("no successful bank fetch since")
-    session = load_session(paths.session)
+    session = load_session(paths.session(DEFAULT_BANK))
     assert session is not None
     save_session(
-        paths.session, session.flag_reconsent("EXPIRED_SESSION on 20 Oct", NOW)
+        paths.session(DEFAULT_BANK),
+        session.flag_reconsent("EXPIRED_SESSION on 20 Oct", NOW),
     )
     _, out, _ = run(capsys, paths, "credits", "--since", "2026-10-01", "--json")
     assert "consent needs renewing" in json.loads(out)["problem"]
