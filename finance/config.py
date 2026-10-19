@@ -108,13 +108,8 @@ class Settings:
     psu_type: str = DEFAULT_PSU_TYPE
     redirect_url: str = DEFAULT_REDIRECT_URL
 
-    def bank(self, name: str | None) -> Bank:
-        """The bank called `name` (any case), or the only one when no name is given."""
-        if name is None:
-            if len(self.banks) == 1:
-                return self.banks[0]
-            names = ", ".join(f"'{bank.name}'" for bank in self.banks)
-            raise SettingsError(f"say which bank with --bank: {names}")
+    def bank(self, name: str) -> Bank:
+        """The bank called `name` (any case)."""
         for bank in self.banks:
             if bank.name.casefold() == name.strip().casefold():
                 return bank

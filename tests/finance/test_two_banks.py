@@ -23,6 +23,7 @@ from finance.store import open_reader
 
 from tests.finance.conftest import NOW, TODAY, connected
 from tests.finance.fake_bank import FakeBank, account, client_factory, tx
+from tests.finance.fake_desktop import no_chrome
 
 TRADE_REPUBLIC = Bank("Trade Republic", "IT")
 REDIRECT = "https://localhost/enablebanking/callback"
@@ -71,13 +72,10 @@ def test_finance_toml_lists_banks_and_defaults_to_fineco(paths: Paths) -> None:
     assert TRADE_REPUBLIC.key == "trade-republic-it"
     assert paths.session(TRADE_REPUBLIC).name == "session-trade-republic-it.json"
     assert settings.bank("trade republic") == TRADE_REPUBLIC
-    with pytest.raises(SettingsError, match="say which bank"):
-        settings.bank(None)
     with pytest.raises(SettingsError, match=r"\[\[bank\]\]"):
         settings.bank("Revolut")
     paths.settings.write_text(settings_text("test-app-id", "/no-key.pem"))
     assert load_settings(paths).banks == (DEFAULT_BANK,)
-    assert load_settings(paths).bank(None) == DEFAULT_BANK
 
 
 @pytest.mark.parametrize(
@@ -109,6 +107,7 @@ def test_connect_asks_for_the_banks_own_consent_length(paths: Paths) -> None:
         paths,
         settings,
         TRADE_REPUBLIC,
+        browser=no_chrome(),
         client_factory=client_factory(bank),
         read_line=lambda prompt: f"{REDIRECT}?state=S&code=C",
         write=out.append,
@@ -123,7 +122,7 @@ def test_connect_asks_for_the_banks_own_consent_length(paths: Paths) -> None:
     assert bank.requests("GET", "/aspsps")[0].query == {"country": "IT"}
     assert load_session(paths.session(TRADE_REPUBLIC)) is not None
     assert load_session(paths.session(DEFAULT_BANK)) is None
-    assert "log in to Trade Republic" in out[0]
+    assert "log in to Trade Republic" in out[1]
 
 
 def test_connect_refuses_a_bank_enable_banking_does_not_list(paths: Paths) -> None:
@@ -133,6 +132,7 @@ def test_connect_refuses_a_bank_enable_banking_does_not_list(paths: Paths) -> No
         paths,
         settings,
         TRADE_REPUBLIC,
+        browser=no_chrome(),
         client_factory=client_factory(FakeBank(aspsps=[])),
         read_line=lambda prompt: "",
         write=out.append,

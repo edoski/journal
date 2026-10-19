@@ -18,6 +18,10 @@
 - Balances are fetched with the first successful run of each day, after the
   transactions, so a failing balance call never blocks the transactions and
   the run makes about four bank calls a day at three runs.
+- With a `renew` hook (the `fetch` command passes `connect.renew_bank`), once
+  every bank is fetched, each bank whose consent ends today or has ended is
+  renewed in turn, still under the lock, and a renewed bank is fetched again;
+  its new result replaces the first one.
 """
 
 from __future__ import annotations
@@ -72,6 +76,10 @@ _URGENCY: tuple[Outcome, ...] = (
     "skipped",
     "ok",
 )
+
+
+# Renews a bank's consent (given its current session); True when renewed.
+Renew = Callable[[Bank, Session], bool]
 
 
 @dataclass(frozen=True)
@@ -335,10 +343,11 @@ def run_fetch(
     client_factory: Callable[[Settings], EnableBankingClient] = EnableBankingClient,
     now: Callable[[], datetime.datetime] = utc_now,
     today: Callable[[], datetime.date] = local_today,
+    renew: Renew | None = None,
 ) -> FetchResult:
     try:
         with exclusive(paths.lock):
-            return _locked_fetch(paths, settings, client_factory, now, today())
+            return _locked_fetch(paths, settings, client_factory, now, today(), renew)
     except Busy as exc:
         return FetchResult("busy", f"Skipped: {exc}.", EXIT_OK)
 
@@ -374,6 +383,7 @@ def _locked_fetch(
     client_factory: Callable[[Settings], EnableBankingClient],
     clock: Callable[[], datetime.datetime],
     today: datetime.date,
+    renew: Renew | None,
 ) -> FetchResult:
     started = clock()
     sessions: list[tuple[Bank, Session | None, str | None]] = []
@@ -408,9 +418,59 @@ def _locked_fetch(
                     clock,
                 )
             results.append((bank, result))
+        if renew is not None:
+            results = [
+                (
+                    bank,
+                    _renewed(
+                        paths,
+                        store,
+                        settings,
+                        bank,
+                        result,
+                        renew,
+                        client_factory,
+                        today,
+                        clock,
+                    ),
+                )
+                for bank, result in results
+            ]
         return _combine(settings, results)
     finally:
         store.close()
+
+
+def _renewed(
+    paths: Paths,
+    store: Store,
+    settings: Settings,
+    bank: Bank,
+    result: FetchResult,
+    renew: Renew,
+    client_factory: Callable[[Settings], EnableBankingClient],
+    today: datetime.date,
+    clock: Callable[[], datetime.datetime],
+) -> FetchResult:
+    """The bank's result after renewing its consent when it is due: the result of
+    a fresh fetch when renewed, else the first one."""
+    try:
+        session = load_session(paths.session(bank))
+    except SessionError:
+        return result
+    if session is None or not session.renewal_due(clock()):
+        return result
+    if not renew(bank, session):
+        return result
+    try:
+        renewed = load_session(paths.session(bank))
+    except SessionError as exc:
+        return FetchResult("error", f"Fetch failed: {exc}", EXIT_ERROR)
+    if renewed is None:
+        return result
+    return _fetch_with(
+        paths, store, settings, bank, renewed, client_factory, clock(), today, clock
+    )
 
 
 def _not_connected(settings: Settings, bank: Bank) -> FetchResult:

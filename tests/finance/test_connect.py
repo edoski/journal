@@ -1,4 +1,4 @@
-"""connect: the bank link, the pasted redirect, the stored session."""
+"""connect: the bank link, the pasted redirect (Chrome unavailable), the stored session."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from finance.session import load_session
 
 from tests.finance.conftest import NOW, connected
 from tests.finance.fake_bank import FakeBank, account, client_factory
+from tests.finance.fake_desktop import NO_CHROME, no_chrome
 
 REDIRECT = "https://localhost/enablebanking/callback"
 
@@ -26,6 +27,7 @@ def connect(
         paths,
         settings,
         DEFAULT_BANK,
+        browser=no_chrome(),
         client_factory=client_factory(bank),
         read_line=lambda prompt: pasted,
         write=out.append,
@@ -72,6 +74,7 @@ def test_connect_asks_the_bank_and_stores_the_session(
     assert paths.rules.exists()
     text = "\n".join(out)
     assert bank.auth_url in text and "can't connect" in text
+    assert out[0] == f"Chrome cannot be used ({NO_CHROME}); paste the address instead."
 
 
 def test_reconnecting_replaces_the_session_and_matches_accounts(
@@ -152,6 +155,7 @@ def test_eof_on_stdin_is_a_clean_failure(paths: Paths, settings: Settings) -> No
         paths,
         settings,
         DEFAULT_BANK,
+        browser=no_chrome(),
         client_factory=client_factory(FakeBank()),
         read_line=eof,
         write=out.append,

@@ -271,6 +271,54 @@ enum BundledPython {
     }
 }
 
+/// Runs a command again as a process macOS holds responsible for itself. Started
+/// from a terminal, a command is the terminal's, and so would be the Automation
+/// permission `--finance` needs to read Google Chrome's tabs for a bank login;
+/// this way it is Journal's, the same one the launchd fetch uses.
+enum SelfResponsible {
+    private static let marker = "JOURNAL_SELF_RESPONSIBLE"
+    private static let defaultHandle = UnsafeMutableRawPointer(bitPattern: -2) // RTLD_DEFAULT
+    private static let signalMask: Int32 = 0x7f
+    private static let signalExitBase: Int32 = 128
+    private typealias SetDisclaim = @convention(c) (
+        UnsafeMutablePointer<posix_spawnattr_t?>, Int32
+    ) -> Int32
+
+    /// The exit status of the command run that way, or nil when this process
+    /// already is that run (or one cannot be started): run the command here.
+    static func run() -> Int32? {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment[marker] == nil,
+              let executable = Bundle.main.executablePath,
+              let symbol = dlsym(defaultHandle, "responsibility_spawnattrs_setdisclaim")
+        else { return nil }
+        let disclaim = unsafeBitCast(symbol, to: SetDisclaim.self)
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        guard disclaim(&attributes, 1) == 0 else { return nil }
+
+        let argv = cStrings(CommandLine.arguments)
+        let envp = cStrings(environment.map { "\($0.key)=\($0.value)" } + ["\(marker)=1"])
+        defer { (argv + envp).forEach { free($0) } }
+        var pid = pid_t()
+        // Same process group: the child keeps the terminal.
+        guard posix_spawn(&pid, executable, nil, &attributes, argv, envp) == 0 else {
+            return nil
+        }
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) == -1 {
+            if errno != EINTR { return 1 }
+        }
+        let signal = status & signalMask
+        return signal == 0 ? (status >> 8) & 0xff : signalExitBase + signal
+    }
+
+    private static func cStrings(_ values: [String]) -> [UnsafeMutablePointer<CChar>?] {
+        values.map { strdup($0) } + [nil]
+    }
+}
+
 final class PromptController: NSObject, NSApplicationDelegate, NSTextFieldDelegate {
     private enum FlowActivity: Equatable {
         case paused
@@ -983,6 +1031,7 @@ let arguments = Array(CommandLine.arguments.dropFirst())
 if arguments.first == "--run" {
     exit(BundledPython.runAttached(arguments: Array(arguments.dropFirst())))
 } else if arguments.first == "--finance" {
+    if let status = SelfResponsible.run() { exit(status) }
     exit(BundledPython.runAttached(module: "finance", arguments: Array(arguments.dropFirst())))
 } else {
     let app = NSApplication.shared

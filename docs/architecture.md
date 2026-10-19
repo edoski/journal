@@ -80,9 +80,14 @@ system `openssl` (`jwt.py`; the key never enters the process) and sends it over 
 verifying TLS context (`tls.py`: Python's default roots, else the macOS system
 roots, else `/etc/ssl/cert.pem`). `connect.py` runs the redirect consent: the
 consent length from the bank's `maximum_consent_validity` (GET /aspsps), the
-bank link, the pasted redirected address, its `state` check, and the session
-stored in `session-<bank key>.json`. `fetch.py` is one locked run over every
-bank, one bank's failure never stopping another: the longest history
+bank link opened in Google Chrome, the redirected address read from Chrome's tabs
+(pasted only when Chrome cannot be opened or read), its `state` check, and the
+session stored in `session-<bank key>.json`, the previous one closed. Chrome and
+notifications sit behind `desktop.py`'s `Browser` and `Notifier` (AppleScript
+through `osascript`; tests use fakes). `fetch.py` is one locked run over every
+bank, one bank's failure never stopping another, followed by the renewal
+(`connect.renew_bank`) of each consent that ends that day or has ended, and a
+fresh fetch of each bank renewed: the longest history
 first, then from the last booked date minus an overlap, all pages or nothing per
 account (an item it cannot read is kept aside in `rejected`, never fatal),
 upserts keyed on `entry_reference` with booking date, direction, amount and

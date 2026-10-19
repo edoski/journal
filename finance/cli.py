@@ -33,13 +33,14 @@ from finance.config import (
     load_settings,
     settings_text,
 )
-from finance.connect import run_connect
+from finance.connect import renew_bank, run_connect
+from finance.desktop import Chrome, MacNotifier
 from finance.fetch import run_fetch
 from finance.files import Busy, ensure_private_dir, exclusive, write_private
 from finance.read import FinanceReadError, categorise, entries_from, holder_names
 from finance.rules import OTHER, RulesError, install_starter, is_holder, load_rules
 from finance.fetch import last_ok_key, vanished_keys
-from finance.session import SessionError, load_session
+from finance.session import Session, SessionError, load_session
 from finance.store import Account, Balance, Store, StoreError, open_reader, open_writer
 
 STALE_AFTER = datetime.timedelta(days=2)
@@ -114,14 +115,22 @@ def cmd_connect(paths: Paths, args: argparse.Namespace) -> int:
     settings = load_settings(paths)
     if not sys.stdin.isatty() and not args.stdin:
         raise CliError(
-            "connect reads the pasted address from a terminal (or pass --stdin)"
+            "connect may ask for the pasted address on a terminal (or pass --stdin)"
         )
-    return run_connect(paths, settings, settings.bank(args.bank))
+    bank = settings.bank(args.bank) if args.bank else None
+    return run_connect(paths, settings, bank, browser=Chrome())
 
 
 def cmd_fetch(paths: Paths, args: argparse.Namespace) -> int:
     settings = load_settings(paths)
-    result = run_fetch(paths, settings)
+    browser, notifier = Chrome(), MacNotifier()
+
+    def renew(bank: Bank, session: Session) -> bool:
+        return renew_bank(
+            paths, settings, bank, session, browser=browser, notifier=notifier
+        )
+
+    result = run_fetch(paths, settings, renew=renew)
     stream = sys.stdout if result.exit_code == 0 else sys.stderr
     print(result.message, file=stream)
     return result.exit_code
@@ -195,9 +204,7 @@ def _bank_problems(
         )
     elif session.expired(now):
         found.append(f"{who} consent ended: run {reconnect}")
-    elif session.valid_until.astimezone().date() <= now.astimezone().date():
-        # Only on the day: a lapse loses nothing, the next fetch reaches back
-        # OVERLAP_DAYS before the last booking.
+    elif session.renewal_due(now):
         found.append(f"{who} consent ends today: renew it with {reconnect}")
     last = store.meta(last_ok_key(bank))
     if last is None:
@@ -607,12 +614,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     connect = commands.add_parser("connect", help="authorise access at a bank")
     connect.add_argument(
-        "--bank", help="the bank's name in finance.toml, when there are several"
+        "--bank",
+        help="the bank's name in finance.toml (default: the one that needs it most)",
     )
     connect.add_argument(
         "--stdin", action="store_true", help="read the address from a pipe"
     )
-    commands.add_parser("fetch", help="fetch balances and booked transactions")
+    commands.add_parser(
+        "fetch",
+        help="fetch balances and booked transactions; renew a consent ending today",
+    )
     commands.add_parser("status", help="consent, last fetch, balance, counts, errors")
     rules = commands.add_parser("rules", help="category rules")
     rules_commands = rules.add_subparsers(dest="rules_command", required=True)

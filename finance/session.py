@@ -46,6 +46,15 @@ class Session:
     def expired(self, now: datetime.datetime) -> bool:
         return now >= self.valid_until
 
+    def renewal_due(self, now: datetime.datetime) -> bool:
+        """The consent has ended or ends today (local day): renewal is due, never
+        earlier. A lapse loses nothing, the next fetch reaches back before the
+        last booking."""
+        return (
+            self.needs_reconsent is not None
+            or self.valid_until.astimezone().date() <= now.astimezone().date()
+        )
+
     def paused(self, now: datetime.datetime) -> bool:
         return self.rate_limited_until is not None and now < self.rate_limited_until
 

@@ -215,8 +215,8 @@ python -m sync.run media book annotations import /abs/path/to/export.html --note
 
 ```bash
 python -m finance setup --application-id ID --key ~/.config/enablebanking/ID.pem
-python -m finance connect          # bank link, then paste the redirected address
-python -m finance fetch            # balances + booked transactions (launchd: 3x a day)
+python -m finance connect [--bank NAME]  # bank login in Chrome, read back from its tabs
+python -m finance fetch            # balances + transactions (launchd: 3x a day); renews due consents
 python -m finance status
 python -m finance rules check
 python -m finance rules unmatched --month YYYY-MM
@@ -231,6 +231,21 @@ normal launch). Category rules apply when notes sync, so a rules edit reaches a 
 note only when it is synced again (e.g. `python -m sync.run period monthly --month YYYY-MM`).
 `fetch` exits 0 on success or a clean skip (another fetch running, the 6-hour pause
 after a 429), 3 when the bank consent must be renewed, 1 on other errors.
+
+Consent renewal (Trade Republic every 90 days, FinecoBank every 180): after fetching
+every bank, `fetch` renews each consent that ends today or has ended (never earlier),
+still holding the fetch lock. It opens the bank login in Google Chrome, posts a
+notification, reads Chrome's tab addresses until one is the redirect URL with this
+attempt's `state` (at most 15 minutes), stores the new session, closes the tab and
+the previous session, and fetches that bank again. A failure or timeout is notified
+and left to the next scheduled run. `connect` does the same by hand; without
+`--bank` it picks the bank not connected, then ended, then ending soonest, and asks
+for the pasted address only when Chrome cannot be opened or read (one line says why).
+`Journal --finance` runs its command as a process responsible for itself, so macOS
+attributes the Automation request to Journal, from a terminal as from launchd: the
+first `connect` asks once "Journal wants access to control Google Chrome"
+(System Settings > Privacy & Security > Automation > Journal). Notifications come
+from `osascript` (listed under Script Editor in System Settings > Notifications).
 
 ### Snapshot baseline fixtures
 
@@ -378,7 +393,8 @@ launchctl load ~/Library/LaunchAgents/com.edo.journal.remind.plist
 
 - Never commit personal journal content.
 - Treat Flow DB as read-mostly; write operations must be intentional and minimal.
-- Finance makes network calls only in `connect` and `fetch`; tests use fakes. Never read,
+- Finance makes network calls only in `connect` and `fetch`, and drives Chrome only to
+  open the bank link and read or close tab addresses; tests use fakes. Never read,
   copy or print the Enable Banking private key; never disable TLS verification.
 - Use file locks for note writes.
 - Avoid destructive git commands (`reset --hard`, checkout of unknown changes).
