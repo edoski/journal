@@ -20,7 +20,9 @@ app_dir="$repo_dir/build/Journal.app"
 contents_dir="$app_dir/Contents"
 resources_dir="$contents_dir/Resources"
 python_version=$(tr -d '[:space:]' < "$project_dir/python-version")
+# --system: never the checkout's .venv, which has no libpython to bundle.
 python_executable=$(uv python find \
+    --system \
     --managed-python \
     --no-python-downloads \
     "$python_version")
