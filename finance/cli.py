@@ -363,7 +363,7 @@ def cmd_balance(paths: Paths, args: argparse.Namespace) -> int:
     try:
         accounts = {account.hash: account for account in store.accounts()}
         if since is not None and args.history:
-            # A fetch just after midnight UTC can belong to the day before locally.
+            # A fetch just before midnight UTC already belongs to the next day in Italy.
             fetched = store.balances_since(since - datetime.timedelta(days=1))
             picked = daily_balances(fetched, since)
         else:
@@ -712,7 +712,7 @@ def build_parser() -> argparse.ArgumentParser:
     balance.add_argument(
         "--history",
         action="store_true",
-        help="each day's balance since --since (its first fetch), account by account",
+        help="each day's balance since --since (read once a day), account by account",
     )
     balance.add_argument("--since", help="YYYY-MM-DD, with --history")
     balance.add_argument("--json", action="store_true")

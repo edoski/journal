@@ -222,7 +222,9 @@ python -m finance rules check
 python -m finance rules unmatched --month YYYY-MM
 python -m finance opened YYYY-MM-DD [--account 0653]  # a new account's opening day (never automatic)
 python -m finance credits --since YYYY-MM-DD --json   # read-only, for biz
+python -m finance debits --since YYYY-MM-DD --json    # read-only, for biz
 python -m finance balance --json                      # read-only, for biz
+python -m finance balance --history --since YYYY-MM-DD --json  # one a day per account, for biz
 ```
 
 From the installed app: `/Applications/Journal.app/Contents/MacOS/Journal --finance <command>`
