@@ -319,7 +319,40 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
         store.close()
 
 
+def fetched_day(balance: Balance) -> str:
+    return (
+        datetime.datetime.fromisoformat(balance.fetched_at)
+        .astimezone()
+        .date()
+        .isoformat()
+    )
+
+
+def daily_balances(balances: Sequence[Balance], since: datetime.date) -> list[Balance]:
+    """Each account's balance at the end of each day from `since`: the day's
+    last fetch, its most useful type. The day is the day it was fetched, since a
+    balance's reference date can lie ahead (FWAV). Days without a fetch are left
+    out."""
+    last: dict[tuple[str, str], str] = {}
+    for balance in balances:
+        day = fetched_day(balance)
+        if day >= since.isoformat():
+            key = (balance.account, day)
+            last[key] = max(last.get(key, ""), balance.fetched_at)
+    chosen = []
+    for (account, _), fetched_at in sorted(last.items()):
+        pick = pick_balance(
+            [b for b in balances if b.account == account and b.fetched_at == fetched_at]
+        )
+        if pick is not None:
+            chosen.append(pick)
+    return chosen
+
+
 def cmd_balance(paths: Paths, args: argparse.Namespace) -> int:
+    if bool(args.history) != bool(args.since):
+        raise CliError("--history and --since YYYY-MM-DD go together")
+    since = datetime.date.fromisoformat(args.since) if args.since else None
     store = _reader(paths)
     if store is None:
         if args.json:
@@ -329,23 +362,32 @@ def cmd_balance(paths: Paths, args: argparse.Namespace) -> int:
         return 0
     try:
         accounts = {account.hash: account for account in store.accounts()}
-        latest: dict[str, list[Balance]] = {}
-        for balance in store.latest_balances():
-            latest.setdefault(balance.account, []).append(balance)
+        if since is not None and args.history:
+            # A fetch just after midnight UTC can belong to the day before locally.
+            fetched = store.balances_since(since - datetime.timedelta(days=1))
+            picked = daily_balances(fetched, since)
+        else:
+            latest: dict[str, list[Balance]] = {}
+            for balance in store.latest_balances():
+                latest.setdefault(balance.account, []).append(balance)
+            picked = [
+                chosen
+                for _, balances in sorted(latest.items())
+                if (chosen := pick_balance(balances)) is not None
+            ]
         rows = []
-        for account, balances in sorted(latest.items()):
-            chosen = pick_balance(balances)
-            if chosen is None:
-                continue
-            known = accounts.get(account)
+        for chosen in picked:
+            known = accounts.get(chosen.account)
             rows.append(
                 {
-                    "account": account,
+                    "account": chosen.account,
                     "iban": known.iban if known else "",
                     "amount": decimal_text(chosen.amount_cents),
                     "currency": chosen.currency,
                     "type": chosen.balance_type,
-                    "date": balance_day(chosen),
+                    "date": fetched_day(chosen)
+                    if args.history
+                    else balance_day(chosen),
                     "fetched_at": chosen.fetched_at,
                 }
             )
@@ -667,6 +709,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--account", help="the last IBAN digits, when there are several accounts"
     )
     balance = commands.add_parser("balance", help="the latest balance (for biz)")
+    balance.add_argument(
+        "--history",
+        action="store_true",
+        help="each day's closing balance since --since, account by account",
+    )
+    balance.add_argument("--since", help="YYYY-MM-DD, with --history")
     balance.add_argument("--json", action="store_true")
     return parser
 

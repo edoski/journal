@@ -235,6 +235,16 @@ class Store:
         ).fetchall()
         return [Balance(*row) for row in rows]
 
+    def balances_since(self, since: datetime.date) -> list[Balance]:
+        """Every balance fetched on or after `since` (UTC), oldest first."""
+        rows = self._db.execute(
+            "SELECT account, fetched_at, balance_type, name, amount_cents, currency, "
+            "reference_date FROM balances WHERE fetched_at >= ? "
+            "ORDER BY account, fetched_at, balance_type",
+            (since.isoformat(),),
+        ).fetchall()
+        return [Balance(*row) for row in rows]
+
     def runs(self, limit: int = 20) -> list[Run]:
         rows = self._db.execute(
             "SELECT started_at, finished_at, outcome, detail, added, updated, calls "

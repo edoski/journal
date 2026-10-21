@@ -136,6 +136,7 @@ def test_credits_and_balance_before_setup(
         ("credits", "--since", "2026-10-01", "--json"),
         ("debits", "--since", "2026-10-01", "--json"),
         ("balance", "--json"),
+        ("balance", "--history", "--since", "2026-10-01", "--json"),
     ):
         code, out, _ = run(capsys, paths, *argv)
         assert code == 0 and json.loads(out) == {"status": "not_set_up"}
@@ -210,6 +211,52 @@ def test_debits_json_mirrors_credits(
     assert account["last_fetch"] is not None
     _, out, _ = run(capsys, paths, "credits", "--since", "2026-10-17", "--json")
     assert json.loads(out)["accounts"] == payload["accounts"]
+
+
+def test_balance_history_gives_each_days_last_fetch(
+    capsys: pytest.CaptureFixture[str],
+    paths: Paths,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bank = populate(paths, settings)
+    for days, amount in ((1, "5100.00"), (3, "4900.00")):
+        bank.balances["uid-1"] = [
+            {
+                "name": "Disponibile",
+                "balance_amount": {"currency": "EUR", "amount": amount},
+                "balance_type": "ITAV",
+            },
+            {
+                "name": "Futuro",
+                "balance_amount": {"currency": "EUR", "amount": "1.00"},
+                "balance_type": "FWAV",
+                "reference_date": "2026-10-31",
+            },
+        ]
+        later = NOW + datetime.timedelta(days=days)
+        result = run_fetch(
+            paths,
+            settings,
+            client_factory=client_factory(bank),
+            now=lambda: later,
+            today=lambda: later.date(),
+        )
+        assert result.outcome == "ok"
+    monkeypatch.setattr(cli, "_now", lambda: NOW + datetime.timedelta(days=3))
+    code, out, _ = run(
+        capsys, paths, "balance", "--history", "--since", "2026-10-21", "--json"
+    )
+    assert code == 0
+    payload = json.loads(out)
+    assert [(b["date"], b["amount"], b["type"]) for b in payload["balances"]] == [
+        ("2026-10-21", "5100.00", "ITAV"),
+        ("2026-10-23", "4900.00", "ITAV"),
+    ]
+    _, out, _ = run(capsys, paths, "balance", "--json")
+    assert [b["amount"] for b in json.loads(out)["balances"]] == ["4900.00"]
+    code, _, err = run(capsys, paths, "balance", "--history")
+    assert code == 1 and "go together" in err
 
 
 def test_balance_json_prefers_the_available_balance(
