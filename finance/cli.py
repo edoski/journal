@@ -1,10 +1,12 @@
-"""`python -m finance`: setup, connect, fetch, status, rules, credits, balance.
+"""`python -m finance`: setup, connect, fetch, status, rules, credits, debits, balance.
 
-`credits` and `balance` with `--json` are the read-only interface of the biz
-tool. Their JSON always has `status`: "ok", "not_set_up" (no store yet) or
-"error" (with `message`, exit status 1); with "ok" it also has `last_fetch`
+`credits`, `debits` and `balance` with `--json` are the read-only interface of
+the biz tool. Their JSON always has `status`: "ok", "not_set_up" (no store yet)
+or "error" (with `message`, exit status 1); with "ok" it also has `last_fetch`
 (the last successful fetch, UTC, or null) and `problem` (one line worth
-showing, or null).
+showing, or null). `credits` and `debits` also list each account with its own
+last successful fetch, so a reader can tell a missing transaction from an
+account that has not been fetched since.
 """
 
 from __future__ import annotations
@@ -42,6 +44,7 @@ from finance.rules import OTHER, RulesError, install_starter, is_holder, load_ru
 from finance.fetch import last_ok_key, vanished_keys
 from finance.session import Session, SessionError, load_session
 from finance.store import Account, Balance, Store, StoreError, open_reader, open_writer
+from finance.transactions import Flow
 
 STALE_AFTER = datetime.timedelta(days=2)
 REJECTED_WINDOW = datetime.timedelta(days=30)
@@ -244,6 +247,15 @@ def _emit(payload: dict[str, Any]) -> None:
 
 
 def cmd_credits(paths: Paths, args: argparse.Namespace) -> int:
+    return _transactions(paths, args, "IN", "credits")
+
+
+def cmd_debits(paths: Paths, args: argparse.Namespace) -> int:
+    return _transactions(paths, args, "OUT", "debits")
+
+
+def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str) -> int:
+    """Money in or out since a date, every account."""
     since = datetime.date.fromisoformat(args.since)
     store = _reader(paths)
     if store is None:
@@ -263,11 +275,11 @@ def cmd_credits(paths: Paths, args: argparse.Namespace) -> int:
         accounts = store.accounts()
         holders = holder_names(accounts)
         ibans = {account.hash: account.iban for account in accounts}
-        rows = store.transactions(since, None, flow="IN")
-        credits = []
+        rows = store.transactions(since, None, flow=flow)
+        items = []
         for row in rows:
             category = categorise(row, rules, holders).category if rules else None
-            credits.append(
+            items.append(
                 {
                     "key": row.key,
                     "account": row.account,
@@ -285,11 +297,19 @@ def cmd_credits(paths: Paths, args: argparse.Namespace) -> int:
         if args.json:
             envelope = _envelope(paths, store)
             envelope["problem"] = envelope["problem"] or rules_problem
-            _emit({**envelope, "credits": credits})
+            fetched = [
+                {
+                    "account": account.hash,
+                    "iban": account.iban,
+                    "last_fetch": account.last_fetch,
+                }
+                for account in accounts
+            ]
+            _emit({**envelope, "accounts": fetched, name: items})
             return 0
         if rules_problem:
             print(f"warning: {rules_problem}", file=sys.stderr)
-        for item in credits:
+        for item in items:
             print(
                 f"{item['date']}  {item['amount']:>10} {item['currency']}  "
                 f"{item['counterparty'] or '-'} | {item['remittance'] or '-'}"
@@ -635,6 +655,9 @@ def build_parser() -> argparse.ArgumentParser:
     credits = commands.add_parser("credits", help="money in since a date (for biz)")
     credits.add_argument("--since", required=True, help="YYYY-MM-DD")
     credits.add_argument("--json", action="store_true")
+    debits = commands.add_parser("debits", help="money out since a date (for biz)")
+    debits.add_argument("--since", required=True, help="YYYY-MM-DD")
+    debits.add_argument("--json", action="store_true")
     opened = commands.add_parser(
         "opened",
         help="record the day a new account was opened (days before: no spending)",
@@ -654,6 +677,7 @@ HANDLERS = {
     "fetch": cmd_fetch,
     "status": cmd_status,
     "credits": cmd_credits,
+    "debits": cmd_debits,
     "balance": cmd_balance,
     "opened": cmd_opened,
 }

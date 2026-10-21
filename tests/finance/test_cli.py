@@ -132,7 +132,11 @@ def test_fetch_and_connect_need_settings(
 def test_credits_and_balance_before_setup(
     capsys: pytest.CaptureFixture[str], paths: Paths
 ) -> None:
-    for argv in (("credits", "--since", "2026-10-01", "--json"), ("balance", "--json")):
+    for argv in (
+        ("credits", "--since", "2026-10-01", "--json"),
+        ("debits", "--since", "2026-10-01", "--json"),
+        ("balance", "--json"),
+    ):
         code, out, _ = run(capsys, paths, *argv)
         assert code == 0 and json.loads(out) == {"status": "not_set_up"}
 
@@ -165,6 +169,47 @@ def test_credits_json(
         "INVOICE 1/2026",
         "IT00X0000000000000000000000",
     )
+
+
+def test_debits_json_mirrors_credits(
+    capsys: pytest.CaptureFixture[str],
+    paths: Paths,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    populate(paths, settings)
+    monkeypatch.setattr(cli, "_now", lambda: NOW + datetime.timedelta(hours=1))
+    code, out, _ = run(capsys, paths, "debits", "--since", "2026-10-17", "--json")
+    assert code == 0
+    payload = json.loads(out)
+    assert payload["status"] == "ok" and payload["problem"] is None
+    assert payload["last_fetch"] is not None
+    assert [
+        (d["date"], d["amount"], d["remittance"], d["iban"], d["holder"])
+        for d in payload["debits"]
+    ] == [
+        (
+            "2026-10-17",
+            "27.80",
+            "PAGAMENTO CARTA 17/10",
+            "IT00X0000000000000000000000",
+            False,
+        ),
+        (
+            "2026-10-18",
+            "27.80",
+            "PAGAMENTO CARTA 17/10",
+            "IT00X0000000000000000000000",
+            False,
+        ),
+    ]
+    assert payload["debits"][0]["transaction"]["entry_reference"] == "o1"
+    assert "credits" not in payload
+    [account] = payload["accounts"]
+    assert account["iban"] == "IT00X0000000000000000000000"
+    assert account["last_fetch"] is not None
+    _, out, _ = run(capsys, paths, "credits", "--since", "2026-10-17", "--json")
+    assert json.loads(out)["accounts"] == payload["accounts"]
 
 
 def test_balance_json_prefers_the_available_balance(
