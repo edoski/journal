@@ -329,24 +329,24 @@ def fetched_day(balance: Balance) -> str:
 
 
 def daily_balances(balances: Sequence[Balance], since: datetime.date) -> list[Balance]:
-    """Each account's balance at the end of each day from `since`: the day's
-    last fetch, its most useful type. The day is the day it was fetched, since a
-    balance's reference date can lie ahead (FWAV). Days without a fetch are left
-    out."""
-    last: dict[tuple[str, str], str] = {}
+    """Each account's balance for each day from `since`: the day's last fetch,
+    its most useful type. The fetch reads balances once a day, at its first run,
+    so this is the morning's balance, not the closing one. The day is the day of
+    the fetch, since a balance's reference date can lie ahead (FWAV). Days
+    without a fetch are left out."""
+    fetches: dict[tuple[str, str], list[Balance]] = {}
     for balance in balances:
-        day = fetched_day(balance)
+        fetches.setdefault((balance.account, balance.fetched_at), []).append(balance)
+    last: dict[tuple[str, str], str] = {}
+    for account, fetched_at in fetches:
+        day = fetched_day(fetches[(account, fetched_at)][0])
         if day >= since.isoformat():
-            key = (balance.account, day)
-            last[key] = max(last.get(key, ""), balance.fetched_at)
-    chosen = []
-    for (account, _), fetched_at in sorted(last.items()):
-        pick = pick_balance(
-            [b for b in balances if b.account == account and b.fetched_at == fetched_at]
-        )
-        if pick is not None:
-            chosen.append(pick)
-    return chosen
+            last[(account, day)] = max(last.get((account, day), ""), fetched_at)
+    return [
+        chosen
+        for (account, _), fetched_at in sorted(last.items())
+        if (chosen := pick_balance(fetches[(account, fetched_at)])) is not None
+    ]
 
 
 def cmd_balance(paths: Paths, args: argparse.Namespace) -> int:
@@ -712,7 +712,7 @@ def build_parser() -> argparse.ArgumentParser:
     balance.add_argument(
         "--history",
         action="store_true",
-        help="each day's closing balance since --since, account by account",
+        help="each day's balance since --since (its first fetch), account by account",
     )
     balance.add_argument("--since", help="YYYY-MM-DD, with --history")
     balance.add_argument("--json", action="store_true")
