@@ -716,3 +716,22 @@ Where the implementation departs from, or settles, the text above:
 - `mock_exam`'s `part` selects the oral mock when it says "oral", else the
   written one. `mock_exam` and `plan_week` carry their protocols from
   `practice.md` ("Written mock", "Oral mock", "The week").
+
+## 12. Revision 2026-10-28: ideas from LearnHarness
+
+[LearnHarness](https://github.com/amosblomqvist/learnharness), shown in Eero
+Alvar's video "Agent Harness for Learning Things" (2026-10-23), teaches in four moves:
+probe the learner's edge, plan a dependency chain to the goal, teach each step as
+predict, explain and check, then practise in a separate stream of adaptive
+problems. The learner writes their raw thinking beside nearly every answer. The
+tutor skill takes the parts that fit the chat loop; the engine is unchanged.
+
+| Idea | Decision | Reason |
+| --- | --- | --- |
+| Thinking beside every answer | **Adopted.** Answers come with their reasoning; marking reads it, and an admitted guess or broken reasoning is `partial`. | Self-explanation prompts, g = 0.55 over 69 effect sizes (Bisra et al. 2018). The same wrong answer can come from different gaps. |
+| Probe the edge before teaching | **Adopted** for a new topic's unplaced `needs`, and optionally the topic itself: free-response, harder after a sound answer, easier after a miss, usually three questions or fewer, each an attempt; a probed topic without a review prompt gets one. | The record places most prerequisites already, so the probe stays short. Free response, because MCQ inflates recognition (Kang 2007). |
+| Predict, explain, check per step | **Adopted** for conceptual steps, one step per message; procedures keep worked-example fading. | Extends §4B's prediction for conceptual topics to each step; the check catches a confusion before the next step builds on it. |
+| Difficulty from ideas combined and cue familiarity | **Adopted** in practice. | Difficult but successful retrievals help memory more than easy ones (Pyc and Rawson 2009). |
+| Confidence slider on every answer | **Not adopted.** | Unchanged from §5; a learner's "I'm guessing" is read from the reasoning. |
+| A graph of taught propositions and reasoning chains | **Not adopted.** | It records coverage, not performance; topics with `needs`, levels and `review.points` already carry what later sessions use. |
+| MCQ probes | **Not adopted.** | §5. |
