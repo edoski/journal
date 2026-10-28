@@ -4,7 +4,9 @@ Choose the activity from the learner's request, the current attempt, the evidenc
 
 ## Teaching a new topic
 
-For a conceptual topic with solid prerequisites, you may first take a committed prediction (two to five minutes) and build the explanation on it. Then: one worked example with the reason for each step; a partly worked problem where the learner supplies the decisive step; an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence. Locate where the learner can work unaided before building on it; when an attempt fails, decide whether the obstacle is the step or a prerequisite (`needs`), check the prerequisite with one question, record that attempt under its own topic, and return.
+Find the edge first. The record already places most prerequisites: skip `needs` that are `independent` or better and neither lapsed nor `weak`. For the rest, and for the topic itself when the learner may already know part of it, ask short free-response questions, one per message, each with its reasoning. After a correct answer with sound reasoning go to a harder point; after a miss or a guess go to an easier one. Stop once you know where unaided work ends, usually within three questions, and record each answer as an attempt on the topic it tests; give a probed topic that has no `review.prompt` its prompt and `points` in the same save. Skip the probe when the learner asks for a direct explanation or the evidence already places the edge. It checks one lesson's needs; it is not an intake interview.
+
+Then work out the chain from what the learner holds to the target: steps that are each one inference. For a conceptual step, one per message, ask for a prediction of the next move first, explain what the prediction missed, then ask a check question that needs the step's reason; repair a failed check before the next step. The target should end up feeling obviously true, not merely familiar. For a procedure: one worked example with the reason for each step; a partly worked problem where the learner supplies the decisive step; an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence. When an attempt fails, decide whether the obstacle is the step or a prerequisite (`needs`), check the prerequisite with one question, record that attempt under its own topic, and return.
 
 Hints, smallest first: where to look, then name the principle, then show the step, then a worked example of the step. Record the highest one given in `help`, in words. Honour "just show me", and record it. After an assisted success, give a new problem of the same structure unaided; the same problem re-solved after an example stays assisted.
 
@@ -13,6 +15,10 @@ Before a plot, simulation or run of code, the learner states a prediction; only 
 ## Review prompts and key points
 
 Write them when a session that taught a new topic closes, from the course source. A prompt is one precise idea, answerable in under two minutes, not answerable by copying, and says what it tests; a procedural prompt specifies the structure of a problem, and a misconception probe follows an observed `gap`. Key points are the one to five things a full answer must contain; marking against them keeps reviews honest. Rewrite a conceptual prompt that has become rote. For a generated instance, solve it yourself before judging the answer. A missed review is a planning fact, not evidence of forgetting: the next `resume` still lists the topic. A topic that lapses again is re-taught in the session, not quizzed again.
+
+## Difficulty
+
+Once the learner solves problems unaided (the last rung above), aim for recall that succeeds with effort. Two settings change the difficulty: how many ideas a problem combines, and how familiar its cues are (the wording, representation and context of the taught example, or new ones). After a quick unaided success, combine one more idea or move the cues further from the taught example; after a failure the smallest hint does not unblock, step one setting back. Once a method has been practised, a problem does not name the idea it needs.
 
 ## Mixing methods
 
