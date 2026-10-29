@@ -67,7 +67,7 @@ The engine's rules apply to every answer, as the tutor skill states them:
 
 The agent saves each question's attempt with `course_save` in the turn the answer arrives, before any call that ends the turn, because in the app a question ends the turn. The tutor saves once per turn after its teaching text, or once at the end of a review. The observations are the same; only the timing differs.
 
-A question call whose arguments cannot be displayed (a truncated or invalid call in the record) never takes the dock and is never an attempt. The transcript shows it with **Retry question**; the retry resolves only the unusable calls, with an error result telling the agent to save no attempt for them and to pose the question again, and it replays no earlier tool, so an answer `course_save` already recorded is neither lost nor saved twice. An answer to a valid sibling waits in the record until that retry, or the learner's next message, runs the turn that saves it.
+A question call whose arguments cannot be displayed (a truncated or invalid call in the record) never takes the dock and is never an attempt. The transcript shows it with **Retry question**; the retry resolves only the unusable calls, with an error result telling the agent to save no attempt for them and to pose the question again, and it replays no earlier tool, so an answer `course_save` already recorded is neither lost nor saved twice. An answer to a valid sibling waits in the record until that retry, or the learner's next message, runs the turn that saves it. A retry interrupted after its results were written stays paused: reopening the session or a finished background job never restarts it, only the learner's next message does.
 
 ## 5. One teaching doctrine
 
