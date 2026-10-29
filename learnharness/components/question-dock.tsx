@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
+import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
 import {
@@ -110,11 +111,7 @@ export function QuestionDock({
 	// crash on `.map` over model-authored bytes.
 	const parsed = canonical === "explain" ? parseExplainInput(input) : parseAskInput(input);
 	if (!parsed) {
-		return (
-			<div data-testid="malformed-question" className="rounded-xl border border-dashed bg-card/60 p-3 text-sm text-muted-foreground">
-				This question arrived malformed — the transcript keeps the retry.
-			</div>
-		);
+		return <MalformedQuestion />;
 	}
 	return (
 		<>

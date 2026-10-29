@@ -885,7 +885,7 @@ describe("automatic continuation after recovery failure", () => {
 describe("answer submission recovery", () => {
 	const question = {
 		...assistantMsg("question", "Q?"),
-		content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Q?" } }],
+		content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Q?", correctAnswer: "A." } }],
 	} as LhMessage;
 	const answer = buildAnswer({ id: "q1", kind: "explain", question: "Q?", mode: "text", options: [], createdAt: "fixture" }, { text: "I don't know.", thinking: "keep my reasoning" });
 
