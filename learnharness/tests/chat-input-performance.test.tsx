@@ -12,6 +12,12 @@ import { ReadingThinkingField } from "../components/reading-thinking.tsx";
 const { window, document } = parseHTML("<html><body><div id='root'></div></body></html>");
 // React wires onChange to the input event only where `oninput` is supported.
 Object.assign(document, { oninput: null });
+// As in browsers, a textarea's default value is its text content; React
+// mounts a seeded textarea through it.
+Object.defineProperty(window.HTMLTextAreaElement.prototype, "defaultValue", {
+	get(this: HTMLTextAreaElement) { return this.textContent; },
+	set(this: HTMLTextAreaElement, value: string) { this.textContent = value; },
+});
 Object.assign(globalThis, {
 	window,
 	document,
@@ -164,5 +170,129 @@ describe("session text fields keep keystrokes local", () => {
 		await submit(host);
 		assert.deepEqual(sent, [paragraph], "the whole paste is sent, paragraph breaks included");
 		assert.equal(field.value, "", "a send clears the field");
+	});
+
+	it("composer retains local edits across owner renders and reads the latest text for send", async () => {
+		let parentRenders = 0;
+		let refresh!: () => void;
+		let replace!: (value: string) => void;
+		let remount!: (visible: boolean) => void;
+		const sent: string[] = [];
+		function Parent() {
+			parentRenders++;
+			const draft = useRef("");
+			const [revision, setRevision] = useState(0);
+			const [, setTick] = useState(0);
+			const [visible, setVisible] = useState(true);
+			refresh = () => setTick((tick) => tick + 1);
+			remount = setVisible;
+			replace = (value) => {
+				draft.current = value;
+				setRevision((previous) => previous + 1);
+			};
+			return visible ? <ChatSessionComposer
+				busy={false} value={draft.current} revision={revision}
+				onChange={(value) => { draft.current = value; }}
+				onSend={() => { sent.push(draft.current); replace(""); }}
+				onStop={() => {}} sendAllowed
+			/> : null;
+		}
+		const host = await mount(<Parent />);
+		let field = fieldIn(host);
+		await typeText(field, "typed");
+		assert.equal(parentRenders, 1);
+		await act(async () => { refresh(); });
+		assert.equal(field.value, "typed", "an unrelated owner render must not restore an old seed");
+		await typeText(field, "typed and more");
+		await submit(host);
+		assert.deepEqual(sent, ["typed and more"]);
+		assert.equal(field.value, "");
+		assert.equal(host.querySelector<HTMLButtonElement>('button[aria-label="Send"]')!.disabled, true);
+
+		// The seed is already empty; a new explicit reset must still clear local edits.
+		await typeText(field, "unsent");
+		await act(async () => { replace(""); });
+		assert.equal(field.value, "");
+		await act(async () => { replace("refused send restored"); });
+		await typeText(field, "new edit");
+		await act(async () => { replace("refused send restored"); });
+		assert.equal(field.value, "refused send restored");
+		await act(async () => { remount(false); });
+		await act(async () => { remount(true); });
+		field = fieldIn(host);
+		assert.equal(field.value, "refused send restored", "a remounted composer takes the current owner ref");
+	});
+
+	it("composer keeps busy steering/stop, compaction gating, and Next affordances", async () => {
+		let update!: (patch: Partial<typeof flags>) => void;
+		let flags = { busy: false, sendAllowed: true, nextProblem: true };
+		let sends = 0;
+		let stops = 0;
+		let nexts = 0;
+		function Parent() {
+			const [state, setState] = useState(flags);
+			update = (patch) => { flags = { ...flags, ...patch }; setState(flags); };
+			return <ChatSessionComposer {...state} value="" revision={0} onChange={() => {}}
+				onSend={() => { sends++; }} onStop={() => { stops++; }} onNext={() => { nexts++; }} />;
+		}
+		const host = await mount(<Parent />);
+		assert.ok(host.querySelector('[aria-label="Next problem"]'));
+		await submit(host);
+		assert.equal(nexts, 1);
+		await act(async () => { update({ busy: true, nextProblem: false }); });
+		assert.ok(host.querySelector('[aria-label="Stop"]'));
+		await submit(host);
+		assert.equal(stops, 1);
+		await typeText(fieldIn(host), "steer now");
+		assert.ok(host.querySelector('[aria-label="Send"]'));
+		await submit(host);
+		assert.equal(sends, 1);
+		await act(async () => { update({ busy: false, sendAllowed: false }); });
+		assert.equal(host.querySelector<HTMLButtonElement>('[aria-label="Send"]')!.disabled, true);
+		await submit(host);
+		assert.equal(sends, 1, "a closed send gate must win over local text");
+	});
+
+	it("reading thoughts survive unrelated renders and explicit same-value restoration", async () => {
+		let refresh!: () => void;
+		let replace!: (value: string) => void;
+		let latest = "";
+		function Parent() {
+			const [seed, setSeed] = useState({ value: "", revision: 0 });
+			const [, setTick] = useState(0);
+			refresh = () => setTick((tick) => tick + 1);
+			replace = (value) => { latest = value; setSeed((previous) => ({ value, revision: previous.revision + 1 })); };
+			return <ReadingThinkingField {...seed} onChange={(value) => { latest = value; }} />;
+		}
+		const host = await mount(<Parent />);
+		const field = fieldIn(host);
+		await typeText(field, "reading draft");
+		await act(async () => { refresh(); });
+		assert.equal(field.value, "reading draft");
+		assert.equal(latest, "reading draft");
+		await act(async () => { replace(""); });
+		assert.equal(field.value, "");
+		await act(async () => { replace("saved question thoughts"); });
+		await typeText(field, "edited after restoration");
+		await act(async () => { replace("saved question thoughts"); });
+		assert.equal(field.value, "saved question thoughts");
+		assert.equal(latest, "saved question thoughts");
+	});
+
+	it("reading appends reach the owner synchronously, before React commits", async () => {
+		let latest = "";
+		let forwardedEdits = 0;
+		const host = await mount(<ReadingThinkingField value="" revision={0}
+			onChange={(value) => { latest = value; forwardedEdits++; }} />);
+		const field = fieldIn(host);
+		await typeText(field, "typed thoughts");
+		await act(async () => {
+			inputEvent(field, "typed thoughts spoken tail");
+			assert.equal(latest, "typed thoughts spoken tail", "a submit right after the append sees the tail");
+			inputEvent(field, "typed thoughts spoken tail and a second burst");
+			assert.equal(latest, "typed thoughts spoken tail and a second burst");
+		});
+		assert.equal(field.value, "typed thoughts spoken tail and a second burst");
+		assert.equal(forwardedEdits, 3, "each edit forwards its synchronous snapshot exactly once");
 	});
 });
