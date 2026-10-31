@@ -36,7 +36,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { LEDGER_FILES, POSITIONS_FILE, SOURCES_FILE } from "../../config.ts";
 import { assertGraphFormat, ensureGraphFormat } from "./graph-format.ts";
-import { writeFileAtomicSync } from "./atomic-write.ts";
+import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 import type {
 	GraphChain,
 	GraphNode,
