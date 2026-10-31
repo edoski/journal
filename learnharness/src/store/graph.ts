@@ -195,9 +195,8 @@ export const graphStore: GraphStore = {
 	},
 
 	/** THE DESTRUCTIVE SEAM (wave 6 session deletion): atomic full-content
-	 *  replacement per provided ledger — write a uniquely-named temp file
-	 *  beside the ledger, then rename over it (POSIX-atomic: a crash mid-
-	 *  write leaves the original ledger and an orphan .tmp-*, never a torn
+	 *  replacement per provided ledger (atomic-write.ts: crashes mid-write
+	 *  leave the original ledger and orphan .tmp-* files, never torn
 	 *  ledger). Empty arrays write an empty file — a purged ledger reads
 	 *  as "nothing yet", same as never-emitted. */
 	rewriteLedgers(next: {
@@ -215,21 +214,10 @@ export const graphStore: GraphStore = {
 		for (const [key, records] of Object.entries(next) as [keyof typeof files, unknown[]][]) {
 			const file = files[key];
 			fs.mkdirSync(path.dirname(file), { recursive: true });
-			const tmp = `${file}.tmp-${crypto.randomUUID().slice(0, 8)}`;
-			try {
-				// JSONL: one record per line, trailing newline — a reader
-				// must see exactly what appendLine would have written.
-				const body = records.map((record) => JSON.stringify(record)).join("\n") + (records.length > 0 ? "\n" : "");
-				fs.writeFileSync(tmp, body, "utf-8");
-				fs.renameSync(tmp, file);
-			} catch (err) {
-				try {
-					fs.unlinkSync(tmp);
-				} catch {
-					/* the rename either already happened or the tmp never existed */
-				}
-				throw err;
-			}
+			// JSONL: one record per line, trailing newline — the reader
+			// must see exactly what appendLine would have written.
+			const body = records.map((record) => JSON.stringify(record)).join("\n") + (records.length > 0 ? "\n" : "");
+			writeFileAtomicSync(file, body);
 		}
 	},
 };
@@ -261,21 +249,7 @@ function readPositionMap(): Record<string, Position> {
 
 function writePositionMap(positions: Record<string, Position>): void {
 	fs.mkdirSync(path.dirname(POSITIONS_FILE), { recursive: true });
-	// Tmp + rename — the same crash-safety rewriteLedgers uses two blocks
-	// up (a9339b3 UI flag): a torn write must never replace the ledger
-	// with a half-written file the reader parses as empty.
-	const tmp = `${POSITIONS_FILE}.tmp-${crypto.randomUUID().slice(0, 8)}`;
-	try {
-		fs.writeFileSync(tmp, JSON.stringify({ positions, updatedAt: new Date().toISOString() }, null, "\t"), "utf-8");
-		fs.renameSync(tmp, POSITIONS_FILE);
-	} catch (err) {
-		try {
-			fs.unlinkSync(tmp);
-		} catch {
-			/* the rename either already happened or the tmp never existed */
-		}
-		throw err;
-	}
+	writeFileAtomicSync(POSITIONS_FILE, JSON.stringify({ positions, updatedAt: new Date().toISOString() }, null, "\t"));
 }
 
 const isPosition = (v: unknown): v is Position =>
