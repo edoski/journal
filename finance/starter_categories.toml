@@ -10,16 +10,32 @@
 # lists what fell into Other.
 #
 # Keys: category, match (list), optional flow ("in" or "out"), optional label
-# (shown instead of the bank text), optional holder = true (also matches when
-# the counterparty is the account holder, by the name the bank gives the
-# account, in any word order). A rule's flow applies to its holder match too.
+# (shown instead of the bank text), optional holder = true (also matches money
+# between your own accounts: the counterparty is the account holder, by the
+# name the bank gives the account, in any word order). A rule's flow applies
+# to its holder match too.
 #
-# Special categories: Income (INCOME in the waterfall), Investing (INVESTED),
-# Transfer (between your own accounts: left out of income, spending and the
-# waterfall, still listed in the transactions note) and Other. Every other
-# category is spending. A refund (money in under a spending category) reduces
-# that category. Money in that no rule matches is shown as Other in the
-# transactions note and counted as INCOME.
+# For a bank that sends no text at all (Trade Republic), a rule can instead
+# name the account and what it expects: account = "IBAN", amount = 50 or
+# [49.75, 50] (euros), days = 2 or [1, 4] (days of the month), and pair = 0.25
+# (the same account has money in and, within 3 days, money out at most that
+# many euros below it: Trade Republic's Saveback and its Bitcoin buy). A rule
+# needs match, holder = true or an account. Such an account's own transfers are
+# found by holder = true, from your matching entry on another account. Example:
+#
+#   [[rule]]
+#   category = "Interest"
+#   account = "IT00X0000000000000000000000"
+#   flow = "in"
+#   days = 1
+#
+# Special categories: Income and Interest (INCOME in the waterfall), Investing
+# (INVESTED), Transfer (between your own accounts) and Gifts (money given to
+# you, such as a family present; needs flow = "in"), both left out of income,
+# spending and the waterfall and still listed in the transactions note, and
+# Other. Every other category is spending. A refund (money in under a spending
+# category) reduces that category. Money in that no rule matches is shown as
+# Other in the transactions note and counted as INCOME.
 #
 # Transfer text patterns are for money out only: a client or friend paying
 # from Revolut may carry "Revolut" in the text. Add a pattern for money in

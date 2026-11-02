@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 
 import pytest
 
@@ -10,8 +11,17 @@ from finance.config import Paths, Settings
 from finance.read import read_entries
 from finance.rules import Booking, RulesError, parse_rules, role_of, words
 
+from tests.finance.conftest import connected
+from tests.finance.fake_bank import FakeBank, tx
+from tests.finance.test_cli import run
 from tests.finance.test_read import build
-from tests.finance.fake_bank import tx
+from tests.finance.test_two_banks import (
+    FINECO_ACCOUNT,
+    TR_ACCOUNT,
+    TRADE_REPUBLIC,
+    fetch,
+    two_banks,
+)
 
 CARD = "IT00X0000000000000000000001"
 MAIN = "IT00X0000000000000000000002"
@@ -70,7 +80,8 @@ def booking(
     iban: str, day: str, flow: str, euros: str, party: str = "", text: str = ""
 ) -> Booking:
     cents = round(float(euros) * 100)
-    return Booking(iban, datetime.date.fromisoformat(day), flow, cents, party, text)  # type: ignore[arg-type]
+    when = datetime.date.fromisoformat(day)
+    return Booking(iban, iban, when, flow, cents, "EUR", party, text)  # type: ignore[arg-type]
 
 
 def test_a_card_account_month_without_text() -> None:
@@ -201,3 +212,82 @@ def test_reading_one_day_still_sees_the_pair_next_day(
     assert [(e.category, e.description) for e in found.entries] == [
         ("Card", "Saveback")
     ]
+
+
+def test_one_saveback_buy_pairs_with_one_credit_closest_first() -> None:
+    found = parse_rules(RULES, "categories.toml")
+    entries = [
+        booking(
+            CARD, "2026-12-01", "IN", "0.55"
+        ),  # interest, a few cents above the buy too
+        booking(CARD, "2026-12-01", "IN", "0.48"),
+        booking(CARD, "2026-12-02", "OUT", "0.43"),
+        booking(CARD, "2026-12-02", "OUT", "0.20"),  # a card payment
+    ]
+    assert [(m.category, m.label) for m in found.categorise(entries)] == [
+        ("Interest", None),
+        ("Card", "Saveback"),
+        ("Investing", "Saveback: Bitcoin"),
+        ("Card", None),
+    ]
+
+
+def test_an_own_transfer_both_banks_name_pairs_before_a_textless_entry() -> None:
+    other = "IT00X0000000000000000000003"
+    found = parse_rules(RULES, "categories.toml")
+    entries = [
+        booking(MAIN, "2026-10-10", "OUT", "100", "ROSSI MARIO", "Giroconto"),
+        booking(other, "2026-10-10", "IN", "100", "Mario Rossi", "Giroconto"),
+        booking(CARD, "2026-10-11", "IN", "100"),  # a friend's transfer, no text
+    ]
+    assert [m.holder for m in found.categorise(entries, HOLDERS)] == [True, True, False]
+
+
+def test_a_sub_cent_amount_is_refused() -> None:
+    with pytest.raises(RulesError) as error:
+        parse_rules(
+            f'[[rule]]\ncategory = "X"\naccount = "{CARD}"\namount = [49.995, 50]\n',
+            "categories.toml",
+        )
+    assert "more than two decimals" in str(error.value)
+
+
+def test_biz_sees_the_same_holder_flag_whatever_it_asks_since(
+    capsys: pytest.CaptureFixture[str], paths: Paths
+) -> None:
+    settings = two_banks(paths)
+    connected(paths, FINECO_ACCOUNT)
+    connected(paths, TR_ACCOUNT, bank=TRADE_REPUBLIC)
+    bank = FakeBank(
+        pages={
+            "uid-1": [
+                (
+                    [
+                        tx(
+                            "2026-10-19",
+                            "250.00",
+                            ref="f1",
+                            creditor="Mario Rossi",
+                            remittance=["Giroconto tra miei conti"],
+                        )
+                    ],
+                    None,
+                )
+            ],
+            "uid-2": [
+                (
+                    [
+                        tx("2026-10-16", "250.00", "CRDT"),  # 3 days before: a friend
+                        tx("2026-10-20", "250.00", "CRDT"),  # the transfer, a day later
+                    ],
+                    None,
+                )
+            ],
+        }
+    )
+    assert fetch(paths, settings, bank).outcome == "ok"
+    for since in ("2026-10-01", "2026-10-18"):
+        _, out, _ = run(capsys, paths, "credits", "--since", since, "--json")
+        flags = {c["date"]: c["holder"] for c in json.loads(out)["credits"]}
+        assert flags["2026-10-20"] is True, since
+        assert flags.get("2026-10-16", False) is False, since

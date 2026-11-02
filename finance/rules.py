@@ -10,9 +10,11 @@ matched is "Other".
 
 The holder is the name the bank gives an account, in any word order. An entry
 the bank sends without any text (Trade Republic sends none) is the holder's
-when another account has the opposite entry, of the same amount and with the
-holder as counterparty, booked within PAIR_DAYS. Each such entry pairs once,
-with the nearest one in time.
+when another account has the opposite entry, of the same amount and currency
+and with the holder as counterparty, booked within PAIR_DAYS. Entries pair one
+to one over the whole store, nearest in time first, and two entries that both
+name the holder pair before an entry without text, so an own transfer between
+two accounts with text is never taken for a third one's.
 
 Conditions for banks that send no text, each also usable alone:
 
@@ -23,6 +25,7 @@ Conditions for banks that send no text, each also usable alone:
   this money: in first, then out within PAIR_DAYS, the out at most `pair` below
   the in and never above it. Trade Republic's Saveback is credited on the 1st
   and buys Bitcoin the next day in whole units, so a few cents stay as cash.
+  Entries pair one to one over the whole store, closest amounts first.
 
 A rule matches when every condition it has holds and, when it has patterns or
 `holder`, one of them hits. A rule needs at least one of `match`, `holder` and
@@ -44,8 +47,10 @@ from __future__ import annotations
 import datetime
 import re
 import tomllib
+from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
@@ -119,10 +124,12 @@ def role_of(category: str) -> Role:
 class Booking:
     """What the rules read of one booked entry."""
 
+    account: str  # the store's account key: what "the same account" means
     iban: str
     day: datetime.date
     flow: Flow
     amount_cents: int
+    currency: str
     counterparty: str
     remittance: str
 
@@ -163,25 +170,13 @@ class Match:
     holder: bool = False
 
 
-def _spends(money_in: Booking, money_out: Booking, gap: int) -> bool:
-    return (
-        money_in.flow == "IN"
-        and money_out.flow == "OUT"
-        and iban_key(money_in.iban) == iban_key(money_out.iban)
-        and 0 <= (money_out.day - money_in.day).days <= PAIR_DAYS
-        and money_in.amount_cents - gap
-        <= money_out.amount_cents
-        <= money_in.amount_cents
-    )
-
-
-def _paired(index: int, bookings: Sequence[Booking], gap: int) -> bool:
-    entry = bookings[index]
-    return any(
-        _spends(entry, other, gap) if entry.flow == "IN" else _spends(other, entry, gap)
-        for position, other in enumerate(bookings)
-        if position != index
-    )
+def _one_to_one(candidates: Iterable[tuple[Any, ...]]) -> dict[int, int]:
+    """Greedy pairing in the order given: each candidate ends with two indexes."""
+    partner: dict[int, int] = {}
+    for *_, first, second in sorted(candidates):
+        if first not in partner and second not in partner:
+            partner[first], partner[second] = second, first
+    return partner
 
 
 def holder_flags(
@@ -191,28 +186,47 @@ def holder_flags(
     module docstring)."""
     names = list(holders)
     flags = [is_holder(b.counterparty, names) for b in bookings]
-    taken: set[int] = set()
-    textless = sorted(
-        (i for i, b in enumerate(bookings) if b.textless),
-        key=lambda i: bookings[i].day,
-    )
-    for index in textless:
-        entry = bookings[index]
-        gaps = [
-            (abs((other.day - entry.day).days), position)
-            for position, other in enumerate(bookings)
-            if flags[position]
-            and position not in taken
-            and not other.textless
-            and other.flow != entry.flow
-            and other.amount_cents == entry.amount_cents
-            and iban_key(other.iban) != iban_key(entry.iban)
-            and abs((other.day - entry.day).days) <= PAIR_DAYS
-        ]
-        if gaps:
-            taken.add(min(gaps)[1])
-            flags[index] = True
+    same: dict[tuple[int, str], list[int]] = defaultdict(list)
+    for index, entry in enumerate(bookings):
+        same[(entry.amount_cents, entry.currency)].append(index)
+    candidates = set()
+    for index, entry in enumerate(bookings):
+        if not flags[index] or entry.textless:
+            continue
+        for other in same[(entry.amount_cents, entry.currency)]:
+            match = bookings[other]
+            gap = abs((match.day - entry.day).days)
+            if (
+                match.account != entry.account
+                and match.flow != entry.flow
+                and gap <= PAIR_DAYS
+                and (match.textless or flags[other])
+            ):
+                low, high = sorted((index, other))
+                candidates.add((gap, match.textless, low, high))
+    for index in _one_to_one(candidates):
+        flags[index] = True
     return flags
+
+
+def spending_pairs(bookings: Sequence[Booking], widest: int) -> dict[int, int]:
+    """Money in and the money out on the same account that spends it, within
+    PAIR_DAYS and at most `widest` cents below it: one to one, closest amounts
+    first. Both entries map to each other."""
+    by_account: dict[tuple[str, str], list[int]] = defaultdict(list)
+    for index, entry in enumerate(bookings):
+        by_account[(entry.account, entry.currency)].append(index)
+    candidates = []
+    for indexes in by_account.values():
+        ins = [i for i in indexes if bookings[i].flow == "IN"]
+        outs = [i for i in indexes if bookings[i].flow == "OUT"]
+        for i in ins:
+            for o in outs:
+                days = (bookings[o].day - bookings[i].day).days
+                short = bookings[i].amount_cents - bookings[o].amount_cents
+                if 0 <= days <= PAIR_DAYS and 0 <= short <= widest:
+                    candidates.append((short, days, i, o))
+    return _one_to_one(candidates)
 
 
 @dataclass(frozen=True)
@@ -223,12 +237,23 @@ class Rules:
     def categorise(
         self, bookings: Sequence[Booking], holders: Iterable[tuple[str, ...]] = ()
     ) -> list[Match]:
-        """Each entry's match, in order. Pairs are looked for among these entries
-        only, so give PAIR_DAYS more on each side than the days wanted."""
+        """Each entry's match, in order. Pairs are found among these entries
+        only, so give every stored entry for categories that never depend on
+        the range read."""
         flags = holder_flags(bookings, holders)
-        return [self._first(i, bookings, flags[i]) for i in range(len(bookings))]
+        widest = max(
+            (rule.pair for rule in self.rules if rule.pair is not None), default=None
+        )
+        pairs = {} if widest is None else spending_pairs(bookings, widest)
+        return [self._first(i, bookings, flags[i], pairs) for i in range(len(bookings))]
 
-    def _first(self, index: int, bookings: Sequence[Booking], holder: bool) -> Match:
+    def _first(
+        self,
+        index: int,
+        bookings: Sequence[Booking],
+        holder: bool,
+        pairs: Mapping[int, int],
+    ) -> Match:
         entry = bookings[index]
         fields = (normalize(entry.counterparty), normalize(entry.remittance))
         for rule in self.rules:
@@ -250,7 +275,11 @@ class Rules:
                 )
                 if not hit:
                     continue
-            if rule.pair is not None and not _paired(index, bookings, rule.pair):
+            if rule.pair is not None and (
+                index not in pairs
+                or abs(entry.amount_cents - bookings[pairs[index]].amount_cents)
+                > rule.pair
+            ):
                 continue
             return Match(rule.category, rule.label, holder)
         return Match(OTHER, None, holder)
@@ -272,10 +301,14 @@ def _clean_name(value: Any, what: str, where: str, limit: int) -> str:
 def _cents(value: Any, what: str, where: str) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise RulesError(f"{where}: {what} must be an amount in euros, such as 49.99")
+    text = repr(value) if isinstance(value, float) else str(value)
     try:
-        cents = to_cents(repr(value) if isinstance(value, float) else str(value))
-    except MalformedTransaction:
+        exponent = Decimal(text).as_tuple().exponent
+        cents = to_cents(text)
+    except (InvalidOperation, MalformedTransaction):
         raise RulesError(f"{where}: {what} {value!r} is not a usable amount") from None
+    if isinstance(exponent, int) and exponent < -2:
+        raise RulesError(f"{where}: {what} {value!r} has more than two decimals")
     if cents < 0:
         raise RulesError(f"{where}: {what} must not be negative")
     return cents
@@ -421,6 +454,7 @@ def _shadow_warnings(rules: Sequence[Rule]) -> tuple[str, ...]:
                 and earlier.days is None
                 and earlier.pair is None
                 and earlier.flow in (None, later.flow)
+                and (earlier.category, earlier.label) != (later.category, later.label)
             ),
             None,
         )

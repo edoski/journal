@@ -18,7 +18,6 @@ from pathlib import Path
 
 from finance.config import Paths, finance_dir
 from finance.rules import (
-    PAIR_DAYS,
     Booking,
     Match,
     Role,
@@ -83,10 +82,12 @@ def holder_names(accounts: Sequence[Account]) -> list[tuple[str, ...]]:
 
 def booking(row: Stored, ibans: dict[str, str]) -> Booking:
     return Booking(
+        account=row.account,
         iban=ibans.get(row.account, ""),
         day=row.booking_date,
         flow=row.flow,
         amount_cents=row.amount_cents,
+        currency=row.currency,
         counterparty=row.counterparty,
         remittance=row.remittance,
     )
@@ -100,12 +101,11 @@ def categorised(
     accounts: Sequence[Account] | None = None,
 ) -> list[tuple[Stored, Match]]:
     """Every stored row booked from `start` to `end` (None: no end) with its
-    match. Rules read PAIR_DAYS on each side for pairs, so an entry is
-    categorised the same whatever range is asked for."""
+    match. The rules see every stored row, so an entry's category never depends
+    on the range asked for."""
     accounts = store.accounts() if accounts is None else accounts
     ibans = {account.hash: account.iban for account in accounts}
-    margin = datetime.timedelta(days=PAIR_DAYS)
-    rows = store.transactions(start - margin, None if end is None else end + margin)
+    rows = store.transactions()
     matches = rules.categorise(
         [booking(row, ibans) for row in rows], holder_names(accounts)
     )

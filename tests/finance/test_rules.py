@@ -40,7 +40,7 @@ def one(
 ) -> Match:
     """The match of a single entry, with no other entries around it."""
     [match] = found.categorise(
-        [Booking("", DAY, flow, 100, counterparty, remittance)], holders
+        [Booking("acct", "", DAY, flow, 100, "EUR", counterparty, remittance)], holders
     )
     return match
 

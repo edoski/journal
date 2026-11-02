@@ -111,7 +111,7 @@ aliases.
     which the service turns into one line in the FINANCES section (SPENT `—`, no
     transactions notes, one warning per process); every other section renders
   - `FinanceBundle.entries` are categorised `FinanceEntry` rows (positive cents,
-    `flow` IN/OUT, `role` income/spending/investing/transfer); `covered_from` is the
+    `flow` IN/OUT, `role` income/spending/investing/transfer/gift); `covered_from` is the
     first day the bank data covers
   - `MediaBundle.items` contains immutable period-ready `MediaItem` rows; period
     rendering does not interpret podcast storage topology
