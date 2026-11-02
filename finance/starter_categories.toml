@@ -35,8 +35,10 @@
 # 1, 2, 3, 5 or 10), runs (the days it invests) and since (the day it was
 # switched on) takes that debit, only when the card payments' round-ups add up
 # to it exactly; a debit that cannot be told apart stays Other, labelled
-# "Card payment or round up?". Put it after that account's other investing
-# rules and before its card rule:
+# "Card payment or round up?". Its category is Investing. Put it after that
+# account's other investing rules and before its card rule. When Round up is
+# switched off, add until = its last run; for a new multiplier, add a second
+# rule whose since is that day:
 #
 #   [[rule]]
 #   category = "Investing"

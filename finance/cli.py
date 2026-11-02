@@ -317,11 +317,7 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
                 for account in accounts
             ]
             if flow == "OUT":
-                account = next(
-                    (r.account for r in (rules or Rules((), ())).rules if r.roundup),
-                    "",
-                )
-                envelope["roundups"] = _runs(rows, found.runs, account or "", since)
+                envelope["roundups"] = _runs(rows, found.runs, since)
             _emit({**envelope, "accounts": fetched, name: items})
             return 0
         if rules_problem:
@@ -339,15 +335,14 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
 def _runs(
     rows: Sequence[Stored],
     runs: Sequence[Run],
-    iban: str,
     since: datetime.date,
 ) -> list[dict[str, Any]]:
-    """The Round up runs from `since` (finance/roundup.py): `status` is
-    "matched" (`debit` is its key, `covers` the card payments' keys),
-    "ambiguous" or "unmatched" (`candidates`: the debits that could be it, left
-    uncategorised) or "missing" (no debit could be it). `expected` lists the
-    sums the card payments allow; `settles` is the last day a booking can
-    change the run."""
+    """The Round up runs that settle from `since` on (finance/roundup.py):
+    `status` is "matched" (`debit` is its debit), "ambiguous" or "unmatched"
+    (`candidates`: the debits that could be it, left uncategorised) or
+    "missing" (no debit could be it). `expected` lists up to 8 of the sums the
+    card payments allow, nearest the debits, `possible` how many there are in
+    all; `settles` is the last day a booking can change the run."""
 
     def brief(index: int) -> dict[str, str]:
         row = rows[index]
@@ -359,17 +354,17 @@ def _runs(
 
     out = []
     for run in runs:
-        if run.day < since:
+        if run.settles < since:
             continue
         out.append(
             {
                 "run": run.day.isoformat(),
                 "status": run.status,
-                "iban": iban,
+                "iban": run.account,
                 "debit": brief(run.debit) if run.debit is not None else None,
                 "candidates": [brief(i) for i in run.candidates],
-                "covers": [rows[i].key for i in run.covers],
                 "expected": [decimal_text(cents) for cents in run.expected],
+                "possible": run.possible,
                 "settles": run.settles.isoformat(),
             }
         )

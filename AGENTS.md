@@ -236,10 +236,11 @@ note only when it is synced again (e.g. `python -m sync.run period monthly --mon
 after a 429), 3 when the bank consent must be renewed, 1 on other errors.
 
 Trade Republic's Round up (`finance/roundup.py`, a `roundup` rule in `categories.toml`
-with the multiplier, run days and start day): each run's debit is taken only when the
-card payments' round-ups add up to it to the cent, trying both sides of the run's
-cut-off for payments booked near it (a payment is booked up to 3 days late). A run
-that matches no debit, or more than one, or several ways, is reported in
+with the multiplier, run days, start day and, once switched off or changed, last run):
+each run's debit is taken only when the card payments' round-ups add up to it to the
+cent, trying both sides of the run's cut-off for payments booked near it (a payment
+is booked up to 3 days late). A run that matches no debit, or more than one, or with
+more than one set of payments passed on to the next run, is reported in
 `debits --json` `roundups` and its candidate debits stay Other; nothing is guessed.
 
 Consent renewal (Trade Republic every 90 days, FinecoBank every 180): after fetching

@@ -33,13 +33,15 @@ A rule matches when every condition it has holds and, when it has patterns or
 
 Trade Republic's Round up (`finance/roundup.py`): a rule with `account`,
 `roundup` (the multiplier: 1, 2, 3, 5 or 10), `runs` (the days of the month it
-invests, such as [2, 9, 16, 23]) and `since` (the day it was switched on, a
-date) takes each run's debit, found by its exact amount among the debits that
-reach it. Every other debit there is a card payment, rounded up. A debit that
+invests, such as [2, 9, 16, 23]), `since` (the day it was switched on) and,
+once it is switched off or changed, `until` (its last run) takes each run's
+debit, found by its exact amount among the debits that reach it. Every other
+such debit, own transfers aside, is a card payment, rounded up. A debit that
 could be a run's but cannot be told apart stays Other, with UNRESOLVED as its
-label; the runs are reported with the categories (`Categorised.runs`). Place it
-after the rules for that account's other investing debits and before its card
-rule. At most one rule has `roundup`.
+label; the runs are reported with the categories (`Categorised.runs`). Its
+category must be an investing one. Place it after the rules for that account's
+other investing debits and before its card rule. A new multiplier is a new rule
+whose `since` is the old one's `until`.
 
 Five categories have a role: Income and Interest (the waterfall's INCOME),
 Investing (INVESTED), Transfer (between own accounts) and Gifts (money given to
@@ -65,7 +67,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any, Literal
 
-from finance import roundup
+from finance.roundup import MULTIPLIERS, SPACING, Debit, RoundUp, Run, resolve
 from finance.files import write_private
 from finance.transactions import Flow, MalformedTransaction, to_cents
 
@@ -99,6 +101,7 @@ _RULE_KEYS = {
     "roundup",
     "runs",
     "since",
+    "until",
 }
 _FORBIDDEN = re.compile(r"[\x00-\x1f\x7f`|]")
 _WORD = re.compile(r"[^\W_]+", re.UNICODE)
@@ -165,7 +168,7 @@ class Rule:
     amount: tuple[int, int] | None = None  # cents, both ends included
     days: tuple[int, int] | None = None  # days of the month, both ends included
     pair: int | None = None  # cents
-    roundup: roundup.Settings | None = None
+    roundup: RoundUp | None = None
 
     @property
     def conditional(self) -> bool:
@@ -251,18 +254,13 @@ class Categorised:
     entries')."""
 
     matches: list[Match]
-    runs: tuple[roundup.Run, ...] = ()
+    runs: tuple[Run, ...] = ()
 
 
 @dataclass(frozen=True)
 class Rules:
     rules: tuple[Rule, ...]
     warnings: tuple[str, ...]
-
-    def categorise(
-        self, bookings: Sequence[Booking], holders: Iterable[tuple[str, ...]] = ()
-    ) -> list[Match]:
-        return self.classify(bookings, holders).matches
 
     def classify(
         self, bookings: Sequence[Booking], holders: Iterable[tuple[str, ...]] = ()
@@ -276,25 +274,30 @@ class Rules:
         )
         pairs = {} if widest is None else spending_pairs(bookings, widest)
         found: dict[int, bool] = {}
-        runs: list[roundup.Run] = []
-        rule = next((r for r in self.rules if r.roundup is not None), None)
-        if rule is not None and rule.roundup is not None:
-            before = self.rules[: self.rules.index(rule)]
+        runs: list[Run] = []
+        for position, rule in enumerate(self.rules):
+            if rule.roundup is None or rule.account is None:
+                continue
             mine = [
                 i
                 for i, entry in enumerate(bookings)
                 if iban_key(entry.iban) == rule.account
             ]
+            if not mine:
+                continue
+            before = self.rules[:position]
             debits = [
-                roundup.Debit(i, bookings[i].day, bookings[i].amount_cents)
+                Debit(i, bookings[i].day, bookings[i].amount_cents)
                 for i in mine
                 if bookings[i].flow == "OUT"
                 and bookings[i].currency == "EUR"
-                and self._first(i, bookings, flags[i], pairs, before, {}) is None
+                and not flags[i]
+                and self._first(i, bookings, flags[i], pairs, before, found) is None
             ]
-            if mine:
-                last = max(bookings[i].day for i in mine)
-                found, runs = roundup.resolve(debits, rule.roundup, last)
+            last = max(bookings[i].day for i in mine)
+            taken, reported = resolve(rule.account, debits, rule.roundup, last)
+            found.update(taken)
+            runs += reported
         matches = [
             self._first(i, bookings, flags[i], pairs, self.rules, found)
             or Match(OTHER, None, flags[i])
@@ -397,12 +400,20 @@ def _day(value: Any, where: str) -> int:
     return value
 
 
-def _roundup(table: Mapping[str, Any], where: str) -> roundup.Settings | None:
-    keys = {"roundup", "runs", "since"} & set(table)
+def _date(value: Any, what: str, where: str) -> datetime.date:
+    if not isinstance(value, datetime.date) or isinstance(value, datetime.datetime):
+        raise RulesError(f"{where}: {what} must be a date, such as 2026-10-23")
+    return value
+
+
+def _roundup(table: Mapping[str, Any], where: str) -> RoundUp | None:
+    keys = {"roundup", "runs", "since", "until"} & set(table)
     if not keys:
         return None
-    if keys != {"roundup", "runs", "since"}:
+    if not {"roundup", "runs", "since"} <= keys:
         raise RulesError(f"{where}: roundup, runs and since go together")
+    if role_of(table.get("category", "")) != "investing":
+        raise RulesError(f'{where}: a roundup rule\'s category is "{INVESTING}"')
     clash = sorted({"match", "holder", "amount", "days", "pair"} & set(table))
     if clash:
         raise RulesError(f"{where}: a roundup rule takes no {', '.join(clash)}")
@@ -411,8 +422,8 @@ def _roundup(table: Mapping[str, Any], where: str) -> roundup.Settings | None:
     if table.get("flow", "out") != "out":
         raise RulesError(f'{where}: a roundup rule is for money out: flow = "out"')
     multiplier = table["roundup"]
-    if isinstance(multiplier, bool) or multiplier not in roundup.MULTIPLIERS:
-        choices = ", ".join(str(m) for m in roundup.MULTIPLIERS)
+    if isinstance(multiplier, bool) or multiplier not in MULTIPLIERS:
+        choices = ", ".join(str(m) for m in MULTIPLIERS)
         raise RulesError(f"{where}: roundup is the multiplier: one of {choices}")
     runs = table["runs"]
     if (
@@ -425,10 +436,19 @@ def _roundup(table: Mapping[str, Any], where: str) -> roundup.Settings | None:
         raise RulesError(
             f"{where}: runs must list days of the month from 1 to 28, such as [2, 9, 16, 23]"
         )
-    since = table["since"]
-    if not isinstance(since, datetime.date) or isinstance(since, datetime.datetime):
-        raise RulesError(f"{where}: since must be a date, such as 2026-10-23")
-    return roundup.Settings(multiplier, tuple(sorted(runs)), since)
+    days = sorted(runs)
+    gaps = [b - a for a, b in zip(days, days[1:], strict=False)] + [
+        28 - days[-1] + days[0]
+    ]
+    if min(gaps) < SPACING:
+        raise RulesError(
+            f"{where}: runs must be at least {SPACING} days apart, February included"
+        )
+    since = _date(table["since"], "since", where)
+    until = _date(table["until"], "until", where) if "until" in table else None
+    if until is not None and until <= since:
+        raise RulesError(f"{where}: until must be after since")
+    return RoundUp(multiplier, tuple(days), since, until)
 
 
 def _rule(position: int, table: Any, source: str) -> Rule:
@@ -543,6 +563,23 @@ def _shadow_warnings(rules: Sequence[Rule]) -> tuple[str, ...]:
                     break
         if later.account is None:
             continue
+        roundup = next(
+            (
+                earlier
+                for earlier in rules[:later_index]
+                if earlier.roundup is not None and earlier.account == later.account
+            ),
+            None,
+        )
+        if (
+            roundup is not None
+            and later.flow != "IN"
+            and (later.amount, later.days, later.pair) != (None, None, None)
+        ):
+            warnings.append(
+                f"{later.describe()} comes after {roundup.describe()}: the round up "
+                "takes its debits for card payments, so put it first"
+            )
         catch_all = next(
             (
                 earlier
@@ -581,8 +618,19 @@ def parse_rules(text: str, source: str) -> Rules:
     if not isinstance(tables, list):
         raise RulesError(f"{source}: rules must be written as [[rule]] tables")
     rules = tuple(_rule(index, table, source) for index, table in enumerate(tables, 1))
-    if sum(1 for rule in rules if rule.roundup is not None) > 1:
-        raise RulesError(f"{source}: only one rule can have roundup")
+    periods = sorted(
+        (rule.account or "", rule.roundup.since, rule.roundup.until, rule.position)
+        for rule in rules
+        if rule.roundup is not None
+    )
+    for (account, _, until, first), (same, since, _, second) in zip(
+        periods, periods[1:], strict=False
+    ):
+        if account == same and (until is None or since < until):
+            raise RulesError(
+                f"{source}: rules {first} and {second} round up the same account "
+                "at the same time: end the first with until, the second's since on or after it"
+            )
     seen: dict[str, Rule] = {}
     for rule in rules:
         other = seen.setdefault(rule.category.casefold(), rule)

@@ -8,31 +8,37 @@ since the previous run. Its feed has no text, so a run's debit looks like a
 card payment. It is accepted only when its amount is exact:
 
 - A card payment is booked 0 to LAG days after it is made, so a payment booked
-  near a run's cut-off may belong to that run or the next ("optional"); every
+  near a run's cut-off may belong to either side of it ("optional"); every
   other one belongs to the first run after it ("certain").
 - A run's debit is booked from the run's day to LATE days after it. Every debit
   there that no earlier rule took is a candidate. Taking its day as the
   cut-off, the run's possible sums are the certain payments' round-ups plus any
-  choice of the optional ones.
+  choice of the optional ones: those booked before the cut-off ("low", left
+  over by a run that could not be matched) and those booked from it ("high",
+  which otherwise go to the next run).
 - The run is matched when exactly one candidate equals a possible sum and every
-  choice that gives that sum leaves the same round-ups to the runs either side.
-  Its payments are then settled, and the next run starts at its cut-off.
+  choice giving that sum takes the same round-ups from the high side, so the
+  next run's payments are known. Which low payments it took never matters:
+  those it leaves belong to the run before, which was reported already.
 - Otherwise nothing is guessed: the run is reported (ambiguous, unmatched or
   missing), every candidate that could be its debit stays uncategorised, and
   the next run treats the payments near this run's cut-off as optional.
 
-Refunds are money in, so they never count. A foreign-currency payment, a cash
-withdrawal or any other debit the rules leave to the card counts as a card
-payment; if Trade Republic rounds it otherwise, no sum matches and the run is
-reported, never guessed.
+A debit counts as a card payment when no earlier rule took it and it is not
+money between the holder's own accounts. Refunds are money in, so they never
+count. If Trade Republic rounds a foreign-currency payment or a cash withdrawal
+otherwise, no sum matches and the run is reported.
+
+If a run does not happen (Round up paused), a card payment whose amount happens
+to equal a possible sum is taken for it: set `until` when Round up is switched
+off or its multiplier changes.
 """
 
 from __future__ import annotations
 
 import datetime
-import itertools
-from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -42,20 +48,23 @@ LAG = 3
 # Days a run may move past its day: a Saturday run on Monday, a holiday next to
 # a weekend.
 LATE = 3
-# Choices of optional payments tried per candidate; beyond it the run is reported.
-MAX_CHOICES = 4096
+# Runs must be further apart than a run's whole reach, LATE + LAG.
+SPACING = LATE + LAG + 1
 MULTIPLIERS = (1, 2, 3, 5, 10)
+# The possible sums a report lists, nearest the debits first.
+SHOWN = 8
 
 Status = Literal["matched", "ambiguous", "unmatched", "missing"]
 
 
 @dataclass(frozen=True)
-class Settings:
+class RoundUp:
     """A `roundup` rule's terms."""
 
     multiplier: int
     runs: tuple[int, ...]  # days of the month, ascending
     since: datetime.date  # payments made from this day are rounded up
+    until: datetime.date | None = None  # the last run
 
 
 @dataclass(frozen=True)
@@ -69,12 +78,14 @@ class Debit:
 class Run:
     """One run the bank data says something about."""
 
+    account: str  # the IBAN it runs on
     day: datetime.date  # the run's day of the month, before any holiday move
     status: Status
     debit: int | None  # matched: the round-up debit's index
     candidates: tuple[int, ...]  # unresolved: the debits that could be it
-    expected: tuple[int, ...]  # cents: the sums the payments allow, ascending
-    covers: tuple[int, ...]  # matched: the card payments it rounds up
+    expected: tuple[int, ...]  # cents: up to SHOWN possible sums, ascending
+    possible: int  # how many sums are possible in all
+    covers: tuple[int, ...]  # matched: one set of card payments that adds up
     settles: datetime.date  # nothing booked after this day can change it
 
 
@@ -84,116 +95,154 @@ def round_up(cents: int, multiplier: int) -> int:
     return (100 - cents % 100) * multiplier
 
 
+def _days(count: int) -> datetime.timedelta:
+    return datetime.timedelta(days=count)
+
+
 @dataclass(frozen=True)
 class _Low:
     """Where a run's payments start: before `exclude`, none; from `certain`,
-    every one; in between, optional."""
+    every one; in between, optional (low)."""
 
     exclude: datetime.date
     certain: datetime.date
 
 
+Multiset = tuple[tuple[int, int], ...]  # (round-up, how many), by round-up
+
+
 @dataclass(frozen=True)
 class _Cut:
-    """One candidate's view of the run: its day as the cut-off."""
+    """The run as one cut-off day sees it."""
 
-    debit: Debit
+    day: datetime.date
+    base: int  # the certain payments' round-ups
     certain: tuple[Debit, ...]
-    optional: tuple[Debit, ...]
-    sides: tuple[str, ...]  # per optional payment: "low" or "high" of the run
+    low: dict[int, tuple[Debit, ...]]  # reachable sum -> one choice reaching it
+    high: dict[int, tuple[int, Multiset | None]]  # sum -> (ways, 1 or 2+; the one)
+    high_payments: tuple[Debit, ...]
+    count: int  # payments that may be in the run
+
+    def sums(self) -> set[int]:
+        lows = sum(1 << low for low in self.low)
+        mask = 0
+        for high in self.high:
+            mask |= lows << high
+        return {self.base + i for i in range(mask.bit_length()) if mask >> i & 1}
+
+    def ways(self, cents: int) -> tuple[int, Multiset | None, int]:
+        """How many high-side choices reach `cents` (capped at 2), the one when
+        there is one, and the low sum it needs."""
+        found = [
+            (ways, chosen, cents - self.base - high)
+            for high, (ways, chosen) in self.high.items()
+            if cents - self.base - high in self.low
+        ]
+        total = min(2, sum(ways for ways, _, _ in found))
+        if total != 1:
+            return total, None, 0
+        _, chosen, low = found[0]
+        return 1, chosen, low
 
 
-def _cut(debit: Debit, pending: Iterable[Debit], low: _Low) -> _Cut:
-    certain, optional, sides = [], [], []
-    for payment in pending:
-        if payment.index == debit.index:
-            continue
-        if payment.day < low.exclude or payment.day > debit.day + _days(LAG):
-            continue
-        if low.certain <= payment.day < debit.day:
-            certain.append(payment)
-        else:
-            optional.append(payment)
-            sides.append("high" if payment.day >= debit.day else "low")
-    return _Cut(debit, tuple(certain), tuple(optional), tuple(sides))
+def _reach(payments: Sequence[Debit], multiplier: int) -> dict[int, tuple[Debit, ...]]:
+    reach: dict[int, tuple[Debit, ...]] = {0: ()}
+    for payment in payments:
+        value = round_up(payment.cents, multiplier)
+        for total, chosen in list(reach.items()):
+            reach.setdefault(total + value, (*chosen, payment))
+    return reach
 
 
-def _days(count: int) -> datetime.timedelta:
-    return datetime.timedelta(days=count)
-
-
-Choice = tuple[tuple[str, int, int], ...]  # (side, round-up, how many), sorted
-
-
-def _choices(cut: _Cut, multiplier: int) -> dict[int, list[Choice]] | None:
-    """Every sum the cut allows, with the choices of optional payments giving it;
-    None when there are more than MAX_CHOICES."""
-    groups: dict[tuple[str, int], int] = defaultdict(int)
-    for payment, side in zip(cut.optional, cut.sides, strict=True):
-        groups[(side, round_up(payment.cents, multiplier))] += 1
-    keys = sorted(groups)
-    total = 1
-    for key in keys:
-        total *= groups[key] + 1
-    if total > MAX_CHOICES:
-        return None
-    base = sum(round_up(p.cents, multiplier) for p in cut.certain)
-    sums: dict[int, list[Choice]] = defaultdict(list)
-    for counts in itertools.product(*(range(groups[key] + 1) for key in keys)):
-        choice = tuple(
-            (side, value, count)
-            for (side, value), count in zip(keys, counts, strict=True)
-            if count
-        )
-        sums[base + sum(value * count for _, value, count in choice)].append(choice)
+def _multisets(
+    payments: Sequence[Debit], multiplier: int
+) -> dict[int, tuple[int, Multiset | None]]:
+    groups = Counter(round_up(p.cents, multiplier) for p in payments)
+    sums: dict[int, tuple[int, Multiset | None]] = {0: (1, ())}
+    for value in sorted(groups):
+        grown: dict[int, tuple[int, Multiset | None]] = {}
+        for total, (ways, chosen) in sums.items():
+            for count in range(groups[value] + 1):
+                key = total + value * count
+                pick = (
+                    chosen if not count or chosen is None else (*chosen, (value, count))
+                )
+                before = grown.get(key)
+                if before is None:
+                    grown[key] = (ways, pick)
+                else:
+                    grown[key] = (min(2, before[0] + ways), None)
+        sums = grown
     return sums
 
 
-def _plausible(cut: _Cut, multiplier: int) -> bool:
+def _cut(
+    day: datetime.date, pending: Sequence[Debit], low: _Low, skip: int, m: int
+) -> _Cut:
+    certain, lows, highs = [], [], []
+    for payment in pending:
+        if payment.index == skip:
+            continue
+        if payment.day < low.exclude or payment.day > day + _days(LAG):
+            continue
+        if low.certain <= payment.day < day:
+            certain.append(payment)
+        elif payment.day < day:
+            lows.append(payment)
+        else:
+            highs.append(payment)
+    return _Cut(
+        day,
+        sum(round_up(p.cents, m) for p in certain),
+        tuple(certain),
+        _reach(lows, m),
+        _multisets(highs, m),
+        tuple(highs),
+        len(certain) + len(lows) + len(highs),
+    )
+
+
+def _plausible(cut: _Cut, cents: int, multiplier: int) -> bool:
     """Whether the debit is within what the cut's payments could add up to."""
     least = len(cut.certain) * multiplier
-    most = (len(cut.certain) + len(cut.optional)) * 100 * multiplier
-    return 0 < cut.debit.cents and least <= cut.debit.cents <= most
+    return 0 < cents and least <= cents <= cut.count * 100 * multiplier
 
 
-def _covered(cut: _Cut, choice: Choice, multiplier: int) -> tuple[Debit, ...]:
-    """The certain payments and, for each (side, round-up), the earliest optional
-    ones: payments the choice cannot tell apart leave the same sums either way."""
-    picked = list(cut.certain)
-    for side, value, count in choice:
-        same = sorted(
-            (
-                p
-                for p, s in zip(cut.optional, cut.sides, strict=True)
-                if s == side and round_up(p.cents, multiplier) == value
-            ),
-            key=lambda p: (p.day, p.index),
-        )
-        picked += same[:count]
-    return tuple(sorted(picked, key=lambda p: (p.day, p.index)))
+def _covered(cut: _Cut, chosen: Multiset, low: int, m: int) -> tuple[int, ...]:
+    picked = list(cut.certain) + list(cut.low[low])
+    for value, count in chosen:
+        same = [p for p in cut.high_payments if round_up(p.cents, m) == value]
+        picked += sorted(same, key=lambda p: (p.day, p.index))[:count]
+    return tuple(p.index for p in sorted(picked, key=lambda p: (p.day, p.index)))
 
 
-def run_days(settings: Settings, last: datetime.date) -> list[datetime.date]:
-    """The runs after `since` up to `last`."""
+def _shown(sums: set[int], near: Sequence[int]) -> tuple[int, ...]:
+    ranked = sorted(sums - {0}, key=lambda s: (min(abs(s - n) for n in near), s))
+    return tuple(sorted(ranked[:SHOWN]))
+
+
+def run_days(settings: RoundUp, last: datetime.date) -> list[datetime.date]:
+    """The runs after `since`, up to `until` and `last`."""
+    end = min(last, settings.until) if settings.until else last
     days = []
     month = settings.since.replace(day=1)
-    while month <= last:
+    while month <= end:
         for day in settings.runs:
             run = month.replace(day=day)
-            if settings.since < run <= last:
+            if settings.since < run <= end:
                 days.append(run)
         month = (month + _days(32)).replace(day=1)
     return days
 
 
 def resolve(
-    debits: Sequence[Debit], settings: Settings, last: datetime.date
+    account: str, debits: Sequence[Debit], settings: RoundUp, last: datetime.date
 ) -> tuple[dict[int, bool], list[Run]]:
-    """The round-up debits among `debits` (every euro debit on the account that
-    no earlier rule took) and the runs up to `last` (the account's last booked
-    day). Returns {index: True for a round-up, False for a debit left
-    uncategorised} and the runs with something to say; a run without card
-    payments and without a debit says nothing."""
+    """The round-up debits among `debits` (every euro card payment and debit
+    that could be a run's, see the module docstring) and the runs up to `last`
+    (the account's last booked day). Returns {index: True for a round-up, False
+    for a debit left uncategorised} and the runs with something to say; a run
+    without card payments and without a debit says nothing."""
     m = settings.multiplier
     pending = sorted(
         (d for d in debits if d.day >= settings.since), key=lambda d: (d.day, d.index)
@@ -204,64 +253,60 @@ def resolve(
     for day in run_days(settings, last):
         settles = day + _days(LATE + LAG)
         window = [d for d in pending if day <= d.day <= day + _days(LATE)]
-        cuts = [_cut(d, pending, low) for d in window]
-        plausible = [c for c in cuts if _plausible(c, m)]
-        sums = {c.debit.index: _choices(c, m) for c in plausible}
-        matching = [
-            c
-            for c in plausible
-            if (found_sums := sums[c.debit.index]) is None
-            or c.debit.cents in found_sums
-        ]
-        shown = [s for s in sums.values() if s is not None]
-        if not shown:
-            nominal = _choices(_cut(Debit(-1, day, 0), pending, low), m)
-            shown = [nominal] if nominal is not None else []
-        expected = tuple(sorted({total for s in shown for total in s if total}))
-        if len(matching) == 1:
-            cut = matching[0]
-            choices = (sums[cut.debit.index] or {}).get(cut.debit.cents, [])
-            if len(choices) == 1:
-                covers = _covered(cut, choices[0], m)
-                found[cut.debit.index] = True
-                taken = {p.index for p in covers} | {cut.debit.index}
-                pending = [d for d in pending if d.index not in taken]
-                low = _Low(cut.debit.day, cut.debit.day)
-                runs.append(
-                    Run(
-                        day,
-                        "matched",
-                        cut.debit.index,
-                        (),
-                        expected,
-                        tuple(p.index for p in covers),
-                        settles,
-                    )
+        cuts = {d.index: _cut(d.day, pending, low, d.index, m) for d in window}
+        plausible = [d for d in window if _plausible(cuts[d.index], d.cents, m)]
+        options = {d.index: cuts[d.index].ways(d.cents) for d in plausible}
+        matching = [d for d in plausible if options[d.index][0]]
+        nominal = _cut(day, pending, low, -1, m)
+        sums = set().union(*(cuts[d.index].sums() for d in plausible)) or nominal.sums()
+        near = [d.cents for d in plausible] or [0]
+        if len(matching) == 1 and options[matching[0].index][0] == 1:
+            debit = matching[0]
+            cut = cuts[debit.index]
+            _, chosen, low_sum = options[debit.index]
+            assert chosen is not None
+            covers = _covered(cut, chosen, low_sum, m)
+            found[debit.index] = True
+            taken = {*covers, debit.index}
+            pending = [d for d in pending if d.index not in taken]
+            low = _Low(debit.day, debit.day)
+            runs.append(
+                Run(
+                    account,
+                    day,
+                    "matched",
+                    debit.index,
+                    (),
+                    _shown(sums, [debit.cents]),
+                    len(sums - {0}),
+                    covers,
+                    settles,
                 )
-                continue
+            )
+            continue
+        status: Status
         if matching:
-            status: Status = "ambiguous"
-            unresolved = matching
+            status, unresolved = "ambiguous", matching
         elif plausible:
             status, unresolved = "unmatched", plausible
-        else:
-            nobody = _cut(Debit(-1, day, 0), pending, low)
-            if not nobody.certain:
-                continue  # nothing was due, so no run happened: payments roll over
+        elif nominal.certain:
             status, unresolved = "missing", []
-        for cut in unresolved:
-            found[cut.debit.index] = False
-        days = [c.debit.day for c in unresolved] or [day, day + _days(LATE)]
-        latest = max(days)
-        low = _Low(min(days), latest + _days(LAG + 1))
+        else:
+            continue  # nothing was due, so no run happened: payments roll over
+        for debit in unresolved:
+            found[debit.index] = False
+        # The cut-off was some day from the run's to LATE days later.
+        low = _Low(day, day + _days(LATE + LAG + 1))
         pending = [d for d in pending if d.day >= low.exclude]
         runs.append(
             Run(
+                account,
                 day,
                 status,
                 None,
-                tuple(c.debit.index for c in unresolved),
-                expected,
+                tuple(d.index for d in unresolved),
+                _shown(sums, near),
+                len(sums - {0}),
                 (),
                 settles,
             )

@@ -39,9 +39,9 @@ def one(
     holders: Iterable[tuple[str, ...]] = (),
 ) -> Match:
     """The match of a single entry, with no other entries around it."""
-    [match] = found.categorise(
+    [match] = found.classify(
         [Booking("acct", "", DAY, flow, 100, "EUR", counterparty, remittance)], holders
-    )
+    ).matches
     return match
 
 
