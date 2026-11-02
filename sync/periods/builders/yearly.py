@@ -6,6 +6,7 @@ import datetime
 from typing import Literal
 
 from sync.constants import MONTH_ABBR
+from sync.contracts.finance import FinanceBundle
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import daterange, month_range, year_range
@@ -26,6 +27,7 @@ from sync.periods.builders.common import (
     study_minutes_for_day,
     training_done_for_day,
 )
+from sync.periods.finances import finances_section, spent_summary
 from sync.periods.windows import YearWindow
 from sync.periods.sections import (
     append_media_section,
@@ -148,6 +150,7 @@ def build_yearly_metrics(
     media_bundle: MediaBundle,
     *,
     prior_year_metrics: list[PeriodAggregate] | None = None,
+    finance: FinanceBundle | None = None,
 ) -> list[str]:
     year = window.year
     year_start = window.start
@@ -178,6 +181,15 @@ def build_yearly_metrics(
         ma_metrics=ma_metrics,
         ma_label="3-YEAR" if ma_metrics else None,
         ma_training_unit="yr",
+        spent=spent_summary(
+            finance,
+            current=(year_start, year_end),
+            previous=(window.previous_start, window.previous_end),
+            prior=[window.prior_bounds(offset) for offset in (3, 2, 1)],
+            unit="yr",
+        )
+        if finance is not None
+        else None,
     )
 
     quarter_day_lists: list[list[datetime.date]] = [
@@ -356,6 +368,13 @@ def build_yearly_metrics(
     )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
+
+    if finance is not None:
+        sections.append(
+            finances_section(
+                finance, year_start, year_end, waterfall=True, named_links=True
+            )
+        )
 
     # MEDIA section
     append_media_section(sections, media_bundle)

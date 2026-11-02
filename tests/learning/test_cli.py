@@ -72,7 +72,9 @@ def test_save_then_read_through_every_read_verb(
     assert found["hits"][0]["handle"] == "rank"
     _, words = run(capsys, monkeypatch, workspace, "search", "found", "rank")
     assert words["hits"][0]["handle"] == "o1"
-    monkeypatch.setenv("VAULT_DIR", str(workspace / "vault"))
+    # The journal vault is resolved when sync.config is imported, so an
+    # environment change here would not reach it: point it at an empty vault.
+    monkeypatch.setattr("sync.study.context.journal_vault", lambda: workspace / "vault")
     _, planned = run(capsys, monkeypatch, workspace, "plan", "--days", "3")
     assert planned["courses"][0]["title"] == "Algebra"
     assert planned["journal"]["available_day_count"] == 0

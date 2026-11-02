@@ -30,6 +30,7 @@ class PathConfig:
     flow_db_path: str
     icloud_shortcuts_dir: str
     icloud_journalsync_dir: str
+    finance_dir: str
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,10 @@ def _build_paths() -> PathConfig:
         icloud_journalsync_dir=_env_path(
             "ICLOUD_JOURNALSYNC_DIR",
             os.path.join(shortcuts_documents_dir, "JournalSync"),
+        ),
+        finance_dir=_env_path(
+            "FINANCE_DIR",
+            os.path.join(application_support_dir, "finance"),
         ),
     )
 

@@ -1,0 +1,26 @@
+Month: [[2020-05]]
+
+| TYPE | CATEGORY | DESCRIPTION | AMOUNT | DATE |
+| ---- | -------- | ----------- | ------ | ---- |
+| **IN** | Income | Fixture Client Ltd | `€2,500.00` | `2020-05-01` |
+| **OUT** | Groceries | Fixture Market | `€19.47` | `2020-05-02` |
+| **OUT** | Eating out | Fixture Bistro | `€22.48` | `2020-05-03` |
+| **OUT** | Other | Card payment \| no merchant | `€9.80` | `2020-05-05` |
+| **OUT** | Investing | Fixture Broker | `€300.00` | `2020-05-05` |
+| **OUT** | Groceries | Fixture Market | `€19.50` | `2020-05-05` |
+| **OUT** | Groceries | Fixture Market | `€19.53` | `2020-05-08` |
+| **OUT** | Eating out | Fixture Bistro | `€22.55` | `2020-05-10` |
+| **OUT** | Groceries | Fixture Market | `€19.56` | `2020-05-11` |
+| **OUT** | Groceries | Fixture Market | `€19.59` | `2020-05-14` |
+| **OUT** | Other | Card payment \| no merchant | `€9.80` | `2020-05-16` |
+| **OUT** | Eating out | Fixture Bistro | `€22.62` | `2020-05-17` |
+| **OUT** | Groceries | Fixture Market | `€19.62` | `2020-05-17` |
+| **IN** | Groceries | Fixture Market (refund) | `€7.00` | `2020-05-20` |
+| **OUT** | Groceries | Fixture Market | `€19.65` | `2020-05-20` |
+| **OUT** | Transfer | Fixture own account | `€100.00` | `2020-05-20` |
+| **OUT** | Groceries | Fixture Market | `€19.68` | `2020-05-23` |
+| **OUT** | Eating out | Fixture Bistro | `€22.69` | `2020-05-24` |
+| **OUT** | Groceries | Fixture Market | `€19.71` | `2020-05-26` |
+| **OUT** | Other | Card payment \| no merchant | `€9.80` | `2020-05-27` |
+| **OUT** | Groceries | Fixture Market | `€19.74` | `2020-05-29` |
+| **OUT** | Eating out | Fixture Bistro | `€22.76` | `2020-05-31` |

@@ -30,6 +30,8 @@ from .specs import (
     TrainingCalendarQuarter,
     VerticalBarProfile,
     VerticalBarSpec,
+    WaterfallSpec,
+    WaterfallStep,
     WeeklyTrainingGridSpec,
 )
 
@@ -42,6 +44,8 @@ __all__ = [
     "ColumnTrack",
     "VerticalBarProfile",
     "VerticalBarSpec",
+    "WaterfallSpec",
+    "WaterfallStep",
     "MonthlyTrainingGridSpec",
     "WeeklyTrainingGridSpec",
     "TrainingCalendarMonth",

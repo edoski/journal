@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import datetime
 
+from sync.contracts.finance import SpentSummary
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import (
     DailyAggregate,
@@ -32,6 +33,7 @@ def append_summary_section(
     ma_metrics: MovingAverageAggregate | None,
     ma_label: str | None,
     ma_training_unit: str,
+    spent: SpentSummary | None = None,
 ) -> None:
     """Render and append the SUMMARY section."""
     summary_lines = render_table(
@@ -43,6 +45,7 @@ def append_summary_section(
             ma_metrics=ma_metrics,
             ma_label=ma_label,
             ma_training_unit=ma_training_unit,
+            spent=spent,
         )
     )
     sections.append(trim_blank_lines(summary_lines))

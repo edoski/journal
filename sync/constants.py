@@ -34,6 +34,9 @@ TRAINING_STATE_DIR = PATHS.daily_training_state_dir
 # Lock directory
 LOCK_DIR = PATHS.lock_dir
 
+# Bank data (the finance package's folder)
+FINANCE_DIR = PATHS.finance_dir
+
 # Day and month labels
 DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
 MONTH_ABBR = [
@@ -55,5 +58,6 @@ MONTH_ABBR = [
 TRAINING_SECTION_HEADER = "### **TRAINING**"
 STUDY_SECTION_HEADER = "### **STUDY**"
 SLEEP_SECTION_HEADER = "### **SLEEP**"
+FINANCES_SECTION_HEADER = "### **FINANCES**"
 TRAINING_TABLE_HEADER_RE = r"\|\s*TIME\s*\|\s*ACTIVITY\s*\|\s*DURATION\s*\|"
 NO_TRAINING_SESSIONS_TOKEN = "no training sessions"

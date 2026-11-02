@@ -59,11 +59,12 @@ def _build_service(
     tmp_path,
     status_source=None,
     note_store=None,
+    template_text: str = "---\nsleep: 7h30m\n---\n",
 ) -> tuple[DailySyncService, str]:
     journal_dir = tmp_path / "journal"
     journal_dir.mkdir()
     template_path = tmp_path / "daily_template.md"
-    template_path.write_text("---\nsleep: 7h30m\n---\n", encoding="utf-8")
+    template_path.write_text(template_text, encoding="utf-8")
     _ = monkeypatch
     training_state_store = JsonDailyTrainingStateStore(
         state_dir=str(tmp_path / "state" / "daily" / "training"),
@@ -165,3 +166,40 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     assert any("skipped write" in rec.getMessage() for rec in caplog.records)
     content = Path(journal_dir, f"{day:%Y-%m-%d}.md").read_text(encoding="utf-8")
     assert "<!-- external-change -->" in content
+
+
+def test_sync_day_preserves_recap_section_below_metrics(monkeypatch, tmp_path):
+    day = datetime.date(2025, 1, 15)
+    template = (
+        "---\nstudy: 0h00m\nsleep:\nworkout: false\nstretch: false\n---\n"
+        "## Metrics\n---\n\n## Recap\n---\n"
+    )
+    service, journal_dir = _build_service(monkeypatch, tmp_path, template_text=template)
+    note = Path(journal_dir, f"{day:%Y-%m-%d}.md")
+
+    assert service.sync_day(day, [_session_for_day(day)]) is True
+    lines = note.read_text(encoding="utf-8").splitlines()
+    level_two_headers = [line for line in lines if line.startswith("## ")]
+    assert level_two_headers == ["## Metrics", "## Recap"]
+
+    recap_text = "Good focus day.\n\n- shipped the parser\n- ### not a header"
+    note.write_text(
+        note.read_text(encoding="utf-8").rstrip("\n") + "\n" + recap_text + "\n",
+        encoding="utf-8",
+    )
+    written = note.read_text(encoding="utf-8")
+
+    assert service.sync_day(day, [_session_for_day(day)]) is False
+    assert note.read_text(encoding="utf-8") == written
+
+    extra = _session_for_day(day)
+    extra["start"] = datetime.datetime.combine(day, datetime.time(11, 0))
+    extra["end"] = extra["completed_at"] = datetime.datetime.combine(
+        day, datetime.time(12, 0)
+    )
+    assert service.sync_day(day, [_session_for_day(day), extra]) is True
+    content = note.read_text(encoding="utf-8")
+    assert "study: 2h00m" in content
+    assert content.endswith("## Recap\n---\n" + recap_text + "\n")
+    assert content.index("### **SLEEP**") < content.index("## Recap")
+    assert service.sync_day(day, [_session_for_day(day), extra]) is False

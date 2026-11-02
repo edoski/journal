@@ -20,7 +20,9 @@ app_dir="$repo_dir/build/Journal.app"
 contents_dir="$app_dir/Contents"
 resources_dir="$contents_dir/Resources"
 python_version=$(tr -d '[:space:]' < "$project_dir/python-version")
+# --system: never the checkout's .venv, which has no libpython to bundle.
 python_executable=$(uv python find \
+    --system \
     --managed-python \
     --no-python-downloads \
     "$python_version")
@@ -32,7 +34,7 @@ if [ -z "$codesign_identity" ]; then
 fi
 
 rm -rf "$app_dir"
-mkdir -p "$contents_dir/MacOS" "$resources_dir/JournalSync/sync"
+mkdir -p "$contents_dir/MacOS" "$resources_dir/JournalSync/sync" "$resources_dir/JournalSync/finance"
 cp "$project_dir/Info.plist" "$contents_dir/Info.plist"
 mkdir -p "$resources_dir/Python"
 rsync -a \
@@ -54,6 +56,12 @@ rsync -a \
     --exclude '.DS_Store' \
     "$repo_dir/sync/" \
     "$resources_dir/JournalSync/sync/"
+rsync -a \
+    --exclude '__pycache__' \
+    --exclude '*.pyc' \
+    --exclude '.DS_Store' \
+    "$repo_dir/finance/" \
+    "$resources_dir/JournalSync/finance/"
 xcrun swiftc \
     -target "$(uname -m)-apple-macosx14.0" \
     -O \
