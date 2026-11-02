@@ -6,6 +6,7 @@ import datetime
 from collections.abc import Callable
 
 from sync.adapters.storage_bootstrap import bootstrap_storage_layout
+from sync.adapters.finance_store import FinanceStoreSource
 from sync.adapters.flow_sessions import FlowStudySessionSource
 from sync.adapters.icloud_status import ICloudDailyStatusSource
 from sync.adapters.json_daily_state import JsonDailyTrainingStateStore
@@ -33,6 +34,7 @@ def _build_period_sync_service() -> PeriodSyncService:
             media_cache_store=JsonMediaDateCacheStore(),
             note_store=note_store,
         ),
+        finance_source=FinanceStoreSource(),
     )
 
 

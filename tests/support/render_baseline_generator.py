@@ -22,6 +22,11 @@ from sync.periods.windows import (
     build_year_window,
 )
 
+from sync.contracts.finance import FinanceBundle
+from sync.periods.finances import month_entries, transactions_note_lines
+from sync.writers.charts import WaterfallSpec, WaterfallStep, render_chart
+
+from tests.support.finance_fixture_data import fixture_bundle_for
 from tests.support.period_fixture_data import FIXTURE_MEDIA_BUNDLE, range_data
 
 SNAPSHOT_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "render_baseline"
@@ -44,7 +49,9 @@ def artifact_text(artifact: RenderBaselineArtifact) -> str:
     return "\n".join(artifact.lines) + "\n"
 
 
-def _weekly_metrics_artifact() -> RenderBaselineArtifact:
+def _weekly_metrics_artifact(
+    finance: FinanceBundle | None = None, name: str = "weekly_metrics.txt"
+) -> RenderBaselineArtifact:
     start, end = iso_week_range(datetime.date(2020, 5, 13))
     daily_data = range_data(start, end)
     prev_start = start - datetime.timedelta(days=7)
@@ -65,11 +72,12 @@ def _weekly_metrics_artifact() -> RenderBaselineArtifact:
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
         prior_week_metrics=prior_week_metrics,
+        finance=finance,
     )
     dates = [start + datetime.timedelta(days=i) for i in range(7)]
     current_metrics = compute_period_metrics(dates, daily_data)
     return RenderBaselineArtifact(
-        name="weekly_metrics.txt",
+        name=name,
         lines=tuple(lines),
         period_type="week",
         total_days=len(dates),
@@ -77,7 +85,9 @@ def _weekly_metrics_artifact() -> RenderBaselineArtifact:
     )
 
 
-def _monthly_metrics_artifact() -> RenderBaselineArtifact:
+def _monthly_metrics_artifact(
+    finance: FinanceBundle | None = None, name: str = "monthly_metrics.txt"
+) -> RenderBaselineArtifact:
     start, end = month_range(2020, 5)
     daily_data = range_data(start, end)
     prev_start, prev_end = month_range(2020, 4)
@@ -96,11 +106,12 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
         prior_month_metrics=prior_month_metrics,
+        finance=finance,
     )
     dates = list(daterange(start, end))
     current_metrics = compute_period_metrics(dates, daily_data)
     return RenderBaselineArtifact(
-        name="monthly_metrics.txt",
+        name=name,
         lines=tuple(lines),
         period_type="month",
         total_days=len(dates),
@@ -108,7 +119,9 @@ def _monthly_metrics_artifact() -> RenderBaselineArtifact:
     )
 
 
-def _yearly_metrics_artifact() -> RenderBaselineArtifact:
+def _yearly_metrics_artifact(
+    finance: FinanceBundle | None = None, name: str = "yearly_metrics.txt"
+) -> RenderBaselineArtifact:
     year = 2020
     start, end = year_range(year)
     prev_start, prev_end = year_range(year - 1)
@@ -128,16 +141,78 @@ def _yearly_metrics_artifact() -> RenderBaselineArtifact:
         prev_daily_data,
         FIXTURE_MEDIA_BUNDLE,
         prior_year_metrics=prior_year_metrics,
+        finance=finance,
     )
     dates = list(daterange(start, end))
     current_metrics = compute_period_metrics(dates, daily_data)
     return RenderBaselineArtifact(
-        name="yearly_metrics.txt",
+        name=name,
         lines=tuple(lines),
         period_type="year",
         total_days=len(dates),
         current_metrics=current_metrics,
     )
+
+
+def _transactions_note_artifact() -> RenderBaselineArtifact:
+    bundle = fixture_bundle_for(datetime.date(2020, 5, 1), datetime.date(2020, 5, 31))
+    return RenderBaselineArtifact(
+        name="transactions_note.txt",
+        lines=tuple(transactions_note_lines(2020, 5, month_entries(bundle, 2020, 5))),
+    )
+
+
+# Waterfall cases with no special handling: each follows the one geometry rule.
+WATERFALL_EDGE_CASES: tuple[tuple[str, int, tuple[tuple[str, int], ...]], ...] = (
+    ("no income", 0, (("GROCERIES", -29095), ("TRANSPORT", -8570), ("OTHER", -3740))),
+    (
+        "spending above income",
+        100000,
+        (("TAXES", -120000), ("GROCERIES", -29095), ("INVESTED", -10000)),
+    ),
+    ("only one category", 250000, (("GROCERIES", -29095),)),
+    (
+        "many small categories",
+        250000,
+        tuple((f"SMALL {i}", -300) for i in range(12)) + (("RENT", -240000),),
+    ),
+    (
+        "a refund larger than the spending",
+        100000,
+        (("GROCERIES", -20000), ("SHOPPING", 5000)),
+    ),
+    ("income only", 250000, ()),
+    ("a €0.40 fee only (less than €1 of spread: no chart)", 0, (("FEES", -40),)),
+    (
+        "twelve tiny steps after a large one (drift capped at 2 cells)",
+        10000,
+        (("RENT", -3000),) + tuple((f"TINY {i}", -2) for i in range(12)),
+    ),
+    (
+        "a rising step at the right wall (a marker, not an empty row)",
+        100000,
+        (("REFUND", 1),),
+    ),
+    ("a falling step at the left wall (the mirror case)", -100000, (("FEES", -1),)),
+)
+
+
+def _waterfall_edge_cases_artifact() -> RenderBaselineArtifact:
+    lines: list[str] = []
+    for title, start, steps in WATERFALL_EDGE_CASES:
+        if lines:
+            lines.append("")
+        lines.append(f"# {title}")
+        chart = render_chart(
+            WaterfallSpec(
+                start_label="INCOME",
+                start_cents=start,
+                steps=[WaterfallStep(label, change) for label, change in steps],
+                end_label="LEFT",
+            )
+        )
+        lines.extend(chart or ["(no chart)"])
+    return RenderBaselineArtifact(name="waterfall_edge_cases.txt", lines=tuple(lines))
 
 
 def generate_render_baseline_artifacts() -> tuple[RenderBaselineArtifact, ...]:
@@ -146,6 +221,20 @@ def generate_render_baseline_artifacts() -> tuple[RenderBaselineArtifact, ...]:
         _weekly_metrics_artifact(),
         _monthly_metrics_artifact(),
         _yearly_metrics_artifact(),
+        _weekly_metrics_artifact(
+            fixture_bundle_for(datetime.date(2020, 4, 1), datetime.date(2020, 5, 31)),
+            "weekly_finances_metrics.txt",
+        ),
+        _monthly_metrics_artifact(
+            fixture_bundle_for(datetime.date(2020, 2, 1), datetime.date(2020, 5, 31)),
+            "monthly_finances_metrics.txt",
+        ),
+        _yearly_metrics_artifact(
+            fixture_bundle_for(datetime.date(2017, 1, 1), datetime.date(2020, 12, 31)),
+            "yearly_finances_metrics.txt",
+        ),
+        _transactions_note_artifact(),
+        _waterfall_edge_cases_artifact(),
     )
 
 

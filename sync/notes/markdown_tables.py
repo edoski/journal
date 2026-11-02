@@ -77,6 +77,15 @@ def escape_markdown_cell(text: str) -> str:
     return "".join(out)
 
 
+_INLINE_MARKUP = frozenset("\\`*_[]<>#~=^$%&")
+
+
+def plain_text_cell(text: str) -> str:
+    """External text as one literal table cell: one line, markup escaped."""
+    collapsed = " ".join(text.split())
+    return "".join(f"\\{ch}" if ch in _INLINE_MARKUP else ch for ch in collapsed)
+
+
 def render_markdown_row(cells: Sequence[str]) -> str:
     """Render markdown table row from cells."""
     rendered = [escape_markdown_cell(str(cell)) for cell in cells]

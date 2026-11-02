@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 
+from sync.contracts.finance import FinanceBundle
 from sync.contracts.media import MediaBundle
 from sync.contracts.metrics import DailyAggregate, PeriodAggregate
 from sync.dates import (
@@ -28,6 +29,7 @@ from sync.periods.builders.common import (
     study_minutes_for_day,
     training_done_for_day,
 )
+from sync.periods.finances import finances_section, spent_summary
 from sync.periods.windows import MonthWindow
 from sync.periods.sections import (
     append_media_section,
@@ -55,6 +57,7 @@ def build_monthly_metrics(
     media_bundle: MediaBundle,
     *,
     prior_month_metrics: list[PeriodAggregate] | None = None,
+    finance: FinanceBundle | None = None,
 ) -> list[str]:
     """Build the metrics block for a resolved monthly window."""
     start_date = window.start
@@ -95,6 +98,15 @@ def build_monthly_metrics(
         ma_metrics=ma_metrics,
         ma_label="3-MONTH" if ma_metrics else None,
         ma_training_unit="mo",
+        spent=spent_summary(
+            finance,
+            current=(start_date, end_date),
+            previous=(window.previous_start, window.previous_end),
+            prior=[window.prior_bounds(offset) for offset in (3, 2, 1)],
+            unit="mo",
+        )
+        if finance is not None
+        else None,
     )
 
     # STUDY section (using activity totals for accuracy)
@@ -239,6 +251,13 @@ def build_monthly_metrics(
     )
     sleep_lines.append("")
     sections.append(trim_blank_lines(sleep_lines))
+
+    if finance is not None:
+        sections.append(
+            finances_section(
+                finance, start_date, end_date, waterfall=True, named_links=False
+            )
+        )
 
     # MEDIA section
     append_media_section(sections, media_bundle)

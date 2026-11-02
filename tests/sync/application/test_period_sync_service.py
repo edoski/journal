@@ -7,6 +7,7 @@ import datetime
 import pytest
 
 from sync.application.period_sync_service import PeriodSyncService
+from sync.contracts.finance import FinanceBundle
 from sync.contracts.media import MediaBundle
 from sync.contracts.notes import NotePublication
 from sync.contracts.metrics import DailyAggregate
@@ -65,6 +66,15 @@ class _StubAggregateSource:
         return {day: {} for day in dates}
 
 
+class _NoFinance:
+    def __init__(self) -> None:
+        self.calls: list[tuple[datetime.date, datetime.date]] = []
+
+    def load(self, start: datetime.date, end: datetime.date) -> FinanceBundle | None:
+        self.calls.append((start, end))
+        return None
+
+
 class _StubMediaSource:
     def __init__(self) -> None:
         self.calls: list[tuple[datetime.date, datetime.date]] = []
@@ -81,6 +91,7 @@ def test_sync_week_writes_metrics_and_runs_cleanup(monkeypatch, tmp_path):
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
+        finance_source=_NoFinance(),
     )
 
     day = datetime.date(2026, 2, 6)
@@ -140,6 +151,7 @@ def test_sync_year_writes_metrics(monkeypatch, tmp_path):
         note_store=note_store,
         aggregate_source=_StubAggregateSource(),
         media_source=media_source,
+        finance_source=_NoFinance(),
     )
 
     window = build_year_window(2026, target_date=datetime.date(2026, 6, 1))
@@ -205,10 +217,144 @@ def test_period_loads_each_day_once_and_preserves_comparison_windows(
     monkeypatch.setattr(
         f"sync.application.period_sync_service.build_{builder}_metrics", render
     )
-    service = PeriodSyncService(_StubNoteStore(), Source(), _StubMediaSource())
+    service = PeriodSyncService(
+        _StubNoteStore(), Source(), _StubMediaSource(), _NoFinance()
+    )
     note_path = str(tmp_path / window.filename)
     if period == "year":
         service.sync_year(window, note_path)
     else:
         getattr(service, f"sync_{period}")(window, note_path, cleanup_previous=False)
     assert loads == [expected_dates]
+
+
+class _NoAggregates:
+    def load_for_dates(self, dates: list[datetime.date]):
+        return {}
+
+
+class _Finance:
+    def __init__(self, bundle: FinanceBundle | None) -> None:
+        self.bundle = bundle
+        self.calls: list[tuple[datetime.date, datetime.date]] = []
+
+    def load(self, start: datetime.date, end: datetime.date) -> FinanceBundle | None:
+        self.calls.append((start, end))
+        return self.bundle
+
+
+def _finance_service(monkeypatch, tmp_path, bundle):
+    note_store = _StubNoteStore()
+    finance = _Finance(bundle)
+    monkeypatch.setattr(
+        "sync.periods.runtime.JOURNAL_DIR", str(tmp_path / "journal"), raising=True
+    )
+    service = PeriodSyncService(
+        note_store=note_store,
+        aggregate_source=_NoAggregates(),
+        media_source=_StubMediaSource(),
+        finance_source=finance,
+    )
+    return service, note_store, finance
+
+
+def test_month_sync_renders_finances_and_writes_the_transactions_note(
+    monkeypatch, tmp_path
+):
+    from tests.support.finance_fixture_data import MOCK_BUNDLE
+
+    service, note_store, finance = _finance_service(monkeypatch, tmp_path, MOCK_BUNDLE)
+    window = build_month_window(datetime.date(2026, 9, 30))
+    note_path = str(tmp_path / "journal" / window.filename)
+
+    service.sync_month(window, note_path, cleanup_previous=False)
+
+    assert finance.calls == [(datetime.date(2026, 6, 1), datetime.date(2026, 9, 30))]
+    note = note_store.read(note_path)
+    assert note is not None and "### **FINANCES**" in note
+    assert "**[[2026-09 transactions|29 transactions →]]**" in note
+    transactions = note_store.read(
+        str(tmp_path / "journal" / "transactions" / "2026-09 transactions.md")
+    )
+    assert transactions is not None
+    assert transactions[0] == "Month: [[2026-09]]"
+    assert len(transactions) == 4 + 29
+    before = dict(note_store._notes)
+    service.sync_month(window, note_path, cleanup_previous=False)
+    assert note_store._notes == before
+
+
+def test_week_and_year_write_the_notes_they_link_to(monkeypatch, tmp_path):
+    from tests.support.finance_fixture_data import MOCK_BUNDLE
+
+    service, note_store, finance = _finance_service(monkeypatch, tmp_path, MOCK_BUNDLE)
+    week = build_week_window(datetime.date(2026, 9, 2))
+    service.sync_week(
+        week, str(tmp_path / "journal" / week.filename), cleanup_previous=False
+    )
+    assert finance.calls == [(datetime.date(2026, 8, 1), datetime.date(2026, 9, 30))]
+    year = build_year_window(2026, target_date=datetime.date(2026, 9, 30))
+    service.sync_year(year, str(tmp_path / "journal" / year.filename))
+    written = sorted(
+        path.rsplit("/", 1)[1] for path in note_store._notes if "/transactions/" in path
+    )
+    assert written == [
+        "2026-06 transactions.md",
+        "2026-07 transactions.md",
+        "2026-08 transactions.md",
+        "2026-09 transactions.md",
+    ]
+
+
+def test_without_finance_nothing_new_is_written(monkeypatch, tmp_path):
+    service, note_store, _ = _finance_service(monkeypatch, tmp_path, None)
+    window = build_month_window(datetime.date(2026, 9, 30))
+    note_path = str(tmp_path / "journal" / window.filename)
+    service.sync_month(window, note_path, cleanup_previous=False)
+    assert list(note_store._notes) == [note_path]
+    assert not any(
+        "FINANCES" in line or "SPENT" in line for line in note_store._notes[note_path]
+    )
+
+
+def test_unreadable_finance_is_one_line_and_every_other_section_renders(
+    monkeypatch, tmp_path, caplog
+):
+    from sync.application import period_sync_service as module
+    from sync.ports.finance import FinanceUnavailableError
+
+    class _Broken:
+        def load(self, start, end):
+            raise FinanceUnavailableError(
+                'categories.toml: rule 2 ("X"): match must be a list'
+            )
+
+    monkeypatch.setattr(module, "_warned_unreadable", False)
+    monkeypatch.setattr("sync.periods.runtime.JOURNAL_DIR", str(tmp_path / "journal"))
+    window = build_month_window(datetime.date(2026, 9, 30))
+    notes = {}
+    for name, source in (("broken", _Broken()), ("none", _NoFinance())):
+        store = _StubNoteStore()
+        service = PeriodSyncService(store, _NoAggregates(), _StubMediaSource(), source)
+        path = str(tmp_path / name / window.filename)
+        service.sync_month(window, path, cleanup_previous=False)
+        service.sync_week(
+            build_week_window(datetime.date(2026, 9, 30)),
+            str(tmp_path / name / "w.md"),
+            cleanup_previous=False,
+        )
+        notes[name] = store.read(path)
+        assert not any("/transactions/" in key for key in store._notes)
+    broken = notes["broken"]
+    start = broken.index("### **FINANCES**")
+    assert broken[start : start + 2] == [
+        "### **FINANCES**",
+        '`finance data unreadable: categories.toml: rule 2 ("X"): match must be a list`',
+    ]
+    assert "| **SPENT** | `—` | `—` | `—` |" in broken
+    without = [line for line in broken if "SPENT" not in line]
+    del without[
+        without.index("### **FINANCES**") : without.index("### **FINANCES**") + 3
+    ]
+    assert without == notes["none"]
+    assert sum("finance data unreadable" in r.message for r in caplog.records) == 1

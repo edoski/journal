@@ -141,9 +141,36 @@ class TrainingCalendarColumnsSpec:
     rule_char: str = "─"
 
 
+@dataclass(frozen=True)
+class WaterfallStep:
+    """One step of a waterfall: a signed change to the running total, in cents."""
+
+    label: str
+    change_cents: int
+
+
+@dataclass(frozen=True)
+class WaterfallSpec:
+    """Spec for a horizontal money waterfall from a start total to what is left.
+
+    The start total and the end total (start plus every step) are drawn from
+    zero with the total glyph; each step with the step glyph, starting where the
+    previous one ended. Labels are rendered upper-case as given.
+    """
+
+    start_label: str
+    start_cents: int
+    steps: Sequence[WaterfallStep]
+    end_label: str
+    width: int = 40
+    total_glyph: str = "█"
+    step_glyph: str = "▒"
+
+
 ChartSpec = (
     VerticalBarSpec
     | MonthlyTrainingGridSpec
     | WeeklyTrainingGridSpec
     | TrainingCalendarColumnsSpec
+    | WaterfallSpec
 )

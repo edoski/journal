@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from sync.contracts.finance import SpentSummary
 from sync.formatting import (
     compute_pace,
+    format_eur_whole,
     format_ma_training_ratio,
     format_minutes,
     format_training_ratio,
@@ -33,6 +35,25 @@ def _format_optional_minutes(value: float | None) -> str:
     if value is None:
         return "—"
     return format_minutes(value, always_show_both=True)
+
+
+def _append_spent_row(lines: list[str], spent: SpentSummary, *, show_ma: bool) -> None:
+    def amount(cents: int | None) -> str:
+        return "—" if cents is None else format_eur_whole(cents)
+
+    average = (
+        "—"
+        if spent.average_cents is None
+        else f"{format_eur_whole(spent.average_cents)}/{spent.average_unit}"
+    )
+    _append_summary_row(
+        lines,
+        show_ma=show_ma,
+        metric_label="SPENT",
+        current=amount(spent.current_cents),
+        previous=amount(spent.previous_cents),
+        ma_value=average,
+    )
 
 
 def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
@@ -143,6 +164,9 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         previous=prev_stretch,
         ma_value=ma_stretch_str,
     )
+
+    if spec.spent is not None:
+        _append_spent_row(lines, spec.spent, show_ma=show_ma)
 
     lines.append("")
     return lines

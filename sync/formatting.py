@@ -185,3 +185,23 @@ def format_progress_bar(
     filled_count = min(width, int(round((current / target) * width)))
     bar = filled_char * filled_count + empty_char * (width - filled_count)
     return bar, percent
+
+
+def format_eur(cents: int) -> str:
+    """Format euro cents with thousands separators, e.g. €2,500.00 or -€12.30."""
+    sign = "-" if cents < 0 else ""
+    whole, rest = divmod(abs(cents), 100)
+    return f"{sign}€{whole:,}.{rest:02d}"
+
+
+def round_cents_to_euros(cents: int) -> int:
+    """Round cents to whole euros, half away from zero."""
+    euros = (abs(cents) + 50) // 100
+    return -euros if cents < 0 else euros
+
+
+def format_eur_whole(cents: int) -> str:
+    """Format euro cents as whole euros, e.g. €2,500 or -€549 (never -€0)."""
+    euros = round_cents_to_euros(cents)
+    sign = "-" if euros < 0 else ""
+    return f"{sign}€{abs(euros):,}"

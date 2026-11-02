@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from sync.constants import JOURNAL_DIR
 from sync.notes.sections import replace_metrics_block
+from sync.periods.finances import TRANSACTIONS_DIR, transactions_note_name
 from sync.ports.notes import NoteStore
 from sync.periods.cleanup import resync_if_marker
 
@@ -14,6 +15,18 @@ from sync.periods.cleanup import resync_if_marker
 def journal_path(filename: str) -> str:
     """Resolve a filename into the journal directory."""
     return os.path.join(JOURNAL_DIR, filename)
+
+
+def transactions_note_path(year: int, month: int) -> str:
+    """Resolve a month's transactions note inside the journal directory."""
+    return os.path.join(
+        JOURNAL_DIR, TRANSACTIONS_DIR, f"{transactions_note_name(year, month)}.md"
+    )
+
+
+def publish_whole_note(path: str, lines: list[str], note_store: NoteStore) -> bool:
+    """Publish a fully generated note; the note store locks, compares and replaces."""
+    return note_store.update(path, lambda _current: lines).changed
 
 
 def publish_note_metrics(

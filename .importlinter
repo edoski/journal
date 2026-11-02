@@ -2,6 +2,7 @@
 root_packages =
     sync
     learning
+    finance
 include_external_packages = True
 
 [importlinter:application_no_adapters]
@@ -100,3 +101,23 @@ allow_indirect_imports = True
 ignore_imports =
     learning.cli -> sync.study.context
     learning.planning -> sync.study.context
+
+[importlinter:sync_finance_through_adapter]
+name = Journal sync reads finance only through its finance adapter
+type = forbidden
+source_modules =
+    sync
+forbidden_modules =
+    finance
+allow_indirect_imports = True
+ignore_imports =
+    sync.adapters.finance_store -> finance.read
+
+[importlinter:finance_standalone]
+name = Finance does not depend on sync or learning
+type = forbidden
+source_modules =
+    finance
+forbidden_modules =
+    sync
+    learning

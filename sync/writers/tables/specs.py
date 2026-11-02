@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+from sync.contracts.finance import SpentSummary
 from sync.contracts.metrics import MovingAverageAggregate, PeriodAggregate
 
 
@@ -28,6 +29,7 @@ class SummaryMetricsTableSpec:
     ma_metrics: MovingAverageAggregate | None = None
     ma_label: str | None = None
     ma_training_unit: str = "7"
+    spent: SpentSummary | None = None
 
 
 TableSpec = SimpleGridTableSpec | SummaryMetricsTableSpec
