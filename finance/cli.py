@@ -6,7 +6,8 @@ or "error" (with `message`, exit status 1); with "ok" it also has `last_fetch`
 (the last successful fetch, UTC, or null) and `problem` (one line worth
 showing, or null). `credits` and `debits` also list each account with its own
 last successful fetch, so a reader can tell a missing transaction from an
-account that has not been fetched since.
+account that has not been fetched since. `debits` also has `roundups`, the
+Round up runs from `--since` (see `_runs`).
 """
 
 from __future__ import annotations
@@ -39,11 +40,20 @@ from finance.connect import renew_bank, run_connect
 from finance.desktop import Chrome, MacNotifier
 from finance.fetch import run_fetch
 from finance.files import Busy, ensure_private_dir, exclusive, write_private
-from finance.read import FinanceReadError, categorised, entries_from
+from finance.read import FinanceReadError, classified, entries_from
 from finance.rules import OTHER, Rules, RulesError, install_starter, load_rules
 from finance.fetch import last_ok_key, vanished_keys
 from finance.session import Session, SessionError, load_session
-from finance.store import Account, Balance, Store, StoreError, open_reader, open_writer
+from finance.roundup import Run
+from finance.store import (
+    Account,
+    Balance,
+    Store,
+    StoreError,
+    Stored,
+    open_reader,
+    open_writer,
+)
 from finance.transactions import Flow
 
 STALE_AFTER = datetime.timedelta(days=2)
@@ -275,10 +285,10 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
         accounts = store.accounts()
         ibans = {account.hash: account.iban for account in accounts}
         # Without rules, no rule matches but own transfers are still known.
-        found = categorised(store, rules or Rules((), ()), since, None, accounts)
+        rows, found = classified(store, rules or Rules((), ()), accounts)
         items = []
-        for row, match in found:
-            if row.flow != flow:
+        for row, match in zip(rows, found.matches, strict=True):
+            if row.flow != flow or row.booking_date < since:
                 continue
             items.append(
                 {
@@ -306,6 +316,12 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
                 }
                 for account in accounts
             ]
+            if flow == "OUT":
+                account = next(
+                    (r.account for r in (rules or Rules((), ())).rules if r.roundup),
+                    "",
+                )
+                envelope["roundups"] = _runs(rows, found.runs, account or "", since)
             _emit({**envelope, "accounts": fetched, name: items})
             return 0
         if rules_problem:
@@ -318,6 +334,46 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
         return 0
     finally:
         store.close()
+
+
+def _runs(
+    rows: Sequence[Stored],
+    runs: Sequence[Run],
+    iban: str,
+    since: datetime.date,
+) -> list[dict[str, Any]]:
+    """The Round up runs from `since` (finance/roundup.py): `status` is
+    "matched" (`debit` is its key, `covers` the card payments' keys),
+    "ambiguous" or "unmatched" (`candidates`: the debits that could be it, left
+    uncategorised) or "missing" (no debit could be it). `expected` lists the
+    sums the card payments allow; `settles` is the last day a booking can
+    change the run."""
+
+    def brief(index: int) -> dict[str, str]:
+        row = rows[index]
+        return {
+            "key": row.key,
+            "date": row.booking_date.isoformat(),
+            "amount": decimal_text(row.amount_cents),
+        }
+
+    out = []
+    for run in runs:
+        if run.day < since:
+            continue
+        out.append(
+            {
+                "run": run.day.isoformat(),
+                "status": run.status,
+                "iban": iban,
+                "debit": brief(run.debit) if run.debit is not None else None,
+                "candidates": [brief(i) for i in run.candidates],
+                "covers": [rows[i].key for i in run.covers],
+                "expected": [decimal_text(cents) for cents in run.expected],
+                "settles": run.settles.isoformat(),
+            }
+        )
+    return out
 
 
 def fetched_day(balance: Balance) -> str:

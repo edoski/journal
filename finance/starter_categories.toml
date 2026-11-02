@@ -29,6 +29,23 @@
 #   flow = "in"
 #   days = 1
 #
+# Trade Republic's Round up rounds each card payment up to the next euro (a
+# whole-euro payment by a full euro), times a multiplier, and invests the total
+# on fixed days of the month as one debit. A rule with roundup (the multiplier:
+# 1, 2, 3, 5 or 10), runs (the days it invests) and since (the day it was
+# switched on) takes that debit, only when the card payments' round-ups add up
+# to it exactly; a debit that cannot be told apart stays Other, labelled
+# "Card payment or round up?". Put it after that account's other investing
+# rules and before its card rule:
+#
+#   [[rule]]
+#   category = "Investing"
+#   label = "Round up: FTSE All-World"
+#   account = "IT00X0000000000000000000000"
+#   roundup = 1
+#   runs = [2, 9, 16, 23]
+#   since = 2026-10-23
+#
 # Special categories: Income and Interest (INCOME in the waterfall), Investing
 # (INVESTED), Transfer (between your own accounts) and Gifts (money given to
 # you, such as a family present; needs flow = "in"), both left out of income,
