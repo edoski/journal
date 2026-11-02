@@ -101,7 +101,7 @@ def test_a_card_account_month_without_text() -> None:
         booking(CARD, "2026-11-03", "IN", "12.00"),
         booking(MAIN, "2026-11-02", "IN", "1900", "BIANCHI ANNA", "Bonifico figlio"),
     ]
-    matches = found.categorise(month, HOLDERS)
+    matches = found.classify(month, HOLDERS).matches
     seen = [(m.category, m.label, m.holder) for m in matches]
     assert seen == [
         ("Transfer", None, True),
@@ -127,7 +127,7 @@ def test_a_textless_entry_pairs_with_one_holder_entry_only() -> None:
         booking(CARD, "2026-11-24", "IN", "250"),  # beyond PAIR_DAYS of the debit
         booking(CARD, "2026-11-21", "IN", "250"),  # the debit is taken already
     ]
-    assert [m.holder for m in found.categorise(entries, HOLDERS)] == [
+    assert [m.holder for m in found.classify(entries, HOLDERS).matches] == [
         True,
         True,
         False,
@@ -141,7 +141,7 @@ def test_saveback_needs_its_buy() -> None:
         booking(CARD, "2026-12-01", "IN", "0.48"),
         booking(CARD, "2026-12-02", "OUT", "0.60"),
     ]
-    assert [m.category for m in found.categorise(alone)] == ["Interest", "Card"]
+    assert [m.category for m in found.classify(alone).matches] == ["Interest", "Card"]
 
 
 @pytest.mark.parametrize(
@@ -224,7 +224,7 @@ def test_one_saveback_buy_pairs_with_one_credit_closest_first() -> None:
         booking(CARD, "2026-12-02", "OUT", "0.43"),
         booking(CARD, "2026-12-02", "OUT", "0.20"),  # a card payment
     ]
-    assert [(m.category, m.label) for m in found.categorise(entries)] == [
+    assert [(m.category, m.label) for m in found.classify(entries).matches] == [
         ("Interest", None),
         ("Card", "Saveback"),
         ("Investing", "Saveback: Bitcoin"),
@@ -240,7 +240,11 @@ def test_an_own_transfer_both_banks_name_pairs_before_a_textless_entry() -> None
         booking(other, "2026-10-10", "IN", "100", "Mario Rossi", "Giroconto"),
         booking(CARD, "2026-10-11", "IN", "100"),  # a friend's transfer, no text
     ]
-    assert [m.holder for m in found.categorise(entries, HOLDERS)] == [True, True, False]
+    assert [m.holder for m in found.classify(entries, HOLDERS).matches] == [
+        True,
+        True,
+        False,
+    ]
 
 
 def test_a_sub_cent_amount_is_refused() -> None:

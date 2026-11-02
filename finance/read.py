@@ -19,6 +19,7 @@ from pathlib import Path
 from finance.config import Paths, finance_dir
 from finance.rules import (
     Booking,
+    Categorised,
     Match,
     Role,
     Rules,
@@ -93,6 +94,19 @@ def booking(row: Stored, ibans: dict[str, str]) -> Booking:
     )
 
 
+def classified(
+    store: Store, rules: Rules, accounts: Sequence[Account] | None = None
+) -> tuple[list[Stored], Categorised]:
+    """Every stored row, and the rules' matches and Round up runs for them."""
+    accounts = store.accounts() if accounts is None else accounts
+    ibans = {account.hash: account.iban for account in accounts}
+    rows = store.transactions()
+    found = rules.classify(
+        [booking(row, ibans) for row in rows], holder_names(accounts)
+    )
+    return rows, found
+
+
 def categorised(
     store: Store,
     rules: Rules,
@@ -103,15 +117,10 @@ def categorised(
     """Every stored row booked from `start` to `end` (None: no end) with its
     match. The rules see every stored row, so an entry's category never depends
     on the range asked for."""
-    accounts = store.accounts() if accounts is None else accounts
-    ibans = {account.hash: account.iban for account in accounts}
-    rows = store.transactions()
-    matches = rules.categorise(
-        [booking(row, ibans) for row in rows], holder_names(accounts)
-    )
+    rows, found = classified(store, rules, accounts)
     return [
         (row, match)
-        for row, match in zip(rows, matches, strict=True)
+        for row, match in zip(rows, found.matches, strict=True)
         if start <= row.booking_date and (end is None or row.booking_date <= end)
     ]
 

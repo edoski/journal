@@ -100,7 +100,10 @@ Categories are not stored. `rules.py` validates `categories.toml` and assigns
 categories when the store is read (`read.py`), so editing the rules re-categorises
 history. Rules see every stored entry, not one: a bank that sends no text (Trade
 Republic) is matched by account, amount, day of the month and pairs of entries,
-and its own transfers by the holder's entry on another account. Pairs are found
+and its own transfers by the holder's entry on another account. Its Round up
+debits (`roundup.py`) are each run's exact sum of the card payments' round-ups;
+a run that does not add up is reported, never guessed, and its candidate debits
+stay Other. Pairs and runs are found
 over the whole store, so an entry gets the same category whatever range is read. `read.read_entries` is the single read interface: sync's
 `FinanceStoreSource` adapter is the only sync module that imports finance, and
 finance imports nothing from sync. Period builders turn the `FinanceBundle` into
@@ -108,7 +111,7 @@ the FINANCES section, the SPENT summary row and the monthly transactions notes
 (`sync/periods/finances.py`); with no store they render exactly what they did
 before, and with unreadable bank data FINANCES is one line naming the reason
 while the rest of the note renders as usual. The biz tool asks `python -m finance credits/debits/balance --json` and never
-opens the store itself.
+opens the store itself; `debits` also lists the Round up runs (`roundups`).
 
 ## Maintenance
 
