@@ -159,8 +159,9 @@ aliases.
     links prefix the month: `**[[YYYY-MM transactions|SEP: N transactions →]]**`,
     `N` being the linked month's entry count
   - money rules: categories are nets (a refund a rule matched reduces its category);
-    money in that no rule matched (shown as Other) counts as INCOME; Transfer
-    entries count nowhere; SPENT never goes below €0
+    money in that no rule matched (shown as Other) counts as INCOME, as do the
+    Income and Interest categories; Transfer and Gifts entries count nowhere;
+    SPENT never goes below €0
   - waterfall below €1 of spread: no chart; tiny steps more than 2 cells from
     their exact place become a `▏` marker; LEFT is always drawn at its exact value
   - unreadable bank data: `### **FINANCES**` then `` `finance data unreadable: <reason>` ``

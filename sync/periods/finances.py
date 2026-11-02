@@ -2,12 +2,13 @@
 
 Money rules, for every period type:
 
-- INCOME is the net of entries in the Income category (money in minus out).
+- INCOME is the net of entries with the income role, the Income and Interest
+  categories (money in minus out).
 - Each spending category's amount is its net: money out minus money in, so a
   refund (money in that a rule put in that category) reduces its category.
 - INVESTED is the net of the Investing category; Transfer entries (between
-  own accounts) are left out of every amount but listed in the transactions
-  note.
+  own accounts) and Gifts entries (money given to the holder) are left out of
+  every amount but listed in the transactions note.
 - LEFT = INCOME - spending - INVESTED. SPENT is the spending total.
 - Money in that no rule matched (category Other) is counted as INCOME, not as
   a refund; it still shows as Other in the transactions note.

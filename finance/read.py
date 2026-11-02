@@ -17,7 +17,17 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from finance.config import Paths, finance_dir
-from finance.rules import Role, Rules, RulesError, load_rules, role_of, words
+from finance.rules import (
+    PAIR_DAYS,
+    Booking,
+    Match,
+    Role,
+    Rules,
+    RulesError,
+    load_rules,
+    role_of,
+    words,
+)
 from finance.store import Account, Store, StoreError, Stored, open_reader
 from finance.transactions import Flow
 
@@ -71,13 +81,42 @@ def holder_names(accounts: Sequence[Account]) -> list[tuple[str, ...]]:
     return [words(account.name) for account in accounts if account.name]
 
 
-def categorise(row: Stored, rules: Rules, holders: Sequence[tuple[str, ...]]) -> Entry:
-    match = rules.categorise(
+def booking(row: Stored, ibans: dict[str, str]) -> Booking:
+    return Booking(
+        iban=ibans.get(row.account, ""),
+        day=row.booking_date,
         flow=row.flow,
+        amount_cents=row.amount_cents,
         counterparty=row.counterparty,
         remittance=row.remittance,
-        holders=holders,
     )
+
+
+def categorised(
+    store: Store,
+    rules: Rules,
+    start: datetime.date,
+    end: datetime.date | None,
+    accounts: Sequence[Account] | None = None,
+) -> list[tuple[Stored, Match]]:
+    """Every stored row booked from `start` to `end` (None: no end) with its
+    match. Rules read PAIR_DAYS on each side for pairs, so an entry is
+    categorised the same whatever range is asked for."""
+    accounts = store.accounts() if accounts is None else accounts
+    ibans = {account.hash: account.iban for account in accounts}
+    margin = datetime.timedelta(days=PAIR_DAYS)
+    rows = store.transactions(start - margin, None if end is None else end + margin)
+    matches = rules.categorise(
+        [booking(row, ibans) for row in rows], holder_names(accounts)
+    )
+    return [
+        (row, match)
+        for row, match in zip(rows, matches, strict=True)
+        if start <= row.booking_date and (end is None or row.booking_date <= end)
+    ]
+
+
+def entry(row: Stored, match: Match) -> Entry:
     return Entry(
         key=row.key,
         account=row.account,
@@ -114,14 +153,13 @@ def entries_from(
     store: Store, rules: Rules, start: datetime.date, end: datetime.date
 ) -> Entries:
     accounts = store.accounts()
-    holders = holder_names(accounts)
     kept: list[Entry] = []
     other_currency = 0
-    for row in store.transactions(start, end):
+    for row, match in categorised(store, rules, start, end, accounts):
         if row.currency != CURRENCY:
             other_currency += 1
             continue
-        kept.append(categorise(row, rules, holders))
+        kept.append(entry(row, match))
     opened = {
         a.hash: day for a in accounts if (day := store.opened(a.hash)) is not None
     }

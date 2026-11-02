@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import os
 import stat
+import datetime
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
 
 from finance.rules import (
+    Booking,
+    Match,
+    Rules,
     RulesError,
     install_starter,
     load_rules,
@@ -16,10 +21,28 @@ from finance.rules import (
     starter_text,
     words,
 )
+from finance.transactions import Flow
+
+DAY = datetime.date(2026, 10, 20)
 
 
-def rules(text: str):  # type: ignore[no-untyped-def]
+def rules(text: str) -> Rules:
     return parse_rules(text, "categories.toml")
+
+
+def one(
+    found: Rules,
+    *,
+    flow: Flow,
+    counterparty: str,
+    remittance: str,
+    holders: Iterable[tuple[str, ...]] = (),
+) -> Match:
+    """The match of a single entry, with no other entries around it."""
+    [match] = found.categorise(
+        [Booking("", DAY, flow, 100, counterparty, remittance)], holders
+    )
+    return match
 
 
 def test_first_match_wins_on_counterparty_or_remittance() -> None:
@@ -35,22 +58,19 @@ match = ["COOPERATIVA TAXI", "trenitalia"]
 """
     )
     assert (
-        found.categorise(
-            flow="OUT", counterparty="COOP ALLEANZA", remittance=""
-        ).category
+        one(found, flow="OUT", counterparty="COOP ALLEANZA", remittance="").category
         == "Groceries"
     )
     assert (
-        found.categorise(
-            flow="OUT", counterparty="", remittance="PAGAMENTO  POS\nTRENITALIA"
+        one(
+            found, flow="OUT", counterparty="", remittance="PAGAMENTO  POS\nTRENITALIA"
         ).category
         == "Transport"
     )
     # the later, longer pattern is shadowed by the earlier "coop": reported, not an error
     assert any("never matches" in warning for warning in found.warnings)
     assert (
-        found.categorise(flow="IN", counterparty="UNKNOWN", remittance="").category
-        == "Other"
+        one(found, flow="IN", counterparty="UNKNOWN", remittance="").category == "Other"
     )
 
 
@@ -64,10 +84,10 @@ match = ["CLIENT LTD"]
 label = "Client"
 """
     )
-    hit = found.categorise(flow="IN", counterparty="CLIENT LTD", remittance="")
+    hit = one(found, flow="IN", counterparty="CLIENT LTD", remittance="")
     assert (hit.category, hit.label) == ("Income", "Client")
     assert (
-        found.categorise(flow="OUT", counterparty="CLIENT LTD", remittance="").category
+        one(found, flow="OUT", counterparty="CLIENT LTD", remittance="").category
         == "Other"
     )
 
@@ -84,20 +104,25 @@ match = ["GIROCONTO"]
     holders = [words("ROSSI MARIO")]
     for party in ("ROSSI MARIO", "Mario Rossi", "MARIO ROSSI ", "Rossi, Mario"):
         assert (
-            found.categorise(
-                flow="IN", counterparty=party, remittance="", holders=holders
+            one(
+                found, flow="IN", counterparty=party, remittance="", holders=holders
             ).category
             == "Transfer"
         )
     assert (
-        found.categorise(
-            flow="IN", counterparty="MARIO BIANCHI", remittance="", holders=holders
+        one(
+            found,
+            flow="IN",
+            counterparty="MARIO BIANCHI",
+            remittance="",
+            holders=holders,
         ).category
         == "Other"
     )
     # the holder's name in the remittance (e.g. a client paying "to Mario Rossi") is not a transfer
     assert (
-        found.categorise(
+        one(
+            found,
             flow="IN",
             counterparty="CLIENT",
             remittance="to Mario Rossi",
@@ -107,8 +132,12 @@ match = ["GIROCONTO"]
     )
     # a one-word holder name is too weak to trust
     assert (
-        found.categorise(
-            flow="IN", counterparty="ROSSI SRL", remittance="", holders=[words("ROSSI")]
+        one(
+            found,
+            flow="IN",
+            counterparty="ROSSI SRL",
+            remittance="",
+            holders=[words("ROSSI")],
         ).category
         == "Other"
     )
@@ -190,8 +219,8 @@ def test_starter_seeds_route_the_expected_texts() -> None:
     starter = rules(starter_text())
 
     def category(party: str, remittance: str = "", flow: str = "OUT") -> str:
-        return starter.categorise(
-            flow=flow, counterparty=party, remittance=remittance
+        return one(
+            starter, flow=flow, counterparty=party, remittance=remittance
         ).category  # type: ignore[arg-type]
 
     assert category("AGENZIA DELLE ENTRATE", "F24 SEMPLIFICATO") == "Taxes"
@@ -204,8 +233,12 @@ def test_starter_seeds_route_the_expected_texts() -> None:
     assert category("LUCA BIANCHI", "Sent from Revolut", "IN") == "Other"
     holders = [words("GALLI EDOARDO")]
     assert (
-        starter.categorise(
-            flow="IN", counterparty="EDOARDO GALLI", remittance="", holders=holders
+        one(
+            starter,
+            flow="IN",
+            counterparty="EDOARDO GALLI",
+            remittance="",
+            holders=holders,
         ).category
         == "Transfer"
     )
@@ -216,8 +249,11 @@ def test_starter_seeds_route_the_expected_texts() -> None:
         )
     )
     assert (
-        with_client.categorise(
-            flow="IN", counterparty="AMOREG LIMITED", remittance="Sent from Revolut"
+        one(
+            with_client,
+            flow="IN",
+            counterparty="AMOREG LIMITED",
+            remittance="Sent from Revolut",
         ).category
         == "Income"
     )

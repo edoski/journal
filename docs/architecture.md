@@ -98,13 +98,17 @@ a 429 and a "needs reconsent" stop after a session error. `store.py` owns the SQ
 
 Categories are not stored. `rules.py` validates `categories.toml` and assigns
 categories when the store is read (`read.py`), so editing the rules re-categorises
-history. `read.read_entries` is the single read interface: sync's
+history. Rules see a batch of entries, not one: a bank that sends no text (Trade
+Republic) is matched by account, amount, day of the month and pairs of entries,
+and its own transfers by the holder's entry on another account. The reader reads
+a few days past each end of the range asked for, so an entry gets the same
+category whatever the range. `read.read_entries` is the single read interface: sync's
 `FinanceStoreSource` adapter is the only sync module that imports finance, and
 finance imports nothing from sync. Period builders turn the `FinanceBundle` into
 the FINANCES section, the SPENT summary row and the monthly transactions notes
 (`sync/periods/finances.py`); with no store they render exactly what they did
 before, and with unreadable bank data FINANCES is one line naming the reason
-while the rest of the note renders as usual. The biz tool asks `python -m finance credits/balance --json` and never
+while the rest of the note renders as usual. The biz tool asks `python -m finance credits/debits/balance --json` and never
 opens the store itself.
 
 ## Maintenance

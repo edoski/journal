@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 FinanceFlow = Literal["IN", "OUT"]
-FinanceRole = Literal["income", "spending", "investing", "transfer"]
+FinanceRole = Literal["income", "spending", "investing", "transfer", "gift"]
 # The category of money no rule matched (finance's rules use the same name).
 UNMATCHED_CATEGORY = "Other"
 

@@ -39,8 +39,8 @@ from finance.connect import renew_bank, run_connect
 from finance.desktop import Chrome, MacNotifier
 from finance.fetch import run_fetch
 from finance.files import Busy, ensure_private_dir, exclusive, write_private
-from finance.read import FinanceReadError, categorise, entries_from, holder_names
-from finance.rules import OTHER, RulesError, install_starter, is_holder, load_rules
+from finance.read import FinanceReadError, categorised, entries_from
+from finance.rules import OTHER, Rules, RulesError, install_starter, load_rules
 from finance.fetch import last_ok_key, vanished_keys
 from finance.session import Session, SessionError, load_session
 from finance.store import Account, Balance, Store, StoreError, open_reader, open_writer
@@ -273,12 +273,13 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
         except RulesError as exc:
             rules, rules_problem = None, f"category rules unreadable: {exc}"
         accounts = store.accounts()
-        holders = holder_names(accounts)
         ibans = {account.hash: account.iban for account in accounts}
-        rows = store.transactions(since, None, flow=flow)
+        # Without rules, no rule matches but own transfers are still known.
+        found = categorised(store, rules or Rules((), ()), since, None, accounts)
         items = []
-        for row in rows:
-            category = categorise(row, rules, holders).category if rules else None
+        for row, match in found:
+            if row.flow != flow:
+                continue
             items.append(
                 {
                     "key": row.key,
@@ -289,8 +290,8 @@ def _transactions(paths: Paths, args: argparse.Namespace, flow: Flow, name: str)
                     "currency": row.currency,
                     "counterparty": row.counterparty,
                     "remittance": row.remittance,
-                    "category": category,
-                    "holder": is_holder(row.counterparty, holders),
+                    "category": match.category if rules else None,
+                    "holder": match.holder,
                     "transaction": json.loads(row.raw),
                 }
             )
