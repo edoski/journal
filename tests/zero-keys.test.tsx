@@ -18,7 +18,6 @@ import type { ProviderKeyInfo } from "../components/settings/keys-section.tsx";
 
 const status = (id: string, present: boolean, source: AuthKeyStatus["source"] = present ? "file" : "none"): AuthKeyStatus => ({
 	id,
-	info: null,
 	present,
 	masked: present ? "…ab12 (64 chars)" : null,
 	source,
@@ -36,8 +35,7 @@ describe("hasProviderKey — the zero-keys pill's truth", () => {
 		assert.equal(hasProviderKey([status("ANTHROPIC_API_KEY", true, "file")], PROVIDERS), true);
 	});
 
-	it("a TOOL key alone does not count — Tavily unlocks no models", () => {
-		// Tavily is not in the providers roster: it must never suppress the pill.
+	it("a stored key no provider reads does not count", () => {
 		assert.equal(hasProviderKey([status("TAVILY_API_KEY", true)], PROVIDERS), false);
 	});
 

@@ -33,7 +33,6 @@ import { runPiTurn } from "./pi/ui-stream.ts";
 import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { searchAvailable } from "./search.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -456,7 +455,6 @@ export async function handleChatInput(
 							chatId,
 							jobStore: stores.jobStore,
 							spawn: (job, input) => void jobRunner.runJob(job.id, input),
-							searchAvailable,
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
 					},
@@ -469,9 +467,6 @@ export async function handleChatInput(
 						chatStore: stores.chatStore,
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						// The registry drop's signal (2026-09-20): no live engine
-						// = no research tool in the teacher's registry.
-						searchAvailable,
 					},
 					agentOpts,
 				)
@@ -485,7 +480,6 @@ export async function handleChatInput(
 						// needs the same job wiring as the teacher's.
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						searchAvailable,
 						// The map reader (wave 7): the prober reads the learner's
 						// knowledge graph through tools when the gate opens —
 						// graph master switch AND the agent.graphTools toggle.

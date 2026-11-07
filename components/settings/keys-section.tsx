@@ -2,7 +2,7 @@
 /**
  * The Keys section (wave-5 polish, 2026-09-21 — owner design): a MINIMAL
  * key-value table. Provider left, masked key right, no description hints
- * (they took too much space), the "Get a key ↗" link a tiny muted guest.
+ * (they took too much space).
  * Clicking a writable row unfolds a paste field + Save (+ Delete for a
  * file-sourced value) beneath it; Esc or a second click folds it away.
  * The Add-provider control is the LAST ROW of the table and uses the
@@ -15,7 +15,7 @@
  *    a paste box on a key the UI cannot make live would mislead.
  *  - OpenRouter is NOT special: one provider among 33, a row only when
  *    stored, otherwise it lives in the Add dropdown like everyone else.
- *  - Providers groups API keys, subscriptions and search.
+ *  - Providers groups API keys and subscriptions.
  *    Unknown variables stay masked/read-only at the end of Model API keys.
  *
  * API: GET /api/keys (masked statuses + the providers array), PUT
@@ -24,7 +24,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { AUTH_KEYS, type AuthKeyStatus } from "@/src/core";
+import type { AuthKeyStatus } from "@/src/core";
 import { SettingsGroup } from "./controls.tsx";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
@@ -44,12 +44,6 @@ interface KeysResponse {
 	providers?: ProviderKeyInfo[];
 }
 
-/** The curated tools group, pinned by id (the catalog owns the copy;
- *  these ids are the contract). Derived from the catalog (search wave,
- *  2026-09-20: the Google CSE pair retired, Tavily + Brave joined) — the
- *  section can never drift from core/auth-keys.ts again. */
-const TOOL_IDS = AUTH_KEYS.map((k) => k.id) as readonly string[];
-
 /** The classification driving the table groups. Pure — exported for
  *  tests. OpenRouter is un-pinned (wave-5 owner ruling): no synthesis,
  *  no special row — it rides the same provider classification. */
@@ -59,38 +53,21 @@ export function classifyKeys(
 ): {
 	/** Stored provider keys (env or file), in GET order. */
 	providerRows: AuthKeyStatus[];
-	/** The curated tools rows (synthesized when absent — always shown,
-	 *  they carry the docs links a first boot needs). */
-	toolRows: AuthKeyStatus[];
 	/** Unknown file vars — preserved, read-only. */
 	unknownRows: AuthKeyStatus[];
 	/** Providers without a stored key — the Add dropdown's options. */
 	addable: ProviderKeyInfo[];
 } {
 	const byId = new Map(statuses.map((s) => [s.id, s]));
-	const isTool = (id: string) => (TOOL_IDS as readonly string[]).includes(id);
 	const providerEnv = new Set((providers ?? []).map((p) => p.envVar));
-	const synth = (id: string): AuthKeyStatus => ({
-		id,
-		info: null,
-		present: false,
-		masked: null,
-		source: "none",
-		shadowedByEnv: false,
-	});
 	const providerRows: AuthKeyStatus[] = [];
 	const unknownRows: AuthKeyStatus[] = [];
 	for (const s of statuses) {
-		if (isTool(s.id)) continue;
-		if (providerEnv.has(s.id) || (!s.info && providers === undefined)) providerRows.push(s);
-		else if (!s.info) unknownRows.push(s);
-		// (pre-interlude catalogs: a curated-but-unclassified status still
-		// renders as a provider row so nothing disappears)
-		else providerRows.push(s);
+		if (providers === undefined || providerEnv.has(s.id)) providerRows.push(s);
+		else unknownRows.push(s);
 	}
 	return {
 		providerRows,
-		toolRows: TOOL_IDS.map((id) => byId.get(id) ?? synth(id)),
 		unknownRows,
 		addable: (providers ?? []).filter((p) => !byId.has(p.envVar)),
 	};
@@ -113,12 +90,11 @@ export function keyStatusLine(status: AuthKeyStatus): string {
 	return `${tail} · ${chars}${status.source === "env" ? " · env" : ""}`;
 }
 
-/** One table row: label left, tiny docs link + status right. Writable
+/** One table row: label left, status right. Writable
  *  rows click-unfold an editor beneath (owner interaction); env-owned
  *  rows are dimmed and read-only (a paste box there would mislead). */
 function KeyTableRow({
 	label,
-	docsUrl,
 	status,
 	expanded,
 	onToggle,
@@ -128,8 +104,6 @@ function KeyTableRow({
 	testid,
 }: {
 	label: string;
-	/** The "Get a key ↗" target — curated keys carry one. */
-	docsUrl?: string;
 	status: AuthKeyStatus;
 	expanded: boolean;
 	onToggle: () => void;
@@ -229,21 +203,8 @@ function KeyTableRow({
 				}`}
 			>
 				<span className="font-ui text-xs text-foreground">{label}</span>
-				<span className="flex items-center gap-2">
-					{docsUrl && (
-						<a
-							href={docsUrl}
-							target="_blank"
-							rel="noreferrer"
-							onClick={(e) => e.stopPropagation()}
-							className="text-[10px] text-muted-foreground/60 underline-offset-2 hover:text-foreground hover:underline"
-						>
-							key ↗
-						</a>
-					)}
-					<span data-testid={`${testid}-status`} className="font-mono text-[11px] text-muted-foreground">
-						{keyStatusLine(status)}
-					</span>
+				<span data-testid={`${testid}-status`} className="font-mono text-[11px] text-muted-foreground">
+					{keyStatusLine(status)}
 				</span>
 			</button>
 			{error && (
@@ -392,7 +353,7 @@ export function KeysSection() {
 		return <p className="px-6 py-5 text-xs text-muted-foreground/70">Loading keys…</p>;
 	}
 
-	const { providerRows, toolRows, unknownRows, addable } = classifyKeys(statuses, providers);
+	const { providerRows, unknownRows, addable } = classifyKeys(statuses, providers);
 
 	async function saveNewProvider(p: ProviderKeyInfo, value: string) {
 		const err = await saveKey(p.envVar, value);
@@ -409,8 +370,7 @@ export function KeysSection() {
 				{providerRows.map((status) => (
 					<KeyTableRow
 						key={status.id}
-						label={providerKeyLabel(status.id, providers) ?? status.info?.label ?? status.id}
-						docsUrl={status.info?.docsUrl}
+						label={providerKeyLabel(status.id, providers) ?? status.id}
 						status={status}
 						expanded={openRow === status.id}
 						onToggle={() => setOpenRow(openRow === status.id ? null : status.id)}
@@ -450,28 +410,6 @@ export function KeysSection() {
 			<SettingsGroup label="Subscriptions" testid="group-subscriptions">
 				<SubscriptionConnections />
 			</SettingsGroup>
-
-			<SettingsGroup label="Search" testid="group-search">
-				{toolRows.map((status) => (
-					<KeyTableRow
-						key={status.id}
-						label={status.info?.label ?? status.id}
-						docsUrl={status.info?.docsUrl}
-						status={status}
-						expanded={openRow === status.id}
-						onToggle={() => setOpenRow(openRow === status.id ? null : status.id)}
-						onSave={async (v) => {
-							const err = await saveKey(status.id, v);
-							if (!err) setOpenRow(null);
-							return err;
-						}}
-						onCancel={() => setOpenRow(null)}
-						onDelete={() => deleteKey(status.id)}
-						testid={`key-${status.id.toLowerCase()}`}
-					/>
-				))}
-			</SettingsGroup>
-
 		</>
 	);
 }

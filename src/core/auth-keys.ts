@@ -1,54 +1,15 @@
 /**
- * The curated auth-key catalog + shape rules (auth-keys wave, 2026-09-19).
- * PURE, browser-safe — no fs, no env. The catalog drives the auth page's
- * key list (label, description, where-to-get docs link) and the write-side
- * shape validation (owner decision: SHAPE-ONLY validation, no live pings —
- * a revoked key looks fine until a real call fails; that trade was chosen
- * over phoning providers).
+ * Model-provider key rules + masking. PURE, browser-safe — no fs, no env.
  *
- * The store itself is the long-standing flat {VAR: value} auth.json map
- * (see config.AUTH_FILE): keys are identified BY their environment-variable
- * name — the same name consumers read today (OPENROUTER_API_KEY, …), so the
- * catalog id IS the file key and the env var, one name everywhere.
+ * The store is the long-standing flat {VAR: value} auth.json map (see
+ * config.AUTH_FILE): keys are identified BY their environment-variable
+ * name — the same name pi-ai reads — so one name serves everywhere.
+ * Validation is shape-only (owner decision: no live pings — a revoked key
+ * looks fine until a real call fails).
  *
- * Unknown vars found in the file (outside the catalog) are PRESERVED
- * verbatim and surfaced as generic entries — forward-compat for future
- * entries (e.g. a plans-login token) without a schema change — but they
- * are not hand-writable through the curated API (only the catalog's keys
- * have shapes worth checking and docs worth showing).
+ * Vars found in the file that no provider reads are PRESERVED verbatim
+ * and surfaced as read-only entries, never written through the API.
  */
-
-/** One curated key entry. `id` is the env-var/file key name. */
-export interface AuthKeyInfo {
-	id: string;
-	/** Human label for the settings page. */
-	label: string;
-	/** One-sentence what-is-this-for. */
-	description: string;
-	/** Where the user gets a key (opens in the real browser via the shell). */
-	docsUrl: string;
-}
-
-export const AUTH_KEYS: readonly AuthKeyInfo[] = [
-	{
-		id: "TAVILY_API_KEY",
-		label: "Tavily",
-		description: "Web-search engine for the researcher sub-agent (AI-native search API). Setting the key activates it — no engine toggle needed.",
-		docsUrl: "https://app.tavily.com/",
-	},
-	{
-		id: "BRAVE_API_KEY",
-		label: "Brave Search",
-		description: "Web-search engine for the researcher sub-agent — the alternative to Tavily. Setting the key activates it.",
-		docsUrl: "https://brave.com/search/api/",
-	},
-] as const;
-
-const AUTH_KEY_IDS: ReadonlySet<string> = new Set(AUTH_KEYS.map((k) => k.id));
-
-export function isKnownAuthKey(id: string): boolean {
-	return AUTH_KEY_IDS.has(id);
-}
 
 /** One model-provider key row for the settings page's dropdown: which
  *  pi-ai provider, the env var its key rides in, and the human label
@@ -129,37 +90,6 @@ export function isProviderEnvVar(envVar: string): boolean {
 /** Shape-check result: ok, or a 400-ready message naming the expectation. */
 export type KeyShapeResult = { ok: true } | { ok: false; error: string };
 
-/**
- * The write-side shape gate (owner decision: reject bad pastes with 400 —
- * a truncated or wrong-family key can never land in the store). Values are
- * TRIMMED first (paste hygiene); empty-after-trim always fails.
- *
- * CURATED keys carry family rules (Tavily's tvly-… prefix; Brave
- * publishes no format — a length floor + paste hygiene only).
- * MODEL-PROVIDER keys use genericProviderKeyGuard below instead (families
- * vary by provider — only paste hygiene applies; owner spec: min length
- * ~12, no whitespace). OPENROUTER_API_KEY moved to the generic guard with
- * the provider-keys interlude — no sk-or family check anymore.
- */
-export function validateKeyShape(id: string, rawValue: string): KeyShapeResult {
-	const value = rawValue.trim();
-	const nonEmpty = (min: number) =>
-		value.length >= min && !/\s/.test(value)
-			? { ok: true as const }
-			: { ok: false as const, error: `${id} must be at least ${min} characters with no whitespace` };
-	switch (id) {
-		case "TAVILY_API_KEY":
-			return value.startsWith("tvly-")
-				? nonEmpty(20)
-				: { ok: false, error: `${id} must start with "tvly-" (Tavily's key format)` };
-		case "BRAVE_API_KEY":
-			// No public format — a length floor + paste hygiene only.
-			return nonEmpty(20);
-		default:
-			return { ok: false, error: `unknown key "${id}" (supported: ${[...AUTH_KEY_IDS].join(", ")})` };
-	}
-}
-
 /** The generic truncation guard for MODEL-PROVIDER keys (families vary —
  *  only paste hygiene applies; owner spec: trim, no whitespace, min 12). */
 export function genericProviderKeyGuard(id: string, rawValue: string): KeyShapeResult {
@@ -180,9 +110,6 @@ export function maskKey(value: string): string {
 /** One key's status row for the GET view (never carries plaintext). */
 export interface AuthKeyStatus {
 	id: string;
-	/** Catalog metadata when the key is curated; null for unknown-file-var
-	 *  entries (preserved + surfaced, but no curated form to edit through). */
-	info: AuthKeyInfo | null;
 	/** A key is present when EITHER the environment or the file has it. */
 	present: boolean;
 	/** The masked tail + character count, e.g. "…ab12 (64 chars)". */
