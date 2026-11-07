@@ -44,6 +44,8 @@ export interface PracticeToolContext {
 	 *  Each absent context (tests) = absent from the registry. */
 	graph?: GraphToolContext;
 	jobs?: JobToolContext;
+	/** The session studies a course: poses carry course topic handles. */
+	courseLinked?: boolean;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -94,10 +96,25 @@ export const problemInputObject = Type.Object({
 
 export type ProblemInput = Static<typeof problemInputObject>;
 
+/** A course-linked session's pose also names the course topics the problem
+ *  exercises: the link between the problem (and its statements) and the
+ *  learner's course record, where the attempt is saved under these handles. */
+export const courseProblemInputObject = Type.Object({
+	...problemInputObject.properties,
+	topics: Type.Array(Type.String({ minLength: 1 }), {
+		minItems: 1,
+		description:
+			"REQUIRED — the course topic handle(s) this problem exercises, from the course record (course_resume / course_search). " +
+			"Save the attempt under the same handles.",
+	}),
+});
+
 export function problemTool(
 	gate: PracticeGate,
 	graphNodes?: PracticeToolContext["graphNodes"],
+	courseLinked = false,
 ): AgentTool<typeof problemInputObject> {
+	const parameters = courseLinked ? courseProblemInputObject : problemInputObject;
 	return {
 		name: "problem",
 		label: "problem",
@@ -106,10 +123,10 @@ export function problemTool(
 			"traces and answer commits arrive back as labeled messages. The modelSolution rides this call's " +
 			"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim — the " +
 			"reveal needs no new field). Only one problem may be active — conclude it before posing the next.",
-		parameters: problemInputObject,
+		parameters,
 		executionMode: "sequential",
 		prepareArguments: (args: unknown) => {
-			const healed = healEncodedArguments(args, problemInputObject);
+			const healed = healEncodedArguments(args, parameters);
 			// TARGET NORMALIZATION (owner round 9): names silently become ids —
 			// the RECORD carries canonical ids (the mastery trace groups on
 			// them); unresolvable strings pass through for execute to reject.
@@ -236,7 +253,7 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	// keep their own (target-normalizing) prepareArguments as the composed
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
-		problem: problemTool(gate, ctx.graphNodes),
+		problem: problemTool(gate, ctx.graphNodes, ctx.courseLinked),
 		conclude: concludeTool(gate),
 		read: readTool,
 		ls: lsTool,

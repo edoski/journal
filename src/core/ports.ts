@@ -27,14 +27,15 @@ import type {
 	NotesSource,
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
+import type { CourseLink, CourseListing, CourseResult, CourseVerb } from "./contracts/course.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
 export interface ChatStore {
-	/** Create a session record (persisted immediately). */
 	/** Create a session record; kind "practice" marks a practice session
-	 *  (absent = teach, the default). */
-	createChat(title: string, kind?: "practice"): ChatRecord;
+	 *  (absent = teach, the default); `course` links the session to one
+	 *  registered course for its whole life. */
+	createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -222,3 +223,18 @@ export interface AuthStore {
 	deleteAuthVar(name: string): void;
 }
 
+
+// ─── CourseRecords — the learning engine's course records ───────────────────
+
+/**
+ * The learner's course records live in the `learning` engine, outside the
+ * app's data dir; the engine is their only writer. The adapter runs the
+ * engine's agent CLI, one verb per call. Never throws: every failure comes
+ * back as a CourseResult or an unavailable listing.
+ */
+export interface CourseRecords {
+	/** Every registered course, for the chooser. */
+	list(): Promise<CourseListing>;
+	/** Run one verb against one course workspace. */
+	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+}

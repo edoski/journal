@@ -13,6 +13,7 @@ import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
+import { CoursePicker, useCourseChoice } from "@/components/course-picker";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
@@ -46,6 +47,7 @@ export async function startDraftSession(
 	picks?: readonly DraftPick[],
 	starter = new SessionStarter(),
 	settingsIdentity?: string,
+	course?: string,
 ): Promise<string | null> {
 	const t = text.trim();
 	if (!t) return null;
@@ -53,10 +55,11 @@ export async function startDraftSession(
 	// from the pick bar creates its session WITH the graph context — the
 	// same contract as the home screen's practice send (the marker with
 	// [id] name: statement lines, target validation's truth set).
+	const linked = course ? { course: { workspace: course } } : {};
 	return starter.start(
 		mode === "practice"
-			? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}) }
-			: { title: t },
+			? { title: t, kind: "practice", ...(picks && picks.length > 0 ? { graphContext: { propositions: picks } } : {}), ...linked }
+			: { title: t, ...linked },
 		fetchLike,
 		settingsIdentity,
 	);
@@ -76,6 +79,7 @@ export function DraftShell({
 	onOpenPicker,
 	onClearPicks,
 	overlay,
+	course,
 }: {
 	busy: boolean;
 	text: string;
@@ -103,6 +107,8 @@ export function DraftShell({
 	 *  the graph view (the overlay fills its column, never the sidebar).
 	 *  Passed as a node so the pick state stays in NewSession. */
 	overlay?: ReactNode;
+	/** The course chooser pill (owned by NewSession). */
+	course?: ReactNode;
 }) {
 	// Tab navigates INTO the composer (owner, keyboard round 2026-10-06):
 	// the only text field on this surface — the cycle's whole chain.
@@ -146,6 +152,7 @@ export function DraftShell({
 						<div className="bg-background pb-4">
 							<div className={DOCK}>
 								<ComposerActions
+									course={course}
 									picker={(picks.length > 0 || mode === "practice") && (
 										<NodePickerControl count={picks.length} onOpen={onOpenPicker} onClear={onClearPicks} />
 									)}
@@ -198,6 +205,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 	// snapshot the standalone chain-table picker reads. Lazy — the graph
 	// is fetched on FIRST open only, then reused.
 	const [picks, setPicks] = useState<DraftPick[]>([]);
+	const courseChoice = useCourseChoice();
 	const picksRef = useRef<DraftPick[]>([]);
 	const applyPicks = (next: DraftPick[]) => {
 		picksRef.current = next;
@@ -255,7 +263,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 		setBusy(true);
 		setStartError(false);
 		void startDraftSession(draft, fetch, mode === "practice" ? "practice" : undefined, mode === "practice" ? picksRef.current : undefined,
-			starterRef.current, JSON.stringify(catalog?.slots.strong))
+			starterRef.current, JSON.stringify(catalog?.slots.strong), courseChoice.workspace || undefined)
 			.then((target) => {
 				if (target) router.push(target);
 				else { startingRef.current = false; setBusy(false); }
@@ -265,7 +273,7 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 				setBusy(false);
 				setStartError(true);
 			});
-	}, [text, router, configured, zeroKeys, catalog, mode]);
+	}, [text, router, configured, zeroKeys, catalog, mode, courseChoice.workspace]);
 
 	return (
 		<>
@@ -279,6 +287,9 @@ export function NewSession({ initialConfigured, mode = "teach" }: { initialConfi
 				picks={picks}
 				onOpenPicker={openPicker}
 				onClearPicks={() => applyPicks([])}
+				course={courseChoice.courses && (
+					<CoursePicker courses={courseChoice.courses} workspace={courseChoice.workspace} onChange={courseChoice.choose} />
+				)}
 				overlay={
 					// THE PICKER (owner round 10b): hosted INSIDE the content
 					// column — absolute inset-0 resolves to the column's relative

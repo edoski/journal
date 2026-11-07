@@ -10,6 +10,7 @@ import type { LhMessage } from "../native-messages.ts";
 import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { EmissionStats } from "./graph.ts";
+import type { CourseLink } from "./course.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -35,6 +36,9 @@ export interface ChatRecord {
 	messages: LhMessage[];
 	/** The session's kind — absent = teach (pre-practice records). */
 	kind?: ChatKind;
+	/** The registered course this session studies, set once at creation.
+	 *  Absent = no course: the session keeps no assessment memory at all. */
+	course?: CourseLink;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model

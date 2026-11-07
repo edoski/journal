@@ -50,4 +50,10 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// discipline (their results are pre-formatted strings too).
 	list_sessions: ToolCallCard,
 	list_propositions: ToolCallCard,
+	// The course-record tools: the same quiet collapsed card, so a saved
+	// attempt leaves a trace the learner can open but never reads by default.
+	course_resume: ToolCallCard,
+	course_show: ToolCallCard,
+	course_search: ToolCallCard,
+	course_save: ToolCallCard,
 };

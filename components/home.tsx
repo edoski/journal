@@ -13,6 +13,7 @@ import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
+import { CoursePicker, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
 
 /**
@@ -62,6 +63,7 @@ export function Home({
 	 *  the composer opens the picker; the picks seed the opening prompt).
 	 *  Not enforcing any input format — the picks are a convenience. */
 	const [mode, setMode] = useState<"teach" | "practice">("teach");
+	const courseChoice = useCourseChoice();
 	const [practiceProps, setPracticeProps] = useState<{ id: string; name: string; statement: string }[]>([]);
 	const [chainSelectOpen, setChainSelectOpen] = useState(false);
 	// The chain table is CONTROLLED off this id set (the lifted pick).
@@ -105,6 +107,7 @@ export function Home({
 				title: t,
 				...(mode === "practice" ? { kind: "practice" } : {}),
 				...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
+				...(courseChoice.workspace ? { course: { workspace: courseChoice.workspace } } : {}),
 			}, fetch, JSON.stringify(catalog?.slots.strong));
 			router.push(target);
 		} catch {
@@ -177,6 +180,9 @@ export function Home({
 					    shows the pick HINT so the affordance is discoverable;
 					    teaching mode with nothing picked renders nothing. */}
 					<ComposerActions
+						course={courseChoice.courses && (
+							<CoursePicker courses={courseChoice.courses} workspace={courseChoice.workspace} onChange={courseChoice.choose} />
+						)}
 						picker={(practiceProps.length > 0 || mode === "practice") && (
 							<NodePickerControl
 								count={practiceProps.length}

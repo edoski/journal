@@ -5,7 +5,8 @@ import { providerEventObserver } from "./provider-events.ts";
 import type { Usage } from "@earendil-works/pi-ai";
 import { PATHS } from "../../config.ts";
 import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
-import { effectivePromptSegments } from "./prompt-segments.ts";
+import { courseRecordPrompt, effectivePromptSegments } from "./prompt-segments.ts";
+import { courseTools, type CourseToolContext } from "./tools/course.ts";
 import {
 	askUserQuestionTool,
 	createProberTools,
@@ -128,6 +129,10 @@ export interface AgentBuildOptions {
 	 *  <chatId>.jsonl via providerEventObserver — the GLM-truncation /
 	 *  DeepSeek-id incident layer. Absent or env-off → no observer. */
 	chatId?: string;
+	/** The session's course link: present = the course-record tools join
+	 *  the registry and the course doctrine joins the prompt, for every
+	 *  agent kind. Absent = no course (nothing changes). */
+	course?: CourseToolContext;
 }
 
 /**
@@ -181,9 +186,10 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// ("practice" is not a ModelRole) honest about that.
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper(kind);
-	const systemPrompt = opts.promptSwitches
+	const composed = opts.promptSwitches
 		? composeInstructions(kind, opts.promptSwitches)
 		: composedInstructions[kind]!;
+	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt()}` : composed;
 	// Debug recorder (owner, 2026-10-04): raw provider events when
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is
 	// the normal no-observer path (tests, env-off).
@@ -202,6 +208,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			// transport. Explicit test registries remain caller-owned.
 			tools: [
 				...tools,
+				...(opts.course ? Object.values(courseTools(opts.course)) : []),
 				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
 					? [withArgumentHeal(sendToUserTool)]
 					: []),

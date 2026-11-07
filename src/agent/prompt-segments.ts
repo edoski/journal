@@ -124,6 +124,13 @@ export function effectivePromptSegments(
 	});
 }
 
+/** The course-record doctrine, appended to any agent's prompt when its
+ *  session is linked to a course (and only then: the course tools exist
+ *  only there). Not an override segment. */
+export function courseRecordPrompt(): string {
+	return fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
+}
+
 /** Every known segment path across both agents (route validation). */
 export function allSegmentPaths(): string[] {
 	const paths = new Set<string>();

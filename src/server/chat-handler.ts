@@ -427,7 +427,10 @@ export async function handleChatInput(
 		requestCycle,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
-		toolToggles: effective.agent.tools,
+		// A course-linked probe is free recall (the engine's evidence rules,
+		// owner-approved 2026-10-28): a picked option is recognition, not an
+		// unaided answer. Teaching and unlinked chats keep the settings.
+		toolToggles: record.course && !teaching ? { ...effective.agent.tools, explain: true } : effective.agent.tools,
 		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
 		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
 		chatId,
@@ -435,6 +438,9 @@ export async function handleChatInput(
 		// point as the tool delta — the agent layer composes the system
 		// prompt fresh per turn, swapping in any enabled override segments.
 		promptSwitches: effective.agent.prompts,
+		// A course-linked session reads and writes the learner's course
+		// record through the engine, whatever the agent kind.
+		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),
 	};
 	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
 	// session builds the practitioner from turn 1 — no prober→teacher
@@ -464,6 +470,7 @@ export async function handleChatInput(
 							searchAvailable,
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+						courseLinked: record.course !== undefined,
 					},
 					agentOpts,
 				)

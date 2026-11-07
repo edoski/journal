@@ -33,6 +33,8 @@ function headlineArg(tool: string, input: unknown): string {
 		return p;
 	}
 	if (typeof inp.pattern === "string") return inp.pattern;
+	if (tool === "course_search" && typeof inp.query === "string") return inp.query;
+	if (tool === "course_show" && Array.isArray(inp.handles)) return inp.handles.join(", ");
 	// list_propositions: the session id is the call's subject — the
 	// collapsed line reads "list_propositions chat_…". Shown as given
 	// (the id is exactly what list_sessions reported to the model).

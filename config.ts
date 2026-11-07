@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,6 +30,20 @@ export const PATHS = {
 	/** Debug artifacts (env-gated): data/debug/provider-events/<chatId>.jsonl
 	 * raw provider stream recordings (src/agent/provider-events.ts). */
 	debug: path.join(DATA_ROOT, "debug"),
+} as const;
+
+/**
+ * The learner's `learning` engine (the journal repo's package), which owns
+ * every course record a session can link to. LH_LEARNING_ENGINE names the
+ * repository; LH_LEARNING_PYTHON the interpreter that has its dependencies.
+ * Missing either is not an error: the course chooser simply stays hidden.
+ */
+const LEARNING_ROOT = process.env.LH_LEARNING_ENGINE
+	? path.resolve(process.env.LH_LEARNING_ENGINE)
+	: path.join(os.homedir(), "dev", "python", "journal");
+export const LEARNING_ENGINE = {
+	root: LEARNING_ROOT,
+	python: process.env.LH_LEARNING_PYTHON || path.join(LEARNING_ROOT, ".venv", "bin", "python"),
 } as const;
 
 // ─── Models ────────────────────────────────────────────────────────────────
