@@ -1,8 +1,20 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Repository root (this file is at <root>/config.ts). */
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+// node's test runner sets NODE_TEST_CONTEXT in every test-file child.
+const TEST_SCRATCH =
+	process.env.NODE_ENV === "test" || process.env.NODE_TEST_CONTEXT !== undefined ? createTestScratch() : undefined;
+
+function createTestScratch(): string {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lh-test-"));
+	process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+	return dir;
+}
 
 /**
  * THE data-location seam (the Electron contract, 2026-09-17): LH_DATA_DIR
@@ -11,12 +23,13 @@ export const ROOT = path.dirname(fileURLToPath(import.meta.url));
  * userData so nothing is written inside the read-only .app bundle
  * (macOS translocation guarantees the bundle is read-only anyway).
  * Unset (plain web dev / repo work) it resolves to the repo's data/,
- * byte-for-byte as before. Read-only assets (prompts) stay ROOT-anchored
- * on purpose: they ship inside the app bundle by design.
+ * byte-for-byte as before, and in a test process to TEST_SCRATCH's.
+ * Read-only assets (prompts) stay ROOT-anchored on purpose: they ship
+ * inside the app bundle by design.
  */
 const DATA_ROOT = process.env.LH_DATA_DIR
 	? path.resolve(process.env.LH_DATA_DIR)
-	: path.join(ROOT, "data");
+	: path.join(TEST_SCRATCH ?? ROOT, "data");
 
 export const PATHS = {
 	root: ROOT,
@@ -142,4 +155,4 @@ export const PROMPTS_OVERRIDE_DIR = path.join(DATA_ROOT, "prompts");
  */
 export const AUTH_FILE = process.env.LH_AUTH_FILE
 	? path.resolve(process.env.LH_AUTH_FILE)
-	: path.join(ROOT, "auth.json");
+	: path.join(TEST_SCRATCH ?? ROOT, "auth.json");

@@ -174,7 +174,7 @@ describe("researcher pdf tools — the temp-dir wall", () => {
 
 describe("web_fetch — PDF pointer + source header", () => {
 	it("a PDF URL points at web_fetch_pdf instead of dead-ending", async () => {
-		const web = createWebTools(() => null);
+		const web = createWebTools();
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			pdfResponse()) as typeof fetch;
@@ -188,7 +188,7 @@ describe("web_fetch — PDF pointer + source header", () => {
 	});
 
 	it("output carries the source line with HTTP status", async () => {
-		const web = createWebTools(() => null);
+		const web = createWebTools();
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async () =>
 			new Response("A plain text page with enough content to matter.", {

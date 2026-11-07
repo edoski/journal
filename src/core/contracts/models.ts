@@ -70,8 +70,7 @@ export interface ModelCatalogResponse {
 	/** Providers with a PRESENT key, and which env var gates each — the
 	 *  model slots wave's federation surface (2026-09-20): the picker lists
 	 *  models from these providers' pi-ai catalogs only. Keyless providers
-	 *  are simply absent (the Keys page is the discovery surface, same
-	 *  discipline as the search engines). */
+	 *  are simply absent (the Keys page is the discovery surface). */
 	providers: CatalogProvider[];
 }
 

@@ -93,26 +93,33 @@ export interface ClaudeArgs {
 	mcpConfigFile: string;
 }
 
-/** `--safe-mode` would drop the --mcp-config server, and `--bare` would skip
- * the user's sign-in, so neither is ever passed. The prompt and tool list go
- * by file: together they outgrow Windows' 32 KiB command line. */
-export function claudeArgs({ model, effort, systemPromptFile, mcpConfigFile }: ClaudeArgs): string[] {
+/** Shared by every `claude -p` spawn. `--safe-mode` would drop an
+ * --mcp-config server, and `--bare` would skip the user's sign-in, so
+ * neither is ever passed. The prompt goes by file: with the tool list it
+ * outgrows Windows' 32 KiB command line. */
+export function claudeBaseArgs({ model, systemPromptFile }: { model: string; systemPromptFile: string }): string[] {
 	return [
 		"-p",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 		"--verbose",
-		"--include-partial-messages",
-		"--tools", "",
 		"--strict-mcp-config",
-		"--mcp-config", mcpConfigFile,
-		"--allowedTools", `mcp__${CLAUDE_MCP_SERVER}`,
 		"--setting-sources", "",
 		"--disable-slash-commands",
 		"--no-session-persistence",
 		"--model", model,
-		...(effort ? ["--effort", effort] : []),
 		"--system-prompt-file", systemPromptFile,
+	];
+}
+
+export function claudeArgs({ model, effort, systemPromptFile, mcpConfigFile }: ClaudeArgs): string[] {
+	return [
+		...claudeBaseArgs({ model, systemPromptFile }),
+		"--include-partial-messages",
+		"--tools", "",
+		"--mcp-config", mcpConfigFile,
+		"--allowedTools", `mcp__${CLAUDE_MCP_SERVER}`,
+		...(effort ? ["--effort", effort] : []),
 	];
 }
 

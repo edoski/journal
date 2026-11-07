@@ -51,7 +51,6 @@ function installFetch() {
 		if (path === "/api/settings/models") { writes.push(JSON.parse(String(init?.body))); return Response.json({ settings: { models: writes.at(-1) } }); }
 		if (path === "/api/keys") return Response.json({ providers: [provider], keys: [] });
 		if (path === "/api/settings/prompts") return Response.json({ prober: [], teacher: [] });
-		if (path === "/api/search") return Response.json({ available: false, engine: null, reason: "fixture" });
 		throw new Error(`Unexpected request ${path}`);
 	};
 }
@@ -294,5 +293,5 @@ test("OpenCode's saved shared credential names both Pi providers without changin
 	assert.equal(providerKeyLabel("OPENCODE_API_KEY", providers), "OpenCode (Zen / Go)");
 	assert.equal(providerKeyLabel("OPENCODE_API_KEY", [...providers].reverse()), "OpenCode (Zen / Go)");
 	assert.equal(providerKeyLabel("FIXTURE_KEY", [provider]), "Fixture");
-	assert.equal(classifyKeys([{ id: "OPENCODE_API_KEY", info: null, present: true, masked: "…fake", source: "file", shadowedByEnv: false }], providers).addable.length, 0);
+	assert.equal(classifyKeys([{ id: "OPENCODE_API_KEY", present: true, masked: "…fake", source: "file", shadowedByEnv: false }], providers).addable.length, 0);
 });
