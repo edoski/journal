@@ -23,7 +23,7 @@ import { piModels } from "../agent/models.ts";
 import { chatGPTConnected, chatGPTModel, chatGPTModels, refreshChatGPTModels } from "../agent/chatgpt-bridge.ts";
 import { NATIVE_SUBSCRIPTIONS } from "../core/contracts/subscriptions.ts";
 import { nativeSubscriptionId, nativeSubscriptionConnected, nativeSubscriptionModel, nativeSubscriptionModels, refreshSubscriptionModels } from "../agent/subscription-bridge.ts";
-import { isClaudeProvider } from "../core/contracts/claude.ts";
+import { CLAUDE_SUBSCRIPTION, isClaudeProvider } from "../core/contracts/claude.ts";
 import { claudeAccountConnections, claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/claude-stream.ts";
 
@@ -34,9 +34,11 @@ export async function refreshConnectionCatalog(provider?: string): Promise<void>
 		!provider || isClaudeProvider(provider) ? refreshClaudeConnections() : Promise.resolve(),
 	]);
 }
-/** Claude's catalog is static, but each account is offered only while it is signed in to its plan. */
-function claudeModels(): Model<Api>[] { return claudeSubscriptionModels(); }
-function claudeProviderIds(): string[] { return claudeAccountConnections().map((entry) => entry.account.providerId); }
+/** Every Claude account is a provider; before the first sign-in check, only the default one is known. */
+function claudeProviderIds(): string[] {
+	const ids = claudeAccountConnections().map((entry) => entry.account.providerId);
+	return ids.length ? ids : [CLAUDE_SUBSCRIPTION.providerId];
+}
 function connectionModel(provider: string, id: string): Model<Api> | undefined {
 	if (isClaudeProvider(provider)) return claudeConnected(provider) ? claudeSubscriptionModel(provider, id) : undefined;
 	return provider === "chatgpt" ? chatGPTModel(id) : nativeSubscriptionId(provider) ? nativeSubscriptionModel(provider, id) : piModels().getModel(provider, id);
@@ -197,7 +199,7 @@ export function catalogContextLimits(): Map<string, number> {
 			index.set(`${provider.id}:${model.id}`, model.contextWindow);
 		}
 	}
-	for (const model of [...chatGPTModels(), ...claudeModels(), ...nativeSubscriptionModels()]) index.set(`${model.provider}:${model.id}`, model.contextWindow);
+	for (const model of [...chatGPTModels(), ...claudeSubscriptionModels(), ...nativeSubscriptionModels()]) index.set(`${model.provider}:${model.id}`, model.contextWindow);
 	return index;
 }
 
@@ -213,7 +215,7 @@ export function modelCatalog(): ModelCatalogResponse {
 		.flatMap((p) => piModels().getModels(p.id))
 		.map(toModelDto)
 		.sort((a, b) => (a.provider === b.provider ? a.id.localeCompare(b.id) : a.provider.localeCompare(b.provider)))
-		.concat([...chatGPTModels(), ...claudeModels(), ...nativeSubscriptionModels()].map(toModelDto));
+		.concat([...chatGPTModels(), ...claudeSubscriptionModels(), ...nativeSubscriptionModels()].map(toModelDto));
 	return {
 		models,
 		defaults: catalogDefaults(),
