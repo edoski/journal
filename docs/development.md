@@ -185,12 +185,14 @@ All deterministic, no LLM, no network (engines are injected — pi-ai's faux pro
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage via React server-side rendering.
 5. **Golden fixtures** (`tests/fixtures/golden-data/`) — a REAL data dir (real records produced by the app, never hand-edited), copied to a temp dir and read through the production paths via the `LH_DATA_DIR` seam. Pins that real data parses, flattens to a legal LLM wire, derives the graph end-to-end, covers every custom-marker kind, and that reads never write. **The fixture law:** an intentional on-disk format change updates the fixtures in the same commit — see the fixture README.
 
+Tests never touch the repo's `data/` or `auth.json`. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory, and an unset `LH_AUTH_FILE` resolves to `auth.json` beside it. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
+
 ## Lineage
 
 The teaching methodology comes from an Obsidian-based POC (its `knowledge graph design.md` was the original epistemic-model source, since amended — see the amendments table in `docs/vision.md`). The harness was originally built on the pi agent SDK, pivoted to standalone Next.js + the Vercel AI SDK, and later swapped its LLM engine back to pi-ai while keeping the AI SDK's `UIMessage` as the client protocol ([`docs/pi-engine-swap.md`](pi-engine-swap.md)).
 
 ## Data
 
-Nothing under `data/` is ever tracked by git. Chats, graph ledgers, jobs, positions, and the settings records are plain files (JSON/JSONL) — inspect them freely; they are the canonical records. The desktop app relocates the whole directory via `LH_DATA_DIR`.
+Nothing under `data/` is ever tracked by git. Chats, graph ledgers, jobs, positions, and the settings records are plain files (JSON/JSONL) — inspect them freely; they are the canonical records. The desktop app relocates the whole directory via `LH_DATA_DIR`. Tests use a temporary directory instead (see [Testing](#testing)).
 
 **Schema stamps (2026-10-10):** chat records carry `version` (stamped at the store's write choke point; absence reads as v1 — lazy migration, no mass rewrite), and the graph family (ledgers, sources, render-settings) shares one sidecar `graph/format.json`, created on the family's first write. `positions.json` is deliberately unstamped (rebuildable). A record stamped NEWER than the running build is refused on read — honest refusal for the downgrade scenario: a read-modify-write store never rewrites what it doesn't understand.

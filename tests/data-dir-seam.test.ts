@@ -1,13 +1,3 @@
-/**
- * The LH_DATA_DIR seam (Electron contract, 2026-09-17): when set, every
- * mutable record relocates under it; when unset, byte-for-byte the old
- * repo-data/ behavior. The desktop shell's whole data story rests on this,
- * so pin both directions.
- *
- * The seam is evaluated at MODULE LOAD, so the "set" case must set the env
- * BEFORE the first import of config.ts in this process (dynamic import,
- * below) and the "unset" case needs a fresh child process.
- */
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -17,6 +7,25 @@ import { describe, it } from "node:test";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "..");
 const TSX_LOADER = path.join(REPO_ROOT, "node_modules", "tsx", "dist", "loader.mjs");
+
+type Resolved = { data: string; chats: string; auth: string; dataDirExisted: boolean };
+
+function resolveInChild(env: { NODE_ENV?: "test"; NODE_TEST_CONTEXT?: string }): Resolved {
+	const { LH_DATA_DIR: _data, LH_AUTH_FILE: _auth, NODE_TEST_CONTEXT: _runner, ...rest } = process.env;
+	const out = execFileSync(
+		process.execPath,
+		[
+			"--import",
+			TSX_LOADER,
+			"--eval",
+			`const m = await import(${JSON.stringify(path.join(REPO_ROOT, "config.ts"))});
+			const fs = await import("node:fs");
+			console.log(JSON.stringify({ data: m.PATHS.data, chats: m.PATHS.chats, auth: m.AUTH_FILE, dataDirExisted: fs.existsSync(m.PATHS.data) }));`,
+		],
+		{ cwd: REPO_ROOT, encoding: "utf-8", env: { ...rest, NODE_ENV: "development", ...env } },
+	);
+	return JSON.parse(out) as Resolved;
+}
 
 describe("LH_DATA_DIR seam", () => {
 	it("relocates data/chats/graph under LH_DATA_DIR, keeps prompts ROOT-anchored", async () => {
@@ -37,14 +46,28 @@ describe("LH_DATA_DIR seam", () => {
 		}
 	});
 
-	it("unset = the repo data/ exactly as before (fresh child process, no env)", () => {
-		const out = execFileSync(
-			process.execPath,
-			["--import", TSX_LOADER, "--eval", `const m = await import(${JSON.stringify(path.join(REPO_ROOT, "config.ts"))}); console.log(JSON.stringify({ data: m.PATHS.data, chats: m.PATHS.chats }));`],
-			{ cwd: REPO_ROOT, encoding: "utf-8" },
-		);
-		const parsed = JSON.parse(out) as { data: string; chats: string | null };
+	it("unset in a plain dev process = the repo data/ and auth.json exactly as before", () => {
+		const parsed = resolveInChild({});
 		assert.equal(parsed.data, path.join(REPO_ROOT, "data"));
 		assert.equal(parsed.chats, path.join(REPO_ROOT, "data", "chats"));
+		assert.equal(parsed.auth, path.join(REPO_ROOT, "auth.json"));
 	});
+
+	for (const [runner, env] of [
+		["npm test (NODE_ENV=test)", { NODE_ENV: "test" }],
+		["a test file run directly (node's runner sets NODE_TEST_CONTEXT)", { NODE_TEST_CONTEXT: "child-v8" }],
+	] as const) {
+		it(`unset under ${runner} = a fresh scratch dir outside the repo, removed on exit`, () => {
+			const first = resolveInChild(env);
+			const second = resolveInChild(env);
+			for (const resolved of [first, second]) {
+				assert.ok(!resolved.data.startsWith(REPO_ROOT + path.sep), `${resolved.data} is outside the repo`);
+				assert.ok(!resolved.auth.startsWith(REPO_ROOT + path.sep), `${resolved.auth} is outside the repo`);
+				assert.equal(path.dirname(resolved.auth), path.dirname(resolved.data), "auth.json sits beside data/, like desktop userData");
+				assert.equal(resolved.dataDirExisted, false, "the data dir starts empty: nothing to inherit");
+				assert.equal(fs.existsSync(path.dirname(resolved.data)), false, "the scratch dir is removed when the process exits");
+			}
+			assert.notEqual(first.data, second.data, "each test process gets its own scratch dir");
+		});
+	}
 });
