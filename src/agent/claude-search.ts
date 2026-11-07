@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { claudeBaseArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary } from "./claude-cli.ts";
+import { claudeLaunch } from "./claude-accounts.ts";
 import { CLAUDE_API_KEY_REFUSAL, CLAUDE_MISSING, claudeErrorMessage, type ClaudeStreamDeps } from "./claude-stream.ts";
 import type { NativeWebSearch } from "./native-web-search.ts";
 
@@ -36,9 +37,10 @@ function toolResultText(line: Json): string | undefined {
 }
 
 /** Killing the relay at its first WebSearch result keeps it to one model turn. */
-export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = process.env }: ClaudeStreamDeps = {}): NativeWebSearch {
+export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = process.env, account }: ClaudeStreamDeps = {}): NativeWebSearch {
 	return (query, signal) => new Promise<string>((resolve, reject) => {
 		if (signal?.aborted) { reject(new Error(CLAUDE_SEARCH_STOPPED)); return; }
+		if (account === "missing") { reject(new Error("This Claude account is no longer set up in T3 Code. Choose another Claude account.")); return; }
 		const bin = binary();
 		if (!bin) { reject(new Error(CLAUDE_MISSING)); return; }
 
@@ -46,10 +48,11 @@ export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = pr
 		const dispose = () => { if (dir) rmSync(dir, { recursive: true, force: true }); };
 		let child: ReturnType<typeof spawn>;
 		try {
+			const launch = account ? claudeLaunch(account, claudeWorkDir()) : undefined;
 			dir = mkdtempSync(join(claudeWorkDir(), "search-"));
 			const systemPromptFile = join(dir, "system-prompt.txt");
 			writeFileSync(systemPromptFile, RELAY_PROMPT, { mode: 0o600 });
-			child = spawn(bin, claudeSearchArgs(systemPromptFile), { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: false }), stdio: ["pipe", "pipe", "pipe"] });
+			child = spawn(bin, claudeSearchArgs(systemPromptFile), { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: false, launch }), stdio: ["pipe", "pipe", "pipe"] });
 		} catch (error) {
 			dispose();
 			reject(new Error(claudeErrorMessage({ text: error instanceof Error ? error.message : String(error) })));
