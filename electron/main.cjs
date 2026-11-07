@@ -282,8 +282,7 @@ function killServer() {
 /** Security posture (all defaults asserted explicitly; the guards are the
  *  checklist's own recommendations for localhost-app shells):
  *  - deny-by-default permission handler allowing only our loopback origin
- *    (groundwork for the mic/STT milestone — Electron auto-approves by
- *    default, we do not);
+ *    (Electron auto-approves by default, we do not);
  *  - will-navigate pinned to the app origin; window.open always denied —
  *    external links go to the real browser via shell.openExternal. */
 function createWindow(url) {
@@ -341,15 +340,15 @@ function createWindow(url) {
 	trustedAppWindows.add(win);
 	win.once("closed", () => trustedAppWindows.delete(win));
 	const allowedOrigin = () => new URL(url).origin;
-	// Deny-by-default; the ONLY grants are media (mic/STT groundwork) and
-	// clipboard-sanitized-write — the copy affordances in the transcript
-	// (md-blocks copy corners) call navigator.clipboard.writeText(), which
+	// Deny-by-default; the ONLY grants are clipboard-sanitized-write and
+	// local-fonts. The copy affordances in the transcript (md-blocks copy
+	// corners) call navigator.clipboard.writeText(), which
 	// Chromium only honors with that permission (chrome-melt tweaks wave,
 	// 2026-09-19; before this grant every copy silently rejected). Still
 	// loopback-origin only — Electron's default is auto-approve-everything,
 	// and we do not ship that.
 	// "local-fonts": the appearance section's reading-font picker (2026-09-26).
-	const allowedPermissions = new Set(["media", "clipboard-sanitized-write", "local-fonts"]);
+	const allowedPermissions = new Set(["clipboard-sanitized-write", "local-fonts"]);
 	const fromOwnOrigin = (origin, permission) =>
 		origin === allowedOrigin() && allowedPermissions.has(permission);
 	session.defaultSession.setPermissionRequestHandler((_wc, permission, callback, details) => {
