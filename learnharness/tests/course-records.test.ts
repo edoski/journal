@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { LEARNING_ENGINE } from "../config.ts";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
@@ -200,8 +201,7 @@ describe("course composition into the agents", () => {
 	}
 });
 
-const ENGINE_ROOT = path.join(os.homedir(), "dev", "python", "journal");
-const ENGINE_PYTHON = path.join(ENGINE_ROOT, ".venv", "bin", "python");
+const { root: ENGINE_ROOT, python: ENGINE_PYTHON } = LEARNING_ENGINE;
 const realEngine = fs.existsSync(ENGINE_PYTHON) && fs.existsSync(path.join(ENGINE_ROOT, "learning", "cli.py"));
 
 describe("course records adapter (the real engine, throwaway course)", { skip: !realEngine && "learning engine not installed" }, () => {

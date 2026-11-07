@@ -95,10 +95,13 @@ extraResources:
   # relative paths start with standalone/, dodging the root-node_modules
   # rule, and the explicit wildcard (minimatch dot:true) reaches
   # standalone/.next and standalone/node_modules.
+  # learning/ holds the engine's tutor references that build-server.mjs
+  # copies beside standalone/ (the course prompt reads them as ../learning).
   - from: .next
     to: server
     filter:
       - "standalone/**/*"
+      - "learning/**/*"
 mac:
   # The backend's --require runs before Next loads. Keep this resource
   # outside app.asar so early Node-mode loading needs no ASAR support.

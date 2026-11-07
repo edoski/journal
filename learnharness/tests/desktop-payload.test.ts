@@ -9,19 +9,24 @@ import { describe, it } from "node:test";
 const source = fs.readFileSync(new URL("../scripts/build-server.mjs", import.meta.url), "utf8");
 const STANDALONE = path.join(".next", "standalone");
 const PROMPT = path.join("src", "agent", "system-prompt.md");
+const REFERENCES = path.join("learning", "skills", "tutor", "references");
 
+/** A throwaway repository: the app in `app/`, the engine's tutor references beside it. */
 function withPayload(test: (fixture: {
 	root: string;
+	repository: string;
 	write: (relative: string, content?: string) => void;
 	run: () => ReturnType<typeof spawnSync>;
 }) => void) {
-	const root = fs.mkdtempSync(path.join(os.tmpdir(), "lh-payload-test-"));
+	const repository = fs.mkdtempSync(path.join(os.tmpdir(), "lh-payload-test-"));
+	const root = path.join(repository, "app");
 	const write = (relative: string, content = "fixture") => {
 		const target = path.join(root, relative);
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.writeFileSync(target, content);
 	};
 	try {
+		write(path.join("..", REFERENCES, "records.md"), "## Observations");
 		write(path.join("scripts", "build-server.mjs"), source);
 		write(path.join(STANDALONE, "server.js"));
 		write(path.join(".next", "static", "runtime.js"));
@@ -29,11 +34,11 @@ function withPayload(test: (fixture: {
 		write(path.join(STANDALONE, PROMPT));
 		write(path.join(STANDALONE, "src", "agent", "prompts", "teacher", "20-teaching.md"));
 		write(path.join(STANDALONE, "src", "agent", "prompts", "course", "10-record.md"));
-		test({ root, write, run: () => spawnSync(process.execPath, [path.join(root, "scripts", "build-server.mjs")], {
+		test({ root, repository, write, run: () => spawnSync(process.execPath, [path.join(root, "scripts", "build-server.mjs")], {
 			cwd: root, encoding: "utf8", timeout: 10_000,
 		}) });
 	} finally {
-		fs.rmSync(root, { recursive: true, force: true });
+		fs.rmSync(repository, { recursive: true, force: true });
 	}
 }
 
@@ -84,6 +89,25 @@ describe("desktop standalone payload", () => {
 				assert.match(String(result.stderr), /REFUSING/);
 			});
 		}
+	});
+
+	it("ships the engine's tutor references beside the standalone server, replaced whole", () => {
+		withPayload(({ root, write, run }) => {
+			write(path.join(".next", REFERENCES, "deleted-by-the-engine.md"));
+			const result = run();
+			assert.equal(result.status, 0, String(result.stderr));
+			assert.equal(fs.readFileSync(path.join(root, ".next", REFERENCES, "records.md"), "utf8"), "## Observations");
+			assert.equal(fs.existsSync(path.join(root, ".next", REFERENCES, "deleted-by-the-engine.md")), false);
+		});
+	});
+
+	it("refuses a payload without the engine's tutor references", () => {
+		withPayload(({ repository, run }) => {
+			fs.rmSync(path.join(repository, "learning"), { recursive: true });
+			const result = run();
+			assert.equal(result.status, 1);
+			assert.match(String(result.stderr), /tutor references are missing/);
+		});
 	});
 
 	it("still refuses a missing runtime prompt asset", () => {

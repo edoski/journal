@@ -42,18 +42,25 @@ export const PATHS = {
 	/** Debug artifacts (env-gated): data/debug/provider-events/<chatId>.jsonl
 	 * raw provider stream recordings (src/agent/provider-events.ts). */
 	debug: path.join(DATA_ROOT, "debug"),
+	/** The tutor skill's references in the learning engine beside this app
+	 *  (<repository>/learning/skills/tutor/references), the teaching doctrine
+	 *  both hosts compose. Read-only like the prompts: scripts/build-server.mjs
+	 *  copies them beside the standalone server, so this path holds there too. */
+	tutorReferences: path.join(path.dirname(ROOT), "learning", "skills", "tutor", "references"),
 } as const;
 
 /**
- * The learner's `learning` engine (the journal repo's package), which owns
- * every course record a session can link to. LH_LEARNING_ENGINE names the
- * repository; LH_LEARNING_PYTHON the interpreter that has its dependencies.
- * When the engine cannot run, no session can start: the composer names the
- * reason and these two settings.
+ * The learner's `learning` engine, which owns every course record a session
+ * can link to. It is the sibling package in this app's repository, so the
+ * default root is the app folder's parent and the interpreter its
+ * `.venv/bin/python`. LH_LEARNING_ENGINE names another repository;
+ * LH_LEARNING_PYTHON another interpreter that has its dependencies. When the
+ * engine cannot run, no session can start: the composer names the reason and
+ * these two settings.
  */
 const LEARNING_ROOT = process.env.LH_LEARNING_ENGINE
 	? path.resolve(process.env.LH_LEARNING_ENGINE)
-	: path.join(os.homedir(), "dev", "python", "journal");
+	: path.dirname(ROOT);
 export const LEARNING_ENGINE = {
 	root: LEARNING_ROOT,
 	python: process.env.LH_LEARNING_PYTHON || path.join(LEARNING_ROOT, ".venv", "bin", "python"),

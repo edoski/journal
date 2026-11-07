@@ -9,6 +9,10 @@
  * (see next.config.ts outputFileTracingExcludes). It also removes two
  * exact build-only paths the tracer sweeps in: old installers and the
  * development Electron runtime. Broad trace exclusions break externals.
+ * The learning engine's tutor references, which the course prompt reads
+ * from ../learning/skills/tutor/references relative to the app folder, sit
+ * outside the trace root; they are copied to the same place relative to the
+ * standalone server (.next/learning/...), which electron-builder ships.
  */
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -76,6 +80,18 @@ for (const extra of ["dist", path.join("node_modules", "electron")]) {
 		console.log(`[build-server] removed build-only payload: ${extra}`);
 	}
 }
+
+// 2d) The engine's tutor references (config.ts PATHS.tutorReferences),
+//     replaced whole so a reference the engine deleted does not linger.
+const TUTOR_REFERENCES = path.join("learning", "skills", "tutor", "references");
+const referencesSource = path.join(path.dirname(ROOT), TUTOR_REFERENCES);
+const referencesTarget = path.join(path.dirname(STANDALONE), TUTOR_REFERENCES);
+if (!exists(referencesSource)) {
+	console.error(`[build-server] the learning engine's tutor references are missing: ${referencesSource}`);
+	process.exit(1);
+}
+fs.rmSync(referencesTarget, { recursive: true, force: true });
+copyTree(referencesSource, referencesTarget);
 
 // 3) Sanity: the runtime-read prompt assets must be present (the teacher
 //    agent reads them from disk at request time).
