@@ -93,6 +93,23 @@ test("thinking streams as thinking and an end_turn finishes with stop", () => {
 	assert.deepEqual(done.message.content[0], { type: "thinking", thinking: "Consider the learner.", thinkingSignature: "sig" });
 });
 
+test("a thinking block with no text never reaches the transcript", () => {
+	const { events } = run([
+		init, messageStart,
+		se({ type: "content_block_start", index: 0, content_block: { type: "thinking", thinking: "" } }),
+		se({ type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig" } }),
+		se({ type: "content_block_stop", index: 0 }),
+		se({ type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_a", name: "mcp__lh__probe", input: {} } }),
+		se({ type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: "{}" } }),
+		se({ type: "content_block_stop", index: 1 }),
+		se({ type: "message_delta", delta: { stop_reason: "tool_use" } }),
+	]);
+	assert.deepEqual(events.map((e) => e.type), ["start", "toolcall_start", "toolcall_delta", "toolcall_end", "done"]);
+	const done = terminal(events);
+	assert(done.type === "done");
+	assert.deepEqual(done.message.content, [{ type: "toolCall", id: "toolu_a", name: "probe", arguments: {} }]);
+});
+
 test("max_tokens finishes with length", () => {
 	const { events } = run([init, messageStart, se({ type: "message_delta", delta: { stop_reason: "max_tokens" } }), se({ type: "message_stop" })]);
 	const done = terminal(events);

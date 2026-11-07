@@ -124,6 +124,9 @@ export class ClaudeStreamMapper {
 	private started = false;
 	private blocks = new Map<number, number>();
 	private json = new Map<number, string>();
+	/** Thinking blocks with no text yet. Claude Code can stream a thinking block
+	 * that carries only a signature; showing it would render an empty panel. */
+	private unseenThinking = new Set<number>();
 	private stopReason: "stop" | "length" = "stop";
 	private rateLimit: RateLimit | undefined;
 	private errorCode: string | undefined;
@@ -212,7 +215,7 @@ export class ClaudeStreamMapper {
 		switch (event.type) {
 			case "message_start": {
 				const message = record(event.message);
-				this.blocks.clear(); this.json.clear();
+				this.blocks.clear(); this.json.clear(); this.unseenThinking.clear();
 				if (typeof message?.id === "string") this.message.responseId = message.id;
 				if (typeof message?.model === "string") this.message.responseModel = message.model;
 				this.usage(message?.usage);
@@ -228,9 +231,8 @@ export class ClaudeStreamMapper {
 					return [...this.start(), { type: "text_start", contentIndex, partial }];
 				}
 				if (block.type === "thinking") {
-					content.push({ type: "thinking", thinking: "" });
-					this.blocks.set(index, contentIndex);
-					return [...this.start(), { type: "thinking_start", contentIndex, partial }];
+					this.unseenThinking.add(index);
+					return this.start();
 				}
 				if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
 					const name = block.name.startsWith(CLAUDE_TOOL_PREFIX) ? block.name.slice(CLAUDE_TOOL_PREFIX.length) : block.name;
@@ -243,6 +245,14 @@ export class ClaudeStreamMapper {
 			}
 			case "content_block_delta": {
 				const index = num(event.index), delta = record(event.delta);
+				if (index !== undefined && this.unseenThinking.has(index)) {
+					if (delta?.type !== "thinking_delta" || typeof delta.thinking !== "string" || !delta.thinking) return [];
+					this.unseenThinking.delete(index);
+					const contentIndex = content.length;
+					content.push({ type: "thinking", thinking: delta.thinking });
+					this.blocks.set(index, contentIndex);
+					return [{ type: "thinking_start", contentIndex, partial }, { type: "thinking_delta", contentIndex, delta: delta.thinking, partial }];
+				}
 				const contentIndex = index === undefined ? undefined : this.blocks.get(index);
 				const block = contentIndex === undefined ? undefined : content[contentIndex];
 				if (contentIndex === undefined || !block || !delta) return [];
@@ -266,6 +276,7 @@ export class ClaudeStreamMapper {
 			}
 			case "content_block_stop": {
 				const index = num(event.index);
+				if (index !== undefined && this.unseenThinking.delete(index)) return [];
 				const contentIndex = index === undefined ? undefined : this.blocks.get(index);
 				const block = contentIndex === undefined ? undefined : content[contentIndex];
 				if (contentIndex === undefined || !block) return [];
