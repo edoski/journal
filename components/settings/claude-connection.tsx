@@ -62,8 +62,14 @@ async function readConnection(refresh: boolean): Promise<ClaudeConnection> {
 	return body.connection;
 }
 
-export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: string }) {
+/** Mounted only while signed in, so a signed-out row never reads the catalog. */
+function UseForAllRoles({ busy, onUse }: { busy: boolean; onUse: () => void }) {
 	const { catalog } = useModelCatalog();
+	if (!catalog || allClaude(catalog.slots)) return null;
+	return <Button type="button" size="xs" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for all roles</Button>;
+}
+
+export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: string }) {
 	const [connection, setConnection] = useState<ClaudeConnection | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -110,7 +116,7 @@ export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: strin
 	const connected = connection?.state === "connected";
 	return <div className="flex flex-col gap-1.5" data-testid="claude-connection">
 		<ConnectionRow label={CLAUDE_LABEL} labelClassName={labelClassName} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()}>
-			{connected && catalog && !allClaude(catalog.slots) && <Button type="button" size="xs" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-all" disabled={busy} onClick={() => void useForAllRoles()}>Use for all roles</Button>}
+			{connected && <UseForAllRoles busy={busy} onUse={() => void useForAllRoles()} />}
 		</ConnectionRow>
 		<p className="text-xs text-muted-foreground" role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection)}</p>
 		<p className="text-xs text-muted-foreground">{CLAUDE_NOTICE}</p>
