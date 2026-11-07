@@ -439,6 +439,8 @@ For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes these same
 
 `subscription-request-cycle.ts` is the shared admission/automatic-input recovery state machine; the old ChatGPT module is its compatibility export. Background consent is independent per provider, default ON, with foreground-preserving cancellation and queue ownership retained on no-dispatch. Native usage rejected before dispatch is transiently excluded from helper usage collectors, without adding persisted provenance fields. Catalogs and read-time pricing preserve the selected connection: subscription use displays compact provider labels, API dollars remain dollars, and mixed usage joins both without estimating subscription dollars or claiming detected tiers/allowances.
 
+The Claude subscription (`claude-subscription`) holds no app credential. `src/agent/claude-stream.ts` is a pi `StreamFunction` that runs the user's own signed-in `claude` CLI once per model call: it replays the transcript as one user message, declares the app's tools through an inline MCP server that never answers a call, and kills the CLI at the first tool_use so pi's loop still runs every tool. The child gets the user's environment minus API-key variables, a turn stops if Claude Code reports an API key source, and connection status comes from `claude auth status` (`src/agent/claude-connection.ts`), so its "key present" is that sign-in.
+
 ## 9. The foundational invariants — what ALWAYS holds
 
 ### Tier A — machine-enforced (`eslint.config.mjs`; lint fails the build)
