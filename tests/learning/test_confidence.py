@@ -128,6 +128,14 @@ def test_a_guess_never_counts_as_transfer() -> None:
     assert progress.standing(record, "rank")["level"] == "assisted"
 
 
+def test_a_right_guess_on_an_exam_is_helped() -> None:
+    exam = {"kind": "exam", "topics": ["rank"], "text": "Midterm Q2"}
+    record = build({**exam, "result": "correct", "sure": "guess"})
+    assert progress.replays(record)["rank"].verdicts == [(day(0), "helped")]
+    clean = build({**exam, "result": "correct"})
+    assert progress.replays(clean)["rank"].verdicts == [(day(0), "solid")]
+
+
 # --- confident errors -----------------------------------------------------------
 
 
@@ -168,6 +176,22 @@ def test_resume_lists_a_confident_error_as_weak(workspace: Workspace) -> None:
             },
         }
     ]
+
+
+def test_an_active_topic_keeps_its_confident_errors_in_its_standing(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            **TOPICS,
+            "path": {"current": "rank"},
+            "observations": [attempt("incorrect", sure="confident")],
+        },
+    )
+    resumed = retrieval.resume(workspace)
+    assert resumed["topics"]["rank"]["standing"]["confident_errors"] == 1
+    assert resumed["weak"] == [{"topic": "rank", "level": "attempted"}]
 
 
 def test_the_week_counts_its_confident_errors() -> None:

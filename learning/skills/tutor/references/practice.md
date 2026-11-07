@@ -30,7 +30,7 @@ Before recording an error, check the loaded evidence for the same error. If it r
 
 ## Self-reports and confidence
 
-Record what the learner says about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. Confidence in an answer has three states, never a number: the learner may mark an answer as a guess or as sure, in their own words, and an unmarked answer is neutral. Store it on the attempt as `sure` (`guess` or `confident`; omit it when unmarked). A guess counts as `partial` whatever the result. A confident error, sure and wrong, gets an explicit contrast at once and rewrites `gap` and `prompt`; it shows as `confident_errors` until the next `solid` verdict. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
+Record what the learner says about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. Confidence in an answer has three states, never a number: the learner may mark an answer as a guess or as sure, in their own words, and an unmarked answer is neutral. Store it on the attempt as `sure` (`guess` or `confident`; omit it when unmarked) beside the answer's own `result`; a right guess counts as `partial`, never `solid`. A confident error, sure and wrong, gets an explicit contrast at once and rewrites `gap` and `prompt`; it shows as `confident_errors` until the next `solid` verdict. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
 
 ## Transfer
 

@@ -252,7 +252,8 @@ before helping with it.
    procedural prompt, pose a fresh instance and ask for the method and the
    first decisive step.
 2. Wait for the answer. No hints unless asked; a hinted answer is `helped`. On
-   a `lapsed` topic, ask "quanto sei sicuro?" with the question. A confident
+   a `lapsed` topic, ask "quanto sei sicuro?" with the question (superseded
+   on 2026-11-07 by the three-state mark, §13). A confident
    error gets an explicit contrast now ("eri sicuro che X; è Y perché…").
 3. Mark against `points`:
    - a correct answer gets one line;
@@ -565,7 +566,8 @@ day, with no level gain and one save at the end.
    - correct answers get one line, and the next question comes in the same
      message;
    - one save at the end, no recap, about four model calls for three items.
-2. A lapsed topic: the tutor asks how sure the learner is. A confident error
+2. A lapsed topic: the tutor asks how sure the learner is (since 2026-11-07,
+   the learner marks "guess" or "sure" instead, §13). A confident error
    gets an explicit contrast and a rewritten `gap` and `prompt`.
 3. A procedural prompt gets a fresh instance.
 4. A wrong method is recorded as `chose` on the right topic.
@@ -773,8 +775,9 @@ calibration. The state is kept because three consumers read it:
   `choice_errors`; it marks the topic `weak` in `resume`. `week` adds
   `confident_errors`, a count of the window's confident errors.
 - The tutor says once, with the first review question, that an answer may be
-  marked "guess" or "sure" in the learner's own words; an unmarked answer is
-  neutral and the field is omitted. It never asks for a number.
+  marked "guess" or "sure" in the learner's own words, and stops once the
+  evidence carries `sure`; an unmarked answer is neutral and the field is
+  omitted. It never asks for a number.
 - Schema 6, additive, as §3.7 decided for `chose`, `contrasts` and `points`:
   an optional field, no migration, and existing records validate and replay
   unchanged.
