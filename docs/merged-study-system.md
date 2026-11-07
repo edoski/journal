@@ -100,12 +100,15 @@ The full `resume` stays a tool for another task. Its evidence log (6.2 KB in SMM
 
 Measured sizes, from copies of the real SMM and AIKR records and the app's composed prompts (`scripts/measure-course-context.ts` reproduces them). Tokens come from the provider's own counts in the live run, recorded in the run's notes. Bytes alone undercount the cost of JSON and Italian text.
 
-| Per turn | Prober | Teacher | Practice |
+| Per turn, bytes | Prober | Teacher | Practice |
 | --- | --- | --- | --- |
-| App system prompt (unchanged by this work) | see script | see script | see script |
-| Course doctrine | see script | see script | see script |
-| `course_*` tool schemas | see script | see script | see script |
-| Course brief, SMM / AIKR | see script | see script | see script |
+| App system prompt (unchanged by this work) | 13,156 | 35,893 | 25,497 |
+| App tool schemas | 9,228 | 11,900 | 7,420 |
+| Course doctrine | 3,838 | 3,838 | 3,838 |
+| `course_*` tool schemas | 2,202 | 2,202 | 2,202 |
+| Course brief, SMM / AIKR | 2,322 / 1,411 | 2,322 / 1,411 | 2,322 / 1,411 |
+
+The course adds about 8.4 KB per turn on SMM (doctrine, tools and brief), against 20 KB for the first bridge, which carried the full `resume`. The practice brief equals the teach brief on these records, because their `resume` lists due topics without review prompts; the practice agent reads them with `course_show`. In the live run on a throwaway course (8 Nov, Claude Opus 5.5 through the Claude subscription), the prober's first call carried 11,277 prompt tokens by the provider's count, and later calls in the turn read about 10,600 of them from the cache.
 
 ## Delivery
 

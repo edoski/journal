@@ -400,6 +400,15 @@ Practice turns the graph into problem sets the learner reasons through out loud.
 
 ---
 
+## 7a. Course records (the learning engine)
+
+Every session belongs to one course of the learner's `learning` engine, which owns all learner state: attempts, verdicts, levels, the review schedule, the course path, tasks and preferences. The app keeps none of it. `docs/merged-study-system.md` is the design; in short:
+
+- **Port and adapter.** `CourseRecords` (`src/core/ports.ts`) is implemented by `src/store/course-records.ts`, which runs the engine's agent CLI (`python -m learning`, configured by `LH_LEARNING_ENGINE` and `LH_LEARNING_PYTHON` in `config.ts`) once per verb. It never throws; failures come back as a typed result.
+- **Courses.** `POST /api/chats` requires a registered course and stamps `ChatRecord.course`; `POST /api/courses` creates one (folder, engine `init`, titled save); `PUT /api/chats/[id]/course` links an older session; `/api/chat` refuses a turn for an unlinked session.
+- **Reading.** At the start of each learner turn, `src/server/course-brief.ts` appends a `course-context` marker, a projection of the engine's `resume` (`src/core/course-brief.ts`), when its key changed. The agents read more with `course_show`, `course_search` and `course_resume` (`src/agent/tools/course.ts`).
+- **Writing.** Question attempts are saved by the agent with `course_save`, following `src/agent/prompts/course/10-record.md`, which joins every agent's prompt. A practice attempt is written once, by `conclude` (`src/core/practice-attempts.ts`). The learner's three-state confidence maps onto the engine's `sure` field in `src/core/engine-confidence.ts`, the only place that mapping lives.
+
 ## 8. Process boundaries (the machine room)
 
 ```mermaid
