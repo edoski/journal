@@ -332,15 +332,16 @@ def test_an_old_marked_block_migrates_without_losing_codex_tables(
 ) -> None:
     package, _, _ = installation
     msc, learn, course = vault
-    for directory in (msc, course.directory):
-        path = install.course_codex_config(directory)
-        path.parent.mkdir()
-        path.write_text(install.course_codex_content("", package.parent, path))
+    dropped = msc.parent / "dropped"
+    left = install.course_codex_config(dropped)
+    left.parent.mkdir(parents=True)
+    left.write_text(install.course_codex_content("", package.parent, left))
     install.settings_path().write_text(
         json.dumps({"schema": 1, "study_roots": [str(msc)]})
     )
     gtm = f'[projects."{tmp_path / "gtm"}"]\ntrust_level = "trusted"\n'
     scratch = f'[projects."{tmp_path / "scratch"}"]\ntrust_level = "untrusted"\n'
+    reopened = f'[projects."{dropped}"]\ntrust_level = "trusted"\n'
     old = "".join(
         f'[projects."{directory}"]\ntrust_level = "trusted"\n\n'
         for directory in (msc, course.directory)
@@ -350,24 +351,59 @@ def test_an_old_marked_block_migrates_without_losing_codex_tables(
         + old
         + gtm
         + "\n"
+        + reopened
+        + "\n"
         + scratch
         + "# End learning study folders\n"
     )
     assert install.install()["codex"]["trust"] == "updated"
     text = install.codex_config().read_text()
     assert "learning study folders" not in text
-    assert gtm in text and scratch in text
+    assert all(table in text for table in (gtm, reopened, scratch))
     assert install.trusted(text) == {
         str(msc),
         str(course.directory),
         str(tmp_path / "gtm"),
+        str(dropped),
     }
     assert install.install()["codex"]["trust"] == "unchanged"
     shutil.rmtree(course.directory)
     install.install([learn])
     text = install.codex_config().read_text()
-    assert install.trusted(text) == {str(learn), str(tmp_path / "gtm")}
+    assert install.trusted(text) == {str(learn), str(tmp_path / "gtm"), str(dropped)}
     assert text.startswith('model = "gpt"\n') and scratch in text
+
+
+def test_installer_tables_go_under_an_explicit_projects_table_and_blank_lines(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, learn, course = vault
+    codex_installed('model = "gpt"\n\n[projects]\n')
+    install.install([msc])
+    path = install.codex_config()
+    path.write_text(path.read_text().replace("\n\n#", "\n\n\n\n#"))
+    shutil.rmtree(course.directory)
+    assert install.install([learn])["codex"]["trust"] == "updated"
+    assert install.install()["codex"]["trust"] == "unchanged"
+    assert path.read_text() == (
+        'model = "gpt"\n\n[projects]\n\n' + install.trust_table(learn)
+    )
+
+
+def test_a_new_course_never_overrides_an_untrusted_entry(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, _, _ = vault
+    codex_installed("")
+    install.install([msc])
+    fresh = msc / "Fresh"
+    fresh.mkdir()
+    path = install.codex_config()
+    untrusted = f'[projects."{fresh}"]\ntrust_level = "untrusted"\n'
+    path.write_text(path.read_text() + "\n" + untrusted)
+    before = path.read_text()
+    assert install.configure_course(initialize(fresh)).startswith("failed: ")
+    assert path.read_text() == before
 
 
 def test_codex_and_claude_code_absent(

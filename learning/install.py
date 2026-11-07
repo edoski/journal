@@ -207,35 +207,44 @@ def _line_starts(text: str, needle: str) -> list[int]:
     return starts
 
 
-def _without_trust(text: str, directory: Path, path: Path) -> str | None:
-    """Text without the installer's table for ``directory``, or None if it has none.
+def _comparable(parsed: dict[str, Any]) -> dict[str, Any]:
+    """A parsed config where an empty ``projects`` table equals a missing one."""
+    return {k: v for k, v in parsed.items() if k != "projects" or v}
 
-    A table is the installer's only while removing its exact text drops that folder
-    and changes nothing else, so an edited table or one with sub-tables stays, and a
-    copy inside a multi-line string is never taken for the table.
+
+def _replaced(
+    text: str, old: str, new: str, expected: dict[str, Any], path: Path
+) -> str | None:
+    """Text with ``old`` at a line start replaced by ``new``, or None.
+
+    Only a replacement whose parsed result equals ``expected`` counts, so a copy of
+    ``old`` inside a multi-line string is never the one replaced.
     """
-    table = trust_table(directory)
-    starts = _line_starts(text, table)
-    if not starts:
-        return None
-    parsed = toml(text, path)
-    projects = {k: v for k, v in _projects(parsed).items() if k != str(directory)}
-    expected = {k: v for k, v in parsed.items() if k != "projects"}
-    if projects:
-        expected["projects"] = projects
-    for start in starts:
-        before, after = text[:start], text[start + len(table) :]
-        if before.endswith("\n\n"):
+    for start in _line_starts(text, old):
+        before, after = text[:start], text[start + len(old) :]
+        if not new and before.endswith("\n\n"):
             before = before[:-1]
-        elif not before:
+        elif not new and not before:
             after = after.removeprefix("\n")
-        candidate = before + after
+        candidate = before + new + after
         try:
-            if toml(candidate, path) == expected:
+            if _comparable(toml(candidate, path)) == expected:
                 return candidate
         except ValueError:
             continue
     return None
+
+
+def _without_trust(text: str, directory: Path, path: Path) -> str | None:
+    """Text without the installer's table for ``directory``, or None if it has none.
+
+    A table is the installer's only while removing its exact text drops that folder
+    and changes nothing else, so an edited table or one with sub-tables stays.
+    """
+    parsed = toml(text, path)
+    projects = {k: v for k, v in _projects(parsed).items() if k != str(directory)}
+    expected = _comparable({**parsed, "projects": projects})
+    return _replaced(text, trust_table(directory), "", expected, path)
 
 
 def _without(text: str, start: str, end: str, path: Path) -> str:
@@ -256,20 +265,14 @@ def _append(text: str, block: str) -> str:
     return text + ("\n" if text else "") + block
 
 
-def _has_course_server(directory: Path) -> bool:
-    try:
-        return CODEX_START in course_codex_config(directory).read_text(encoding="utf-8")
-    except OSError:
-        return False
-
-
-def _marked_old_block(text: str, path: Path) -> str:
+def _migrated_old_block(text: str, directories: list[Path], path: Path) -> str:
     """Migrate the old marked block that held every installer trust table.
 
     Codex's TOML library put tables it added into that block too, so a table in it
-    counts as the installer's only when it reads exactly as written and its folder
-    has the installer's project server file; it gets the mark and every other table
-    stays as it is. The block's two comment lines go.
+    becomes the installer's only when its folder is still a study folder and it
+    reads exactly as written; it gets the mark. A table for any other folder stays
+    as the user's, since that folder may have been trusted through Codex after it
+    stopped being a study folder. The block's two comment lines go.
     """
     if _OLD_TRUST_START not in text and _OLD_TRUST_END not in text:
         return text
@@ -279,36 +282,35 @@ def _marked_old_block(text: str, path: Path) -> str:
         )
     before, _, tail = text.partition(_OLD_TRUST_START)
     block, _, after = tail.partition(_OLD_TRUST_END)
+    migrated = before + block + after
+    expected = _comparable(toml(migrated, path))
     for key, value in _projects(toml(block, path)).items():
         directory = Path(key)
-        old = _bare_trust(directory)
-        starts = _line_starts(block, old)
-        if (
-            value == {"trust_level": "trusted"}
-            and starts
-            and _has_course_server(directory)
-        ):
-            start = starts[0]
-            block = block[:start] + trust_table(directory) + block[start + len(old) :]
-    migrated = before + block + after
-    if toml(migrated, path) != toml(text, path):
-        raise ValueError(f"{path}: the old learning block would not migrate cleanly")
+        if directory in directories and value == {"trust_level": "trusted"}:
+            old = _bare_trust(directory)
+            marked = _replaced(migrated, old, trust_table(directory), expected, path)
+            migrated = marked if marked is not None else migrated
     return migrated
+
+
+def _normalized(text: str) -> str:
+    return text.rstrip("\n") + "\n" if text.strip() else ""
 
 
 def codex_global_content(original: str, directories: list[Path], *, prune: bool) -> str:
     """The user config without a global server entry, trusting ``directories``.
 
-    A folder without a trust table gets the installer's; with ``prune``, the
-    installer's own tables for folders not listed are removed. Tables it did not
-    write, or that were edited since, are left as they are; a listed folder whose
-    table is not trusted is a conflict to resolve first.
+    ``directories`` are all the study folders. One without a trust table gets the
+    installer's; with ``prune``, the installer's own tables for other folders are
+    removed. Tables it did not write, or that were edited since, are left as they
+    are; a study folder whose table is not trusted is a conflict to resolve first.
     """
     path = codex_config()
     text = _OLD_CODEX.sub("", original)
     if "# Learning communication" in text or "# End learning communication" in text:
         raise ValueError(f"incomplete old learning communication block in {path}")
-    text = _marked_old_block(_without(text, CODEX_START, CODEX_END, path), path)
+    text = _without(text, CODEX_START, CODEX_END, path)
+    text = _migrated_old_block(text, directories, path)
     if codex_entry(text, path) is not None:
         raise ValueError(
             f"{path} defines [mcp_servers.{SERVER}] for every folder; remove it, "
@@ -316,13 +318,10 @@ def codex_global_content(original: str, directories: list[Path], *, prune: bool)
         )
     if prune:
         for key in list(_projects(toml(text, path))):
-            removed = (
-                None
-                if Path(key) in directories
-                else _without_trust(text, Path(key), path)
-            )
-            if removed is not None:
-                text = removed
+            if Path(key) not in directories:
+                removed = _without_trust(text, Path(key), path)
+                text = removed if removed is not None else text
+        text = _normalized(text)
     projects = _projects(toml(text, path))
     for directory in directories:
         existing = projects.get(str(directory))
@@ -670,8 +669,13 @@ def configure_course(workspace: Workspace) -> str:
     try:
         backup = Backup(support_directory())
         with _codex_lock():
+            directories = course_directories(study_roots())
             course = _course_codex(workspace.directory, repo, backup)
-            trust = _trust([workspace.directory], backup, prune=False)
+            trust = _trust(
+                list(dict.fromkeys([*directories, workspace.directory])),
+                backup,
+                prune=False,
+            )
     except (OSError, ValueError) as error:
         return f"failed: {error}"
     return "unchanged" if course == trust == "unchanged" else "configured"
