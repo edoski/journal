@@ -39,12 +39,12 @@ npx electron-builder --linux --x64 --publish never
 
 ## CI vs release
 
-`.github/workflows/ci.yml` runs on main pushes and pull requests:
+In the journal repository, GitHub runs only the root workflows, so this folder's `.github/` (kept from upstream) is inert. The root `.github/workflows/ci.yml` runs on main pushes and pull requests:
 
-- Typecheck, full deterministic test suite, and lint on Ubuntu.
+- The repository gate on macOS (`macos-15`): `python tools/check.py`, which runs the Python packages' checks and this app's typecheck, full deterministic test suite and lint.
 - Native renderer tests plus standalone build/boot-smoke on macOS (`macos-15`), Windows, and Linux. This macOS job does not compile the Icon Composer asset; only release packaging needs the newer runner.
 
-`.github/workflows/release.yml` has two deliberately separate modes:
+The release workflow below describes upstream's `.github/workflows/release.yml`; it does not run from this folder. It has two deliberately separate modes:
 
 - **Manual / Run workflow:** unsigned rehearsal installers saved as workflow artifacts for 7 days. No signing secrets needed, no release created, and nothing published. macOS notarization is skipped. Use the Windows/Linux artifacts for the first human smoke pass. These are not production macOS installers.
 - **Push `v<package.json version>`:** gates first, then one job creates or reuses a **single draft GitHub Release** before the three OS jobs package/upload their artifacts and update metadata in parallel. This avoids competing draft creation. A published or ambiguous existing release fails the preparation step instead of being modified. Separate runs for the same ref are serialized, never cancelled mid-upload. The tag must match the package version. macOS must sign and notarize successfully; missing secrets fail loudly. The workflow never publishes the draft. After all three packaging jobs succeed, a final read-only **Verify draft release** job (below) fails the run unless that draft is complete and self-consistent.

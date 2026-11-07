@@ -27,6 +27,10 @@ include = ["sync*", "learning*", "finance*"]
 learning = ["skills/tutor/SKILL.md", "skills/tutor/references/*.md"]
 finance = ["starter_categories.toml"]
 
+[tool.ruff]
+# The study app checks its own code, including its Python helper scripts.
+extend-exclude = ["learnharness"]
+
 [tool.coverage.run]
 branch = true
 source = ["sync", "learning", "finance"]

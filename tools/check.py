@@ -1,4 +1,4 @@
-"""Run the project's checks, optionally limited to one feature package."""
+"""Run the project's checks, optionally limited to one package or the study app."""
 
 from __future__ import annotations
 
@@ -8,19 +8,42 @@ import shlex
 import subprocess
 import sys
 
+PYTHON_PACKAGES = ("sync", "learning", "finance")
+APP = "learnharness"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "scope",
         nargs="?",
-        choices=("all", "sync", "learning", "finance"),
+        choices=("all", *PYTHON_PACKAGES, APP),
         default="all",
     )
     parser.add_argument("--coverage", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    packages = ["sync", "learning", "finance"] if args.scope == "all" else [args.scope]
+    commands: list[tuple[list[str], Path]] = []
+    if args.scope != APP:
+        commands.extend((command, root) for command in _python_commands(args))
+    if args.scope in ("all", APP):
+        app = root / APP
+        if not (app / "node_modules").is_dir():
+            print(f"{APP}/node_modules is missing: run `npm ci` in {APP}/ first.")
+            return 1
+        commands.extend(
+            (["npm", "run", script], app) for script in ("typecheck", "lint", "test")
+        )
+    for command, cwd in commands:
+        print(f"\n{shlex.join(command)}", flush=True)
+        result = subprocess.run(command, cwd=cwd, check=False)
+        if result.returncode:
+            return result.returncode
+    return 0
+
+
+def _python_commands(args: argparse.Namespace) -> list[list[str]]:
+    packages = list(PYTHON_PACKAGES) if args.scope == "all" else [args.scope]
     paths = (
         ["."]
         if args.scope == "all"
@@ -45,12 +68,7 @@ def main() -> int:
     commands.append(tests)
     if "sync" in packages:
         commands.append([python, "tools/regenerate_baselines.py", "--check"])
-    for command in commands:
-        print(f"\n{shlex.join(command)}", flush=True)
-        result = subprocess.run(command, cwd=root, check=False)
-        if result.returncode:
-            return result.returncode
-    return 0
+    return commands
 
 
 if __name__ == "__main__":
