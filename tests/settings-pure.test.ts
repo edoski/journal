@@ -248,14 +248,13 @@ describe("classifyKeys — the Keys section's two-group projection", () => {
 	});
 
 	it("curated tool ids always render (synthesized when absent)", () => {
-		const out = classifyKeys([synth("DEEPGRAM_API_KEY", true)], undefined);
+		const out = classifyKeys([synth("BRAVE_API_KEY", true)], undefined);
 		assert.deepEqual(out.toolRows.map((r) => r.id), [
-			"DEEPGRAM_API_KEY",
 			"TAVILY_API_KEY",
 			"BRAVE_API_KEY",
 		]);
-		assert.ok(out.toolRows[0]!.present);
-		assert.ok(!out.toolRows[1]!.present);
+		assert.ok(!out.toolRows[0]!.present);
+		assert.ok(out.toolRows[1]!.present);
 	});
 
 	it("unknown file vars surface read-only, out of the provider rows", () => {

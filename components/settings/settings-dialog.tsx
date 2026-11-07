@@ -66,12 +66,7 @@ const SECTIONS = [
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
-/** `open(section?, row?)` — the optional ROW deep-links into the Keys
- *  section with that row unfolded (zero-keys wave: the dictation error's
- *  click lands on the Deepgram row). `row` is the KEY ID (the env-var
- *  name, e.g. DEEPGRAM_API_KEY — KeysSection's openRow state), not the
- *  row's testid. */
-const DialogContext = createContext<{ open: (section?: string, row?: string) => void }>({ open: () => {} });
+const DialogContext = createContext<{ open: (section?: string) => void }>({ open: () => {} });
 
 /** AppShell-level mount: the sidebar row and the mod+, chord call this.
  *  `open(section)` lands the dialog on a specific section (the first-run
@@ -83,10 +78,8 @@ export function SettingsDialogProvider({
 }) {
 	const [show, setShow] = useState(false);
 	const [landOn, setLandOn] = useState<SectionId>("keys");
-	const [landOnRow, setLandOnRow] = useState<string | null>(null);
-	const open = useCallback((section?: string, row?: string) => {
+	const open = useCallback((section?: string) => {
 		setLandOn(section ? section as SectionId : "keys");
-		setLandOnRow(row ?? null);
 		setShow(true);
 	}, []);
 	useEffect(() => window.lh?.onOpenSettings?.((section) => open(section)), [open]);
@@ -94,7 +87,7 @@ export function SettingsDialogProvider({
 		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
-				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} initialRow={landOnRow} />
+				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
 			)}
 		</DialogContext.Provider></NativeSubscriptionUIProvider></ChatGPTUIProvider>
 	);
@@ -107,12 +100,9 @@ export function useSettingsDialog() {
 function SettingsDialog({
 	onClose,
 	initialSection,
-	initialRow,
 }: {
 	onClose: () => void;
 	initialSection: SectionId;
-	/** The keys-section row to unfold (see DialogContext above). */
-	initialRow: string | null;
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 	// Plain dim backdrop (no blur — nothing decorative); a genuine
@@ -123,7 +113,7 @@ function SettingsDialog({
 			data-testid="settings-backdrop"
 			{...backdropDismiss}
 		>
-			<SettingsDialogBody onClose={onClose} initialSection={initialSection} initialRow={initialRow} />
+			<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
 		</div>,
 		document.body,
 	);
@@ -134,13 +124,9 @@ function SettingsDialog({
 export function SettingsDialogBody({
 	onClose,
 	initialSection = "keys",
-	initialRow = null,
 }: {
 	onClose: () => void;
 	initialSection?: SectionId;
-	/** The keys row to unfold on arrival (null = none). While-open
-	 *  retargets follow it exactly like initialSection below. */
-	initialRow?: string | null;
 }) {
 	const { onAppearanceChange } = useAppearance();
 	const [record, setRecord] = useState<UserSettings | null | undefined>(
@@ -210,8 +196,8 @@ export function SettingsDialogBody({
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim
-				// at the document level — the window chain (dictation →
-				// abort) must not also act. One Esc, one action.
+				// at the document level — the window chain (abort) must
+				// not also act. One Esc, one action.
 				e.preventDefault();
 				e.stopPropagation();
 				onClose();
@@ -370,7 +356,7 @@ export function SettingsDialogBody({
 							)}
 							{active === "keys" && (
 								<SettingsSection title="Providers" testid="section-keys">
-									<KeysSection initialRow={initialRow ?? undefined} />
+									<KeysSection />
 								</SettingsSection>
 							)}
 							{active === "agent" && (

@@ -3,7 +3,7 @@
  * key manager behind GET/PUT/DELETE /api/keys.
  *
  * THE ENV SEAM (the architecture keystone): every consumer — models.ts's
- * openRouterApiKey(), the sub-agents, web.ts, the STT route — reads
+ * openRouterApiKey(), the sub-agents, web.ts — reads
  * process.env directly, and the agent layer may not import the store
  * layer. Instead of rewiring five consumers across lanes, the store
  * REFLECTS itself into the child's env: at boot (idempotent, anchored on
@@ -183,9 +183,7 @@ export function keyStatuses(): AuthKeyStatus[] {
 }
 
 /** The live value for one var, env-first (the env-wins rule) — the canonical
- *  read for consumers that don't live behind the @/src/server barrel (the
- *  STT route was the one cold-boot hole: a first-ever request to it would
- *  otherwise read env before any fill-gap ran). */
+ *  read for consumers that don't live behind the @/src/server barrel. */
 export function keyValue(id: string): string | undefined {
 	// The fresh-user switch: ONLY the file store counts (belt-and-
 	// suspenders — the boot deletion already emptied the env; this guards

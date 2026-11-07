@@ -1,9 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { finishDictation, isDictationActive, joinDictation, useDictationTarget } from "@/components/dictation";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
@@ -46,10 +45,10 @@ import { CONFIDENCE_COLORS, confidenceRailStyle } from "@/components/confidence-
  * with Submit docked inside it exactly like the chat composer's send.
  *
  * The thinking field is the transfer channel of the whole product (wave-2):
- * never called "optional", Enter makes a NEWLINE (it is for dumping — soon
- * dictated, not typed), submission is the button only, and its size scales
- * with the phase (probing stays quick; teaching invites depth). The
- * "Other…" option is an editable option ROW — circle + inline input,
+ * never called "optional", Enter makes a NEWLINE (it is for dumping),
+ * submission is the button only, and its size scales with the phase
+ * (probing stays quick; teaching invites depth). The "Other…" option is
+ * an editable option ROW — circle + inline input,
  * styled like its siblings — so picking Other never displaces thinking.
  *
  * Collapse behavior (scroll-up → slim bar) is owned by the DockOverlay in the
@@ -76,20 +75,12 @@ export interface QuestionDockProps {
 	/** Restore only this call's unconfirmed submission after recovery. */
 	initialDraft?: QuestionFormDraft;
 	onSaveDraft?: (draft: QuestionFormDraft) => void;
-	/** Escape in a question field stops dictation (STT wave) — threaded
-	 *  from the page that owns the dictation hook. */
-	onEscape?: () => void;
 	/** The keyboard machine (wave B) is armed only while the dock is
 	 *  expanded — the collapsed bar keeps its native Enter-to-expand. */
 	active?: boolean;
 	/** Session phase at the question — scales the thinking field: probing
 	 *  stays quick (one row), teaching invites dumping (three rows). */
 	phase?: Phase3;
-	/** Dictation claim (owner 2026-10-03): false while a teach-phase check
-	 *  sits UNREVEALED — the reading-thinking field owns dictated speech
-	 *  during the reading; the dock reclaims on reveal. Default true (probe
-	 *  questions, predictions, old callers). */
-	dictationClaim?: boolean;
 	/** Compaction is running for this chat (owner round 14): the answer
 	 *  POST would block on the server's compaction gate — disable submit
 	 *  and say so in the hint row. The server registry is the real gate;
@@ -107,9 +98,7 @@ export function QuestionDock({
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
-	onEscape,
 	phase = "probe",
-	dictationClaim = true,
 	compactionRunning = false,
 }: QuestionDockProps) {
 	// The probe-phase names (owner, 2026-10-09) canonicalize onto their
@@ -164,8 +153,6 @@ export function QuestionDock({
 					onSubmit={onSubmit}
 					initialDraft={initialDraft}
 					onSaveDraft={onSaveDraft}
-					onEscape={onEscape}
-					dictationClaim={dictationClaim}
 					compactionRunning={compactionRunning}
 				/>
 			</div>
@@ -261,8 +248,6 @@ function QuestionDockForm({
 	onSubmit,
 	initialDraft,
 	onSaveDraft,
-	onEscape,
-	dictationClaim = true,
 	compactionRunning = false,
 }: Omit<QuestionDockProps, "expanded" | "onExpand" | "reveal">) {
 	const kind = toolQuestionKind(toolName);
@@ -327,46 +312,12 @@ function QuestionDockForm({
 	const [thinking, setThinking] = useState(initialDraft?.thinking ?? "");
 	const [other, setOther] = useState(initialDraft?.other ?? "");
 	const [text, setText] = useState(initialDraft?.text ?? "");
-	/* Refs MIRROR the two dictation-target fields ("nothing gets lost"
-	 * round, owner 2026-10-01): the run's flush lands via setState, which
-	 * a closure waiting through `await finishDictation()` cannot observe
-	 * in time — submit reads these, kept current at every write site. */
-	const thinkingTextRef = useRef(initialDraft?.thinking ?? "");
-	const answerTextRef = useRef(initialDraft?.text ?? "");
 	// Confidence (owner, 2026-10-01): an index into CONFIDENCE_STOPS,
 	// resting at 50 — a real coin flip by definition, untouched or
 	// deliberate (the same number, the same meaning). The dock unmounts
 	// between questions, so each question starts fresh at 50.
 	const [confIdx, setConfIdx] = useState<number>(initialDraft?.confidenceIndex ?? DEFAULT_CONFIDENCE_INDEX);
 	const selectMode: SelectMode = qd.mode === "multi-select" ? "multi-select" : "single-select";
-
-	// The PRIMARY dictation input (owner, STT round 1): while a question
-	// waits, dictated finals land HERE, never in the hidden composer — text
-	// mode owns "Your answer", select modes own "Your thinking". The claim
-	// is effect-scoped, so the question unmounting releases it and
-	// dictation falls back to the composer automatically.
-	useDictationTarget(
-		useCallback(
-			(t: string) => {
-				// Ref-first (see the refs block above): the join is computed from
-				// the mirror, then both mirrors agree with state — a submit
-				// resuming post-finish reads the tail, never a stale closure.
-				if (qd.mode === "text") {
-					const v = joinDictation(answerTextRef.current, t);
-					answerTextRef.current = v;
-					setText(v);
-				} else {
-					const v = joinDictation(thinkingTextRef.current, t);
-					thinkingTextRef.current = v;
-					setThinking(v);
-				}
-			},
-			[qd.mode],
-		),
-		// Released while a teach check sits unrevealed (owner 2026-10-03):
-		// the reading-thinking field owns dictated speech during the reading.
-		dictationClaim,
-	);
 
 	const toggle = (idx: number) => setSel(toggleOption(selectMode, sel, idx));
 
@@ -377,45 +328,29 @@ function QuestionDockForm({
 
 	const submit = () => {
 		if (!canSubmit || compactionRunning) return;
-		/* FINISH DICTATION FIRST (owner, 2026-10-01): Enter may arrive while
-		 * a run is live with reasoning still in Deepgram's hands. Stop the
-		 * run, let the last finals land in the target field, and only then
-		 * build the answer — the spoken reasoning is never lost to a
-		 * forgotten stop. The field values below come from the REF mirrors
-		 * because the flush lands via setState after an await. */
-		if (!isDictationActive()) {
-			doSubmit();
-			return;
-		}
-		void finishDictation().then(doSubmit);
-	};
-	const doSubmit = () => {
-		if (!canSubmit) return;
 		const req: AnswerRequest = {
 			dontKnow: sel.dontKnow,
 			values: [...sel.selected].map((i) => qd.options[i]!.value),
 			other: sel.otherSelected ? other : undefined,
-			text: qd.mode === "text" ? answerTextRef.current : undefined,
-			thinking: qd.mode !== "text" ? thinkingTextRef.current.trim() || undefined : undefined,
+			text: qd.mode === "text" ? text : undefined,
+			thinking: qd.mode !== "text" ? thinking.trim() || undefined : undefined,
 			// Always sent on quiz answers (owner: 50 must mean 50, never
 			// "untouched"); buildAnswer drops it on "I don't know".
 			confidence: kind === "quiz" ? CONFIDENCE_STOPS[confIdx] : undefined,
 		};
-		// Snapshot before optimistic submission unmounts the form. Ref values
-		// include the dictation finals that just landed, unlike stale closures.
+		// Snapshot before optimistic submission unmounts the form.
 		onSaveDraft?.({
 			selection: { ...sel, selected: new Set(sel.selected) },
-			thinking: thinkingTextRef.current,
+			thinking,
 			other,
-			text: answerTextRef.current,
+			text,
 			confidenceIndex: confIdx,
 		});
 		onSubmit(buildAnswer(qd, req, toolName));
 	};
 
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): the same
-	 * law as the practice dock — dictated answers rarely focus the field.
-	 * Rides submit() so the dictation-flush law is shared, not forked. */
+	 * law as the practice dock. */
 	useEnterSubmits(submit);
 
 	// Selecting Other never clears the thinking field — two channels, the
@@ -723,8 +658,7 @@ function QuestionDockForm({
 											// to protect, and typing has already selected the row, so
 											// the payload is ready. Every Enter (shift or not — nothing
 											// else could ever happen in a one-line field) rides the
-											// same submit seam as the button, dictation finish-first
-											// included.
+											// same submit seam as the button.
 											if (e.key === "Enter") {
 												e.preventDefault();
 												submit();
@@ -834,7 +768,7 @@ function QuestionDockForm({
 			{/* The learner's half of the dock — a composer TWIN: a labeled, bordered
 			    field with Submit docked inside, exactly like the chat composer's
 			    send. Select modes get "Your thinking" (Enter makes a newline — it
-			    is for dumping, soon dictated; the button submits); text mode
+			    is for dumping; the button submits); text mode
 			    keeps "Your answer" with Enter-to-submit. */}
 			<form
 				className="border-t border-border/60 p-1.5"
@@ -853,18 +787,13 @@ function QuestionDockForm({
 					{qd.mode === "text" ? (
 						<textarea
 							value={text}
-							onChange={(e) => {
-								answerTextRef.current = e.target.value;
-								setText(e.target.value);
-							}}
+							onChange={(e) => setText(e.target.value)}
 							onKeyDown={(e) => {
-								// Esc ends dictation (the dictate decisions: click-again
-								// or Esc) — stopPropagation claims it (keyboard wave
-								// A) so the window chain doesn't also abort a turn.
-								if (e.key === "Escape" && onEscape) {
+								// The field claims Esc so the window chain doesn't
+								// open the question's dismiss confirm under the cursor.
+								if (e.key === "Escape") {
 									e.preventDefault();
 									e.stopPropagation();
-									onEscape();
 									return;
 								}
 								// Chat convention: Enter submits, Shift+Enter is a newline;
@@ -882,18 +811,13 @@ function QuestionDockForm({
 						<textarea
 							ref={thinkingRef}
 							value={thinking}
-							onChange={(e) => {
-								thinkingTextRef.current = e.target.value;
-								setThinking(e.target.value);
-							}}
+							onChange={(e) => setThinking(e.target.value)}
 							onKeyDown={(e) => {
-								// Esc ends dictation (the dictate decisions: click-again
-								// or Esc) — stopPropagation claims it (keyboard wave
-								// A) so the window chain doesn't also abort a turn.
-								if (e.key === "Escape" && onEscape) {
+								// The field claims Esc so the window chain doesn't
+								// open the question's dismiss confirm under the cursor.
+								if (e.key === "Escape") {
 									e.preventDefault();
 									e.stopPropagation();
-									onEscape();
 									return;
 								}
 								// THE STANDARD CHORD (owner round 5, 2026-10-05): Enter

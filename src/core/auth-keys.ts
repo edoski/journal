@@ -31,12 +31,6 @@ export interface AuthKeyInfo {
 
 export const AUTH_KEYS: readonly AuthKeyInfo[] = [
 	{
-		id: "DEEPGRAM_API_KEY",
-		label: "Deepgram",
-		description: "Speech-to-text key for dictation — needs ≥ Member permission in the Deepgram console to mint tokens.",
-		docsUrl: "https://console.deepgram.com/",
-	},
-	{
 		id: "TAVILY_API_KEY",
 		label: "Tavily",
 		description: "Web-search engine for the researcher sub-agent (AI-native search API). Setting the key activates it — no engine toggle needed.",
@@ -140,8 +134,8 @@ export type KeyShapeResult = { ok: true } | { ok: false; error: string };
  * a truncated or wrong-family key can never land in the store). Values are
  * TRIMMED first (paste hygiene); empty-after-trim always fails.
  *
- * CURATED keys carry family rules (Tavily's tvly-… prefix; Brave and
- * Deepgram publish no format — length floors + paste hygiene only).
+ * CURATED keys carry family rules (Tavily's tvly-… prefix; Brave
+ * publishes no format — a length floor + paste hygiene only).
  * MODEL-PROVIDER keys use genericProviderKeyGuard below instead (families
  * vary by provider — only paste hygiene applies; owner spec: min length
  * ~12, no whitespace). OPENROUTER_API_KEY moved to the generic guard with
@@ -160,9 +154,6 @@ export function validateKeyShape(id: string, rawValue: string): KeyShapeResult {
 				: { ok: false, error: `${id} must start with "tvly-" (Tavily's key format)` };
 		case "BRAVE_API_KEY":
 			// No public format — a length floor + paste hygiene only.
-			return nonEmpty(20);
-		case "DEEPGRAM_API_KEY":
-			// No public format — the length floor only catches truncated pastes.
 			return nonEmpty(20);
 		default:
 			return { ok: false, error: `unknown key "${id}" (supported: ${[...AUTH_KEY_IDS].join(", ")})` };

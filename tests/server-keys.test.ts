@@ -23,7 +23,6 @@ import { after, describe, it } from "node:test";
 // never real secrets). The strip affects only this disposable child process.
 for (const varName of [
 	"OPENROUTER_API_KEY",
-	"DEEPGRAM_API_KEY",
 	"TAVILY_API_KEY",
 	"BRAVE_API_KEY",
 	"GOOGLE_SEARCH_API_KEY",
@@ -60,7 +59,7 @@ const ENV_OWNED = "sk-or-v1-envvalue99";
 
 after(() => {
 	delete process.env.OPENROUTER_API_KEY;
-	delete process.env.DEEPGRAM_API_KEY;
+	delete process.env.BRAVE_API_KEY;
 	delete process.env.OPENAI_API_KEY;
 	fs.rmSync(TMP, { recursive: true, force: true });
 });
@@ -83,7 +82,7 @@ describe("boot fill-gap + precedence", () => {
 	});
 
 	it("absent curated keys: not present, source none", () => {
-		const row = keyStatuses().find((s) => s.id === "DEEPGRAM_API_KEY")!;
+		const row = keyStatuses().find((s) => s.id === "BRAVE_API_KEY")!;
 		assert.ok(!row.present);
 		assert.equal(row.source, "none");
 		assert.equal(row.masked, null);
@@ -93,17 +92,17 @@ describe("boot fill-gap + precedence", () => {
 	it("keyValue resolves env-first", () => {
 		assert.equal(keyValue("OPENROUTER_API_KEY"), ENV_OWNED);
 		assert.equal(keyValue("FUTURE_PLANS_TOKEN"), "opaque-plans-token");
-		assert.equal(keyValue("DEEPGRAM_API_KEY"), undefined);
+		assert.equal(keyValue("BRAVE_API_KEY"), undefined);
 	});
 });
 
 describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 	it("save reflects into env + file (fill-gap set)", () => {
-		const value = "d".repeat(40); // throwaway, ≥ Deepgram floor
-		const r = saveKey("DEEPGRAM_API_KEY", value);
+		const value = "d".repeat(40); // throwaway, ≥ Brave floor
+		const r = saveKey("BRAVE_API_KEY", value);
 		assert.ok(r.ok);
-		assert.equal(process.env.DEEPGRAM_API_KEY, value, "env updated immediately");
-		assert.equal(authStore.authVars().DEEPGRAM_API_KEY, value, "file updated");
+		assert.equal(process.env.BRAVE_API_KEY, value, "env updated immediately");
+		assert.equal(authStore.authVars().BRAVE_API_KEY, value, "file updated");
 		assert.equal(r.status.source, "file", "the reflected copy is the store's — the file is its origin of truth");
 		assert.ok(!r.status.shadowedByEnv);
 	});
@@ -118,11 +117,11 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 
 	it("bad shape: rejected, nothing stored or reflected", () => {
 		const before = JSON.stringify(authStore.authVars());
-		const r = saveKey("DEEPGRAM_API_KEY", "short");
+		const r = saveKey("BRAVE_API_KEY", "short");
 		assert.ok(!r.ok);
 		if (!r.ok) assert.match(r.error, /at least 20/);
 		assert.equal(JSON.stringify(authStore.authVars()), before);
-		assert.equal(process.env.DEEPGRAM_API_KEY, "d".repeat(40));
+		assert.equal(process.env.BRAVE_API_KEY, "d".repeat(40));
 	});
 
 	it("unknown id: rejected with the supported list", () => {
@@ -132,10 +131,10 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 	});
 
 	it("delete removes env + file for fill-gap vars", () => {
-		const row = deleteKey("DEEPGRAM_API_KEY");
+		const row = deleteKey("BRAVE_API_KEY");
 		assert.ok(!row.present);
-		assert.equal(process.env.DEEPGRAM_API_KEY, undefined, "env copy was ours — removed");
-		assert.ok(!("DEEPGRAM_API_KEY" in authStore.authVars()));
+		assert.equal(process.env.BRAVE_API_KEY, undefined, "env copy was ours — removed");
+		assert.ok(!("BRAVE_API_KEY" in authStore.authVars()));
 	});
 
 	it("delete of an env-owned var: file copy gone, env remains (env wins)", () => {
@@ -148,7 +147,7 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 
 	it("re-running initAuthEnv is idempotent — deleted vars never resurrect", () => {
 		initAuthEnv();
-		assert.equal(process.env.DEEPGRAM_API_KEY, undefined, "file entry gone → no re-fill");
+		assert.equal(process.env.BRAVE_API_KEY, undefined, "file entry gone → no re-fill");
 	});
 
 	describe("model-provider keys (provider-keys interlude)", () => {
@@ -177,7 +176,7 @@ describe("saveKey / deleteKey (immediate effect, no restart)", () => {
 		});
 
 		it("isWritableAuthKey: curated ∪ provider env vars; unknown stays unwritable", () => {
-			assert.ok(isWritableAuthKey("DEEPGRAM_API_KEY"));
+			assert.ok(isWritableAuthKey("BRAVE_API_KEY"));
 			assert.ok(isWritableAuthKey("OPENROUTER_API_KEY"));
 			assert.ok(isWritableAuthKey("OPENAI_API_KEY"));
 			assert.ok(!isWritableAuthKey("FUTURE_PLANS_TOKEN"));

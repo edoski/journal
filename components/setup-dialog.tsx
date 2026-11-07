@@ -331,8 +331,8 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 			if (e.key !== "Escape") return;
 			// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim at
 			// the document level before the layered dismissal — every branch
-			// below acts, so the window chain (dictation → abort) must
-			// never also fire. One Esc, one action.
+			// below acts, so the window chain (abort) must never also
+			// fire. One Esc, one action.
 			e.preventDefault();
 			e.stopPropagation();
 			if (keyMenuOpen) {

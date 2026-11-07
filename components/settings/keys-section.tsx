@@ -15,7 +15,7 @@
  *    a paste box on a key the UI cannot make live would mislead.
  *  - OpenRouter is NOT special: one provider among 33, a row only when
  *    stored, otherwise it lives in the Add dropdown like everyone else.
- *  - Providers groups API keys, subscriptions, dictation and search.
+ *  - Providers groups API keys, subscriptions and search.
  *    Unknown variables stay masked/read-only at the end of Model API keys.
  *
  * API: GET /api/keys (masked statuses + the providers array), PUT
@@ -30,7 +30,6 @@ import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { DictationLanguageSetting } from "@/components/dictation-language";
 
 /** One pi-ai provider with plain API-key auth (the Platform seam —
  *  derived from pi-ai's own env-key table; no drift possible). */
@@ -324,21 +323,12 @@ function AddProviderRow({
 	);
 }
 
-export function KeysSection({
-	/** A deep-linked row to unfold on arrival (zero-keys wave): the
-	 *  dictation error's click lands here on DEEPGRAM_API_KEY. Followed
-	 *  while mounted too — the settings dialog's while-open retarget
-	 *  pattern. undefined = nothing seeded. */
-	initialRow,
-}: {
-	initialRow?: string;
-}) {
+export function KeysSection() {
 	const [statuses, setStatuses] = useState<AuthKeyStatus[] | null>(null);
 	const [providers, setProviders] = useState<ProviderKeyInfo[] | undefined>(undefined);
 	const [loading, setLoading] = useState(true);
-	/** The unfolded row (its id), null = all folded. Seeded by the
-	 *  deep-link (initialRow) and re-followed when it retargets. */
-	const [openRow, setOpenRow] = useState<string | null>(initialRow ?? null);
+	/** The unfolded row (its id), null = all folded. */
+	const [openRow, setOpenRow] = useState<string | null>(null);
 	/** The paste editor for a freshly chosen Add-provider target. */
 	const [adding, setAdding] = useState<ProviderKeyInfo | null>(null);
 	const [addError, setAddError] = useState<string | null>(null);
@@ -351,9 +341,6 @@ export function KeysSection({
 		if (openRow === null && adding === null) return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
-			// A language dropdown above this editor in the dismissal stack owns
-			// the first Escape; do not swallow it at document capture phase.
-			if (document.querySelector('[data-testid="dictation-language-menu"]')) return;
 			e.preventDefault();
 			e.stopPropagation();
 			setOpenRow(null);
@@ -376,13 +363,6 @@ export function KeysSection({
 	useEffect(() => {
 		void reload();
 	}, []);
-
-	// The deep-link follow: a retarget while the section is open (the
-	// same while-open pattern the dialog's section nav uses) unfolds the
-	// named row; a fresh mount seeds it via the useState initializer.
-	useEffect(() => {
-		if (initialRow !== undefined) setOpenRow(initialRow);
-	}, [initialRow]);
 
 	async function saveKey(id: string, value: string): Promise<string | null> {
 		const res = await fetch(`/api/keys/${id}`, {
@@ -471,8 +451,8 @@ export function KeysSection({
 				<SubscriptionConnections />
 			</SettingsGroup>
 
-			{(["Dictation", "Search"] as const).map((label) => <SettingsGroup key={label} label={label} testid={label === "Dictation" ? "group-dictation" : "group-search"}>
-				{toolRows.filter((status) => label === "Dictation" ? status.id === "DEEPGRAM_API_KEY" : status.id !== "DEEPGRAM_API_KEY").map((status) => (
+			<SettingsGroup label="Search" testid="group-search">
+				{toolRows.map((status) => (
 					<KeyTableRow
 						key={status.id}
 						label={status.info?.label ?? status.id}
@@ -490,18 +470,7 @@ export function KeysSection({
 						testid={`key-${status.id.toLowerCase()}`}
 					/>
 				))}
-				{label === "Dictation" && <>
-					<DictationLanguageSetting />
-					<p data-testid="dictation-setup-hint" className="px-1 text-[11px] leading-relaxed text-muted-foreground/70">
-						Create a <a
-							href="https://console.deepgram.com/"
-							target="_blank"
-							rel="noreferrer"
-							className="underline underline-offset-2 hover:text-foreground"
-						>Deepgram API key</a> with the Member role or higher, then add it above.
-					</p>
-				</>}
-			</SettingsGroup>)}
+			</SettingsGroup>
 
 		</>
 	);
