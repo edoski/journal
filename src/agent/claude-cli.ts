@@ -1,14 +1,19 @@
-import { accessSync, constants, mkdirSync, statSync } from "node:fs";
+import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, isAbsolute, join } from "node:path";
+import { delimiter, dirname, isAbsolute, join } from "node:path";
+import { AUTH_PROVIDER_ENV_VARS } from "../core/auth-keys.ts";
 
 /** The contract with the user's own, unmodified `claude` CLI. LearnHarness
  * never reads, stores or passes a Claude credential: Claude Code signs in
  * through Anthropic's own flow and keeps its credentials to itself. */
 
-/** Removed from the child's environment: the first three would make Claude
- * Code bill an API key instead of the plan, the last is app-private. */
-export const CLAUDE_ENV_DENYLIST = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "LH_DESKTOP_API_SECRET"] as const;
+/** Removed from the child's environment: each would make Claude Code use a
+ * credential, provider or endpoint other than the user's own plan sign-in. */
+export const CLAUDE_ENV_DENYLIST = [
+	"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_FOUNDRY_API_KEY", "ANTHROPIC_AWS_API_KEY",
+	"CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
+	"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "AWS_BEARER_TOKEN_BEDROCK",
+] as const;
 
 export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
@@ -16,7 +21,7 @@ export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
 /** App tools reach the model as MCP tools of this server, so Claude Code names them `mcp__lh__<name>`. */
 export const CLAUDE_MCP_SERVER = "lh";
 export const CLAUDE_TOOL_PREFIX = `mcp__${CLAUDE_MCP_SERVER}__`;
-const TOOLS_ENV = "LH_CLAUDE_TOOLS";
+const TOOLS_ENV = "LH_CLAUDE_TOOLS_FILE";
 
 export type ClaudeEnv = Record<string, string | undefined>;
 
@@ -39,7 +44,6 @@ export function resolveClaudeBinary({ env = process.env, home = homedir(), execu
 		join(home, ".local", "bin"),
 		"/opt/homebrew/bin",
 		"/usr/local/bin",
-		join(home, ".claude", "local"),
 	];
 	for (const dir of dirs) {
 		const candidate = join(dir, name);
@@ -48,28 +52,40 @@ export function resolveClaudeBinary({ env = process.env, home = homedir(), execu
 	return null;
 }
 
-/** The user's own environment minus the denylist. Tool search stays off so
- * app tools are never deferred, and the user's CLAUDE.md files and auto
- * memory stay out of the tutor's context. */
-export function claudeChildEnv(base: ClaudeEnv): NodeJS.ProcessEnv {
-	const env: ClaudeEnv = { ...base };
-	for (const name of CLAUDE_ENV_DENYLIST) delete env[name];
+/** The user's own environment minus the denylist, the app's own provider
+ * keys and its private LH_* settings. The binary's directory joins PATH so an
+ * npm-installed `claude` (a `#!/usr/bin/env node` script) finds its node in a
+ * GUI app's bare PATH. Tool search stays off so app tools are never deferred;
+ * the user's CLAUDE.md files, auto memory and Claude Code's own compaction
+ * stay out of the tutor's context; the non-streaming fallback is off because
+ * its replies never reach the stream mapper. */
+export function claudeChildEnv(base: ClaudeEnv, { binary, thinking = true }: { binary?: string; thinking?: boolean } = {}): NodeJS.ProcessEnv {
+	const env: ClaudeEnv = {};
+	for (const [name, value] of Object.entries(base)) {
+		if ((CLAUDE_ENV_DENYLIST as readonly string[]).includes(name) || AUTH_PROVIDER_ENV_VARS.has(name) || name.startsWith("LH_")) continue;
+		env[name] = value;
+	}
+	if (binary) env.PATH = [dirname(binary), env.PATH].filter(Boolean).join(delimiter);
 	env.ENABLE_TOOL_SEARCH = "false";
 	env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
 	env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
+	env.DISABLE_AUTO_COMPACT = "1";
+	env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK = "1";
+	if (!thinking) env.CLAUDE_CODE_DISABLE_THINKING = "1";
 	return env as NodeJS.ProcessEnv;
 }
 
 export interface ClaudeArgs {
 	model: string;
 	effort?: ClaudeEffort;
-	systemPrompt: string;
-	mcpConfig: string;
+	systemPromptFile: string;
+	mcpConfigFile: string;
 }
 
 /** `--safe-mode` would drop the --mcp-config server, and `--bare` would skip
- * the user's sign-in, so neither is ever passed. */
-export function claudeArgs({ model, effort, systemPrompt, mcpConfig }: ClaudeArgs): string[] {
+ * the user's sign-in, so neither is ever passed. The prompt and tool list go
+ * by file: together they outgrow Windows' 32 KiB command line. */
+export function claudeArgs({ model, effort, systemPromptFile, mcpConfigFile }: ClaudeArgs): string[] {
 	return [
 		"-p",
 		"--input-format", "stream-json",
@@ -78,14 +94,14 @@ export function claudeArgs({ model, effort, systemPrompt, mcpConfig }: ClaudeArg
 		"--include-partial-messages",
 		"--tools", "",
 		"--strict-mcp-config",
-		"--mcp-config", mcpConfig,
+		"--mcp-config", mcpConfigFile,
 		"--allowedTools", `mcp__${CLAUDE_MCP_SERVER}`,
 		"--setting-sources", "",
 		"--disable-slash-commands",
 		"--no-session-persistence",
 		"--model", model,
 		...(effort ? ["--effort", effort] : []),
-		"--system-prompt", systemPrompt,
+		"--system-prompt-file", systemPromptFile,
 	];
 }
 
@@ -100,7 +116,7 @@ export interface ClaudeToolDeclaration {
  * kills Claude Code, so Claude Code can never run a tool or make a second
  * model call. Run inline with -e so no extra file has to be packaged. */
 export const CLAUDE_MCP_SCRIPT = `
-const tools = JSON.parse(process.env.${TOOLS_ENV} || "[]");
+const tools = JSON.parse(require("node:fs").readFileSync(process.env.${TOOLS_ENV}, "utf8"));
 const send = (message) => process.stdout.write(JSON.stringify(message) + "\\n");
 require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
 	let message;
@@ -114,17 +130,32 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
 
 /** The MCP server runs on this process's own runtime: the Electron binary in
  * the desktop app (hence ELECTRON_RUN_AS_NODE), plain node in dev. */
-export function claudeMcpEnv(tools: readonly ClaudeToolDeclaration[]): Record<string, string> {
-	return { ELECTRON_RUN_AS_NODE: "1", [TOOLS_ENV]: JSON.stringify(tools) };
+export function claudeMcpConfig(toolsFile: string, runtime = process.execPath): string {
+	return JSON.stringify({ mcpServers: { [CLAUDE_MCP_SERVER]: { type: "stdio", command: runtime, args: ["-e", CLAUDE_MCP_SCRIPT], env: { ELECTRON_RUN_AS_NODE: "1", [TOOLS_ENV]: toolsFile } } } });
 }
 
-export function claudeMcpConfig(tools: readonly ClaudeToolDeclaration[], runtime = process.execPath): string {
-	return JSON.stringify({ mcpServers: { [CLAUDE_MCP_SERVER]: { type: "stdio", command: runtime, args: ["-e", CLAUDE_MCP_SCRIPT], env: claudeMcpEnv(tools) } } });
-}
-
-/** An app-owned neutral working directory, never the repo or the data dir. */
+/** An app-owned neutral working directory, private to this OS user: Claude
+ * Code reads project settings from its cwd, so nobody else may write here. */
 export function claudeWorkDir(): string {
-	const dir = join(tmpdir(), "learnharness-claude");
-	mkdirSync(dir, { recursive: true });
+	const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+	const dir = join(tmpdir(), `learnharness-claude${uid === undefined ? "" : `-${uid}`}`);
+	mkdirSync(dir, { recursive: true, mode: 0o700 });
+	const stat = statSync(dir);
+	if (uid !== undefined && stat.uid !== uid) throw new Error(`${dir} belongs to another user`);
+	if ((stat.mode & 0o077) !== 0) chmodSync(dir, 0o700);
 	return dir;
+}
+
+export interface ClaudeCallFiles { systemPromptFile: string; mcpConfigFile: string; dispose: () => void }
+
+/** One call's prompt, tool list and MCP config, in a private directory the caller disposes once the child exits. */
+export function writeClaudeCallFiles(systemPrompt: string, tools: readonly ClaudeToolDeclaration[], runtime = process.execPath): ClaudeCallFiles {
+	const dir = mkdtempSync(join(claudeWorkDir(), "call-"));
+	const file = (name: string, content: string) => { const path = join(dir, name); writeFileSync(path, content, { mode: 0o600 }); return path; };
+	const toolsFile = file("tools.json", JSON.stringify(tools));
+	return {
+		systemPromptFile: file("system-prompt.txt", systemPrompt),
+		mcpConfigFile: file("mcp.json", claudeMcpConfig(toolsFile, runtime)),
+		dispose: () => rmSync(dir, { recursive: true, force: true }),
+	};
 }

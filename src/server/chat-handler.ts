@@ -541,7 +541,10 @@ export async function handleChatInput(
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
 				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) return claudeTurnError(error instanceof Error ? error.message : String(error));
+				if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) {
+					console.error(`[chat ${chatId}] Claude turn error:`, error);
+					return claudeTurnError(error instanceof Error ? error.message : String(error));
+				}
 				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, String(error));
 				console.error(`[chat ${chatId}] turn error:`, error);
 				return "An error occurred.";

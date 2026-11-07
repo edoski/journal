@@ -44,7 +44,7 @@ test("the status check uses the turn's environment, caches briefly and re-checks
 	assert.equal((await refreshClaudeConnection(deps)).state, "connected");
 	assert.deepEqual(calls[0]!.args, ["auth", "status", "--json"]);
 	for (const name of ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "LH_DESKTOP_API_SECRET"]) assert.equal(calls[0]!.env[name], undefined, name);
-	assert.equal(calls[0]!.env.PATH, "/bin");
+	assert.equal(calls[0]!.env.PATH, "/fake:/bin", "the binary's directory leads PATH");
 	assert.equal(claudeConnected(), true);
 	clock = 10_000;
 	await refreshClaudeConnection(deps);
@@ -91,7 +91,7 @@ test("the Claude integration never touches a Claude credential: no token flows, 
 	const files = ["src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-stream.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "src/core/contracts/claude.ts"];
 	for (const file of files) {
 		const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-		for (const forbidden of [/setup-token/, /keychain/i, /find-generic-password/, /\.credentials/, /readFile/, /auth login/, /"--bare"/]) {
+		for (const forbidden of [/setup-token/, /keychain/i, /find-generic-password/, /\.credentials/, /["'\/]\.claude["'\/]/, /auth login/, /"--bare"/]) {
 			assert(!forbidden.test(source), `${file} must not contain ${forbidden}`);
 		}
 		const tokenMentions = source.match(/CLAUDE_CODE_OAUTH_TOKEN/g) ?? [];

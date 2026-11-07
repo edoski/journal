@@ -217,14 +217,15 @@ test("plan models clone pi's Anthropic entries with zero cost and keep the think
 	assert.equal(subscriptionLabel("claude-subscription:claude-opus-5-5"), "Claude");
 });
 
-test("effort follows the model's thinking map and is omitted when the map has no value", () => {
+test("effort follows the model's thinking map, keeps unmapped level names and rounds minimal up", () => {
 	assert.equal(claudeEffort(model, "high"), "high");
 	assert.equal(claudeEffort(model, "xhigh"), "xhigh");
 	assert.equal(claudeEffort(model, "minimal"), undefined);
 	assert.equal(claudeEffort(model, undefined), undefined);
 	const fable = claudeSubscriptionModel("claude-fable-5-1")!;
 	assert.equal(claudeEffort(fable, "max"), "max");
-	assert.equal(claudeEffort(fable, "low"), undefined);
+	assert.equal(claudeEffort(fable, "low"), "low", "a level the map leaves out keeps its name");
+	assert.equal(claudeEffort(fable, "minimal"), "low", "Claude Code has no minimal effort");
 });
 
 const user = (content: UserMessage["content"]): UserMessage => ({ role: "user", content, timestamp: 0 });

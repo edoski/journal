@@ -118,7 +118,7 @@ export function ClaudeConnectionRow({ labelClassName }: { labelClassName?: strin
 		<ConnectionRow label={CLAUDE_LABEL} labelClassName={labelClassName} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()}>
 			{connected && <UseForAllRoles busy={busy} onUse={() => void useForAllRoles()} />}
 		</ConnectionRow>
-		<p className="text-xs text-muted-foreground" role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection)}</p>
+		{(connection || !error) && <p className="text-xs text-muted-foreground" role="status" data-testid="claude-connection-state">{claudeConnectionSentence(connection)}</p>}
 		<p className="text-xs text-muted-foreground">{CLAUDE_NOTICE}</p>
 		{error && <p role="alert" className="text-xs text-red-400">{error}</p>}
 	</div>;

@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 import { normalizeContext, type AssistantMessageEvent } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { claudeSubscriptionModel, claudeSubscriptionStream, claudeTranscriptBlocks } from "../src/agent/claude-stream.ts";
-import { CLAUDE_MCP_SCRIPT, claudeMcpEnv } from "../src/agent/claude-cli.ts";
+import { CLAUDE_MCP_SCRIPT, writeClaudeCallFiles } from "../src/agent/claude-cli.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "lh-fake-claude-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -23,7 +23,11 @@ let stdin = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => { stdin += chunk; });
 process.stdin.on("end", () => {
-	fs.writeFileSync(out + ".json", JSON.stringify({ argv: process.argv.slice(2), env: process.env, stdin, cwd: process.cwd() }));
+	const argv = process.argv.slice(2);
+	const read = (flag) => fs.readFileSync(argv[argv.indexOf(flag) + 1], "utf8");
+	const mcp = JSON.parse(read("--mcp-config"));
+	const tools = JSON.parse(fs.readFileSync(mcp.mcpServers.lh.env.LH_CLAUDE_TOOLS_FILE, "utf8"));
+	fs.writeFileSync(out + ".json", JSON.stringify({ argv, env: process.env, stdin, cwd: process.cwd(), systemPrompt: read("--system-prompt-file"), mcp, tools }));
 	for (const line of fixture.lines) process.stdout.write(JSON.stringify(line) + "\\n");
 	if (fixture.exit !== undefined) { process.stderr.write(fixture.stderr || ""); process.exit(fixture.exit); }
 });
@@ -33,7 +37,7 @@ chmodSync(fake, 0o755);
 
 const model = claudeSubscriptionModel("claude-opus-5-5")!;
 const se = (event: unknown) => ({ type: "stream_event", event, parent_tool_use_id: null });
-const init = { type: "system", subtype: "init", apiKeySource: "none" };
+const init = { type: "system", subtype: "init", apiKeySource: "none", mcp_servers: [{ name: "lh", status: "connected" }] };
 const toolUseLines = [
 	init,
 	se({ type: "message_start", message: { id: "msg_1", usage: { input_tokens: 5 } } }),
@@ -56,6 +60,11 @@ function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string })
 		ANTHROPIC_AUTH_TOKEN: "parent-auth-token",
 		CLAUDE_CODE_OAUTH_TOKEN: "parent-oauth-token",
 		LH_DESKTOP_API_SECRET: "x".repeat(64),
+		LH_AUTH_FILE: "/secret/auth.json",
+		OPENAI_API_KEY: "sk-openai-parent",
+		CLAUDE_CODE_USE_BEDROCK: "1",
+		ANTHROPIC_BASE_URL: "https://proxy.example",
+		CLAUDE_CODE_OAUTH_REFRESH_TOKEN: "parent-refresh",
 	};
 	const stream = claudeSubscriptionStream({ binary: () => fake, env });
 	const context = normalizeContext({
@@ -65,9 +74,9 @@ function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string })
 	});
 	return {
 		out,
-		recorded: () => JSON.parse(readFileSync(`${out}.json`, "utf8")) as { argv: string[]; env: Record<string, string | undefined>; stdin: string; cwd: string },
+		recorded: () => JSON.parse(readFileSync(`${out}.json`, "utf8")) as { argv: string[]; env: Record<string, string | undefined>; stdin: string; cwd: string; systemPrompt: string; mcp: { mcpServers: { lh: { command: string; args: string[]; env: Record<string, string> } } }; tools: { name: string }[] },
 		killed: () => existsSync(`${out}.killed`),
-		start: (signal?: AbortSignal) => ({ events: stream(model, context, { reasoning: "high", signal }), context }),
+		start: (signal?: AbortSignal, { thinking = true }: { thinking?: boolean } = {}) => ({ events: stream(model, context, { reasoning: thinking ? "high" : undefined, signal }), context }),
 	};
 }
 async function collect(events: AsyncIterable<AssistantMessageEvent>, onEvent?: (event: AssistantMessageEvent) => void): Promise<AssistantMessageEvent[]> {
@@ -89,30 +98,58 @@ test("the child gets the user's environment minus every credential and app secre
 	assert(done.type === "done" && done.reason === "toolUse");
 	assert.deepEqual(done.message.content, [{ type: "toolCall", id: "toolu_1", name: "quiz", arguments: { question: "Q?" } }]);
 
-	const { argv, env, stdin, cwd } = run.recorded();
-	for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "LH_DESKTOP_API_SECRET"]) assert.equal(env[name], undefined, `${name} must not reach Claude Code`);
-	assert.equal(env.PATH, process.env.PATH, "the user's own environment is kept");
+	const { argv, env, stdin, cwd, systemPrompt, mcp, tools } = run.recorded();
+	for (const name of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BASE_URL", "LH_DESKTOP_API_SECRET", "LH_AUTH_FILE", "OPENAI_API_KEY"]) assert.equal(env[name], undefined, `${name} must not reach Claude Code`);
+	assert.equal(env.HOME, process.env.HOME, "the user's own environment is kept");
+	assert.equal(env.PATH, [dir, process.env.PATH].join(delimiter), "the binary's own directory leads PATH");
 	assert.equal(env.ENABLE_TOOL_SEARCH, "false");
+	assert.equal(env.CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK, "1");
+	assert.equal(env.CLAUDE_CODE_DISABLE_THINKING, undefined, "thinking stays on at a set effort");
 	assert(!argv.includes("--bare"));
 	assert(!argv.includes("--safe-mode"));
 	assert(!argv.some((arg) => /sk-ant|oauth-token|auth-token/.test(arg)), "no credential rides argv");
 	const flag = (name: string) => argv[argv.indexOf(name) + 1];
 	assert.equal(flag("--model"), "claude-opus-5-5");
 	assert.equal(flag("--effort"), "high");
-	assert.equal(flag("--system-prompt"), "You are a tutor.");
+	assert.equal(systemPrompt, "You are a tutor.");
+	assert(!argv.includes("--system-prompt"), "the prompt goes by file");
 	assert.equal(flag("--tools"), "");
 	assert.equal(flag("--setting-sources"), "");
 	assert.equal(flag("--allowedTools"), "mcp__lh");
 	for (const fixed of ["-p", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands", "--include-partial-messages", "--verbose"]) assert(argv.includes(fixed), fixed);
-	const mcp = JSON.parse(flag("--mcp-config")!) as { mcpServers: { lh: { command: string; args: string[]; env: Record<string, string> } } };
 	assert.equal(mcp.mcpServers.lh.command, process.execPath);
 	assert.equal(mcp.mcpServers.lh.args[0], "-e");
 	assert.equal(mcp.mcpServers.lh.env.ELECTRON_RUN_AS_NODE, "1");
-	assert.deepEqual(JSON.parse(mcp.mcpServers.lh.env.LH_CLAUDE_TOOLS!).map((t: { name: string }) => t.name), ["quiz"]);
+	assert.deepEqual(tools.map((t) => t.name), ["quiz"]);
+	assert(await until(() => !existsSync(flag("--mcp-config")!)), "the call's files are removed once the child exits");
 	assert.notEqual(cwd, process.cwd(), "Claude Code runs in a neutral directory, not the repo");
 	const input = JSON.parse(stdin.trim()) as { type: string; message: { role: string; content: unknown } };
 	assert.equal(input.type, "user");
 	assert.deepEqual(input.message.content, claudeTranscriptBlocks(context.messages));
+});
+
+test("thinking off disables Claude Code's thinking", async () => {
+	const run = scenario({ lines: toolUseLines });
+	await collect(run.start(undefined, { thinking: false }).events);
+	const { argv, env } = run.recorded();
+	assert(!argv.includes("--effort"));
+	assert.equal(env.CLAUDE_CODE_DISABLE_THINKING, "1");
+});
+
+test("a turn whose tool server did not connect fails instead of running without tools", async () => {
+	const run = scenario({ lines: [{ ...init, mcp_servers: [{ name: "lh", status: "failed" }] }, ...toolUseLines.slice(1)] });
+	const seen = await collect(run.start().events);
+	assert.equal(seen.length, 1);
+	assert(seen[0]!.type === "error");
+	assert.match(seen[0]!.error.errorMessage!, /could not load LearnHarness's tools/);
+});
+
+test("a tool call that arrives only as a snapshot fails instead of waiting on the tool server", async () => {
+	const run = scenario({ lines: [init, { type: "assistant", parent_tool_use_id: null, message: { content: [{ type: "tool_use", id: "toolu_1", name: "mcp__lh__quiz", input: {} }] } }] });
+	const seen = await collect(run.start().events);
+	const last = seen.at(-1)!;
+	assert(last.type === "error");
+	assert(await until(run.killed));
 });
 
 test("Claude Code is killed as soon as the model stops for a tool call", async () => {
@@ -156,7 +193,11 @@ test("a missing claude binary fails the turn without spawning", async () => {
 
 test("the declaration server lists the app's tools and never answers a tool call", async () => {
 	const tools = [{ name: "quiz", description: "Pose a question.", inputSchema: { type: "object", properties: { question: { type: "string" } } } }];
-	const child = spawn(process.execPath, ["-e", CLAUDE_MCP_SCRIPT], { env: { ...process.env, ...claudeMcpEnv(tools) }, stdio: ["pipe", "pipe", "inherit"] });
+	const files = writeClaudeCallFiles("prompt", tools);
+	after(files.dispose);
+	const server = (JSON.parse(readFileSync(files.mcpConfigFile, "utf8")) as { mcpServers: { lh: { args: string[]; env: Record<string, string> } } }).mcpServers.lh;
+	assert.equal(server.args[1], CLAUDE_MCP_SCRIPT);
+	const child = spawn(process.execPath, server.args, { env: { ...process.env, ...server.env }, stdio: ["pipe", "pipe", "inherit"] });
 	const replies: { id: number; result: Record<string, unknown> }[] = [];
 	createInterface({ input: child.stdout }).on("line", (line) => replies.push(JSON.parse(line)));
 	const send = (message: unknown) => child.stdin.write(`${JSON.stringify(message)}\n`);

@@ -6,7 +6,8 @@ export interface ClaudeRunResult { code: number | null; stdout: string; stderr: 
 /** Runs `<binary> <args>` with the given env; injectable so tests never spawn the real CLI. */
 export type ClaudeRunner = (binary: string, args: string[], env: NodeJS.ProcessEnv) => Promise<ClaudeRunResult>;
 
-const TIMEOUT_MS = 10_000;
+/** Generous: a freshly updated binary's first launch can wait on macOS verifying it. */
+const TIMEOUT_MS = 30_000;
 const TTL_MS = 30_000;
 
 const runClaude: ClaudeRunner = (binary, args, env) => new Promise((resolve) => {
@@ -48,7 +49,7 @@ function cache(): ConnectionCache {
 async function check(run: ClaudeRunner, binary: () => string | null, env: ClaudeEnv): Promise<ClaudeConnection> {
 	const bin = binary();
 	if (!bin) return { state: "missing" };
-	const result = await run(bin, ["auth", "status", "--json"], claudeChildEnv(env));
+	const result = await run(bin, ["auth", "status", "--json"], claudeChildEnv(env, { binary: bin }));
 	if (result.error) return { state: "error", message: "Claude Code could not report its sign-in status. Check that `claude` runs in a terminal, then press Refresh." };
 	return parseClaudeAuthStatus(result.stdout);
 }

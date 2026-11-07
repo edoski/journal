@@ -17,7 +17,7 @@ import {
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
 import { CLAUDE_MODEL_IDS, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
-import { CLAUDE_EFFORTS, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeMcpConfig, claudeWorkDir, resolveClaudeBinary, type ClaudeEffort, type ClaudeEnv } from "./claude-cli.ts";
+import { CLAUDE_EFFORTS, CLAUDE_MCP_SERVER, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary, writeClaudeCallFiles, type ClaudeEffort, type ClaudeEnv } from "./claude-cli.ts";
 
 const PROVIDER = CLAUDE_SUBSCRIPTION.providerId;
 const NO_KEY = " No API key was used.";
@@ -35,11 +35,16 @@ export function claudeSubscriptionModels(): Model<Api>[] {
 	return CLAUDE_MODEL_IDS.flatMap((id) => claudeSubscriptionModel(id) ?? []);
 }
 
-/** Pi's level → Claude Code's --effort value through the model's own map; absent when the map has none. */
+const isEffort = (value: unknown): value is ClaudeEffort => typeof value === "string" && (CLAUDE_EFFORTS as readonly string[]).includes(value);
+
+/** Pi's level → Claude Code's --effort value. The model's map wins; a level
+ * the map leaves out keeps its own name (pi's convention), and minimal, which
+ * Claude Code lacks, rounds up to low. Off and unsupported levels have none. */
 export function claudeEffort(model: Model<Api>, level: ThinkingLevel | undefined): ClaudeEffort | undefined {
 	if (!level) return undefined;
-	const mapped: unknown = model.thinkingLevelMap?.[level];
-	return typeof mapped === "string" && (CLAUDE_EFFORTS as readonly string[]).includes(mapped) ? mapped as ClaudeEffort : undefined;
+	const map = model.thinkingLevelMap as Record<string, unknown> | undefined;
+	const mapped = map && level in map ? map[level] : level === "minimal" ? "low" : level;
+	return isEffort(mapped) ? mapped : undefined;
 }
 
 type AnthropicBlock =
@@ -86,7 +91,7 @@ export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rat
 		const reset = rateLimit?.resetsAt ? ` It resets ${claudeResetTime(rateLimit.resetsAt)}.` : "";
 		return `Your Claude plan's usage limit is reached.${reset} See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
 	}
-	if (code === "authentication_failed" || code === "oauth_org_not_allowed" || status === 401 || /not logged in|log ?in|authenticat/i.test(text)) {
+	if (code === "authentication_failed" || code === "oauth_org_not_allowed" || status === 401 || /not logged in|please (run \/)?log ?in|authenticat/i.test(text)) {
 		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers.${NO_KEY}`;
 	}
 	if (code === "model_not_found" || status === 404 || /model\b.*\b(not found|not available|unavailable|does not exist)|(invalid|unknown) model/i.test(text)) {
@@ -104,6 +109,8 @@ export function claudeResetTime(resetsAt: number): string {
 export const CLAUDE_API_KEY_REFUSAL = `Claude Code would bill an API key here, not your Claude plan, so LearnHarness stopped the request. Remove the API key from Claude Code's settings, then retry.${NO_KEY}`;
 export const CLAUDE_MISSING = `Claude Code was not found. Install Claude Code, run \`claude\` in a terminal and sign in, then press Refresh in Settings → Providers.${NO_KEY}`;
 const CLAUDE_ABORTED = "Claude request cancelled.";
+/** Background jobs pass no abort signal, so a silent child would otherwise hold them forever. */
+const CLAUDE_IDLE_MS = 10 * 60_000;
 
 /** A loop-level failure on a Claude turn: keep curated text, mask the rest. */
 export function claudeTurnError(message: string): string {
@@ -132,7 +139,7 @@ export class ClaudeStreamMapper {
 	private errorCode: string | undefined;
 	private errorStatus: number | undefined;
 
-	constructor(model: Model<Api>, now = Date.now()) {
+	constructor(model: Model<Api>, now = Date.now(), private readonly expectsTools = false) {
 		this.message = {
 			role: "assistant", api: model.api, provider: model.provider, model: model.id, content: [], stopReason: "stop", timestamp: now,
 			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
@@ -144,17 +151,27 @@ export class ClaudeStreamMapper {
 		if (this.finished || !event) return [];
 		switch (event.type) {
 			case "system":
-				if (event.subtype === "init" && event.apiKeySource !== "none") return this.fail(CLAUDE_API_KEY_REFUSAL);
+				if (event.subtype !== "init") return [];
+				if (event.apiKeySource !== "none") return this.fail(CLAUDE_API_KEY_REFUSAL);
+				if (this.expectsTools && !(Array.isArray(event.mcp_servers) && event.mcp_servers.some((server) => record(server)?.name === CLAUDE_MCP_SERVER && record(server)?.status === "connected"))) {
+					return this.fail(`Claude Code could not load LearnHarness's tools, so the turn was stopped.${NO_KEY}`);
+				}
 				return [];
 			case "rate_limit_event": {
 				const info = record(event.rate_limit_info);
 				if (info?.status === "rejected") this.rateLimit = { resetsAt: num(info.resetsAt), rateLimitType: typeof info.rateLimitType === "string" ? info.rateLimitType : undefined };
 				return [];
 			}
-			case "assistant":
+			case "assistant": {
 				if (typeof event.error === "string") this.errorCode = event.error;
 				if (num(event.api_error_status) !== undefined) this.errorStatus = num(event.api_error_status);
+				// A tool call that never streamed would reach the MCP server, which never answers: fail instead of waiting.
+				const content = record(event.message)?.content;
+				if (!event.parent_tool_use_id && Array.isArray(content) && content.some((block) => record(block)?.type === "tool_use") && !this.message.content.some((block) => block.type === "toolCall")) {
+					return this.fail(`Claude Code returned a reply LearnHarness could not stream. Retry.${NO_KEY}`);
+				}
 				return [];
+			}
 			case "stream_event":
 				if (event.parent_tool_use_id) return [];
 				return this.stream(record(event.event));
@@ -215,6 +232,7 @@ export class ClaudeStreamMapper {
 		switch (event.type) {
 			case "message_start": {
 				const message = record(event.message);
+				if (this.message.content.length) return this.fail(`Claude Code restarted its reply midway. Retry.${NO_KEY}`);
 				this.blocks.clear(); this.json.clear(); this.unseenThinking.clear();
 				if (typeof message?.id === "string") this.message.responseId = message.id;
 				if (typeof message?.model === "string") this.message.responseModel = message.model;
@@ -337,7 +355,7 @@ export interface ClaudeStreamDeps {
 export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(), env = process.env }: ClaudeStreamDeps = {}): StreamFunction<Api, SimpleStreamOptions> {
 	return (model, context, options) => {
 		const output = new AssistantMessageEventStream();
-		const mapper = new ClaudeStreamMapper(model);
+		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0);
 		let stop = () => {};
 		let ended = false;
 		const emit = (events: AssistantMessageEvent[]) => {
@@ -350,17 +368,30 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		if (!bin) { emit(mapper.fail(CLAUDE_MISSING)); return output; }
 
 		const tools = getCurrentTools(context.messages).map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.parameters }));
-		const args = claudeArgs({
-			model: model.id,
-			effort: claudeEffort(model, options?.reasoning),
-			systemPrompt: getCurrentSystemPrompt(context.messages),
-			mcpConfig: claudeMcpConfig(tools),
-		});
-		const child = spawn(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env), stdio: ["pipe", "pipe", "pipe"] });
+		const effort = claudeEffort(model, options?.reasoning);
+		let files: ReturnType<typeof writeClaudeCallFiles> | undefined;
+		let child: ReturnType<typeof spawn>;
+		try {
+			files = writeClaudeCallFiles(getCurrentSystemPrompt(context.messages), tools);
+			const args = claudeArgs({ model: model.id, effort, systemPromptFile: files.systemPromptFile, mcpConfigFile: files.mcpConfigFile });
+			child = spawn(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: effort !== undefined }), stdio: ["pipe", "pipe", "pipe"] });
+		} catch (error) {
+			files?.dispose();
+			emit(mapper.fail(`Claude Code could not be started (${error instanceof Error ? error.message : String(error)}).${NO_KEY}`));
+			return output;
+		}
+		const { stdin, stdout, stderr: errors } = child as ReturnType<typeof spawn> & { stdin: NonNullable<ReturnType<typeof spawn>["stdin"]>; stdout: NonNullable<ReturnType<typeof spawn>["stdout"]>; stderr: NonNullable<ReturnType<typeof spawn>["stderr"]> };
 		let stderr = "";
 		let buffer = "";
+		let idle: ReturnType<typeof setTimeout> | undefined;
+		const watch = () => {
+			clearTimeout(idle);
+			idle = setTimeout(() => emit(mapper.fail(`Claude Code sent nothing for ${CLAUDE_IDLE_MS / 60_000} minutes, so the request was stopped.${NO_KEY}`)), CLAUDE_IDLE_MS);
+			idle.unref?.();
+		};
 		const onAbort = () => emit(mapper.abort());
 		stop = () => {
+			clearTimeout(idle);
 			signal?.removeEventListener("abort", onAbort);
 			if (child.exitCode !== null || child.signalCode !== null) return;
 			child.kill("SIGTERM");
@@ -368,25 +399,35 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		};
 		signal?.addEventListener("abort", onAbort, { once: true });
 
-		child.stdout.setEncoding("utf8");
-		child.stdout.on("data", (chunk: string) => {
+		const feedLine = (raw: string) => {
+			const line = raw.trim();
+			if (!line || mapper.finished) return;
+			let parsed: unknown;
+			try { parsed = JSON.parse(line); } catch { return; }
+			emit(mapper.feed(parsed));
+		};
+		watch();
+		stdout.setEncoding("utf8");
+		stdout.on("data", (chunk: string) => {
+			watch();
 			buffer += chunk;
 			let newline: number;
 			while (!mapper.finished && (newline = buffer.indexOf("\n")) >= 0) {
-				const line = buffer.slice(0, newline).trim();
+				const line = buffer.slice(0, newline);
 				buffer = buffer.slice(newline + 1);
-				if (!line) continue;
-				let parsed: unknown;
-				try { parsed = JSON.parse(line); } catch { continue; }
-				emit(mapper.feed(parsed));
+				feedLine(line);
 			}
 		});
-		child.stderr.setEncoding("utf8");
-		child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-4000); });
-		child.stdin.on("error", () => {});
+		errors.setEncoding("utf8");
+		errors.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(-4000); });
+		stdin.on("error", () => {});
 		child.on("error", (error) => emit(mapper.fail(`Claude Code could not be started (${error.message}).${NO_KEY}`)));
-		child.on("close", (code, killSignal) => emit(mapper.exit(code, killSignal, stderr)));
-		child.stdin.end(`${JSON.stringify({ type: "user", message: { role: "user", content: claudeTranscriptBlocks(context.messages) } })}\n`);
+		child.on("close", (code, killSignal) => {
+			files?.dispose();
+			feedLine(buffer);
+			emit(mapper.exit(code, killSignal, stderr));
+		});
+		stdin.end(`${JSON.stringify({ type: "user", message: { role: "user", content: claudeTranscriptBlocks(context.messages) } })}\n`);
 		return output;
 	};
 }
