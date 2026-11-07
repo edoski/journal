@@ -188,7 +188,7 @@ flowchart LR
         FS["fs stores — src/store (data/)"]
         LLM["LLM engines — pi-ai/OpenRouter via piEngineFor"]
         HEAD["headless Chrome — demo verify · SVG render"]
-        WEB["web tools — Google CSE + Readability/Jina (researcher)"]
+        WEB["web tools — model-native search + Readability/Jina (researcher)"]
     end
 
     BROWSER --> HTTP
@@ -410,7 +410,7 @@ flowchart LR
     end
     subgraph OUTSIDE["outside the process"]
         OR["OpenRouter (BYOK key from auth.json, env-injected — never argv)"]
-        GCSE["Google CSE / Jina (researcher tools)"]
+        GCSE["page fetch / Jina (researcher tools)"]
         CHROME["system Chrome (headless: demo verify · SVG render)"]
         DISK["data/ ledgers (via LH_DATA_DIR seam)"]
     end
@@ -436,6 +436,8 @@ For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes these same
 `subscription-request-cycle.ts` is the shared admission/automatic-input recovery state machine; the old ChatGPT module is its compatibility export. Background consent is independent per provider, default ON, with foreground-preserving cancellation and queue ownership retained on no-dispatch. Native usage rejected before dispatch is transiently excluded from helper usage collectors, without adding persisted provenance fields. Catalogs and read-time pricing preserve the selected connection: subscription use displays compact provider labels, API dollars remain dollars, and mixed usage joins both without estimating subscription dollars or claiming detected tiers/allowances.
 
 The Claude subscription (`claude-subscription`) holds no app credential. `src/agent/claude-stream.ts` is a pi `StreamFunction` that runs the user's own signed-in `claude` CLI once per model call: it replays the transcript as one user message, declares the app's tools through an inline MCP server that never answers a call, and kills the CLI at the first tool_use so pi's loop still runs every tool. The child gets the user's environment minus Anthropic credential and provider variables and the app's own keys. If Claude Code reports an API key source at startup, the CLI is killed (best effort: its first request may already be in flight). Connection status comes from `claude auth status` (`src/agent/claude-connection.ts`), so its "key present" is that sign-in.
+
+The researcher's `web_search` is the engine model's own search, looked up by provider in `src/agent/native-web-search.ts`. Only `claude-subscription` has an entry today, so a researcher on any other provider has no `web_search` and researches with `web_fetch`. For Claude, `src/agent/claude-search.ts` spawns a separate `claude -p` relay per search, on Haiku, with only Claude Code's built-in `WebSearch` tool. It returns the first search result verbatim and kills the relay. The researcher's own spawn never gets built-in tools: mixing them with the app's tools would break the one-model-call-per-spawn contract.
 
 ## 9. The foundational invariants — what ALWAYS holds
 

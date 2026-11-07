@@ -42,7 +42,6 @@ Secrets and machine-specific paths only. Model choice and thinking budgets are t
 | Variable | Purpose |
 |---|---|
 | `OPENROUTER_API_KEY` | required — all LLM calls go through OpenRouter |
-| `GOOGLE_SEARCH_API_KEY` + `GOOGLE_CSE_ID` | researcher's `web_search` (Google Custom Search) |
 | `CHROME_PATH` | optional system Chrome fallback for demo verification; the app's own browser helper is primary (nothing is downloaded) |
 
 The packaged desktop app takes keys from `userData/auth.json` (BYOK, mode 0600, read/written directly by the server via `LH_AUTH_FILE`). PDFs render natively with pdfjs/Skia; SVGs use resvg.
@@ -124,7 +123,7 @@ src/
     tools/plan.ts               plan_init (author-once mermaid plan, deterministic parser)
     tools/probe.ts              probe_done (probe→teach handoff seam)
     tools/jobs.ts               research / demo / visual tool surfaces
-    tools/web.ts                web_search (Google CSE) + web_fetch (researcher only)
+    tools/web.ts                web_search (model-native) + web_fetch (researcher only)
     subagents/                  researcher · demo-builder · visual-maker
                                 · pdf-reader,
                                 extraction pipeline (extractor/auditor + merger handoff),
