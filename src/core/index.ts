@@ -52,6 +52,8 @@ export * from "./prices.ts";
 export * from "./context-usage.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
 export { NATIVE_SUBSCRIPTIONS } from "./contracts/subscriptions.ts";
+export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULTS, CLAUDE_USAGE_URL } from "./contracts/claude.ts";
+export type { ClaudeConnection, ClaudeModelId } from "./contracts/claude.ts";
 export type { NativeSubscriptionProviderId, NativeSubscriptionLogicalId, NativeSubscriptionStatus, NativeSubscriptionSnapshot, NativeSubscriptionScope, NativeSubscriptionControlBridge, SubscriptionInteraction, SubscriptionPrompt } from "./contracts/subscriptions.ts";
 export * from "./cost-summary.ts";
 export * from "./fuzzy.ts";
