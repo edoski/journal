@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/yearly metrics.
+It also fetches the owner's own bank transactions (`finance`) for the period notes' FINANCES section.
 
 ## Project Structure
 
@@ -14,6 +15,8 @@ This repository syncs Flow app focus data into an Obsidian journal and builds da
   - `notes/`: Markdown operations and note locking.
   - `run/`: CLI parsing, direct dispatch, and integration construction.
 - `learning/`: study workspaces, records, retrieval, preferences, planning, notes, and the MCP server.
+- `finance/`: Enable Banking client (stdlib, RS256 via system `openssl`), local SQLite store,
+  category rules, fetch/connect/status CLI (`python -m finance`) and the read interface for sync.
 - `tests/`: behavior, external integrations, and rendering fixtures.
 - `tools/check.py`: full or package-focused quality checks.
 - `macos/Journal/`: native app and bundled sync runtime.
@@ -44,6 +47,8 @@ aliases.
 - `sync/periods` must not import `sync/run`.
 - No cross-module private (`_name`) imports in `sync/`.
 - `sync` must not import `learning`.
+- Only `sync/adapters/finance_store.py` imports `finance`, and only `finance.read`;
+  `finance` imports neither `sync` nor `learning`.
 - Learning reads journal activity and schedules through
   `sync.study.context.journal_summary`; it does not import other sync internals.
 - Learning record shapes, validation and the patch rule belong to
@@ -55,6 +60,9 @@ aliases.
 ### Rendering architecture
 
 - Charts are rendered only via `sync/writers/charts/api.py::render_chart(spec)`.
+  The FINANCES waterfall is `WaterfallSpec` (one geometry rule for every case:
+  scale from the lowest to the highest running total with zero included; steps
+  chained and at least one cell wide while there is room; totals drawn from zero).
 - Markdown tables are rendered only via `sync/writers/tables/api.py::render_table(spec)`.
 - Markdown table parsing/row escaping is centralized in `sync/notes/markdown_tables.py`.
 - Chart/table specs should expose one canonical field type per value slot; normalize richer domain payloads at call sites instead of widening spec fields with unions.
@@ -71,6 +79,9 @@ aliases.
 - `PeriodSyncService`: period orchestration for weekly/monthly/yearly notes.
   - period-specific rendering logic lives in `sync/periods/builders/`.
   - media scanning is injected through `MediaSource` and passed into the period renderer as `MediaBundle`.
+  - bank data is injected through `FinanceSource` and passed to the builders as
+    `FinanceBundle` (`None` when finance is not set up: nothing new renders); the
+    service also publishes the monthly transactions notes.
 
 ### Canonical rendering entrypoints
 
@@ -94,6 +105,14 @@ aliases.
     directory creation, and the canonical trailing newline
 - `DailyAggregateSource.load_for_dates(dates) -> dict[date, DailyAggregate]`
 - `MediaSource.scan(start, end) -> MediaBundle`
+- `FinanceSource.load(start, end) -> FinanceBundle | None`
+  - `None` means no finance store exists; an unreadable store or an invalid
+    `categories.toml` raises `FinanceUnavailableError` (in `sync/ports/finance.py`),
+    which the service turns into one line in the FINANCES section (SPENT `—`, no
+    transactions notes, one warning per process); every other section renders
+  - `FinanceBundle.entries` are categorised `FinanceEntry` rows (positive cents,
+    `flow` IN/OUT, `role` income/spending/investing/transfer/gift); `covered_from` is the
+    first day the bank data covers
   - `MediaBundle.items` contains immutable period-ready `MediaItem` rows; period
     rendering does not interpret podcast storage topology
 - `FlowSessionRepository` owns Flow connection lifecycle, session SQL,
@@ -130,6 +149,36 @@ aliases.
   - the index note's episode table is regenerated on every scan from all its episodes
     in watch order, so only its frontmatter may be hand-edited; a series without an
     index note gets a hidden one (`visible: false`) written on the next scan
+- Periodic `FINANCES` sections (only when bank data exists and the period has entries):
+  - placed after `SLEEP` and before `MEDIA`
+  - monthly and yearly: the waterfall (INCOME, spending categories by net amount
+    descending, INVESTED, LEFT), then `| CATEGORY | AMOUNT | SHARE |` (spending
+    categories with a positive net only), then transaction link lines
+  - weekly: no waterfall; the category table and one link per month the week touches
+  - monthly link: `**[[YYYY-MM transactions|N transactions →]]**`; weekly and yearly
+    links prefix the month: `**[[YYYY-MM transactions|SEP: N transactions →]]**`,
+    `N` being the linked month's entry count
+  - money rules: categories are nets (a refund a rule matched reduces its category);
+    money in that no rule matched (shown as Other) counts as INCOME, as do the
+    Income and Interest categories; Transfer and Gifts entries count nowhere;
+    SPENT never goes below €0
+  - waterfall below €1 of spread: no chart; tiny steps more than 2 cells from
+    their exact place become a `▏` marker; LEFT is always drawn at its exact value
+  - unreadable bank data: `### **FINANCES**` then `` `finance data unreadable: <reason>` ``
+- Periodic `SUMMARY` gains a `SPENT` row when bank data exists: whole euros, CURRENT
+  and PREVIOUS period totals, moving-average column `€N/wk`, `€N/mo` or `€N/yr`;
+  `—` for periods the bank data does not cover from their first day (they stay
+  out of the average); an opening day set with `finance opened` completes only
+  the period that contains it (periods ending earlier stay `—`); `finance status`
+  shows it, or says when the stored date is broken
+- Transactions notes `transactions/YYYY-MM transactions.md` are generated whole:
+  - first line `Month: [[YYYY-MM]]`, a blank line, then
+    `| TYPE | CATEGORY | DESCRIPTION | AMOUNT | DATE |`
+  - every entry booked that month, Transfer included, sorted by date (IN before OUT
+    on a day); bank text is escaped as plain text; nothing is written while the
+    bank data is unreadable
+  - written when the month's note syncs and whenever a weekly or yearly note links to
+    the month; hand edits are overwritten
 - `PROTOCOL.md` `## SCHEDULE` is canonical only when it includes:
   - `| RULE | STUDY_START | STUDY_END | LUNCH_START | LUNCH_END | WORKOUT_START |`
   - required `DEFAULT` row with full values
@@ -163,6 +212,52 @@ python -m sync.run grades sync <bsc|msc>
 python -m sync.run media book annotations import /abs/path/to/export.html --note /abs/path/to/book.md
 ```
 
+### Finance
+
+```bash
+python -m finance setup --application-id ID --key ~/.config/enablebanking/ID.pem
+python -m finance connect [--bank NAME]  # bank login in Chrome, read back from its tabs
+python -m finance fetch            # balances + transactions (launchd: 3x a day); renews due consents
+python -m finance status
+python -m finance rules check
+python -m finance rules unmatched --month YYYY-MM
+python -m finance opened YYYY-MM-DD [--account 0653]  # a new account's opening day (never automatic)
+python -m finance credits --since YYYY-MM-DD --json   # read-only, for biz
+python -m finance debits --since YYYY-MM-DD --json    # read-only, for biz; with the Round up runs
+python -m finance balance --json                      # read-only, for biz
+python -m finance balance --history --since YYYY-MM-DD --json  # one a day per account, for biz
+```
+
+From the installed app: `/Applications/Journal.app/Contents/MacOS/Journal --finance <command>`
+(only after a rebuild that includes `finance/`: an older app treats `--finance` as a
+normal launch). Category rules apply when notes sync, so a rules edit reaches a past
+note only when it is synced again (e.g. `python -m sync.run period monthly --month YYYY-MM`).
+`fetch` exits 0 on success or a clean skip (another fetch running, the 6-hour pause
+after a 429), 3 when the bank consent must be renewed, 1 on other errors.
+
+Trade Republic's Round up (`finance/roundup.py`, a `roundup` rule in `categories.toml`
+with the multiplier, run days, start day and, once switched off or changed, last run):
+each run's debit is taken only when the card payments' round-ups add up to it to the
+cent, trying both sides of the run's cut-off for payments booked near it (a payment
+is booked up to 3 days late). A run that matches no debit, or more than one, or with
+more than one set of payments passed on to the next run, is reported in
+`debits --json` `roundups` and its candidate debits stay Other; nothing is guessed.
+
+Consent renewal (Trade Republic every 90 days, FinecoBank every 180): after fetching
+every bank, `fetch` renews each consent that ends today or has ended (never earlier),
+still holding the fetch lock. It opens the bank login in Google Chrome, posts a
+notification, reads Chrome's tab addresses until one is the redirect URL with this
+attempt's `state` (at most 15 minutes), stores the new session, closes the tab and
+the previous session, and fetches that bank again. A failure or timeout is notified
+and left to the next scheduled run. `connect` does the same by hand; without
+`--bank` it picks the bank not connected, then ended, then ending soonest, and asks
+for the pasted address only when Chrome cannot be opened or read (one line says why).
+`Journal --finance` runs its command as a process responsible for itself, so macOS
+attributes the Automation request to Journal, from a terminal as from launchd: the
+first `connect` asks once "Journal wants access to control Google Chrome"
+(System Settings > Privacy & Security > Automation > Journal). Notifications come
+from `osascript` (listed under Script Editor in System Settings > Notifications).
+
 ### Snapshot baseline fixtures
 
 ```bash
@@ -189,6 +284,7 @@ source .venv/bin/activate
 python tools/check.py
 python tools/check.py sync
 python tools/check.py learning
+python tools/check.py finance
 ```
 
 The gate runs Ruff lint/format checks, strict mypy, import-linter, and Python
@@ -222,6 +318,8 @@ Primary env overrides:
 - `SCHEDULE_PATH`, `BSC_GRADES_PATH`, `MSC_GRADES_PATH`
 - `JOURNAL_SUPPORT_DIR`, `JOURNAL_STATE_DIR`, `DAILY_STATE_DIR`, `TRAINING_STATE_DIR`
 - `MEDIA_CACHE_DIR`, `LOCK_DIR`
+- `FINANCE_DIR` (default `<JOURNAL_SUPPORT_DIR>/finance`; `finance/config.py` resolves
+  the same rule, since finance does not import sync)
 - `FLOW_DB_PATH`, `ICLOUD_SHORTCUTS_DIR`, `ICLOUD_JOURNALSYNC_DIR`
 
 ## Runtime Configuration
@@ -250,7 +348,7 @@ Repository relocation:
   update their bundled Python code.
 
 The configured `tools/hooks/post-commit` hook rebuilds and installs the app after
-commits touching `sync/` or `macos/`. Run the quality gate before such commits.
+commits touching `sync/`, `finance/` or `macos/`. Run the quality gate before such commits.
 
 ## Data and Cache Files
 
@@ -262,12 +360,24 @@ commits touching `sync/` or `macos/`. Run the quality gate before such commits.
 - shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)
 - training state: `~/Library/Application Support/Journal/state/daily/training/YYYY-MM-DD.json` (14-day retention)
 - locks: `~/Library/Application Support/Journal/locks/<shard>/<sha1>.lock` (stable lock files; do not prune by age)
+- finance (folder 700, files 600): `~/Library/Application Support/Journal/finance/`
+  - `finance.toml` (application id, key path, `[[bank]]` tables; none means FinecoBank)
+  - `session-<bank key>.json` per bank, e.g. `session-finecobank-it.json` (consent, accounts, pauses)
+  - `finance.sqlite3` (transactions with their raw JSON, balances, fetch runs)
+  - `categories.toml` (category rules, starter copy written by setup/connect)
+  - `fetch.lock`
 
 ## LaunchAgents
 
 - Journal sync: `~/Library/LaunchAgents/com.edo.journal.sync.plist`
 - Skip automation: `~/Library/LaunchAgents/com.edo.journal.skip.plist`
 - Remind automation: `~/Library/LaunchAgents/com.edo.journal.remind.plist`
+- Bank fetch: `~/Library/LaunchAgents/com.edo.journal.finance.plist` (source in
+  `macos/LaunchAgents/`, 07:30/13:30/19:30, `Umask` 077, logs in
+  `/Users/edo/Library/Logs/Journal/finance.{out,err}`: launchd neither expands `~`
+  nor creates the folder, so `mkdir -m 700 -p ~/Library/Logs/Journal` comes first;
+  the period sync picks the data up on its own schedule). Install only after the
+  rebuilt app answers `/Applications/Journal.app/Contents/MacOS/Journal --finance status`.
 
 Reload:
 
@@ -294,5 +404,8 @@ launchctl load ~/Library/LaunchAgents/com.edo.journal.remind.plist
 
 - Never commit personal journal content.
 - Treat Flow DB as read-mostly; write operations must be intentional and minimal.
+- Finance makes network calls only in `connect` and `fetch`, and drives Chrome only to
+  open the bank link and read or close tab addresses; tests use fakes. Never read,
+  copy or print the Enable Banking private key; never disable TLS verification.
 - Use file locks for note writes.
 - Avoid destructive git commands (`reset --hard`, checkout of unknown changes).

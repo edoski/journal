@@ -16,4 +16,8 @@ This repository syncs focus, training, sleep, and media into Obsidian journal no
 
 **Shortcut Status File**: A JSON payload produced by iCloud Shortcuts. Shortcut status ingestion reads, validates, finalizes, or quarantines these files before exposing typed daily status.
 
+**Finance Entry**: One booked bank transaction with its category, read from the finance store. Categories come from `categories.toml` rules when the store is read, never from the fetch.
+
+**Transactions Note**: A generated note per month, `transactions/YYYY-MM transactions.md`, listing every finance entry of the month; period notes link to it.
+
 **Runtime Command**: A CLI command bound by the composition root to application services, adapters, and command-specific dependencies.

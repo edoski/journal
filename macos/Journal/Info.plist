@@ -34,7 +34,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Journal controls Flow sessions and reads their current state.</string>
+    <string>Journal controls Flow sessions and reads their current state, and reads Google Chrome&apos;s tabs to finish a bank login.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>

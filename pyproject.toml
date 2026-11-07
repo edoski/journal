@@ -21,14 +21,15 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["sync*", "learning*"]
+include = ["sync*", "learning*", "finance*"]
 
 [tool.setuptools.package-data]
 learning = ["skills/tutor/SKILL.md", "skills/tutor/references/*.md"]
+finance = ["starter_categories.toml"]
 
 [tool.coverage.run]
 branch = true
-source = ["sync", "learning"]
+source = ["sync", "learning", "finance"]
 
 [tool.coverage.report]
 show_missing = true
