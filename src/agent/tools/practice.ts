@@ -26,6 +26,15 @@ import { activeProblemOf } from "../../core/native-messages.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
+import type { CourseToolContext } from "./course.ts";
+import type { LhMarkerMessage } from "../../core/native-messages.ts";
+import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
+import {
+	conclusionProblem,
+	practiceObservations,
+	type PracticeConclusion,
+	type SubmissionConfidence,
+} from "../../core/practice-attempts.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
@@ -141,11 +150,79 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
+	result: Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], {
+		description:
+			"REQUIRED — the attempt's result for his course record: correct, partial (a guess, or a right answer reached by reasoning that does not hold) or incorrect.",
+	}),
+	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
+	chose: Type.Optional(
+		Type.String({ minLength: 1, description: "On a discrimination miss: the course topic handle of the method he wrongly chose." }),
+	),
+	firstTry: Type.Optional(
+		Type.Object(
+			{
+				result: Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")]),
+				response: Type.String({ description: "His first answer, in a short line." }),
+			},
+			{ description: "When the problem took more than one answer: his first unaided answer and its result." },
+		),
+	),
 });
 
 export type ConcludeInput = Static<typeof concludeInputObject>;
 
-export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInputObject> {
+/** Where a conclusion is recorded: the session's record (for the pose and
+ *  the submissions) and its course. */
+export interface ConcludeRecording {
+	ctx: PracticeToolContext;
+	course: CourseToolContext;
+}
+
+/** The confidence of the first and last submission on one problem. */
+function submissionConfidence(messages: readonly LhMessage[], problemCallId: string): SubmissionConfidence {
+	const states = messages
+		.filter((m): m is LhMessage & LhMarkerMessage => (m as { customType?: string }).customType === "practice-thinking")
+		.map((m) => m.details as { problemCallId?: unknown; confidence?: unknown } | null)
+		.filter((d) => d?.problemCallId === problemCallId)
+		.map((d) => (typeof d?.confidence === "string" ? d.confidence : undefined));
+	return { first: states[0], last: states[states.length - 1] };
+}
+
+/** Save a concluded problem's attempts; a refusal names what to fix. */
+async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
+	if (input.outcome === "dismissed") return { text: "" };
+	const conclusion: PracticeConclusion = {
+		outcome: input.outcome,
+		rung: input.rung,
+		result: input.result,
+		response: input.response,
+		...(input.chose ? { chose: input.chose } : {}),
+		...(input.firstTry ? { firstTry: input.firstTry } : {}),
+	};
+	const problem = conclusionProblem(conclusion);
+	if (problem) return { refused: problem, text: "" };
+	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
+	const active = record ? activeProblemOf(record.messages) : null;
+	const pose = active?.input as { statement?: unknown; topics?: unknown } | undefined;
+	if (!record || !active || typeof pose?.statement !== "string" || !Array.isArray(pose.topics)) {
+		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
+	}
+	const observations = practiceObservations(
+		{ statement: pose.statement, topics: pose.topics.filter((t): t is string => typeof t === "string") },
+		conclusion,
+		submissionConfidence(record.messages, active.toolCallId),
+	);
+	const saved = await rec.course.records.run(rec.course.course.workspace, { verb: "save", changes: { observations } });
+	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
+	if (saved.kind === "validation") return { refused: `the course record refused the attempt: ${saved.message}`, text: "" };
+	return {
+		text:
+			`The attempt was not saved (${saved.message}). On your next turn, re-send exactly this with course_save: ` +
+			JSON.stringify({ observations }),
+	};
+}
+
+export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {
 	return {
 		name: "conclude",
 		label: "conclude",
@@ -158,18 +235,22 @@ export function concludeTool(gate: PracticeGate): AgentTool<typeof concludeInput
 		parameters: concludeInputObject,
 		prepareArguments: (args: unknown) => healEncodedArguments(args, concludeInputObject) as never,
 		executionMode: "sequential",
-		execute: async (_toolCallId, _input) => {
+		execute: async (_toolCallId, input) => {
 			if (!gate.problemActive) {
 				return invalidInputResult("conclude", ["no active problem to conclude — pose one first"]);
 			}
+			const recorded = recording ? await recordConclusion(recording, input) : { text: "" };
+			if (recorded.refused) return invalidInputResult("conclude", [recorded.refused]);
 			gate.problemActive = false;
-			return concludeResult();
+			const ack = concludeResult();
+			if (!recorded.text) return ack;
+			return { ...ack, content: [{ type: "text", text: `${CONCLUDE_ACK_TEXT}\n\n${recorded.text}` }] };
 		},
 	};
 }
 
 /** The practice toolset (the practice agent's whole registry). */
-export function practiceTools(ctx: PracticeToolContext): Record<string, AgentTool<any>> {
+export function practiceTools(ctx: PracticeToolContext, course?: CourseToolContext): Record<string, AgentTool<any>> {
 	// ONE gate per turn, shared by both tools — the intra-turn truth.
 	const gate = createPracticeGate(ctx);
 	// THE RARELY-NEEDED SET (owner round 10): read/ls/find/grep over the
@@ -186,7 +267,7 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
 		problem: problemTool(gate),
-		conclude: concludeTool(gate),
+		conclude: concludeTool(gate, course ? { ctx, course } : undefined),
 		read: readTool,
 		ls: lsTool,
 		find: findTool,

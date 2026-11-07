@@ -55,6 +55,8 @@ const CONCLUDE = {
 	rung: null,
 	missClass: null,
 	retest: false,
+	result: "correct",
+	response: "Correct, with the full argument.",
 } as const;
 
 const createdChats: string[] = [];

@@ -107,7 +107,6 @@ describe("a course-linked turn", () => {
 	it("practice: the pose carries course topics and the attempt is saved to the linked course", async () => {
 		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: "/study/linalg" } })).json()) as { id: string };
 		chatStore.saveSettings(id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
-		const observation = { topics: ["rank"], text: "Find the rank of [[1,2],[2,4]].", response: "1, the rows are dependent", help: "none", result: "correct" };
 		const engine = scripted([
 			() => fauxAssistantMessage([fauxToolCall("course_resume", {}, { id: "r1" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxToolCall("problem", {
@@ -117,8 +116,10 @@ describe("a course-linked turn", () => {
 				modelSolution: "Row 2 is twice row 1, so the rank is 1.",
 			}, { id: "p1" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([
-				fauxToolCall("course_save", { changes: { observations: [observation] } }, { id: "s1" }),
-				fauxToolCall("conclude", { outcome: "solved", verdict: "Correct and justified.", rung: null, missClass: null, retest: false }, { id: "c1" }),
+				fauxToolCall("conclude", {
+					outcome: "solvedWithHints", verdict: "Correct after one nudge.", rung: "R1", missClass: "cue", retest: false,
+					result: "correct", response: "1, the rows are dependent", firstTry: { result: "incorrect", response: "2" },
+				}, { id: "c1" }),
 			], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxText("Clean.")]),
 		]);
@@ -136,10 +137,16 @@ describe("a course-linked turn", () => {
 			["--workspace", "/study/linalg", "resume"],
 			["--workspace", "/study/linalg", "save"],
 		]);
-		assert.deepEqual(JSON.parse(linked[1]!.stdin), { observations: [observation] });
-		const saveResult = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "course_save") as { isError: boolean; content: Array<{ text: string }> };
-		assert.equal(saveResult.isError, false);
-		assert.deepEqual(JSON.parse(saveResult.content[0]!.text), { revision: 1, changed: true, observations: ["o1"] });
+		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
+		assert.deepEqual(JSON.parse(linked[1]!.stdin), {
+			observations: [
+				{ topics: ["rank"], text: statement, response: "2", help: "none", result: "incorrect" },
+				{ topics: ["rank"], text: statement, response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct" },
+			],
+		}, "conclude is the single write: the first unaided try, then the assisted success");
+		const ack = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "conclude") as { isError: boolean; content: Array<{ text: string }> };
+		assert.equal(ack.isError, false);
+		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
 	it("probe phase: a course-linked prober quizzes by free recall; an unlinked one keeps the settings", async () => {

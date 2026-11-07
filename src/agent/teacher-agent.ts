@@ -339,7 +339,7 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
  * for a mixed batch (for example, send_to_user + problem).
  */
 export function createPracticeAgent(ctx: PracticeToolContext, opts: AgentBuildOptions = {}) {
-	const tools = opts.tools ?? practiceTools(ctx);
+	const tools = opts.tools ?? practiceTools(ctx, opts.course);
 	return baseAgentOptions("practice", opts, Object.values(tools));
 }
 
