@@ -44,7 +44,7 @@ process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 const POSE = {
 	statement: "Prove that every finite group of prime order is cyclic.",
 	mode: "recall",
-	target: ["group-order"],
+	topics: ["group-order"],
 	modelSolution: "Let |G| = p. Any x ≠ e generates a subgroup whose order divides p…",
 } as const;
 

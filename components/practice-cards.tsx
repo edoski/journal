@@ -26,27 +26,6 @@ import { createPortal } from "react-dom";
 import { ThinkingBlock } from "@/components/thinking-block";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
 
-/* TARGET NAMES (owner round 17, 2026-10-06): targets are normalized to
- * opaque node ids at the record seam (owner round 9 — the mastery trace
- * groups on them), so the drawer resolves names at render time. One
- * lazy module-cached fetch of the graph view (the id → name map is a
- * few KB); failures degrade to raw ids — observability never breaks the
- * card. */
-let nodeNameMapPromise: Promise<Record<string, string>> | null = null;
-function nodeNameMap(): Promise<Record<string, string>> {
-	nodeNameMapPromise ??= fetch("/api/graph")
-		.then((r) => (r.ok ? r.json() : { nodes: [] }))
-		.then((g: { nodes?: Array<{ id?: unknown; name?: unknown }> }) =>
-			Object.fromEntries(
-				(g.nodes ?? [])
-					.filter((n) => typeof n.id === "string")
-					.map((n) => [n.id as string, typeof n.name === "string" ? (n.name as string) : (n.id as string)]),
-			),
-		)
-		.catch(() => ({}));
-	return nodeNameMapPromise;
-}
-
 /** The practice-thinking marker's details (native-messages.ts). */
 export interface PracticeThinkingData {
 	problemCallId: string;
@@ -151,7 +130,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 			)}
 			<MetadataPopover
 				concludeInput={input}
-				problemInput={(part.problemInput ?? {}) as { mode?: unknown; target?: unknown }}
+				problemInput={(part.problemInput ?? {}) as { mode?: unknown; topics?: unknown }}
 			/>
 		</div>
 	);
@@ -164,7 +143,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
  * bg-card p-4 shadow-lg, opening BELOW the trigger — always); any scroll or
  * click outside closes it (plus Esc, claimed from the layered chain
  * per the popover law). Shows every field the agent filled in both the
- * problem call (mode, targets — names resolved lazily) and the
+ * problem call (mode, course topics) and the
  * conclude call (outcome, rung, miss class, retest). Statement and
  * modelSolution stay out — they are the visible card. The data keeps
  * the original SMALL register (text-xs rows, mono values — owner
@@ -175,7 +154,7 @@ function MetadataPopover({
 	problemInput,
 }: {
 	concludeInput: { outcome?: string; rung?: unknown; missClass?: unknown; retest?: unknown };
-	problemInput: { mode?: unknown; target?: unknown };
+	problemInput: { mode?: unknown; topics?: unknown };
 }) {
 	const [open, setOpen] = useState(false);
 	const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -184,21 +163,9 @@ function MetadataPopover({
 	// the trigger's viewport rect AT OPEN TIME — any scroll closes the
 	// box, so there is nothing to track.
 	const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
-	const [names, setNames] = useState<Record<string, string> | null>(null);
-	const targets = Array.isArray(problemInput.target)
-		? problemInput.target.filter((t): t is string => typeof t === "string")
+	const topics = Array.isArray(problemInput.topics)
+		? problemInput.topics.filter((t): t is string => typeof t === "string")
 		: [];
-	// Resolve names only when there is something to resolve.
-	useEffect(() => {
-		if (!open || targets.length === 0 || names) return;
-		let alive = true;
-		void nodeNameMap().then((m) => {
-			if (alive) setNames(m);
-		});
-		return () => {
-			alive = false;
-		};
-	}, [open, targets.length, names]);
 
 	usePopoverDismiss(rootRef, open, () => setOpen(false));
 	// ANY scroll closes it (owner law): capture-phase, so every scroller
@@ -215,7 +182,7 @@ function MetadataPopover({
 	const miss = typeof concludeInput.missClass === "string" ? concludeInput.missClass : "";
 	const retest = typeof concludeInput.retest === "boolean" ? concludeInput.retest : undefined;
 	const outcome = typeof concludeInput.outcome === "string" ? concludeInput.outcome : "";
-	if (!mode && targets.length === 0 && !rung && !miss && retest === undefined) return null;
+	if (!mode && topics.length === 0 && !rung && !miss && retest === undefined) return null;
 
 	return (
 		<div ref={rootRef} className="relative mt-3">
@@ -258,21 +225,8 @@ function MetadataPopover({
 				<dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
 						<dt className="text-muted-foreground">Mode</dt>
 						<dd className="font-mono">{mode || "—"}</dd>
-						<dt className="text-muted-foreground">Targets</dt>
-						<dd className="font-mono">
-							{targets.length === 0 ? (
-								"untagged"
-							) : (
-								<span>
-									{targets.map((t, i) => (
-										<span key={t}>
-											{i > 0 && ", "}
-											{names?.[t] ?? t}
-										</span>
-									))}
-								</span>
-							)}
-						</dd>
+						<dt className="text-muted-foreground">Topics</dt>
+						<dd className="font-mono">{topics.length === 0 ? "—" : topics.join(", ")}</dd>
 						<dt className="text-muted-foreground">Outcome</dt>
 						<dd className="font-mono">{outcome || "—"}</dd>
 						<dt className="text-muted-foreground">Hint rung</dt>

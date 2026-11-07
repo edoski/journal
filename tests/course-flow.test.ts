@@ -125,7 +125,7 @@ describe("a course-linked turn", () => {
 		let seenCourse: unknown;
 		const factory: Factory = (opts) => {
 			seenCourse = opts.course?.course;
-			return createPracticeAgent({ chatId: id, chatStore, courseLinked: true }, { ...opts, engine });
+			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, engine });
 		};
 		await turn(id, { type: "text", text: "practice rank" }, factory);
 		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent" }, factory);

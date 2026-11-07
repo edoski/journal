@@ -12,8 +12,7 @@
  *     (bareQuestionTools carried NO prepareArguments at all), and the
  *     quote-encoded literal heals before TypeBox validation.
  *  2. THE DEBRIS STRIP AT MEMBERSHIP SEAMS — stripModelValueDebris in
- *     coerceCorrectAnswer (boundary check + grading), normalizeQuizType,
- *     and resolveTargetId.
+ *     coerceCorrectAnswer (boundary check + grading) and normalizeQuizType.
  *  3. THE DISPLAY MIRROR — the record keeps RAW arguments, so
  *     parseQuizInput heals the same wobble on read (the tool-parts law:
  *     a healed-at-boundary quiz whose display parse rejects is an
@@ -32,7 +31,6 @@ import {
 	quizInputProblems,
 } from "../src/core/question-core.ts";
 import { parseQuizInput } from "../src/core/tool-parts.ts";
-import { resolveTargetId } from "../src/core/chains.ts";
 import { bareQuestionTools } from "../src/agent/teacher-agent.ts";
 import { probeQuizTool } from "../src/agent/tools.ts";
 
@@ -146,12 +144,6 @@ describe("the colon shape — correctAnswer with copy-syntax debris", () => {
 		assert.equal(normalizeQuizType("bogus"), undefined);
 	});
 
-	it("resolveTargetId heals copy-syntax on targets", () => {
-		const nodes = [{ id: "experience-first", name: "Experience first" }];
-		assert.equal(resolveTargetId(":experience-first", nodes), "experience-first");
-		assert.equal(resolveTargetId('"Experience first"', nodes), "experience-first");
-		assert.equal(resolveTargetId("nope", nodes), null);
-	});
 });
 
 describe("the calculus retry loop — an exact answer was incorrectly stripped", () => {

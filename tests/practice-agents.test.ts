@@ -76,7 +76,7 @@ const ctxOf = (messages: LhMessage[]) => ({ chatId: "c1", chatStore: recordStore
 const PROBLEM_INPUT = {
 	statement: "Prove the sum is even.",
 	mode: "recall",
-	target: ["parity-sum"],
+	topics: ["parity-sum"],
 	modelSolution: "Pair them; each pair is even.",
 } as const;
 
@@ -137,59 +137,15 @@ describe("the practice tool gating law", () => {
 	});
 });
 
-// ── target validation (the mastery-trace contract, owner round 9) ──────────
+// ── course topics: every pose names the course topics it exercises ─────────
 
-describe("target validation — names normalize to ids, unknowns reject", () => {
-	const NODES = [
-		{ id: "n_parity", name: "Parity of a sum", statement: "The sum of two odds is even." },
-		{ id: "n_pairing", name: "Pairing", statement: "Pair elements to count parity." },
-	] as const;
-	const graphNodes = () => NODES;
-
-	it("a NAME target silently normalizes to the canonical id (the record carries ids)", async () => {
-		const healed = problemTool(createPracticeGate(ctxOf([])), graphNodes).prepareArguments!({
-			...PROBLEM_INPUT,
-			target: ["Parity of a sum", "pairing"],
-		}) as { target: string[] };
-		assert.deepEqual(healed.target, ["n_parity", "n_pairing"], "case-insensitive name → id, whole-graph set");
-	});
-
-	it("an id target passes through untouched (already canonical)", async () => {
-		const healed = problemTool(createPracticeGate(ctxOf([])), graphNodes).prepareArguments!({
-			...PROBLEM_INPUT,
-			target: ["n_parity"],
-		}) as { target: string[] };
-		assert.deepEqual(healed.target, ["n_parity"]);
-	});
-
-	it("an UNKNOWN target rejects with a one-line error and does NOT arm the gate", async () => {
-		const gate = createPracticeGate(ctxOf([]));
-		const tool = problemTool(gate, graphNodes);
-		const rejected = await tool.execute("call_x", { ...PROBLEM_INPUT, target: ["ghost-prop"] } as never);
-		assert.equal(rejected.isError, true);
-		assert.match((rejected.details as { problems: string[] }).problems[0]!, /ghost-prop/);
-		assert.match((rejected.details as { problems: string[] }).problems[0]!, /proposition ids from the session context/);
-		// the message teaches the exit (round 12): omitting always works
-		assert.match((rejected.details as { problems: string[] }).problems[0]!, /omit target entirely/);
-		// honest activation (the BKT law): a rejected pose frees the slot —
-		// the next, valid pose goes through.
-		const valid = await tool.execute("call_y", { ...PROBLEM_INPUT, target: ["n_parity"] } as never);
-		assert.equal(valid.isError, undefined);
-	});
-
-	it("UNTAGGED PROBLEMS (owner round 12): absent target poses freely; [] heals away to absent", async () => {
-		const tool = problemTool(createPracticeGate(ctxOf([])), graphNodes);
-		const absent = await tool.execute("call_a", { statement: "S", mode: "recall", modelSolution: "M" } as never);
-		assert.equal(absent.isError, undefined, "no targets = an untagged problem, never a rejection");
-		const healed = tool.prepareArguments!({ statement: "S", mode: "recall", target: [], modelSolution: "M" }) as {
-			target?: string[];
-		};
-		assert.ok(!healed.target || healed.target.length === 0, "an explicit [] is the model saying no-targets — healed away");
-	});
-
-	it("NO node source (the legacy/test wiring) = no validation, free strings ack", async () => {
-		const result = await problemTool(createPracticeGate(ctxOf([]))).execute("call_x", PROBLEM_INPUT as never);
-		assert.equal(result.isError, undefined);
+describe("problem poses carry course topic handles", () => {
+	it("a pose without topics fails validation; with topics it arms the gate", async () => {
+		const tool = problemTool(createPracticeGate(ctxOf([])));
+		const schema = tool.parameters as { required?: string[] };
+		assert.ok(schema.required?.includes("topics"));
+		const posed = await tool.execute("call_t", { ...PROBLEM_INPUT, topics: ["rank"] } as never);
+		assert.equal(posed.isError, undefined);
 	});
 });
 

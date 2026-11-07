@@ -36,7 +36,7 @@ describe("healEncodedArguments — the GLM incident", () => {
 		const raw = {
 			statement: "Prove that every finite group of prime order is cyclic.",
 			mode: QUOTED("recall"), // the incident: every field valid BUT mode
-			target: ["group-order"],
+			topics: ["group-order"],
 			modelSolution: "Let |G| = p. Any x ≠ e generates a subgroup whose order divides p…",
 		};
 		// The raw shape is the incident: validation throws.
@@ -58,7 +58,7 @@ describe("healEncodedArguments — the GLM incident", () => {
 	});
 
 	it("well-formed args pass through untouched — the SAME reference", () => {
-		const args = { mode: "recall", target: ["a"], retest: false };
+		const args = { mode: "recall", topics: ["a"], retest: false };
 		assert.equal(healEncodedArguments(args, problemInputObject), args);
 		assert.equal(healEncodedArguments(args, concludeInputObject), args);
 	});
@@ -91,10 +91,10 @@ describe("healEncodedArguments — the sibling encodings", () => {
 	});
 
 	it("heals a stringified array (the extraction-bug sibling)", () => {
-		const healed = healEncodedArguments({ target: '["a","b"]' }, problemInputObject) as {
-			target: unknown;
+		const healed = healEncodedArguments({ topics: '["a","b"]' }, problemInputObject) as {
+			topics: unknown;
 		};
-		assert.deepEqual(healed.target, ["a", "b"]);
+		assert.deepEqual(healed.topics, ["a", "b"]);
 	});
 
 	it("leaves plain string properties alone (statement is a string schema)", () => {

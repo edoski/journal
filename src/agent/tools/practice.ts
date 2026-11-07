@@ -16,7 +16,6 @@
 
 import { Type, type Static } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { resolveTargetId } from "../../core/chains.ts";
 import { readTool } from "./read.ts";
 import { lsTool } from "./ls.ts";
 import { findTool } from "./find.ts";
@@ -33,19 +32,12 @@ import { healEncodedArguments, healToolRecord } from "./heal.ts";
 export interface PracticeToolContext {
 	chatId: string;
 	chatStore: { getChat(id: string): { messages: LhMessage[]; kind?: string } | null };
-	/** The WHOLE-graph node list, read fresh per pose (owner round 9 — the
-	 *  mastery-trace contract): targets validate against every proposition,
-	 *  not just the session's picks, so pickless sessions and future
-	 *  graph-tools poses stay valid. Absent (tests) = no validation. */
-	graphNodes?: () => ReadonlyArray<Pick<import("../../core/contracts/graph.ts").GraphNode, "id" | "name">>;
 	/** THE RARELY-NEEDED SET (owner round 10, 2026-10-05): the map readers
 	 *  behind the SAME settings gate as the prober's (graphToolsEnabled at
 	 *  the composition root); the research + pdf jobs (both keyless).
 	 *  Each absent context (tests) = absent from the registry. */
 	graph?: GraphToolContext;
 	jobs?: JobToolContext;
-	/** The session studies a course: poses carry course topic handles. */
-	courseLinked?: boolean;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -80,15 +72,12 @@ export const problemInputObject = Type.Object({
 	mode: Type.Union([Type.Literal("recall"), Type.Literal("discrimination"), Type.Literal("composition")], {
 		description: "REQUIRED — the demand mode: recall, discrimination, or composition (bare words, no quotes).",
 	}),
-	target: Type.Optional(
-		Type.Array(Type.String(), {
-			minItems: 1,
-			description:
-				"The proposition id(s) this problem exercises, from the session context's [id] list — include when " +
-				"the material is in the map; OMIT entirely when it is not (a topic session poses untagged problems). " +
-				"Names are normalized to ids at the seam; an unknown proposition is rejected.",
-		}),
-	),
+	topics: Type.Array(Type.String({ minLength: 1 }), {
+		minItems: 1,
+		description:
+			"REQUIRED — the course topic handle(s) this problem exercises, from the course record. " +
+			"The attempt is saved under the same handles.",
+	}),
 	modelSolution: Type.String({
 		description: "REQUIRED — the full solution, moves in order, committed BEFORE the learner sees the problem. This IS the reveal — conclude shows it verbatim; never re-author it.",
 	}),
@@ -96,25 +85,7 @@ export const problemInputObject = Type.Object({
 
 export type ProblemInput = Static<typeof problemInputObject>;
 
-/** A course-linked session's pose also names the course topics the problem
- *  exercises: the link between the problem (and its statements) and the
- *  learner's course record, where the attempt is saved under these handles. */
-export const courseProblemInputObject = Type.Object({
-	...problemInputObject.properties,
-	topics: Type.Array(Type.String({ minLength: 1 }), {
-		minItems: 1,
-		description:
-			"REQUIRED — the course topic handle(s) this problem exercises, from the course record (course_resume / course_search). " +
-			"Save the attempt under the same handles.",
-	}),
-});
-
-export function problemTool(
-	gate: PracticeGate,
-	graphNodes?: PracticeToolContext["graphNodes"],
-	courseLinked = false,
-): AgentTool<typeof problemInputObject> {
-	const parameters = courseLinked ? courseProblemInputObject : problemInputObject;
+export function problemTool(gate: PracticeGate): AgentTool<typeof problemInputObject> {
 	return {
 		name: "problem",
 		label: "problem",
@@ -123,53 +94,14 @@ export function problemTool(
 			"traces and answer commits arrive back as labeled messages. The modelSolution rides this call's " +
 			"arguments and stays hidden from the learner until you conclude (conclude shows it verbatim — the " +
 			"reveal needs no new field). Only one problem may be active — conclude it before posing the next.",
-		parameters,
+		parameters: problemInputObject,
 		executionMode: "sequential",
-		prepareArguments: (args: unknown) => {
-			const healed = healEncodedArguments(args, parameters);
-			// TARGET NORMALIZATION (owner round 9): names silently become ids —
-			// the RECORD carries canonical ids (the mastery trace groups on
-			// them); unresolvable strings pass through for execute to reject.
-			// UNTAGGED PROBLEMS (owner round 12): an explicit empty list is
-			// the model saying "no targets" — healed AWAY, so the record's
-			// canonical form is tagged-or-absent, never [].
-			if (!graphNodes) {
-				const bare = (healed as { target?: unknown }).target;
-				return Array.isArray(bare) && bare.length === 0
-					? ({ ...(healed as Record<string, unknown>), target: undefined } as never)
-					: (healed as never);
-			}
-			const target = (healed as { target?: unknown }).target;
-			if (!Array.isArray(target) || target.length === 0) {
-				return { ...(healed as Record<string, unknown>), target: undefined } as never;
-			}
-			const list = graphNodes();
-			const normalized = target.map((t) =>
-				typeof t === "string" ? (resolveTargetId(t, list) ?? t) : t,
-			);
-			if (normalized.every((t, i) => t === target[i])) return healed as never;
-			return { ...(healed as Record<string, unknown>), target: normalized } as never;
-		},
-		execute: async (_toolCallId, input) => {
+		prepareArguments: (args: unknown) => healEncodedArguments(args, problemInputObject) as never,
+		execute: async (_toolCallId, _input) => {
 			if (gate.problemActive) {
 				return invalidInputResult("problem", [
 					"a problem is already active — call conclude on it before posing the next one",
 				]);
-			}
-			// TARGET VALIDATION (owner round 9, round 12): against the WHOLE
-			// graph, and ONLY when targets are present — absent means an
-			// untagged problem (topic sessions, owner round 12), which poses
-			// freely. A one-line rejection — the proposition list already
-			// sits in the agent's context (the [id] marker); no re-listing.
-			// The message teaches the exit: omitting always works.
-			if (graphNodes && input.target && input.target.length > 0) {
-				const list = graphNodes();
-				const unknown = input.target.filter((t) => resolveTargetId(t, list) === null);
-				if (unknown.length > 0) {
-					return invalidInputResult("problem", [
-						`target ${JSON.stringify(unknown)} is not a known proposition — targets must be proposition ids from the session context; if the material is not in the map, omit target entirely`,
-					]);
-				}
 			}
 			gate.problemActive = true;
 			return problemResult();
@@ -253,7 +185,7 @@ export function practiceTools(ctx: PracticeToolContext): Record<string, AgentToo
 	// keep their own (target-normalizing) prepareArguments as the composed
 	// inner pass; the double heal is idempotent by construction.
 	return healToolRecord({
-		problem: problemTool(gate, ctx.graphNodes, ctx.courseLinked),
+		problem: problemTool(gate),
 		conclude: concludeTool(gate),
 		read: readTool,
 		ls: lsTool,

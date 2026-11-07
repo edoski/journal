@@ -454,11 +454,6 @@ export async function handleChatInput(
 					{
 						chatId,
 						chatStore: stores.chatStore,
-						// TARGET VALIDATION (owner round 9): the practice tools read the
-						// WHOLE graph fresh per pose — targets validate against every
-						// proposition, not just the session's picks (pickless sessions
-						// and future graph-tools poses stay valid).
-						graphNodes: () => stores.graphStore.readNodes(),
 						// THE RARELY-NEEDED SET (owner round 10): research + pdf jobs
 						// (same runner/gating as the teacher's — research honestly
 						// absent when no engine is live) and the map readers behind
@@ -470,7 +465,6 @@ export async function handleChatInput(
 							searchAvailable,
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
-						courseLinked: record.course !== undefined,
 					},
 					agentOpts,
 				)

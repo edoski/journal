@@ -256,11 +256,6 @@ export interface GraphContextPick {
  *  feeds the transcript's collapsible GraphContextCard. No more seed
  *  text glued into the first prompt. */
 export function newGraphContextMessage(picks: readonly GraphContextPick[], chains: readonly string[]): LhMarkerMessage {
-	// IDS FIRST (owner round 9, 2026-10-05 — the mastery-trace contract):
-	// each proposition is introduced ONCE with its id, name, and statement;
-	// the problem tool's `target` field takes these ids (names normalize to
-	// ids at the seam). Chains below stay NAMES — they are comprehension
-	// context, not tags; names read, ids reference.
 	const lines = [
 		// PREAMBLE LAW (owner, 2026-10-10): custom markers flatten to
 		// USER-role messages on the wire (toLlmMessages) — this text arrives
@@ -269,8 +264,8 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
 		// it honestly as injected session context, not learner speech.
 		"[Session context] — picked from the learner's knowledge map when starting this session:",
 		"",
-		"Propositions (id — name: statement; the problem tool's target field uses these ids):",
-		...picks.map((p) => `- [${p.id}] ${p.name}: ${p.statement}`),
+		"Propositions (name: statement):",
+		...picks.map((p) => `- ${p.name}: ${p.statement}`),
 	];
 	if (chains.length > 0) {
 		lines.push("", "Reasoning chains among them (premises → conclusion):", ...chains.map((c) => `- ${c}`));
@@ -423,7 +418,7 @@ export function modelSolutionForConclude(
 }
 
 /** The full pose-side fold (owner round 17, 2026-10-06 — observability):
- * EVERYTHING the agent filled into the problem call — mode, target ids,
+ * EVERYTHING the agent filled into the problem call — mode, topics,
  * statement, the committed solution — joined onto the conclude part so
  * the card's collapsible "agent's data" drawer renders pure. Same walk
  * and refusal law as the reveal: a pose the record never acked (a
@@ -431,7 +426,7 @@ export function modelSolutionForConclude(
 export function problemInputForConclude(
 	messages: readonly LhMessage[],
 	concludeCallId: string,
-): { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown } | undefined {
+): { statement?: unknown; mode?: unknown; topics?: unknown; modelSolution?: unknown } | undefined {
 	let mi = messages.findIndex(
 		(m) =>
 			(m as { role?: string }).role === "assistant" &&
@@ -450,7 +445,7 @@ export function problemInputForConclude(
 			if (block.type !== "toolCall" || block.name !== PRACTICE_PROBLEM_TOOL) continue;
 			if (!clean.has(block.id)) continue; // a refused pose revealed nothing
 			return (block.arguments ?? undefined) as
-				| { statement?: unknown; mode?: unknown; target?: unknown; modelSolution?: unknown }
+				| { statement?: unknown; mode?: unknown; topics?: unknown; modelSolution?: unknown }
 				| undefined;
 		}
 	}

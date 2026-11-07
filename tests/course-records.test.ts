@@ -15,7 +15,6 @@ import { fileURLToPath } from "node:url";
 import { createCourseRecords } from "../src/store/course-records.ts";
 import { courseTools } from "../src/agent/tools/course.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent } from "../src/agent/teacher-agent.ts";
-import { problemTool, createPracticeGate } from "../src/agent/tools/practice.ts";
 import { createFauxCore } from "@earendil-works/pi-ai";
 import type { CourseRecords } from "../src/core/ports.ts";
 import type { CourseVerb } from "../src/core/contracts/course.ts";
@@ -162,7 +161,7 @@ describe("course composition into the agents", () => {
 		teacher: (course?: { course: typeof COURSE; records: CourseRecords }) =>
 			createTeacherAgent({ chatId: "c1", chatStore, jobStore, spawn: () => {} }, course ? { course, engine } : { engine }),
 		practice: (course?: { course: typeof COURSE; records: CourseRecords }) =>
-			createPracticeAgent({ chatId: "c1", chatStore, courseLinked: course !== undefined }, course ? { course, engine } : { engine }),
+			createPracticeAgent({ chatId: "c1", chatStore }, course ? { course, engine } : { engine }),
 	};
 	for (const [kind, build] of Object.entries(builds)) {
 		it(`${kind}: a linked session gets the course tools and doctrine; an unlinked one gets neither`, () => {
@@ -175,14 +174,6 @@ describe("course composition into the agents", () => {
 			assert.doesNotMatch(plain.state.systemPrompt, /The course record/);
 		});
 	}
-
-	it("a course-linked practice pose requires course topic handles; an unlinked one does not", () => {
-		const gate = createPracticeGate({ chatId: "c1", chatStore });
-		const linked = problemTool(gate, undefined, true).parameters as { required?: string[] };
-		const plain = problemTool(gate).parameters as { required?: string[]; properties: Record<string, unknown> };
-		assert.ok(linked.required?.includes("topics"));
-		assert.ok(!("topics" in plain.properties));
-	});
 });
 
 const ENGINE_ROOT = path.join(os.homedir(), "dev", "python", "journal");
