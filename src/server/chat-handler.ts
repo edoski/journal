@@ -33,7 +33,7 @@ import { runPiTurn } from "./pi/ui-stream.ts";
 import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { searchAvailable, searchProvider } from "./search.ts";
+import { searchAvailable } from "./search.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -102,11 +102,6 @@ const jobRunner = createJobRunner({
 	// with the 503-envelope family instead of dying mid-run.
 	providerKeyMissing: (provider, tier) =>
 		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
-	// Search port wave (2026-09-20): the researcher's web_search runs on the
-	// injected port — resolved FRESH per job (key rotations land immediately).
-	// null = honestly unavailable; the dispatch-level drop (below) uses the
-	// same signal so keyless servers never see the research tool at all.
-	searchProvider,
 });
 /** The app's ONE extraction pipeline instance — both front doors share it:
  *  quiz-triggered session runs (turn-service) and notes imports

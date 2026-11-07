@@ -46,7 +46,7 @@ import {
 } from "../src/core/contracts.ts";
 import { composeInstructions, createTeacherAgent } from "../src/agent/teacher-agent.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
-import { webTools } from "../src/agent/tools/web.ts";
+import { createWebTools } from "../src/agent/tools/web.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import {
@@ -72,7 +72,6 @@ import { jobStore } from "../src/store/jobs.ts";
 import { createJobRunner, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
 import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts";
 import type { PiEngine } from "../src/agent/models.ts";
-import type { SearchProvider } from "../src/core/search.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import { subscribe } from "../src/core/events.ts";
@@ -505,8 +504,7 @@ describe("dispatch (async protocol §2)", () => {
 		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 
 		const delivery = fakeDeliver();
-		const search = stubSearch();
-		const testRunner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver, searchProvider: () => search });
+		const testRunner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
 		const engine = researchCallingTeacher();
 		const tools = createTeacherTools({
 			chatId: chat.id,
@@ -549,9 +547,6 @@ describe("dispatch (async protocol §2)", () => {
 		assert.equal((steer.details as { jobId: string }).jobId, job!.id);
 		assert.ok(steer.content.includes("sigma.js v3 is current"), "steer text carries the brief");
 
-		// Search threading (2026-09-20): the researcher's web_search ran on
-		// the INJECTED port — the stub saw the scripted query, no network.
-		assert.deepEqual(search.queries, ["sigma.js latest version (5)"]);
 		researchModelOverride.current = undefined;
 	});
 });
@@ -578,20 +573,6 @@ function researcherModel(): PiEngine {
 	]);
 }
 
-/** A recording stub provider (search port wave, 2026-09-20): the runner's
- *  injected search seam — no network, queries captured for assertions. */
-function stubSearch(): SearchProvider & { queries: string[] } {
-	const queries: string[] = [];
-	return {
-		id: "tavily",
-		async search(query: string, count: number) {
-			queries.push(`${query} (${count})`);
-			return [{ title: "sigma.js", url: "https://www.sigmajs.org/", snippet: "v3 released" }];
-		},
-		queries,
-	};
-}
-
 describe("research runner (async protocol §3)", () => {
 	it("runJob completes the job: result + sources on the job, brief on the steer, activity recorded", async () => {
 		const chat = chatStore.createChat("Test: runner completion");
@@ -605,8 +586,7 @@ describe("research runner (async protocol §3)", () => {
 		trackJob(job.id);
 
 		const delivery = fakeDeliver();
-		const search = stubSearch();
-		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver, searchProvider: () => search });
+		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
 		researchModelOverride.current = researcherModel();
 		try {
 			await runner.runJob(job.id);
@@ -622,24 +602,19 @@ describe("research runner (async protocol §3)", () => {
 		assert.equal(result.brief, BRIEF);
 		assert.ok(result.sources.length > 0, "sources parsed from the brief");
 		assert.equal(result.sources[0]!.url, "https://www.sigmajs.org/docs");
-
-				// The activity trail: the last recorded activity is the deliver
-		// flip; the search line fired before it. The search itself ran on
-		// the INJECTED port — the stub saw the query (no network):
-		assert.deepEqual(search.queries, ["sigma.js latest version (5)"]);
 	});
 
-	it("a keyless fetch-only researcher still completes and delivers a sourced job result", async () => {
+	it("a fetch-only researcher completes and delivers a sourced job result", async () => {
 		const url = "https://example.com/supplied-source";
 		const brief = `## Summary\nVerified supplied source. [Source](${url})\n\n## Sources\n- Source (${url})`;
 		const input = { question: `Verify ${url}` };
-		const chat = chatStore.createChat("Test: keyless fetch-only research");
+		const chat = chatStore.createChat("Test: fetch-only research");
 		trackChat(chat.id);
 		chatStore.saveMessages(chat.id, nativeToolMessages("verify supplied URL", "research", "call-keyless", input));
 		const job = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "call-keyless" });
 		trackJob(job.id);
 		const delivery = fakeDeliver();
-		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver, searchProvider: () => null });
+		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
 		const fetched: string[] = [];
 		const realFetch = globalThis.fetch;
 		globalThis.fetch = (async (source) => {
@@ -709,7 +684,6 @@ describe("research runner (async protocol §3)", () => {
 			chatStore,
 			jobStore,
 			deliver: delivery.deliver,
-			searchProvider: () => stubSearch(),
 		});
 		researchModelOverride.current = researcherModel();
 		try {
@@ -872,11 +846,8 @@ describe("pdf runner (sources v0)", () => {
 
 describe("researcher agent", () => {
 	it("runs with the web tool set (no network touched)", () => {
-		// The researcher is a runSubagent call over the webTools registry —
-		// the tool set is what the loop sees.
-		assert.ok(webTools.web_search, "web_search available");
-		assert.ok(webTools.web_fetch, "web_fetch available");
-		assert.equal(Object.keys(webTools).length, 2, "ONLY the web tools — no question/plan tools");
+		const webTools = createWebTools(async () => "");
+		assert.deepEqual(Object.keys(webTools).sort(), ["web_fetch", "web_search"], "ONLY the web tools — no question/plan tools");
 		// reset any accidental global override
 		researchModelOverride.current = undefined;
 	});
@@ -1620,7 +1591,7 @@ describe("abort (src/server/jobs.ts abortJob)", () => {
 		const { jobId } = newChatWithResearchJob("abort keeps usage", "call-abort2");
 		setTurnRunner(async () => 200);
 		researchModelOverride.current = oneStepThenHangModel();
-		const runner = createJobRunner({ chatStore, jobStore, deliver: async () => {}, searchProvider: () => stubSearch() });
+		const runner = createJobRunner({ chatStore, jobStore, deliver: async () => {} });
 		try {
 			const settled = runner.runJob(jobId, RESEARCH_INPUT);
 			await waitFor(() => (jobStore.getJob(jobId)!.usage?.steps ?? 0) === 1, 8000, "first step folded");
