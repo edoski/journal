@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CLAUDE_ROLE_DEFAULTS, CLAUDE_SUBSCRIPTION, MODEL_SLOTS, type ClaudeConnection, type ModelsSettings, type SlotPins } from "@/src/core";
+import { CLAUDE_ROLE_DEFAULT, CLAUDE_SUBSCRIPTION, MODEL_SLOTS, type ClaudeConnection, type ModelsSettings, type SlotPins } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { useModelCatalog } from "@/components/model-catalog";
@@ -46,12 +46,12 @@ export function claudeConnectionSentence(connection: ClaudeConnection | null): s
 
 export function claudeRoleModels(): ModelsSettings {
 	const models: ModelsSettings = {};
-	for (const slot of MODEL_SLOTS) models[slot] = { model: { provider: CLAUDE_SUBSCRIPTION.providerId, id: CLAUDE_ROLE_DEFAULTS[slot] } };
+	for (const slot of MODEL_SLOTS) models[slot] = { model: { provider: CLAUDE_SUBSCRIPTION.providerId, id: CLAUDE_ROLE_DEFAULT.id }, thinkingLevel: CLAUDE_ROLE_DEFAULT.thinkingLevel };
 	return models;
 }
 
 function allClaude(slots: SlotPins | undefined): boolean {
-	return !!slots && MODEL_SLOTS.every((slot) => slots[slot]?.model.provider === CLAUDE_SUBSCRIPTION.providerId);
+	return !!slots && MODEL_SLOTS.every((slot) => slots[slot]?.model.provider === CLAUDE_SUBSCRIPTION.providerId && slots[slot]?.model.id === CLAUDE_ROLE_DEFAULT.id);
 }
 
 async function readConnection(refresh: boolean): Promise<ClaudeConnection> {

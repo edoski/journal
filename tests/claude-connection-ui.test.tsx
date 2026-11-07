@@ -71,7 +71,8 @@ test("connected shows the account and plan; Use for all roles writes the three s
 	const put = calls.find((c) => c.method === "PUT");
 	assert.equal(put?.path, "/api/settings/models");
 	assert.deepEqual(put?.body, claudeRoleModels());
-	assert.deepEqual(put?.body, { strong: pin("claude-subscription", "claude-opus-5-5"), cheap: pin("claude-subscription", "claude-sonnet-5-5"), vision: pin("claude-subscription", "claude-sonnet-5-5") });
+	const opusHigh = { ...pin("claude-subscription", "claude-opus-5-5"), thinkingLevel: "high" };
+	assert.deepEqual(put?.body, { strong: opusHigh, cheap: opusHigh, vision: opusHigh });
 	assert(signals.includes("models"), "model menus re-read after the write");
 	await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 	assert.equal(useAll(), null, "hidden once every slot already uses Claude");

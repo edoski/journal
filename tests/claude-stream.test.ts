@@ -15,12 +15,12 @@ import {
 import { CLAUDE_MODEL_IDS } from "../src/core/contracts/claude.ts";
 import { subscriptionLabel } from "../src/core/prices.ts";
 
-const model = claudeSubscriptionModel("claude-sonnet-5-5")!;
+const model = claudeSubscriptionModel("claude-opus-5-5")!;
 const NO_KEY = "No API key was used.";
 
-const init = { type: "system", subtype: "init", apiKeySource: "none", model: "claude-sonnet-5-5", tools: ["mcp__lh__plan_init", "mcp__lh__quiz"] };
+const init = { type: "system", subtype: "init", apiKeySource: "none", model: "claude-opus-5-5", tools: ["mcp__lh__plan_init", "mcp__lh__quiz"] };
 const se = (event: unknown) => ({ type: "stream_event", event, parent_tool_use_id: null });
-const messageStart = se({ type: "message_start", message: { id: "msg_1", model: "claude-sonnet-5-5", usage: { input_tokens: 12, cache_read_input_tokens: 9000, cache_creation_input_tokens: 300, output_tokens: 1 } } });
+const messageStart = se({ type: "message_start", message: { id: "msg_1", model: "claude-opus-5-5", usage: { input_tokens: 12, cache_read_input_tokens: 9000, cache_creation_input_tokens: 300, output_tokens: 1 } } });
 
 function run(lines: unknown[]): { events: AssistantMessageEvent[]; mapper: ClaudeStreamMapper; fedAfterFinish: number } {
 	const mapper = new ClaudeStreamMapper(model, 1);
@@ -213,7 +213,7 @@ test("plan models clone pi's Anthropic entries with zero cost and keep the think
 		assert.deepEqual(m.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
 		assert(m.thinkingLevelMap, `${m.id} keeps its thinking map`);
 	}
-	assert.equal(claudeSubscriptionModel("claude-opus-4-1"), undefined, "only the verified ids are offered");
+	assert.equal(claudeSubscriptionModel("claude-sonnet-5-5"), undefined, "only Opus 5.5 is offered");
 	assert.equal(subscriptionLabel("claude-subscription:claude-opus-5-5"), "Claude");
 });
 
@@ -222,7 +222,7 @@ test("effort follows the model's thinking map, keeps unmapped level names and ro
 	assert.equal(claudeEffort(model, "xhigh"), "xhigh");
 	assert.equal(claudeEffort(model, "minimal"), undefined);
 	assert.equal(claudeEffort(model, undefined), undefined);
-	const fable = claudeSubscriptionModel("claude-fable-5-1")!;
+	const fable = { ...model, thinkingLevelMap: { off: null, xhigh: "xhigh", max: "max" } };
 	assert.equal(claudeEffort(fable, "max"), "max");
 	assert.equal(claudeEffort(fable, "low"), "low", "a level the map leaves out keeps its name");
 	assert.equal(claudeEffort(fable, "minimal"), "low", "Claude Code has no minimal effort");

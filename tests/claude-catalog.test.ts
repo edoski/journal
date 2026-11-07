@@ -24,7 +24,7 @@ test("Claude models join the picker, context limits and slot validation only whi
 	assert.equal(providerKeyPresent("claude-subscription"), true);
 	assert.equal(catalogProviders().find((p) => p.id === "claude-subscription")?.keyPresent, true);
 	const claude = modelCatalog().models.filter((m) => m.provider === "claude-subscription");
-	assert.deepEqual(claude.map((m) => m.id), ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"]);
+	assert.deepEqual(claude.map((m) => m.id), ["claude-opus-5-5"], "only Opus 5.5 is listed");
 	assert(claude.every((m) => m.cost.input === 0 && m.cost.output === 0));
 	assert.equal(catalogContextLimits().get("claude-subscription:claude-opus-5-5"), 1_000_000);
 	assert.deepEqual(validateModelsSettings(claudeSlots), { ok: true });
@@ -32,7 +32,7 @@ test("Claude models join the picker, context limits and slot validation only whi
 
 test("Claude is an ordinary keyed provider, not an app-held subscription credential", () => {
 	assert.equal(isSubscriptionProvider("claude-subscription"), false);
-	const engine = piEngineForSpec({ provider: "claude-subscription", id: "claude-sonnet-5-5", thinkingLevel: "minimal" });
+	const engine = piEngineForSpec({ provider: "claude-subscription", id: "claude-opus-5-5", thinkingLevel: "minimal" });
 	assert.equal(engine.model.provider, "claude-subscription");
 	assert.equal(engine.level, "low", "pi's clamp uses the cloned thinking map");
 });

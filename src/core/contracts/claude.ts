@@ -10,9 +10,11 @@ export type ClaudeConnection =
 	| { state: "missing" }
 	| { state: "error"; message: string };
 
-export const CLAUDE_MODEL_IDS = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"] as const;
+/** Only Opus 5.5 is offered, by the owner's choice: every role runs on it. */
+export const CLAUDE_MODEL_IDS = ["claude-opus-5-5"] as const;
 export type ClaudeModelId = (typeof CLAUDE_MODEL_IDS)[number];
 
-export const CLAUDE_ROLE_DEFAULTS = { strong: "claude-opus-5-5", cheap: "claude-sonnet-5-5", vision: "claude-sonnet-5-5" } as const satisfies Record<"strong" | "cheap" | "vision", ClaudeModelId>;
+/** What "Use for all roles" writes to every model slot. */
+export const CLAUDE_ROLE_DEFAULT = { id: "claude-opus-5-5", thinkingLevel: "high" } as const satisfies { id: ClaudeModelId; thinkingLevel: string };
 
 export const CLAUDE_USAGE_URL = "https://claude.ai/settings/usage";
