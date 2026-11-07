@@ -36,10 +36,10 @@ describe("AgentBuildOptions.toolToggles (the P2 bridge)", () => {
 		agent.state.tools.map((t) => t.name).sort();
 
 	it("flows into the teacher's registry: a job-tool delta is a no-op on the bare set", () => {
-		// No ctx → bare agent: quiz/ask only. A job-tool delta names tools
+		// No ctx → bare agent: explain/ask only. A job-tool delta names tools
 		// that don't exist there — the bridge must not crash on it.
 		const bare = createTeacherAgent(undefined, { engine: fauxEngine(), toolToggles: { research: false } });
-		assert.deepEqual(toolNames(bare), ["ask_user_question", "quiz"]);
+		assert.deepEqual(toolNames(bare), ["ask_user_question", "explain"]);
 	});
 
 	it("flows into the prober's registry; probe_done survives everything", () => {
@@ -81,16 +81,16 @@ describe("parseAgentSettingsBody: tool keys validate at write time", () => {
 		assert.deepEqual(r.ok && r.settings.tools, { research: false, pdf: false });
 	});
 
-	it("the quizzing-mechanics key (explain) is writable (owner 2026-09-27)", () => {
-		const r = parse({ explain: true });
+	it("the retired quizzing switch (explain) is dropped, not rejected — stored sections write back cleanly", () => {
+		const r = parse({ explain: false, research: false });
 		assert.equal(r.ok, true);
-		assert.deepEqual(r.ok && r.settings.tools, { explain: true });
+		assert.deepEqual(r.ok && r.settings.tools, { research: false });
 	});
 
 	it("unknown keys are rejected with the supported list (the quiz wedge never persists)", () => {
 		const r = parse({ quiz: false });
 		assert.equal(r.ok, false);
-		assert.match(!r.ok && r.error, /unknown tool "quiz" \(supported: research, demo, visual, pdf, explain\)/);
+		assert.match(!r.ok && r.error, /unknown tool "quiz" \(supported: research, demo, visual, pdf\)/);
 		const typo = parse({ reasearch: false });
 		assert.equal(typo.ok, false);
 		assert.match(!typo.ok && typo.error, /unknown tool "reasearch"/);

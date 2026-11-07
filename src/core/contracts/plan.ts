@@ -46,9 +46,9 @@ export type PlanNodeStatus = "current" | "visited" | "upcoming";
 //
 // (2026-09-11 pivot — docs/probe-teach-split.md §3.) The teacher AUTHORS the
 // map (plan_init, mermaid — re-callable rewrite) and never tracks progress.
-// The quiz `nodeId` means "this question is ABOUT this node" — a position
+// The explain `nodeId` means "this question is ABOUT this node" — a position
 // signal, never a completion signal. Derivation reads CALLS only:
-//   current — the node of the most RECENT tagged quiz call (any state)
+//   current — the node of the most RECENT tagged question call (any state)
 //   visited — every node referenced by an EARLIER tagged call
 // Consequences: a node spans multiple turns/checks naturally (several
 // questions may tag the same node — the map holds still); moving to a new
@@ -56,7 +56,7 @@ export type PlanNodeStatus = "current" | "visited" | "upcoming";
 // check outcomes (a failed check then a move-on is still visited); results
 // feed nothing; there is NO fallback current (before the first tagged check
 // nothing is current). Untagged checks no longer exist (nodeId is required
-// on the teach quiz, owner ruling 2026-09-26). NodeIds missing from the
+// on the teach question, owner ruling 2026-09-26). NodeIds missing from the
 // current tree are ignored (a rewrite may have dropped the node).
 
 /** Minimal structural message slice — anything with typed parts (mirrors
@@ -66,7 +66,7 @@ interface PartsCarrier {
 }
 
 export interface DerivedPlanStatuses {
-	/** The node the most recent tagged quiz call is about; null before any. */
+	/** The node the most recent tagged question call is about; null before any. */
 	current: string | null;
 	/** Nodes referenced by earlier tagged calls — been there, monotonic. */
 	visited: ReadonlySet<string>;
@@ -85,9 +85,7 @@ export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarri
 	// duplicates collapsed (several checks on one node = one stay on it)
 	for (const m of messages) {
 		for (const part of m.parts) {
-			// Either quizzing tool (quiz/explain) tags position — the mechanic
-			// is a settings switch; the fold recognizes both (owner 2026-09-27).
-			if (part.type !== "tool-quiz" && part.type !== "tool-explain") continue;
+			if (!part.type.startsWith("tool-") || !POSITION_QUESTION_TOOLS.includes(part.type.slice("tool-".length))) continue;
 			const nodeId = (part.input as { nodeId?: unknown } | undefined)?.nodeId;
 			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue; // untagged/unknown — moves nothing
 			if (runs.at(-1) !== nodeId) runs.push(nodeId);
@@ -126,8 +124,9 @@ export interface PlanToolResult {
 // ─── the native fold (Wave D: derivePlanStatuses over LhMessage[]) ───────────
 
 import type { LhMessage } from "../native-messages.ts";
+import { POSITION_QUESTION_TOOLS } from "../question-core.ts";
 
-/** The same derivation over the NATIVE record: quiz CALLS only (any state —
+/** The same derivation over the NATIVE record: tagged question CALLS only (any state —
  *  a dangling call still moves position; results feed nothing). */
 export function derivePlanStatusesLh(tree: PlanTree, messages: readonly LhMessage[]): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
@@ -137,7 +136,7 @@ export function derivePlanStatusesLh(tree: PlanTree, messages: readonly LhMessag
 		const content = (m as { content?: unknown }).content;
 		if (!Array.isArray(content)) continue;
 		for (const block of content as Array<{ type?: string; name?: string; arguments?: unknown }>) {
-			if (block.type !== "toolCall" || (block.name !== "quiz" && block.name !== "explain")) continue;
+			if (block.type !== "toolCall" || !POSITION_QUESTION_TOOLS.includes(block.name ?? "")) continue;
 			const nodeId = (block.arguments as { nodeId?: unknown } | undefined)?.nodeId;
 			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
 			if (runs.at(-1) !== nodeId) runs.push(nodeId);

@@ -57,3 +57,21 @@ export function courseLabel(course: { workspace: string; title: string | null })
 	const parts = course.workspace.split("/").filter(Boolean);
 	return parts[parts.length - 1] ?? course.workspace;
 }
+
+/** The learner's one-tap read of his own answer (Edoardo, 7 Nov 2026):
+ *  three discrete states, no slider and no percentage. It rides every
+ *  graded free-response answer and every practice submission. */
+export const CONFIDENCE_STATES = ["guessing", "neutral", "confident"] as const;
+export type Confidence = (typeof CONFIDENCE_STATES)[number];
+export const DEFAULT_CONFIDENCE: Confidence = "neutral";
+
+/** The control's choices, in display order. */
+export const CONFIDENCE_CHOICES: readonly { state: Confidence; label: string }[] = [
+	{ state: "guessing", label: "Guessing" },
+	{ state: "neutral", label: "Neutral" },
+	{ state: "confident", label: "Confident" },
+];
+
+export function isConfidence(value: unknown): value is Confidence {
+	return (CONFIDENCE_STATES as readonly unknown[]).includes(value);
+}

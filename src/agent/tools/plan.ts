@@ -8,11 +8,11 @@ import { parseMermaidPlan } from "./mermaid-plan.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
- *  load-bearing — every later quiz/explain call must reference one. The
+ *  load-bearing — every later explain call must reference one. The
  *  field-drop incidents (tools_fails_2) showed the turn's tail is where
  *  discipline slips; the reminder lands right there. */
 const PLAN_NODE_IDS_REMINDER =
-	"These are the plan's node ids — the only valid nodeId values for every quiz and explain call from here on. Reference them exactly.";
+	"These are the plan's node ids — the only valid nodeId values for every explain call from here on. Reference them exactly.";
 
 /** What the plan tools close over (the plan-tree half of the tool context). */
 export interface PlanToolContext {
@@ -89,7 +89,7 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
 					chatStore.saveTree(chatId, next);
 					// Context diet: content = the validated nodeIds + the reminder (the
-				// ids just became binding for every quiz/explain call); details =
+				// ids just became binding for every explain call); details =
 					// the full tree for the record/UI — the plan popup's latestTree
 					// seam, agent-invisible (the serializer sends content only).
 					return {

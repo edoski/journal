@@ -29,17 +29,16 @@
 
 import { Value } from "typebox/value";
 import type { TSchema } from "typebox";
-import { quizDisplayInputSchema, askInputSchema, askOptionProblems, quizInputProblems, explainInputProblems, explainDisplayInputSchema, type AskToolInput, type QuizToolInput, type ExplainToolInput } from "./question-core.ts";
-import { healEncodedArguments } from "./argument-heal.ts";
+import { askInputSchema, askOptionProblems, explainInputProblems, explainDisplayInputSchema, type AskToolInput, type ExplainToolInput } from "./question-core.ts";
 import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts";
 
 /** The pi-boundary parse step, mirrored here (live-smoke fix, 2026-09-26):
  *  pi-ai's validateToolArguments runs TypeBox's Value.Convert on the model's
  *  raw arguments before Value.Check — a correctAnswer sent as the NUMBER 17
  *  (what the live smoke's model actually emitted) converts to "17" at the
- *  boundary, so the tool poses the quiz fine. But the persisted record keeps
+ *  boundary, so the tool poses the question fine. But the persisted record keeps
  *  the RAW arguments, so a parse seam that skips Convert would reject the
- *  exact input the boundary accepted — an invisible pending quiz and a
+ *  exact input the boundary accepted — an invisible pending question and a
  *  learner lockout. Every display parse converts first, exactly like the
  *  boundary; Convert mutates, so the input is cloned before touching. */
 function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
@@ -48,43 +47,6 @@ function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
 	Value.Convert(schema, converted);
 	if (!Value.Check(schema, converted)) return undefined;
 	return Value.Clean(schema, converted) as T;
-}
-
-/**
- * Quiz parse for DISPLAY: the shared authoring base, pre-refinement.
- * Both boundaries (the prober's quizInputBase, the teacher's quizInputObject
- * over base + optional nodeId) share THE SAME quizInputBase fields, so
- * anything that passed either boundary parses here; the teacher-only
- * `nodeId` is an unknown key Value.Clean strips (zod's old strip behavior,
- * kept so the display shape stays exactly what the dock always saw). This
- * is deliberately the LENIENT common core — the strict per-agent authoring
- * checks are the boundary's job — but it runs the shared grading
- * refinement (quizInputProblems) after Convert, mirroring the boundary's
- * full chain: pi accepts `correctAnswer: 17` structurally (Convert →
- * "17") and execute's refinement is what makes it a posed-or-rejected
- * call. The display parse follows the same order so an input that could
- * never have been posed (e.g. `correctAnswer: undefined`, which Convert
- * widens to "") renders as a quiet fallback, not a broken quiz.
- */
-/** Shape parsing never repairs authored text. The dock builds its answer
- * data from this source copy; recovery belongs exclusively to presentation
- * (ToolContentResponse), never option identities, grading, or snapshots. */
-export function parseQuizInput(input: unknown): QuizToolInput | undefined {
-	// quizDisplayInputSchema (question-core, owner 2026-10-03): base + the
-	// OPTIONAL `type` — new teach-phase records carry predict|check and the
-	// dock renders/gates by it (normalizeQuizType at the read seam); old and
-	// probe records carry none. nodeId stays an unknown key Value.Clean
-	// strips, exactly as before.
-	// The display mirror of the boundary heal (whitehead, 2026-10-09): the
-	// record keeps RAW arguments, so the recorded `type: "\"predict\""`
-	// wobble must heal HERE too or a posed quiz renders invisible (the
-	// tool-parts law). healEncodedArguments is the same pure pass the
-	// boundary's withArgumentHeal runs.
-	const healedInput = healEncodedArguments(input, quizDisplayInputSchema);
-	const cleaned = boundaryParse<QuizToolInput>(quizDisplayInputSchema, healedInput);
-	if (!cleaned) return undefined;
-	if (quizInputProblems(cleaned).length > 0) return undefined;
-	return cleaned;
 }
 
 /**
@@ -101,11 +63,10 @@ export function parseAskInput(input: unknown): AskToolInput | undefined {
 }
 
 /** Explain parse for DISPLAY: the display schema (base + OPTIONAL
- *  lenient `type`, exactly the quiz pattern — teach explain calls carry
- *  the role since 2026-10-09; the commitment refinement
- *  (explainInputProblems) mirrors the boundary chain). Both explain
- *  variants share the same fields; the teacher's nodeId is an unknown
- *  key Value.Clean strips, same as the quiz seam. */
+ *  lenient `type` — teach explain calls carry the role since 2026-10-09;
+ *  the commitment refinement (explainInputProblems) mirrors the boundary
+ *  chain). Both explain variants share the same fields; the teacher's
+ *  nodeId is an unknown key Value.Clean strips. */
 export function parseExplainInput(input: unknown): ExplainToolInput | undefined {
 	const cleaned = boundaryParse<ExplainToolInput>(explainDisplayInputSchema, input);
 	if (!cleaned) return undefined;

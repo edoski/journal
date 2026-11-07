@@ -57,8 +57,8 @@ import { PracticeDock } from "@/components/practice-dock";
 import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
-import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import { CourseLinkBanner } from "@/components/course-link-banner";
+import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
@@ -495,10 +495,10 @@ export function Chat({
 	// the dock stays mounted (the problem is still active until the agent
 	// concludes).
 	const submitThinking = useCallback(
-		(text: string) => {
+		(text: string, confidence: Confidence) => {
 			const problem = activeProblemRef.current;
 			if (!problem) return;
-			void send({ type: "thinking", problemCallId: problem.toolCallId, text });
+			void send({ type: "thinking", problemCallId: problem.toolCallId, text, confidence });
 		},
 		[send],
 	);
@@ -1543,13 +1543,15 @@ export function Chat({
 																onOpen={() => setPlanOpen(true)}
 															/>
 														);
+													// quiz/probe: the removed multiple-choice tools — an old
+													// transcript's answered ones render as plain cards.
 													case "tool-quiz":
 													case "tool-probe":
 													case "tool-ask_user_question":
 													case "tool-explain":
 													case "tool-recall": {
 														// Pending/streaming questions live in the dock, not the
-														// transcript; answered ones render as graded records.
+														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
 															return (
 																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} />
@@ -1904,7 +1906,7 @@ function DockOverlay({
 	 *  question (the composer is replaced); null in teaching sessions. */
 	practice: { toolCallId: string; input: unknown } | null;
 	/** (commit, text) — the practice dock's two submit lanes. */
-	onSubmitThinking: (text: string) => void;
+	onSubmitThinking: (text: string, confidence: Confidence) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
 	/** The reading-thinking draft (owner 2026-10-03) — owned by ChatView so
@@ -2310,7 +2312,7 @@ function DockOverlay({
 						>
 							{pending ? (
 								<QuestionDock
-									toolName={pending.tool as "quiz" | "probe" | "ask_user_question" | "explain" | "recall"}
+									toolName={pending.tool as "ask_user_question" | "explain" | "recall"}
 									toolCallId={pending.toolCallId}
 									input={pending.input as never}
 									expanded={expanded}

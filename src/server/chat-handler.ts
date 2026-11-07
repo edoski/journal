@@ -427,10 +427,7 @@ export async function handleChatInput(
 		requestCycle,
 		messages: asAgentMessages(agentMessages),
 		onUsage: collectUsage,
-		// A course-linked probe is free recall (the engine's evidence rules,
-		// owner-approved 2026-10-28): a picked option is recognition, not an
-		// unaided answer. Teaching and unlinked chats keep the settings.
-		toolToggles: record.course && !teaching ? { ...effective.agent.tools, explain: true } : effective.agent.tools,
+		toolToggles: effective.agent.tools,
 		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
 		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
 		chatId,

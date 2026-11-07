@@ -43,6 +43,7 @@ import {
 	THINKING_LABEL,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
+import type { Confidence } from "./contracts/course.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
 
 /** The hard-invariant wording for an aborted turn's unanswered calls —
@@ -286,15 +287,16 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
  *  model READS the text to tell working traces from claimed answers. The
  *  content label is the single "Your thinking"; `details` keeps the raw
  *  payload for the transcript card. One problem may carry many
- *  submissions. */
-export function newThinkingMessage(problemCallId: string, text: string): LhMarkerMessage {
+ *  submissions. `confidence` is the learner's one-tap read of the
+ *  submission; the dock always sends one. */
+export function newThinkingMessage(problemCallId: string, text: string, confidence?: Confidence): LhMarkerMessage {
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-thinking",
-		content: `${THINKING_LABEL}:\n${text}`,
+		content: `${THINKING_LABEL}:\n${text}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
 		display: true,
-		details: { problemCallId, text },
+		details: { problemCallId, text, ...(confidence ? { confidence } : {}) },
 		timestamp: Date.now(),
 	};
 }
@@ -755,7 +757,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "toolResult") {
 		if (!(QUESTION_TOOLS as readonly string[]).includes(message.toolName) || message.isError || message.details == null || (message.details as { dismissed?: boolean }).dismissed) return "neutral";
 		const details = message.details as Partial<QuestionAnswerData>;
-		if (!["quiz", "ask", "explain"].includes(details.kind ?? "") || typeof details.questionText !== "string" || typeof details.dontKnow !== "boolean" || !Array.isArray(details.answers) || typeof details.answeredAt !== "string") return "unrecognizable";
+		if (!["ask", "explain"].includes(details.kind ?? "") || typeof details.questionText !== "string" || !Array.isArray(details.answers) || typeof details.answeredAt !== "string") return "unrecognizable";
 		const calls = history.flatMap((m) => m.role === "assistant" ? m.content.filter((b) => b.type === "toolCall" && b.id === message.toolCallId) : []);
 		return calls.length === 1 && calls[0]?.type === "toolCall" && calls[0].name === message.toolName ? "learner" : "unrecognizable";
 	}

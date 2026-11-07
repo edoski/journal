@@ -148,7 +148,7 @@ describe("send_to_user mechanics", () => {
 		for (const block of [null, {}, { type: "text", text: "ordinary" }, outputCall(2), outputCall("  "), { ...outputCall(), name: "other" }]) {
 			assert.equal(sendToUserText(block), undefined);
 		}
-		assert.deepEqual(userFacingTextOf([null, fauxThinking("Not lesson prose."), fauxText("First"), outputCall(message), fauxToolCall("quiz", { question: "Q?" })]), ["First", message]);
+		assert.deepEqual(userFacingTextOf([null, fauxThinking("Not lesson prose."), fauxText("First"), outputCall(message), fauxToolCall("explain", { question: "Q?" })]), ["First", message]);
 	});
 });
 
@@ -156,12 +156,12 @@ describe("send_to_user transcript projection", () => {
 	it("renders in place as prose, with thinking unchanged and no tool/ack duplication", () => {
 		const messages = [assistant([
 			fauxText("Before."), outputCall("**The lesson.** $x = 1$"),
-			fauxThinking("Private reasoning."), fauxToolCall("quiz", { question: "Q?" }, { id: "quiz-1" }),
+			fauxThinking("Private reasoning."), fauxToolCall("explain", { question: "Q?" }, { id: "quiz-1" }),
 			fauxText("After."),
 		]), ack()];
 		const before = structuredClone(messages);
 		const view = projectView(messages);
-		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-quiz", "text"]);
+		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-explain", "text"]);
 		assert.deepEqual(prose(view), ["Before.", "**The lesson.** $x = 1$", "After."]);
 		assert.equal(view[0]!.parts.find((p) => p.type === "reasoning")!.text, "Private reasoning.");
 		assert.deepEqual(view[0]!.parts.filter((p) => p.type === "text").map((p) => p.id), ["a1-t0", "a1-t1", "a1-t2"]);
@@ -320,15 +320,14 @@ describe("send_to_user native flow (offline)", () => {
 
 	it("output + question streams, persists natively, replays, and reloads as prose before the question", async () => {
 		const lesson = "**Synthetic lesson:** four is twice two. $2 + 2 = 4$";
-		const quiz = {
+		const question = {
 			type: "check", nodeId: "synthetic", question: "What is two plus two?",
-			options: [{ label: "Four", value: "4" }, { label: "Five", value: "5" }],
-			correctAnswer: "4", explanation: "Add two pairs.",
+			correctAnswer: "Four — two pairs make four.",
 		};
 		const { engine, faux } = scripted("openrouter", "anthropic/claude-opus-5.5", [
 			fauxAssistantMessage([
 				fauxThinking("Synthetic private thought."), outputCall(lesson),
-				fauxToolCall("quiz", quiz, { id: "quiz-1" }),
+				fauxToolCall("explain", question, { id: "quiz-1" }),
 			], { stopReason: "toolUse" }),
 		]);
 		const chat = chatStore.createChat("Synthetic native output flow");
@@ -350,12 +349,12 @@ describe("send_to_user native flow (offline)", () => {
 		assert.deepEqual(response.content.map((c) => c.type), ["thinking", "toolCall", "toolCall"]);
 		assert.deepEqual(response.content[1], outputCall(lesson));
 		assert.ok(saved.some((m) => m.role === "toolResult" && m.toolName === SEND_TO_USER_TOOL), "native output ack persists");
-		assert.ok(!saved.some((m) => m.role === "toolResult" && m.toolName === "quiz"), "question placeholder remains transient");
+		assert.ok(!saved.some((m) => m.role === "toolResult" && m.toolName === "explain"), "question placeholder remains transient");
 		const providerHistory = toLlmMessages(asAgentMessages(saved));
 		assert.deepEqual(providerHistory.find((m) => m.role === "assistant")!.content, response.content, "next request keeps native call/thinking structure");
 		assert.deepEqual(prose(projectView(saved)), [lesson]);
 		const parts = projectView(saved).flatMap((m) => m.parts);
-		assert.ok(parts.findIndex((p) => p.type === "text") < parts.findIndex((p) => p.type === "tool-quiz"));
+		assert.ok(parts.findIndex((p) => p.type === "text") < parts.findIndex((p) => p.type === "tool-explain"));
 		const client = new SessionModel({ chatId: chat.id, initialMessages: [user], fetch: globalThis.fetch });
 		await client.consumeStream(new Response(wire));
 		assert.deepEqual(prose(client.getState().messages), [lesson], "native event replay shows the lesson exactly once");

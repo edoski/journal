@@ -40,10 +40,10 @@ after(() => {
 	fs.rmSync(TMP_DATA, { recursive: true, force: true });
 });
 
-/** A record whose newest assistant message carries a DANGLING quiz call —
+/** A record whose newest assistant message carries a DANGLING question call —
  *  the settled state a mid-turn dismissal parks against. */
 function chatWithDanglingQuiz(id: string): string {
-	const chat = chatStore.createChat("park: dangling quiz");
+	const chat = chatStore.createChat("park: dangling question");
 	chatStore.saveMessages(chat.id, [{
 		id: newMessageId(),
 		role: "assistant",
@@ -52,7 +52,7 @@ function chatWithDanglingQuiz(id: string): string {
 			{
 				type: "toolCall",
 				id: `${id}-q1`,
-				name: "quiz",
+				name: "explain",
 				arguments: { question: "What is a cyclic group?" },
 			},
 		],
@@ -102,14 +102,14 @@ describe("the park registry", () => {
 });
 
 describe("applyParkedDismissal — against real records", () => {
-	it("applies a parked question dismissal to the dangling quiz call", () => {
+	it("applies a parked question dismissal to the dangling question call", () => {
 		const chat = chatWithDanglingQuiz("apply-q");
 		const pending = danglingQuestionOf(chatStore.getChat(chat)!.messages);
 		assert.ok(pending);
 		parkDismissal(chat, {
 			type: "dismiss",
 			toolCallId: pending!.toolCallId,
-			answer: dismissedAnswer("quiz", "What is a cyclic group?"),
+			answer: dismissedAnswer("explain", "What is a cyclic group?"),
 		});
 		let emitted = 0;
 		const off = subscribe((e) => {
@@ -166,7 +166,7 @@ describe("the dismiss route — the park contract (202)", () => {
 					input: {
 						type: "dismiss",
 						toolCallId: pending!.toolCallId,
-						answer: dismissedAnswer("quiz", "What is a cyclic group?"),
+						answer: dismissedAnswer("explain", "What is a cyclic group?"),
 					},
 				}),
 			}),
@@ -192,7 +192,7 @@ describe("the dismiss route — the park contract (202)", () => {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					input: { type: "dismiss", toolCallId: "call-nowhere", answer: dismissedAnswer("quiz", "?") },
+					input: { type: "dismiss", toolCallId: "call-nowhere", answer: dismissedAnswer("explain", "?") },
 				}),
 			}),
 			{ params: Promise.resolve({ id: chat }) },

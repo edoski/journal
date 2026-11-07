@@ -20,7 +20,7 @@ function toolPart(tool: string, state: string) {
 
 describe("streamingToolActivity (the turn-activity label)", () => {
 	it("question tools keep their question shimmer", () => {
-		assert.equal(streamingToolActivity([msg("assistant", [toolPart("quiz", "input-streaming")])]), "Writing a question…");
+		assert.equal(streamingToolActivity([msg("assistant", [toolPart("recall", "input-streaming")])]), "Writing a question…");
 		assert.equal(
 			streamingToolActivity([msg("assistant", [toolPart("ask_user_question", "input-streaming")])]),
 			"Writing a question…",

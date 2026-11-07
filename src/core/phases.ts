@@ -7,9 +7,9 @@
  *   probe  — until the prober's `probe_done` call CONCLUDES (a clean
  *            toolResult for it; the assessment rides the call's arguments)
  *   plan   — probe concluded, until teaching actually BEGINS
- *   teach  — the first quiz tool call tagged with a `nodeId` (a question
- *            ABOUT a plan node — probe quizzes carry no nodeId in their
- *            schema, so nothing false-triggers). The CALL is the seam, not
+ *   teach  — the first explain call tagged with a `nodeId` (a question
+ *            ABOUT a plan node — the prober's recall carries no nodeId in
+ *            its schema, so nothing false-triggers). The CALL is the seam, not
  *            its answer: the block that poses the first node question is
  *            where teaching starts.
  *
@@ -17,8 +17,8 @@
  * turn, and the learner's next message is a natural reply (a change
  * request, or the go-ahead). The live indicator LAGS by design (owner
  * accepted): "teach" shows only once the first node's question is posed.
- * A teacher that never tags a quiz can no longer exist — nodeId is
- * schema-required at the teach quiz boundary (owner ruling 2026-09-26),
+ * A teacher that never tags a question can no longer exist — nodeId is
+ * schema-required at the teach explain boundary (owner ruling 2026-09-26),
  * so the seam signal is structural, not prompt-mandated.
  *
  * The former derived-occupancy seam (phase-of-tree via `currentNodeId`)
@@ -29,12 +29,14 @@
  * VIEW messages (the client's dividers and dock — part shapes, pure and
  * structural); `phaseAt3Lh` folds the NATIVE record (server summaries,
  * tests) — probe→plan advances at the probe_done RESULT message, plan→teach
- * at the assistant message carrying the first nodeId-tagged quiz CALL.
+ * at the assistant message carrying the first nodeId-tagged question CALL.
  * Both are strictly sequential; the two derivations agree on every settled
  * record (a call's part projects into the same view boundary).
  *
  * Pure: only browser-safe core helpers — safe on server, client, and tests.
  */
+
+import { POSITION_QUESTION_TOOLS } from "./question-core.ts";
 
 /** The three phases of a session, as the picker / header / dividers see them. */
 export type Phase3 = "probe" | "plan" | "teach";
@@ -48,8 +50,8 @@ export interface PhaseMessage {
 	parts: ReadonlyArray<{ type: string; state?: string; input?: unknown; output?: unknown }>;
 }
 
-/** A quiz call's part input carries `nodeId` iff it is tagged (teach-only —
- *  the probe quiz schema has no nodeId field). */
+/** A graded call's part input carries `nodeId` iff it is tagged (teach-only —
+ *  the prober's recall schema has no nodeId field). */
 function taggedNodeId(input: unknown): boolean {
 	return (
 		typeof input === "object" &&
@@ -57,6 +59,10 @@ function taggedNodeId(input: unknown): boolean {
 		typeof (input as { nodeId?: unknown }).nodeId === "string" &&
 		(input as { nodeId: string }).nodeId.length > 0
 	);
+}
+
+function isPositionPart(type: string): boolean {
+	return type.startsWith("tool-") && POSITION_QUESTION_TOOLS.includes(type.slice("tool-".length));
 }
 
 /** The phase at `upToIndex` (inclusive; default: the last message). */
@@ -77,7 +83,7 @@ function advance(
 	if (!parts) return phase;
 	for (const part of parts) {
 		// STRICTLY SEQUENTIAL: probe → plan only via a concluded probe_done,
-		// plan → teach only via the first nodeId-tagged quiz CALL (the call,
+		// plan → teach only via the first nodeId-tagged question CALL (the call,
 		// not its answer — an errored-and-retried call still proves teaching
 		// began, and the retry lands in the same group anyway).
 		if (
@@ -86,11 +92,9 @@ function advance(
 		) {
 			phase = "plan";
 		}
-		// plan → teach via the first nodeId-tagged quizzing CALL — quiz OR
-		// explain, whichever mechanic the settings armed (both carry nodeId).
 		if (
 			phase === "plan" &&
-			(part.type === "tool-quiz" || part.type === "tool-explain") &&
+			isPositionPart(part.type) &&
 			taggedNodeId(part.input)
 		) {
 			phase = "teach";
@@ -102,8 +106,8 @@ function advance(
 /**
  * WHERE inside the flipping message teaching begins (owner round 8,
  * 2026-10-05 — the stacked-dividers bug): plan→teach flips at the first
- * tagged quiz/explain CALL, but the plan PRESENTATION often lives in the
- * same assistant message — an earlier provider STEP than the quiz call.
+ * tagged explain CALL, but the plan PRESENTATION often lives in the
+ * same assistant message — an earlier provider STEP than that call.
  * A message-level seam therefore drew the Teaching divider before the
  * plan presentation too (Planning and Teaching stacked back-to-back).
  * This returns the part index of the STEP BOUNDARY governing the flip
@@ -124,10 +128,7 @@ export function teachStepIndex(
 			latest = i;
 			continue;
 		}
-		if (
-			(part.type === "tool-quiz" || part.type === "tool-explain") &&
-			taggedNodeId(part.input)
-		) {
+		if (isPositionPart(part.type) && taggedNodeId(part.input)) {
 			// The call's governing step: 0–1 step-starts seen = the message's
 			// FIRST step → -1 (the divider belongs before the whole message);
 			// a later step → that step-start's index (the divider renders at
@@ -161,7 +162,7 @@ import { probeDoneResultIds, type LhMessage } from "./native-messages.ts";
 /** The phase at `upToIndex` (inclusive; default: the last message) of a
  *  NATIVE record. probe→plan advances at the probe_done call's clean
  *  toolResult; plan→teach at the assistant message carrying the first
- *  nodeId-tagged quiz CALL (mirrors the view fold — same seam, native
+ *  nodeId-tagged question CALL (mirrors the view fold — same seam, native
  *  shape). */
 export function phaseAt3Lh(messages: readonly LhMessage[], upToIndex?: number): Phase3 {
 	let phase: Phase3 = "probe";
@@ -178,7 +179,7 @@ export function phaseAt3Lh(messages: readonly LhMessage[], upToIndex?: number): 
 				for (const block of content) {
 					if (
 						block.type === "toolCall" &&
-						(block.name === "quiz" || block.name === "explain") &&
+						POSITION_QUESTION_TOOLS.includes(block.name ?? "") &&
 						taggedNodeId(block.arguments)
 					) {
 						phase = "teach";

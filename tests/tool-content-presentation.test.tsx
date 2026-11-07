@@ -8,8 +8,8 @@ import { parseHTML } from "linkedom";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
 import { QuestionDock } from "../components/question-dock.tsx";
 import { AnsweredCard } from "../components/answered-card.tsx";
-import { answerForPresentation, buildAnswer, normalizeOptions, parseAskInput, parseExplainInput, parseQuizInput,
-	repairMathForDisplay, resolveCorrect, type QuestionAnswerData, type QuestionData } from "../src/core/index.ts";
+import { answerForPresentation, buildAnswer, normalizeOptions, parseAskInput, parseExplainInput,
+	repairMathForDisplay, type QuestionAnswerData, type QuestionData } from "../src/core/index.ts";
 
 const fixtures = JSON.parse(readFileSync(new URL("./fixtures/tool-rendering/matrix-regressions.json", import.meta.url), "utf8")) as {
 	cases: Array<{ chatId: string; source: string; raw: string; oldDisplay: string }>;
@@ -19,7 +19,7 @@ const b = String.raw`$\begin{pmatrix}p&q\\r&s\end{pmatrix}$`;
 const brokenA = a.replace(String.raw`\\c`, String.raw`\c`);
 const brokenB = b.replace(String.raw`\\r`, String.raw`\r`);
 const doubled = String.raw`$\\nabla f$`;
-const input = { question: a, options: [{ label: a, value: "a" }, { label: b, value: "b" }], correctAnswer: "a", explanation: a };
+const input = { question: a, options: [{ label: a, value: "a" }, { label: b, value: "b" }] };
 const dom = (html: string) => parseHTML(`<html><body>${html}</body></html>`).document;
 const render = (text: string, recovered = true) => renderToStaticMarkup(
 	recovered ? <ToolContentResponse mode="static">{text}</ToolContentResponse> : <MessageResponse mode="static">{text}</MessageResponse>);
@@ -76,28 +76,15 @@ test("mixed-escaped environment markers retain existing recovery rather than tre
 	}
 });
 
-test("presentation-equivalent labels cannot make a source-invalid correctAnswer gradeable", () => {
-	const source = { question: "Which?", options: [{ label: String.raw`$\nabla f$` }, { label: "no" }],
-		correctAnswer: doubled, explanation: "A model-authored identity mismatch" };
-	const before = structuredClone(source);
-	assert.equal(repairMathForDisplay(doubled), source.options[0]!.label);
-	assert.equal(parseQuizInput(source), undefined);
-	assert.deepEqual(source, before);
-});
-
 test("shape parsers retain source text and identities; recovery is presentation only", () => {
-	const quiz = { ...input, question: doubled, explanation: "$\forall x$", options: [{ label: doubled }, { label: "no" }], correctAnswer: doubled };
 	const ask = { question: doubled, options: [{ label: doubled, value: doubled, description: doubled }, { label: "no" }] };
 	const explain = { question: doubled, correctAnswer: "$\forall x$" };
-	const before = structuredClone({ quiz, ask, explain });
-	assert.equal(parseQuizInput(quiz)!.question, doubled);
-	assert.equal(parseQuizInput(quiz)!.explanation, quiz.explanation);
-	assert.equal(parseQuizInput(quiz)!.correctAnswer, doubled);
+	const before = structuredClone({ ask, explain });
 	assert.deepEqual(parseAskInput(ask), ask);
 	assert.deepEqual(parseExplainInput(explain), explain);
 	assert.deepEqual(tex(render(doubled)), [String.raw`\nabla f`]);
 	assert.deepEqual(tex(render(doubled, false)), [String.raw`\\nabla f`]);
-	assert.deepEqual({ quiz, ask, explain }, before);
+	assert.deepEqual({ ask, explain }, before);
 });
 
 test("the live dock recovers only its rendering, including question, context and option labels", () => {
@@ -109,54 +96,45 @@ test("the live dock recovers only its rendering, including question, context and
 });
 
 test("answers snapshot source text, not recovered labels or identities", () => {
-	const source = { ...input, question: doubled, explanation: doubled, options: [{ label: doubled }, { label: "no" }], correctAnswer: doubled };
-	const parsed = parseQuizInput(source)!;
+	const source = { question: doubled, options: [{ label: doubled }, { label: "no" }] };
+	const parsed = parseAskInput(source)!;
 	const options = normalizeOptions(parsed.options);
-	const qd: QuestionData = { id: "source", kind: "quiz", question: parsed.question, mode: "single-select", options,
-		correctIndices: resolveCorrect(parsed.correctAnswer, options).indices, explanation: parsed.explanation, createdAt: "synthetic" };
-	const answer = buildAnswer(qd, { values: [doubled], confidence: 70 }, "probe");
+	const qd: QuestionData = { id: "source", kind: "ask", question: parsed.question, mode: "single-select", options, createdAt: "synthetic" };
+	const answer = buildAnswer(qd, { values: [doubled] }, "ask_user_question");
 	assert.equal(answer.questionText, doubled);
 	assert.equal(answer.options![0]!.label, doubled);
 	assert.equal(answer.answers[0]!.value, doubled);
 	assert.equal(answer.answers[0]!.label, doubled);
-	assert.equal(answer.explanation, doubled);
-	assert.equal(answer.correct, true);
 	const before = structuredClone(answer);
 	assert.deepEqual(tex(renderToStaticMarkup(<AnsweredCard answer={answer} input={source} />)), Array(2).fill(String.raw`\nabla f`));
 	assert.deepEqual(answer, before);
 });
 
 function historical(): QuestionAnswerData {
-	return { kind: "quiz", questionText: brokenA, options: [{ index: 1, label: brokenB }, { index: 2, label: brokenA }],
-		answers: [{ index: 1, label: brokenB, value: "b" }], correct: false, correctIndices: [2], dontKnow: false,
-		explanation: brokenA, confidence: 70, answeredAt: "synthetic" };
+	return { kind: "ask", questionText: brokenA, options: [{ index: 1, label: brokenB }, { index: 2, label: brokenA }],
+		answers: [{ index: 1, label: brokenB, value: "b" }], answeredAt: "synthetic" };
 }
-test("historical source join restores matrices while retaining recorded order, answer and grade", () => {
+test("historical source join restores matrices while retaining recorded order and answer", () => {
 	const answer = historical();
 	const before = structuredClone({ answer, input });
 	const projection = answerForPresentation(answer, input);
 	assert.equal(projection.questionText, a);
-	assert.equal(projection.explanation, a);
 	assert.deepEqual(projection.options, [{ index: 1, label: b }, { index: 2, label: a }]);
 	assert.equal(projection.answers, answer.answers);
-	assert.equal(projection.correctIndices, answer.correctIndices);
-	assert.equal(projection.correct, false);
-	assert.equal(projection.confidence, 70);
 	const html = renderToStaticMarkup(<AnsweredCard answer={answer} input={input} />);
 	assert.deepEqual(tex(html), [a.slice(1,-1), b.slice(1,-1), a.slice(1,-1)]);
-	assert.match(html, /incorrect/);
 	assert.deepEqual({ answer, input }, before);
 });
 
 test("historical ambiguous options and absent/invalid original calls retain their snapshots", () => {
 	const source = { ...input, options: [...input.options, { label: String.raw`$\begin{matrix}x\\y\end{matrix}$`, value: "c" }] };
-	const answer = { ...historical(), answers: [], dontKnow: true, options: [
+	const answer = { ...historical(), answers: [], options: [
 		{ index: 1, label: brokenB }, { index: 2, label: brokenA }, { index: 3, label: String.raw`$\begin{matrix}x\y\end{matrix}$` },
 	] };
 	assert.deepEqual(answerForPresentation(answer, source).options, answer.options);
 	assert.equal(answerForPresentation(answer, undefined), answer);
-	assert.equal(answerForPresentation(answer, { question: a }), answer);
-	const dismissed = { kind: "quiz", dismissed: true } as QuestionAnswerData;
+	assert.equal(answerForPresentation(answer, { options: input.options }), answer, "a call missing its question is invalid");
+	const dismissed = { kind: "ask", dismissed: true } as QuestionAnswerData;
 	assert.equal(answerForPresentation(dismissed, input), dismissed);
 	const before = structuredClone(answer);
 	renderToStaticMarkup(<AnsweredCard answer={answer} />);

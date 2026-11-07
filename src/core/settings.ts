@@ -253,11 +253,10 @@ export interface AgentSettings {
 	 *  Absent + no key = unavailable (no silent fallback, no default). */
 	search?: { engine?: SearchEngineId };
 	/** Prober graph tools (wave 7, owner ruling 2026-09-23): read-only
-	 *  knowledge-graph views for the prober agent — a session list +
-	 *  per-session propositions with understanding levels. Its SUBJECT
-	 *  is the graph but its MECHANISM is agent capability (tool
-	 *  registration), so it lives here in its OWN subsection, not in the
-	 *  tool-toggles map. Absent = enabled (the toggle discipline); the
+	 *  knowledge-graph views for the prober agent — a session list + the
+	 *  propositions born in each session. Its SUBJECT is the graph but its
+	 *  MECHANISM is agent capability (tool registration), so it lives here
+	 *  in its OWN subsection, not in the tool-toggles map. Absent = enabled (the toggle discipline); the
 	 *  effective gate composes graph.enabled AND this switch. */
 	graphTools?: { enabled?: boolean };
 	/** System-prompt override SWITCHES keyed by segment path (absent key =

@@ -42,6 +42,7 @@ import {
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
+import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
@@ -54,7 +55,7 @@ export type ChatInput =
 	 *  thinking on the ACTIVE problem — one lane (owner 2026-10-05):
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
-	| { type: "thinking"; problemCallId: string; text: string }
+	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
@@ -184,7 +185,15 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.text !== "string" || i.text.trim().length === 0) {
 				throw new ChatInputError("thinking input requires non-empty text");
 			}
-			return { type: "thinking", problemCallId: i.problemCallId, text: i.text };
+			if (i.confidence !== undefined && !isConfidence(i.confidence)) {
+				throw new ChatInputError(`thinking input confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+			}
+			return {
+				type: "thinking",
+				problemCallId: i.problemCallId,
+				text: i.text,
+				...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
+			};
 		case "next":
 			return { type: "next" };
 		default:
@@ -226,7 +235,7 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("thinking input targets no active problem");
 			}
-			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text)];
+			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

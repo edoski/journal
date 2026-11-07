@@ -15,7 +15,7 @@ function isToolUIPart(part: UIMessage["parts"][number]): boolean {
 }
 
 /**
- * The pending-question gate: an unanswered QUESTION tool part (quiz/ask)
+ * The pending-question gate: an unanswered QUESTION tool part (explain/recall/ask)
  * blocks the composer — one question at a time, mirroring the teacher's
  * prompt contract. Derived client state; the server enforces nothing.
  *
@@ -34,27 +34,22 @@ function isToolUIPart(part: UIMessage["parts"][number]): boolean {
 export interface PendingToolCall {
 	toolCallId: string;
 	tool: string;
-	/** Tool input (quiz/ask args) — lets the composer pick note vs answer mode. */
+	/** Tool input (question args) — lets the composer pick note vs answer mode. */
 	input: unknown;
 }
 
 /** Tools that render in the question dock and gate the composer. The
- *  probe-phase names (probe/recall, owner 2026-10-09) join their teach
- *  twins — old records keep the teach names; new probe-phase calls carry
- *  the phase names. */
-export const QUESTION_TOOLS = [
-	"quiz",
-	"probe",
-	"ask_user_question",
-	"explain",
-	"recall",
-] as const;
+ *  probe-phase name (recall, owner 2026-10-09) joins its teach twin. The
+ *  removed multiple-choice tools (quiz, probe — 7 Nov 2026) are absent:
+ *  an old transcript's unanswered one never pends, and its answered ones
+ *  render as plain read-only cards. */
+export const QUESTION_TOOLS = ["ask_user_question", "explain", "recall"] as const;
 
 /** The tool→kind map (the dock's own fold, named once — the dismissal
  *  path and the dock must never disagree on what a tool is). The probe
- *  names fold onto their teach kinds — the dock is kind-driven. */
-export function toolQuestionKind(tool: string): "quiz" | "ask" | "explain" {
-	return tool === "quiz" || tool === "probe" ? "quiz" : tool === "explain" || tool === "recall" ? "explain" : "ask";
+ *  name folds onto its teach kind — the dock is kind-driven. */
+export function toolQuestionKind(tool: string): "ask" | "explain" {
+	return tool === "explain" || tool === "recall" ? "explain" : "ask";
 }
 
 /** Tools fulfilled by background sub-agent jobs (W2/W6). */
@@ -65,9 +60,9 @@ export const JOB_TOOLS = ["research", "demo", "visual"] as const;
 /** The tools a user may toggle off in settings — THE DEFINITIVE LIST
  *  (adjudicated 2026-09-19, P2 reconciliation: the sub-agent JOB tools
  *  only — research/demo/visual/pdf). Deliberately NOT toggleable, ever:
- *  quiz + ask_user_question (the prober's flow is graded-quiz brackets →
- *  probe_done; quiz-off would collapse the assessment and teaching
- *  doctrine is built on graded verification — the wedge danger), the
+ *  the graded question tool + ask_user_question (the prober's flow is
+ *  graded brackets → probe_done; removing it would collapse the
+ *  assessment and teaching doctrine is built on graded verification), the
  *  learner-filesystem set (user-decided 2026-09, sources v1: always-on),
  *  plan tools, and probe_done (it is how the phase ENDS — a prober that
  *  can never conclude is a lockout).
@@ -77,13 +72,6 @@ export const JOB_TOOLS = ["research", "demo", "visual"] as const;
  *  (research, not researcher; pdf is the PDF-reader dispatch, sources v0
  *  2026-09). */
 export const TOGGLEABLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
-
-/** The keys the settings WRITE side accepts in agent.tools: the plain
- *  toggleables PLUS the quizzing-mechanics switch (`explain: true` arms
- *  free-recall quizzing and drops the MC quiz — see quizMechanics in
- *  agent/tools.ts; owner 2026-09-27). `quiz` itself stays unwritable:
- *  mechanics-managed, never individually toggleable. */
-export const WRITABLE_TOOL_KEYS = [...TOGGLEABLE_TOOLS, "explain"] as const;
 
 /** The resolved settings → factory seam shape (Platform wires chat-handler
  *  to pass this through from the settings record; storage and defaults are

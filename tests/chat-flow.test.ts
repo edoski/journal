@@ -1,7 +1,7 @@
 /**
  * Scripted integration test — the full teacher loop with zero tokens:
  *
- *   learner opens chat → faux model calls `quiz` → server streams + persists
+ *   learner opens chat → faux model calls `explain` → server streams + persists
  *   → client grades and sends the ANSWER EVENT back
  *   → faux model reacts → transcript persisted.
  *
@@ -36,7 +36,7 @@ import { buildSubagentSteer } from "../src/core/contracts.ts";
 import { abortTurn, runningTurn, settledTurnResponse } from "../src/server/turn-runs.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
-import { buildAnswer, dismissedAnswer, normalizeOptions, resolveCorrect, type QuestionData } from "../src/core/question-core.ts";
+import { buildAnswer, dismissedAnswer, type QuestionData } from "../src/core/question-core.ts";
 import { danglingQuestionOf, endsInDismissal, needsContinuation, newAnswerResult, newUserMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
 import type { PiEngine } from "../src/agent/models.ts";
@@ -56,20 +56,14 @@ import { PATHS } from "../config.ts";
 // key must be present in the test process like any real setup.
 process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 
-const QUIZ_INPUT = {
-	question: "Which planet is closest to the sun?",
-	options: [
-		{ label: "Venus" },
-		{ label: "Mercury" },
-		{ label: "Mars" },
-	],
-	correctAnswer: "Mercury",
-	explanation: "Mercury is the innermost planet.",
+const QUESTION_INPUT = {
 	type: "check",
 	nodeId: "planet-order",
+	question: "Which planet is closest to the sun?",
+	correctAnswer: "Mercury — the innermost orbit.",
 };
 
-/** Turn 1: a bit of reasoning, then the quiz tool call. Turn 2: plain text.
+/** Turn 1: a bit of reasoning, then the explain tool call. Turn 2: plain text.
  *  Each response factory records the prompt it received (the transcript the
  *  model saw) — the old doStream capture, engine-shaped. */
 function scriptedTeacher(steps: (calls: string[][]) => FauxResponseStep[]): {
@@ -82,13 +76,13 @@ function scriptedTeacher(steps: (calls: string[][]) => FauxResponseStep[]): {
 	return { engine: { model: faux.getModel(), streamFn: faux.streamSimple }, calls };
 }
 
-/** The default two-turn lesson: probe quiz, then react to the answer. */
+/** The default two-turn lesson: a graded question, then react to the answer. */
 function defaultLesson(calls: string[][]): FauxResponseStep[] {
 	return [
 		(context) => {
 			calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 			return fauxAssistantMessage(
-				[fauxThinking("Probe the basics first."), fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" })],
+				[fauxThinking("Probe the basics first."), fauxToolCall("explain", QUESTION_INPUT, { id: "call-1" })],
 				{ stopReason: "toolUse" },
 			);
 		},
@@ -107,20 +101,18 @@ function agentFactory(engine: PiEngine): Parameters<typeof handleChatRequest>[1]
 	return (opts) => createTeacherAgent(undefined, { engine, messages: opts.messages });
 }
 
-/** The graded answer a client sends for a quiz (the shared grading seam). */
-function gradedAnswer(input: typeof QUIZ_INPUT, values: string[]) {
-	const options = normalizeOptions(input.options);
+/** The free-response answer a client sends (the dock's buildAnswer seam). */
+function answerFor(input: typeof QUESTION_INPUT, text: string) {
 	const qd: QuestionData = {
 		id: "call-1",
-		kind: "quiz",
+		kind: "explain",
 		question: input.question,
-		mode: "single-select",
-		options,
-		correctIndices: resolveCorrect(input.correctAnswer, options).indices,
-		explanation: input.explanation,
+		mode: "text",
+		options: [],
+		committedAnswer: input.correctAnswer,
 		createdAt: new Date().toISOString(),
 	};
-	return buildAnswer(qd, { values });
+	return buildAnswer(qd, { text });
 }
 
 /** Parse an SSE body into its wire events (verbatim pi AgentEvents +
@@ -228,13 +220,13 @@ function post(chatId: string, input: unknown): Request {
 
 /** The silent-dismissal route POST (module scope — the parallel-rounds
  *  pins drive it too). */
-function dismissPost(chatId: string, toolCallId: string, kind: "quiz" | "ask" | "explain" = "quiz"): Promise<Response> {
+function dismissPost(chatId: string, toolCallId: string, kind: "ask" | "explain" = "explain"): Promise<Response> {
 	return dismissRoute.POST(
 		new Request(`http://test/api/chats/${chatId}/dismiss`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				input: { type: "dismiss", toolCallId, answer: dismissedAnswer(kind, kind === "ask" ? "Next topic?" : QUIZ_INPUT.question) },
+				input: { type: "dismiss", toolCallId, answer: dismissedAnswer(kind, kind === "ask" ? "Next topic?" : QUESTION_INPUT.question) },
 			}),
 		}),
 		{ params: Promise.resolve({ id: chatId }) },
@@ -275,7 +267,7 @@ after(() => {
 });
 
 describe("teacher chat flow (scripted model)", () => {
-	it("quiz tool call persists as a pending part; the answer continues the lesson", async () => {
+	it("a graded question call persists as a pending part; the answer continues the lesson", async () => {
 		const { engine, calls } = scriptedTeacher(defaultLesson);
 		const chat = createConfiguredChat("Test: solar system");
 		createdChats.push(chat.id);
@@ -294,31 +286,31 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.ok(thinking && thinking.type === "thinking", "thinking block streamed + persisted");
 		assert.match((thinking as { thinking?: string }).thinking!, /Probe the basics/);
 
-		const quizCall = assistantMsg.content.find((b) => b.type === "toolCall" && b.name === "quiz");
+		const quizCall = assistantMsg.content.find((b) => b.type === "toolCall" && b.name === "explain");
 		assert.ok(quizCall && quizCall.type === "toolCall", "quiz tool call persisted");
 		assert.equal((quizCall as { id?: string }).id, "call-1");
-		assert.deepEqual((quizCall as { arguments?: unknown }).arguments, QUIZ_INPUT);
+		assert.deepEqual((quizCall as { arguments?: unknown }).arguments, QUESTION_INPUT);
 
 		// The projection pins the client view: reasoning part + a pending
 		// (input-available) quiz part — the dock's mount state.
 		const view1 = projectView(saved1.messages);
 		const reasoningPart = view1[1]!.parts.find((p) => p.type === "reasoning");
 		assert.ok(reasoningPart && reasoningPart.type === "reasoning", "reasoning part projected");
-		const quizPart = view1[1]!.parts.find((p) => p.type === "tool-quiz");
-		assert.ok(quizPart && quizPart.type === "tool-quiz", "quiz tool part projected");
+		const quizPart = view1[1]!.parts.find((p) => p.type === "tool-explain");
+		assert.ok(quizPart && quizPart.type === "tool-explain", "quiz tool part projected");
 		assert.equal((quizPart as { state?: string }).state, "input-available", "unanswered quiz = pending state (resume record)");
-		assert.deepEqual((quizPart as { input?: unknown }).input, QUIZ_INPUT);
+		assert.deepEqual((quizPart as { input?: unknown }).input, QUESTION_INPUT);
 
 		// The pending-question gate sees it (the native seam).
 		const pending = danglingQuestionOf(saved1.messages);
 		assert.equal(pending?.toolCallId, "call-1");
-		assert.equal(pending?.tool, "quiz");
-		assert.deepEqual(pending?.input, QUIZ_INPUT);
+		assert.equal(pending?.tool, "explain");
+		assert.deepEqual(pending?.input, QUESTION_INPUT);
 
 		// ── The learner answers: the client grades and posts the ANSWER
 		// EVENT — the answer lands as the call's real tool result. ──
-		const answer = gradedAnswer(QUIZ_INPUT, ["Mercury"]);
-		assert.equal(answer.correct, true);
+		const answer = answerFor(QUESTION_INPUT, "Mercury");
+		assert.equal(answer.confidence, "neutral");
 		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer }), agentFactory(engine));
 
 		// ── The teacher reacts — the projection groups the reaction into the
@@ -336,14 +328,14 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.ok(textPart && textPart.type === "text", "reaction text appended after the tool part");
 		assert.match((textPart as { text?: string }).text!, /Mercury it is/);
 		// The answered quiz part is still there, now with its output.
-		const answeredQuiz = finalParts.find((p) => p.type === "tool-quiz");
-		assert.ok(answeredQuiz && answeredQuiz.type === "tool-quiz" && (answeredQuiz as { state?: string }).state === "output-available");
+		const answeredQuiz = finalParts.find((p) => p.type === "tool-explain");
+		assert.ok(answeredQuiz && answeredQuiz.type === "tool-explain" && (answeredQuiz as { state?: string }).state === "output-available");
 		// The graded answer rode the record as the call's tool result and
 		// round-trips through JSON (undefined keys drop) — compare its
 		// SUBSTANCE, not key-for-key against the in-memory build.
-		const out = (answeredQuiz as { output?: { kind?: string; correct?: boolean } }).output!;
-		assert.equal(out.kind, "quiz");
-		assert.equal(out.correct, true);
+		const out = (answeredQuiz as { output?: { kind?: string; text?: string } }).output!;
+		assert.equal(out.kind, "explain");
+		assert.equal(out.text, "Mercury");
 
 		// The model actually received the graded answer as a tool result.
 		assert.equal(calls.length, 2, "model saw exactly two prompts");
@@ -577,7 +569,7 @@ describe("teacher chat flow (scripted model)", () => {
 			content: [
 				{ type: "text", text: "The answer text." },
 				{ type: "thinking", thinking: "Checked the map afterwards." },
-				{ type: "toolCall", id: "call-tr", name: "quiz", arguments: { question: "q", options: [{ label: "a" }], correctAnswer: "a", explanation: "" } },
+				{ type: "toolCall", id: "call-tr", name: "explain", arguments: { question: "q", correctAnswer: "a" } },
 			],
 			stopReason: "toolUse",
 		} as never;
@@ -587,7 +579,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const order = parts.map((p) => p.type);
 		assert.equal(order[0], "reasoning", "reasoning renders FIRST regardless of content order");
 		assert.ok(order.indexOf("text") > order.indexOf("reasoning"), "text follows the reasoning");
-		assert.equal(order[order.length - 1], "tool-quiz", "the tool call stays last");
+		assert.equal(order[order.length - 1], "tool-explain", "the tool call stays last");
 		// The canonical think-first shape is unchanged.
 		const leadingThink: LhMessage = {
 			...baseMessage,
@@ -651,34 +643,32 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.equal(runningTurn(chat.id), undefined, "handle unregistered at settle");
 	});
 
-	it("an ungradeable quiz is rejected at the call boundary, the error reaches the model, and the model retries", async () => {
+	it("a question without a commitment is rejected at the call boundary, the error reaches the model, and the model retries", async () => {
 		// The authoring contract (question-core superRefine): a quiz whose
 		// correctAnswer matches no option value must NEVER reach the dock —
 		// the boundary re-runs the schema at the call boundary, marks the
 		// call invalid, and returns the validation error to the teacher as
 		// a tool result. The loop re-prompts the model, which retries in the
 		// same turn. This pins that whole mechanism (the live Nietzsche bug).
-		const BAD_QUIZ_INPUT = {
+		const BAD_QUESTION_INPUT = {
 			question: "What is Nietzsche's genealogical claim about religion?",
 			type: "check",
 			nodeId: "genealogy",
-			options: [{ label: "A cultural diagnosis" }, { label: "Atheism as a conclusion" }],
-			correctAnswer: "cultural-diagnosis", // the exact live failure shape: a slug, no match
-			explanation: "Genealogy diagnoses, it does not convert.",
+			correctAnswer: "   ", // no commitment — nothing to grade against
 		};
 
 		const steps = (calls: string[][]): FauxResponseStep[] => [
 			(context) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				return fauxAssistantMessage(
-					[fauxToolCall("quiz", BAD_QUIZ_INPUT, { id: "call-bad" })],
+					[fauxToolCall("explain", BAD_QUESTION_INPUT, { id: "call-bad" })],
 					{ stopReason: "toolUse" },
 				);
 			},
 			(context) => {
 				calls.push(context.messages.map((m) => JSON.stringify((m as { content: unknown }).content)));
 				return fauxAssistantMessage(
-					[fauxToolCall("quiz", QUIZ_INPUT, { id: "call-good" })],
+					[fauxToolCall("explain", QUESTION_INPUT, { id: "call-good" })],
 					{ stopReason: "toolUse" },
 				);
 			},
@@ -696,7 +686,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const badEnd = events.find((e) => e.type === "tool_execution_end" && e.toolCallId === "call-bad");
 		assert.ok(badEnd, "the invalid call's execution end is on the wire");
 		assert.equal(badEnd.isError, true, "the invalid call surfaced as an error execution");
-		assert.match(String(badEnd.result?.content?.[0]?.text ?? ""), /does not match any option value/);
+		assert.match(String(badEnd.result?.content?.[0]?.text ?? ""), /correctAnswer is required/);
 		const goodEnd = events.find((e) => e.type === "tool_execution_end" && e.toolCallId === "call-good");
 		assert.ok(goodEnd, "the valid retry's execution end is on the wire");
 		assert.equal(goodEnd.isError, false, "the valid retry's end is CLEAN — the dock mounts on it");
@@ -706,7 +696,7 @@ describe("teacher chat flow (scripted model)", () => {
 		// …and the second prompt carried the validation error back as a tool result.
 		assert.match(
 			calls[1]!.join(" "),
-			/does not match any option value/,
+			/correctAnswer is required/,
 			"the validation error reached the model",
 		);
 
@@ -715,21 +705,21 @@ describe("teacher chat flow (scripted model)", () => {
 		// retry as the dangling quiz. The projection renders the error part.
 		const saved = chatStore.getChat(chat.id)!;
 		const view = projectView(saved.messages);
-		const quizParts = view[1]!.parts.filter((p) => p.type === "tool-quiz");
+		const quizParts = view[1]!.parts.filter((p) => p.type === "tool-explain");
 		const failed = quizParts.find(
-			(p) => p.type === "tool-quiz" && (p as { state?: string }).state === "output-error",
+			(p) => p.type === "tool-explain" && (p as { state?: string }).state === "output-error",
 		);
 		assert.ok(failed, "the invalid call persisted as an error-state part");
 		assert.match(
 			String((failed as { errorText?: string }).errorText),
-			/does not match any option value/,
+			/correctAnswer is required/,
 		);
 		const pending = danglingQuestionOf(saved.messages);
 		assert.equal(pending?.toolCallId, "call-good", "the RETRIED quiz is the pending one");
-		assert.deepEqual(pending?.input, QUIZ_INPUT);
+		assert.deepEqual(pending?.input, QUESTION_INPUT);
 	});
 
-	it("structurally invalid quiz input (unhealable garbage) never reaches the dock and retries clean", async () => {
+	it("structurally invalid question input (unhealable garbage) never reaches the dock and retries clean", async () => {
 		// The two-tier world (owner, 2026-10-09 — the universal argument
 		// heal): a JSON-ENCODED stand-in for the schema shape (the live
 		// string-options habit) now heals at EVERY registry — see
@@ -738,18 +728,16 @@ describe("teacher chat flow (scripted model)", () => {
 		// could rescue (not JSON, not an array) rejects honestly at the
 		// boundary — tool-input-error, never a pending question — and the
 		// model's clean retry becomes the pending quiz.
-		const STRINGY_QUIZ_INPUT = {
+		const STRINGY_QUESTION_INPUT = {
 			question: "Lewis's indexical analysis of 'actual' — which is it?",
 			type: "check",
 			nodeId: "indexicals",
-			options: "definitely not a JSON array — denim all the way down", // ← unhealable garbage
-			correctAnswer: "indexical",
-			explanation: "Indexical: every world is actual to its own inhabitants.",
+			correctAnswer: { garbage: "denim all the way down" }, // ← unhealable garbage
 		};
 
 		const steps: FauxResponseStep[] = [
-			() => fauxAssistantMessage([fauxToolCall("quiz", STRINGY_QUIZ_INPUT, { id: "call-stringy" })], { stopReason: "toolUse" }),
-			() => fauxAssistantMessage([fauxToolCall("quiz", QUIZ_INPUT, { id: "call-clean" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxToolCall("explain", STRINGY_QUESTION_INPUT, { id: "call-stringy" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxToolCall("explain", QUESTION_INPUT, { id: "call-clean" })], { stopReason: "toolUse" }),
 		];
 		const { engine } = scriptedTeacher(() => steps);
 
@@ -761,7 +749,7 @@ describe("teacher chat flow (scripted model)", () => {
 		const stringyEnd = events.find((e) => e.type === "tool_execution_end" && e.toolCallId === "call-stringy");
 		assert.ok(stringyEnd, "the invalid quiz's execution end is on the wire");
 		assert.equal(stringyEnd.isError, true, "the structural reject surfaced as an error execution");
-		assert.match(String(stringyEnd.result?.content?.[0]?.text ?? ""), /options/);
+		assert.match(String(stringyEnd.result?.content?.[0]?.text ?? ""), /correctAnswer: must be string/);
 
 		const saved = chatStore.getChat(chat.id)!;
 		const view = projectView(saved.messages);
@@ -769,25 +757,25 @@ describe("teacher chat flow (scripted model)", () => {
 				(p) => (p as { toolCallId?: string }).toolCallId === "call-stringy",
 			);
 		assert.equal((failed as { state?: string }).state, "output-error", "persisted as an error part");
-		assert.match(String((failed as { errorText?: string }).errorText), /options/);
+		assert.match(String((failed as { errorText?: string }).errorText), /correctAnswer: must be string/);
 		const pending = danglingQuestionOf(saved.messages);
 		assert.equal(pending?.toolCallId, "call-clean", "the retried quiz is the pending one");
 	});
 
-	it("parallel quiz calls are asked, saved, and answered in the model's call order", async () => {
+	it("parallel question calls are asked, saved, and answered in the model's call order", async () => {
 		// The live modal-realism observation: the teacher batched two quizzes
 		// in one turn, and the dock showed the SECOND one first (the backward
 		// part scan), so the interaction order was reversed vs the record.
 		// Pins: (A) danglingQuestionOf picks the FIRST unanswered question in
 		// call order; (B) question tools execute sequentially, so their
 		// tool-input-available chunks arrive in call order on the wire.
-		const QUIZ_A = { ...QUIZ_INPUT, question: "Quiz A: which planet is closest to the sun?" };
-		const QUIZ_B = { ...QUIZ_INPUT, question: "Quiz B: which planet is largest?" };
+		const QUIZ_A = { ...QUESTION_INPUT, question: "Quiz A: which planet is closest to the sun?" };
+		const QUIZ_B = { ...QUESTION_INPUT, question: "Quiz B: which planet is largest?" };
 
 		const { engine } = scriptedTeacher(() => [
 			() =>
 				fauxAssistantMessage(
-					[fauxToolCall("quiz", QUIZ_A, { id: "call-a" }), fauxToolCall("quiz", QUIZ_B, { id: "call-b" })],
+					[fauxToolCall("explain", QUIZ_A, { id: "call-a" }), fauxToolCall("explain", QUIZ_B, { id: "call-b" })],
 					{ stopReason: "toolUse" },
 			),
 		]);
@@ -808,7 +796,7 @@ describe("teacher chat flow (scripted model)", () => {
 		// Saved in call order (the projection preserves the content order).
 		const saved = chatStore.getChat(chat.id)!;
 		const quizIds = projectView(saved.messages)[1]!.parts
-			.filter((p) => p.type === "tool-quiz")
+			.filter((p) => p.type === "tool-explain")
 			.map((p) => (p as { toolCallId: string }).toolCallId);
 		assert.deepEqual(quizIds, ["call-a", "call-b"], "parts persisted in call order");
 
@@ -817,7 +805,7 @@ describe("teacher chat flow (scripted model)", () => {
 		assert.equal(pending?.toolCallId, "call-a", "the FIRST asked question is the dock subject");
 		// …the learner answers A: the answer lands as call-a's tool result —
 		// the SECOND question becomes the dock subject only after that.
-		const answered = [...saved.messages, newAnswerResult("call-a", "quiz", gradedAnswer(QUIZ_A, ["Mercury"]))];
+		const answered = [...saved.messages, newAnswerResult("call-a", "explain", answerFor(QUIZ_A, "Mercury"))];
 		const next = danglingQuestionOf(answered);
 		assert.equal(next?.toolCallId, "call-b", "the SECOND question becomes the dock subject only after the first is answered");
 	});
@@ -859,7 +847,7 @@ describe("canonical persistence failures", () => {
 		let builds = 0;
 		chatStore.saveMessages = () => { throw new Error("synthetic write-ahead failure"); };
 		try {
-			const res = await handleChatRequest(post(chat.id, { type: "answer", toolCallId: "call-1", answer: gradedAnswer(QUIZ_INPUT, ["Mercury"]) }), (opts) => {
+			const res = await handleChatRequest(post(chat.id, { type: "answer", toolCallId: "call-1", answer: answerFor(QUESTION_INPUT, "Mercury") }), (opts) => {
 				builds++;
 				return agentFactory(engine)!(opts);
 			});
@@ -867,7 +855,7 @@ describe("canonical persistence failures", () => {
 			if (running) await new Response(running.subscribe()).text();
 			assert.equal(res.status, 500);
 			const client = new SessionModel({ chatId: chat.id, initialMessages: before, fetch: async () => res.clone() });
-			await client.submitAnswer("quiz", "call-1", gradedAnswer(QUIZ_INPUT, ["Mercury"]));
+			await client.submitAnswer("explain", "call-1", answerFor(QUESTION_INPUT, "Mercury"));
 			assert.equal(client.getState().error?.message, "Your input could not be saved. Please try again.");
 			assert.equal(await res.text(), "Your input could not be saved. Please try again.");
 			assert.equal(builds, 0);
@@ -889,7 +877,7 @@ describe("canonical persistence failures", () => {
 			return save(id, messages);
 		};
 		try {
-			const body = await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer: gradedAnswer(QUIZ_INPUT, ["Mercury"]) }), agentFactory(engine));
+			const body = await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer: answerFor(QUESTION_INPUT, "Mercury") }), agentFactory(engine));
 			const errors = eventsOf(body).filter(e => e.type === "error");
 			assert.equal(errors.length, 1);
 			assert.equal(errors[0]!.errorText, "The reply could not be saved.");
@@ -976,7 +964,7 @@ describe("mid-turn navigation (turn liveness + write-ahead)", () => {
 		await drainTurn(post(chat.id, { type: "text", text: "teach me the solar system" }), agentFactory(engine));
 
 		// The learner answers; the client posts the ANSWER EVENT.
-		const answer = gradedAnswer(QUIZ_INPUT, ["Mercury"]);
+		const answer = answerFor(QUESTION_INPUT, "Mercury");
 
 		// NOT drained: the teacher turn is streaming, but the answer is already
 		// on disk — a remount (or crash) mid-turn sees the answered quiz, never
@@ -984,8 +972,8 @@ describe("mid-turn navigation (turn liveness + write-ahead)", () => {
 		const res = await handleChatRequest(post(chat.id, { type: "answer", toolCallId: "call-1", answer }), agentFactory(engine));
 		const midTurn = chatStore.getChat(chat.id)!;		assert.equal(midTurn.messages.length, 3, "write-ahead appended the answer tool result before finish");
 		assert.equal((midTurn.messages[2] as { role?: string }).role, "toolResult");
-		const midQuiz = projectView(midTurn.messages)[1]!.parts.find((p) => p.type === "tool-quiz");
-		assert.ok(midQuiz && midQuiz.type === "tool-quiz");
+		const midQuiz = projectView(midTurn.messages)[1]!.parts.find((p) => p.type === "tool-explain");
+		assert.ok(midQuiz && midQuiz.type === "tool-explain");
 		assert.equal((midQuiz as { state?: string }).state, "output-available", "write-ahead persisted the answer before finish");
 
 		await drainRunning(chat.id); // finish → persist the full turn → endTurn
@@ -1320,11 +1308,8 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 	createdChats.push(chat.id);
 
 	// Free-recall armed: the mechanic swap is the ONLY change to the registry.
-	const tools = createTeacherTools(
-		{ chatId: chat.id, chatStore, jobStore, spawn: () => {} },
-		{ explain: true },
-	);
-	assert.ok(tools.explain && !tools.quiz, "explain armed, quiz dropped — one quizzing tool");
+	const tools = createTeacherTools({ chatId: chat.id, chatStore, jobStore, spawn: () => {} });
+	assert.ok(tools.explain && !tools.quiz, "explain is the teacher's only graded tool");
 
 	const factory: Parameters<typeof handleChatRequest>[1] = (opts) =>
 		createTeacherAgent(undefined, { engine, messages: opts.messages, tools });
@@ -1352,8 +1337,7 @@ it("explain tool call persists as a pending part; the free-text answer reveals t
 		committedAnswer: EXPLAIN_INPUT.correctAnswer,
 		createdAt: new Date().toISOString(),
 	};
-	const answer = buildAnswer(qd, { text: "It stays near the Sun." });
-	assert.equal(answer.correct, undefined, "no client grading — the model grades");
+	const answer = buildAnswer(qd, { text: "It stays near the Sun.", confidence: "confident" });
 
 	await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer }), factory);
 
@@ -1416,7 +1400,7 @@ describe("the silent dismissal (A2)", () => {
 		assert.equal((await dismissPost(chat.id, "call-x")).status, 400);
 	});
 
-	it("parallel quizzes dismiss call-by-call — the composer returns only when nothing dangles", async () => {
+	it("parallel questions dismiss call-by-call — the composer returns only when nothing dangles", async () => {
 		const chat = createConfiguredChat("Test: parallel dismiss");
 		createdChats.push(chat.id);
 		// Two quiz calls in one assistant message (the sequential-execution
@@ -1427,8 +1411,8 @@ describe("the silent dismissal (A2)", () => {
 				id: "a1",
 				role: "assistant",
 				content: [
-					{ type: "toolCall", id: "call-a", name: "quiz", arguments: { question: "A?" } as never },
-					{ type: "toolCall", id: "call-b", name: "quiz", arguments: { question: "B?" } as never },
+					{ type: "toolCall", id: "call-a", name: "explain", arguments: { question: "A?" } as never },
+					{ type: "toolCall", id: "call-b", name: "explain", arguments: { question: "B?" } as never },
 				],
 				api: "openai-completions",
 				provider: "openrouter",
@@ -1469,7 +1453,7 @@ describe("parallel question calls: the answer defers its wake while a sibling da
 				return fauxAssistantMessage(
 					[
 						fauxThinking("Batch a graded and a non-graded check."),
-						fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" }),
+						fauxToolCall("explain", QUESTION_INPUT, { id: "call-1" }),
 						fauxToolCall("ask_user_question", ASK_INPUT, { id: "call-2" }),
 					],
 					{ stopReason: "toolUse" },
@@ -1496,7 +1480,7 @@ describe("parallel question calls: the answer defers its wake while a sibling da
 
 		// The graded answer: the result appends ADJACENT to the calling
 		// assistant message — and NO wake fires while the ask still dangles.
-		const quizAns = gradedAnswer(QUIZ_INPUT, ["Mercury"]);
+		const quizAns = answerFor(QUESTION_INPUT, "Mercury");
 		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer: quizAns }), agentFactory(engine));
 		assert.equal(calls.length, 1, "the sibling answer woke NOTHING (the gate deferred)");
 		saved = chatStore.getChat(chat.id)!;
@@ -1537,7 +1521,7 @@ describe("parallel rounds: the LAST resolution decides the wake (owner ruling 20
 				return fauxAssistantMessage(
 					[
 						fauxThinking("Batch again."),
-						fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" }),
+						fauxToolCall("explain", QUESTION_INPUT, { id: "call-1" }),
 						fauxToolCall("ask_user_question", { question: "Next topic?", options: [{ label: "Chemistry" }, { label: "History" }] }, { id: "call-2" }),
 					],
 					{ stopReason: "toolUse" },
@@ -1557,7 +1541,7 @@ describe("parallel rounds: the LAST resolution decides the wake (owner ruling 20
 		await drainTurn(post(chat.id, { type: "text", text: "two questions please" }), agentFactory(engine));
 
 		// Answer the quiz — deferred by the parallel gate.
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer: gradedAnswer(QUIZ_INPUT, ["Mercury"]) }), agentFactory(engine));
+		await drainTurn(post(chat.id, { type: "answer", toolCallId: "call-1", answer: answerFor(QUESTION_INPUT, "Mercury") }), agentFactory(engine));
 		assert.equal(calls.length, 1, "the sibling answer deferred");
 
 		// Dismiss the ask — the LAST resolution is a dismissal: no continuation
@@ -1675,10 +1659,10 @@ describe("composer steering: POST /api/chats/[id]/steer", () => {
 // boundary remints colliding ids ONCE — the client, the record, the pending
 // gate, and the next turn's provider context all see unique ids.
 describe("duplicate provider tool-call ids (the Lacan fix)", () => {
-	it("every `call_0` turn keeps its identity: ask answered as ask, quiz as quiz, ids unique in the record", async () => {
+	it("every `call_0` turn keeps its identity: ask answered as ask, explain as explain, ids unique in the record", async () => {
 		// the live shape (the real Lacan session): an ask with NO options
 		const ASK = { question: "What do you want from Lacan?" };
-		const QUIZ2 = { ...QUIZ_INPUT, type: "check" };
+		const QUIZ2 = { ...QUESTION_INPUT, type: "check" };
 		// BOTH turns name their single call `call_0` — the provider's shape.
 		const { engine } = scriptedTeacher(() => [
 			(context) => {
@@ -1691,7 +1675,7 @@ describe("duplicate provider tool-call ids (the Lacan fix)", () => {
 			(context) => {
 				void context;
 				return fauxAssistantMessage(
-					[fauxText("The unconscious, then."), fauxToolCall("quiz", QUIZ2, { id: "call_0" })],
+					[fauxText("The unconscious, then."), fauxToolCall("explain", QUIZ2, { id: "call_0" })],
 					{ stopReason: "toolUse" },
 				);
 			},
@@ -1712,11 +1696,11 @@ describe("duplicate provider tool-call ids (the Lacan fix)", () => {
 		// Turn 2: the quiz — ALSO `call_0` from the provider.
 		saved = chatStore.getChat(chat.id)!;
 		pending = danglingQuestionOf(saved.messages)!;
-		assert.equal(pending.tool, "quiz");
+		assert.equal(pending.tool, "explain");
 		const quizId = pending.toolCallId;
 		assert.notEqual(quizId, askId, "the uniquifier reminted the colliding id at the wire boundary");
 		assert.match(quizId, /^call_0~\d+$/, "mint scheme: orig~n");
-		await drainTurn(post(chat.id, { type: "answer", toolCallId: quizId, answer: gradedAnswer(QUIZ2, ["Mercury"]) }), agentFactory(engine));
+		await drainTurn(post(chat.id, { type: "answer", toolCallId: quizId, answer: answerFor(QUIZ2, "Mercury") }), agentFactory(engine));
 
 		saved = chatStore.getChat(chat.id)!;
 		// The invariant: CALL ids are unique among themselves (a call and its
@@ -1739,6 +1723,6 @@ describe("duplicate provider tool-call ids (the Lacan fix)", () => {
 		assert.equal(askPart?.state, "output-available");
 		assert.equal(askPart?.output?.kind, "ask", "the ask card keeps its own answer");
 		assert.equal(quizPart?.state, "output-available");
-		assert.equal(quizPart?.output?.kind, "quiz", "the quiz card got ITS answer (the pre-fix bug: it landed on the ask card)");
+		assert.equal(quizPart?.output?.kind, "explain", "the explain card got ITS answer (the pre-fix bug: it landed on the ask card)");
 	});
 });

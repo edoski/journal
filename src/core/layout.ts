@@ -33,7 +33,6 @@ import {
 	type SimulationNodeDatum,
 } from "d3-force";
 import type { GraphEdge, GraphNode, Position } from "./contracts.ts";
-import { seededRandom } from "./question-core.ts";
 
 /** A node the d3 simulation mutates (x/y/vx/vy; fx/fy = pinned). */
 export interface LayoutNode extends SimulationNodeDatum {
@@ -717,4 +716,21 @@ export function incrementalLayout(
 	const out = new Map<string, Position>();
 	for (const n of simNodes) out.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
 	return out;
+}
+
+/** mulberry32 seeded by a string — deterministic jitter for hydration-safe layout. */
+function seededRandom(seed: string): () => number {
+	let h = 2166136261;
+	for (let i = 0; i < seed.length; i++) {
+		h ^= seed.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	let a = h >>> 0;
+	return () => {
+		a |= 0;
+		a = (a + 0x6d2b79f5) | 0;
+		let t = Math.imul(a ^ (a >>> 15), 1 | a);
+		t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
 }

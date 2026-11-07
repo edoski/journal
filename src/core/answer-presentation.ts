@@ -2,17 +2,15 @@
  * projection: answer identities, ordering, grading, and learner text remain
  * the recorded facts; only model-authored display text comes from the call. */
 import { normalizeOptions, type QuestionAnswerData } from "./question-core.ts";
-import { parseAskInput, parseExplainInput, parseQuizInput } from "./tool-parts.ts";
+import { parseAskInput, parseExplainInput } from "./tool-parts.ts";
 import { repairMathForDisplay } from "./math-delims.ts";
 
 export function answerForPresentation(answer: QuestionAnswerData, input: unknown): QuestionAnswerData {
 	if (answer.dismissed) return answer;
-	const quiz = answer.kind === "quiz" ? parseQuizInput(input) : undefined;
 	const explain = answer.kind === "explain" ? parseExplainInput(input) : undefined;
-	const source = quiz ?? explain ?? (answer.kind === "ask" ? parseAskInput(input) : undefined);
+	const source = explain ?? (answer.kind === "ask" ? parseAskInput(input) : undefined);
 	if (!source) return answer;
 	const projected = { ...answer, questionText: source.question };
-	if (quiz) projected.explanation = quiz.explanation;
 	if (explain) projected.committed = explain.correctAnswer;
 	if (!answer.options?.length || !("options" in source) || !source.options?.length) return projected;
 
@@ -34,7 +32,7 @@ export function answerForPresentation(answer: QuestionAnswerData, input: unknown
 		}
 	};
 	// Selected-answer values are stable identities when the record retained
-	// them. Do not normalize those values, recompute a shuffle, or regrade.
+	// them. Do not normalize those values or reorder.
 	bindUnique(saved.map((option) => {
 		const values = answer.answers.filter((a) => a.index === option.index).map((a) => a.value);
 		return original.flatMap((o, oi) => values.includes(o.value) ? [oi] : []);

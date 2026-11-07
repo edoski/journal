@@ -2,7 +2,7 @@
 
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
-import type { ArtifactPartProps } from "@/src/core";
+import type { ArtifactPartProps, Confidence } from "@/src/core";
 
 /**
  * The practice transcript cards (practice sessions, owner design
@@ -32,6 +32,8 @@ export interface PracticeThinkingData {
 	/** Legacy records (pre 2026-10-05) carry the old two-lane flag; ignored. */
 	commit?: boolean;
 	text: string;
+	/** Absent on submissions recorded before 7 Nov 2026. */
+	confidence?: Confidence;
 }
 
 export function ProblemCard({ part }: ArtifactPartProps) {

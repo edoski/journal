@@ -987,7 +987,7 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 			{
 				id: "a1",
 				role: "assistant",
-				content: [{ type: "toolCall", id: "quiz-call", name: "quiz", arguments: { question: "q", choices: ["a", "b"] } as never }],
+				content: [{ type: "toolCall", id: "quiz-call", name: "explain", arguments: { question: "q", correctAnswer: "a" } as never }],
 				api: "openai-completions",
 				provider: "openrouter",
 				model: "test",
@@ -1014,7 +1014,7 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 				id: "r1",
 				role: "toolResult",
 				toolCallId: "quiz-call",
-				toolName: "quiz",
+				toolName: "explain",
 				content: [{ type: "text", text: "answered" }],
 				details: { answer: "a", correct: true, explanation: "" },
 				isError: false,
@@ -1044,7 +1044,7 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 			{
 				id: "a1",
 				role: "assistant",
-				content: [{ type: "toolCall", id: "quiz-call", name: "quiz", arguments: { question: "q" } as never }],
+				content: [{ type: "toolCall", id: "quiz-call", name: "explain", arguments: { question: "q", correctAnswer: "a" } as never }],
 				api: "openai-completions",
 				provider: "openrouter",
 				model: "test",
@@ -1056,9 +1056,9 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 				id: "r1",
 				role: "toolResult",
 				toolCallId: "quiz-call",
-				toolName: "quiz",
+				toolName: "explain",
 				content: [{ type: "text", text: "skipped" }],
-				details: { kind: "quiz", questionText: "q", dontKnow: false, answers: [], dismissed: true, answeredAt: "t" },
+				details: { kind: "explain", questionText: "q", answers: [], dismissed: true, answeredAt: "t" },
 				isError: false,
 				timestamp: 1,
 			} as never,
@@ -1223,7 +1223,7 @@ describe("Wave C: live steering handoff + settlement reconciliation", () => {
 			{
 				id: "a-q",
 				role: "assistant",
-				content: [{ type: "toolCall", id: "quiz-call", name: "quiz", arguments: { question: "q", choices: ["a", "b"] } as never }],
+				content: [{ type: "toolCall", id: "quiz-call", name: "explain", arguments: { question: "q", correctAnswer: "a" } as never }],
 				api: "openai-completions",
 				provider: "openrouter",
 				model: "test",
@@ -1379,7 +1379,7 @@ describe("persistTurn (native history, Wave B)", () => {
 			{
 				id: "",
 				role: "assistant",
-				content: [{ type: "toolCall", id: "q1", name: "quiz", arguments: { question: "q?" } as never }],
+				content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "q?", correctAnswer: "a" } as never }],
 				api: "openai-completions",
 				provider: "openrouter",
 				model: "test",
@@ -1392,7 +1392,7 @@ describe("persistTurn (native history, Wave B)", () => {
 				id: "",
 				role: "toolResult",
 				toolCallId: "q1",
-				toolName: "quiz",
+				toolName: "explain",
 				content: [{ type: "text", text: "question posed" }],
 				details: "question posed",
 				isError: false,
@@ -1403,7 +1403,7 @@ describe("persistTurn (native history, Wave B)", () => {
 				id: "",
 				role: "toolResult",
 				toolCallId: "q1",
-				toolName: "quiz",
+				toolName: "explain",
 				content: [{ type: "text", text: "bad options" }],
 				details: "bad options",
 				isError: true,
@@ -1472,7 +1472,7 @@ describe("prompt composition", () => {
 			["teacher", teacher],
 			["prober", prober],
 		] as const) {
-			assert.ok(prompt.includes("asymmetry"), `${name} carries the option craft (moved out of tool descriptions)`);
+			assert.ok(prompt.includes("**Grading.**"), `${name} carries the grading craft (moved out of tool descriptions)`);
 			assert.ok(prompt.includes("TRANSCRIBED SPEECH"), `${name} reads spoken thinking leniently`);
 			assert.ok(prompt.includes("thinkingWhileReading"), `${name} knows the reading channel`);
 		}

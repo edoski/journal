@@ -257,21 +257,20 @@ describe("a course-linked turn", () => {
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
-	it("probe phase: a course-linked prober quizzes by free recall; an unlinked one keeps the settings", async () => {
-		const toggles: Array<Record<string, boolean> | undefined> = [];
+	it("probe phase: a course-linked prober asks by free recall, even under the retired multiple-choice setting", async () => {
+		const tools: string[][] = [];
 		const build = (chatId: string): Factory => (opts) => {
-			toggles.push(opts.toolToggles as Record<string, boolean> | undefined);
-			return createProberAgent(
+			const agent = createProberAgent(
 				{ chatId, chatStore, deliver: () => {}, jobStore: { createJob: () => { throw new Error("unused"); } } as never, spawn: () => {} },
-				{ ...opts, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
+				{ ...opts, toolToggles: { ...opts.toolToggles, explain: false }, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
 			);
+			tools.push(agent.state.tools.map((t) => t.name));
+			return agent;
 		};
 		const linked = (await (await createChat({ title: "linked", course: { workspace: LINALG } })).json()) as { id: string };
-		for (const id of [linked.id, chatStore.createChat("unlinked").id]) {
-			chatStore.saveSettings(id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
-			await turn(id, { type: "text", text: "teach me rank" }, build(id));
-		}
-		assert.equal(toggles[0]?.explain, true, "linked: free recall");
-		assert.notEqual(toggles[1]?.explain, true, "unlinked: the settings decide");
+		chatStore.saveSettings(linked.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		await turn(linked.id, { type: "text", text: "teach me rank" }, build(linked.id));
+		assert.ok(tools[0]?.includes("recall"), "free recall is the prober's graded tool");
+		assert.ok(!tools[0]?.includes("probe"), "no multiple-choice tool exists");
 	});
 });

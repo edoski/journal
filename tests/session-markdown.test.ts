@@ -80,32 +80,26 @@ describe("messageMarkdown", () => {
 		assert.equal(md, "### Learner\n\nhello");
 	});
 
-	it("quiz blocks: question + outcome + the learner's note", () => {
+	it("removed multiple-choice results (quiz, probe) export as the generic tool line", () => {
 		const md = messageMarkdown(
-			result("r1", "q1", "quiz", { questionText: "What is a derivative?", correct: false, dontKnow: false, note: "mixed up signs" }),
+			result("r1", "q1", "quiz", { questionText: "What is a derivative?", correct: false, dontKnow: false }),
 			"r1",
 		)!;
-		assert.match(md, /^### Quiz · r1$/m);
-		assert.match(md, /\*\*Q:\*\* What is a derivative\?/);
-		assert.match(md, /The learner answered incorrectly\./);
-		assert.match(md, /\*\(his thinking: mixed up signs\)\*/);
+		assert.equal(md, "### Tool · r1\n\n*quiz result delivered*");
 	});
 
-	it("explain results: the learner's own words are shown", () => {
+	it("explain results: question, the learner's own words, and his note", () => {
 		const md = messageMarkdown(
-			result("r1", "e1", "explain", { questionText: "Why does Mercury stay near the Sun?", text: "it never strays far" }),
+			result("r1", "e1", "explain", { questionText: "Why does Mercury stay near the Sun?", text: "it never strays far", note: "mixed up signs" }),
 			"r1",
 		)!;
 		assert.match(md, /^### Recall check · r1$/m);
+		assert.match(md, /\*\*Q:\*\* Why does Mercury stay near the Sun\?/);
 		assert.match(md, /The learner answered in his own words: it never strays far/);
+		assert.match(md, /\*\(his thinking: mixed up signs\)\*/);
 	});
 
 	it("probe-phase questions export under their own names (owner, 2026-10-09)", () => {
-		const probe = messageMarkdown(
-			result("r1", "p1", "probe", { questionText: "What is a derivative?", correct: true, dontKnow: false }),
-			"r1",
-		)!;
-		assert.match(probe, /^### Probe · r1$/m);
 		const recall = messageMarkdown(
 			result("r2", "rr1", "recall", { questionText: "Why does Mercury stay near the Sun?", text: "it never strays far" }),
 			"r2",

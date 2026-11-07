@@ -323,13 +323,13 @@ describe("send (one input event, verbatim consumption)", () => {
 		);
 	});
 
-	it("the optimistic answer result attaches to the pending quiz part at once", async () => {
+	it("the optimistic answer result attaches to the pending question part at once", async () => {
 		const quizCall = {
 			id: "call-1",
 			role: "assistant",
 			content: [
 				{ type: "text", text: "Q?" },
-				{ type: "toolCall", id: "call-1", name: "quiz", arguments: { question: "Q?", choices: ["a", "b"] } },
+				{ type: "toolCall", id: "call-1", name: "explain", arguments: { question: "Q?", choices: ["a", "b"] } },
 			],
 			stopReason: "toolUse",
 			usage: { input: 0, output: 0, total: 0, cacheReads: 0, cacheWrites: 0 },
@@ -346,12 +346,12 @@ describe("send (one input event, verbatim consumption)", () => {
 			throw new Error(`unexpected fetch: ${String(input)}`);
 		}) as typeof globalThis.fetch;
 		const m = model({ initialMessages: [newUserMessage("hi"), quizCall] });
-		const pending = m.submitAnswer("quiz", "call-1", { correct: true } as never);
+		const pending = m.submitAnswer("explain", "call-1", { correct: true } as never);
 		// The dock's AnsweredCard state — before any server round-trip:
 		const state = m.getState();
 		const quizPart = state.messages
 			.flatMap((v) => v.parts)
-			.find((p) => p.type === "tool-quiz")!;
+			.find((p) => p.type === "tool-explain")!;
 		assert.equal(quizPart.state, "output-available");
 		assert.deepEqual(quizPart.output, { correct: true });
 		await pending;
@@ -383,16 +383,16 @@ describe("send (one input event, verbatim consumption)", () => {
 			message: {
 				role: "assistant",
 				content: [
-					{ type: "toolCall", id: "q1", name: "quiz", arguments: {} },
-					{ type: "toolCall", id: "bad1", name: "quiz", arguments: {} },
+					{ type: "toolCall", id: "q1", name: "explain", arguments: {} },
+					{ type: "toolCall", id: "bad1", name: "explain", arguments: {} },
 				],
 			},
 		});
 		await settle();
-		push({ type: "tool_execution_end", toolCallId: "q1", toolName: "quiz", isError: false, result: { content: [{ type: "text", text: "Question posed" }], details: { placeholder: true } } });
-		push({ type: "tool_execution_end", toolCallId: "bad1", toolName: "quiz", isError: true, result: { content: [{ type: "text", text: "correctAnswer does not match any option value" }], details: undefined } });
+		push({ type: "tool_execution_end", toolCallId: "q1", toolName: "explain", isError: false, result: { content: [{ type: "text", text: "Question posed" }], details: { placeholder: true } } });
+		push({ type: "tool_execution_end", toolCallId: "bad1", toolName: "explain", isError: true, result: { content: [{ type: "text", text: "correctAnswer does not match any option value" }], details: undefined } });
 		await settle();
-		const parts = m.getState().messages.flatMap((v) => v.parts).filter((p) => p.type === "tool-quiz");
+		const parts = m.getState().messages.flatMap((v) => v.parts).filter((p) => p.type === "tool-explain");
 		assert.equal(parts.length, 2);
 		assert.equal(parts[0]!.state, "input-available", "the clean placeholder is IGNORED — the dock mounts on it");
 		assert.equal(parts[1]!.state, "output-error");
@@ -409,7 +409,7 @@ describe("send (one input event, verbatim consumption)", () => {
 				id: "tr_q1",
 				role: "toolResult",
 				toolCallId: "q1",
-				toolName: "quiz",
+				toolName: "explain",
 				content: [{ type: "text", text: "Question posed — the turn ends here; the learner's graded answer arrives as this call's result." }],
 				details: null,
 				isError: false,
@@ -417,7 +417,7 @@ describe("send (one input event, verbatim consumption)", () => {
 			],
 		});
 		await settle();
-		const afterTurnEnd = m.getState().messages.flatMap((v) => v.parts).filter((p) => p.type === "tool-quiz");
+		const afterTurnEnd = m.getState().messages.flatMap((v) => v.parts).filter((p) => p.type === "tool-explain");
 		assert.equal(afterTurnEnd[0]!.state, "input-available", "the placeholder toolResult keeps the dock's mount state");
 		assert.equal(afterTurnEnd[0]!.output, undefined, "no null output ever reaches the AnsweredCard");
 		push({ type: "agent_end", messages: [] });
@@ -836,9 +836,9 @@ describe("truncated stream recovery", () => {
 });
 
 describe("automatic continuation after recovery failure", () => {
-	const question = { ...assistantMsg("question", ""), content: [{ type: "toolCall", id: "q1", name: "quiz", arguments: { question: "Q?" } }] } as LhMessage;
-	const answer = buildAnswer({ id: "q1", kind: "quiz", question: "Q?", mode: "single-select", options: [], createdAt: "fixture" }, { dontKnow: true });
-	const answered = [question, newAnswerResult("q1", "quiz", answer)];
+	const question = { ...assistantMsg("question", ""), content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Q?" } }] } as LhMessage;
+	const answer = buildAnswer({ id: "q1", kind: "explain", question: "Q?", mode: "text", options: [], createdAt: "fixture" }, { text: "I don't know." });
+	const answered = [question, newAnswerResult("q1", "explain", answer)];
 
 	it("a retained failure seeds the banner and blocks continuation even after banner dismissal", async () => {
 		let posts = 0;
@@ -884,9 +884,9 @@ describe("automatic continuation after recovery failure", () => {
 describe("answer submission recovery", () => {
 	const question = {
 		...assistantMsg("question", "Q?"),
-		content: [{ type: "toolCall", id: "q1", name: "quiz", arguments: { question: "Q?" } }],
+		content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Q?" } }],
 	} as LhMessage;
-	const answer = buildAnswer({ id: "q1", kind: "quiz", question: "Q?", mode: "single-select", options: [], createdAt: "fixture" }, { dontKnow: true, thinking: "keep my reasoning" });
+	const answer = buildAnswer({ id: "q1", kind: "explain", question: "Q?", mode: "text", options: [], createdAt: "fixture" }, { text: "I don't know.", thinking: "keep my reasoning" });
 
 	it("restores the question after a failed POST and checks the record before another POST", async () => {
 		const calls: string[] = [];
@@ -900,45 +900,45 @@ describe("answer submission recovery", () => {
 			if (String(url).endsWith("/stream")) return sseResponse("[DONE]");
 			return Response.json({ messages: [question], turnInFlight: false });
 		} });
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(m.getState().messages[0]!.parts.find(p => p.toolCallId === "q1")!.state, "input-available");
 		assert.equal(m.status, "error");
 		m.clearError(); // dismissing the banner must not disable recovery
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(posts, 2, "error must not permanently close the send gate");
 		assert.deepEqual(calls.slice(0, 3), ["/api/chat", "/api/chats/chat_x", "/api/chat"]);
 	});
 
 	it("retains all submitted draft channels until the canonical answer resolves the call", async () => {
-		const form = { selection: { selected: new Set([1]), otherSelected: true, dontKnow: false }, thinking: "reasoning", other: "custom answer", text: "free text", confidenceIndex: 4 };
+		const form = { selection: { selected: new Set([1]), otherSelected: true }, thinking: "reasoning", other: "custom answer", text: "free text", confidence: "confident" as const };
 		const m = model({ initialMessages: [question], fetch: async () => { throw new TypeError("offline"); } });
 		m.saveQuestionDraft("q1", { form });
 		m.saveQuestionDraft("q1", { readingThinking: "reading reasoning" });
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.deepEqual(m.questionDraft("q1"), { form, readingThinking: "reading reasoning" });
 		m.setMessages([question]);
 		assert.deepEqual(m.questionDraft("q1"), { form, readingThinking: "reading reasoning" });
 		assert.equal(m.questionDraft("q2"), undefined, "a different question never inherits the draft");
-		m.adoptRecord([question, newAnswerResult("q1", "quiz", answer)]);
+		m.adoptRecord([question, newAnswerResult("q1", "explain", answer)]);
 		assert.equal(m.questionDraft("q1"), undefined, "only confirmed native resolution clears it");
 	});
 
 	it("a final 409 restores the question instead of leaving an optimistic answer", async () => {
 		const m = model({ initialMessages: [question], waitMaxMs: 0, fetch: async () => new Response("busy", { status: 409 }) });
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(m.getState().nativeMessages.length, 1);
 		assert.equal(m.status, "error");
 	});
 
 	it("does not repost an answer whose acceptance acknowledgement was lost", async () => {
 		let posts = 0;
-		const saved = JSON.parse(JSON.stringify([question, newAnswerResult("q1", "quiz", answer)])) as LhMessage[];
+		const saved = JSON.parse(JSON.stringify([question, newAnswerResult("q1", "explain", answer)])) as LhMessage[];
 		const m = model({ initialMessages: [question], fetch: async (url) => {
 			if (String(url) === "/api/chat") { posts++; throw new TypeError("failed fetch"); }
 			return Response.json({ messages: saved, turnInFlight: false });
 		} });
-		await m.submitAnswer("quiz", "q1", answer);
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(posts, 1);
 		assert.equal(m.status, "ready");
 		assert.deepEqual(m.getState().nativeMessages, saved);
@@ -950,10 +950,10 @@ describe("answer submission recovery", () => {
 			calls.push(String(url));
 			if (String(url) === "/api/chat") throw new TypeError("failed fetch");
 			if (String(url).endsWith("/stream")) return sseResponse("[DONE]");
-			return Response.json({ messages: [question, newAnswerResult("q1", "quiz", answer)], turnInFlight: true });
+			return Response.json({ messages: [question, newAnswerResult("q1", "explain", answer)], turnInFlight: true });
 		} });
-		await m.submitAnswer("quiz", "q1", answer);
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.deepEqual(calls, ["/api/chat", "/api/chats/chat_x", "/api/chats/chat_x/stream"]);
 		assert.equal(m.status, "ready");
 	});
@@ -961,8 +961,8 @@ describe("answer submission recovery", () => {
 	it("keeps the question and makes no further POST while reconciliation is unreachable", async () => {
 		const calls: string[] = [];
 		const m = model({ initialMessages: [question], fetch: async (url) => { calls.push(String(url)); throw new TypeError("offline"); } });
-		await m.submitAnswer("quiz", "q1", answer);
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.deepEqual(calls, ["/api/chat", "/api/chats/chat_x"]);
 		assert.equal(m.status, "error");
 		assert.equal(m.getState().nativeMessages.some(m => m.role === "toolResult"), false);
@@ -973,7 +973,7 @@ describe("answer submission recovery", () => {
 			if (String(url).endsWith("/dismiss") || String(url) === "/api/chat") return Response.json({ ok: true });
 			throw new TypeError("record read failed");
 		} });
-		await m.dismissQuestion("q1", dismissedAnswer("quiz", "Q?"));
+		await m.dismissQuestion("q1", dismissedAnswer("explain", "Q?"));
 		await m.send({ type: "text", text: "move on" });
 		assert.equal(m.status, "error");
 		const part = m.getState().messages.flatMap(m => m.parts).find(p => p.toolCallId === "q1")!;
@@ -984,16 +984,16 @@ describe("answer submission recovery", () => {
 	it("restores an unconfirmed optimistic answer when the post-ack record read fails", async () => {
 		let posts = 0;
 		let reads = 0;
-		const saved = JSON.parse(JSON.stringify([question, newAnswerResult("q1", "quiz", answer)])) as LhMessage[];
+		const saved = JSON.parse(JSON.stringify([question, newAnswerResult("q1", "explain", answer)])) as LhMessage[];
 		const m = model({ initialMessages: [question], fetch: async (url) => {
 			if (String(url) === "/api/chat") { posts++; return Response.json({ ok: true }); }
 			if (++reads === 1) throw new TypeError("record read failed");
 			return Response.json({ messages: saved, turnInFlight: false });
 		} });
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(m.status, "error");
 		assert.equal(m.getState().nativeMessages.some(m => m.role === "toolResult"), false);
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(posts, 1, "the acknowledged answer must not be reposted");
 		assert.equal(m.status, "ready");
 		assert.deepEqual(m.getState().nativeMessages, saved);
@@ -1022,13 +1022,13 @@ describe("answer submission recovery", () => {
 
 	it("adopts a changed pending question instead of sending the stale answer", async () => {
 		let posts = 0;
-		const newer = { ...question, id: "new-question", content: [{ type: "toolCall", id: "q2", name: "quiz", arguments: {} }] } as LhMessage;
+		const newer = { ...question, id: "new-question", content: [{ type: "toolCall", id: "q2", name: "explain", arguments: {} }] } as LhMessage;
 		const m = model({ initialMessages: [question], fetch: async (url) => {
 			if (String(url) === "/api/chat") { posts++; throw new TypeError("failed fetch"); }
 			return Response.json({ messages: [question, newer], turnInFlight: false });
 		} });
-		await m.submitAnswer("quiz", "q1", answer);
-		await m.submitAnswer("quiz", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
+		await m.submitAnswer("explain", "q1", answer);
 		assert.equal(posts, 1);
 		assert.deepEqual(m.getState().nativeMessages, [question, newer]);
 		assert.equal(m.status, "ready");
@@ -1366,9 +1366,9 @@ describe("adoptRecord — append-only adoption", () => {
 		assert.ok(!absorbed({ ...newUserMessage("my question") }, [serverCopy]), "an id-less message is never absorbed");
 		// The answer result absorbs by toolCallId (ids differ, content may too —
 		// the toolCallId is the identity of an answer).
-		const answer = { ...newAnswerResult("call-1", "quiz", { correct: true }), id: "c_local_2" } as LhMessage;
+		const answer = { ...newAnswerResult("call-1", "explain", { correct: true }), id: "c_local_2" } as LhMessage;
 		assert.ok(
-			absorbed(answer, [{ ...newAnswerResult("call-1", "quiz", { correct: true }), id: "srv_10" } as LhMessage]),
+			absorbed(answer, [{ ...newAnswerResult("call-1", "explain", { correct: true }), id: "srv_10" } as LhMessage]),
 			"the answer result absorbs by toolCallId",
 		);
 	});
@@ -1417,24 +1417,24 @@ describe("needsContinuation (the native lastAssistantMessageIsCompleteWithToolCa
 	});
 
 	it("a dangling question never fires a turn (the dock owns it)", () => {
-		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "quiz")];
+		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "explain")];
 		assert.equal(needsContinuation(messages), false);
 	});
 
-	it("parallel quizzes: only ALL-answered continues (the dock still owns the open one)", () => {
+	it("parallel questions: only ALL-answered continues (the dock still owns the open one)", () => {
 		const messages = [
 			userText("u1", "topic"),
 			{
 				...assistantWithCall("a1", "call-a"),
 				content: [
-					{ type: "toolCall", id: "call-a", name: "quiz", arguments: {} },
-					{ type: "toolCall", id: "call-b", name: "quiz", arguments: {} },
+					{ type: "toolCall", id: "call-a", name: "explain", arguments: {} },
+					{ type: "toolCall", id: "call-b", name: "explain", arguments: {} },
 				],
 			} as unknown as LhMessage,
-			resultMsg("call-a", "quiz"),
+			resultMsg("call-a", "explain"),
 		];
 		assert.equal(needsContinuation(messages), false);
-		const both = [...messages, resultMsg("call-b", "quiz")];
+		const both = [...messages, resultMsg("call-b", "explain")];
 		assert.equal(needsContinuation(both), true, "once the dock answers B, the agent owes the reaction");
 	});
 
@@ -1450,13 +1450,13 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 	 *  appends (full answer in details — the folds read it there). */
 	function dismissedMsg(callId: string): LhMessage {
 		return {
-			...newAnswerResult(callId, "quiz", dismissedAnswer("quiz", "Pick a planet")),
+			...newAnswerResult(callId, "explain", dismissedAnswer("explain", "Pick a planet")),
 			id: `d_${callId}`,
 		} as unknown as LhMessage;
 	}
 
 	it("an all-dismissed tail demands NO continuation — the session waits for the user", () => {
-		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "quiz"), dismissedMsg("call-q1")];
+		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "explain"), dismissedMsg("call-q1")];
 		assert.equal(needsContinuation(messages), false);
 		assert.equal(endsInDismissal(messages), true, "the pause predicate reads the same tail");
 	});
@@ -1465,7 +1465,7 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 		const assistant = {
 			...assistantWithCall("a1", "call-a"),
 			content: [
-				{ type: "toolCall", id: "call-a", name: "quiz", arguments: {} },
+				{ type: "toolCall", id: "call-a", name: "explain", arguments: {} },
 				{ type: "toolCall", id: "call-b", name: "ask_user_question", arguments: {} },
 			],
 		} as unknown as LhMessage;
@@ -1483,11 +1483,11 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 		const assistant = {
 			...assistantWithCall("a1", "call-a"),
 			content: [
-				{ type: "toolCall", id: "call-a", name: "quiz", arguments: {} },
-			{ type: "toolCall", id: "call-b", name: "quiz", arguments: {} },
+				{ type: "toolCall", id: "call-a", name: "explain", arguments: {} },
+			{ type: "toolCall", id: "call-b", name: "explain", arguments: {} },
 			],
 		} as unknown as LhMessage;
-		const messages = [userText("u1", "topic"), assistant, resultMsg("call-a", "quiz"), dismissedMsg("call-b")];
+		const messages = [userText("u1", "topic"), assistant, resultMsg("call-a", "explain"), dismissedMsg("call-b")];
 		assert.equal(endsInDismissal(messages), true, "tail ends in the dismissal");
 		assert.equal(needsContinuation(messages), false, "ending on a dismissal = the user signaled stop — the reaction rides the next message");
 	});
@@ -1496,11 +1496,11 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 		const assistant = {
 			...assistantWithCall("a1", "call-a"),
 			content: [
-				{ type: "toolCall", id: "call-a", name: "quiz", arguments: {} },
-				{ type: "toolCall", id: "call-b", name: "quiz", arguments: {} },
+				{ type: "toolCall", id: "call-a", name: "explain", arguments: {} },
+				{ type: "toolCall", id: "call-b", name: "explain", arguments: {} },
 			],
 		} as unknown as LhMessage;
-		const messages = [userText("u1", "topic"), assistant, dismissedMsg("call-a"), resultMsg("call-b", "quiz")];
+		const messages = [userText("u1", "topic"), assistant, dismissedMsg("call-a"), resultMsg("call-b", "explain")];
 		assert.equal(endsInDismissal(messages), false);
 		assert.equal(needsContinuation(messages), true, "ending on a real answer = the reaction is owed");
 	});
@@ -1508,7 +1508,7 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 	it("any user message un-pauses (the derived tail flips)", () => {
 		const messages = [
 			userText("u1", "topic"),
-			assistantWithCall("a1", "call-q1", "quiz"),
+			assistantWithCall("a1", "call-q1", "explain"),
 			dismissedMsg("call-q1"),
 			userText("u2", "moving on"),
 		];
@@ -1516,7 +1516,7 @@ describe("the dismissal pause (needsContinuation + endsInDismissal)", () => {
 	});
 
 	it("a normal answer is not a dismissal (the predicate stays honest)", () => {
-		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "quiz"), resultMsg("call-q1", "quiz")];
+		const messages = [userText("u1", "topic"), assistantWithCall("a1", "call-q1", "explain"), resultMsg("call-q1", "explain")];
 		assert.equal(endsInDismissal(messages), false);
 	});
 });
@@ -1537,25 +1537,20 @@ describe("newAnswerResult two audiences", () => {
 	it("MODEL sees the compact learner-only record; details keeps the FULL graded answer", () => {
 		const qd: QuestionData = {
 			id: "call-1",
-			kind: "quiz",
+			kind: "explain",
 			question: "Which planet is closest to the Sun?",
-			mode: "single-select",
-			options: [
-				{ label: "Mercury", value: "mercury" },
-				{ label: "Venus", value: "venus" },
-			],
-			correctIndices: [1],
-			explanation: "Mercury orbits closest.",
+			mode: "text",
+			options: [],
+			committedAnswer: "Mercury — the innermost orbit.",
 			createdAt: "2026-01-01T00:00:00Z",
 		};
-		const full = buildAnswer(qd, { values: ["mercury"], confidence: 70, thinking: "guessed" });
-		const msg = newAnswerResult("call-1", "quiz", full);
+		const full = buildAnswer(qd, { text: "Mercury", confidence: "guessing", thinking: "guessed" });
+		const msg = newAnswerResult("call-1", "explain", full);
 		const modelSees = JSON.parse((msg.content as { type: "text"; text: string }[])[0]!.text);
 		assert.deepEqual(modelSees, {
-			kind: "quiz",
-			answers: [{ index: 1, label: "Mercury" }],
-			correct: true,
-			confidence: 70,
+			kind: "explain",
+			text: "Mercury",
+			confidence: "guessing",
 			thinking: "guessed",
 		});
 		assert.equal(msg.details, full, "details is the full QuestionAnswerData verbatim");

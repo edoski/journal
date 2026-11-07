@@ -15,7 +15,7 @@ import { ProblemCard, ConcludeCard } from "../components/practice-cards.tsx";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
 import {
 	repairMathForDisplay, healOverescapedCommands, restoreMathEscapes,
-	parseQuizInput, parseAskInput, parseExplainInput, activeProblemOf, projectView,
+	parseAskInput, parseExplainInput, activeProblemOf, projectView,
 	toLlmMessages, type LhMessage, type ArtifactPartProps,
 } from "../src/core/index.ts";
 
@@ -207,17 +207,14 @@ describe("practice display surfaces", () => {
 	});
 
 	it("teaching shape parsing retains source bytes; presentation alone recovers them", () => {
-		const quiz = { question: doubled, options: [{ label: "yes" }, { label: "no" }], correctAnswer: "yes", explanation: debris };
 		const ask = { question: doubled };
 		const explain = { question: doubled, correctAnswer: debris };
-		const before = structuredClone({ quiz, ask, explain });
-		assert.equal(parseQuizInput(quiz)?.question, doubled);
-		assert.equal(parseQuizInput(quiz)?.explanation, debris);
+		const before = structuredClone({ ask, explain });
 		assert.equal(parseAskInput(ask)?.question, doubled);
 		assert.equal(parseExplainInput(explain)?.question, doubled);
 		assert.equal(parseExplainInput(explain)?.correctAnswer, debris);
 		assertMath(renderToStaticMarkup(<ToolContentResponse>{parseAskInput(ask)!.question}</ToolContentResponse>));
-		assert.deepEqual({ quiz, ask, explain }, before);
+		assert.deepEqual({ ask, explain }, before);
 	});
 
 	it("native history, active args and the view join remain raw; commitment appears only at conclusion", () => {

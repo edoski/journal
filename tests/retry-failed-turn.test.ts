@@ -35,7 +35,7 @@ const { isTurnRunning } = await import("../src/server/turn-liveness.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { jobStore } = await import("../src/store/jobs.ts");
 const { subscribe } = await import("../src/core/events.ts");
-const { buildAnswer, normalizeOptions, resolveCorrect } = await import("../src/core/question-core.ts");
+const { buildAnswer } = await import("../src/core/question-core.ts");
 const { ChatInputError, endsInFailedTurn, failedResponseAtEnd, inputAppends, parseChatInput, retryDrops } = await import("../src/core/input-events.ts");
 const { INTERRUPTED_TEXT, asAgentMessages, hasProbeDone, newHandoffMessage, newPlanBlockMessage, newUserMessage, reconstructRequestCause, toLlmMessages } = await import("../src/core/native-messages.ts");
 const { phaseAt3Lh } = await import("../src/core/phases.ts");
@@ -45,13 +45,11 @@ after(() => {
 	fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-const QUIZ_INPUT = {
-	question: "Which planet is closest to the sun?",
-	options: [{ label: "Venus" }, { label: "Mercury" }],
-	correctAnswer: "Mercury",
-	explanation: "Mercury is the innermost planet.",
+const QUESTION_INPUT = {
 	type: "check",
 	nodeId: "planet-order",
+	question: "Which planet is closest to the sun?",
+	correctAnswer: "Mercury — the innermost orbit.",
 };
 
 const networkFailure: FauxResponseStep = () => { throw new Error("fetch failed"); };
@@ -101,18 +99,16 @@ function createConfiguredChat(title: string, kind?: "practice") {
 }
 
 function gradedAnswer() {
-	const options = normalizeOptions(QUIZ_INPUT.options);
 	const qd: QuestionData = {
 		id: "call-1",
-		kind: "quiz",
-		question: QUIZ_INPUT.question,
-		mode: "single-select",
-		options,
-		correctIndices: resolveCorrect(QUIZ_INPUT.correctAnswer, options).indices,
-		explanation: QUIZ_INPUT.explanation,
+		kind: "explain",
+		question: QUESTION_INPUT.question,
+		mode: "text",
+		options: [],
+		committedAnswer: QUESTION_INPUT.correctAnswer,
 		createdAt: new Date().toISOString(),
 	};
-	return buildAnswer(qd, { values: ["Mercury"], thinking: "Mercury is the innermost", readingThinking: "I followed the planet ordering", confidence: 80 });
+	return buildAnswer(qd, { text: "Mercury", thinking: "Mercury is the innermost", readingThinking: "I followed the planet ordering", confidence: "confident" });
 }
 
 const roles = (chatId: string) => chatStore.getChat(chatId)!.messages.map((m) => m.role);
@@ -130,7 +126,7 @@ function assertPreserved(before: LhMessage[], saved: LhMessage[]): void {
 describe("failed-response Retry (issue #110)", () => {
 	it("retries from the saved answer, preserving the full input and failed attempt", async () => {
 		const { engine, contexts, histories } = scripted([
-			() => fauxAssistantMessage([fauxToolCall("quiz", QUIZ_INPUT, { id: "call-1" })], { stopReason: "toolUse" }),
+			() => fauxAssistantMessage([fauxToolCall("explain", QUESTION_INPUT, { id: "call-1" })], { stopReason: "toolUse" }),
 			networkFailure,
 			() => fauxAssistantMessage([fauxText("Right — Mercury it is.")]),
 		]);
@@ -415,7 +411,7 @@ describe("retained generations and Pi's native provider filtering", () => {
 	it("still repairs an unanswered call from a completed generation", () => {
 		const faux = createFauxCore({});
 		const question: LhMessage = {
-			...fauxAssistantMessage([fauxToolCall("quiz", QUIZ_INPUT, { id: "unanswered-question" })], { stopReason: "toolUse" }), id: "question",
+			...fauxAssistantMessage([fauxToolCall("explain", QUESTION_INPUT, { id: "unanswered-question" })], { stopReason: "toolUse" }), id: "question",
 		};
 		const messages = [newUserMessage("hello"), question, newUserMessage("move on")];
 		const before = JSON.parse(JSON.stringify(messages));

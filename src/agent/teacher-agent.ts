@@ -18,7 +18,7 @@ import {
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
-import { quizInputObject, quizInputProblems } from "../core/question-core.ts";
+import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
@@ -137,8 +137,8 @@ export interface AgentBuildOptions {
 
 /**
  * The turn's question-stop rule (docs/pi-engine-swap.md §2; Wave A
- * 2026-09-26, owner Option A): a question tool call (quiz /
- * ask_user_question) that RESOLVED — its synthetic "question posed" result
+ * 2026-09-26, owner Option A): a question tool call (explain /
+ * recall / ask_user_question) that RESOLVED — its synthetic "question posed" result
  * is not an error — ends the run: the learner's answer arrives as the next
  * POST. A call that FAILED authoring validation (error result) must NOT
  * stop the run — the model retries within the same turn, exactly the old
@@ -271,8 +271,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 }
 
 /**
- * The PROBER (agent A): the quizzing tool (quiz, or explain under free
- * recall — no nodeId either way) + ask + probe_done, lean on
+ * The PROBER (agent A): recall (no nodeId) + ask + probe_done, lean on
  * probing doctrine. Its whole job is bracketing the learner's edge and
  * concluding with the assessment (probe_done) — which also queues the
  * handoff wake (see tools/probe.ts) and is the transcript seam the
@@ -299,8 +298,8 @@ export function createTeacherAgent(
 	return baseAgentOptions("teacher", opts, Object.values(tools));
 }
 
-/** The bare teach question set (tests, bare agents): quiz with the shared
- *  authoring refinement (quizInputProblems, run in execute — returns an
+/** The bare teach question set (tests, bare agents): explain with the
+ *  commitment check (explainInputProblems, run in execute — returns an
  *  invalidInputResult isError result the model retries on, pi 1.0
  *  convention) but NO per-session nodeId check (no record to read),
  *  plus ask. */
@@ -308,23 +307,20 @@ export function bareQuestionTools(): Record<string, AgentTool<any>> {
 	// A typed const (not an inline literal): the specific AgentTool typing
 	// gives execute its precise Static input; heterogeneous records take
 	// AgentTool<any>, whose loose Static would smudge it to unknown.
-	const quiz: AgentTool<typeof quizInputObject> = {
-		name: "quiz",
-		label: "quiz",
-		description: "Ask the learner a graded question.",
-		parameters: quizInputObject,
+	const explain: AgentTool<typeof explainInputObject> = {
+		name: "explain",
+		label: "explain",
+		description: "Ask the learner a graded free-response question.",
+		parameters: explainInputObject,
 		executionMode: "sequential",
 		execute: async (_toolCallId, input) => {
-			const problems = quizInputProblems(input);
-			if (problems.length > 0) return invalidInputResult("quiz", problems);
+			const problems = explainInputProblems(input);
+			if (problems.length > 0) return invalidInputResult("explain", problems);
 			return questionResult();
 		},
 	};
-	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
-	// the bare quiz carried NO prepareArguments at all — not even the
-	// options-unwrap; now it gets the full standard heal like every tool.
 	return healToolRecord({
-		quiz,
+		explain,
 		ask_user_question: askUserQuestionTool,
 	});
 }

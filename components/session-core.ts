@@ -691,13 +691,13 @@ export class SessionModel {
 			// The practice submissions (2026-10-04): the marker lands
 			// optimistically — the card renders from its details the
 			// moment the button fires.
-			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text), id: localId() });
+			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence), id: localId() });
 		} else if (input.type === "next") {
 			// The move-on signal (owner round 16): the NEXT PROBLEM line
 			// renders the instant the chip/Enter fires.
 			optimistic.push({ ...newNextMessage(), id: localId() });
 		} else if (input.type === "answer") {
-			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "quiz";
+			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "explain";
 			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer), id: localId() };
 			optimistic.push(result);
 			this.unconfirmedAnswers.set(result.id, input.toolCallId);
@@ -841,7 +841,7 @@ export class SessionModel {
 	 * (or any later refetch) replaces the optimistic append with truth. */
 	async dismissQuestion(toolCallId: string, answer: QuestionAnswerData): Promise<void> {
 		if (!this.readyRef) return;
-		const tool = pendingCallTool([...this.base, ...this.tail], toolCallId) ?? "quiz";
+		const tool = pendingCallTool([...this.base, ...this.tail], toolCallId) ?? "explain";
 		this.mutate(() => {
 			this.tail = [...this.tail, { ...newAnswerResult(toolCallId, tool, answer), id: localId() }];
 		});

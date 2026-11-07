@@ -74,8 +74,6 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 	const out = result.details as
 		| Partial<{
 				questionText: string;
-				correct: boolean;
-				dontKnow: boolean;
 				note: string;
 				text: string;
 				answers: string[];
@@ -84,26 +82,11 @@ function toolResultBody(result: ToolResultMessage, ctx?: MarkdownContext): { hea
 		  }>
 		| undefined;
 
-	if (
-		result.toolName === "quiz" ||
-		result.toolName === "probe" ||
-		result.toolName === "explain" ||
-		result.toolName === "recall"
-	) {
-		const heading =
-			result.toolName === "quiz"
-				? "Quiz"
-				: result.toolName === "probe"
-					? "Probe"
-					: result.toolName === "recall"
-						? "Recall"
-						: "Recall check"; // explain — the teach free-recall name
+	if (result.toolName === "explain" || result.toolName === "recall") {
+		const heading = result.toolName === "recall" ? "Recall" : "Recall check"; // explain — the teach free-recall name
 		const question = typeof out?.questionText === "string" && out.questionText ? out.questionText : "(no question text)";
 		const body = [`**Q:** ${question}`];
 		if (out?.dismissed === true) body.push("The learner skipped this check.");
-		else if (out?.dontKnow === true) body.push("The learner did not know.");
-		else if (out?.correct === true) body.push("The learner answered correctly.");
-		else if (out?.correct === false) body.push("The learner answered incorrectly.");
 		else if (typeof out?.text === "string" && out.text.trim()) body.push(`The learner answered in his own words: ${out.text.trim()}`);
 		if (typeof out?.note === "string" && out.note) body.push(`*(his thinking: ${out.note})*`);
 		return { heading, body };

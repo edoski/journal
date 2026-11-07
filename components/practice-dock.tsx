@@ -5,7 +5,9 @@ import { ChevronRightIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
+import { ConfidenceChoice } from "@/components/confidence-choice";
 import { cn } from "@/lib/utils";
+import { DEFAULT_CONFIDENCE, type Confidence } from "@/src/core";
 
 /**
  * The practice dock (practice sessions, owner design 2026-10-04): an
@@ -15,7 +17,8 @@ import { cn } from "@/lib/utils";
  * (owner round 2, 2026-10-05): Enter sends, Shift+Enter makes a newline.
  * There are no lanes — whether a submission claims an answer is apparent
  * from the thinking itself; the agent reads it. One problem may carry
- * many submissions; each starts a turn.
+ * many submissions; each starts a turn and carries one of three
+ * confidence states, neutral unless the learner taps another.
  *
  * Collapse (scroll-up → slim bar) is owned by the DockOverlay; this
  * component is content only, and the expanded form stays MOUNTED while
@@ -36,8 +39,8 @@ export interface PracticeDockProps {
 	/** Collapse state, owned by the DockOverlay. */
 	expanded: boolean;
 	onExpand: () => void;
-	/** text — POST {type:"thinking"} (one lane; the register is read from the text). */
-	onSubmit: (text: string) => void;
+	/** text + confidence — POST {type:"thinking"} (one lane; the register is read from the text). */
+	onSubmit: (text: string, confidence: Confidence) => void;
 	/** Compaction is running for this chat (owner round 14): the thinking
 	 *  POST would block on the server's compaction gate — disable submit
 	 *  and say so in the hint row. The server registry is the real gate;
@@ -47,13 +50,15 @@ export interface PracticeDockProps {
 
 export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, compactionRunning = false }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
+	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
 
 	const submit = () => {
 		if (compactionRunning) return;
 		const text = thinking.trim();
 		if (text.length === 0) return;
 		setThinking("");
-		onSubmit(text);
+		setConfidence(DEFAULT_CONFIDENCE);
+		onSubmit(text, confidence);
 	};
 
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): the
@@ -130,7 +135,8 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
 				    field 10 − p-1 (4) = button 6. */}
 				<div className="flex items-center justify-between gap-2 p-1">
-					<span aria-hidden className="pl-1.5 text-xs text-muted-foreground">
+					<ConfidenceChoice value={confidence} onChange={setConfidence} />
+					<span aria-hidden className="min-w-0 truncate pl-1.5 text-xs text-muted-foreground">
 						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
 					</span>
 					<Button

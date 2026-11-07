@@ -141,7 +141,10 @@ function askPart(
 	return { name: "ask_user_question", toolCallId, input, output };
 }
 
-function answer(over: Partial<QuestionAnswerData>): QuestionAnswerData {
+/** Legacy-shaped answers: these transcripts predate the removal of
+ *  multiple choice (7 Nov 2026), so they carry `kind: "quiz"`, `correct`
+ *  and `dontKnow` — old records the graph pipeline must still read. */
+function answer(over: Record<string, unknown>): QuestionAnswerData {
 	return {
 		kind: "quiz",
 		questionText: "question text",
@@ -149,7 +152,7 @@ function answer(over: Partial<QuestionAnswerData>): QuestionAnswerData {
 		answers: [],
 		answeredAt: "2026-08-22T00:00:00.000Z",
 		...over,
-	};
+	} as unknown as QuestionAnswerData;
 }
 
 /** Create a chat in the real store with messages; returns the record.

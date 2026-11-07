@@ -98,9 +98,9 @@ describe("prober graph tools — registration", () => {
 			"list_sessions",
 			"ls",
 			"pdf",
-			"probe",
 			"probe_done",
 			"read",
+			"recall",
 			"research",
 		]);
 	});

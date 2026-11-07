@@ -150,9 +150,9 @@ test("full native record reconstruction preserves original causes and reports ge
  assert.equal(reconstructRequestCause([auto, newThinkingMessage("problem", "working")]), "ambiguous");
  assert.equal(reconstructRequestCause([auto, assistant, newNextMessage()]), "foreground");
  assert.equal(reconstructRequestCause([user, ...concludedByDismissalPair("problem")]), "foreground");
- const question = { ...assistant, content: [{ type: "toolCall", id: "question", name: "quiz", arguments: {} }] } as LhMessage;
- assert.equal(reconstructRequestCause([auto, question, newAnswerResult("question", "quiz", { kind: "quiz", questionText: "Scratch", dontKnow: false, answers: [], answeredAt: "2026-10-24T00:00:00Z" })]), "foreground");
- assert.equal(reconstructRequestCause([auto, question, { ...newAnswerResult("question", "quiz", {}), details: null }]), "background");
- assert.equal(reconstructRequestCause([auto, question, newAnswerResult("orphan", "quiz", {})]), "ambiguous");
+ const question = { ...assistant, content: [{ type: "toolCall", id: "question", name: "explain", arguments: {} }] } as LhMessage;
+ assert.equal(reconstructRequestCause([auto, question, newAnswerResult("question", "explain", { kind: "explain", questionText: "Scratch", answers: [], confidence: "neutral", answeredAt: "2026-10-24T00:00:00Z" })]), "foreground");
+ assert.equal(reconstructRequestCause([auto, question, { ...newAnswerResult("question", "explain", {}), details: null }]), "background");
+ assert.equal(reconstructRequestCause([auto, question, newAnswerResult("orphan", "explain", {})]), "ambiguous");
  assert.equal(reconstructRequestCause([user, { ...user, content: "conflict" }]), "ambiguous");
 });
