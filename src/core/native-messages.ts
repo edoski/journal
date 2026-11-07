@@ -68,6 +68,7 @@ export interface LhMarkerMessage {
 	role: "custom";
 	customType:
 		| "graph-context"
+		| "course-context"
 		| "probe-handoff"
 		| "subagent-steer"
 		| "subagent-abort"
@@ -240,6 +241,37 @@ export function newPlanBlockMessage(
  *  vocabulary — the tool-execute layer owns the tools themselves). */
 export const PRACTICE_PROBLEM_TOOL = "problem";
 export const PRACTICE_CONCLUDE_TOOL = "conclude";
+
+/** The course brief marker (core/course-brief.ts): the learner's course
+ *  record as the lesson's agent sees it without asking. `details.key`
+ *  decides when a fresh brief is due. Model-facing only: the view renders
+ *  nothing for it. */
+export function newCourseContextMessage(text: string, key: string): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "course-context",
+		content: text,
+		display: false,
+		details: { key },
+		timestamp: Date.now(),
+	};
+}
+
+/** The key of the latest course brief the agent can still see: none once
+ *  a compaction summarized it away. */
+export function visibleCourseBriefKey(messages: readonly LhMessage[]): string | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (m.role !== "custom") continue;
+		if (m.customType === "compaction") return null;
+		if (m.customType === "course-context") {
+			const key = (m.details as { key?: unknown } | null)?.key;
+			return typeof key === "string" ? key : null;
+		}
+	}
+	return null;
+}
 
 /** One picked proposition of the graph-context marker (the learner's map
  *  pick — name + statement as the learner SAW them at pick time). */
@@ -752,7 +784,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
-		return ["graph-context", "plan-block", "problem-dismissed", "compaction"].includes(message.customType) ? "neutral" : "unrecognizable";
+		return ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
 		if (!(QUESTION_TOOLS as readonly string[]).includes(message.toolName) || message.isError || message.details == null || (message.details as { dismissed?: boolean }).dismissed) return "neutral";

@@ -260,7 +260,7 @@ describe("send_to_user native flow (offline)", () => {
 		it(`output + practice problem stops after the pose (${outputFirst ? "output first" : "problem first"})`, async () => {
 			const output = outputCall("Try this practice problem.");
 			const problem = fauxToolCall("problem", {
-				statement: "What is two plus two?", mode: "recall", modelSolution: "Four.",
+				statement: "What is two plus two?", mode: "recall", topics: ["arithmetic"], modelSolution: "Four.",
 			}, { id: "problem-1" });
 			const { engine, faux } = scripted("anthropic", "claude-opus-5-5", [
 				fauxAssistantMessage(outputFirst ? [output, problem] : [problem, output], { stopReason: "toolUse" }),
@@ -281,7 +281,7 @@ describe("send_to_user native flow (offline)", () => {
 				fauxAssistantMessage([
 					outputCall("Undelivered introduction."),
 					fauxToolCall("problem", {
-						statement: "What is two plus two?", mode: "recall", modelSolution: "Four.",
+						statement: "What is two plus two?", mode: "recall", topics: ["arithmetic"], modelSolution: "Four.",
 					}, { id: "unfinished-problem" }),
 				], { stopReason }),
 			]);
@@ -304,7 +304,7 @@ describe("send_to_user native flow (offline)", () => {
 			fauxAssistantMessage([
 				outputCall("Here is the corrected problem.", "send-2"),
 				fauxToolCall("problem", {
-					statement: "What is two plus two?", mode: "recall", modelSolution: "Four.",
+					statement: "What is two plus two?", mode: "recall", topics: ["arithmetic"], modelSolution: "Four.",
 				}, { id: "good-problem" }),
 			], { stopReason: "toolUse" }),
 			fauxAssistantMessage("Premature continuation must not run."),

@@ -1,13 +1,18 @@
 /**
- * The one place the app's confidence state meets the learning engine.
- * The engine is gaining an optional three-state field on attempts; until
- * its name and values are final, an attempt carries no confidence field,
- * and the tutor's existing rules (a guess is `partial`, a confident error
- * rewrites the topic's gap) carry the meaning. When the engine's field
- * lands, only `engineConfidence` changes.
+ * The one place the app's confidence state meets the learning engine: an
+ * attempt's `sure` field (journal PR #6). The app asks all three states, so
+ * neutral is sent too. The engine grades a guess as never solid and counts
+ * a confident wrong answer as a confident error.
  */
 
+const SURE: Record<string, "guess" | "neutral" | "confident"> = {
+	guessing: "guess",
+	neutral: "neutral",
+	confident: "confident",
+};
+
 /** The observation fields for one answer's confidence state. */
-export function engineConfidence(_state: string | undefined): Record<string, unknown> {
-	return {};
+export function engineConfidence(state: string | undefined): { sure?: "guess" | "neutral" | "confident" } {
+	const sure = state ? SURE[state] : undefined;
+	return sure ? { sure } : {};
 }

@@ -237,19 +237,17 @@ describe("a course-linked turn", () => {
 			return createPracticeAgent({ chatId: id, chatStore }, { ...opts, engine });
 		};
 		await turn(id, { type: "text", text: "practice rank" }, factory);
-		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent" }, factory);
+		await turn(id, { type: "thinking", problemCallId: "p1", text: "1, the rows are dependent", confidence: "confident" }, factory);
 
 		assert.deepEqual(seenCourse, { workspace: LINALG, title: "Linear Algebra" });
 		const linked = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === LINALG);
-		assert.deepEqual(linked.map((c) => c.args.slice(0, 3)), [
-			["--workspace", LINALG, "resume"],
-			["--workspace", LINALG, "save"],
-		]);
+		assert.deepEqual(linked.map((c) => c.args[2]), ["resume", "resume", "resume", "save"], "turn brief, the agent's resume, turn brief, conclude's save");
+		const save = linked[3]!;
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
-		assert.deepEqual(JSON.parse(linked[1]!.stdin), {
+		assert.deepEqual(JSON.parse(save.stdin), {
 			observations: [
-				{ topics: ["rank"], text: statement, response: "2", help: "none", result: "incorrect" },
-				{ topics: ["rank"], text: statement, response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct" },
+				{ topics: ["rank"], text: statement, response: "2", help: "none", result: "incorrect", sure: "confident" },
+				{ topics: ["rank"], text: statement, response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct", sure: "confident" },
 			],
 		}, "conclude is the single write: the first unaided try, then the assisted success");
 		const ack = chatStore.getChat(id)!.messages.find((m) => (m as { toolName?: string }).toolName === "conclude") as { isError: boolean; content: Array<{ text: string }> };

@@ -152,7 +152,7 @@ export const concludeInputObject = Type.Object({
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
 	result: Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], {
 		description:
-			"REQUIRED — the attempt's result for his course record: correct, partial (a guess, or a right answer reached by reasoning that does not hold) or incorrect.",
+			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
 	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
 	chose: Type.Optional(

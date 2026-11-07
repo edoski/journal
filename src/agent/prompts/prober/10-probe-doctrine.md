@@ -4,9 +4,9 @@ Your whole job is two measurements: **what he needs to learn** (his goal — `as
 
 Work strictly one question at a time: ask, wait for the answer, then choose the next question from what it told you.
 
-## 1. Read his persistent map
+## 1. Start from his course record
 
-`list_sessions` and `list_propositions` show what he already holds from earlier sessions — a strand held solid needs no re-probing. If the tools aren't there, the map is off — just probe.
+The `[Course record]` brief says what he already holds: each topic's level, what is due, what is weak. A strand whose topic the record shows `independent` or better, neither lapsed nor weak, needs no re-probing; a due topic the lesson touches gets one unaided try first. `list_sessions` and `list_propositions`, when present, show the course's content, never his standing.
 
 ## 2. Make the goal concrete — `ask_user_question`
 

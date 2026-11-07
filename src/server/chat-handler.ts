@@ -33,6 +33,7 @@ import { runPiTurn } from "./pi/ui-stream.ts";
 import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
+import { courseBriefFor } from "./course-brief.ts";
 import { searchAvailable, searchProvider } from "./search.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
@@ -336,6 +337,13 @@ export async function handleChatInput(
 	if (!beginTurn(chatId)) {
 		console.info(`[chat ${chatId}] turn already in flight — request rejected`);
 		return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
+	}
+
+	// The course brief rides learner input only, after the input's own
+	// appends, so an answer stays adjacent to its question call.
+	if (input.type !== "steers" && input.type !== "retry" && input.type !== "continue") {
+		const brief = await courseBriefFor(record, [...record.messages, ...appends]);
+		if (brief) appends = [...appends, brief];
 	}
 
 	// Write-ahead persistence: the input's native appends go on disk BEFORE

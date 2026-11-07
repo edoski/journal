@@ -370,6 +370,8 @@ function applyResultTo(part: LhViewPart | undefined, result: ToolResultMessage):
 /** A marker's projected message (handoff/steers) or splice (plan block). */
 function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
+		case "course-context":
+			return; // model-facing course brief: nothing to render
 		case "graph-context": {
 			// The session's map context (owner, 2026-10-04): user-side —
 			// a minimal collapsible card ABOVE the first user message;
