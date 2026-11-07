@@ -252,7 +252,8 @@ before helping with it.
    procedural prompt, pose a fresh instance and ask for the method and the
    first decisive step.
 2. Wait for the answer. No hints unless asked; a hinted answer is `helped`. On
-   a `lapsed` topic, ask "quanto sei sicuro?" with the question. A confident
+   a `lapsed` topic, ask "quanto sei sicuro?" with the question (superseded
+   on 2026-11-07 by the three-state mark, §13). A confident
    error gets an explicit contrast now ("eri sicuro che X; è Y perché…").
 3. Mark against `points`:
    - a correct answer gets one line;
@@ -432,7 +433,7 @@ implicit credit.
 | Self-grading, AI judging or deterministic checks | **The tutor judges against stored `points`.** Contested verdicts become `corrects` observations; unwatched work is `uncertain`. | Chat only. The tutor judges reasoning best, key points bound leniency, and self-grading inflates. |
 | A CAS or JS equivalence check | **None.** Prefer course solutions; work generated instances yourself first. | Stdlib only; there is no card. |
 | Item bank vs one prompt per topic | **One prompt plus key points per topic.** The tutor generates fresh procedural instances and retry questions. | Stable prompts and consistent marking where storage helps, variety where the model is good. No caps, wear tracking or migration. |
-| Confidence on every item vs occasionally | **Not stored.** Ask "quanto sei sicuro?" on lapsed topics only, and act on a confident error at once. | Confidence ratings barely improve learning (Double et al. 2018: g=0.05). No consumer justifies a field (open decision 2). |
+| Confidence on every item vs occasionally | **Three optional states on any answer** (revised 2026-11-07, §13): the learner may mark an answer as a guess or as sure, and an unmarked answer is neutral. Stored as `sure`; no percentage. | A guess caps the grade, a confident error triggers a contrast and a retest, and the study app's prober sizes its next question from it. Rating confidence itself barely improves learning (Double et al. 2018: g=0.05), so this is a signal for marking and scheduling, not calibration training (open decision 2). |
 | Error-type enum vs method choice | **`chose: <topic>`**, with choice errors derived. `contrasts` only for methods known to compete. | One field carries the wrong-method signal and the pair (open decision 3). |
 | MCQ | **Not used.** Method choice is answered free-response. | Recognition inflation (Kang 2007). |
 | Next review after a failed probe | **From the first try:** 1 day if missed, 2 if helped. | A same-day retry does not erase a failure. |
@@ -565,7 +566,8 @@ day, with no level gain and one save at the end.
    - correct answers get one line, and the next question comes in the same
      message;
    - one save at the end, no recap, about four model calls for three items.
-2. A lapsed topic: the tutor asks how sure the learner is. A confident error
+2. A lapsed topic: the tutor asks how sure the learner is (since 2026-11-07,
+   the learner marks "guess" or "sure" instead, §13). A confident error
    gets an explicit contrast and a rewritten `gap` and `prompt`.
 3. A procedural prompt gets a fresh instance.
 4. A wrong method is recorded as `chose` on the right topic.
@@ -622,7 +624,7 @@ day, with no level gain and one save at the end.
 | MCQ drills | recognition inflation |
 | Bulk AI card generation from PDFs | volume without diagnosis |
 | An item bank (several stored items per topic) | one prompt plus key points, with tutor-generated variants, covers the loop |
-| A stored `confidence` field and a calibration line | no consumer strong enough; ask in the moment on lapsed topics |
+| A confidence percentage or slider, and a calibration line | choosing a number costs the learner focus, and no step reads calibration; three states carry what marking and scheduling use (§13) |
 | An `error` enum | `chose` carries the only error type the loop acts on |
 | A `grader` field, a key checker, `event` ids | chat only; the tutor judges; the duplicate window suffices |
 | Mock marks, a task clock, `exam.exclude`, a review forecast, a stored run-up phase | no step of the loop needs them |
@@ -660,9 +662,10 @@ prototype is in `/tmp/mcp-apps-proto/`.
 
 1. **Schema:** stay on schema 6, additive (*recommended*: no stored shape
    changes, no migration), or bump to 7 as a clean marker.
-2. **Confidence:** no stored field; ask on lapsed topics in the moment
-   (*recommended*). The alternative stores `confidence` with a one-in-three
-   sample, a derived confident-error flag and a weekly calibration line.
+2. **Confidence:** decided 2026-11-07 (§13). An optional three-state `sure`
+   on attempts, a derived confident-error count, and no calibration line. It
+   replaces the earlier recommendation, no stored field and a question on
+   lapsed topics only.
 3. **Method errors:** one field, `chose: <topic>` (*recommended*), or an
    `error: recall|choice|execution` enum with contrasts set after each choice
    error.
@@ -732,6 +735,49 @@ tutor skill takes the parts that fit the chat loop; the engine is unchanged.
 | Probe the edge before teaching | **Adopted** for a new topic's unplaced `needs`, and optionally the topic itself: free-response, harder after a sound answer, easier after a miss, usually three questions or fewer, each an attempt; a probed topic without a review prompt gets one. | The record places most prerequisites already, so the probe stays short. Free response, because MCQ inflates recognition (Kang 2007). |
 | Predict, explain, check per step | **Adopted** for conceptual steps, one step per message; procedures keep worked-example fading. | Extends §4B's prediction for conceptual topics to each step; the check catches a confusion before the next step builds on it. |
 | Difficulty from ideas combined and cue familiarity | **Adopted** in practice. | Difficult but successful retrievals help memory more than easy ones (Pyc and Rawson 2009). |
-| Confidence slider on every answer | **Not adopted.** | Unchanged from §5; a learner's "I'm guessing" is read from the reasoning. |
+| Confidence slider on every answer | **Not adopted** as a slider; three states replaced it on 2026-11-07 (§13). | A number costs focus to pick; a guess or a sure answer is all marking and scheduling use. |
 | A graph of taught propositions and reasoning chains | **Not adopted.** | It records coverage, not performance; topics with `needs`, levels and `review.points` already carry what later sessions use. |
 | MCQ probes | **Not adopted.** | §5. |
+
+## 13. Revision 2026-11-07: confidence in three states
+
+Edoardo's decision: free-flowing answers stay the core, and confidence comes
+back in three discrete states, guessing, neutral and confident, with no slider
+and no percentage, so no time or focus goes into picking an arbitrary number.
+
+This is a decision about signals for marking and scheduling, not about
+calibration training. Double et al. (2018) still holds: rating confidence
+barely improves learning (g=0.05), so nothing here tries to train or score
+calibration. The state is kept because three consumers read it:
+
+- **A guess caps the grade.** An admitted guess was already `partial` even
+  when right (§12), but only when the tutor read it out of the reasoning text.
+  The field makes the rule explicit: a guess is never `solid`.
+- **A confident error is acted on.** Confident and wrong is the error that
+  returns within a week unless contrasted (Butler, Fazio and Marsh 2011). The
+  tutor gives an explicit contrast now and rewrites `gap` and `prompt`; the
+  miss already brings a retest the next day. Before, the tutor found confident
+  errors only by asking on lapsed topics; a one-word mark catches them on any
+  answer.
+- **The study app's prober** (LearnHarness) sizes its next question from the
+  learner's confidence and sends the field.
+
+**As built:**
+
+- Observation `sure`: `guess`, `neutral` or `confident`, on attempts and exams;
+  a self-report takes none. Absent means the learner did not say, and grades
+  exactly as `neutral`.
+- `progress.grade`: a `guess` is `helped`, never `solid`, whatever the
+  `result`, the same cap `uncertain` and help apply. The stored `result` stays
+  the answer's own.
+- A confident error is `sure: confident` with `result: incorrect`. Standing
+  `confident_errors` counts them since the last `solid` verdict, like
+  `choice_errors`; it marks the topic `weak` in `resume`. `week` adds
+  `confident_errors`, a count of the window's confident errors.
+- The tutor says once, with the first review question, that an answer may be
+  marked "guess" or "sure" in the learner's own words, and stops once the
+  evidence carries `sure`; an unmarked answer is neutral and the field is
+  omitted. It never asks for a number.
+- Schema 6, additive, as §3.7 decided for `chose`, `contrasts` and `points`:
+  an optional field, no migration, and existing records validate and replay
+  unchanged.

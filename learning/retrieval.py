@@ -27,7 +27,9 @@ TOPIC_OBSERVATIONS = 3
 OMITTED_LIMIT = 12
 RECENT_OBSERVATIONS = 3
 # Shown once under ``topics``; due and weak entries for those topics omit them.
-TOPIC_DETAIL = frozenset({"title", "prompt", "points", "gap", "last", "choice_errors"})
+TOPIC_DETAIL = frozenset(
+    {"title", "prompt", "points", "gap", "last", "choice_errors", "confident_errors"}
+)
 SHOW_LIMIT = 30
 SEARCH_LIMIT = 12
 EXCERPT_CHARS = 160
@@ -248,7 +250,7 @@ def _weak(
     weak = []
     for key in order:
         topic, standing = record["topics"][key], levels[key]
-        flags = ("lapsed", "stale", "choice_errors")
+        flags = ("lapsed", "stale", "choice_errors", "confident_errors")
         if not ("gap" in topic or any(flag in standing for flag in flags)):
             continue
         item = {"topic": key, "level": standing["level"]}

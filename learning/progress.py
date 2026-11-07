@@ -104,13 +104,25 @@ def _histories(observations: dict[str, Any]) -> dict[str, _History]:
 
 
 def grade(observation: dict[str, Any]) -> str:
-    """``solid`` (correct, unaided, certain), ``helped`` or ``missed``."""
+    """``solid`` (correct, unaided, certain, not a guess), ``helped`` or ``missed``."""
     result = observation["result"]
     if result == "incorrect":
         return "missed"
-    if result == "correct" and unaided(observation) and "uncertain" not in observation:
+    if (
+        result == "correct"
+        and unaided(observation)
+        and "uncertain" not in observation
+        and observation.get("sure") != "guess"
+    ):
         return "solid"
     return "helped"
+
+
+def confident_error(observation: dict[str, Any]) -> bool:
+    """An incorrect answer the learner was confident in."""
+    return (
+        observation["result"] == "incorrect" and observation.get("sure") == "confident"
+    )
 
 
 def _unaided_miss(observation: dict[str, Any]) -> bool:
@@ -215,17 +227,12 @@ def _lapsed(replayed: Replay) -> bool:
     return bool(grades) and grades[-1] != "solid" and "solid" in grades[:-1]
 
 
-def _choice_errors(attempts: list[Attempt], replayed: Replay) -> dict[str, int]:
-    """Wrongly chosen methods since the last ``solid`` verdict, with their counts."""
+def _since_solid(attempts: list[Attempt], replayed: Replay) -> list[dict[str, Any]]:
+    """Attempts dated after the last ``solid`` verdict's day."""
     since = max(
         (day for day, verdict in replayed.verdicts if verdict == "solid"), default=""
     )
-    errors = Counter(
-        item["chose"]
-        for _, item in attempts
-        if "chose" in item and item["date"] > since
-    )
-    return dict(sorted(errors.items()))
+    return [item for _, item in attempts if item["date"] > since]
 
 
 def _standing(
@@ -244,9 +251,13 @@ def _standing(
         result["last"] = {**last, "unaided": unaided(item)}
     if _lapsed(replayed):
         result["lapsed"] = True
-    errors = _choice_errors(attempts, replayed)
+    recent = _since_solid(attempts, replayed)
+    errors = Counter(item["chose"] for item in recent if "chose" in item)
     if errors:
-        result["choice_errors"] = errors
+        result["choice_errors"] = dict(sorted(errors.items()))
+    confident = sum(map(confident_error, recent))
+    if confident:
+        result["confident_errors"] = confident
     judged = topic.get("judged")
     if judged is not None and history.latest > judged:
         result["stale"] = True
@@ -617,7 +628,7 @@ def as_of(record: dict[str, Any], day: date) -> dict[str, Any]:
 
 
 def week(record: dict[str, Any], today: date) -> dict[str, Any]:
-    """The last seven days: level changes, first tries, attempts, wrong methods."""
+    """The last seven days: level changes, first tries, attempts, errors."""
     start = today - timedelta(days=WEEK_DAYS - 1)
     first = start.isoformat()
     before = standings(as_of(record, start))
@@ -635,10 +646,12 @@ def week(record: dict[str, Any], today: date) -> dict[str, Any]:
     ]
     attempts = {"unaided": 0, "assisted": 0}
     errors: list[dict[str, str]] = []
+    confident = 0
     for item in effective(record["observations"]).values():
         if item["date"] < first or item["kind"] not in SCHEDULING_KINDS:
             continue
         attempts["unaided" if unaided(item) else "assisted"] += 1
+        confident += confident_error(item)
         if "chose" in item:
             errors.extend(
                 {"topic": topic, "chose": item["chose"]} for topic in item["topics"]
@@ -652,4 +665,6 @@ def week(record: dict[str, Any], today: date) -> dict[str, Any]:
         result["attempts"] = attempts
     if errors:
         result["choice_errors"] = errors
+    if confident:
+        result["confident_errors"] = confident
     return result
