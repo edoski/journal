@@ -47,7 +47,7 @@ Execution plan for `docs/vision.md`. Section references (§) point into that doc
 
 ## Deferred (recorded, not in this plan)
 
-Dictation (§2), not-a-chat presentation overhaul + structural-identity items (§2, LOW PRIORITY), DB migration (JSON stores suffice now), retroactive bootstrap of the ~15 vault POC sessions (awaits the full extraction/consolidation pipeline), spaced repetition, practice exercises, Electron, Pyodide.
+Not-a-chat presentation overhaul + structural-identity items (§2, LOW PRIORITY), DB migration (JSON stores suffice now), retroactive bootstrap of the ~15 vault POC sessions (awaits the full extraction/consolidation pipeline), spaced repetition, practice exercises, Electron, Pyodide.
 
 ## Definition of done (every wave)
 

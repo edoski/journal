@@ -470,6 +470,6 @@ describe("tool descriptions carry mechanics only, no question-craft", () => {
 			"utf-8",
 		);
 		assert.ok(shared.includes("asymmetry"), "the option craft moved here, not deleted");
-		assert.ok(shared.includes("TRANSCRIBED SPEECH"), "the dictation-leniency note lives here");
+		assert.ok(shared.includes("TRANSCRIBED SPEECH"), "the spoken-thinking leniency note lives here");
 	});
 });

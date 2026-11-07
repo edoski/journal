@@ -29,7 +29,7 @@ Instead of just giving you an explanation, it uses your answers and thinking to 
 3. **Teach.** Each step builds on something you already understand. You predict, get an explanation, and check your understanding. Confusions are repaired before anything is built on them. The aim is for the goal to feel obviously true, not merely familiar.
 4. **Practice.** Separate sessions pose varied problems that require the right knowledge to come to mind without being named first. Problems and hints adapt to your reasoning.
 
-**Think out loud.** The thinking fields let you explain your reasoning, uncertainties, and reactions in your own words. This is how the agent gets a detailed picture rather than just a record of right and wrong answers. You can type or use dictation.
+**Think out loud.** The thinking fields let you explain your reasoning, uncertainties, and reactions in your own words. This is how the agent gets a detailed picture rather than just a record of right and wrong answers.
 
 The agent can also research questions in the background, create visual explanations, and build interactive demonstrations.
 
@@ -49,17 +49,15 @@ Future teaching sessions can read the graph instead of starting from scratch. Pr
 - **Windows (x64):** run the installer. It is currently unsigned; Windows may show an “unknown publisher” or SmartScreen warning.
 - **Linux (x64):** make the AppImage executable and open it, or install the Debian/Ubuntu `.deb`.
 
-Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional dictation and web search use separate service keys.
+Add your provider API key and choose your models, then start a session with what you want to understand. LearnHarness supports 30+ provider options, including OpenAI, Anthropic, Google, DeepSeek, and OpenRouter. Optional web search uses a separate service key.
 
 All three platforms support in-app updates.
-
-**Dictation:** Create a [Deepgram API key](https://console.deepgram.com/) with the **Member role or higher** ([required for token minting](https://developers.deepgram.com/reference/auth/tokens/grant)) and add it under **Settings → Providers → Dictation**. Choose the language below the key; **Multilingual** supports automatic recognition and mixed-language speech. A `403 Insufficient permissions` error during token minting can indicate an insufficient key role.
 
 ## Your keys, your data
 
 - **Your keys and models.** No LearnHarness subscription or markup. You pay your providers for usage; a live cost meter shows model costs.
 - **Local storage.** Your chats, graph, settings, and API keys live on your machine. Learning records are plain files you can inspect.
-- **External services.** Models run through your configured providers. Model requests send the context needed for the task; web research and dictation also contact external services. Local storage does not mean offline processing.
+- **External services.** Models run through your configured providers. Model requests send the context needed for the task; web research also contacts external services. Local storage does not mean offline processing.
 - **Inspectable behavior.** System prompts are visible and editable. The app is open source under the AGPL-3.0 license.
 
 ## Development and support
