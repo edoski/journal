@@ -30,7 +30,7 @@ Before recording an error, check the loaded evidence for the same error. If it r
 
 ## Self-reports and confidence
 
-Record what the learner says about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. Confidence is not stored: ask how sure they are only with a question on a lapsed topic, and correct a confident error explicitly at once. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
+Record what the learner says about their own understanding ("I never really got this", "I'm fine with determinants") as a `self_report`; it guides what you check next and never counts as performance. Confidence in an answer has three states, never a number: the learner may mark an answer as a guess or as sure, in their own words, and an unmarked answer is neutral. Store it on the attempt as `sure` (`guess` or `confident`; omit it when unmarked). A guess counts as `partial` whatever the result. A confident error, sure and wrong, gets an explicit contrast at once and rewrites `gap` and `prompt`; it shows as `confident_errors` until the next `solid` verdict. On "I've got it, skip": skip, and offer one quick check only when the topic is a prerequisite of what comes next.
 
 ## Transfer
 
@@ -40,7 +40,7 @@ Delayed retrieval means attempting an idea later without rereading. Transfer mea
 
 When `resume` has `new_week`, offer a look at the week in one line after today's review. On acceptance, or from the `plan_week` prompt, read `plan` with `all`:
 
-1. Look back in four to six plain lines from each course's `week`: what moved (`levels`), what is shaky and why, and the wrong-method pairs (`choice_errors`). No percentages or streaks.
+1. Look back in four to six plain lines from each course's `week`: what moved (`levels`), what is shaky and why, the wrong-method pairs (`choice_errors`), and how many answers were confidently wrong (`confident_errors`). No percentages or streaks.
 2. Propose one mixed set per course: four to six problems from the course sheets or past papers on two or three topics linked by `contrasts` or recent wrong-method errors, at level `assisted` or better. Problems do not reveal their type and no two in a row use the same method; each answer starts with the method and a one-line reason, then the solve (paper and photos are fine). Give feedback after each full answer; the set takes 30–45 minutes. The first time, say once that mixing feels harder and works better.
 3. The learner decides whether and when.
 

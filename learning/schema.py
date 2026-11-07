@@ -27,6 +27,7 @@ RESERVED = re.compile(r"o[0-9]+")
 DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 KINDS = ("attempt", "exam", "self_report")
 RESULTS = ("correct", "partial", "incorrect")
+SURE = ("guess", "neutral", "confident")
 REVIEWERS = ("engine", "tutor")
 UNAIDED = "none"
 DUPLICATE_WINDOW = timedelta(minutes=30)
@@ -104,6 +105,7 @@ _FLAG = "flag"
 _KIND = "kind"
 _RESULT = "result"
 _HELP = "help"
+_SURE = "sure"
 _INTRODUCED = "introduced"
 _REVIEW = "review"
 _BY = "by"
@@ -142,6 +144,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "response": _TEXT,
         "help": _HELP,
         "result": _RESULT,
+        "sure": _SURE,
         "chose": _HANDLE,
         "transfer": _FLAG,
         "date": _DAY,
@@ -237,6 +240,7 @@ class Observation(TypedDict, total=False):
     response: str
     help: str
     result: str
+    sure: str
     chose: str
     transfer: bool
     date: str
@@ -535,6 +539,7 @@ _RULES: dict[str, Callable[[Any, str, bool], Any]] = {
     _KIND: _choice(KINDS),
     _RESULT: _choice(RESULTS),
     _HELP: _help,
+    _SURE: _choice(SURE),
     _INTRODUCED: _introduced,
     _REVIEW: _review,
     _BY: _choice(REVIEWERS),
@@ -634,7 +639,7 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
     else:
         given = [
             name
-            for name in ("result", "help", "transfer", "chose")
+            for name in ("result", "help", "sure", "transfer", "chose")
             if name in observation
         ]
         if given:
