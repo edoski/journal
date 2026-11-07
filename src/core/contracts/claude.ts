@@ -51,6 +51,9 @@ export function isClaudeLimitFailure(failure: { provider?: string; errorMessage?
 /** A window whose reset has passed is full again, until the next reading says otherwise. */
 function effectiveUsage(usage: ClaudeUsage | null, now: number): ClaudeUsage | null {
 	if (!usage || usage.resetsAt === null || usage.resetsAt * 1000 > now) return usage;
+	// A limited reading's reset is the blocking window's (often the 5-hour one), so
+	// only the block ends; the weekly share left is unknown until the next reading.
+	if (usage.limited) return { ...usage, resetsAt: null, limited: false };
 	return { ...usage, percentLeft: 100, resetsAt: null, limited: false };
 }
 
@@ -58,9 +61,10 @@ function effectiveUsage(usage: ClaudeUsage | null, now: number): ClaudeUsage | n
  * limited, most weekly usage left (ties: the sooner reset, since quota left
  * at a reset is lost). Accounts with no reading come after measured ones. */
 export function nextClaudeAccount(current: string, statuses: readonly ClaudeAccountStatus[], now = Date.now()): ClaudeAccountStatus | null {
+	const currentEmail = statuses.find((status) => status.account.providerId === current)?.account.email;
 	const candidates = statuses
 		.map((status) => ({ status, usage: effectiveUsage(status.usage, now) }))
-		.filter(({ status, usage }) => status.account.providerId !== current && status.connection.state === "connected" && !usage?.limited && (usage === null || usage.percentLeft > 0));
+		.filter(({ status, usage }) => status.account.providerId !== current && !(currentEmail && status.account.email === currentEmail) && status.connection.state === "connected" && !usage?.limited && (usage === null || usage.percentLeft > 0));
 	candidates.sort((a, b) => {
 		if (!a.usage || !b.usage) return a.usage ? -1 : b.usage ? 1 : 0;
 		if (a.usage.percentLeft !== b.usage.percentLeft) return b.usage.percentLeft - a.usage.percentLeft;

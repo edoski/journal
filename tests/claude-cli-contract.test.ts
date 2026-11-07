@@ -228,6 +228,16 @@ test("a child that exits without a result fails the turn with its stderr tail", 
 	assert.match(last.error.errorMessage!, /exited with code 2.*unexpected thing/);
 });
 
+test("a provider whose account is gone fails instead of running on another login", async () => {
+	let spawned = false;
+	const stream = claudeSubscriptionStream({ binary: () => { spawned = true; return fake; }, account: "missing" });
+	const seen = await collect(stream(model, normalizeContext({ messages: [] })));
+	assert.equal(seen.length, 1);
+	assert(seen[0]!.type === "error");
+	assert.match(seen[0]!.error.errorMessage!, /no longer set up/);
+	assert.equal(spawned, false);
+});
+
 test("a missing claude binary fails the turn without spawning", async () => {
 	const stream = claudeSubscriptionStream({ binary: () => null });
 	const seen = await collect(stream(model, normalizeContext({ messages: [] })));

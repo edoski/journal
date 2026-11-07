@@ -95,9 +95,13 @@ interface RateLimit { resetsAt?: number; rateLimitType?: string }
 
 /** Curated, user-facing failure text; every variant says no API key was used. */
 export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rateLimit?: RateLimit; status?: number; code?: string; text?: string }): string {
-	if (rateLimit || code === "rate_limit" || /usage limit|limit reached|rate.?limit/i.test(text)) {
-		const reset = rateLimit?.resetsAt ? ` It resets ${claudeResetTime(rateLimit.resetsAt)}.` : "";
+	// Only a rejected rate-limit event proves the plan limit; a bare 429 may pass in a minute.
+	if (rateLimit) {
+		const reset = rateLimit.resetsAt ? ` It resets ${claudeResetTime(rateLimit.resetsAt)}.` : "";
 		return `${CLAUDE_LIMIT_TEXT}${reset} See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
+	}
+	if (code === "rate_limit" || status === 429 || /usage limit|limit reached|rate.?limit/i.test(text)) {
+		return `Claude is limiting requests right now. Wait a minute, then retry. See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
 	}
 	if (code === "authentication_failed" || code === "oauth_org_not_allowed" || status === 401 || /not logged in|please (run \/)?log ?in|authenticat/i.test(text)) {
 		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers.${NO_KEY}`;
@@ -358,7 +362,8 @@ export interface ClaudeStreamDeps {
 	/** The base environment before the denylist is applied. */
 	env?: ClaudeEnv;
 	/** The account this call runs on; absent means the plain signed-in `claude`. */
-	account?: LoadedClaudeAccount;
+	/** "missing": the provider names an account that no longer exists, so the call must not fall back to another login. */
+	account?: LoadedClaudeAccount | "missing";
 }
 
 /** One `claude -p` process per model call. Pi's agent loop runs every tool;
@@ -366,7 +371,7 @@ export interface ClaudeStreamDeps {
 export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(), env = process.env, account }: ClaudeStreamDeps = {}): StreamFunction<Api, SimpleStreamOptions> {
 	return (model, context, options) => {
 		const output = new AssistantMessageEventStream();
-		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0, (info) => recordClaudeRateLimit(account?.providerId ?? model.provider, info));
+		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0, (info) => recordClaudeRateLimit(account && account !== "missing" ? account.providerId : model.provider, info));
 		let stop = () => {};
 		let ended = false;
 		const emit = (events: AssistantMessageEvent[]) => {
@@ -375,6 +380,7 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		};
 		const signal = options?.signal;
 		if (signal?.aborted) { emit(mapper.abort()); return output; }
+		if (account === "missing") { emit(mapper.fail(`This Claude account is no longer set up in T3 Code. Choose another Claude account.${NO_KEY}`)); return output; }
 		const bin = binary();
 		if (!bin) { emit(mapper.fail(CLAUDE_MISSING)); return output; }
 

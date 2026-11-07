@@ -84,8 +84,8 @@ test("concurrent refreshes share one probe per account, and a failed probe keeps
 });
 
 const connected: ClaudeConnection = { state: "connected", email: null, plan: null };
-const status = (providerId: string, usage: Partial<ClaudeUsage> | null, connection: ClaudeConnection = connected): ClaudeAccountStatus => ({
-	account: { providerId, label: providerId, email: null, auth: "token" },
+const status = (providerId: string, usage: Partial<ClaudeUsage> | null, connection: ClaudeConnection = connected, email: string | null = null): ClaudeAccountStatus => ({
+	account: { providerId, label: providerId, email, auth: "token" },
 	connection,
 	usage: usage && { percentLeft: 50, resetsAt: RESET, limited: false, checkedAt: 0, ...usage },
 });
@@ -105,7 +105,9 @@ test("the next account is the connected, unlimited one with the most left; ties 
 	assert.equal(nextClaudeAccount("d", statuses, NOW)?.account.providerId, "c");
 	assert.equal(nextClaudeAccount("a", [statuses[0]!, statuses[4]!, statuses[5]!], NOW)?.account.providerId, "e", "an unmeasured account beats none");
 	assert.equal(nextClaudeAccount("a", [statuses[0]!, statuses[5]!, statuses[6]!], NOW), null);
-	assert.equal(nextClaudeAccount("a", [status("a", null), status("z", { percentLeft: 0, limited: true, resetsAt: RESET - 200 })], NOW)?.account.providerId, "z", "a window that already reset is full again");
+	assert.equal(nextClaudeAccount("a", [status("a", null), status("z", { percentLeft: 30, limited: true, resetsAt: RESET - 200 })], NOW)?.account.providerId, "z", "a block that already ended no longer excludes the account");
+	assert.equal(nextClaudeAccount("a", [status("a", null), status("z", { percentLeft: 0, limited: true, resetsAt: RESET - 200 })], NOW), null, "an ended block keeps the last weekly share, not a full week");
+	assert.equal(nextClaudeAccount("a", [status("a", { percentLeft: 0, limited: true }, undefined, "same@example.com"), status("y", { percentLeft: 80 }, undefined, "same@example.com")], NOW), null, "never the same login under another entry");
 	assert.equal(soonestClaudeReset([statuses[2]!, statuses[3]!, statuses[5]!]), RESET + 10);
 	assert.equal(soonestClaudeReset([status("x", null)]), null);
 });

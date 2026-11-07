@@ -98,8 +98,12 @@ export function claudeAccountConnections(): readonly ClaudeAccountConnection[] {
 	return cache().accounts;
 }
 
+/** Before the first check the account list is read directly, so a cold start
+ * never mistakes a configured account for a missing one. */
 export function claudeAccount(providerId: string): LoadedClaudeAccount | undefined {
-	return cache().accounts.find((entry) => entry.account.providerId === providerId)?.account;
+	const accounts = cache().accounts;
+	if (!accounts.length) return loadClaudeAccounts().find((account) => account.providerId === providerId);
+	return accounts.find((entry) => entry.account.providerId === providerId)?.account;
 }
 
 /** The last known connection of one account; null until the first check completes. */

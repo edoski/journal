@@ -160,7 +160,7 @@ require("node:readline").createInterface({ input: process.stdin }).on("line", (l
 /** The MCP server runs on this process's own runtime: the Electron binary in
  * the desktop app (hence ELECTRON_RUN_AS_NODE), plain node in dev. */
 export function claudeMcpConfig(toolsFile: string, runtime = process.execPath): string {
-	return JSON.stringify({ mcpServers: { [CLAUDE_MCP_SERVER]: { type: "stdio", command: runtime, args: ["-e", CLAUDE_MCP_SCRIPT], env: { ELECTRON_RUN_AS_NODE: "1", [TOOLS_ENV]: toolsFile } } } });
+	return JSON.stringify({ mcpServers: { [CLAUDE_MCP_SERVER]: { type: "stdio", command: runtime, args: ["-e", CLAUDE_MCP_SCRIPT], env: { ELECTRON_RUN_AS_NODE: "1", [TOOLS_ENV]: toolsFile, CLAUDE_CODE_OAUTH_TOKEN: "" } } } });
 }
 
 /** An app-owned neutral working directory, private to this OS user: Claude
