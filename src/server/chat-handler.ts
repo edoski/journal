@@ -11,7 +11,7 @@ import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProv
 import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
-import { CLAUDE_SUBSCRIPTION } from "../core/contracts/claude.ts";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
@@ -225,7 +225,7 @@ export async function handleChatInput(
 	// persist (nothing durable changes); wake-pipeline turns ride the same
 	// path. The affected tier is strong — the conversation chain's own tier
 	// (a chat.model override still resolves through it).
-	if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) await refreshConnectionCatalog(conversation.provider);
+	if (isClaudeProvider(conversation.provider)) await refreshConnectionCatalog(conversation.provider);
 	if (isSubscriptionProvider(conversation.provider)) {
 		await refreshConnectionCatalog(conversation.provider);
 		if (input.type === "steers" && !connectionBackgroundAllowed(conversation.provider)) {
@@ -256,7 +256,7 @@ export async function handleChatInput(
 	};
 	let conversationEngine: PiEngine;
 	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : conversation.provider === CLAUDE_SUBSCRIPTION.providerId ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
+	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(
 		{
@@ -541,7 +541,7 @@ export async function handleChatInput(
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
 				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) {
+				if (isClaudeProvider(conversation.provider)) {
 					console.error(`[chat ${chatId}] Claude turn error:`, error);
 					return claudeTurnError(error instanceof Error ? error.message : String(error));
 				}

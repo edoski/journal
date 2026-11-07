@@ -1,14 +1,15 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 import { normalizeContext, type AssistantMessageEvent } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { claudeSubscriptionModel, claudeSubscriptionStream, claudeTranscriptBlocks } from "../src/agent/claude-stream.ts";
-import { CLAUDE_MCP_SCRIPT, writeClaudeCallFiles } from "../src/agent/claude-cli.ts";
+import { CLAUDE_MCP_SCRIPT, claudeWorkDir, writeClaudeCallFiles } from "../src/agent/claude-cli.ts";
+import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "lh-fake-claude-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -35,7 +36,7 @@ setInterval(() => {}, 1000);
 `);
 chmodSync(fake, 0o755);
 
-const model = claudeSubscriptionModel("claude-opus-5-5")!;
+const model = claudeSubscriptionModel("claude-subscription", "claude-opus-5-5")!;
 const se = (event: unknown) => ({ type: "stream_event", event, parent_tool_use_id: null });
 const init = { type: "system", subtype: "init", apiKeySource: "none", mcp_servers: [{ name: "lh", status: "connected" }] };
 const toolUseLines = [
@@ -48,7 +49,7 @@ const toolUseLines = [
 ];
 
 let runs = 0;
-function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string }) {
+function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string }, account?: LoadedClaudeAccount) {
 	const out = join(dir, `run-${++runs}`);
 	const fixturePath = `${out}.fixture.json`;
 	writeFileSync(fixturePath, JSON.stringify(fixture));
@@ -65,8 +66,9 @@ function scenario(fixture: { lines: unknown[]; exit?: number; stderr?: string })
 		CLAUDE_CODE_USE_BEDROCK: "1",
 		ANTHROPIC_BASE_URL: "https://proxy.example",
 		CLAUDE_CODE_OAUTH_REFRESH_TOKEN: "parent-refresh",
+		CLAUDE_CONFIG_DIR: "/parent/claude-config",
 	};
-	const stream = claudeSubscriptionStream({ binary: () => fake, env });
+	const stream = claudeSubscriptionStream({ binary: () => fake, env, account });
 	const context = normalizeContext({
 		systemPrompt: "You are a tutor.",
 		messages: [{ role: "user", content: "Teach me hash tables.", timestamp: 0 }],
@@ -126,6 +128,49 @@ test("the child gets the user's environment minus every credential and app secre
 	const input = JSON.parse(stdin.trim()) as { type: string; message: { role: string; content: unknown } };
 	assert.equal(input.type, "user");
 	assert.deepEqual(input.message.content, claudeTranscriptBlocks(context.messages));
+});
+
+const CREDENTIALS = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "ANTHROPIC_BASE_URL", "LH_DESKTOP_API_SECRET", "OPENAI_API_KEY"];
+
+test("a token account's child gets only that account's token and a private config dir", async () => {
+	const account: LoadedClaudeAccount = { providerId: "claude-subscription-work", label: "Work", email: null, auth: "token", instanceId: "work", token: () => "fake-setup-token-work" };
+	const run = scenario({ lines: toolUseLines }, account);
+	await collect(run.start().events);
+	const { argv, env } = run.recorded();
+	assert.equal(env.CLAUDE_CODE_OAUTH_TOKEN, "fake-setup-token-work");
+	for (const name of CREDENTIALS) assert.equal(env[name], undefined, `${name} must not reach Claude Code`);
+	const dir = env.CLAUDE_CONFIG_DIR!;
+	assert(dir.startsWith(join(claudeWorkDir(), "accounts")), "a private config dir under the app's Claude work dir");
+	assert.equal(statSync(dir).mode & 0o777, 0o700);
+	assert(!argv.includes("--bare"));
+	assert(!argv.some((arg) => arg.includes("fake-setup-token")), "the token never rides argv");
+});
+
+test("a profile account's child gets its own config dir and no token; the T3 default home drops the inherited dir", async () => {
+	const profile = scenario({ lines: toolUseLines }, { providerId: "claude-subscription-home", label: "Home", email: null, auth: "profile", instanceId: "home", configDir: "/fake/.claude-home" });
+	await collect(profile.start().events);
+	assert.equal(profile.recorded().env.CLAUDE_CONFIG_DIR, "/fake/.claude-home");
+	assert.equal(profile.recorded().env.CLAUDE_CODE_OAUTH_TOKEN, undefined);
+	for (const name of CREDENTIALS) assert.equal(profile.recorded().env[name], undefined, name);
+	assert(!profile.recorded().argv.includes("--bare"));
+
+	const home = scenario({ lines: toolUseLines }, { providerId: "claude-subscription", label: "Main", email: null, auth: "default", instanceId: "main" });
+	await collect(home.start().events);
+	assert.equal(home.recorded().env.CLAUDE_CONFIG_DIR, undefined, "the default home, whatever the parent set");
+	assert.equal(home.recorded().env.CLAUDE_CODE_OAUTH_TOKEN, undefined);
+
+	const plain = scenario({ lines: toolUseLines });
+	await collect(plain.start().events);
+	assert.equal(plain.recorded().env.CLAUDE_CONFIG_DIR, "/parent/claude-config", "the synthetic default runs exactly like a terminal `claude`");
+});
+
+test("a token that cannot be read fails the turn without starting Claude Code", async () => {
+	const run = scenario({ lines: toolUseLines }, { providerId: "claude-subscription-work", label: "Work", email: null, auth: "token", instanceId: "work", token: () => { throw new Error("LearnHarness could not read T3 Code's setup token for Work."); } });
+	const seen = await collect(run.start().events);
+	assert.equal(seen.length, 1);
+	assert(seen[0]!.type === "error");
+	assert.match(seen[0]!.error.errorMessage!, /setup token for Work.*No API key was used\.$/);
+	assert(!existsSync(`${run.out}.json`), "no child ran");
 });
 
 test("thinking off disables Claude Code's thinking", async () => {

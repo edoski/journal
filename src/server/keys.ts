@@ -54,7 +54,7 @@ import {
 import { authStore } from "../store/auth.ts";
 import { isSubscriptionProvider, subscriptionConnected } from "../agent/subscription-connections.ts";
 import { claudeConnected } from "../agent/claude-connection.ts";
-import { CLAUDE_SUBSCRIPTION } from "../core/contracts/claude.ts";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
 
 // The once-per-process boot record — globalThis anchor (HMR re-imports the
 // module; the snapshot must not re-run and misread fill-gapped vars as real
@@ -202,7 +202,7 @@ export function keyValue(id: string): string | undefined {
  * no key at all: nothing to gate, present by definition. */
 export function providerKeyPresent(provider: string): boolean {
 	if (isSubscriptionProvider(provider)) return subscriptionConnected(provider);
-	if (provider === CLAUDE_SUBSCRIPTION.providerId) return claudeConnected();
+	if (isClaudeProvider(provider)) return claudeConnected(provider);
 	const info = AUTH_PROVIDER_KEYS.find((p) => p.id === provider);
 	return info ? keyValue(info.envVar) !== undefined : true;
 }

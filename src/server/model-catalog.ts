@@ -23,25 +23,25 @@ import { piModels } from "../agent/models.ts";
 import { chatGPTConnected, chatGPTModel, chatGPTModels, refreshChatGPTModels } from "../agent/chatgpt-bridge.ts";
 import { NATIVE_SUBSCRIPTIONS } from "../core/contracts/subscriptions.ts";
 import { nativeSubscriptionId, nativeSubscriptionConnected, nativeSubscriptionModel, nativeSubscriptionModels, refreshSubscriptionModels } from "../agent/subscription-bridge.ts";
-import { CLAUDE_SUBSCRIPTION } from "../core/contracts/claude.ts";
-import { claudeConnected, refreshClaudeConnection } from "../agent/claude-connection.ts";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
+import { claudeAccountConnections, claudeConnected, refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { claudeSubscriptionModel, claudeSubscriptionModels } from "../agent/claude-stream.ts";
 
-const CLAUDE = CLAUDE_SUBSCRIPTION.providerId;
 export async function refreshConnectionCatalog(provider?: string): Promise<void> {
 	await Promise.all([
 		!provider || provider === "chatgpt" ? refreshChatGPTModels(piModels().getModels("openai").filter((m): m is Model<"openai-responses"> => m.api === "openai-responses")) : Promise.resolve(),
 		!provider || nativeSubscriptionId(provider) ? refreshSubscriptionModels() : Promise.resolve(),
-		!provider || provider === CLAUDE ? refreshClaudeConnection() : Promise.resolve(),
+		!provider || isClaudeProvider(provider) ? refreshClaudeConnections() : Promise.resolve(),
 	]);
 }
-/** Claude's catalog is static, but it is offered only while Claude Code is signed in to the plan. */
-function claudeModels(): Model<Api>[] { return claudeConnected() ? claudeSubscriptionModels() : []; }
+/** Claude's catalog is static, but each account is offered only while it is signed in to its plan. */
+function claudeModels(): Model<Api>[] { return claudeSubscriptionModels(); }
+function claudeProviderIds(): string[] { return claudeAccountConnections().map((entry) => entry.account.providerId); }
 function connectionModel(provider: string, id: string): Model<Api> | undefined {
-	if (provider === CLAUDE) return claudeConnected() ? claudeSubscriptionModel(id) : undefined;
+	if (isClaudeProvider(provider)) return claudeConnected(provider) ? claudeSubscriptionModel(provider, id) : undefined;
 	return provider === "chatgpt" ? chatGPTModel(id) : nativeSubscriptionId(provider) ? nativeSubscriptionModel(provider, id) : piModels().getModel(provider, id);
 }
-function connectionProviderIds(): string[] { return [...piModels().getProviders().map((p) => p.id), "chatgpt", CLAUDE, ...NATIVE_SUBSCRIPTIONS.map((p) => p.logicalId)]; }
+function connectionProviderIds(): string[] { return [...piModels().getProviders().map((p) => p.id), "chatgpt", ...claudeProviderIds(), ...NATIVE_SUBSCRIPTIONS.map((p) => p.logicalId)]; }
 import { settingsStore } from "../store/settings.ts";
 import { effectiveSettings } from "./stores.ts";
 import { keyValue } from "./keys.ts";
@@ -149,7 +149,7 @@ export function catalogProviders(): CatalogProvider[] {
 		keyPresent: keyValue(p.envVar) !== undefined,
 	})).concat([
 		{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() },
-		{ id: CLAUDE, envVar: "", keyPresent: claudeConnected() },
+		...claudeProviderIds().map((id) => ({ id, envVar: "", keyPresent: claudeConnected(id) })),
 		...NATIVE_SUBSCRIPTIONS.map((p) => ({ id: p.logicalId, envVar: "", keyPresent: nativeSubscriptionConnected(p.providerId) })),
 	]).sort((a, b) => a.id.localeCompare(b.id));
 }

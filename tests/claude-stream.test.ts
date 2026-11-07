@@ -12,10 +12,12 @@ import {
 	claudeTranscriptBlocks,
 	claudeTurnError,
 } from "../src/agent/claude-stream.ts";
-import { CLAUDE_MODEL_IDS } from "../src/core/contracts/claude.ts";
+import { CLAUDE_MODEL_IDS, isClaudeLimitFailure } from "../src/core/contracts/claude.ts";
 import { subscriptionLabel } from "../src/core/prices.ts";
+import { refreshClaudeConnections, resetClaudeConnections } from "../src/agent/claude-connection.ts";
+import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 
-const model = claudeSubscriptionModel("claude-opus-5-5")!;
+const model = claudeSubscriptionModel("claude-subscription", "claude-opus-5-5")!;
 const NO_KEY = "No API key was used.";
 
 const init = { type: "system", subtype: "init", apiKeySource: "none", model: "claude-opus-5-5", tools: ["mcp__lh__plan_init", "mcp__lh__quiz"] };
@@ -146,6 +148,18 @@ test("a rejected rate-limit event makes the failure say the plan limit and when 
 	assert(error.error.errorMessage!.includes(claudeResetTime(resetsAt)));
 	assert(error.error.errorMessage!.includes("https://claude.ai/settings/usage"));
 	assert(error.error.errorMessage!.endsWith(NO_KEY));
+	assert(isClaudeLimitFailure(error.error), "the limit prompt recognizes the curated text on a Claude account");
+	assert(!isClaudeLimitFailure({ ...error.error, provider: "openrouter" }), "only on a Claude account");
+});
+
+test("every rate-limit event reaches the usage recorder, allowed or rejected", () => {
+	const seen: unknown[] = [];
+	const mapper = new ClaudeStreamMapper(model, 1, false, (info) => seen.push(info));
+	const info = { status: "allowed", unifiedWindows: { seven_day: { utilization: 0.4, resetsAt: 1_800_000_000, status: "allowed" } } };
+	mapper.feed(init);
+	mapper.feed({ type: "rate_limit_event", rate_limit_info: info });
+	mapper.feed({ type: "rate_limit_event" });
+	assert.deepEqual(seen, [info]);
 });
 
 test("signed-out and unknown-model failures get their own guidance", () => {
@@ -205,16 +219,30 @@ test("loop-level failures keep curated Claude text and mask everything else", ()
 	assert.match(claudeTurnError("TypeError: x is undefined"), /^Claude request failed/);
 });
 
-test("plan models clone pi's Anthropic entries with zero cost and keep the thinking map", () => {
-	const models = claudeSubscriptionModels();
-	assert.deepEqual(models.map((m) => m.id), [...CLAUDE_MODEL_IDS]);
-	for (const m of models) {
-		assert.equal(m.provider, "claude-subscription");
-		assert.deepEqual(m.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
-		assert(m.thinkingLevelMap, `${m.id} keeps its thinking map`);
+test("plan models clone pi's Anthropic entries per signed-in account, with zero cost and the thinking map", async () => {
+	const accounts: LoadedClaudeAccount[] = [
+		{ providerId: "claude-subscription", label: "Main", email: null, auth: "default", instanceId: "main" },
+		{ providerId: "claude-subscription-work", label: "Work", email: null, auth: "profile", instanceId: "work", configDir: "/fake/.claude-work" },
+		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "profile", instanceId: "spare", configDir: "/fake/.claude-spare" },
+	];
+	const loggedIn = JSON.stringify({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" });
+	await refreshClaudeConnections({ force: true, load: () => accounts, binary: () => "/fake/claude", run: async (_bin, _args, env) => ({ code: 0, stdout: env.CLAUDE_CONFIG_DIR === "/fake/.claude-spare" ? JSON.stringify({ loggedIn: false }) : loggedIn, stderr: "" }) });
+	try {
+		const models = claudeSubscriptionModels();
+		assert.deepEqual(models.map((m) => `${m.provider}:${m.id}`), ["claude-subscription:claude-opus-5-5", "claude-subscription-work:claude-opus-5-5"], "one Opus 5.5 per signed-in account");
+		assert.deepEqual(models.map((m) => m.name.split(" · ")[1]), ["Main", "Work"]);
+		for (const m of models) {
+			assert.deepEqual(m.cost, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+			assert(m.thinkingLevelMap, `${m.id} keeps its thinking map`);
+		}
+		assert.equal(claudeSubscriptionModel("claude-subscription", "claude-sonnet-5-5"), undefined, "only Opus 5.5 is offered");
+		assert.equal(claudeSubscriptionModel("claude-subscription-gone", "claude-opus-5-5"), undefined, "an unknown account has no models");
+		assert.deepEqual(CLAUDE_MODEL_IDS, ["claude-opus-5-5"]);
+	} finally {
+		resetClaudeConnections();
 	}
-	assert.equal(claudeSubscriptionModel("claude-sonnet-5-5"), undefined, "only Opus 5.5 is offered");
 	assert.equal(subscriptionLabel("claude-subscription:claude-opus-5-5"), "Claude");
+	assert.equal(subscriptionLabel("claude-subscription-work:claude-opus-5-5"), "Claude");
 });
 
 test("effort follows the model's thinking map, keeps unmapped level names and rounds minimal up", () => {
