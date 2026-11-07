@@ -52,8 +52,8 @@ export * from "./prices.ts";
 export * from "./context-usage.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
 export { NATIVE_SUBSCRIPTIONS } from "./contracts/subscriptions.ts";
-export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULTS, CLAUDE_USAGE_URL } from "./contracts/claude.ts";
-export type { ClaudeConnection, ClaudeModelId } from "./contracts/claude.ts";
+export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULT, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
+export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeModelId, ClaudeUsage } from "./contracts/claude.ts";
 export type { NativeSubscriptionProviderId, NativeSubscriptionLogicalId, NativeSubscriptionStatus, NativeSubscriptionSnapshot, NativeSubscriptionScope, NativeSubscriptionControlBridge, SubscriptionInteraction, SubscriptionPrompt } from "./contracts/subscriptions.ts";
 export * from "./cost-summary.ts";
 export * from "./fuzzy.ts";
@@ -68,12 +68,10 @@ export * from "./settings.ts";
 // shape its success line describes, hence this type-only re-export.
 export type { ChatDeleteMode, ChatDeletionStats } from "./graph-deletion.ts";
 export * from "./settings-resolution.ts";
-export * from "./search.ts"; // search port (search wave, 2026-09-20)
 export * from "./session-find.ts";
 export * from "./session-navigation.ts";
-// auth-keys.ts (auth-keys wave, 2026-09-19): the curated key catalog +
-// shape rules + masking — pure, browser-safe (the auth page binds to the
-// /api/keys routes built on it).
+// auth-keys.ts (auth-keys wave, 2026-09-19): provider key rules + masking —
+// pure, browser-safe (the auth page binds to the /api/keys routes built on it).
 export * from "./auth-keys.ts";
 // keyboard.ts: the shortcut registry + binding normalization (pure, browser-safe).
 export * from "./keyboard.ts";

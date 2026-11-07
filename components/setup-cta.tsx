@@ -8,8 +8,8 @@
  * keys unlock). Click opens the SetupDialog, whose stage derives to
  * the first-key screen on its own.
  *
- * Truth: GET /api/keys — a PROVIDER key present (env or file; tool keys
- * like Tavily do not count — they unlock no models). Live updates ride
+ * Truth: GET /api/keys — a PROVIDER key present (env or file; a stored
+ * var no provider reads does not count — it unlocks no models). Live updates ride
  * the lh:settings-saved "keys" signal (keys-section dispatches after
  * save AND delete; the setup dialog's first-key screen dispatches on
  * its own save), the same re-read pattern chat.tsx uses for "models".
@@ -89,8 +89,7 @@ export function ZeroKeysPill({ onOpen, inline = false }: { onOpen: () => void; i
 /** Pure: the strong slot is pinned to a provider whose key is GONE (owner
  *  interlude, 2026-09-25 — the original deleted-key scenario). The catalog
  *  already knows both halves: slots.strong is the resolved pin, providers[]
- *  lists only PRESENT-key providers (keyless ones are absent, the same
- *  discipline as the search engines). False when the strong slot is unset
+ *  lists only PRESENT-key providers (keyless ones are absent). False when the strong slot is unset
  *  (the models guard owns that case — this check only runs when slots ARE
  *  configured) or the catalog hasn't loaded (the server gate remains the
  *  belt). Exported for pins. */

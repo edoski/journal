@@ -11,7 +11,7 @@ import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProv
 import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
-import { CLAUDE_SUBSCRIPTION } from "../core/contracts/claude.ts";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
@@ -34,7 +34,6 @@ import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefFor } from "./course-brief.ts";
-import { searchAvailable, searchProvider } from "./search.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -103,11 +102,6 @@ const jobRunner = createJobRunner({
 	// with the 503-envelope family instead of dying mid-run.
 	providerKeyMissing: (provider, tier) =>
 		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
-	// Search port wave (2026-09-20): the researcher's web_search runs on the
-	// injected port — resolved FRESH per job (key rotations land immediately).
-	// null = honestly unavailable; the dispatch-level drop (below) uses the
-	// same signal so keyless servers never see the research tool at all.
-	searchProvider,
 });
 /** The app's ONE extraction pipeline instance — both front doors share it:
  *  quiz-triggered session runs (turn-service) and notes imports
@@ -226,7 +220,7 @@ export async function handleChatInput(
 	// persist (nothing durable changes); wake-pipeline turns ride the same
 	// path. The affected tier is strong — the conversation chain's own tier
 	// (a chat.model override still resolves through it).
-	if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) await refreshConnectionCatalog(conversation.provider);
+	if (isClaudeProvider(conversation.provider)) await refreshConnectionCatalog(conversation.provider);
 	if (isSubscriptionProvider(conversation.provider)) {
 		await refreshConnectionCatalog(conversation.provider);
 		if (input.type === "steers" && !connectionBackgroundAllowed(conversation.provider)) {
@@ -257,7 +251,7 @@ export async function handleChatInput(
 	};
 	let conversationEngine: PiEngine;
 	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : conversation.provider === CLAUDE_SUBSCRIPTION.providerId ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
+	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(
 		{
@@ -467,7 +461,6 @@ export async function handleChatInput(
 							chatId,
 							jobStore: stores.jobStore,
 							spawn: (job, input) => void jobRunner.runJob(job.id, input),
-							searchAvailable,
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
 					},
@@ -480,9 +473,6 @@ export async function handleChatInput(
 						chatStore: stores.chatStore,
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						// The registry drop's signal (2026-09-20): no live engine
-						// = no research tool in the teacher's registry.
-						searchAvailable,
 					},
 					agentOpts,
 				)
@@ -496,7 +486,6 @@ export async function handleChatInput(
 						// needs the same job wiring as the teacher's.
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
-						searchAvailable,
 						// The map reader (wave 7): the prober reads the learner's
 						// knowledge graph through tools when the gate opens —
 						// graph master switch AND the agent.graphTools toggle.
@@ -547,7 +536,7 @@ export async function handleChatInput(
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
 				if (conversation.provider === "chatgpt") return chatGPTStreamError(String(error));
-				if (conversation.provider === CLAUDE_SUBSCRIPTION.providerId) {
+				if (isClaudeProvider(conversation.provider)) {
 					console.error(`[chat ${chatId}] Claude turn error:`, error);
 					return claudeTurnError(error instanceof Error ? error.message : String(error));
 				}

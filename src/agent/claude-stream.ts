@@ -16,23 +16,31 @@ import {
 } from "@earendil-works/pi-ai";
 import { ANTHROPIC_MODELS } from "@earendil-works/pi-ai/providers/anthropic.models";
 import { AssistantMessageEventStream } from "@earendil-works/pi-ai/utils/event-stream";
-import { CLAUDE_MODEL_IDS, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
-import { CLAUDE_EFFORTS, CLAUDE_MCP_SERVER, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary, writeClaudeCallFiles, type ClaudeEffort, type ClaudeEnv } from "./claude-cli.ts";
+import { CLAUDE_LIMIT_TEXT, CLAUDE_MODEL_IDS, CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL } from "../core/contracts/claude.ts";
+import { claudeLaunch, type LoadedClaudeAccount } from "./claude-accounts.ts";
+import { CLAUDE_EFFORTS, CLAUDE_MCP_SERVER, CLAUDE_TOOL_PREFIX, claudeArgs, claudeChildEnv, claudeWorkDir, resolveClaudeBinary, writeClaudeCallFiles, type ClaudeEffort, type ClaudeEnv, type ClaudeLaunch } from "./claude-cli.ts";
+import { claudeAccount, claudeAccountConnections } from "./claude-connection.ts";
+import { recordClaudeRateLimit } from "./claude-usage.ts";
 
-const PROVIDER = CLAUDE_SUBSCRIPTION.providerId;
 const NO_KEY = " No API key was used.";
 
-/** Pi's Anthropic catalog entries, relabelled as plan models: no per-token
- * cost, same limits and thinking map (so pi's level clamp still works). */
-export function claudeSubscriptionModel(id: string): Model<Api> | undefined {
+/** Pi's Anthropic catalog entries, relabelled as one account's plan models: no
+ * per-token cost, same limits and thinking map (so pi's level clamp still
+ * works). The default account resolves before the first sign-in check. */
+export function claudeSubscriptionModel(providerId: string, id: string): Model<Api> | undefined {
 	if (!(CLAUDE_MODEL_IDS as readonly string[]).includes(id)) return undefined;
+	const account = claudeAccount(providerId);
+	if (!account && providerId !== CLAUDE_SUBSCRIPTION.providerId) return undefined;
 	const base = (ANTHROPIC_MODELS as Record<string, Model<Api> | undefined>)[id];
 	if (!base) return undefined;
-	return { ...base, provider: PROVIDER, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
+	return { ...base, provider: providerId, name: account ? `${base.name} · ${account.label}` : base.name, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } };
 }
 
+/** Opus 5.5 once per signed-in account. */
 export function claudeSubscriptionModels(): Model<Api>[] {
-	return CLAUDE_MODEL_IDS.flatMap((id) => claudeSubscriptionModel(id) ?? []);
+	return claudeAccountConnections()
+		.filter((entry) => entry.connection.state === "connected")
+		.flatMap((entry) => CLAUDE_MODEL_IDS.flatMap((id) => claudeSubscriptionModel(entry.account.providerId, id) ?? []));
 }
 
 const isEffort = (value: unknown): value is ClaudeEffort => typeof value === "string" && (CLAUDE_EFFORTS as readonly string[]).includes(value);
@@ -87,9 +95,13 @@ interface RateLimit { resetsAt?: number; rateLimitType?: string }
 
 /** Curated, user-facing failure text; every variant says no API key was used. */
 export function claudeErrorMessage({ rateLimit, status, code, text = "" }: { rateLimit?: RateLimit; status?: number; code?: string; text?: string }): string {
-	if (rateLimit || code === "rate_limit" || /usage limit|limit reached|rate.?limit/i.test(text)) {
-		const reset = rateLimit?.resetsAt ? ` It resets ${claudeResetTime(rateLimit.resetsAt)}.` : "";
-		return `Your Claude plan's usage limit is reached.${reset} See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
+	// Only a rejected rate-limit event proves the plan limit; a bare 429 may pass in a minute.
+	if (rateLimit) {
+		const reset = rateLimit.resetsAt ? ` It resets ${claudeResetTime(rateLimit.resetsAt)}.` : "";
+		return `${CLAUDE_LIMIT_TEXT}${reset} See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
+	}
+	if (code === "rate_limit" || status === 429 || /usage limit|limit reached|rate.?limit/i.test(text)) {
+		return `Claude is limiting requests right now. Wait a minute, then retry. See ${CLAUDE_USAGE_URL}.${NO_KEY}`;
 	}
 	if (code === "authentication_failed" || code === "oauth_org_not_allowed" || status === 401 || /not logged in|please (run \/)?log ?in|authenticat/i.test(text)) {
 		return `Claude Code is not signed in. Run \`claude\` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers.${NO_KEY}`;
@@ -139,7 +151,7 @@ export class ClaudeStreamMapper {
 	private errorCode: string | undefined;
 	private errorStatus: number | undefined;
 
-	constructor(model: Model<Api>, now = Date.now(), private readonly expectsTools = false) {
+	constructor(model: Model<Api>, now = Date.now(), private readonly expectsTools = false, private readonly onRateLimit?: (info: unknown) => void) {
 		this.message = {
 			role: "assistant", api: model.api, provider: model.provider, model: model.id, content: [], stopReason: "stop", timestamp: now,
 			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
@@ -159,6 +171,7 @@ export class ClaudeStreamMapper {
 				return [];
 			case "rate_limit_event": {
 				const info = record(event.rate_limit_info);
+				if (info) this.onRateLimit?.(info);
 				if (info?.status === "rejected") this.rateLimit = { resetsAt: num(info.resetsAt), rateLimitType: typeof info.rateLimitType === "string" ? info.rateLimitType : undefined };
 				return [];
 			}
@@ -348,14 +361,17 @@ export interface ClaudeStreamDeps {
 	binary?: () => string | null;
 	/** The base environment before the denylist is applied. */
 	env?: ClaudeEnv;
+	/** The account this call runs on; absent means the plain signed-in `claude`. */
+	/** "missing": the provider names an account that no longer exists, so the call must not fall back to another login. */
+	account?: LoadedClaudeAccount | "missing";
 }
 
 /** One `claude -p` process per model call. Pi's agent loop runs every tool;
  * Claude Code only produces the next assistant message. */
-export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(), env = process.env }: ClaudeStreamDeps = {}): StreamFunction<Api, SimpleStreamOptions> {
+export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(), env = process.env, account }: ClaudeStreamDeps = {}): StreamFunction<Api, SimpleStreamOptions> {
 	return (model, context, options) => {
 		const output = new AssistantMessageEventStream();
-		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0);
+		const mapper = new ClaudeStreamMapper(model, Date.now(), getCurrentTools(context.messages).length > 0, (info) => recordClaudeRateLimit(account && account !== "missing" ? account.providerId : model.provider, info));
 		let stop = () => {};
 		let ended = false;
 		const emit = (events: AssistantMessageEvent[]) => {
@@ -364,17 +380,23 @@ export function claudeSubscriptionStream({ binary = () => resolveClaudeBinary(),
 		};
 		const signal = options?.signal;
 		if (signal?.aborted) { emit(mapper.abort()); return output; }
+		if (account === "missing") { emit(mapper.fail(`This Claude account is no longer set up in T3 Code. Choose another Claude account.${NO_KEY}`)); return output; }
 		const bin = binary();
 		if (!bin) { emit(mapper.fail(CLAUDE_MISSING)); return output; }
 
 		const tools = getCurrentTools(context.messages).map((tool) => ({ name: tool.name, description: tool.description, inputSchema: tool.parameters }));
 		const effort = claudeEffort(model, options?.reasoning);
+		let launch: ClaudeLaunch | undefined;
+		try { launch = account ? claudeLaunch(account, claudeWorkDir()) : undefined; } catch (error) {
+			emit(mapper.fail(`${(error as Error).message}${NO_KEY}`));
+			return output;
+		}
 		let files: ReturnType<typeof writeClaudeCallFiles> | undefined;
 		let child: ReturnType<typeof spawn>;
 		try {
 			files = writeClaudeCallFiles(getCurrentSystemPrompt(context.messages), tools);
 			const args = claudeArgs({ model: model.id, effort, systemPromptFile: files.systemPromptFile, mcpConfigFile: files.mcpConfigFile });
-			child = spawn(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: effort !== undefined }), stdio: ["pipe", "pipe", "pipe"] });
+			child = spawn(bin, args, { cwd: claudeWorkDir(), env: claudeChildEnv(env, { binary: bin, thinking: effort !== undefined, launch }), stdio: ["pipe", "pipe", "pipe"] });
 		} catch (error) {
 			files?.dispose();
 			emit(mapper.fail(`Claude Code could not be started (${error instanceof Error ? error.message : String(error)}).${NO_KEY}`));

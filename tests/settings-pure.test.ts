@@ -11,7 +11,6 @@ import { appearanceVars, derivedPalette, resolveAppearance, staleVarNames } from
 import {
 	PROMPT_IN_USE_HINT,
 	composePromptSwitch,
-	composeSearchEngine,
 	composeSlotModel,
 	composeTool,
 	sectionedSegments,
@@ -182,18 +181,6 @@ describe("agent section compose helpers — the replace-whole PUT body", () => {
 		assert.deepEqual(after2.strong, { model: { provider: "zai", id: "glm-4.7-flash" } }, "thinking dropped, model kept");
 	});
 
-	it("composeSearchEngine: null REMOVES the pin (auto-activation's resting state)", () => {
-		const withPin: AgentSettings = { search: { engine: "tavily" } };
-		const cleared = composeSearchEngine(withPin, null);
-		assert.equal(cleared.search, undefined);
-		// no pin to begin with → carried verbatim
-		assert.deepEqual(composeSearchEngine({ tools: { demo: true } }, null).tools, { demo: true });
-	});
-
-	it("composeSearchEngine: the explicit preference writes agent.search.engine", () => {
-		assert.deepEqual(composeSearchEngine(undefined, "brave").search, { engine: "brave" });
-	});
-
 	it("composePromptSwitch: on = explicit true, off = key REMOVED (absent = off)", () => {
 		assert.deepEqual(composePromptSwitch({ prompts: { a: true } }, "b", true).prompts, { a: true, b: true });
 		assert.deepEqual(composePromptSwitch({ prompts: { a: true, b: true } }, "b", false).prompts, { a: true });
@@ -215,7 +202,6 @@ describe("nextOverrides — the rebind persistence map", () => {
 describe("classifyKeys — the Keys section's two-group projection", () => {
 	const synth = (id: string, present = false): AuthKeyStatus => ({
 		id,
-		info: null,
 		present,
 		masked: present ? `…${id.slice(-4)} (32 chars)` : null,
 		source: present ? "file" : "none",
@@ -246,16 +232,6 @@ describe("classifyKeys — the Keys section's two-group projection", () => {
 		assert.ok(out.addable.some((p) => p.id === "deepseek"));
 	});
 
-	it("curated tool ids always render (synthesized when absent)", () => {
-		const out = classifyKeys([synth("BRAVE_API_KEY", true)], undefined);
-		assert.deepEqual(out.toolRows.map((r) => r.id), [
-			"TAVILY_API_KEY",
-			"BRAVE_API_KEY",
-		]);
-		assert.ok(!out.toolRows[0]!.present);
-		assert.ok(out.toolRows[1]!.present);
-	});
-
 	it("unknown file vars surface read-only, out of the provider rows", () => {
 		const out = classifyKeys([synth("PLANS_LOGIN_TOKEN", true)], providers);
 		assert.equal(out.unknownRows.length, 1);
@@ -271,20 +247,20 @@ describe("classifyKeys — the Keys section's two-group projection", () => {
 describe("keyStatusLine — the minimal at-a-glance state", () => {
 	it("present file key: tail + chars, no source suffix", () => {
 		assert.equal(
-			keyStatusLine({ id: "X", info: null, present: true, masked: "…ab12 (64 chars)", source: "file", shadowedByEnv: false }),
+			keyStatusLine({ id: "X", present: true, masked: "…ab12 (64 chars)", source: "file", shadowedByEnv: false }),
 			"…ab12 · 64",
 		);
 	});
 
 	it("env-owned key carries the 'env' marker (the row renders read-only)", () => {
 		assert.equal(
-			keyStatusLine({ id: "X", info: null, present: true, masked: "…ca10 (73 chars)", source: "env", shadowedByEnv: false }),
+			keyStatusLine({ id: "X", present: true, masked: "…ca10 (73 chars)", source: "env", shadowedByEnv: false }),
 			"…ca10 · 73 · env",
 		);
 	});
 
 	it("absent key reads 'not set'", () => {
-		assert.equal(keyStatusLine({ id: "X", info: null, present: false, masked: null, source: "none", shadowedByEnv: false }), "not set");
+		assert.equal(keyStatusLine({ id: "X", present: false, masked: null, source: "none", shadowedByEnv: false }), "not set");
 	});
 });
 

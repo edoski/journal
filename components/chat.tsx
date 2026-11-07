@@ -72,7 +72,9 @@ import {
 	activeProblemOf,
 	dismissedAnswer,
 	endsInFailedTurn,
+	failedResponseAtEnd,
 	findPendingToolCall,
+	isClaudeLimitFailure,
 	phaseAt3,
 	phaseTimeline,
 	teachStepIndex,
@@ -80,6 +82,7 @@ import {
 	questionNeedsReveal,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
+import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
 import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/thinking-block";
 
 /** One width for everything: transcript, cards, and the bottom blob share this column. */
@@ -713,6 +716,8 @@ export function Chat({
 	// recovers from it. Later compaction requires new input instead.
 	const retryable = (status === "ready" || status === "error") && !busy && !compacting && endsInFailedTurn(nativeMessages);
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
+	const failure = failedResponseAtEnd(nativeMessages);
+	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
 	const canSend =
 		text.trim().length > 0 && !pending && !activeProblem && !compacting;
 
@@ -1623,6 +1628,7 @@ export function Chat({
 							{error && (
 								<div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">
 									<span>Something went wrong: {error.message}</span>
+									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} chatId={chatId} failure={claudeLimit} onContinue={retryFailedTurn} />}
 									{retryable && (
 										<Button variant="outline" size="xs" data-testid="retry-failed-turn" onClick={retryFailedTurn}>
 											Retry

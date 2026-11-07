@@ -3,7 +3,7 @@
  * key manager behind GET/PUT/DELETE /api/keys.
  *
  * THE ENV SEAM (the architecture keystone): every consumer — models.ts's
- * openRouterApiKey(), the sub-agents, web.ts — reads
+ * openRouterApiKey(), the sub-agents — reads
  * process.env directly, and the agent layer may not import the store
  * layer. Instead of rewiring five consumers across lanes, the store
  * REFLECTS itself into the child's env: at boot (idempotent, anchored on
@@ -21,9 +21,8 @@
  * honestly reports shadowedByEnv — the page explains why the saved key
  * is not the live one.
  *
- * Unknown vars in the file are preserved verbatim and surfaced as
- * generic status rows (no catalog form to edit through — only curated
- * keys have shapes and docs; core/auth-keys.ts).
+ * Vars in the file that no provider reads are preserved verbatim and
+ * surfaced as read-only status rows (core/auth-keys.ts).
  *
  * THE FRESH-USER SWITCH (owner, interlude 2026-09-22): LH_IGNORE_ENV_KEYS=1
  * makes every env key invisible APP-WIDE — the exact new-user simulation
@@ -40,21 +39,17 @@
  */
 
 import {
-	AUTH_KEYS,
 	AUTH_PROVIDER_KEYS,
 	AUTH_PROVIDER_ENV_VARS,
-	type AuthKeyInfo,
 	type AuthKeyStatus,
 	genericProviderKeyGuard,
-	isKnownAuthKey,
 	isProviderEnvVar,
 	maskKey,
-	validateKeyShape,
 } from "../core/auth-keys.ts";
 import { authStore } from "../store/auth.ts";
 import { isSubscriptionProvider, subscriptionConnected } from "../agent/subscription-connections.ts";
 import { claudeConnected } from "../agent/claude-connection.ts";
-import { CLAUDE_SUBSCRIPTION } from "../core/contracts/claude.ts";
+import { isClaudeProvider } from "../core/contracts/claude.ts";
 
 // The once-per-process boot record — globalThis anchor (HMR re-imports the
 // module; the snapshot must not re-run and misread fill-gapped vars as real
@@ -72,12 +67,6 @@ function boot(): AuthBoot {
 	const g = globalThis as Record<symbol, AuthBoot | undefined>;
 	if (!g[BOOT_KEY]) g[BOOT_KEY] = { realEnv: new Set(), fillGap: new Set() };
 	return g[BOOT_KEY];
-}
-
-/** Is `id` a WRITABLE key name — curated catalog or model-provider env
- *  var (provider-keys interlude: PUT/DELETE accept both). */
-export function isWritableAuthKey(id: string): boolean {
-	return isKnownAuthKey(id) || isProviderEnvVar(id);
 }
 
 /** The settings page's provider dropdown: every pi-ai provider that takes
@@ -106,10 +95,7 @@ export function initAuthEnv(): void {
 	const fileVars = authStore.authVars();
 	const managed = new Set<string>([
 		...Object.keys(fileVars),
-		...AUTH_KEYS.map((k) => k.id),
-		// Provider env vars are managed names too (provider-keys interlude):
-		// an env-exported OPENAI_API_KEY with a file copy gets honest shadow
-		// semantics, exactly like the curated vars.
+		// An env-exported OPENAI_API_KEY with a file copy gets honest shadow semantics.
 		...AUTH_PROVIDER_KEYS.map((p) => p.envVar),
 	]);
 	if (envKeysIgnored()) {
@@ -135,10 +121,9 @@ export function initAuthEnv(): void {
 	}
 }
 
-/** Is this env-var name one the keys system manages (curated, provider,
- *  or held in the file)? */
+/** Is this env-var name one the keys system manages (a provider's, or held in the file)? */
 function isManagedName(name: string): boolean {
-	return isWritableAuthKey(name) || name in authStore.authVars();
+	return isProviderEnvVar(name) || name in authStore.authVars();
 }
 
 /**
@@ -151,10 +136,10 @@ export function resolveKeyStatuses(
 	realEnv: ReadonlySet<string>,
 	/** The model-provider env vars (provider-keys interlude): PRESENT ones
 	 *  join the status rows — absent ones never spam (the dropdown is the
-	 *  discovery surface). Curated keys always get rows, present or not. */
+	 *  discovery surface). */
 	providerEnvVars: ReadonlySet<string> = new Set(),
 ): AuthKeyStatus[] {
-	const ids = new Set<string>([...AUTH_KEYS.map((k) => k.id), ...Object.keys(fileVars)]);
+	const ids = new Set<string>(Object.keys(fileVars));
 	for (const envVar of providerEnvVars) {
 		if (env[envVar] !== undefined || fileVars[envVar] !== undefined) ids.add(envVar);
 	}
@@ -169,7 +154,6 @@ export function resolveKeyStatuses(
 		const live = envValue !== undefined ? envValue : fileValue;
 		rows.push({
 			id,
-			info: AUTH_KEYS.find((k) => k.id === id) ?? null,
 			present: live !== undefined,
 			masked: live !== undefined ? `${maskKey(live)} (${live.trim().length} chars)` : null,
 			source: isRealEnv ? "env" : live !== undefined ? "file" : "none",
@@ -179,7 +163,7 @@ export function resolveKeyStatuses(
 	return rows;
 }
 
-/** The GET view: every curated key (present or not) + unknown file vars. */
+/** The GET view: present provider keys + every file var. */
 export function keyStatuses(): AuthKeyStatus[] {
 	return resolveKeyStatuses(authStore.authVars(), process.env, boot().realEnv, AUTH_PROVIDER_ENV_VARS);
 }
@@ -202,7 +186,7 @@ export function keyValue(id: string): string | undefined {
  * no key at all: nothing to gate, present by definition. */
 export function providerKeyPresent(provider: string): boolean {
 	if (isSubscriptionProvider(provider)) return subscriptionConnected(provider);
-	if (provider === CLAUDE_SUBSCRIPTION.providerId) return claudeConnected();
+	if (isClaudeProvider(provider)) return claudeConnected(provider);
 	const info = AUTH_PROVIDER_KEYS.find((p) => p.id === provider);
 	return info ? keyValue(info.envVar) !== undefined : true;
 }
@@ -214,7 +198,8 @@ export function providerKeyPresent(provider: string): boolean {
  * reports shadowedByEnv so the page can explain it).
  */
 export function saveKey(id: string, value: string): { ok: true; status: AuthKeyStatus } | { ok: false; error: string } {
-	const shape = isProviderEnvVar(id) ? genericProviderKeyGuard(id, value) : validateKeyShape(id, value);
+	if (!isProviderEnvVar(id)) return { ok: false, error: `unknown key "${id}"` };
+	const shape = genericProviderKeyGuard(id, value);
 	if (!shape.ok) return { ok: false, error: shape.error };
 	const trimmed = value.trim();
 	authStore.setAuthVar(id, trimmed);
@@ -223,7 +208,6 @@ export function saveKey(id: string, value: string): { ok: true; status: AuthKeyS
 		process.env[id] = trimmed;
 		record.fillGap.add(id);
 	}
-	// validateKeyShape guarantees catalog membership, so the row exists.
 	return { ok: true, status: keyStatuses().find((s) => s.id === id)! };
 }
 

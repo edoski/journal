@@ -1,5 +1,4 @@
 import type { PiEngine } from "../models.ts";
-import type { SearchProvider } from "../../core/search.ts";
 import {
 	accumulateJobUsage,
 	buildSubagentSteer,
@@ -80,12 +79,6 @@ export interface JobRunnerDeps {
 	 *  EMPTY → undefined; runJob then refuses the spawn honestly instead
 	 *  of guessing a model. */
 	engineFor?: (role: ModelRole) => PiEngine | undefined;
-	/** The search seam (search port wave, 2026-09-20): resolves the LIVE
-	 *  provider fresh per job — server/search.ts composition injected by
-	 *  the wiring; null = honestly unavailable (the researcher's web_search
-	 *  reports it as recoverable text). Absent seam (tests) reads the same;
-	 *  research dispatch and web_fetch do not require search credentials. */
-	searchProvider?: () => SearchProvider | null;
 	/** Key-presence gate (provider-key interlude, 2026-09-25): given the
 	 *  resolved engine's provider + the kind's slot tier, return the
 	 *  refusal envelope when the provider's key is missing (null = run).
@@ -372,7 +365,6 @@ export function createJobRunner(deps: JobRunnerDeps): JobRunner {
 			jobStore.updateJob(jobId, { activity: "researching" });
 			const brief = await runResearcherAgent(prompt, {
 				engine: model,
-				search: deps.searchProvider,
 				pdfDir,
 				abortSignal: loop.abortSignal,
 				chatId: loop.chatId,

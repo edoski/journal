@@ -68,6 +68,19 @@ describe("the settings store", () => {
 		assert.deepEqual(out.graph, { enabled: true }); // siblings survive
 	});
 
+	it("a saved search engine pin loads and is dropped", () => {
+		fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+		fs.writeFileSync(
+			SETTINGS_FILE,
+			JSON.stringify({ version: 1, agent: { search: { engine: "tavily" }, tools: { research: false } } }),
+			"utf-8",
+		);
+		const out = readSettings();
+		assert.ok(out);
+		assert.equal("search" in (out.agent ?? {}), false);
+		assert.deepEqual(out.agent?.tools, { research: false });
+	});
+
 	it("corrupt settings.json → null (first-boot semantics), never throws", () => {
 		fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
 		fs.writeFileSync(SETTINGS_FILE, "{not json", "utf-8");

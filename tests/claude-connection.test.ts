@@ -1,16 +1,26 @@
 import { beforeEach, test } from "node:test";
 import assert from "node:assert/strict";
-import { claudeConnected, claudeConnection, parseClaudeAuthStatus, refreshClaudeConnection, resetClaudeConnection, type ClaudeRunner } from "../src/agent/claude-connection.ts";
+import { claudeConnected, claudeConnection, parseClaudeAuthStatus, refreshClaudeConnections, resetClaudeConnections, type ClaudeRunner, type RefreshClaudeOptions } from "../src/agent/claude-connection.ts";
+import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 import { resolveClaudeBinary } from "../src/agent/claude-cli.ts";
 import { isProviderKeyRefusal, providerKeyMissing } from "../src/core/settings.ts";
 
-beforeEach(() => resetClaudeConnection());
+beforeEach(() => resetClaudeConnections());
+
+const DEFAULT: LoadedClaudeAccount = { providerId: "claude-subscription", label: "Claude Code", email: null, auth: "default", instanceId: null };
+const ID = DEFAULT.providerId;
+const refreshClaudeConnection = async (options: RefreshClaudeOptions = {}) => (await refreshClaudeConnections({ load: () => [DEFAULT], ...options }))[0]!.connection;
 
 const status = (fields: Record<string, unknown>) => JSON.stringify({ analyticsDisabled: false, projectsDirectory: "/x", configDirectory: "/y", ...fields });
 
 test("a claude.ai sign-in on Anthropic's API is a plan connection", () => {
 	assert.deepEqual(parseClaudeAuthStatus(status({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "learner@example.com", subscriptionType: "max" })), { state: "connected", email: "learner@example.com", plan: "max" });
 	assert.deepEqual(parseClaudeAuthStatus(status({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" })), { state: "connected", email: null, plan: null });
+});
+
+test("a setup token on Anthropic's API is a plan connection too, with no email or plan in the status", () => {
+	assert.deepEqual(parseClaudeAuthStatus(status({ loggedIn: true, authMethod: "oauth_token", apiProvider: "firstParty" })), { state: "connected", email: null, plan: null });
+	assert.deepEqual(parseClaudeAuthStatus(status({ loggedIn: true, authMethod: "oauth_token", apiProvider: "bedrock" })), { state: "not-subscription", authMethod: "bedrock" });
 });
 
 test("signed out, API-key and cloud-provider sign-ins are not plan connections", () => {
@@ -31,7 +41,7 @@ test("a missing binary reports missing without running anything", async () => {
 	const connection = await refreshClaudeConnection({ binary: () => null, run: async () => { ran = true; return { code: 0, stdout: "", stderr: "" }; } });
 	assert.deepEqual(connection, { state: "missing" });
 	assert.equal(ran, false);
-	assert.equal(claudeConnected(), false);
+	assert.equal(claudeConnected(ID), false);
 });
 
 test("the status check uses the turn's environment, caches briefly and re-checks when forced", async () => {
@@ -40,25 +50,25 @@ test("the status check uses the turn's environment, caches briefly and re-checks
 	const run: ClaudeRunner = async (_binary, args, env) => { calls.push({ args, env }); return { code: 0, stdout: output, stderr: "" }; };
 	let clock = 0;
 	const deps = { run, binary: () => "/fake/claude", now: () => clock, env: { PATH: "/bin", ANTHROPIC_API_KEY: "sk-ant-should-vanish", CLAUDE_CODE_OAUTH_TOKEN: "t", ANTHROPIC_AUTH_TOKEN: "t", LH_DESKTOP_API_SECRET: "s" } };
-	assert.equal(claudeConnection(), null);
+	assert.equal(claudeConnection(ID), null);
 	assert.equal((await refreshClaudeConnection(deps)).state, "connected");
 	assert.deepEqual(calls[0]!.args, ["auth", "status", "--json"]);
 	for (const name of ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_AUTH_TOKEN", "LH_DESKTOP_API_SECRET"]) assert.equal(calls[0]!.env[name], undefined, name);
 	assert.equal(calls[0]!.env.PATH, "/fake:/bin", "the binary's directory leads PATH");
-	assert.equal(claudeConnected(), true);
+	assert.equal(claudeConnected(ID), true);
 	clock = 10_000;
 	await refreshClaudeConnection(deps);
 	assert.equal(calls.length, 1, "within the cache window");
 	output = status({ loggedIn: false, authMethod: "none", apiProvider: "firstParty" });
 	await refreshClaudeConnection({ ...deps, force: true });
 	assert.equal(calls.length, 2);
-	assert.deepEqual(claudeConnection(), { state: "signed-out" });
-	assert.equal(claudeConnected(), false);
+	assert.deepEqual(claudeConnection(ID), { state: "signed-out" });
+	assert.equal(claudeConnected(ID), false);
 	output = status({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" });
 	clock = 50_000;
 	await refreshClaudeConnection(deps);
 	assert.equal(calls.length, 3, "after the cache window");
-	assert.equal(claudeConnected(), true);
+	assert.equal(claudeConnected(ID), true);
 });
 
 test("concurrent checks share one run, and a run that fails to start is an error state", async () => {
@@ -86,15 +96,52 @@ test("a turn refused for Claude points at Claude Code's own sign-in, not at a ke
 	assert(isProviderKeyRefusal(envelope.error));
 });
 
-test("the Claude integration never touches a Claude credential: no token flows, no keychain, no reads of Claude's files", async () => {
+test("the account checks run in parallel, one per account, each with its own environment", async () => {
+	const accounts: LoadedClaudeAccount[] = [
+		DEFAULT,
+		{ providerId: "claude-subscription-work", label: "Work", email: null, auth: "profile", instanceId: "work", configDir: "/fake/.claude-work" },
+		{ providerId: "claude-subscription-spare", label: "Spare", email: null, auth: "token", instanceId: "spare", token: () => { throw new Error("LearnHarness could not read T3 Code's setup token for Spare."); } },
+	];
+	let active = 0, peak = 0;
+	const dirs: (string | undefined)[] = [];
+	const run: ClaudeRunner = async (_binary, _args, env) => {
+		active++; peak = Math.max(peak, active); dirs.push(env.CLAUDE_CONFIG_DIR);
+		await new Promise((r) => setTimeout(r, 10));
+		active--;
+		return { code: 0, stdout: status({ loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty" }), stderr: "" };
+	};
+	const result = await refreshClaudeConnections({ force: true, load: () => accounts, run, binary: () => "/fake/claude", env: { CLAUDE_CONFIG_DIR: "/parent/dir" } });
+	assert.equal(peak, 2, "both runnable accounts were checked at once");
+	assert.deepEqual(dirs.sort(), ["/fake/.claude-work", "/parent/dir"], "the synthetic default keeps the inherited config dir; the profile gets its own");
+	assert.deepEqual(result.map((entry) => entry.connection.state), ["connected", "connected", "error"]);
+	assert.equal(claudeConnected("claude-subscription-work"), true);
+	assert.match((claudeConnection("claude-subscription-spare") as { message: string }).message, /setup token for Spare/);
+	assert.equal(claudeConnected("claude-subscription-gone"), false);
+});
+
+const ALL_CLAUDE_FILES = ["src/agent/claude-accounts.ts", "src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-stream.ts", "src/agent/claude-usage.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "components/claude-limit-prompt.tsx", "src/core/contracts/claude.ts"];
+
+test("no Claude file reads the keychain or Claude Code's credential files, runs setup-token, or passes --bare", async () => {
 	const { readFileSync } = await import("node:fs");
-	const files = ["src/agent/claude-cli.ts", "src/agent/claude-connection.ts", "src/agent/claude-stream.ts", "src/server/claude-connection-http.ts", "components/settings/claude-connection.tsx", "src/core/contracts/claude.ts"];
-	for (const file of files) {
+	for (const file of ALL_CLAUDE_FILES) {
 		const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
-		for (const forbidden of [/setup-token/, /keychain/i, /find-generic-password/, /\.credentials/, /["'\/]\.claude["'\/]/, /auth login/, /"--bare"/]) {
+		for (const forbidden of [/setup-token/, /keychain/i, /find-generic-password/, /\.credentials/, /auth login/, /"--bare"/]) {
 			assert(!forbidden.test(source), `${file} must not contain ${forbidden}`);
 		}
-		const tokenMentions = source.match(/CLAUDE_CODE_OAUTH_TOKEN/g) ?? [];
-		assert(tokenMentions.length === 0 || (file === "src/agent/claude-cli.ts" && tokenMentions.length === 1), `${file}: the OAuth token name appears only in the denylist`);
 	}
+});
+
+test("only the accounts module reads T3 Code's files or a Claude config dir's .claude.json", async () => {
+	const { readFileSync } = await import("node:fs");
+	for (const file of ALL_CLAUDE_FILES.filter((f) => f !== "src/agent/claude-accounts.ts")) {
+		const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+		for (const forbidden of [/\.t3\b/, /provider-env-/, /secrets/, /\.claude\.json/, /["'\/]\.claude["'\/]/, /readFileSync/]) {
+			if (file === "src/agent/claude-cli.ts" && forbidden.source === "readFileSync") continue;
+			assert(!forbidden.test(source), `${file} must not contain ${forbidden}`);
+		}
+	}
+	const cli = readFileSync(new URL("../src/agent/claude-cli.ts", import.meta.url), "utf8");
+	assert.equal((cli.match(/readFileSync/g) ?? []).length, 1, "claude-cli.ts reads only the tool list, inside the MCP script");
+	const accounts = readFileSync(new URL("../src/agent/claude-accounts.ts", import.meta.url), "utf8");
+	assert(!/writeFileSync|appendFileSync|console\./.test(accounts), "the accounts module never writes or logs");
 });

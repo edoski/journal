@@ -11,11 +11,10 @@
  *
  * DELETE: gone from the file always; the env copy goes only when it was
  * the store's own reflection (a real env var stays — env wins). Idempotent
- * (absent key = success). Writable ids are the CURATED CATALOG ∪ THE
- * MODEL-PROVIDER env vars (provider-keys interlude); anything else is 404
- * — unknown file vars are preserved, not editable.
+ * (absent key = success). Writable ids are the model-provider env vars;
+ * anything else is 404 — unknown file vars are preserved, not editable.
  */
-import { isWritableAuthKey } from "@/src/server";
+import { isProviderEnvVar } from "@/src/core";
 import { deleteKey, saveKey } from "@/src/server";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +23,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: Request, { params }: Params) {
 	const { id } = await params;
-	if (!isWritableAuthKey(id)) {
+	if (!isProviderEnvVar(id)) {
 		return Response.json({ error: `unknown key "${id}"` }, { status: 404 });
 	}
 	let body: unknown;
@@ -43,7 +42,7 @@ export async function PUT(req: Request, { params }: Params) {
 
 export async function DELETE(_req: Request, { params }: Params) {
 	const { id } = await params;
-	if (!isWritableAuthKey(id)) {
+	if (!isProviderEnvVar(id)) {
 		return Response.json({ error: `unknown key "${id}"` }, { status: 404 });
 	}
 	return Response.json({ status: deleteKey(id) });

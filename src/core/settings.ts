@@ -29,10 +29,9 @@
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { AUTH_PROVIDER_KEYS } from "./auth-keys.ts";
-import { CLAUDE_SUBSCRIPTION } from "./contracts/claude.ts";
+import { isClaudeProvider } from "./contracts/claude.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
-import type { SearchEngineId } from "./search.ts";
 
 /** The schema version this code understands. Bump ONLY for breaking shape
  *  changes (a field renamed/meaning changed); pure additions never bump. */
@@ -161,7 +160,7 @@ const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan �
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
 	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
 	return {
-		error: provider === CLAUDE_SUBSCRIPTION.providerId ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
+		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
 		code: PROVIDER_KEY_MISSING_CODE,
 		provider,
 		slots,
@@ -245,13 +244,6 @@ export interface AgentSettings {
 	/** Tool toggles keyed by tool id (absent key = enabled). User-level
 	 *  only — no per-chat override (owner decision 2026-09-19). */
 	tools?: Record<string, boolean>;
-	/** Search-engine preference (search wave, 2026-09-20). OPTIONAL by
-	 *  owner decision: setting a key auto-activates its engine — the user
-	 *  never chooses an engine to make search work. An explicit choice only
-	 *  pins the preference (e.g. when BOTH keys are present); the chosen
-	 *  engine must still have its key, else search is honestly unavailable.
-	 *  Absent + no key = unavailable (no silent fallback, no default). */
-	search?: { engine?: SearchEngineId };
 	/** Prober graph tools (wave 7, owner ruling 2026-09-23): read-only
 	 *  knowledge-graph views for the prober agent — a session list + the
 	 *  propositions born in each session. Its SUBJECT is the graph but its
@@ -515,13 +507,6 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	if (tools) out.tools = tools;
 	const prompts = sanitizeBooleanMap(raw.prompts);
 	if (prompts) out.prompts = prompts;
-	// Search preference: lenient read side (an unknown engine id drops;
-	// the write side's parser is strict — a stale client can't brick the
-	// record, it just loses the pin and auto-detection resumes).
-	if (raw.search !== null && typeof raw.search === "object" && !Array.isArray(raw.search)) {
-		const engine = (raw.search as Record<string, unknown>).engine;
-		if (engine === "tavily" || engine === "brave") out.search = { engine };
-	}
 	// Prober graph tools (wave 7): its own agent-section subsection —
 	// lenient read side (a bad shape drops the key and the default ON
 	// resumes; the write side's parser is strict).

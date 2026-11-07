@@ -2,14 +2,16 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { Usage } from "@earendil-works/pi-ai";
 import { createWebTools } from "../tools/web.ts";
 import { createPdfReadTools } from "../tools/pdf-read.ts";
-import type { SearchProvider } from "../../core/search.ts";
+import { nativeWebSearchFor, type NativeWebSearch } from "../native-web-search.ts";
 import type { PiEngine } from "../models.ts";
-import { runSubagent } from "./pi-run.ts";
+import { runSubagent, subagentEngine } from "./pi-run.ts";
 
 /**
  * The researcher sub-agent (vision §2.5): a SEPARATE ToolLoopAgent instance
- * from the teacher — an isolated loop with only web_search + web_fetch, so
+ * from the teacher — an isolated loop with only the web and PDF tools, so
  * raw search/fetch churn never touches the teacher's context window.
+ * web_search is the engine model's native search, present only when its
+ * provider has one.
  *
  * System prompt adapted from the pi researcher agent
  * (~/.pi/agent/extensions/interactive-subagents/agents/researcher.md).
@@ -45,11 +47,15 @@ Evaluation — what to keep vs drop:
 - Sources that directly address the question outweigh tangentially related ones.
 - Drop SEO filler, outdated info, and beginner tutorials (unless that's the audience).
 
-Tool outputs may be error strings (e.g. search unconfigured, a page that failed to fetch).
+web_search results come with a short summary. Where a claim matters, verify it against the
+linked pages with web_fetch, and cite the URLs.
+
+If you have no web_search tool, research with web_fetch on URLs you can name with confidence
+(official docs, specs, Wikipedia, primary sources) and state the limitation under Gaps.
+
+Tool outputs may be error strings (e.g. a page that failed to fetch).
 Adapt: try another URL or another search angle; if research is genuinely impossible, say so
 in the brief instead of inventing facts.
-
-If web_search reports that search is unavailable because credentials are missing, do not retry it with different queries. Use web_fetch when you have source URLs, and continue with any other available sources. If the missing search capability materially limits your work, state the limitation and the missing-key setup needed in your brief. Never invent search results or sources.
 
 Your FINAL assistant message is your entire deliverable — it must stand alone, using this format:
 
@@ -69,11 +75,8 @@ What couldn't be answered. Suggested next steps.`;
 
 export interface ResearcherRunOptions {
 	engine?: PiEngine;
-	/** The search seam (search port wave, 2026-09-20): resolves the LIVE
-	 *  provider per call, null = honestly unavailable (the web_search tool
-	 *  reports that in its output — no crash, no silent fallback). Absent
-	 *  seam reads as unavailable; web_fetch remains usable without it. */
-	search?: () => SearchProvider | null;
+	/** Test seam. Undefined resolves native search from the engine's provider; null means none. */
+	search?: NativeWebSearch | null;
 	/** The researcher's PDF dir (PDF wave, 2026-10-07): when present, the
 	 *  toolset gains web_fetch_pdf + pdf_info/pdf_extract/pdf_search scoped
 	 *  to this per-job temp dir — PDFs from the web, read page-level. The
@@ -87,17 +90,19 @@ export interface ResearcherRunOptions {
 }
 
 /**
- * Run the researcher to completion: isolated context, web tools only, final
- * text = the brief. The engine and search seam are injectable so tests run
- * the loop scripted.
+ * Run the researcher to completion: isolated context, web and PDF tools
+ * only, final text = the brief. The engine and search are injectable so tests run the
+ * loop scripted.
  */
 export async function runResearcherAgent(prompt: string, opts: ResearcherRunOptions = {}): Promise<string> {
-	const tools = Object.values(createWebTools(opts.search ?? (() => null)));
+	const engine = subagentEngine("researcher", opts.engine);
+	const search = opts.search === undefined ? nativeWebSearchFor(engine.model) : opts.search ?? undefined;
+	const tools = Object.values(createWebTools(search));
 	if (opts.pdfDir) tools.push(...Object.values(createPdfReadTools(opts.pdfDir)));
 	const { text } = await runSubagent(tools, {
 		role: "researcher",
 		prompt,
-		engine: opts.engine,
+		engine,
 		systemPrompt: INSTRUCTIONS,
 		maxTurns: 12,
 		abortSignal: opts.abortSignal,

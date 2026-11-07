@@ -2,8 +2,7 @@
  * GET /api/keys — the auth page's key list (auth-keys wave, 2026-09-19;
  * providers added by the provider-keys interlude same wave).
  *
- * Every curated key (present or not) plus unknown file vars surfaced as
- * generic rows — ABSENT provider keys deliberately do NOT spam status
+ * Every file var surfaced as a row — ABSENT provider keys deliberately do NOT spam status
  * rows; the provider dropdown is the discovery surface. `providers`
  * carries it: {id, envVar, label} for every pi-ai plain-key provider,
  * derived from pi-ai's own provider→env-var table (no-drift pin in
