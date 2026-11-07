@@ -143,7 +143,7 @@ describe("the practice transcript cards", () => {
 				part={part({
 					type: "tool-conclude",
 					input: { outcome: "solvedWithHints", verdict: "v", rung: "R2", missClass: "cue", retest: true },
-					problemInput: { mode: "discrimination", target: ["n_abc"] },
+					problemInput: { mode: "discrimination", topics: ["rank"] },
 					reveal: "The solution.",
 				})}
 			/>,
