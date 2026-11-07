@@ -39,9 +39,8 @@ def root(workspace: Workspace) -> Path:
     return workspace.directory.parent
 
 
-def without_trust(path: Path) -> None:
-    text = path.read_text()
-    path.write_text(text.partition(install.TRUST_START)[0])
+def without_trust(path: Path, directory: Path) -> None:
+    path.write_text(path.read_text().replace(install.trust_table(directory), ""))
 
 
 def names(result: dict[str, Any]) -> set[str]:
@@ -133,7 +132,7 @@ def test_an_installed_host_is_ready_and_the_check_is_read_only(
         ),
         (
             "codex",
-            lambda w: without_trust(install.codex_config()),
+            lambda w: without_trust(install.codex_config(), w.directory),
             {"codex_course"},
         ),
         (
