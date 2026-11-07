@@ -565,12 +565,7 @@ sigma.js v3 is current.
 /** The researcher loop's scripted engine. Turn 1: a web_search tool call;
  *  turn 2: the final text brief. */
 function researcherModel(): PiEngine {
-	return fauxEngine([
-		fauxAssistantMessage([fauxToolCall("web_search", { query: "sigma.js latest version" }, { id: "ws1" })], {
-			stopReason: "toolUse",
-		}),
-		fauxAssistantMessage([fauxText(BRIEF)]),
-	]);
+	return fauxEngine([fauxAssistantMessage([fauxText(BRIEF)])]);
 }
 
 describe("research runner (async protocol §3)", () => {
@@ -594,7 +589,6 @@ describe("research runner (async protocol §3)", () => {
 			researchModelOverride.current = undefined;
 		}
 
-		// The job is done, with the activity line from the tool call.
 		const done = jobStore.getJob(job.id)!;
 		assert.equal(done.status, "done");
 		assert.equal(done.activity, "finished", "delivery does not own the worker status");

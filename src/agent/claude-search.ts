@@ -9,11 +9,9 @@ import type { NativeWebSearch } from "./native-web-search.ts";
  * so a Haiku relay is the cheapest and fastest outer turn. */
 const RELAY_MODEL = "claude-haiku-5-5";
 const RELAY_PROMPT = "You are a search relay. Call the WebSearch tool exactly once, with the user's message verbatim as the query. Do not answer from memory.";
-const SEARCH_TIMEOUT_MS = 120_000;
 
 export const CLAUDE_SEARCH_DID_NOT_RUN = "Claude's web search did not run. Retry with a different query.";
 const CLAUDE_SEARCH_STOPPED = "Claude's web search was stopped before it finished.";
-const CLAUDE_SEARCH_TIMED_OUT = `Claude's web search took longer than ${SEARCH_TIMEOUT_MS / 1000} seconds, so it was stopped. Retry.`;
 
 function claudeSearchArgs(systemPromptFile: string): string[] {
 	return [
@@ -65,12 +63,9 @@ export function claudeWebSearch({ binary = () => resolveClaudeBinary(), env = pr
 		let code: string | undefined;
 		let status: number | undefined;
 		const onAbort = () => settle(new Error(CLAUDE_SEARCH_STOPPED));
-		const timer = setTimeout(() => settle(new Error(CLAUDE_SEARCH_TIMED_OUT)), SEARCH_TIMEOUT_MS);
-		timer.unref?.();
 		function settle(outcome: string | Error): void {
 			if (settled) return;
 			settled = true;
-			clearTimeout(timer);
 			signal?.removeEventListener("abort", onAbort);
 			if (child.exitCode === null && child.signalCode === null) {
 				child.kill("SIGTERM");
