@@ -36,8 +36,9 @@ export interface ChatRecord {
 	messages: LhMessage[];
 	/** The session's kind — absent = teach (pre-practice records). */
 	kind?: ChatKind;
-	/** The registered course this session studies, set once at creation.
-	 *  Absent = no course: the session keeps no assessment memory at all. */
+	/** The registered course this session studies, set at creation.
+	 *  Absent only on sessions older than that rule: they stay readable and
+	 *  take no learner turn until the learner links a course. */
 	course?: CourseLink;
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;

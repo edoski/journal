@@ -58,7 +58,8 @@ import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-c
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import type { ArtifactPartProps, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
-import type { LhViewMessage } from "@/src/core";
+import { CourseLinkBanner } from "@/components/course-link-banner";
+import type { CourseLink, LhViewMessage } from "@/src/core";
 import { PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
 	CompactionCutDivider,
@@ -216,9 +217,13 @@ export function Chat({
 	initiallyCompacting = false,
 	initialConfigured = false,
 	kind = "teach",
+	course,
 }: {
 	chatId: string;
 	title: string;
+	/** The session's course. Absent on sessions older than the rule that
+	 *  every session has one: the link banner replaces the dock. */
+	course?: CourseLink;
 	initialMessages: LhMessage[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
@@ -1297,6 +1302,11 @@ export function Chat({
 							{titleText}
 							</button>
 						</Hint>
+						{course && (
+							<span data-testid="course-label" className="min-w-0 shrink truncate font-ui text-xs text-muted-foreground">
+								{course.title}
+							</span>
+						)}
 							{/* flex-1 spacer: keeps the chips at the right edge AND stays a
 							    drag surface (no carve-out) — the freed bar is grippable. */}
 							<div className="min-w-4 flex-1" aria-hidden="true" />
@@ -1633,7 +1643,7 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				<DockOverlay
+				{!course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
 					initialQuestionDraft={pending ? questionDraft(pending.toolCallId)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.toolCallId, { form }); }}
@@ -1707,7 +1717,7 @@ export function Chat({
 						// actually leaves. An offline preflight keeps the draft visible.
 						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
 					}}
-				/>
+				/>}
 				</Conversation>
 
 				{/* The session-scoped focuses (chrome-melt wave, 2026-09-19): mounted

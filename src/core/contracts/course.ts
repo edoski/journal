@@ -29,10 +29,11 @@ export interface CourseSummary {
 	task: string | null;
 }
 
-/** What the chooser endpoint returns. `available: false` means the engine
- *  could not be run (not installed or misconfigured); the picker hides. */
+/** What the chooser endpoint returns. `roots` are the study folders a new
+ *  course can be created in. `available: false` means the engine could not
+ *  be run (not installed or misconfigured): no session can start. */
 export type CourseListing =
-	| { available: true; courses: CourseSummary[] }
+	| { available: true; courses: CourseSummary[]; roots: string[] }
 	| { available: false; reason: string };
 
 /** One engine verb's outcome. `json` is the engine's own stdout object,

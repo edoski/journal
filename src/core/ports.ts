@@ -27,7 +27,7 @@ import type {
 	NotesSource,
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
-import type { CourseLink, CourseListing, CourseResult, CourseVerb } from "./contracts/course.ts";
+import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb } from "./contracts/course.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
@@ -55,6 +55,9 @@ export interface ChatStore {
 	/** Persist the per-chat model/thinking settings (the model control).
 	 *  Replace-whole: the picker sends the complete settings object. */
 	saveSettings(id: string, settings: ChatSettings): void;
+	/** Link the session to a registered course (the banner on a session
+	 *  that has none, or whose course is gone). Silent, like saveSettings. */
+	linkCourse(id: string, course: CourseLink): void;
 	/** Rename a session (the header's click-to-edit title, 2026-09-17).
 	 * Like saveSettings: a rename is NOT conversation activity — updatedAt
 	 * stays put, so sidebar order never churns on a rename. */
@@ -234,7 +237,11 @@ export interface AuthStore {
  */
 export interface CourseRecords {
 	/** Every registered course, for the chooser. */
-	list(): Promise<CourseListing>;
+	list(): Promise<{ available: true; courses: CourseSummary[] } | Extract<CourseListing, { available: false }>>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+	/** Make an existing empty directory a titled, registered course: the
+	 *  engine's `init` there, then a save of the title. `workspace` is the
+	 *  directory as the engine registered it. */
+	create(directory: string, title: string): Promise<{ ok: true; workspace: string } | Extract<CourseResult, { ok: false }>>;
 }

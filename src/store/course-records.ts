@@ -12,7 +12,7 @@
  */
 
 import { spawn } from "node:child_process";
-import type { CourseListing, CourseResult, CourseSummary, CourseVerb } from "../core/contracts/course.ts";
+import type { CourseResult, CourseSummary, CourseVerb } from "../core/contracts/course.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
 export interface EngineCommand {
@@ -139,7 +139,7 @@ function summaryOf(entry: unknown): CourseSummary | null {
 
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	return {
-		async list(): Promise<CourseListing> {
+		async list() {
 			const result = toResult(await exec(engine, ["plan", "--all", "--days", "1"], ""), "plan");
 			if (!result.ok) return { available: false, reason: result.message };
 			const entries = (result.json as { courses?: unknown }).courses;
@@ -151,6 +151,13 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
 			return toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
+		},
+		async create(directory, title) {
+			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");
+			if (!init.ok) return init;
+			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
+			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify({ title })), "save");
+			return saved.ok ? { ok: true, workspace } : saved;
 		},
 	};
 }

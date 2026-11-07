@@ -19,10 +19,13 @@ import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
+import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 
 // ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-graph-context-"));
 process.env.LH_DATA_DIR = TMP_DATA;
+const COURSE = { workspace: "/study/course" };
+useFakeEngine(TMP_DATA, [{ ...COURSE, title: "Course" }]);
 
 const { newGraphContextMessage } = await import("../src/core/native-messages.ts");
 const { toLlmMessages } = await import("../src/core/native-messages.ts");
@@ -125,6 +128,7 @@ describe("POST /api/chats — graphContext becomes message[0]", () => {
 				title: "drill me on logic",
 				kind: "practice",
 				graphContext: { propositions: PICKS },
+				course: COURSE,
 			}),
 		}));
 		assert.equal(res.status, 200);
@@ -141,7 +145,7 @@ describe("POST /api/chats — graphContext becomes message[0]", () => {
 	});
 
 	it("no picks (or malformed) → no marker, an empty record as before", async () => {
-		for (const body of [{ title: "t" }, { title: "t", graphContext: { propositions: "junk" } }]) {
+		for (const body of [{ title: "t", course: COURSE }, { title: "t", course: COURSE, graphContext: { propositions: "junk" } }]) {
 			const res = await POST(new Request("http://test/api/chats", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },

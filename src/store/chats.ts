@@ -168,6 +168,15 @@ function saveSettings(id: string, settings: ChatSettings): void {
 	writeChat(record);
 }
 
+/** Link the session to a course. Not conversation activity, and not a
+ * list-shape change: updatedAt stays put and nothing is announced. */
+function linkCourse(id: string, course: CourseLink): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.course = { workspace: course.workspace, title: course.title };
+	writeChat(record);
+}
+
 /** Rename a session (the header's click-to-edit title, 2026-09-17). Like
  * saveSettings, a rename is NOT conversation activity: updatedAt stays put
  * so sidebar order never churns. Same fallback as createChat — the empty
@@ -213,6 +222,7 @@ export const chatStore: ChatStore = {
 	saveMessages,
 	saveTree,
 	saveSettings,
+	linkCourse,
 	renameChat,
 	deleteChat,
 	appendTurnUsage,

@@ -104,6 +104,25 @@ describe("course records adapter (fake engine)", () => {
 	});
 });
 
+describe("course records adapter: create (fake engine)", () => {
+	it("runs init in the directory, then saves the title to the workspace init reports", async () => {
+		const { engine, calls } = fakeEngine();
+		const created = await createCourseRecords(engine).create("/s/new", "New Course");
+		assert.deepEqual(created, { ok: true, workspace: "/s/new" });
+		assert.deepEqual(calls().map((c) => [c.args, c.stdin]), [
+			[["--workspace", "/s/new", "init"], ""],
+			[["--workspace", "/s/new", "save"], JSON.stringify({ title: "New Course" })],
+		]);
+	});
+
+	it("a failed init stops before the save and returns the engine's message", async () => {
+		const { engine, calls } = fakeEngine();
+		const created = await createCourseRecords({ ...engine, env: { ...engine.env, FAKE_ENGINE_FAIL: "init" } }).create("/s/new", "New Course");
+		assert.deepEqual(created, { ok: false, kind: "io", message: "init could not write the record" });
+		assert.deepEqual(calls().map((c) => c.args[2]), ["init"]);
+	});
+});
+
 /** An in-memory CourseRecords that records every verb. */
 function memoryRecords(answer: (verb: CourseVerb) => Awaited<ReturnType<CourseRecords["run"]>>) {
 	const seen: Array<{ workspace: string; verb: CourseVerb }> = [];
@@ -112,6 +131,9 @@ function memoryRecords(answer: (verb: CourseVerb) => Awaited<ReturnType<CourseRe
 		run: async (workspace, verb) => {
 			seen.push({ workspace, verb });
 			return answer(verb);
+		},
+		create: async () => {
+			throw new Error("unused");
 		},
 	};
 	return { records, seen };
@@ -220,5 +242,19 @@ describe("course records adapter (the real engine, throwaway course)", { skip: !
 		const text = JSON.stringify(resumed.json);
 		assert.match(text, /Scratch algebra/);
 		assert.match(text, /"rank"/);
+	});
+
+	it("create makes a new folder a titled course that the listing shows at once", async () => {
+		const home = fs.mkdtempSync(path.join(TMP, "home-"));
+		const directory = path.join(fs.mkdtempSync(path.join(TMP, "root-")), "measure-theory");
+		fs.mkdirSync(directory);
+		const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-07" };
+		const records = createCourseRecords({ python: ENGINE_PYTHON, root: ENGINE_ROOT, env });
+		const created = await records.create(directory, "Measure Theory");
+		assert.ok(created.ok, !created.ok ? created.message : "");
+		const listing = await records.list();
+		assert.ok(listing.available);
+		assert.deepEqual(listing.courses.map((c) => [c.workspace, c.title]), [[created.workspace, "Measure Theory"]]);
+		assert.equal(fs.realpathSync(created.workspace), fs.realpathSync(directory));
 	});
 });

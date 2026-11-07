@@ -17,10 +17,13 @@ import fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { after, describe, it } from "node:test";
+import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
 
 // ── the seam, BEFORE any config-loading import ──────────────────────────────
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-birth-stamp-"));
 process.env.LH_DATA_DIR = TMP_DATA;
+const COURSE = { workspace: "/study/course" };
+useFakeEngine(TMP_DATA, [{ ...COURSE, title: "Course" }]);
 
 const { POST } = await import("../app/api/chats/route.ts");
 const { readSettings, writeSettings } = await import("../src/store/settings.ts");
@@ -34,7 +37,7 @@ function post(): Promise<Response> {
 	return POST(new Request("http://test/api/chats", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ title: "teach me the chain rule" }),
+		body: JSON.stringify({ title: "teach me the chain rule", course: COURSE }),
 	}));
 }
 

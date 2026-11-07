@@ -36,7 +36,8 @@ export const PATHS = {
  * The learner's `learning` engine (the journal repo's package), which owns
  * every course record a session can link to. LH_LEARNING_ENGINE names the
  * repository; LH_LEARNING_PYTHON the interpreter that has its dependencies.
- * Missing either is not an error: the course chooser simply stays hidden.
+ * When the engine cannot run, no session can start: the composer names the
+ * reason and these two settings.
  */
 const LEARNING_ROOT = process.env.LH_LEARNING_ENGINE
 	? path.resolve(process.env.LH_LEARNING_ENGINE)

@@ -13,7 +13,7 @@ import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
-import { CoursePicker, useCourseChoice } from "@/components/course-picker";
+import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
 
 /**
@@ -94,6 +94,8 @@ export function Home({
 			openModelPicker();
 			return; // Preserve the draft and never create an orphan session.
 		}
+		const course = courseChoice.requireCourse();
+		if (!course) return;
 		startingRef.current = true;
 		setBusy(true);
 		setStartError(false);
@@ -107,7 +109,7 @@ export function Home({
 				title: t,
 				...(mode === "practice" ? { kind: "practice" } : {}),
 				...(practiceProps.length > 0 ? { graphContext: { propositions: practiceProps } } : {}),
-				...(courseChoice.workspace ? { course: { workspace: courseChoice.workspace } } : {}),
+				course: { workspace: course },
 			}, fetch, JSON.stringify(catalog?.slots.strong));
 			router.push(target);
 		} catch {
@@ -180,9 +182,7 @@ export function Home({
 					    shows the pick HINT so the affordance is discoverable;
 					    teaching mode with nothing picked renders nothing. */}
 					<ComposerActions
-						course={courseChoice.courses && (
-							<CoursePicker courses={courseChoice.courses} workspace={courseChoice.workspace} onChange={courseChoice.choose} />
-						)}
+						course={courseChoice.state.status !== "loading" && <CourseControl choice={courseChoice} />}
 						picker={(practiceProps.length > 0 || mode === "practice") && (
 							<NodePickerControl
 								count={practiceProps.length}
