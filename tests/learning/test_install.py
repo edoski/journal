@@ -9,6 +9,7 @@ import zipfile
 import pytest
 
 from learning import install
+from learning.study import study
 from learning.workspace import Workspace, initialize, support_directory
 
 SKILL = {"SKILL.md": "Learn.\n", "references/records.md": "Records.\n"}
@@ -78,6 +79,21 @@ def vault(tmp_path: Path) -> tuple[Path, Path, Workspace]:
 def codex_installed(text: str = OLD_CODEX) -> None:
     install.codex_config().parent.mkdir(exist_ok=True)
     install.codex_config().write_text(text)
+
+
+def codex_adds(table: str) -> None:
+    """Add a table where Codex's TOML library puts a new one.
+
+    toml_edit gives a new table the position of the table before it, so it lands
+    after the keys of the file's last table, ahead of any trailing comment.
+    """
+    path = install.codex_config()
+    lines = path.read_text().splitlines(keepends=True)
+    end = max(index for index, line in enumerate(lines) if line.startswith("[")) + 1
+    while end < len(lines) and lines[end].strip() and lines[end][0] not in "#[":
+        end += 1
+    lines.insert(end, "\n" + table)
+    path.write_text("".join(lines))
 
 
 def snapshot(home: Path) -> dict[str, int]:
@@ -187,6 +203,38 @@ def test_dropped_roots_lose_the_server_and_their_trust(
     assert json.loads(install.settings_path().read_text())["study_roots"] == [
         str(learn)
     ]
+
+
+def test_tables_codex_adds_after_the_installers_survive(
+    installation: tuple[Path, Path, FakeClaude],
+    vault: tuple[Path, Path, Workspace],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    msc, learn, _ = vault
+    codex_installed("")
+    install.install([msc, learn])
+    added = [
+        f'[projects."{tmp_path / 'gtm'}"]\ntrust_level = "trusted"\n',
+        f'[projects."{tmp_path / 'scratch'}"]\ntrust_level = "untrusted"\n',
+        '[mcp_servers.notes]\ncommand = "notes"\n',
+    ]
+    for table in added:
+        codex_adds(table)
+    fresh = msc / "Fresh"
+    fresh.mkdir()
+    steps = {
+        "reinstall": lambda: install.install(),
+        "study init": lambda: study(["--workspace", str(fresh), "init"]),
+        "drop a root": lambda: install.install([learn]),
+    }
+    for name, step in steps.items():
+        step()
+        text = install.codex_config().read_text()
+        assert [table for table in added if table not in text] == [], name
+    assert str(fresh) in install.trusted(text)
+    assert str(msc) not in install.trusted(text)
+    capsys.readouterr()
 
 
 def test_trust_the_user_already_gave_is_left_alone(
