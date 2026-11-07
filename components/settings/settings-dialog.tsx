@@ -45,7 +45,7 @@ import { UpdateSettings } from "./update-settings.tsx";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
-import { notifySettingsSaved } from "@/components/settings-signal";
+import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
@@ -189,6 +189,20 @@ export function SettingsDialogBody({
 			.catch(() => setRecord(null));
 	}, []);
 
+	// A models write from outside this dialog's own writer (Claude's "Use for
+	// all roles" on the Providers page) must reach the mirror, or the Agent
+	// tab would compose its next slot write from stale siblings.
+	const announcing = useRef(false);
+	useSettingsSaved((section) => {
+		if (section !== "models" || announcing.current) return;
+		fetch("/api/settings")
+			.then((r) => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
+			.then((body: { settings: UserSettings | null }) =>
+				setRecord((prev) => (prev ? { ...prev, models: body.settings?.models } : prev)),
+			)
+			.catch(() => {});
+	});
+
 	// Escape closes — the layered-dismiss convention (Esc is dead for the
 	// sections' own editors while they hold focus; this listener is the
 	// dialog's outer layer).
@@ -240,7 +254,12 @@ export function SettingsDialogBody({
 				(prev) =>
 					stored ?? ({ ...(prev ?? {}), [section]: body }) as UserSettings,
 			);
-			notifySettingsSaved(section);
+			announcing.current = true;
+			try {
+				notifySettingsSaved(section);
+			} finally {
+				announcing.current = false;
+			}
 			if (section === "appearance")
 				onAppearanceChange(body as AppearanceSettings);
 		},

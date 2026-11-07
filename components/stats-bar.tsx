@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { subscriptionLabels, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
+import { CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL, subscriptionLabels, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
 import { formatTokens, formatUsd, planCostLabel, prettyModel } from "@/components/usage-format";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
 
@@ -150,6 +150,7 @@ export function StatsBar({
 								<span className="tabular-nums text-card-foreground">{costLabel}</span>
 							</div>
 							{providers.includes("ChatGPT") && <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer" className="underline underline-offset-2">Manage ChatGPT usage</a>}
+							{providers.includes(CLAUDE_SUBSCRIPTION.label) && <a href={CLAUDE_USAGE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">Manage Claude usage</a>}
 							{unpriced > 0 && (
 								<div className="flex justify-between gap-2">
 									<span>Unpriced turns</span>
