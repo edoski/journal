@@ -20,6 +20,8 @@
  * the same loop on quiz `type` for ten turns. A STRING value where the
  * schema expects a literal union / boolean / null / number / array is
  * JSON.parse-d and kept when the parsed value satisfies the expectation.
+ * Objects too: the Claude CLI bridge delivers nested objects and arrays as
+ * JSON strings (a course_save patch arrived as one).
  * Well-formed args pass through UNTOUCHED (same reference); unhealable
  * values stay for validation to reject honestly.
  */
@@ -87,6 +89,9 @@ export function healEncodedArguments(
 			fixed = parsed;
 		}
 		if (fixed === undefined && prop.type === "array" && Array.isArray(parsed)) fixed = parsed;
+		if (fixed === undefined && prop.type === "object" && typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+			fixed = parsed;
+		}
 		if (fixed !== undefined) {
 			healed ??= { ...(args as Record<string, unknown>) };
 			healed[key] = fixed;

@@ -92,3 +92,20 @@ describe("the display mirror — raw records render on read", () => {
 		assert.equal(normalizeQuestionType((parsed as { type?: unknown }).type), "predict");
 	});
 });
+
+describe("JSON-string-encoded objects and arrays (the Claude CLI bridge)", () => {
+	it("heals a stringified object where the schema expects an object", async () => {
+		const { healEncodedArguments } = await import("../src/core/argument-heal.ts");
+		const { Type } = await import("typebox");
+		const schema = Type.Object({ changes: Type.Record(Type.String(), Type.Unknown()) });
+		const healed = healEncodedArguments({ changes: '{"observations":[]}' }, schema as never) as { changes: unknown };
+		assert.deepEqual(healed.changes, { observations: [] });
+		assert.deepEqual(healEncodedArguments({ changes: "[1]" }, schema as never), { changes: "[1]" }, "an array is not an object");
+	});
+
+	it("the display parse heals stringified ask options like the boundary does", async () => {
+		const { parseAskInput } = await import("../src/core/tool-parts.ts");
+		const parsed = parseAskInput({ question: "Which?", options: '[{"label":"Intuition"},{"label":"Proof"}]' });
+		assert.deepEqual(parsed?.options?.map((o) => o.label), ["Intuition", "Proof"]);
+	});
+});

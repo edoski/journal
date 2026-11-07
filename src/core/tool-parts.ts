@@ -28,6 +28,7 @@
  */
 
 import { Value } from "typebox/value";
+import { healEncodedArguments } from "./argument-heal.ts";
 import type { TSchema } from "typebox";
 import { askInputSchema, askOptionProblems, explainInputProblems, explainDisplayInputSchema, type AskToolInput, type ExplainToolInput } from "./question-core.ts";
 import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts";
@@ -43,7 +44,9 @@ import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts"
  *  boundary; Convert mutates, so the input is cloned before touching. */
 function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
-	const converted = structuredClone(input);
+	// The record keeps raw arguments; the boundary healed them before
+	// validation, so the display heals the same way.
+	const converted = structuredClone(healEncodedArguments(input, schema as never));
 	Value.Convert(schema, converted);
 	if (!Value.Check(schema, converted)) return undefined;
 	return Value.Clean(schema, converted) as T;
