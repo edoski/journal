@@ -44,10 +44,13 @@ function synthetic(home: string): LoadedClaudeAccount {
 /** Enabled `claudeAgent` instances from T3 Code's settings. When T3 Code is
  * absent, unreadable or has no account on the default home, a synthetic
  * default account stands in: the plain signed-in `claude`, as before accounts. */
-export function loadClaudeAccounts({ t3Dir, home = homedir() }: ClaudeAccountPaths = {}): LoadedClaudeAccount[] {
+export function loadClaudeAccounts({ t3Dir, home: homeArg }: ClaudeAccountPaths = {}): LoadedClaudeAccount[] {
+	const home = homeArg ?? homedir();
+	// Tests never see the machine's real T3 accounts or tokens unless they pass their own paths.
 	const t3 = t3Dir ?? join(home, ".t3");
+	const readT3 = t3Dir !== undefined || homeArg !== undefined || process.env.NODE_ENV !== "test";
 	const defaultHome = resolve(home, ".claude");
-	const instances = record(record(json(join(t3, "userdata", "settings.json")))?.providerInstances) ?? {};
+	const instances = (readT3 && record(record(json(join(t3, "userdata", "settings.json")))?.providerInstances)) || {};
 	const accounts: LoadedClaudeAccount[] = [];
 	for (const [instanceId, raw] of Object.entries(instances)) {
 		const instance = record(raw);

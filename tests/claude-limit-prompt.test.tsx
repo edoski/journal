@@ -28,7 +28,7 @@ function install(statuses: ClaudeAccountStatus[]) {
 	globalThis.fetch = async (input, init) => {
 		const path = String(input), method = init?.method ?? "GET";
 		calls.push({ path, method, ...(init?.body ? { body: JSON.parse(String(init.body)) } : {}) });
-		if (path === "/api/subscriptions/claude?refresh=1") return Response.json({ accounts: statuses });
+		if (path === "/api/subscriptions/claude") return Response.json({ accounts: statuses });
 		if (path === "/api/chats/c1" && method === "GET") return Response.json({ settings: { model: { provider: EXHAUSTED, id: "claude-opus-5-5" }, thinkingLevel: "xhigh" } });
 		if (path === "/api/settings") return Response.json({ settings: { models: SLOTS } });
 		if (method === "PUT") return Response.json({ settings: JSON.parse(String(init!.body)) });
@@ -61,7 +61,7 @@ test("the prompt offers the account with the most left, then moves the session a
 	const draft = { current: "stale draft" as string | null };
 	let writesAtRetry = -1;
 	await mount(() => { writesAtRetry = calls.filter((c) => c.method === "PUT").length; retryFailedResponse((input) => { sent.push(input); }, draft); });
-	assert(calls.some((c) => c.path === "/api/subscriptions/claude?refresh=1"), "the choice comes from a forced refresh");
+	assert(calls.some((c) => c.path === "/api/subscriptions/claude"), "the choice comes from the cached reading, which probes stale accounts");
 	const button = byTestid("claude-limit-continue");
 	assert.equal(button?.textContent, "Continue on Spare (70% left)");
 	await act(async () => { button!.click(); await new Promise((r) => setTimeout(r, 0)); });

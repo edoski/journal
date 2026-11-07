@@ -55,7 +55,7 @@ export function ClaudeLimitPrompt({ chatId, failure, onContinue }: { chatId: str
 
 	useEffect(() => {
 		mounted.current = true;
-		readClaudeAccounts(true)
+		readClaudeAccounts(false)
 			.then((statuses) => { if (mounted.current) setPrompt({ state: "ready", statuses }); })
 			.catch(() => { if (mounted.current) setPrompt({ state: "failed" }); });
 		return () => { mounted.current = false; };
