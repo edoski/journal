@@ -10,10 +10,13 @@ The server is offered only in study folders, never in ordinary projects:
   finds it from every folder below the root after a one-time approval. Any
   user-scope registration is removed with ``claude mcp remove``.
 - Codex: a marked ``[mcp_servers.learning]`` table in ``<dir>/.codex/config.toml``
-  for every study root and registered course, and one marked block in
-  ``~/.codex/config.toml`` trusting exactly those folders (Codex reads project
-  configuration only from trusted project roots). The global server entry and the
-  old developer-instructions block are removed.
+  for every study root and registered course, and a trust table in
+  ``~/.codex/config.toml`` for each of those folders that has none (Codex reads
+  project configuration only from trusted project roots). Each trust table the
+  installer writes carries its own comment line; it removes a table later only
+  while that table still reads exactly as written, so tables Codex or the user
+  add or edit are never touched. The global server entry and the old
+  developer-instructions block are removed.
 
 Every changed file is backed up first. ``preflight`` validates everything
 without writing, so a failure leaves no partial installation.
@@ -39,8 +42,11 @@ from learning.workspace import Workspace, registered, support_directory
 SERVER = "learning"
 CODEX_START = "# Begin learning MCP server\n"
 CODEX_END = "# End learning MCP server\n"
-TRUST_START = "# Begin learning study folders\n"
-TRUST_END = "# End learning study folders\n"
+_TRUST_MARK = (
+    "# learning.install adds and removes this study folder; edit it to keep it\n"
+)
+_OLD_TRUST_START = "# Begin learning study folders\n"
+_OLD_TRUST_END = "# End learning study folders\n"
 _SETTINGS_SCHEMA = 1
 _OLD_CODEX = re.compile(
     r"# Learning communication\n.*?# End learning communication\n", re.DOTALL
@@ -154,14 +160,13 @@ def codex_block(repo: Path) -> str:
     )
 
 
-def trust_block(directories: list[Path]) -> str:
-    if not directories:
-        return ""
-    tables = "\n".join(
-        f'[projects.{json.dumps(str(directory))}]\ntrust_level = "trusted"\n'
-        for directory in directories
-    )
-    return TRUST_START + tables + TRUST_END
+def _bare_trust(directory: Path) -> str:
+    return f'[projects.{json.dumps(str(directory))}]\ntrust_level = "trusted"\n'
+
+
+def trust_table(directory: Path) -> str:
+    """A trust table exactly as the installer writes it; only this text is its own."""
+    return _TRUST_MARK + _bare_trust(directory)
 
 
 def toml(text: str, path: Path) -> dict[str, Any]:
@@ -179,14 +184,67 @@ def codex_entry(text: str, path: Path | None = None) -> Any:
     return servers.get(SERVER) if isinstance(servers, dict) else None
 
 
+def _projects(parsed: dict[str, Any]) -> dict[str, Any]:
+    projects = parsed.get("projects", {})
+    return projects if isinstance(projects, dict) else {}
+
+
 def trusted(text: str, path: Path | None = None) -> set[str]:
     """Project folders the Codex config marks as trusted."""
-    projects = toml(text, path or codex_config()).get("projects", {})
     return {
         key
-        for key, value in (projects.items() if isinstance(projects, dict) else ())
+        for key, value in _projects(toml(text, path or codex_config())).items()
         if isinstance(value, dict) and value.get("trust_level") == "trusted"
     }
+
+
+def _line_starts(text: str, needle: str) -> list[int]:
+    starts, start = [], text.find(needle)
+    while start != -1:
+        if start == 0 or text[start - 1] == "\n":
+            starts.append(start)
+        start = text.find(needle, start + 1)
+    return starts
+
+
+def _comparable(parsed: dict[str, Any]) -> dict[str, Any]:
+    """A parsed config where an empty ``projects`` table equals a missing one."""
+    return {k: v for k, v in parsed.items() if k != "projects" or v}
+
+
+def _replaced(
+    text: str, old: str, new: str, expected: dict[str, Any], path: Path
+) -> str | None:
+    """Text with ``old`` at a line start replaced by ``new``, or None.
+
+    Only a replacement whose parsed result equals ``expected`` counts, so a copy of
+    ``old`` inside a multi-line string is never the one replaced.
+    """
+    for start in _line_starts(text, old):
+        before, after = text[:start], text[start + len(old) :]
+        if not new and before.endswith("\n\n"):
+            before = before[:-1]
+        elif not new and not before:
+            after = after.removeprefix("\n")
+        candidate = before + new + after
+        try:
+            if _comparable(toml(candidate, path)) == expected:
+                return candidate
+        except ValueError:
+            continue
+    return None
+
+
+def _without_trust(text: str, directory: Path, path: Path) -> str | None:
+    """Text without the installer's table for ``directory``, or None if it has none.
+
+    A table is the installer's only while removing its exact text drops that folder
+    and changes nothing else, so an edited table or one with sub-tables stays.
+    """
+    parsed = toml(text, path)
+    projects = {k: v for k, v in _projects(parsed).items() if k != str(directory)}
+    expected = _comparable({**parsed, "projects": projects})
+    return _replaced(text, trust_table(directory), "", expected, path)
 
 
 def _without(text: str, start: str, end: str, path: Path) -> str:
@@ -207,41 +265,79 @@ def _append(text: str, block: str) -> str:
     return text + ("\n" if text else "") + block
 
 
-def codex_global_content(original: str, directories: list[Path]) -> str:
-    """The user config without a global server entry, trusting exactly ``directories``.
+def _migrated_old_block(text: str, directories: list[Path], path: Path) -> str:
+    """Migrate the old marked block that held every installer trust table.
 
-    Folders the user already trusts outside the marked block are left to them; a
-    folder with a different, unmarked trust level is a conflict to resolve first.
+    Codex's TOML library put tables it added into that block too, so a table in it
+    becomes the installer's only when its folder is still a study folder and it
+    reads exactly as written; it gets the mark. A table for any other folder stays
+    as the user's, since that folder may have been trusted through Codex after it
+    stopped being a study folder. The block's two comment lines go.
+    """
+    if _OLD_TRUST_START not in text and _OLD_TRUST_END not in text:
+        return text
+    if text.count(_OLD_TRUST_START) != 1 or text.count(_OLD_TRUST_END) != 1:
+        raise ValueError(
+            f"incomplete learning block {_OLD_TRUST_START.strip()!r} in {path}"
+        )
+    before, _, tail = text.partition(_OLD_TRUST_START)
+    block, _, after = tail.partition(_OLD_TRUST_END)
+    migrated = before + block + after
+    expected = _comparable(toml(migrated, path))
+    for key, value in _projects(toml(block, path)).items():
+        directory = Path(key)
+        if directory in directories and value == {"trust_level": "trusted"}:
+            old = _bare_trust(directory)
+            marked = _replaced(migrated, old, trust_table(directory), expected, path)
+            migrated = marked if marked is not None else migrated
+    return migrated
+
+
+def _normalized(text: str) -> str:
+    return text.rstrip("\n") + "\n" if text.strip() else ""
+
+
+def codex_global_content(original: str, directories: list[Path], *, prune: bool) -> str:
+    """The user config without a global server entry, trusting ``directories``.
+
+    ``directories`` are all the study folders. One without a trust table gets the
+    installer's; with ``prune``, the installer's own tables for other folders are
+    removed. Tables it did not write, or that were edited since, are left as they
+    are; a study folder whose table is not trusted is a conflict to resolve first.
     """
     path = codex_config()
     text = _OLD_CODEX.sub("", original)
     if "# Learning communication" in text or "# End learning communication" in text:
         raise ValueError(f"incomplete old learning communication block in {path}")
     text = _without(text, CODEX_START, CODEX_END, path)
-    base = _without(text, TRUST_START, TRUST_END, path)
-    if codex_entry(base, path) is not None:
+    text = _migrated_old_block(text, directories, path)
+    if codex_entry(text, path) is not None:
         raise ValueError(
             f"{path} defines [mcp_servers.{SERVER}] for every folder; remove it, "
             "then install again (the server belongs only in study folders)"
         )
-    projects = toml(base, path).get("projects", {})
-    own = []
+    if prune:
+        for key in list(_projects(toml(text, path))):
+            if Path(key) not in directories:
+                removed = _without_trust(text, Path(key), path)
+                text = removed if removed is not None else text
+        text = _normalized(text)
+    projects = _projects(toml(text, path))
     for directory in directories:
-        existing = projects.get(str(directory)) if isinstance(projects, dict) else None
+        existing = projects.get(str(directory))
         if existing is None:
-            own.append(directory)
+            text = _append(text, trust_table(directory))
         elif not isinstance(existing, dict) or existing.get("trust_level") != "trusted":
             raise ValueError(
                 f'{path}: [projects."{directory}"] is not trusted; set trust_level = '
                 '"trusted" there or remove that table, then install again'
             )
-    updated = _append(base, trust_block(own))
-    missing = {str(directory) for directory in directories} - trusted(updated, path)
-    if missing or codex_entry(updated, path) is not None:
+    missing = {str(directory) for directory in directories} - trusted(text, path)
+    if missing or codex_entry(text, path) is not None:
         raise ValueError(
-            f"{path}: the learning trust block would not parse as expected"
+            f"{path}: the learning trust tables would not parse as expected"
         )
-    return updated
+    return text
 
 
 def course_codex_content(original: str, repo: Path, path: Path) -> str:
@@ -380,7 +476,9 @@ def preflight(package: Path, support: Path, roots: list[Path]) -> None:
     if config.exists():
         _file_destination(config)
         directories = course_directories(roots)
-        codex_global_content(config.read_text(encoding="utf-8"), directories)
+        codex_global_content(
+            config.read_text(encoding="utf-8"), directories, prune=True
+        )
         for directory in directories:
             path = _course_file(directory)
             _file_destination(path)
@@ -541,10 +639,10 @@ def _course_codex(directory: Path, repo: Path, backup: Backup) -> str:
     )
 
 
-def _trust(directories: list[Path], backup: Backup) -> str:
+def _trust(directories: list[Path], backup: Backup, *, prune: bool) -> str:
     path = codex_config()
     original = path.read_text(encoding="utf-8")
-    updated = codex_global_content(original, directories)
+    updated = codex_global_content(original, directories, prune=prune)
     return _publish(path, updated, backup, "codex-config.toml")
 
 
@@ -559,18 +657,8 @@ def install_codex(repo: Path, roots: list[Path], backup: Backup) -> dict[str, st
             str(directory): _course_codex(directory, repo, backup)
             for directory in directories
         }
-        result["trust"] = _trust(directories, backup)
+        result["trust"] = _trust(directories, backup, prune=True)
     return result
-
-
-def configured_trust() -> list[Path]:
-    """Folders in the installer's marked trust block."""
-    path = codex_config()
-    text = path.read_text(encoding="utf-8") if path.exists() else ""
-    if TRUST_START not in text:
-        return []
-    block = text.partition(TRUST_START)[2].partition(TRUST_END)[0]
-    return [Path(key) for key in toml(block, path).get("projects", {})]
 
 
 def configure_course(workspace: Workspace) -> str:
@@ -581,11 +669,13 @@ def configure_course(workspace: Workspace) -> str:
     try:
         backup = Backup(support_directory())
         with _codex_lock():
-            directories = list(
-                dict.fromkeys([*configured_trust(), workspace.directory])
-            )
+            directories = course_directories(study_roots())
             course = _course_codex(workspace.directory, repo, backup)
-            trust = _trust(directories, backup)
+            trust = _trust(
+                list(dict.fromkeys([*directories, workspace.directory])),
+                backup,
+                prune=False,
+            )
     except (OSError, ValueError) as error:
         return f"failed: {error}"
     return "unchanged" if course == trust == "unchanged" else "configured"

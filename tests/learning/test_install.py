@@ -1,6 +1,8 @@
 import json
 import os
 from pathlib import Path
+import re
+import shutil
 import subprocess
 import tomllib
 from typing import Any
@@ -9,7 +11,8 @@ import zipfile
 import pytest
 
 from learning import install
-from learning.workspace import Workspace, initialize, support_directory
+from learning.study import study
+from learning.workspace import Workspace, initialize, registered, support_directory
 
 SKILL = {"SKILL.md": "Learn.\n", "references/records.md": "Records.\n"}
 OLD_CODEX = (
@@ -78,6 +81,21 @@ def vault(tmp_path: Path) -> tuple[Path, Path, Workspace]:
 def codex_installed(text: str = OLD_CODEX) -> None:
     install.codex_config().parent.mkdir(exist_ok=True)
     install.codex_config().write_text(text)
+
+
+def codex_adds(table: str) -> None:
+    """Add a table where Codex's TOML library puts a new one.
+
+    toml_edit gives a new table the position of the table before it, so it lands
+    after the keys of the file's last table, ahead of any trailing comment.
+    """
+    path = install.codex_config()
+    lines = path.read_text().splitlines(keepends=True)
+    end = max(index for index, line in enumerate(lines) if line.startswith("[")) + 1
+    while end < len(lines) and lines[end].strip() and lines[end][0] not in "#[":
+        end += 1
+    lines.insert(end, "\n" + table)
+    path.write_text("".join(lines))
 
 
 def snapshot(home: Path) -> dict[str, int]:
@@ -187,20 +205,205 @@ def test_dropped_roots_lose_the_server_and_their_trust(
     assert json.loads(install.settings_path().read_text())["study_roots"] == [
         str(learn)
     ]
+    shutil.rmtree(course.directory)
+    install.install()
+    assert install.trusted(install.codex_config().read_text()) == {str(learn)}
+
+
+def test_tables_codex_adds_after_the_installers_survive(
+    installation: tuple[Path, Path, FakeClaude],
+    vault: tuple[Path, Path, Workspace],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    msc, learn, _ = vault
+    codex_installed("")
+    install.install([msc, learn])
+    gtm, scratch = tmp_path / "gtm", tmp_path / "scratch"
+    added = [
+        f'[projects."{gtm}"]\ntrust_level = "trusted"\n',
+        f'[projects."{scratch}"]\ntrust_level = "untrusted"\n',
+        '[mcp_servers.notes]\ncommand = "notes"\n',
+    ]
+    for table in added:
+        codex_adds(table)
+
+    def lost() -> list[str]:
+        text = install.codex_config().read_text()
+        return [table for table in added if table not in text]
+
+    install.install()
+    assert lost() == []
+    fresh = msc / "Fresh"
+    fresh.mkdir()
+    assert study(["--workspace", str(fresh), "init"]) == 0
+    assert json.loads(capsys.readouterr().out)["hosts"]["codex"] == "configured"
+    assert lost() == []
+    install.install([learn])
+    assert lost() == []
+    trusted = install.trusted(install.codex_config().read_text())
+    assert trusted == {str(learn), str(fresh), str(gtm)} | {
+        str(workspace.directory) for workspace in registered()
+    }
 
 
 def test_trust_the_user_already_gave_is_left_alone(
     installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
 ) -> None:
-    msc, _, course = vault
-    original = f'[projects."{msc}"]\ntrust_level = "trusted"\nnote = "mine"\n'
+    msc, learn, course = vault
+    original = f'[projects."{msc}"]\ntrust_level = "trusted"\n'
     codex_installed(original)
     install.install([msc])
     text = install.codex_config().read_text()
     assert text.startswith(original)
-    block = text.partition(install.TRUST_START)[2]
-    assert f'"{msc}"' not in block and f'"{course.directory}"' in block
-    assert install.configured_trust() == [course.directory]
+    assert install.trusted(text) == {str(msc), str(course.directory)}
+    shutil.rmtree(course.directory)
+    install.install([learn])
+    assert install.codex_config().read_text() == (
+        original + "\n" + install.trust_table(learn)
+    )
+
+
+def test_trust_tables_edited_since_install_belong_to_their_editor(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, learn, course = vault
+    codex_installed("")
+    install.install([msc])
+    path = install.codex_config()
+    root = f'[projects."{msc}"]\ntrust_level = "trusted"\n'
+    path.write_text(
+        path.read_text().replace(root, root + 'note = "mine"\n')
+        + f'\n[projects."{course.directory}".sandbox]\nmode = "strict"\n'
+    )
+    shutil.rmtree(course.directory)
+    install.install([learn])
+    assert tomllib.loads(path.read_text())["projects"] == {
+        str(msc): {"trust_level": "trusted", "note": "mine"},
+        str(course.directory): {
+            "trust_level": "trusted",
+            "sandbox": {"mode": "strict"},
+        },
+        str(learn): {"trust_level": "trusted"},
+    }
+
+
+def test_a_multiline_string_beside_the_trust_tables_stays_intact(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, _, course = vault
+    codex_installed("")
+    install.install([msc])
+    path = install.codex_config()
+    installed = path.read_text()
+    header = f'[projects."{course.directory}"]\n'
+    lines = installed.splitlines(keepends=True)
+    at = lines.index(header)
+    copy = "".join(lines[at - 1 : at + 2])
+    notes = f'[mcp_servers.notes]\ncommand = "notes"\nhelp = """\n{copy}"""\n'
+    path.write_text(notes + "\n" + installed)
+    shutil.rmtree(course.directory)
+    install.install([msc])
+    text = path.read_text()
+    assert text.startswith(notes)
+    assert tomllib.loads(text)["mcp_servers"]["notes"]["help"] == copy
+    assert install.trusted(text) == {str(msc)}
+
+
+def test_study_folders_alone_make_a_tidy_config(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, _, course = vault
+    codex_installed("")
+    install.install([msc])
+    table = r'# .+\n\[projects\."[^"\n]+"\]\ntrust_level = "trusted"\n'
+    text = install.codex_config().read_text()
+    assert re.fullmatch(f"{table}\n{table}", text), text
+    assert install.trusted(text) == {str(msc), str(course.directory)}
+    shutil.rmtree(course.directory)
+    install.install([])
+    assert install.codex_config().read_text() == ""
+
+
+def test_an_old_marked_block_migrates_without_losing_codex_tables(
+    installation: tuple[Path, Path, FakeClaude],
+    vault: tuple[Path, Path, Workspace],
+    tmp_path: Path,
+) -> None:
+    package, _, _ = installation
+    msc, learn, course = vault
+    dropped = msc.parent / "dropped"
+    left = install.course_codex_config(dropped)
+    left.parent.mkdir(parents=True)
+    left.write_text(install.course_codex_content("", package.parent, left))
+    install.settings_path().write_text(
+        json.dumps({"schema": 1, "study_roots": [str(msc)]})
+    )
+    gtm = f'[projects."{tmp_path / "gtm"}"]\ntrust_level = "trusted"\n'
+    scratch = f'[projects."{tmp_path / "scratch"}"]\ntrust_level = "untrusted"\n'
+    reopened = f'[projects."{dropped}"]\ntrust_level = "trusted"\n'
+    old = "".join(
+        f'[projects."{directory}"]\ntrust_level = "trusted"\n\n'
+        for directory in (msc, course.directory)
+    )
+    codex_installed(
+        'model = "gpt"\n\n# Begin learning study folders\n'
+        + old
+        + gtm
+        + "\n"
+        + reopened
+        + "\n"
+        + scratch
+        + "# End learning study folders\n"
+    )
+    assert install.install()["codex"]["trust"] == "updated"
+    text = install.codex_config().read_text()
+    assert "learning study folders" not in text
+    assert all(table in text for table in (gtm, reopened, scratch))
+    assert install.trusted(text) == {
+        str(msc),
+        str(course.directory),
+        str(tmp_path / "gtm"),
+        str(dropped),
+    }
+    assert install.install()["codex"]["trust"] == "unchanged"
+    shutil.rmtree(course.directory)
+    install.install([learn])
+    text = install.codex_config().read_text()
+    assert install.trusted(text) == {str(learn), str(tmp_path / "gtm"), str(dropped)}
+    assert text.startswith('model = "gpt"\n') and scratch in text
+
+
+def test_installer_tables_go_under_an_explicit_projects_table_and_blank_lines(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, learn, course = vault
+    codex_installed('model = "gpt"\n\n[projects]\n')
+    install.install([msc])
+    path = install.codex_config()
+    path.write_text(path.read_text().replace("\n\n#", "\n\n\n\n#"))
+    shutil.rmtree(course.directory)
+    assert install.install([learn])["codex"]["trust"] == "updated"
+    assert install.install()["codex"]["trust"] == "unchanged"
+    assert path.read_text() == (
+        'model = "gpt"\n\n[projects]\n\n' + install.trust_table(learn)
+    )
+
+
+def test_a_new_course_never_overrides_an_untrusted_entry(
+    installation: tuple[Path, Path, FakeClaude], vault: tuple[Path, Path, Workspace]
+) -> None:
+    msc, _, _ = vault
+    codex_installed("")
+    install.install([msc])
+    fresh = msc / "Fresh"
+    fresh.mkdir()
+    path = install.codex_config()
+    untrusted = f'[projects."{fresh}"]\ntrust_level = "untrusted"\n'
+    path.write_text(path.read_text() + "\n" + untrusted)
+    before = path.read_text()
+    assert install.configure_course(initialize(fresh)).startswith("failed: ")
+    assert path.read_text() == before
 
 
 def test_codex_and_claude_code_absent(
@@ -247,11 +450,11 @@ def test_new_courses_configure_codex_and_report_claude_code_reach(
     assert install.claude_code_reach(lone).startswith("not reachable")
     # Every registered course, inside a study root or not, was configured by install.
     assert install.configure_course(lone) == "unchanged"
-    assert set(install.configured_trust()) == {
-        msc,
-        course.directory,
-        fresh.directory,
-        lone.directory,
+    assert install.trusted(install.codex_config().read_text()) == {
+        str(msc),
+        str(course.directory),
+        str(fresh.directory),
+        str(lone.directory),
     }
     install.course_codex_config(lone.directory).write_text("not = [toml")
     assert install.configure_course(lone).startswith("failed: ")
@@ -284,6 +487,12 @@ def test_new_courses_configure_codex_and_report_claude_code_reach(
                 f'[projects."{r}"]\ntrust_level = "untrusted"\n'
             ),
             "is not trusted",
+        ),
+        (
+            lambda p, r: codex_installed(
+                f'# Begin learning study folders\n[projects."{r}"]\ntrust_level = "trusted"\n'
+            ),
+            "incomplete learning block",
         ),
         (
             lambda p, r: (
