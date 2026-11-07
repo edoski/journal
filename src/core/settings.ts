@@ -29,7 +29,7 @@
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { AUTH_PROVIDER_KEYS } from "./auth-keys.ts";
-import { CLAUDE_SUBSCRIPTION } from "./contracts/claude.ts";
+import { isClaudeProvider } from "./contracts/claude.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 import type { SearchEngineId } from "./search.ts";
@@ -161,7 +161,7 @@ const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan â
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
 	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
 	return {
-		error: provider === CLAUDE_SUBSCRIPTION.providerId ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
+		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
 		code: PROVIDER_KEY_MISSING_CODE,
 		provider,
 		slots,
