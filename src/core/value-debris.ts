@@ -12,7 +12,7 @@
  * THE SEAM: strip at every MEMBERSHIP comparison — never on free text
  * (statements, questions, explanations may legitimately carry any of
  * these characters). Pure + browser-safe: shared by the call boundary
- * (quizInputProblems), the display parse (tool-parts), and grading
+ * (explainInputProblems), the display parse (tool-parts), and grading
  * (question-dock) — the three consumers the tool-parts law keeps in
  * lockstep. Idempotent by construction.
  */

@@ -178,6 +178,14 @@ describe("new course", () => {
 		assert.equal(res.status, 502);
 		assert.deepEqual(await res.json(), { error: "save could not write the record", code: "engine_failed" });
 		assert.ok(fs.existsSync(path.join(STUDY, "topology")));
+
+		// The real init leaves its manifest and no course record; creating
+		// again finishes the job instead of refusing the folder forever.
+		fs.mkdirSync(path.join(STUDY, "topology", ".study"));
+		fs.writeFileSync(path.join(STUDY, "topology", ".study", "workspace.json"), "{}");
+		delete process.env.FAKE_ENGINE_FAIL;
+		const retried = await createCourse({ root: STUDY, title: "Topology" });
+		assert.equal(retried.status, 200, await retried.clone().text());
 	});
 });
 

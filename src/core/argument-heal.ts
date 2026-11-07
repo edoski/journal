@@ -8,7 +8,7 @@
  *
  *   - the agent boundary: pi's prepareArguments seam, BEFORE TypeBox
  *     validation (withArgumentHeal / healToolRecord);
- *   - the display parse: tool-parts' parseQuizInput, before
+ *   - the display parse: tool-parts' boundaryParse, before
  *     boundaryParse — the persisted record keeps raw arguments, so the
  *     same wobble heals on read.
  *

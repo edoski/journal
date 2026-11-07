@@ -98,13 +98,13 @@ describe("course brief injection", () => {
 		const briefs = messages.filter((m) => (m as { customType?: string }).customType === "course-context");
 		assert.equal(briefs.length, 1);
 		const firstUser = messages.findIndex((m) => m.role === "user");
-		assert.equal(messages.indexOf(briefs[0]!), firstUser + 1, "the brief follows the learner's input");
+		assert.equal(messages.indexOf(briefs[0]!), firstUser - 1, "the brief precedes the learner's words");
 		assert.match((briefs[0] as { content: string }).content, /Due today:\n- rank \(assisted\)/);
 	});
 
 	it("an unlinked session gets no brief", async () => {
 		const chat = chatStore.createChat("plain");
-		const { courseBriefFor } = await import("../src/server/course-brief.ts");
-		assert.equal(await courseBriefFor(chatStore.getChat(chat.id)!, []), null);
+		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
+		assert.equal(await fetchCourseBrief(chatStore.getChat(chat.id)!), null);
 	});
 });

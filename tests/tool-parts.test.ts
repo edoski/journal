@@ -53,11 +53,11 @@ describe("parseProbeDoneInput", () => {
 		assert.ok(parseProbeDoneInput(VALID_ASSESSMENT));
 	});
 
-	it("the live crash shape — assessment STRINGIFIED — does not parse", () => {
-		// The exact double-encoding from the modal-realism run: strands died
-		// on `.map` because the card cast the shape. The parse kills the class.
+	it("a STRINGIFIED assessment heals like the boundary; garbage does not parse", () => {
+		// The double-encoding from the modal-realism run: the boundary heals
+		// it before validation, so the display parse heals it the same way.
 		const stringified = { assessment: JSON.stringify(VALID_ASSESSMENT.assessment) };
-		assert.equal(parseProbeDoneInput(stringified), undefined);
+		assert.equal(parseProbeDoneInput(stringified)?.assessment.strands.length, 2);
 		const garbage = JSON.stringify(VALID_ASSESSMENT.assessment).slice(0, 30);
 		assert.equal(parseProbeDoneInput(garbage), undefined);
 	});

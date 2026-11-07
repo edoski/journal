@@ -27,7 +27,7 @@ import { CONCLUDE_ACK_TEXT } from "../core/contracts/chat.ts";
  * Structural validation is NOT here: pi's loop validates arguments against
  * the tool's TypeBox parameters before execute ever runs (pi-ai's
  * validateToolArguments — the fast TypeBox path). Refinements that no
- * schema can carry (quizInputProblems, the live-tree nodeId check) run at
+ * schema can carry (explainInputProblems, the live-tree nodeId check) run at
  * the top of the tool's own execute and throw ToolInputError.
  */
 

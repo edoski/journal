@@ -123,7 +123,7 @@ export function CoursesUnavailable({ reason }: { reason: string }) {
 		<p role="alert" data-testid="courses-unavailable" className="font-ui text-xs text-destructive">
 			{unavailableMessage(reason)}.{" "}
 			<span className="text-muted-foreground">
-				Set LH_LEARNING_ENGINE to the learning engine&apos;s folder and LH_LEARNING_PYTHON to its Python, then restart.
+				If the engine is not found, set LH_LEARNING_ENGINE to its folder and LH_LEARNING_PYTHON to its Python, then restart.
 			</span>
 		</p>
 	);

@@ -214,12 +214,13 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	);
 	const saved = await rec.course.records.run(rec.course.course.workspace, { verb: "save", changes: { observations } });
 	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
-	if (saved.kind === "validation") return { refused: `the course record refused the attempt: ${saved.message}`, text: "" };
-	return {
-		text:
-			`The attempt was not saved (${saved.message}). On your next turn, re-send exactly this with course_save: ` +
-			JSON.stringify({ observations }),
-	};
+	// The problem still concludes: a pose's topics cannot change after the
+	// fact, so holding the problem open would lock the session.
+	const repair =
+		saved.kind === "validation"
+			? "Repair it with course_save (for example, create the missing topic in the same patch) and send these observations: "
+			: "On your next turn, re-send exactly this with course_save: ";
+	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations })}` };
 }
 
 export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording): AgentTool<typeof concludeInputObject> {

@@ -232,12 +232,18 @@ describe("render smoke tests", () => {
 
 	it("a malformed question input renders the quiet fallback, never a crash", () => {
 		// The seam rule (tool-parts.ts): the dock PARSES the model-authored
-		// input instead of casting it — the live crash shape (options as a
-		// JSON string) must render the fallback, not die on .map.
+		// input instead of casting it. Options the boundary healed from a
+		// JSON string render; options no heal can read render the fallback.
+		const healed = renderDock({
+			toolName: "ask_user_question",
+			toolCallId: "stringified",
+			input: { question: "q?", options: JSON.stringify([{ label: "a" }, { label: "b" }]) } as never,
+		});
+		assert.ok(!healed.includes('data-testid="malformed-question"'), "stringified options heal like the boundary");
 		const html = renderDock({
 			toolName: "ask_user_question",
 			toolCallId: "bad",
-			input: { question: "q?", options: JSON.stringify([{ label: "a" }, { label: "b" }]) } as never,
+			input: { question: "q?", options: "[{label: a" } as never,
 		});
 		assert.ok(html.includes('data-testid="malformed-question"'));
 		assert.match(html, /malformed/);

@@ -43,3 +43,33 @@ describe("a concluded practice problem as engine observations", () => {
 		assert.equal(conclusionProblem({ ...base, outcome: "movedOn", result: "incorrect" }), null);
 	});
 });
+
+describe("conclude records the attempt, and never locks the session", async () => {
+	const { practiceTools } = await import("../src/agent/tools/practice.ts");
+	const pose = { statement: "Find the rank.", mode: "recall", topics: ["fresh-topic"], modelSolution: "1" };
+	const messages = [
+		{ id: "a1", role: "assistant", content: [{ type: "toolCall", id: "p1", name: "problem", arguments: pose }], stopReason: "toolUse", timestamp: 1 },
+		{ id: "r1", role: "toolResult", toolCallId: "p1", toolName: "problem", content: [{ type: "text", text: "posed" }], isError: false, timestamp: 2 },
+	];
+	const chatStore = { getChat: () => ({ messages }) } as never;
+	const conclusion = { outcome: "solved", verdict: "ok", rung: null, missClass: null, retest: false, result: "correct", response: "1" };
+
+	it("a refused save still concludes, and hands the observations back for course_save", async () => {
+		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async () => ({ ok: false, kind: "validation", message: 'unknown topic "fresh-topic"' }) };
+		const tools = practiceTools({ chatId: "c", chatStore }, { course: { workspace: "/w", title: "T" }, records } as never);
+		const result = await tools.conclude!.execute("c1", conclusion, undefined);
+		assert.notEqual(result.isError, true);
+		const text = (result.content[0] as { text: string }).text;
+		assert.match(text, /The attempt was not saved \(unknown topic "fresh-topic"\)\. Repair it with course_save/);
+		assert.match(text, /"topics":\["fresh-topic"\]/);
+		const next = await tools.problem!.execute("p2", pose, undefined);
+		assert.notEqual(next.isError, true, "the problem slot is free again");
+	});
+
+	it("a conclusion that contradicts its outcome is refused and the problem stays active", async () => {
+		const records = { list: async () => ({ available: true, courses: [], roots: [] }), run: async () => ({ ok: true, json: {} }) };
+		const tools = practiceTools({ chatId: "c", chatStore }, { course: { workspace: "/w", title: "T" }, records } as never);
+		const refused = await tools.conclude!.execute("c1", { ...conclusion, outcome: "surrendered" }, undefined);
+		assert.equal(refused.isError, true);
+	});
+});

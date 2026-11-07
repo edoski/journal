@@ -173,6 +173,12 @@ export function parseChatInput(input: unknown): ChatInput {
 			if (typeof i.answer !== "object" || i.answer === null) {
 				throw new ChatInputError("answer input requires the graded answer object");
 			}
+			{
+				const confidence = (i.answer as { confidence?: unknown }).confidence;
+				if (confidence !== undefined && !isConfidence(confidence)) {
+					throw new ChatInputError(`answer confidence must be one of ${CONFIDENCE_STATES.join(", ")}`);
+				}
+			}
 			return { type: "answer", toolCallId: i.toolCallId, answer: i.answer as QuestionAnswerData };
 		case "continue":
 			return { type: "continue" };

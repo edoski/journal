@@ -38,6 +38,7 @@ function writePlan(plan) {
 }
 
 if (process.env.FAKE_ENGINE_FAIL === verb) fail(`${verb} could not write the record`, "io");
+if (workspace?.includes("/missing")) fail(`No study workspace at ${workspace}. Run \`study init\` in the intended directory.`);
 
 switch (verb) {
 	case "plan":

@@ -33,7 +33,7 @@ import { runPiTurn } from "./pi/ui-stream.ts";
 import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
-import { courseBriefFor } from "./course-brief.ts";
+import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
 import { providerKeyPresent } from "./keys.ts";
 import {
 	extractionEnabled,
@@ -268,6 +268,10 @@ export async function handleChatInput(
 		},
 		chatId,
 	);
+	// The course brief rides learner input only, fetched before the record
+	// is re-read below.
+	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "continue";
+	const courseBrief = learnerInput ? await fetchCourseBrief(record) : null;
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	record = compactedRecord;
@@ -325,19 +329,17 @@ export async function handleChatInput(
 		return settledTurnResponse(); // the cheap terminal — no beginTurn, no turn
 	}
 
+	// The brief precedes the learner's words; an answer's result must stay
+	// adjacent to its question call, so there the brief follows it.
+	const briefMarker = courseBriefMarker(courseBrief, [...record.messages, ...appends]);
+	if (briefMarker) appends = input.type === "answer" ? [...appends, briefMarker] : [briefMarker, ...appends];
+
 	// One turn per chat, ever. A second request while a turn runs means a
 	// stale/remounted client raced a live one — letting it through would
 	// double-run the teacher and clobber the first turn's persist.
 	if (!beginTurn(chatId)) {
 		console.info(`[chat ${chatId}] turn already in flight — request rejected`);
 		return Response.json({ error: "A turn is already running for this session" }, { status: 409 });
-	}
-
-	// The course brief rides learner input only, after the input's own
-	// appends, so an answer stays adjacent to its question call.
-	if (input.type !== "steers" && input.type !== "retry" && input.type !== "continue") {
-		const brief = await courseBriefFor(record, [...record.messages, ...appends]);
-		if (brief) appends = [...appends, brief];
 	}
 
 	// Write-ahead persistence: the input's native appends go on disk BEFORE

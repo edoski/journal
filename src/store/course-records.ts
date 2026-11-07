@@ -109,6 +109,11 @@ function toResult(exit: Exit, verbName: string): CourseResult {
 		}
 	}
 	const reported = engineError(exit.stderr.trim()) ?? engineError(exit.stdout.trim());
+	// A missing or moved workspace is reported as a validation error, but no
+	// patch can repair it.
+	if (reported && /No study workspace|Study directory does not exist/.test(reported.message)) {
+		return { ok: false, kind: "unavailable", message: reported.message };
+	}
 	if (reported) return { ok: false, ...reported };
 	const tail = (exit.stderr.trim() || exit.stdout.trim()).split("\n").slice(-3).join("\n");
 	return { ok: false, kind: "io", message: `${verbName} failed${tail ? `: ${tail}` : ""}` };

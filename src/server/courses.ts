@@ -61,10 +61,18 @@ export async function createCourse(root: string, title: string): Promise<CourseC
 	try {
 		fs.mkdirSync(directory);
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+		// A folder a failed creation left behind (the engine initialized it,
+		// the title save never landed) has no course record to rename, so
+		// creating again finishes the job.
+		const unfinished =
+			fs.existsSync(path.join(directory, ".study", "workspace.json")) &&
+			!fs.existsSync(path.join(directory, ".study", "course.json"));
+		if ((error as NodeJS.ErrnoException).code === "EEXIST" && !unfinished) {
 			return { ok: false, status: 409, code: "course_exists", error: `${directory} already exists` };
 		}
-		return { ok: false, status: 500, code: "create_failed", error: (error as Error).message };
+		if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+			return { ok: false, status: 500, code: "create_failed", error: (error as Error).message };
+		}
 	}
 	const created = await stores.courseRecords.create(directory, name);
 	if (!created.ok) return { ok: false, status: 502, code: "engine_failed", error: created.message };

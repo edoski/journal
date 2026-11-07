@@ -97,6 +97,8 @@ describe("course records adapter (fake engine)", () => {
 		const slow = await records.run("/w", { verb: "show", handles: ["slow"] });
 		assert.equal(!slow.ok && slow.kind, "io");
 		assert.match(!slow.ok ? slow.message : "", /did not finish in time/);
+		const moved = await records.run("/study/missing-course", { verb: "resume" });
+		assert.equal(!moved.ok && moved.kind, "unavailable", "a moved workspace is not a repairable validation error");
 		const missing = createCourseRecords({ python: path.join(TMP, "no-such-python"), root: TMP });
 		assert.equal((await missing.run("/w", { verb: "resume" })).ok, false);
 		const listing = await missing.list();
