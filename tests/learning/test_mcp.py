@@ -276,6 +276,8 @@ def test_tools_map_onto_the_cli_in_the_course_of_the_working_directory(
         server.tool("guide", topic="records")
         == (REPOSITORY / "learning/skills/tutor/references/records.md").read_text()
     )
+    references = REPOSITORY / "learning/skills/tutor/references"
+    assert sorted(mcp.GUIDES) == sorted(p.stem for p in references.glob("*.md"))
     [listed] = server.tool("courses")["courses"]
     assert listed == {
         "directory": str(folder.resolve()),
@@ -388,18 +390,18 @@ def test_prompts_embed_the_skill_and_a_fresh_resume(
     assert "45-minute" in text("mock_exam", minutes="45")
     mock = text("mock_exam", minutes="45")
     assert "kind exam" not in mock and "kind: exam" not in mock
-    assert mcp.skill_section("Written mock", "practice") in mock
+    assert mcp.guide_section("Written mock", "reviews") in mock
     assert "three columns" in mock and "45-minute written mock" in mock
     oral = text("mock_exam", course="algebra", part="oral")
-    assert mcp.skill_section("Oral mock", "practice") in oral
+    assert mcp.guide_section("Oral mock", "reviews") in oral
     assert "Written mock" not in oral and "photos" not in oral
     review = text("review", course="algebra")
-    assert mcp.skill_section("Today's review") in review
+    assert mcp.guide_section("Today's review", "reviews") in review
     assert "Mark against `points`" in review
     assert "Only the first try on a due day counts" in review
     week = text("plan_week")
     assert '"courses"' in week
-    assert mcp.skill_section("The week", "practice") in week
+    assert mcp.guide_section("The week", "reviews") in week
     assert "No percentages" in week
     bad = server.request(
         "prompts/get", {"name": "mock_exam", "arguments": {"minutes": "soon"}}
@@ -412,3 +414,24 @@ def test_save_rules_state_the_30_minute_duplicate_window() -> None:
     assert "within a day" not in mcp.SAVE_RULES
     for field in ("points", "contrasts", "chose"):
         assert field in mcp.SAVE_RULES
+
+
+APP_TOOLS = (
+    "course_save",
+    "course_show",
+    "course_search",
+    "course_resume",
+    "conclude",
+    "explain",
+    "probe_done",
+    "problem",
+    "ask_user_question",
+)
+
+
+def test_shared_doctrine_names_no_tools() -> None:
+    references = REPOSITORY / "learning/skills/tutor/references"
+    for name in ("evidence", "teaching", "reviews"):
+        text = (references / f"{name}.md").read_text()
+        for tool in (*mcp.TOOLS, *APP_TOOLS):
+            assert f"`{tool}`" not in text, f"{name}.md names the tool {tool}"

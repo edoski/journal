@@ -5,45 +5,35 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { PATHS } from "../config.ts";
-import { ENGINE_DOCTRINE, courseRecordPrompt, engineDoctrineSection } from "../src/agent/prompt-segments.ts";
+import { ENGINE_DOCTRINE, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-engine-doctrine-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
-fs.writeFileSync(path.join(TMP, "ref.md"), "# Title\n\n## One\n\nfirst\n\n### Detail\n\nkept\n\n## Two\n\nsecond\n");
+
+const ADAPTER = fs.readFileSync(path.join(PATHS.root, "src", "agent", "prompts", "course", "10-record.md"), "utf8").trim();
 
 describe("engine doctrine", () => {
-	it("every referenced section exists in the engine's tutor references", () => {
+	it("every listed file exists in the engine's tutor references and has content", () => {
 		assert.equal(PATHS.tutorReferences, path.join(path.dirname(PATHS.root), "learning", "skills", "tutor", "references"));
-		for (const entry of ENGINE_DOCTRINE) {
-			const section = engineDoctrineSection(PATHS.tutorReferences, entry);
-			assert.ok(section.startsWith(`## ${entry.section}\n`), `${entry.file}: ${entry.section}`);
-			assert.ok(section.split("\n").length > 2, `${entry.file}: ${entry.section} has a body`);
+		assert.ok(ENGINE_DOCTRINE.length > 0);
+		for (const file of ENGINE_DOCTRINE) {
+			assert.ok(fs.readFileSync(path.join(PATHS.tutorReferences, file), "utf8").trim().length > 0, file);
 		}
 	});
 
-	it("the course prompt is the app's adapter followed by the engine's sections", () => {
-		const prompt = courseRecordPrompt();
-		assert.ok(prompt.startsWith("## The course record"));
-		for (const entry of ENGINE_DOCTRINE) assert.ok(prompt.includes(`\n\n${engineDoctrineSection(PATHS.tutorReferences, entry)}`), entry.section);
+	it("the course prompt is the app's adapter followed by each engine file, whole", () => {
+		const doctrine = ENGINE_DOCTRINE.map((file) => fs.readFileSync(path.join(PATHS.tutorReferences, file), "utf8").trim());
+		assert.equal(courseRecordPrompt(), [ADAPTER, ...doctrine].join("\n\n"));
+		assert.ok(ADAPTER.startsWith("## The course record"));
 	});
 
-	it("takes a section up to the next heading of its level", () => {
-		assert.equal(engineDoctrineSection(TMP, { file: "ref.md", section: "One" }), "## One\n\nfirst\n\n### Detail\n\nkept");
-		assert.equal(engineDoctrineSection(TMP, { file: "ref.md", section: "Two" }), "## Two\n\nsecond");
-	});
-
-	it("reads a file checked out with CRLF line endings", () => {
-		fs.writeFileSync(path.join(TMP, "crlf.md"), "## One\r\n\r\nfirst\r\n\r\n## Two\r\n");
-		assert.equal(engineDoctrineSection(TMP, { file: "crlf.md", section: "One" }), "## One\n\nfirst");
+	it("fails when a listed file is missing", () => {
+		for (const file of ENGINE_DOCTRINE.slice(1)) fs.writeFileSync(path.join(TMP, file), "kept");
+		assert.throws(() => courseRecordPrompt(TMP), /ENOENT/);
 	});
 
 	it("the desktop package ships the references the build copies beside the server", () => {
 		const builder = fs.readFileSync(path.join(PATHS.root, "electron-builder.yml"), "utf8");
 		assert.match(builder, /- from: \.next\n\s+to: server\n\s+filter:\n\s+- "standalone\/\*\*\/\*"\n\s+- "learning\/\*\*\/\*"/);
-	});
-
-	it("fails on a missing file or heading", () => {
-		assert.throws(() => engineDoctrineSection(TMP, { file: "renamed.md", section: "One" }), /ENOENT/);
-		assert.throws(() => engineDoctrineSection(TMP, { file: "ref.md", section: "Gone" }), /no "## Gone" in ref.md/);
 	});
 });

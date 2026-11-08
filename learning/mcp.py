@@ -24,7 +24,15 @@ PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "learning", "title": "Learning", "version": "6"}
 PACKAGE = Path(__file__).resolve().parent
 SKILL = PACKAGE / "skills" / "tutor"
-GUIDES = ("records", "practice", "course", "lifecycle", "research")
+GUIDES = (
+    "records",
+    "evidence",
+    "teaching",
+    "reviews",
+    "course",
+    "lifecycle",
+    "research",
+)
 TIMEOUT = 60
 
 INSTRUCTIONS = (
@@ -283,7 +291,8 @@ TOOLS: dict[str, tuple[str, Json, Json, Builder | None]] = {
         lambda a: (["sources", "--scan"], ""),
     ),
     "guide": (
-        "Detailed rules: records (patch shapes), practice (exercises, reviews, "
+        "Detailed rules: records (patch shapes), evidence (attempts and grading), "
+        "teaching (the edge, steps, hints, practice), reviews (reviews, the week, "
         "exams), course (course facts), lifecycle (forgetting, planning), research.",
         _schema(
             ("topic",), local=False, topic={"type": "string", "enum": list(GUIDES)}
@@ -466,13 +475,13 @@ def skill_body() -> str:
     return text.strip()
 
 
-def skill_section(title: str, guide: str | None = None) -> str:
-    """One section of the skill or a guide, without its heading.
+def guide_section(title: str, guide: str) -> str:
+    """One section of a guide, without its heading.
 
     A ``##`` section runs to the next ``##`` heading; a ``###`` one also stops
     at the next ``###``.
     """
-    body = skill_body() if guide is None else _guide(guide)
+    body = _guide(guide)
     level = "###" if f"\n### {title}\n" in body else "##"
     start = body.index(f"{level} {title}\n") + len(f"{level} {title}\n")
     stops = ["\n## "] + (["\n### "] if level == "###" else [])
@@ -500,8 +509,9 @@ def get_prompt(name: str, arguments: Any) -> Json:
         parts = [
             "You are the learner's tutor. Run today's review of the `due` topics "
             "below, in that order, with this protocol; answer in the learner's "
-            "language and keep bookkeeping silent.",
-            skill_section("Today's review"),
+            "language, keep bookkeeping silent and `save` once, at the end or when "
+            "the learner leaves.",
+            guide_section("Today's review", "reviews"),
             _resume(chosen),
         ]
     elif name == "mock_exam":
@@ -515,16 +525,17 @@ def get_prompt(name: str, arguments: Any) -> Json:
             "the course's recorded exam format, covering the study path and "
             "weighted to `unready` topics, with this protocol; answer in the "
             "learner's language and keep bookkeeping silent.",
-            skill_section("Oral mock" if oral else "Written mock", "practice"),
+            guide_section("Oral mock" if oral else "Written mock", "reviews"),
             _resume(chosen),
         ]
     else:
         text, _failed = run(None, ["plan", "--all", "--days=7"])
         parts = [
-            "You are the learner's tutor. Look back at the week and propose mixed "
-            "sets across these courses with this protocol; answer in the learner's "
-            "language and keep bookkeeping silent.",
-            skill_section("The week", "practice"),
+            "You are the learner's tutor. The learner accepted the week's "
+            "look-back: look back at the week and propose mixed sets across these "
+            "courses with this protocol, without offering it first; answer in the "
+            "learner's language and keep bookkeeping silent.",
+            guide_section("The week", "reviews"),
             f"Plan (`plan --all`):\n{text}",
         ]
     return {

@@ -32,7 +32,7 @@ The app deletes, because the engine owns it:
 
 The app keeps, as lesson mechanics: the plan tree and its derived statuses, `probe_done` and its assessment (the handoff artifact inside one lesson), `conclude` with `outcome`, `rung`, `missClass` and `retest` (the inputs the agent maps to an attempt), compaction's in-session summary, and the session markdown export.
 
-The engine deletes, because the app owns it: the lesson-conduct text in the tutor skill that restates the app's doctrine (section 5). No engine code is removed.
+The teaching doctrine is one host-neutral text in the engine's tutor references, which the tutor skill and the app both compose (section 5). No engine code is removed.
 
 ## 2. No dual mode
 
@@ -69,12 +69,12 @@ The agent saves each question's attempt with `course_save` in the turn the answe
 
 ## 5. One teaching doctrine
 
-Today the pedagogy is written twice: the app's prompts (`prober/10-probe-doctrine.md`, `teacher/05-method.md`, `20-teaching.md`, `28-predictions.md`, `practice/10-doctrine.md`) and the tutor skill (`SKILL.md`, `references/practice.md`). The app now lives in the journal repository as its own top-level folder, `learnharness/` (Edoardo, 7 Nov; a git subtree that keeps the app's history and AGPL license), so both texts live in one repository, and the doctrine becomes one set of files there.
+The pedagogy used to be written twice: the app's prompts (`prober/10-probe-doctrine.md`, `teacher/05-method.md`, `20-teaching.md`, `28-predictions.md`, `practice/10-doctrine.md`) and the tutor skill (`SKILL.md` and its former `references/practice.md`). The app lives in the journal repository as its own top-level folder, `learnharness/` (Edoardo, 7 Nov; a git subtree that keeps the app's history and AGPL license), so the doctrine is one set of files there.
 
-- **Single source:** the tutor skill's references, split into host-neutral files that name no tools: `learning/skills/tutor/references/evidence.md` (what an attempt is and how it is graded and recorded), `teaching.md` (finding the edge, predict-teach-check, hints, practice, mixing, transfer) and `reviews.md` (today's review, close, the week). Each host adds only a short adapter that maps the doctrine to its own tools: the tutor skill's tool table, and the app's `prompts/course/` fragment for `course_*`, `explain`, `problem` and `conclude`.
-- **How the app reads them (in place):** the course prompt composes the entries of `ENGINE_DOCTRINE` (`src/agent/prompt-segments.ts`) from `config.ts`'s `PATHS.tutorReferences`, the repository-relative `../learning/skills/tutor/references/`. `scripts/build-server.mjs` copies that folder beside the standalone server (`.next/learning/...`, shipped by electron-builder), so the same relative path holds in the desktop payload. `tests/engine-doctrine.test.ts` fails when a named file or section is missing, so a rename in the engine breaks the build rather than a lesson. Until E3, the one entry is the `## Observations` section of `records.md`, the engine's rules for an observation, and `prompts/course/10-record.md` keeps only what is specific to the app (the confidence mapping, grading, the strongest hint, `conclude`).
-- **Where the two differ, the more specific, code-enforced text wins:** commit-before-pose, the R0 to R5 hint ladder, the miss classes and the probe's floor-and-ceiling bracketing come from the app. Evidence, free response, what counts, scheduling, reviews and the close come from the engine. The probe keeps the app's floor-and-ceiling bracketing and skips what the record already shows.
-- **Until the split (request E3),** the app keeps its own teaching doctrine. E3 replaces the `records.md` section entry with the host-neutral whole files and deletes the app's duplicate text.
+- **Single source:** the tutor skill's references, host-neutral files that name no tools (engine request E3, done 8 Nov): `learning/skills/tutor/references/evidence.md` (what an attempt is and how it is graded and recorded), `teaching.md` (finding the edge, predict-teach-check, procedures, hints, practice problems, difficulty, mixing, transfer) and `reviews.md` (today's review, review prompts, lapses, the close, the week, the exam run-up and mocks). Each host adds only a short adapter that maps the doctrine to its own tools: the tutor skill's tool table, and the app's `prompts/course/` fragment for `course_*`, `explain`, `problem` and `conclude`.
+- **How the app reads them (in place):** the course prompt is the adapter `prompts/course/10-record.md` followed by each file listed in `ENGINE_DOCTRINE` (`src/agent/prompt-segments.ts`), whole, from `config.ts`'s `PATHS.tutorReferences`, the repository-relative `../learning/skills/tutor/references/`. `scripts/build-server.mjs` copies that folder beside the standalone server (`.next/learning/...`, shipped by electron-builder), so the same relative path holds in the desktop payload. `tests/engine-doctrine.test.ts` fails when a listed file is missing, so a rename in the engine breaks the build rather than a lesson. Today the one entry is `evidence.md`, and the adapter keeps only what is specific to the app: reading the brief, the opening, the confidence mapping, saving in the turn the answer arrives, `conclude`, keeping the rest current and refused saves.
+- **Where the two differed, the more specific, code-enforced text won:** commit-before-pose, the R0 to R5 hint ladder, the miss classes and the probe's floor-and-ceiling bracketing come from the app, written as practices rather than tool calls. Evidence, free response, what counts, scheduling, reviews and the close come from the engine. The probe keeps the app's floor-and-ceiling bracketing and skips what the record already places.
+- **Next (the app's dedupe):** `ENGINE_DOCTRINE` adds `teaching.md` and `reviews.md`, and the app deletes its duplicate doctrine: the overlapping parts of the prober, teacher and practice prompts, and the adapter's opening and bookkeeping paragraphs that `reviews.md` and the tutor's records rules then state.
 
 ## 6. One interface to the engine
 
@@ -104,24 +104,25 @@ Measured sizes, from copies of the real SMM and AIKR records and the app's compo
 | --- | --- | --- | --- |
 | App system prompt (unchanged by this work) | 13,156 | 35,893 | 25,497 |
 | App tool schemas | 9,228 | 11,900 | 7,420 |
-| Course doctrine (the app's adapter and the engine's observation rules) | 5,533 | 5,533 | 5,533 |
+| Course doctrine (the app's adapter and the engine's `evidence.md`) | 7,474 | 7,474 | 7,474 |
 | `course_*` tool schemas | 2,202 | 2,202 | 2,202 |
 | Course brief, SMM / AIKR | 2,322 / 1,411 | 2,322 / 1,411 | 2,322 / 1,411 |
 
-The course adds about 10.1 KB per turn on SMM (doctrine, tools and brief), against 20 KB for the first bridge, which carried the full `resume`. Composing the engine's observation rules after the move took the doctrine from 3,838 to 5,533 bytes; E3's host-neutral `evidence.md` is the place to win that back. The practice brief equals the teach brief on these records, because their `resume` lists due topics without review prompts; the practice agent reads them with `course_show`. In the live run on a throwaway course before the move (8 Nov, Claude Opus 5.5 through the Claude subscription), the prober's first call carried 11,277 prompt tokens by the provider's count, and later calls in the turn read about 10,600 of them from the cache.
+The course adds about 12.0 KB per turn on SMM (doctrine, tools and brief), against 20 KB for the first bridge, which carried the full `resume`. Composing the engine's observation rules after the move took the doctrine from 3,838 to 5,533 bytes, and E3's whole `evidence.md` to 7,474: it adds the evidence rules the app's prompts lacked (what counts, the miss classes, recurring errors, confidence and self-reports, the learner's work). The app's dedupe wins it back on the system-prompt row, where the duplicate doctrine sits (`practice/10-doctrine.md` alone is 14,947 bytes). The practice brief equals the teach brief on these records, because their `resume` lists due topics without review prompts; the practice agent reads them with `course_show`. In the live run on a throwaway course before the move (8 Nov, Claude Opus 5.5 through the Claude subscription), the prober's first call carried 11,277 prompt tokens by the provider's count, and later calls in the turn read about 10,600 of them from the cache.
 
 ## Delivery
 
 1. **This branch:** the CLI adapter, course required for every session, the New course flow, linking older sessions, free response everywhere with the multiple-choice and confidence code deleted, `target` replaced by `topics`, the role briefs, and the slimmer doctrine. Proven on a throwaway course in the real app, with measured token counts.
 2. **Next branch:** the per-course graph and statement topic tags. It touches extraction, the snapshot, the chain table, the home view and practice picks.
-3. **The move into the journal repository (done):** the engine root defaults to the repository root, and the course prompt composes the engine's observation rules from the same repository. **After request E3:** the app composes the engine's host-neutral doctrine files and deletes its duplicate text.
+3. **The move into the journal repository (done):** the engine root defaults to the repository root, and the course prompt composes the engine's doctrine from the same repository.
+4. **E3, the engine half (done):** the host-neutral `evidence.md`, `teaching.md` and `reviews.md`; the course prompt composes `evidence.md` whole. **Next:** the app composes `teaching.md` and `reviews.md` and deletes its duplicate text.
 
 ## Engine changes requested from the lead thread
 
 - **E1:** a CLI verb `courses`, the same data as the MCP `courses` tool plus `study_roots` from `install.json`. It must list registered workspaces that have no `course.json` yet. Today `plan --all` lists a course only after its first save, and the study roots are readable only from an internal file.
 - **E1 detail:** `courses` must not read the Journal. Today the only listing (`plan --all`) imports the Journal context, so a Journal or iCloud failure hides every course, and the app validates each new session against it.
 - **E2:** `init --title T --create`: create the folder, refuse one that already holds a course, and title it, in one call.
-- **E3 (open, follow-up to the move):** split the tutor skill's references into host-neutral `evidence.md`, `teaching.md` and `reviews.md` that name no tools, keep the host's tool mapping in `SKILL.md`, and merge in the app's code-enforced practices named in section 5. The loader, payload copy and missing-file test are in place: E3 changes `ENGINE_DOCTRINE` to these files and deletes the app's duplicate doctrine. It was left out of the move because merging the two doctrines is a content change to the tutor, not a small behaviour-neutral one.
+- **E3 (engine half done, 8 Nov):** the tutor skill's references are split into host-neutral `evidence.md`, `teaching.md` and `reviews.md` that name no tools (`practice.md` and the `## Observations` section of `records.md` are gone), `SKILL.md` keeps the host's tool mapping, and the app's code-enforced practices named in section 5 are merged in. `ENGINE_DOCTRINE` lists `evidence.md`. Next, in the app: compose `teaching.md` and `reviews.md` and delete the duplicate doctrine.
 - **E5:** `brief --role prober|teacher|practice [--topics T...]`: the role projection of `resume` (section 7), with the teacher's topics joined to their needs' levels, so no selection logic lives in TypeScript.
 - **E6:** a stable course id minted in the workspace manifest and returned by `courses`, so the app keys graphs and links on it instead of the folder path.
 - **E4:** done (journal PR #6, `sure`).
@@ -129,7 +130,7 @@ The course adds about 10.1 KB per turn on SMM (doctrine, tools and brief), again
 ## Decisions taken by default, which Edoardo can change
 
 - Practice attempts count as evidence. This overturns the 29 Sep 2026 ruling that practice is "strengthening, not assessment" and that grading writes nothing; the merged system follows the lead thread's mapping of practice answers to engine attempts.
-- A prediction stated before teaching is saved as an attempt, as the tutor skill's practice reference says ("only the prediction is evidence").
+- A prediction before a plot, simulation or run of code on what was taught is saved as an attempt; a prediction before a step not yet taught is not (8 Nov: recording it would let a guess about untaught material mark a topic lapsed on a later day).
 
 - Graph per course, in the app's data dir. The alternative is next to the course record in the vault, where the tutor could read it too.
 - Multiple-choice graded questions are deleted, not kept for practice-only drills.
