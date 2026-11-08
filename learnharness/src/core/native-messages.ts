@@ -35,7 +35,7 @@
 
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from "@earendil-works/pi-ai";
-import { QUESTION_TOOLS } from "./pending.ts";
+import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
@@ -45,6 +45,7 @@ import {
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
 import type { Confidence } from "./contracts/course.ts";
 import { activeCompactionOf, keptIndexFor } from "./compaction.ts";
+import { parseQuestionInput } from "./tool-parts.ts";
 
 /** The hard-invariant wording for an aborted turn's unanswered calls —
  *  carried over verbatim from the pre-native era so the model's view
@@ -634,7 +635,7 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			const marker = m as LhMarkerMessage;
 			// UI-only markers: plan blocks, and problem dismissals (the
 			// synthesized conclude pair carries the model's face).
-			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			if (isUiOnlyMarker(marker)) continue;
 			// The head supersedes every compaction marker, not only its own
 			// stored position. Without a resolved head, preserve the existing
 			// full-history fallback, including the summary text.
@@ -677,25 +678,93 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 // ─── native scans (the UIMessage-era pending/phase seams, natively) ──────────
 
 /** The pending-question gate (findPendingToolCall's native twin): the
- *  NEWEST assistant message's FIRST question-tool call with no result in
- *  the tail — one question at a time, the dock's subject. */
+ *  NEWEST assistant message's FIRST answerable question-tool call with no
+ *  result in the tail — never a failed generation or malformed fragment. */
 export function danglingQuestionOf(
 	messages: readonly LhMessage[],
 ): { toolCallId: string; tool: string; input: unknown } | null {
-	for (let mi = messages.length - 1; mi >= 0; mi--) {
-		const m = messages[mi]!;
-		if ((m as { role?: string }).role !== "assistant") continue;
-		const assistant = m as AssistantMessage & { id: string };
-		const answered = resultIdsFrom(messages.slice(mi + 1));
-		for (const block of assistant.content) {
-			if (block.type !== "toolCall") continue;
-			if (!(QUESTION_TOOLS as readonly string[]).includes(block.name)) continue;
-			if (answered.has(block.id)) continue;
-			return { toolCallId: block.id, tool: block.name, input: block.arguments };
+	const question = questionCallsOf(messages).find(call => call.status === "answerable");
+	return question ? { toolCallId: question.toolCallId, tool: question.tool, input: question.input } : null;
+}
+
+/** The same authority, retaining native boundaries for the client dock.
+ * Unique call ids are stable even when a live message's local id is replaced
+ * by its persisted stamp. Only colliding ids need an occurrence-qualified
+ * draft/reset key; this never changes stored ids or the answer wire. */
+export function pendingQuestionOf(messages: readonly LhMessage[]): PendingQuestion | null {
+	// turn_end includes the temporary questionResult acknowledgement. The
+	// view ignores it too: it is NOT the learner's answer. Exclude it only
+	// from client authority, leaving persisted/server result policy intact.
+	const question = questionCallsOf(messages.filter(message => !isLiveQuestionPlaceholder(message))).find(call => call.status === "answerable");
+	if (!question) return null;
+	let occurrences = 0;
+	for (const message of messages) {
+		// A streamed c_ assistant can temporarily coexist with its saved
+		// copy during append-only adoption. New live calls are already
+		// uniquified; only settled history establishes reuse.
+		if (message.role !== "assistant" || message.id.startsWith("c_")) continue;
+		for (const call of message.content) {
+			if (call.type === "toolCall" && call.id === question.toolCallId) occurrences++;
 		}
-		return null; // the newest assistant message's questions are all answered
 	}
-	return null;
+	return {
+		toolCallId: question.toolCallId, tool: question.tool, input: question.input,
+		messageId: question.messageId, contentIndex: question.contentIndex,
+		key: occurrences > 1 ? JSON.stringify([question.messageId, question.contentIndex, question.toolCallId]) : question.toolCallId,
+	};
+}
+
+/** Only the transient c_ result with the questionResult contract qualifies.
+ * Real answers have details; errors/aborts remain resolving results. A saved
+ * null result is not reinterpreted by this client-only compatibility seam. */
+function isLiveQuestionPlaceholder(message: LhMessage): boolean {
+	return message.role === "toolResult" && message.id.startsWith("c_") &&
+		!message.isError && message.details === null &&
+		(QUESTION_TOOLS as readonly string[]).includes(message.toolName);
+}
+
+export interface QuestionCall extends Omit<PendingQuestion, "key"> {
+	status: "streaming" | "answerable" | "malformed" | "failed";
+}
+
+/** Newest native assistant only; siblings remain in call order. No result
+ * alone is NOT proof of a posed question: failed generations never execute
+ * their calls, and older records can contain truncated/unvalidated inputs. */
+export function questionCallsOf(messages: readonly LhMessage[]): QuestionCall[] {
+	for (let mi = messages.length - 1; mi >= 0; mi--) {
+		const assistant = messages[mi]!;
+		if (assistant.role !== "assistant") continue;
+		const answered = resultIdsFrom(messages.slice(mi + 1));
+		const calls: QuestionCall[] = [];
+		for (const [contentIndex, block] of assistant.content.entries()) {
+			if (block.type !== "toolCall" || !(QUESTION_TOOLS as readonly string[]).includes(block.name) || answered.has(block.id)) continue;
+			const status = assistant.stopReason === "error" || assistant.stopReason === "aborted" ? "failed"
+				: assistant.stopReason === "pending" ? "streaming"
+				: assistant.stopReason === "length" || block.argumentsError || !parseQuestionInput(block.name, block.arguments) ? "malformed"
+				: "answerable";
+			calls.push({ toolCallId: block.id, tool: block.name, input: block.arguments,
+				messageId: assistant.id, contentIndex, status });
+		}
+		return calls; // never revive older calls, even when this message has none
+	}
+	return [];
+}
+
+/** Background wakes must still wait for an explicit learner action when a
+ * question is unusable. Releasing the composer is not permission to retry. */
+export function hasUnresolvedQuestion(messages: readonly LhMessage[]): boolean {
+	return questionCallsOf(messages).length > 0;
+}
+
+/** The one recovery authority, for the transcript's Retry button and the
+ * server alike. Only while the malformed batch ends the record: after later
+ * learner input, an appended result would follow that input on the wire,
+ * and providers reject every later turn. Client placeholders are loop
+ * acknowledgements, not learner answers. */
+export function malformedQuestionsOf(messages: readonly LhMessage[]): QuestionCall[] {
+	const settled = messages.filter(message => !isLiveQuestionPlaceholder(message));
+	if (trailingBatchOwner(settled) < 0) return [];
+	return questionCallsOf(settled).filter(call => call.status === "malformed");
 }
 
 /** Successful probe_done result MESSAGE ids, in transcript order. A call
@@ -727,12 +796,6 @@ export function probeDoneResultIds(messages: readonly LhMessage[]): Set<string> 
  *  only a concluded call plus a matching successful result means teach. */
 export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 	return probeDoneResultIds(messages).size > 0;
-}
-
-/** Every toolResult id in the record — answer-event validation (the call
- *  must be a DANGLING question call, not an already-answered one). */
-export function answeredCallIds(messages: readonly LhMessage[]): Set<string> {
-	return resultIdsFrom(messages);
 }
 
 // ─── the continuation fold (Wave D: the SDK's
@@ -774,6 +837,15 @@ export function endsInDismissal(messages: readonly LhMessage[]): boolean {
 	return last !== undefined && isDismissedResult(last);
 }
 
+/** The recovery click authorizes its immediate replacement turn, not an
+ * automatic restart if only the write-ahead error results survived. No new
+ * stored latch: explicit input or replacement output changes this tail. */
+export function endsInQuestionRecovery(messages: readonly LhMessage[]): boolean {
+	const last = messages[messages.length - 1];
+	return last?.role === "toolResult" && last.isError &&
+		(last.details as { questionRecovery?: unknown } | null)?.questionRecovery === true;
+}
+
 export type RequestCause = "foreground" | "background";
 export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
@@ -787,6 +859,9 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 		return ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"].includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
+		if (message.isError && (message.details as { questionRecovery?: unknown } | null)?.questionRecovery === true) {
+			return questionCallsOf(history as readonly LhMessage[]).some(call => call.status === "malformed" && call.toolCallId === message.toolCallId && call.tool === message.toolName) ? "learner" : "unrecognizable";
+		}
 		if (!(QUESTION_TOOLS as readonly string[]).includes(message.toolName) || message.isError || message.details == null || (message.details as { dismissed?: boolean }).dismissed) return "neutral";
 		const details = message.details as Partial<QuestionAnswerData>;
 		if (!["ask", "explain"].includes(details.kind ?? "") || typeof details.questionText !== "string" || !Array.isArray(details.answers) || typeof details.answeredAt !== "string") return "unrecognizable";
@@ -825,19 +900,26 @@ export function reconstructRequestCause(messages: readonly LhMessage[]): Reconst
 	return resolve();
 }
 
+/** Markers toLlmMessages drops: the model never sees them between a call
+ *  and its result. */
+function isUiOnlyMarker(m: LhMessage): boolean {
+	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed");
+}
+
+/** The index of the assistant whose call batch ends the record: only its
+ *  tool results and UI-only markers follow it (contiguous by construction —
+ *  the agent appends its batch; the question gate keeps a quiz call and its
+ *  learner answer adjacent). -1 when model-facing input, a context marker,
+ *  or a compaction follows the newest assistant. */
+function trailingBatchOwner(messages: readonly LhMessage[]): number {
+	let i = messages.length - 1;
+	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!))) i--;
+	return messages[i]?.role === "assistant" ? i : -1;
+}
+
 export function needsContinuation(messages: readonly LhMessage[]): boolean {
 	const last = messages[messages.length - 1];
 	if (!last || (last as { role?: string }).role !== "toolResult") return false;
-	// The trailing results batch (contiguous by construction — the agent
-	// appends its batch; the question gate keeps a quiz call and its
-	// learner answer adjacent).
-	let start = messages.length - 1;
-	while (
-		start > 0 &&
-		(messages[start - 1] as { role?: string } | undefined)?.role === "toolResult"
-	) {
-		start--;
-	}
 	// The dismissal rule (A2 + owner ruling 2026-10-03, round-1 incident):
 	// the batch's LAST resolution decides. Ending on a dismissal = the
 	// user signaled STOP — no wake, no reaction owed now; the answers'
@@ -845,14 +927,14 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 	// answer = the reaction is owed. One law with the pump's pause
 	// (endsInDismissal reads the same last result), so continuation,
 	// delivery-holding, and the pause can never disagree.
-	if (isDismissedResult(messages[messages.length - 1]!)) {
+	if (isDismissedResult(messages[messages.length - 1]!) || endsInQuestionRecovery(messages)) {
 		return false;
 	}
-	const owner = messages[start - 1];
-	if (!owner || (owner as { role?: string }).role !== "assistant") return false;
-	const content = (owner as { content?: unknown }).content;
+	const start = trailingBatchOwner(messages);
+	if (start < 0) return false;
+	const content = (messages[start] as { content?: unknown }).content;
 	if (!Array.isArray(content)) return false;
-	const results = messages.slice(start) as ToolResultMessage[];
+	const results = messages.slice(start + 1).filter((m) => m.role === "toolResult") as ToolResultMessage[];
 	// PRACTICE (owner design, 2026-10-04): a batch acking a problem POSE
 	// owes nothing — terminate:true ended that turn DELIBERATELY (the
 	// learner's next thinking submission is the next turn), and unlike a

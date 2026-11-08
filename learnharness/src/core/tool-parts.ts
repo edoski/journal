@@ -77,6 +77,16 @@ export function parseExplainInput(input: unknown): ExplainToolInput | undefined 
 	return cleaned;
 }
 
+/** One display-validity decision for dock authority and recovery. Does not
+ * mutate the recorded input or invent missing authoring fields. */
+export function parseQuestionInput(tool: string, input: unknown): AskToolInput | ExplainToolInput | undefined {
+	switch (tool) {
+		case "explain": case "recall": return parseExplainInput(input);
+		case "ask_user_question": return parseAskInput(input);
+		default: return undefined;
+	}
+}
+
 /** probe_done parse — the core-owned schema the tool itself declares. */
 export function parseProbeDoneInput(input: unknown): ProbeDoneInput | undefined {
 	return boundaryParse<ProbeDoneInput>(probeDoneInputSchema, input);
