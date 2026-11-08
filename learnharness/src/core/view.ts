@@ -34,7 +34,16 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
+import {
+	asAgentMessages,
+	failedOutputCallIds,
+	modelSolutionForConclude,
+	nativeInputCause,
+	PRACTICE_CONCLUDE_TOOL,
+	problemInputForConclude,
+	SEND_TO_USER_TOOL,
+	sendToUserText,
+} from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -123,6 +132,41 @@ function lastSuccessfulPlanInit(parts: LhViewPart[]): number {
 	return idx;
 }
 
+/** The plain text blocks, as `messageId:contentIndex`, that follow a turn's
+ *  last delivered `send_to_user`. The model is told to end the turn there;
+ *  what it writes after is talk about the session ("the attempt is saved",
+ *  a closing message sent twice), never part of the message. A turn starts
+ *  at each learner or automatic input. */
+export function textAfterFinalOutput(messages: readonly LhMessage[]): ReadonlySet<string> {
+	const dropped = new Set<string>();
+	const failed = failedOutputCallIds(messages);
+	const history = asAgentMessages(messages);
+	let delivered = false;
+	let sinceDelivery: string[] = [];
+	messages.forEach((m, i) => {
+		if (m.role !== "assistant") {
+			// The whole record serves as history: it only looks up the call an answer answers.
+			if (nativeInputCause(history[i]!, history) === "neutral") return;
+			delivered = false;
+			sinceDelivery = [];
+			return;
+		}
+		m.content.forEach((block, index) => {
+			if (block.type === "text" && delivered) {
+				const key = `${m.id}:${index}`;
+				dropped.add(key);
+				sinceDelivery.push(key);
+			} else if (block.type === "toolCall" && block.name === SEND_TO_USER_TOOL && !failed.has(block.id) && sendToUserText(block)) {
+				// Text between two deliveries stays: only the turn's last one ends it.
+				for (const key of sinceDelivery) dropped.delete(key);
+				sinceDelivery = [];
+				delivered = true;
+			}
+		});
+	});
+	return dropped;
+}
+
 /** Project the native record (+ live turn working list) into the client's
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
@@ -135,6 +179,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			outputErrors.set(message.toolCallId, message);
 		}
 	}
+
+	const afterFinalOutput = textAfterFinalOutput(messages);
 
 	const lastAssistant = (): LhViewMessage | undefined => {
 		const last = out[out.length - 1];
@@ -224,6 +270,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
+					if (afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });

@@ -161,10 +161,10 @@ describe("send_to_user transcript projection", () => {
 		]), ack()];
 		const before = structuredClone(messages);
 		const view = projectView(messages);
-		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-explain", "text"]);
-		assert.deepEqual(prose(view), ["Before.", "**The lesson.** $x = 1$", "After."]);
+		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-explain"]);
+		assert.deepEqual(prose(view), ["Before.", "**The lesson.** $x = 1$"], "text after the turn's last delivery is not shown");
 		assert.equal(view[0]!.parts.find((p) => p.type === "reasoning")!.text, "Private reasoning.");
-		assert.deepEqual(view[0]!.parts.filter((p) => p.type === "text").map((p) => p.id), ["a1-t0", "a1-t1", "a1-t2"]);
+		assert.deepEqual(view[0]!.parts.filter((p) => p.type === "text").map((p) => p.id), ["a1-t0", "a1-t1"]);
 		assert.deepEqual(messages, before, "projection never rewrites native content");
 		assert.deepEqual(projectView(JSON.parse(JSON.stringify(messages))), view, "reload is identical, without consulting a provider gate");
 	});
@@ -194,6 +194,44 @@ describe("send_to_user transcript projection", () => {
 		});
 		assert.deepEqual(prose(live), []);
 		assert.equal(live[0]!.parts[1]!.state, "output-error");
+	});
+});
+
+describe("plain text after a turn's last send_to_user", () => {
+	const learner = (text: string, id: string): LhMessage => ({ ...newUserMessage(text), id }) as LhMessage;
+
+	it("is dropped, whether in the same message or a later one of the turn", () => {
+		const messages = [
+			learner("can you keep explanations short?", "u1"),
+			assistant([outputCall("Got it, short from now on.")], "a1"),
+			ack(),
+			assistant([fauxText("I've saved your preference for short explanations.")], "a2"),
+			assistant([fauxText("The session is closed and the next step has been sent.")], "a3"),
+		];
+		assert.deepEqual(prose(projectView(messages)), ["Got it, short from now on."]);
+	});
+
+	it("stays when it sits between two deliveries, or when the turn delivered nothing", () => {
+		const between = [
+			learner("hi", "u1"),
+			assistant([outputCall("First.", "send-1"), fauxText("Bridge."), outputCall("Second.", "send-2")], "a1"),
+			ack("send-1"), ack("send-2"),
+		];
+		assert.deepEqual(prose(projectView(between)), ["First.", "Bridge.", "Second."]);
+		const plainOnly = [learner("hi", "u1"), assistant([fauxText("A model without send_to_user answers in plain text.")], "a1")];
+		assert.deepEqual(prose(projectView(plainOnly)), ["A model without send_to_user answers in plain text."]);
+	});
+
+	it("is shown again in the next turn, and a failed delivery does not count", () => {
+		const messages = [
+			learner("one", "u1"),
+			assistant([outputCall("Reply one.", "send-1")], "a1"), ack("send-1"),
+			learner("two", "u2"),
+			assistant([fauxText("Reply two, in plain text.")], "a2"),
+			learner("three", "u3"),
+			assistant([outputCall("Broken.", "send-3"), fauxText("Fallback text.")], "a3"), ack("send-3", true),
+		];
+		assert.deepEqual(prose(projectView(messages)), ["Reply one.", "Reply two, in plain text.", "Fallback text."]);
 	});
 });
 
