@@ -160,4 +160,10 @@ describe("SessionRow practice badge (practice sessions, 2026-10-04)", () => {
 		const html = render(item({ kind: "practice", pendingProblem: true }));
 		assert.match(html, /Problem waiting ·/);
 	});
+
+	it("while the tutor grades a submitted attempt the row says Working, not waiting", () => {
+		const html = render(item({ kind: "practice", pendingProblem: true, busy: true }));
+		assert.match(html, /Working…/);
+		assert.doesNotMatch(html, /Problem waiting/);
+	});
 });

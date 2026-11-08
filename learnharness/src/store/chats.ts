@@ -29,9 +29,10 @@ function chatFile(id: string): string {
  *  appendTurnUsage, appendExtractionUsage, saveSettings, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
  *  spam the bus, and every list-visible change it causes (title, order,
- *  phase, busy, pendingQuestion) is already announced by turn-started /
- *  turn-settled, which the sidebar refetches on. Silence here is law,
- *  not oversight. */
+ *  phase, busy, pendingQuestion, pendingProblem) is already announced by
+ *  turn-started / turn-settled, or for a turn-less write (a dismissal,
+ *  compaction) by record-changed, which the sidebar refetches on. Silence
+ *  here is law, not oversight. */
 function createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord {
 	const now = new Date().toISOString();
 	const record: ChatRecord = {
@@ -108,13 +109,17 @@ function listChats(): ChatSummary[] {
 						// NOT record-derived — the API route merges it (ChatListItem).
 						phase: phaseAt3Lh(messages),
 						pendingQuestion: danglingQuestionOf(messages) !== null,
+						// Practice: a posed problem with no conclude (the sidebar's
+						// "Problem waiting"); false on teaching sessions, which
+						// have no problem tool.
+						pendingProblem: summary.kind === "practice" && activeProblemOf(messages) !== null,
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);
 					return null;
 				}
 			})
-			.filter((s): s is ChatSummary => s !== null)
+			.filter((s) => s !== null)
 			.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 	} catch {
 		return [];
