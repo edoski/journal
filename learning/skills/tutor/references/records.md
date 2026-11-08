@@ -63,7 +63,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 `path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
-A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
+A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the session's first save. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 
 ## Knowledge
 
@@ -71,7 +71,7 @@ Understanding of the course that is costly to rebuild: notation correspondences,
 
 ## Preferences
 
-`{"preferences": {"explanation_depth": "Short first, details on request"}}` sets a course preference; `global_preferences` sets one for every course. One instruction per dimension (`response_format`, `explanation_depth`, `lesson_pace`, `question_style`, `teaching_style`, or another short name); `null` deletes. Record them from the learner's explicit feedback, or a narrow one from repeated feedback; never from silence or praise. A one-answer request ("bullets this time") stays in the conversation; a condition for one unfinished task goes in that task's `note`.
+`{"preferences": {"explanation_length": "short"}}` sets a course preference; `global_preferences` sets one for every course. One instruction per dimension (`response_format`, `explanation_depth`, `lesson_pace`, `question_style`, `teaching_style`, or another short name); `null` deletes. Record them from the learner's explicit feedback ("keep explanations short, I read on my phone"), or a narrow one from repeated feedback; never from silence or praise. A preference is never a `knowledge` entry. A one-answer request ("bullets this time") stays in the conversation; a condition for one unfinished task goes in that task's `note`.
 
 ## Sources
 

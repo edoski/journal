@@ -340,6 +340,16 @@ def _unknown_field(name: str, fields: Collection[str], path: str) -> str:
     )
 
 
+def _misfiled(kind: str, value: dict[str, Any]) -> str:
+    """Points a knowledge entry that calls itself a preference to ``preferences``."""
+    if kind != "knowledge" or "prefer" not in str(value).casefold():
+        return ""
+    return (
+        '; a teaching preference is not knowledge: save it under "preferences", '
+        'e.g. {"preferences": {"explanation_length": "short"}}'
+    )
+
+
 def slug(value: str) -> str:
     """The closest valid handle for free text, e.g. ``Rank and Nullity``."""
     folded = unicodedata.normalize("NFKD", value.casefold())
@@ -569,7 +579,9 @@ def entry(
     helpers = {} if patch else HELPERS.get(kind, {})
     for name in value:
         if name not in allowed and name not in helpers:
-            raise ValueError(_unknown_field(name, allowed, path))
+            raise ValueError(
+                _unknown_field(name, allowed, path) + _misfiled(kind, value)
+            )
     order = value if patch else [*allowed, *helpers]
     result: dict[str, Any] = {}
     for name in order:

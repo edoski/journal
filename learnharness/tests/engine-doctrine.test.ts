@@ -71,6 +71,19 @@ describe("engine doctrine", () => {
 		assert.ok(practice.includes("cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception;"));
 	});
 
+	it("every agent reads how to keep the record coherent from one session to the next", () => {
+		for (const agent of AGENTS) {
+			const prompt = normalize(courseRecordPrompt(agent));
+			assert.ok(prompt.includes("When more than five topics are due, or any are due within 21 days of the exam, an open-ended start says so in one line"), `${agent}: the backlog`);
+			assert.ok(prompt.includes("with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue"), `${agent}: focus`);
+			assert.ok(prompt.includes('`{"preferences": {"explanation_length": "short"}}` sets a course preference') && prompt.includes("A preference is never a `knowledge` entry."), `${agent}: preferences`);
+			assert.ok(headings(courseRecordPrompt(agent)).includes("Exam facts"), `${agent}: exam facts`);
+		}
+		for (const agent of ["teacher", "practice"] as const) {
+			assert.ok(normalize(courseRecordPrompt(agent)).includes("Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete"), `${agent}: the close`);
+		}
+	});
+
 	it("carries the practice rules approved in the app, word for word", () => {
 		const practice = normalize(courseRecordPrompt("practice"));
 		for (const approved of [

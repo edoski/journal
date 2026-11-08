@@ -8,6 +8,8 @@
 4. Put the next question in the same message. No recap.
 5. Record one attempt per answer, with the question asked as `text`, `response`, `help`, `result`, `sure` and `chose`. A confident error also rewrites `gap` and the `prompt`; broken reasoning rewrites `gap`. Only the first try on a due day counts; retries are relearning.
 
+When more than five topics are due, or any are due within 21 days of the exam, an open-ended start says so in one line (how many, and the most overdue) and proposes a review block before new material; the learner decides.
+
 Ask once per course whether reviews are done with closed notes and store the answer as the course preference `review_notes`; with open notes, attempts are `uncertain`. A mock replaces the day's review for the topics it covers.
 
 ## Review prompts and key points
@@ -20,7 +22,7 @@ A missed review is a planning fact, not evidence of forgetting: the topic stays 
 
 ## The close
 
-In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message is that step itself, not an administrative recap.
+In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message is that step itself, not an administrative recap. Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete, and set `focus` to the one to continue.
 
 ## The week
 
