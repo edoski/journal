@@ -10,6 +10,7 @@ import {
 	isBinaryFile,
 	matchGlob,
 	MAX_OUTPUT_BYTES,
+	homePath,
 	resolveSourcePath,
 	truncateGrepLine,
 	walkFiles,
@@ -33,7 +34,7 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const grepInputFor = (defaultLabel: string) => Type.Object({
 	pattern: Type.String({ minLength: 1, description: "Search pattern (regex or literal string)" }),
 	path: Type.Optional(
-		Type.String({ description: `Directory or file to search (default: ${defaultLabel})` }),
+		Type.String({ description: `Directory or file to search (default: ${defaultLabel}; a relative path starts from the learner's home)` }),
 	),
 	glob: Type.Optional(Type.String({ description: "Filter files by glob pattern, e.g. '*.ts' or '**/*.spec.ts'" })),
 	ignoreCase: Type.Optional(Type.Boolean({ description: "Case-insensitive search (default: false)" })),
@@ -136,9 +137,11 @@ export function createGrepTool(courseDir?: string): AgentTool<ReturnType<typeof 
 					continue;
 				}
 				const lines = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-				const rel = isDirectory
-					? path.relative(searchPath, filePath).split(path.sep).join("/")
-					: path.basename(filePath);
+				const rel = !input.path && courseDir
+					? homePath(filePath)
+					: isDirectory
+						? path.relative(searchPath, filePath).split(path.sep).join("/")
+						: path.basename(filePath);
 
 				for (let i = 0; i < lines.length; i++) {
 					if (regex.test(lines[i]!)) {

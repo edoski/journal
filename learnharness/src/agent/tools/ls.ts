@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import { capOutput, formatSize, MAX_OUTPUT_BYTES, resolveSourcePath } from "./fs-shared.ts";
+import { capOutput, formatSize, homePath, MAX_OUTPUT_BYTES, resolveSourcePath } from "./fs-shared.ts";
 
 /**
  * The ls tool — sources v1 (2026-09-19): a Node port of pi's
@@ -17,7 +17,7 @@ const DEFAULT_LIMIT = 500;
 
 const lsInputFor = (defaultLabel: string) => Type.Object({
 	path: Type.Optional(
-		Type.String({ description: `Directory to list (default: ${defaultLabel})` }),
+		Type.String({ description: `Directory to list (default: ${defaultLabel}; a relative path starts from the learner's home)` }),
 	),
 	limit: Type.Optional(
 		Type.Integer({ description: "Maximum number of entries to return (default: 500)" }),
@@ -64,7 +64,8 @@ export function createLsTool(courseDir?: string): AgentTool<ReturnType<typeof ls
 				const fullPath = path.join(dirPath, entry);
 				try {
 					const entryStat = await fs.stat(fullPath);
-					lines.push(entryStat.isDirectory() ? `${entry}/` : entry);
+					const shown = input.path || !courseDir ? entry : homePath(fullPath);
+					lines.push(entryStat.isDirectory() ? `${shown}/` : shown);
 				} catch {
 					// pi: skip entries it cannot stat
 				}

@@ -231,17 +231,25 @@ function checkedSourcePath(absolute: string, denied: (absolute: string) => boole
 	return real;
 }
 
-/** Relative/absent → home; leading ~ expands, ~user stays literal. Return
- *  the CHECKED canonical location for IO, not an unchecked symlink alias.
- *  These path checks are not protection against a hostile concurrent OS user. */
-/** A path the model gave, resolved against the learner's home; with none,
- *  `defaultDir` (the session's course folder) or else home. */
+/** Relative → home; absent → `defaultDir` (the session's course folder) or
+ *  else home; leading ~ expands, ~user stays literal. Return the CHECKED
+ *  canonical location for IO, not an unchecked symlink alias. These path
+ *  checks are not protection against a hostile concurrent OS user. */
 export function resolveSourcePath(p?: string, defaultDir?: string): string {
 	const home = os.homedir();
 	const resolved = !p ? (defaultDir ?? home) : p === "~" || p.startsWith("~/") || p.startsWith(`~${path.sep}`)
 		? path.join(home, p.slice(1))
 		: path.resolve(home, p);
 	return checkedSourcePath(resolved, sourcePathCheck(home));
+}
+
+/** A result path a search rooted in the course folder prints: one `read`
+ *  and `pdf` open as given (`~/…` inside home, else absolute), since a
+ *  relative path resolves against home, not the course folder. */
+export function homePath(absolute: string): string {
+	const rel = path.relative(os.homedir(), absolute);
+	const inside = rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+	return inside ? `~/${rel.split(path.sep).join("/")}` : absolute;
 }
 
 /** pi's formatSize idiom (50KB prints as "50.0KB"). */

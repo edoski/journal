@@ -2,7 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentEvent, AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
 import { providerEventObserver } from "./provider-events.ts";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import { PATHS } from "../../config.ts";
 import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
 import { courseRecordPrompt, effectivePromptSegments } from "./prompt-segments.ts";
@@ -189,13 +189,17 @@ const SEARCH_TOOLS: Record<string, { shared: AgentTool<any>; create: (courseDir:
 	ls: { shared: lsTool, create: createLsTool },
 };
 
-/** In a course session, a file search with no path stays in the course
- *  folder rather than the learner's whole home. */
-function courseRooted(tool: AgentTool<any, any>, courseDir: string | undefined): AgentTool<any, any> {
-	const search = courseDir ? SEARCH_TOOLS[tool.name] : undefined;
-	if (!search || tool.execute !== search.shared.execute) return tool;
-	const rooted = search.create(courseDir!);
-	return { ...tool, parameters: rooted.parameters, execute: rooted.execute };
+/** The shared file tools, bound to this agent: `read` to its model, so
+ *  images fit its limits, and in a course session the searches to the course
+ *  folder, so a search with no path stays out of the rest of the learner's
+ *  home. A tool that is not the shared one is left as it is. */
+function sessionTool(tool: AgentTool<any, any>, model: Model<Api>, courseDir: string | undefined): AgentTool<any, any> {
+	if (tool.name === "read" && tool.execute === readTool.execute) {
+		return { ...tool, execute: createReadTool(model).execute as AgentTool<any>["execute"] };
+	}
+	const search = SEARCH_TOOLS[tool.name];
+	if (!courseDir || !search || tool.execute !== search.shared.execute) return tool;
+	return withArgumentHeal(search.create(courseDir));
 }
 
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
@@ -223,17 +227,12 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			thinkingLevel: engine.level,
 			// Conditional registry inclusion, like the graph-tool gates: when
 			// closed, neither the tool nor its usage instructions reach the model.
-			// The shared read tool is rebound to this agent's model, in every
-			// registry including explicit ones, so images fit its limits. The
+			// The shared file tools are bound to this agent (sessionTool), in
+			// every registry including explicit ones. The
 			// send_to_user gate matches Claude across providers (including
 			// OpenRouter), not the API transport; explicit registries opt out.
 			tools: [
-				...tools.map((tool) => courseRooted(
-					tool.name === "read" && tool.execute === readTool.execute
-						? { ...tool, execute: createReadTool(engine.model).execute as AgentTool<any>["execute"] }
-						: tool,
-					opts.course?.course.workspace,
-				)),
+				...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
 				...(opts.course ? Object.values(courseTools(opts.course)) : []),
 				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
 					? [withArgumentHeal(sendToUserTool)]

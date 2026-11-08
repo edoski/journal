@@ -8,6 +8,7 @@ import {
 	formatSize,
 	MAX_OUTPUT_BYTES,
 	matchGlob,
+	homePath,
 	resolveSourcePath,
 	walkFiles,
 } from "./fs-shared.ts";
@@ -30,7 +31,7 @@ const findInputFor = (defaultLabel: string) =>
 			minLength: 1,
 			description: "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
 		}),
-		path: Type.Optional(Type.String({ description: `Directory to search in (default: ${defaultLabel})` })),
+		path: Type.Optional(Type.String({ description: `Directory to search in (default: ${defaultLabel}; a relative path starts from the learner's home)` })),
 		limit: Type.Optional(Type.Integer({ description: "Maximum number of results (default: 1000)" })),
 	});
 
@@ -65,7 +66,7 @@ export function createFindTool(courseDir?: string): AgentTool<ReturnType<typeof 
 						limitReached = true;
 						return true; // stop the walk
 					}
-					matches.push(rel);
+					matches.push(input.path || !courseDir ? rel : homePath(filePath));
 					return false;
 				},
 				ctx?.signal,

@@ -263,7 +263,7 @@ describe("a course-linked turn", () => {
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
-	it("a course session's file search defaults to the course folder", () => {
+	it("a course session's file search defaults to the course folder", async () => {
 		const agent = createPracticeAgent(
 			{ chatId: "chat_files", chatStore },
 			{ engine: scripted([]), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never } },
@@ -271,8 +271,12 @@ describe("a course-linked turn", () => {
 		for (const name of ["find", "grep", "ls"]) {
 			const tool = agent.state.tools.find((t) => t.name === name)!;
 			const description = (tool.parameters as { properties: { path: { description: string } } }).properties.path.description;
-			assert.match(description, /default: the course folder/, name);
+			assert.match(description, /default: the course folder; a relative path starts from the learner's home/, name);
 		}
+		fs.writeFileSync(path.join(LINALG, "lecture-1.md"), "rank\n");
+		const ls = agent.state.tools.find((t) => t.name === "ls")!;
+		const listing = await ls.execute("ls1", ls.prepareArguments ? ls.prepareArguments({}) : {});
+		assert.equal((listing.content[0] as { text: string }).text, path.join(LINALG, "lecture-1.md"), "ls with no path lists the course folder, as paths read opens");
 	});
 
 	it("probe phase: a course-linked prober asks by free recall, even under the retired multiple-choice setting", async () => {

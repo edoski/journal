@@ -160,9 +160,12 @@ describe("source access: canonical roots and all tool paths", () => {
 
 	it("in a course, a search with no path stays in the course folder; an explicit path still reaches home", async () => {
 		const course = path.join(home, "courses", "stat");
-		assert.equal(await text(createFindTool(course), { pattern: "lecture*" }), "lecture-3.md");
-		assert.equal(await text(createLsTool(course), {}), "lecture-3.md");
-		assert.match(await text(createGrepTool(course), { pattern: "lecture" }), /^lecture-3\.md:1: the course's lecture$/);
+		const found = await text(createFindTool(course), { pattern: "lecture*" });
+		assert.equal(found, "~/courses/stat/lecture-3.md", "a course-folder result is a path read opens as given");
+		assert.match(await text(readTool, { path: found }), /the course's lecture/);
+		assert.equal(await text(createLsTool(course), {}), "~/courses/stat/lecture-3.md");
+		assert.match(await text(createGrepTool(course), { pattern: "lecture" }), /^~\/courses\/stat\/lecture-3\.md:1: the course's lecture$/);
+		assert.equal(await text(createLsTool(course), { path: "~/courses/stat" }), "lecture-3.md", "an explicit path keeps pi's relative output");
 		assert.match(await text(createFindTool(course), { pattern: "lecture*", path: "~/Downloads" }), /lecture-3-flyer\.md/);
 		const everywhere = await text(findTool, { pattern: "lecture*" });
 		assert.match(everywhere, /Downloads\/lecture-3-flyer\.md/, "without a course the default is still home");
