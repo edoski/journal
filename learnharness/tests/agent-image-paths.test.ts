@@ -47,7 +47,11 @@ const { createTeacherAgent, createProberAgent, createPracticeAgent } = await imp
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
 const { runVisualMaker } = await import("../src/agent/subagents/visual-maker.ts");
 
-const PDF = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
+/** A copy outside the checkout: a checkout under a protected home folder
+ *  (an agent worktree in ~/.t3) is itself off-limits to the file tools. */
+const PDF = path.join(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
+fs.copyFileSync(path.join(import.meta.dirname, "fixtures", "sample-3page.pdf"), PDF);
+process.on("exit", () => fs.rmSync(path.dirname(PDF), { recursive: true, force: true }));
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="4800" height="120" viewBox="0 0 4800 120"><rect width="4800" height="120" fill="white"/></svg>';
 const CUSTOM_RESIZE = { maxWidth: 320, maxHeight: 200 };
 
