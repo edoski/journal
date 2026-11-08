@@ -19,8 +19,7 @@ directories:
 #         macOS 26+ renders the true layered icon) + an actool fallback icns
 #         capped at 256px, which scripts/after-pack.cjs swaps for the
 #         hand-packed full-res build/icon.icns (pre-Tahoe keeps 16→1024).
-#         Requires actool ≥ 26: desktop:dist injects DEVELOPER_DIR locally;
-#         the release workflow's mac job runs setup-xcode.
+#         Requires actool ≥ 26: desktop:dist injects DEVELOPER_DIR locally.
 #   win   build/icon.ico  — generated (16→256) from the flat design by
 #         scripts/make-icons.mjs.
 #   linux build/icon.png  — 512×512, same script. Rounded squircle with
@@ -54,33 +53,6 @@ files:
   - "!**/*"
   - electron/**/*
   - package.json
-  # Auto-update (Wave C, 2026-10-10): electron-updater + its runtime tree
-  # re-included explicitly. The negation above excludes node_modules, and
-  # the shell's bare positives can't re-include them — these explicit
-  # node_modules positives do (gitignore order: the LAST matching pattern
-  # wins; verified post-build by listing the asar — see desktop:dist notes).
-  # Tree fact-checked via each package's declared dependencies:
-  # electron-updater → fs-extra, js-yaml, lazy-val, lodash.escaperegexp,
-  # lodash.isequal, semver, tiny-typed-emitter, builder-util-runtime;
-  # builder-util-runtime → debug, sax; fs-extra → graceful-fs, jsonfile,
-  # universalify; debug → ms; jsonfile → universalify (again); js-yaml →
-  # argparse. Keep in sync when electron-updater bumps (npm ls --all).
-  - node_modules/electron-updater/**/*
-  - node_modules/fs-extra/**/*
-  - node_modules/js-yaml/**/*
-  - node_modules/lazy-val/**/*
-  - node_modules/lodash.escaperegexp/**/*
-  - node_modules/lodash.isequal/**/*
-  - node_modules/semver/**/*
-  - node_modules/tiny-typed-emitter/**/*
-  - node_modules/builder-util-runtime/**/*
-  - node_modules/debug/**/*
-  - node_modules/sax/**/*
-  - node_modules/graceful-fs/**/*
-  - node_modules/jsonfile/**/*
-  - node_modules/universalify/**/*
-  - node_modules/ms/**/*
-  - node_modules/argparse/**/*
   # Main-process ID-token signature verification (no bundled OAuth implementation).
   - node_modules/jose/**/*
 extraResources:
@@ -109,14 +81,8 @@ mac:
     - from: electron/server-title-guard.cjs
       to: server-title-guard.cjs
   icon: build/icon.icon
-  # zip rides next to dmg (flipped 2026-10-08): Squirrel.Mac — Electron's
-  # macOS auto-updater — installs from ZIP and cannot read DMGs. DMG is
-  # for humans; ZIP + blockmap are the updater's payload.
   target:
     - target: dmg
-      arch:
-        - arm64
-    - target: zip
       arch:
         - arm64
   # Locale trim (payload wave, 2026-09-24): English-only app — cuts
@@ -157,10 +123,9 @@ win:
       arch:
         - x64
   artifactName: "${productName}-${version}-${arch}-setup.${ext}"
-  # Unsigned Windows release (owner ruling): preserve icon/version metadata,
-  # skip signing, and do not require a publisher signature for updates.
+  # Unsigned Windows build (owner ruling): preserve icon/version metadata,
+  # skip signing.
   signExecutable: false
-  verifyUpdateCodeSignature: false
 nsis:
   oneClick: true
   perMachine: false
@@ -177,17 +142,5 @@ linux:
   category: Education
   # Match Electron's app_id/WM_CLASS to the installed desktop launcher.
   syncDesktopName: true
-  # Both targets update via electron-updater 6.8.9. AppImage replaces its
-  # own file; deb uses dpkg/apt and may request administrator permission.
-publish:
-  # Update feed = GitHub Releases (decided 2026-10-08): latest-mac.yml +
-  # zip/blockmap live on releases; electron-updater reads them anonymously.
-  # REQUIRES THE REPO TO BE PUBLIC before 0.3.0 ships — anonymous downloads
-  # from a private repo are impossible, and a token baked into the app
-  # would be a leak. desktop:dist passes no --publish flag, so builds never
-  # upload; publishing happens at release time (GH_TOKEN + --publish).
-  - provider: github
-    owner: amosblomqvist
-    repo: learnharness
-    # All three CI jobs contribute assets; only the owner publishes it.
-    releaseType: draft
+# No update feed: the fork ships no releases and the app has no updater.
+publish: null
