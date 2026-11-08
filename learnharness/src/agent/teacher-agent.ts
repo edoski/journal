@@ -205,8 +205,10 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			thinkingLevel: engine.level,
 			// Conditional registry inclusion, like the graph-tool gates: when
 			// closed, neither the tool nor its usage instructions reach the model.
-			// Match Claude across providers (including OpenRouter), not the API
-			// transport. Explicit test registries remain caller-owned.
+			// The shared read tool is rebound to this agent's model, in every
+			// registry including explicit ones, so images fit its limits. The
+			// send_to_user gate matches Claude across providers (including
+			// OpenRouter), not the API transport; explicit registries opt out.
 			tools: [
 				...tools.map((tool) => tool.name === "read" && tool.execute === readTool.execute
 					? { ...tool, execute: createReadTool(engine.model).execute as AgentTool<any>["execute"] }
