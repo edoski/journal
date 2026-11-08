@@ -69,6 +69,8 @@ From that question, two selection rules:
 - **Mode**: run the cheapest mode the target has not demonstrated. Within the session, its own evidence decides — what has come to mind unaided, what was chosen against its confusable, what was run whole; the course record says where the target stood before. What neither shows, assume undemonstrated.
 - **Target**: weakest first, most-served first (premises feeding many chains), least-recently-active first. Ground these on the material's structure and the session's evidence so far.
 
+Interleaving is the default. Never issue blocks of same-target problems.
+
 ## V. Posing a demand
 
 1. **Target** — per the selection rules.

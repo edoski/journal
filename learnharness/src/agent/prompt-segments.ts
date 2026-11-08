@@ -124,42 +124,50 @@ export function effectivePromptSegments(
 	});
 }
 
-/** One file of the engine's doctrine: whole, or its opening (the text
- *  before its first `## ` heading) followed by the listed `## ` sections. */
-export type DoctrinePart = { readonly file: string; readonly sections?: readonly string[] };
+/** One file of the engine's doctrine: whole, or its opening (the title and
+ *  the text before its first `## ` heading) followed by the listed `## `
+ *  sections. `intro: false` keeps only the title of the opening, for an agent
+ *  whose job the opening's general rules do not fit. */
+export type DoctrinePart =
+	| { readonly file: string }
+	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false };
 
 /** What each agent composes from the tutor skill's host-neutral references,
  *  so the tutor and the app teach from one text and each agent reads only
- *  the parts its job uses. The exam run-up and the week are left out: they
- *  read figures the app's course brief does not carry. */
+ *  the parts its job uses. Left out: the week and the exam run-up, which
+ *  read figures the app's course brief does not carry, and *Difficulty*,
+ *  which practice states more specifically in its own doctrine. The prober
+ *  skips teaching.md's opening: it measures, and the lesson's teaching
+ *  rules belong to the teacher. */
 export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
 	prober: [
 		{ file: "evidence.md" },
-		{ file: "teaching.md", sections: ["Finding the edge"] },
+		{ file: "teaching.md", sections: ["Finding the edge"], intro: false },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
 	],
 	teacher: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
-		{ file: "reviews.md", sections: ["Review prompts and key points", "Missed reviews and lapses", "The close"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
 	],
 	practice: [
 		{ file: "evidence.md" },
-		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Difficulty", "Mixing methods", "Transfer", "Corrections and diagrams"] },
+		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
 	],
 };
 
-function doctrineText(dir: string, { file, sections }: DoctrinePart): string {
-	const text = fs.readFileSync(path.join(dir, file), "utf-8").trim();
-	if (!sections) return text;
-	const [opening = "", ...rest] = text.split(/\r?\n(?=## )/);
-	const picked = sections.map((title) => {
-		const section = rest.find((part) => part.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
-		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${file}`);
+function doctrineText(dir: string, part: DoctrinePart): string {
+	const text = fs.readFileSync(path.join(dir, part.file), "utf-8").trim();
+	if (!("sections" in part)) return text;
+	const [opening = "", ...rest] = `\n${text}`.split(/\r?\n(?=## )/);
+	const picked = part.sections.map((title) => {
+		const section = rest.find((chunk) => chunk.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
+		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${part.file}`);
 		return section.trim();
 	});
-	return [opening.trim(), ...picked].join("\n\n");
+	const head = part.intro === false ? (opening.trim().split(/\r?\n/, 1)[0] ?? "") : opening.trim();
+	return [head, ...picked].filter(Boolean).join("\n\n");
 }
 
 /** The course-record doctrine, appended to every agent's prompt in a

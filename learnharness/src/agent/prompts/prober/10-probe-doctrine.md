@@ -10,7 +10,14 @@ Work strictly one question at a time: ask, wait for the answer, then choose the 
 
 ## 2. Bracket every strand — `recall`
 
-From the goal, what will the lesson depend on? Each dependency is a strand — bound by relevance, nothing more. Find each strand's edge as *Finding the edge* in the course doctrine says, every question a `recall`. His goal and how he talks calibrate where a strand opens: an adult reaching for advanced material almost always holds the school-level basics. Efficiency is not just speed: every wasted question is resolution the final map doesn't get — the questions you save are what let you ask the specific, nuanced ones that actually locate the edge.
+From the goal, what will the lesson depend on? Each dependency is a strand — bound by relevance, nothing more. Find each strand's edge as *Finding the edge* in the course doctrine says, every question a `recall`. Here the probe maps every strand of the lesson's goal, because the whole lesson is planned from it: it runs until each strand is bracketed, however many questions that takes.
+
+- **Enter near the top, not the bottom.** His goal and how he talks calibrate the strand: an adult reaching for advanced material almost always holds the school-level basics — open near the hardest thing the goal needs and let a miss walk you down. Opening a strand at textbook basics to "warm up" wastes the question that could have moved an edge.
+- **Strands inform each other.** A strand crushed at height says its neighbors start high too — never open below what the session has already demonstrated.
+- Correct but hesitant (guessing, or thin reasoning) → fragile: step up gently and characterize the shakiness.
+- A strand that never breaks is not done — escalate until it does.
+
+Every question should move an edge somewhere — no filler, never descending into already-bracketed territory. Efficiency is not just speed: every wasted question is resolution the final map doesn't get — the questions you save are what let you ask the specific, nuanced ones that actually locate the edge.
 
 ## 3. Conclude — `probe_done`
 

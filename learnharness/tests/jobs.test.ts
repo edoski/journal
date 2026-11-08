@@ -45,7 +45,6 @@ import {
 	buildProbeHandoffSteer,
 } from "../src/core/contracts.ts";
 import { composeInstructions, createTeacherAgent } from "../src/agent/teacher-agent.ts";
-import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
@@ -1427,9 +1426,8 @@ describe("prompt composition", () => {
 
 	it("the predict-check cycle composes into the teacher; the craft chunk reaches BOTH agents (owner 2026-10-03)", () => {
 		const teacher = composeInstructions("teacher");
-		// the cycle is the engine's chain; the app maps its two questions onto `type`
-		assert.ok(courseRecordPrompt("teacher").includes("is predict, teach, check"), "the cycle line is in");
-		assert.ok(courseRecordPrompt("teacher").includes("Skip it when there is nothing to anticipate"), "the skip rule is in");
+		// the cycle is the engine's chain (tests/engine-doctrine.test.ts); the app maps its two questions onto `type`
+		assert.ok(teacher.includes("as *The chain* in the course doctrine sets out"), "the cycle points to the chain");
 		assert.ok(teacher.includes('The prediction (`type: "predict"`)'), "the prediction role section is in");
 		assert.ok(teacher.includes('The check (`type: "check"`)'), "the check role section is in");
 		// the craft + thinking channels (shared/20-question-tools.md) — BOTH agents
@@ -1444,7 +1442,6 @@ describe("prompt composition", () => {
 		}
 		// the cycle is teach-phase doctrine — it never composes into the prober
 		assert.ok(!prober.includes('type: "predict"'), "the question types stay out of the prober");
-		assert.ok(!courseRecordPrompt("prober").includes("## The chain"), "the teaching cycle stays out of the prober");
 	});
 
 	it("the sources-v0 prompt lines compose: read/pdf doctrine in the teacher, the read line in the prober", () => {
