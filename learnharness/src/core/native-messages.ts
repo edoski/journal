@@ -849,6 +849,20 @@ export function endsInQuestionRecovery(messages: readonly LhMessage[]): boolean 
 export type RequestCause = "foreground" | "background";
 export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
+/** Markers that carry context, never a new input. */
+const NEUTRAL_MARKERS = ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"];
+
+/** Whether a message is an input that starts a new agent turn: exactly
+ *  the messages `nativeInputCause` does not call neutral, decided without
+ *  the history it needs only to tell learner from unrecognizable. */
+export function opensTurn(message: LhMessage): boolean {
+	if (message.role === "user") return true;
+	if (message.role === "custom") return !NEUTRAL_MARKERS.includes(message.customType);
+	if (message.role !== "toolResult") return false;
+	if (message.isError) return (message.details as { questionRecovery?: unknown } | null)?.questionRecovery === true;
+	return (QUESTION_TOOLS as readonly string[]).includes(message.toolName) && message.details != null && !(message.details as { dismissed?: boolean }).dismissed;
+}
+
 /** Native causes only: flattened user roles, IDs' prefixes and prose confer no permission. */
 export function nativeInputCause(message: AgentMessage, history: readonly AgentMessage[]): NativeInputCause {
 	if (message.role === "user") return "learner";
@@ -856,7 +870,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "custom") {
 		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
-		return ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"].includes(message.customType) ? "neutral" : "unrecognizable";
+		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {
 		if (message.isError && (message.details as { questionRecovery?: unknown } | null)?.questionRecovery === true) {
