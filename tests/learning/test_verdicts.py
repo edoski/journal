@@ -205,6 +205,20 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
     assert course.due == on(12).isoformat()
 
 
+def test_a_topic_a_correction_removes_is_rescheduled_from_its_remaining_verdicts() -> (
+    None
+):
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", topics=["a", "b"], text="mixed problem"))
+    assert course.due == on(6).isoformat()
+    course.attempts(
+        5, att("incorrect", topics=["b"], text="mixed problem, b only", corrects=["o2"])
+    )
+    assert course.verdicts == [(on(1).isoformat(), "solid")]
+    assert course.scheduled.reviews["a"] == {"due": on(4).isoformat(), "by": "engine"}
+    assert course.due == on(4).isoformat()
+
+
 def test_the_exam_clamp_applies_to_every_replayed_interval() -> None:
     course = Course({**TOPICS, "exam": {"date": on(10).isoformat()}})
     course.attempts(1, att("correct"))
