@@ -12,7 +12,7 @@ real-data-extraction/
 dist/
 
 # dev auth/keys store (auth-keys wave): repo-root auth.json — secrets never committed
-auth.json
+auth.json*
 chatgpt-credentials.json*
 github-copilot-credentials.json*
 xai-credentials.json*
