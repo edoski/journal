@@ -71,6 +71,33 @@ describe("engine doctrine", () => {
 		assert.ok(practice.includes("cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception;"));
 	});
 
+	it("every agent reads how to keep the record coherent from one session to the next", () => {
+		for (const agent of AGENTS) {
+			const prompt = normalize(courseRecordPrompt(agent));
+			assert.ok(prompt.includes("When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line"), `${agent}: the backlog`);
+			assert.ok(prompt.includes("with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice."), `${agent}: focus`);
+			assert.ok(prompt.includes('`{"preferences": {"explanation_depth": "Short first, details on request"}}` sets a course preference') && prompt.includes("A preference is never a `knowledge` entry."), `${agent}: preferences`);
+			assert.ok(headings(courseRecordPrompt(agent)).includes("Exam facts"), `${agent}: exam facts`);
+		}
+		for (const agent of ["teacher", "practice"] as const) {
+			assert.ok(normalize(courseRecordPrompt(agent)).includes("Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete"), `${agent}: the close`);
+		}
+	});
+
+	it("the composed doctrine names none of the tutor's tools", () => {
+		const skill = fs.readFileSync(path.join(PATHS.tutorReferences, "..", "SKILL.md"), "utf8");
+		const tools = new Set(
+			skill.split(/\r?\n/)
+				.filter((line) => line.startsWith("| ") && !line.startsWith("| Need") && !line.startsWith("| ---"))
+				.flatMap((line) => [...(line.split("|")[2]?.split(" with ")[0] ?? "").matchAll(/(?:^\s*|, |then |or )`([a-z_]+)`/g)].map((m) => m[1]!)),
+		);
+		assert.ok(tools.has("save") && tools.has("list_sources") && tools.has("guide"), [...tools].join(", "));
+		for (const agent of AGENTS) {
+			const doctrine = courseRecordPrompt(agent).slice(ADAPTER.length);
+			for (const tool of tools) assert.ok(!doctrine.includes(`\`${tool}\``), `${agent}: the doctrine names the tool \`${tool}\``);
+		}
+	});
+
 	it("carries the practice rules approved in the app, word for word", () => {
 		const practice = normalize(courseRecordPrompt("practice"));
 		for (const approved of [

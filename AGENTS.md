@@ -66,9 +66,10 @@ aliases.
   `CourseRecords` adapter, from the repository root's `.venv/bin/python` unless
   `LH_LEARNING_ENGINE`/`LH_LEARNING_PYTHON` say otherwise) and by composing, per agent, the
   files and `##` sections of `learning/skills/tutor/references/` listed in its
-  `ENGINE_DOCTRINE` (`evidence.md`, `teaching.md`, `reviews.md`); renaming such a file or
-  section fails the app's tests. Those doctrine files name no tools. The Python packages never import or read
-  `learnharness`.
+  `ENGINE_DOCTRINE` (`evidence.md`, `teaching.md`, `reviews.md`, and sections of
+  `records.md` and `course.md`); renaming such a file or section fails the app's
+  tests. The composed parts name no tools, which the app's tests check. The Python
+  packages never import or read `learnharness`.
 
 ### Rendering architecture
 

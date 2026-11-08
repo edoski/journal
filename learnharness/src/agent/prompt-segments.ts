@@ -138,22 +138,32 @@ export type DoctrinePart =
  *  read figures the app's course brief does not carry, and *Difficulty*,
  *  which practice states more specifically in its own doctrine. The prober
  *  skips teaching.md's opening: it measures, and the lesson's teaching
- *  rules belong to the teacher. */
+ *  rules belong to the teacher. From records.md and course.md every agent
+ *  reads only what keeps the record coherent across sessions: tasks and
+ *  `focus`, `preferences`, and the exam facts. */
+const ACROSS_SESSIONS: readonly DoctrinePart[] = [
+	{ file: "records.md", sections: ["Path and tasks", "Preferences"], intro: false },
+	{ file: "course.md", sections: ["Exam facts"], intro: false },
+];
+
 export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
 	prober: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Finding the edge"], intro: false },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
+		...ACROSS_SESSIONS,
 	],
 	teacher: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+		...ACROSS_SESSIONS,
 	],
 	practice: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
 		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+		...ACROSS_SESSIONS,
 	],
 };
 

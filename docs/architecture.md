@@ -96,7 +96,8 @@ hints, practice problems) and `reviews.md` (reviews, the close, the week, the ex
 run-up) in `learning/skills/tutor/references/` name no tools, and each host maps
 them to its own tools (the skill's tool table, the app's course adapter). The app's
 course prompt composes, for each of its agents, the files and `##` sections listed
-in its `ENGINE_DOCTRINE` by repository-relative path, and its own prompts keep only
+in its `ENGINE_DOCTRINE` by repository-relative path, including `records.md`'s
+tasks and preferences and `course.md`'s exam facts, and its own prompts keep only
 what is specific to the app. Its desktop build copies that folder beside the server
 payload, and its tests fail when a listed file or section is missing. The app leaves
 out the week and the exam run-up until its course brief carries their figures.

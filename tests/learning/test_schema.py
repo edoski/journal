@@ -259,6 +259,27 @@ def test_unknown_fields_name_the_path_and_close_matches(
     fails(course(BASE), patch, *fragments)
 
 
+def test_a_preference_filed_as_knowledge_is_pointed_to_preferences() -> None:
+    patch = {
+        "knowledge": {
+            "short_explanations": {
+                "kind": "preference",
+                "text": "Keep explanations short: the learner reads on a phone.",
+            }
+        }
+    }
+    fails(
+        course(BASE),
+        patch,
+        'knowledge.short_explanations: unknown field "kind"',
+        '{"preferences": {"explanation_depth": "Short first"}}',
+    )
+    fact = {"text": "The lecturer prefers row vectors", "source": "slides"}
+    with pytest.raises(ValueError) as caught:
+        apply(course(BASE), {"knowledge": {"notation": fact}})
+    assert "preferences" not in str(caught.value)
+
+
 def test_unknown_handles_say_how_to_create_them_and_suggest_close_ones() -> None:
     record = course(BASE)
     fails(
