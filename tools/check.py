@@ -13,6 +13,7 @@ APP = "learnharness"
 # The app's tests that run the engine's CLI or read its tutor references, so an
 # engine change checked with the `learning` scope meets them too.
 ENGINE_CONTRACT_TESTS = (
+    "tests/course-brief.test.ts",
     "tests/course-records.test.ts",
     "tests/engine-doctrine.test.ts",
 )

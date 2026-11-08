@@ -57,7 +57,7 @@ After a verdict the next expected review is 1 day after `missed`, 2 after `helpe
 
 The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one), `choice_errors` (wrongly chosen methods since the last `solid` verdict, with counts), `confident_errors` (confident errors since the last `solid` verdict) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
 
-`resume.due` is today's review: at most five topics whose review date has come (`due_more` counts the rest, which carry over). Lapsed topics come first, then, in the 21 days before an exam, topics without a `solid` verdict in the last two weeks, then the most overdue, then path order. Prerequisites are listed before the topics that need them, and a competing method follows its partner. A topic leaves the list when a save gives it a verdict.
+`resume.due` is today's review: at most five topics whose review date has come (`due_more` counts the rest, which carry over, and `due_oldest` names the most overdue when it is among them). Lapsed topics come first, then, in the 21 days before an exam, topics without a `solid` verdict in the last two weeks, then the most overdue, then path order. Prerequisites are listed before the topics that need them, and a competing method follows its partner. A topic leaves the list when a save gives it a verdict.
 
 ## Path and tasks
 

@@ -273,6 +273,35 @@ def test_today_s_review_is_capped_at_five(workspace: Workspace) -> None:
     assert result["due_more"] == 3
 
 
+def test_the_most_overdue_review_is_named_when_it_falls_past_the_first_five(
+    workspace: Workspace,
+) -> None:
+    unready = {f"t{index}": {} for index in range(5)}
+    records.save(
+        workspace,
+        {
+            "exam": {"date": day(10)},
+            "topics": {"old": {}, **unready},
+            "observations": [attempt("old", date=day(-3))],
+        },
+    )
+    records.save(
+        workspace,
+        {
+            "topics": {
+                "old": {"review": {"due": day(-9)}},
+                **{key: {"review": {"due": day(0)}} for key in unready},
+            }
+        },
+    )
+    result = retrieval.resume(workspace)
+    assert "old" not in [item["topic"] for item in result["due"]]
+    assert result["due_more"] == 1
+    assert result["due_oldest"] == {"topic": "old", "overdue": 9}
+    records.save(workspace, {"exam": None})
+    assert "due_oldest" not in retrieval.resume(workspace)
+
+
 def test_a_prerequisite_precedes_its_dependent_even_at_lower_priority() -> None:
     record = pinned({"basis": 0, "rank": -5}, rank={"needs": ["basis"]})
     assert due(record) == ["basis", "rank"]

@@ -4,6 +4,7 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -29,48 +30,103 @@ const { createProberAgent } = await import("../src/agent/teacher-agent.ts");
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
-const RESUME = {
-	today: "2026-11-07",
-	course: { title: "Linear Algebra", exam: { date: "2026-12-01", days_left: 24 } },
-	path: { current: "rank", topics: [["systems", "independent"], ["rank", "assisted"]] },
-	due: [{ topic: "rank", level: "assisted", overdue: 3, prompt: "Why is rank the dimension of the column space?", points: ["span", "independence"], gap: "counts vectors" }],
-	weak: [{ topic: "eigen", level: "attempted", lapsed: true, gap: "confuses eigenvalue with eigenvector", choice_errors: { diagonalize: 2 } }],
-	task: { key: "ex-5", title: "Exercise 5", goal: "justify uniqueness", step: "eliminate the second row", help: "long help text" },
-	topics: { rank: { title: "Rank", standing: { level: "assisted" } } },
-	evidence: [{ id: "o1", text: "a long evidence entry that never enters the brief" }],
-	knowledge: { notation: { text: "rows first", pinned: true }, other: { text: "unpinned fact" } },
-	preferences: { explanation_depth: "Short first" },
-};
+// The real engine's resume on a throwaway course: no focus among two open
+// tasks, the current topic's gap and review keys written once under
+// `topics`, and a run-up that pushes the most overdue review past the five.
+const ENGINE_ROOT = path.resolve(HERE, "..", "..");
+const ENGINE_PYTHON = path.join(ENGINE_ROOT, ".venv", "bin", "python");
+const realEngine = fs.existsSync(ENGINE_PYTHON);
 
-describe("course brief projection", () => {
-	it("teach: levels, due topics without their review keys, weak gaps, the task step, preferences and pinned knowledge", () => {
+function realResume(): Record<string, unknown> {
+	const home = fs.mkdtempSync(path.join(TMP, "home-"));
+	const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
+	const engine = (day: string, args: string[], input?: unknown) =>
+		execFileSync(ENGINE_PYTHON, ["-m", "learning", "--workspace", workspace, ...args], {
+			cwd: ENGINE_ROOT,
+			env: { ...process.env, HOME: home, LEARNING_TODAY: day, PYTHONPATH: ENGINE_ROOT },
+			input: input === undefined ? undefined : JSON.stringify(input),
+		}).toString();
+	engine("2026-11-04", ["init"]);
+	engine("2026-11-04", ["save"], {
+		title: "Linear Algebra",
+		exam: { date: "2026-11-17" },
+		topics: {
+			systems: { title: "Linear systems" },
+			pivots: {},
+			rank: { title: "Rank", needs: ["systems"], gap: "counts vectors, not independent ones" },
+			eigen: { gap: "confuses eigenvalue with eigenvector" },
+			t1: {}, t2: {}, t3: {}, t4: {},
+		},
+		path: { current: "rank", order: ["systems", "pivots", "rank", "eigen", "t1", "t2", "t3", "t4"] },
+		tasks: {
+			"ex-5": { title: "Exercise 5", goal: "justify uniqueness", step: "eliminate the second row", help: "long help text" },
+			"ex-6": { title: "Exercise 6", step: "check the base case" },
+		},
+		knowledge: { notation: { text: "rows first", pinned: true }, other: { text: "unpinned fact" } },
+		preferences: { explanation_length: "short" },
+		observations: [
+			{ topics: ["systems"], text: "Solve a 2x2 system", help: "none", result: "correct" },
+			{ topics: ["rank"], text: "Rank of [[1,2],[2,4]]?", response: "2", help: "none", result: "incorrect", sure: "confident", chose: "pivots" },
+		],
+	});
+	const due = { due: "2026-11-07" };
+	engine("2026-11-07", ["save"], {
+		topics: {
+			systems: { review: { due: "2026-10-29" } },
+			rank: { review: { ...due, prompt: "Why is rank the dimension of the column space?", points: ["span", "independence"] } },
+			t1: { review: due }, t2: { review: due }, t3: { review: due }, t4: { review: due },
+		},
+	});
+	return JSON.parse(engine("2026-11-07", ["resume"])) as Record<string, unknown>;
+}
+
+// CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
+describe("course brief projection of the real engine's resume", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
+	const RESUME = realEngine || process.env.LH_REQUIRE_REAL_ENGINE ? realResume() : {};
+
+	it("teach: the weekday, levels, due topics without review keys, every weak gap, every open task's step, preferences and pinned knowledge", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 · exam in 24 days/);
-		assert.match(text, /Path, current rank: systems \(independent\), rank \(assisted\)/);
-		assert.match(text, /- rank \(assisted, 3 days overdue\)/);
+		assert.match(text, /^\[Course record\] Linear Algebra · today 2026-11-07 \(Saturday\) · exam in 10 days/);
+		assert.match(text, /Path, current rank: systems \(independent\), pivots \(new\), rank \(attempted\)/);
+		assert.match(text, /- rank \(attempted\)\n/);
 		assert.doesNotMatch(text, /prompt:|points:/, "the teacher fetches review keys on demand");
-		assert.match(text, /- eigen \(attempted, lapsed\): confuses eigenvalue with eigenvector/);
-		assert.match(text, /next step: eliminate the second row/);
-		assert.match(text, /- explanation_depth: Short first/);
+		assert.match(text, /- rank \(attempted\): counts vectors, not independent ones; sure but wrong ×1/, "the current topic keeps its gap");
+		assert.match(text, /- eigen \(new\): confuses eigenvalue with eigenvector/);
+		assert.match(text, /Open tasks, none in focus:\n- ex-6: Exercise 6\n {2}next step: check the base case\n- ex-5: Exercise 5\n {2}next step: eliminate the second row/);
+		assert.match(text, /- explanation_length: short/);
 		assert.match(text, /- notation: rows first/);
-		assert.doesNotMatch(text, /long evidence entry|unpinned fact|long help text/);
+		assert.doesNotMatch(text, /unpinned fact|long help text/);
 	});
 
-	it("practice adds each due topic's review prompt and points, and recurring wrong-method pairs", () => {
+	it("the due backlog shows its total and the most overdue review past the five", () => {
+		const { text } = projectCourseBrief(RESUME, "teach");
+		assert.match(text, /Due today: 6 topics; the first 5 are below, 1 more not listed, among them the most overdue, systems \(9 days overdue\):/);
+	});
+
+	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
 		const { text } = projectCourseBrief(RESUME, "practice");
-		assert.match(text, /prompt: Why is rank the dimension of the column space\?/);
-		assert.match(text, /points: span; independence/);
-		assert.match(text, /wrongly chose diagonalize ×2/);
+		assert.match(text, /- rank \(attempted\)\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/);
+		assert.match(text, /wrongly chose pivots ×1/);
 	});
 
-	it("the key moves with the day, the due set and the task step, not with levels", () => {
+	it("a focused task shows its goal and step and names the other open tasks", () => {
+		const tasks = RESUME.tasks as Array<Record<string, unknown>>;
+		const focused = { ...RESUME, task: { ...tasks[1], goal: "justify uniqueness" }, tasks: [tasks[0]] };
+		const { text } = projectCourseBrief(focused, "teach");
+		assert.match(text, /Open task ex-5: Exercise 5\n {2}goal: justify uniqueness\n {2}next step: eliminate the second row\nOther open tasks: ex-6/);
+	});
+
+	it("the key moves with the day, the due set and the tasks' steps, not with levels", () => {
 		const base = projectCourseBrief(RESUME, "teach").key;
-		assert.equal(projectCourseBrief({ ...RESUME, path: { ...RESUME.path, topics: [["rank", "independent"]] } }, "teach").key, base);
+		const tasks = RESUME.tasks as Array<Record<string, unknown>>;
+		assert.equal(projectCourseBrief({ ...RESUME, path: { ...(RESUME.path as object), topics: [["rank", "independent"]] } }, "teach").key, base);
 		assert.notEqual(projectCourseBrief({ ...RESUME, today: "2026-11-08" }, "teach").key, base);
 		assert.notEqual(projectCourseBrief({ ...RESUME, due: [] }, "teach").key, base);
-		assert.notEqual(projectCourseBrief({ ...RESUME, task: { ...RESUME.task, step: "next" } }, "teach").key, base);
+		assert.notEqual(projectCourseBrief({ ...RESUME, tasks: [{ ...tasks[0], step: "next" }, tasks[1]] }, "teach").key, base);
 	});
+});
 
+describe("course brief markers", () => {
 	it("a compaction hides earlier briefs", () => {
 		const brief = newCourseContextMessage("b", "k1");
 		const compaction = { ...newCourseContextMessage("", "x"), customType: "compaction" as const, details: {} };
