@@ -8,7 +8,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { after, describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createFauxCore, fauxAssistantMessage, fauxText } from "@earendil-works/pi-ai";
 
@@ -37,7 +37,10 @@ const ENGINE_ROOT = path.resolve(HERE, "..", "..");
 const ENGINE_PYTHON = path.join(ENGINE_ROOT, ".venv", "bin", "python");
 const realEngine = fs.existsSync(ENGINE_PYTHON);
 
-function realResume(): Record<string, unknown> {
+type Resume = Record<string, unknown>;
+
+/** `resume` with no task in focus, then with ex-5 in focus. */
+function realResumes(): { open: Resume; focused: Resume } {
 	const home = fs.mkdtempSync(path.join(TMP, "home-"));
 	const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
 	const engine = (day: string, args: string[], input?: unknown) =>
@@ -77,12 +80,18 @@ function realResume(): Record<string, unknown> {
 			t1: { review: due }, t2: { review: due }, t3: { review: due }, t4: { review: due },
 		},
 	});
-	return JSON.parse(engine("2026-11-07", ["resume"])) as Record<string, unknown>;
+	const open = JSON.parse(engine("2026-11-07", ["resume"])) as Resume;
+	engine("2026-11-07", ["save"], { focus: "ex-5" });
+	return { open, focused: JSON.parse(engine("2026-11-07", ["resume"])) as Resume };
 }
 
 // CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
 describe("course brief projection of the real engine's resume", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
-	const RESUME = realEngine || process.env.LH_REQUIRE_REAL_ENGINE ? realResume() : {};
+	let RESUME: Resume = {};
+	let FOCUSED: Resume = {};
+	before(() => {
+		({ open: RESUME, focused: FOCUSED } = realResumes());
+	});
 
 	it("teach: the weekday, levels, due topics without review keys, every weak gap, every open task's step, preferences and pinned knowledge", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
@@ -100,7 +109,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("the due backlog shows its total and the most overdue review past the five", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /Due today: 6 topics; the first 5 are below, 1 more not listed, among them the most overdue, systems \(9 days overdue\):/);
+		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them systems \(9 days overdue\):/);
 	});
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
@@ -110,19 +119,22 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 	});
 
 	it("a focused task shows its goal and step and names the other open tasks", () => {
-		const tasks = RESUME.tasks as Array<Record<string, unknown>>;
-		const focused = { ...RESUME, task: { ...tasks[1], goal: "justify uniqueness" }, tasks: [tasks[0]] };
-		const { text } = projectCourseBrief(focused, "teach");
+		const { text } = projectCourseBrief(FOCUSED, "teach");
 		assert.match(text, /Open task ex-5: Exercise 5\n {2}goal: justify uniqueness\n {2}next step: eliminate the second row\nOther open tasks: ex-6/);
 	});
 
-	it("the key moves with the day, the due set and the tasks' steps, not with levels", () => {
+	it("the key moves with what the brief shows: the day, the due set and backlog, the tasks' steps; not with levels or task order", () => {
 		const base = projectCourseBrief(RESUME, "teach").key;
-		const tasks = RESUME.tasks as Array<Record<string, unknown>>;
+		const tasks = RESUME.tasks as Resume[];
 		assert.equal(projectCourseBrief({ ...RESUME, path: { ...(RESUME.path as object), topics: [["rank", "independent"]] } }, "teach").key, base);
 		assert.notEqual(projectCourseBrief({ ...RESUME, today: "2026-11-08" }, "teach").key, base);
 		assert.notEqual(projectCourseBrief({ ...RESUME, due: [] }, "teach").key, base);
 		assert.notEqual(projectCourseBrief({ ...RESUME, tasks: [{ ...tasks[0], step: "next" }, tasks[1]] }, "teach").key, base);
+		assert.notEqual(projectCourseBrief({ ...RESUME, due_more: undefined, due_oldest: undefined }, "teach").key, base, "clearing the hidden oldest review re-sends the brief");
+		assert.equal(projectCourseBrief({ ...RESUME, tasks: [tasks[1], tasks[0]] }, "teach").key, base);
+		const focusedKey = projectCourseBrief(FOCUSED, "teach").key;
+		const others = FOCUSED.tasks as Resume[];
+		assert.equal(projectCourseBrief({ ...FOCUSED, tasks: others.map((t) => ({ ...t, step: "unseen" })) }, "teach").key, focusedKey, "a step the brief does not print leaves the key");
 	});
 });
 

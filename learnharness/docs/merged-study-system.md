@@ -95,7 +95,7 @@ The engine is the sibling `learning` folder in the same repository. The default 
 
 ## 7. Context budget
 
-The course state reaches the agent as a **course brief**: a `course-context` marker in the transcript, the same idiom as the graph-context marker. At the start of each turn the server computes the brief and appends a new marker only when its key changed since the last marker the agent can see. The key is the study day, the due topics, the open tasks' steps and the current path topic. So the cached prefix holds turn after turn. A new day, a review that cleared a due topic, compaction (which cuts old markers) and a moved task step each bring a fresh brief. Level changes between briefs reach the agent through the save receipts.
+The course state reaches the agent as a **course brief**: a `course-context` marker in the transcript, the same idiom as the graph-context marker. At the start of each turn the server computes the brief and appends a new marker only when its key changed since the last marker the agent can see. The key is the study day, the due topics and backlog, the open tasks (with their steps when none is in focus) and the current path topic. So the cached prefix holds turn after turn. A new day, a review that cleared a due topic, compaction (which cuts old markers) and a moved task step each bring a fresh brief. Level changes between briefs reach the agent through the save receipts.
 
 The brief is a field projection of `resume`, not a rule. `resume` writes a topic's gap, review keys and error counts once, under `topics`, for the current and task topics, so the brief reads them from there for those topics' due and weak lines. The target is an engine verb, `brief --role` (request E5), so that the engine owns the selection.
 

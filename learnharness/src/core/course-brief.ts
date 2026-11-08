@@ -6,8 +6,8 @@
  * with the course tools.
  *
  * The brief's key is the part that changes the lesson's opening move: the
- * study day, the due topics, the open tasks' steps and the current path
- * topic. A new brief enters the transcript only when the key changes, so
+ * study day, the due topics and backlog, the open tasks (with their steps
+ * when none is in focus) and the current path topic. A new brief enters the transcript only when the key changes, so
  * the cached prompt prefix holds between saves; level changes in between
  * reach the agent through the save receipts.
  */
@@ -82,8 +82,8 @@ function dueHeading(r: Json, shown: number): string {
 	if (more === 0) return "Due today:";
 	const oldest = obj(r.due_oldest);
 	const tail =
-		str(oldest.topic) && typeof oldest.overdue === "number" ? `, among them the most overdue, ${oldest.topic} (${daysOverdue(oldest.overdue)})` : "";
-	return `Due today: ${shown + more} topics; the first ${shown} are below, ${more} more not listed${tail}:`;
+		str(oldest.topic) && typeof oldest.overdue === "number" ? `, the most overdue among them ${oldest.topic} (${daysOverdue(oldest.overdue)})` : "";
+	return `Due: ${shown + more} topics; today's review is the ${shown} below, ${more} more wait${tail}:`;
 }
 
 function taskLines(r: Json): string[] {
@@ -141,7 +141,11 @@ export function projectCourseBrief(resume: unknown, role: BriefRole): { key: str
 		r.today ?? null,
 		due.map((d) => obj(d).topic ?? null),
 		task ? [task.key ?? null, task.step ?? null] : null,
-		list(r.tasks).map((t) => [obj(t).key ?? null, obj(t).step ?? null]),
+		r.due_more ?? null,
+		obj(r.due_oldest).topic ?? null,
+		list(r.tasks)
+			.map((t) => [str(obj(t).key) ?? "", task ? null : (obj(t).step ?? null)])
+			.sort(([a], [b]) => String(a).localeCompare(String(b))),
 		path.current ?? null,
 		role,
 	]);
