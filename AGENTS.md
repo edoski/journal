@@ -1,7 +1,8 @@
 # Repository Guidelines
 
 This repository syncs Flow app focus data into an Obsidian journal and builds daily/weekly/monthly/yearly metrics.
-It also fetches the owner's own bank transactions (`finance`) for the period notes' FINANCES section.
+It also fetches the owner's own bank transactions (`finance`) for the period notes' FINANCES section,
+and holds LearnHarness (`learnharness/`), the study app that runs lessons on the `learning` engine.
 
 ## Project Structure
 
@@ -17,8 +18,12 @@ It also fetches the owner's own bank transactions (`finance`) for the period not
 - `learning/`: study workspaces, records, retrieval, preferences, planning, notes, and the MCP server.
 - `finance/`: Enable Banking client (stdlib, RS256 via system `openssl`), local SQLite store,
   category rules, fetch/connect/status CLI (`python -m finance`) and the read interface for sync.
+- `learnharness/`: LearnHarness, the study app (Next.js + Electron, TypeScript), brought in
+  with its history by `git subtree` and licensed AGPL-3.0 in its own `LICENSE`. It runs the
+  lesson and keeps no learner state; its own `AGENTS.md`, `docs/architecture.md` and
+  `docs/merged-study-system.md` govern its code. Its `.github/` is upstream's and does not run.
 - `tests/`: behavior, external integrations, and rendering fixtures.
-- `tools/check.py`: full or package-focused quality checks.
+- `tools/check.py`: full, package-focused or app quality checks.
 - `macos/Journal/`: native app and bundled sync runtime.
 
 See [docs/architecture.md](docs/architecture.md) for module ownership and the
@@ -56,6 +61,12 @@ aliases.
   `learning/progress.py`; publication and receipts to `learning/records.py`;
   `resume`/`show`/`search` to `learning/retrieval.py` on the single packer in
   `learning/packing.py`; the CLI verb table to `learning/cli.py`.
+- `learnharness` reaches the engine only by running `python -m learning` (its
+  `CourseRecords` adapter, from the repository root's `.venv/bin/python` unless
+  `LH_LEARNING_ENGINE`/`LH_LEARNING_PYTHON` say otherwise) and by composing sections of
+  `learning/skills/tutor/references/` named in its `ENGINE_DOCTRINE`; renaming such a
+  file or `## ` heading fails the app's tests. The Python packages never import or read
+  `learnharness`.
 
 ### Rendering architecture
 
@@ -285,10 +296,16 @@ python tools/check.py
 python tools/check.py sync
 python tools/check.py learning
 python tools/check.py finance
+python tools/check.py learnharness
 ```
 
 The gate runs Ruff lint/format checks, strict mypy, import-linter, and Python
-behavior tests. Sync checks also verify unchanged rendering fixtures.
+behavior tests. Sync checks also verify unchanged rendering fixtures. The full gate
+and the `learnharness` scope also run the app's `npm run typecheck`, `npm run lint`
+and `npm test` in `learnharness/`, after `npm ci` there (Ruff skips the folder); the
+`learning` scope runs the app's tests that use the engine's CLI and tutor references.
+CI (`.github/workflows/ci.yml`) runs the full gate on macOS and the app's standalone
+build and boot smoke on macOS, Windows and Linux.
 
 Add `--coverage` when coverage diagnostics are useful. For failure detail, run
 `python -m pytest tests/ -v --tb=short`. These deterministic checks establish code

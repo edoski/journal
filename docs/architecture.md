@@ -4,7 +4,10 @@ Journal has three feature packages. `sync` renders journal notes and runs sessio
 media, and grade commands. `learning` owns study memory, lesson publication,
 retrieval, and teaching-client integrations. `finance` fetches the owner's bank
 data into a local store. They belong to the same project; none needs a generic
-application framework.
+application framework. `learnharness` is the study app that teaches on top of
+`learning`; it is TypeScript with its own gate and AGPL license. It runs the
+engine through the engine's CLI and reads the tutor skill's references as prompt
+text, nothing else.
 
 Learning reads recorded study activity and schedules through
 `sync.study.context.journal_summary`. That read-only interface owns knowledge of
@@ -71,6 +74,29 @@ results and explicit self-reports; the tutor's own explanations are not evidence
 Levels and review dates are computed, not asserted. There is no vector service,
 background reflection worker or curriculum database.
 
+## LearnHarness
+
+`learnharness/` is LearnHarness, a Next.js and Electron study app, brought in with
+its full history by `git subtree` from a fork of an AGPL-3.0 project; its `LICENSE`
+covers that folder only. The engine is the learner's memory and the app is the
+classroom: it runs one lesson (probe, plan, teach, check, practice, hints, visuals,
+demos, PDFs, research) and holds no learner state across sessions. Every session
+belongs to one engine course. Its own `AGENTS.md` and `docs/architecture.md`
+describe its code; `docs/merged-study-system.md` assigns each concern to the app or
+the engine.
+
+The app runs `python -m learning [--workspace DIR] VERB` as one child process per
+verb through its `CourseRecords` adapter, so the CLI is the contract and grading,
+levels and scheduling exist only in Python. The engine root defaults to the
+repository root with its `.venv/bin/python`; `LH_LEARNING_ENGINE` and
+`LH_LEARNING_PYTHON` override them, which a packaged desktop app outside the
+repository needs. Its course prompt composes the engine's teaching doctrine from
+`learning/skills/tutor/references/` by repository-relative path: the sections
+listed in its `ENGINE_DOCTRINE`, today the observation rules in `records.md`. Its
+desktop build copies that folder beside the server payload, and its tests fail when
+a listed file or heading is missing. Splitting those references into host-neutral
+`evidence.md`, `teaching.md` and `reviews.md` (request E3) is the next step.
+
 ## Finance
 
 `finance` reads the bank accounts of every bank listed in `finance.toml`
@@ -115,11 +141,13 @@ opens the store itself; `debits` also lists the Round up runs (`roundups`).
 
 ## Maintenance
 
-Run `python tools/check.py` from the project environment. Use `sync`, `learning`
-or `finance` as an optional argument for focused checks, and `--coverage` when coverage detail
+Run `python tools/check.py` from the project environment. Use `sync`, `learning`,
+`finance` or `learnharness` as an optional argument for focused checks, and `--coverage` when coverage detail
 is useful. Ruff, strict mypy, import contracts and Python tests cover the
-maintained code. The sync check also verifies rendering fixtures
-without rewriting them.
+maintained Python code. The sync check also verifies rendering fixtures
+without rewriting them. The full check and the `learnharness` scope run the app's
+typecheck, lint and tests (`npm ci` in `learnharness/` first); its tests run the real
+engine from the repository's `.venv`.
 
 Rendering fixtures are a compatibility contract, not refactoring targets. Changes
 to architecture must preserve note text, whitespace, charts, tables, `sync` CLI
