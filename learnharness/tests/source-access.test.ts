@@ -65,7 +65,7 @@ await write("unrelated/.ssh/notes.md", "ordinary outside-home directory\n");
 for (const name of [".env", ".env.example", ".env.template", ".ENV.production"]) await write(`elsewhere/${name}`);
 
 const { isSensitivePath, resolveSourcePath, sensitiveHomeLocations, walkFiles } = await import("../src/agent/tools/fs-shared.ts");
-const { readTool } = await import("../src/agent/tools/read.ts");
+const { readTool, createReadTool } = await import("../src/agent/tools/read.ts");
 const { lsTool } = await import("../src/agent/tools/ls.ts");
 const { findTool } = await import("../src/agent/tools/find.ts");
 const { grepTool } = await import("../src/agent/tools/grep.ts");
@@ -201,7 +201,7 @@ describe("source access: canonical roots and all tool paths", () => {
 		});
 	}
 
-	it("applies unchanged to prober, teacher and practice registrations", async () => {
+	it("applies unchanged to prober, teacher and practice registrations and model-bound reads", async () => {
 		const ctx = { chatId: "synthetic", chatStore: { getChat: () => null } as unknown as ChatStore, jobStore: {} as JobStore, spawn: () => {}, deliver: () => {} };
 		for (const tools of [createProberTools(ctx), createTeacherTools(ctx), practiceTools(ctx)]) {
 			await assert.rejects(tools.read!.execute!("s", { path: auth }), denied);
@@ -209,6 +209,8 @@ describe("source access: canonical roots and all tool paths", () => {
 			await assert.rejects(tools.find!.execute!("s", { path: "~/.ssh", pattern: "*" }), denied);
 			await assert.rejects(tools.grep!.execute!("s", { path: auth, pattern: "x" }), denied);
 		}
+		const model = createFauxCore({ tokenSize: { min: 64, max: 64 } }).getModel();
+		await assert.rejects(createReadTool(model).execute!("s", { path: auth }), denied);
 	});
 
 	it("normal image reading still works; protected image reads fail at the shared gate", async () => {
