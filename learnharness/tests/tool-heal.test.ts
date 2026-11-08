@@ -109,3 +109,22 @@ describe("JSON-string-encoded objects and arrays (the Claude CLI bridge)", () =>
 		assert.deepEqual(parsed?.options?.map((o) => o.label), ["Intuition", "Proof"]);
 	});
 });
+
+describe("an object argument sent as a broken JSON string", () => {
+	it("is refused with the parse failure, not only 'must be object'", async () => {
+		const { Type } = await import("typebox");
+		const { withArgumentHeal } = await import("../src/agent/tools/heal.ts");
+		const tool = withArgumentHeal({
+			name: "course_save",
+			label: "course_save",
+			description: "",
+			parameters: Type.Object({ changes: Type.Record(Type.String(), Type.Unknown()) }),
+			execute: async () => ({ content: [], details: {} }),
+		});
+		assert.throws(
+			() => tool.prepareArguments!({ changes: '{"observations":[{"topics":["permutations"]' }),
+			/Validation failed for tool "course_save":\n {2}- changes: arrived as a string that failed to parse as JSON \(.+\); send changes as a JSON object, not a string/,
+		);
+		assert.deepEqual(tool.prepareArguments!({ changes: '{"path":{"current":"x"}}' }), { changes: { path: { current: "x" } } });
+	});
+});
