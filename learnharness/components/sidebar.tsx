@@ -262,10 +262,11 @@ export function timeAgo(iso: string, now = new Date()): string {
 function sessionMeta(chat: ChatListItem): string {
 	if (chat.compacting) return `Compacting context · ${timeAgo(chat.updatedAt)}`;
 	if (chat.pendingQuestion) return `Waiting for input · ${timeAgo(chat.updatedAt)}`;
+	// A submitted attempt leaves the problem posed while the tutor grades it.
+	if (chat.busy) return "Working…";
 	if ((chat.kind ?? "teach") === "practice" && chat.pendingProblem) {
 		return `Problem waiting · ${timeAgo(chat.updatedAt)}`;
 	}
-	if (chat.busy) return "Working…";
 	return timeAgo(chat.updatedAt);
 }
 
@@ -485,8 +486,10 @@ function SessionsSidebar() {
 	/* PUSH (architecture S6, 2026-10-02): the 2.5s poll is RETIRED — the
 	   last standing network poll in the app. List truth arrives as
 	   events: chats-changed (create/rename/delete — the list-SHAPE
-	   writes), and turn-started/turn-settled for EVERY chat (unfiltered:
-	   any chat's turn flips busy/order/phase in this list). Announced
+	   writes), turn-started/turn-settled for EVERY chat (unfiltered:
+	   any chat's turn flips busy/order/phase in this list), and
+	   record-changed for the turn-less record writes (an idle dismissal
+	   clears a waiting question or problem). Announced
 	   fetches ride the 250ms trailing debounce (the S4/S5 law); resync
 	   (reconnect / dev-restart) is immediate. lh:turn-state +
 	   lh:chat-renamed stay for same-tab INSTANTS — local beats any
@@ -504,6 +507,7 @@ function SessionsSidebar() {
 	useServerEvent("chats-changed", scheduleEventRefresh);
 	useServerEvent("turn-started", scheduleEventRefresh);
 	useServerEvent("turn-settled", scheduleEventRefresh);
+	useServerEvent("record-changed", scheduleEventRefresh);
 	useServerEvent("compaction-changed", scheduleEventRefresh);
 	useServerResync(() => void refreshRef.current());
 	useEffect(
