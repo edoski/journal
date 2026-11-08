@@ -1464,7 +1464,8 @@ describe("prompt composition", () => {
 		for (const kind of ["teacher", "prober"] as const) {
 			const instructions = composeInstructions(kind);
 			assert.ok(instructions.includes("## Learner files"), `${kind} carries the shared learner-files fragment`);
-			assert.ok(instructions.includes("find it yourself with `find`"), `${kind} knows to locate files itself`);
+			assert.ok(instructions.includes("find it yourself in the course folder"), `${kind} knows to locate files itself`);
+			assert.ok(instructions.includes("ask him where it is before searching anywhere else in his home"), `${kind} asks before searching the rest of his home`);
 			assert.ok(instructions.includes("home directory"), `${kind} knows the home-anchored path rule`);
 		}
 		// the agent's OWN fragments compose before the shared appendix
