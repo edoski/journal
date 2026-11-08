@@ -137,7 +137,7 @@ export const ENGINE_DOCTRINE: ReadonlyArray<{ file: string; section: string }> =
  *  doctrine test instead of a lesson. */
 export function engineDoctrineSection(dir: string, entry: { file: string; section: string }): string {
 	const text = fs.readFileSync(path.join(dir, entry.file), "utf-8");
-	const lines = text.split("\n");
+	const lines = text.split(/\r?\n/);
 	const start = lines.indexOf(`## ${entry.section}`);
 	if (start === -1) throw new Error(`engine doctrine: no "## ${entry.section}" in ${entry.file}`);
 	const end = lines.findIndex((line, i) => i > start && line.startsWith("## "));

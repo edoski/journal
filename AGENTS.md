@@ -302,7 +302,8 @@ python tools/check.py learnharness
 The gate runs Ruff lint/format checks, strict mypy, import-linter, and Python
 behavior tests. Sync checks also verify unchanged rendering fixtures. The full gate
 and the `learnharness` scope also run the app's `npm run typecheck`, `npm run lint`
-and `npm test` in `learnharness/`, after `npm ci` there (Ruff skips the folder).
+and `npm test` in `learnharness/`, after `npm ci` there (Ruff skips the folder); the
+`learning` scope runs the app's tests that use the engine's CLI and tutor references.
 CI (`.github/workflows/ci.yml`) runs the full gate on macOS and the app's standalone
 build and boot smoke on macOS, Windows and Linux.
 

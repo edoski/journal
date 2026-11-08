@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** Repository root (this file is at <root>/config.ts). */
+/** App root (this file is at <app>/config.ts); its parent is the journal repository. */
 export const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 // node's test runner sets NODE_TEST_CONTEXT in every test-file child.

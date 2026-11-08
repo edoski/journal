@@ -32,6 +32,16 @@ describe("engine doctrine", () => {
 		assert.equal(engineDoctrineSection(TMP, { file: "ref.md", section: "Two" }), "## Two\n\nsecond");
 	});
 
+	it("reads a file checked out with CRLF line endings", () => {
+		fs.writeFileSync(path.join(TMP, "crlf.md"), "## One\r\n\r\nfirst\r\n\r\n## Two\r\n");
+		assert.equal(engineDoctrineSection(TMP, { file: "crlf.md", section: "One" }), "## One\n\nfirst");
+	});
+
+	it("the desktop package ships the references the build copies beside the server", () => {
+		const builder = fs.readFileSync(path.join(PATHS.root, "electron-builder.yml"), "utf8");
+		assert.match(builder, /- from: \.next\n\s+to: server\n\s+filter:\n\s+- "standalone\/\*\*\/\*"\n\s+- "learning\/\*\*\/\*"/);
+	});
+
 	it("fails on a missing file or heading", () => {
 		assert.throws(() => engineDoctrineSection(TMP, { file: "renamed.md", section: "One" }), /ENOENT/);
 		assert.throws(() => engineDoctrineSection(TMP, { file: "ref.md", section: "Gone" }), /no "## Gone" in ref.md/);

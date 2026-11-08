@@ -38,6 +38,8 @@ jobs:
       - run: npm ci
         working-directory: learnharness
       - run: .venv/bin/python tools/check.py
+        env:
+          LH_REQUIRE_REAL_ENGINE: "1"
 
   standalone:
     # The study app's desktop server payload on each platform it ships for.

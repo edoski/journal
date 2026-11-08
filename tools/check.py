@@ -10,6 +10,12 @@ import sys
 
 PYTHON_PACKAGES = ("sync", "learning", "finance")
 APP = "learnharness"
+# The app's tests that run the engine's CLI or read its tutor references, so an
+# engine change checked with the `learning` scope meets them too.
+ENGINE_CONTRACT_TESTS = (
+    "tests/course-records.test.ts",
+    "tests/engine-doctrine.test.ts",
+)
 
 
 def main() -> int:
@@ -26,14 +32,20 @@ def main() -> int:
     commands: list[tuple[list[str], Path]] = []
     if args.scope != APP:
         commands.extend((command, root) for command in _python_commands(args))
-    if args.scope in ("all", APP):
+    if args.scope in ("all", APP, "learning"):
         app = root / APP
         if not (app / "node_modules").is_dir():
             print(f"{APP}/node_modules is missing: run `npm ci` in {APP}/ first.")
             return 1
-        commands.extend(
-            (["npm", "run", script], app) for script in ("typecheck", "lint", "test")
-        )
+        if args.scope == "learning":
+            commands.append(
+                (["npx", "tsx", "--test", *ENGINE_CONTRACT_TESTS], app),
+            )
+        else:
+            commands.extend(
+                (["npm", "run", script], app)
+                for script in ("typecheck", "lint", "test")
+            )
     for command, cwd in commands:
         print(f"\n{shlex.join(command)}", flush=True)
         result = subprocess.run(command, cwd=cwd, check=False)

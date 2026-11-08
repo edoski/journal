@@ -28,7 +28,7 @@ learning = ["skills/tutor/SKILL.md", "skills/tutor/references/*.md"]
 finance = ["starter_categories.toml"]
 
 [tool.ruff]
-# The study app checks its own code, including its Python helper scripts.
+# The study app has its own TypeScript gate; its Python helper scripts keep upstream's style.
 extend-exclude = ["learnharness"]
 
 [tool.coverage.run]

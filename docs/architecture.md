@@ -5,8 +5,9 @@ media, and grade commands. `learning` owns study memory, lesson publication,
 retrieval, and teaching-client integrations. `finance` fetches the owner's bank
 data into a local store. They belong to the same project; none needs a generic
 application framework. `learnharness` is the study app that teaches on top of
-`learning`; it is TypeScript with its own gate and AGPL license, and talks to the
-engine only through the engine's CLI.
+`learning`; it is TypeScript with its own gate and AGPL license. It runs the
+engine through the engine's CLI and reads the tutor skill's references as prompt
+text, nothing else.
 
 Learning reads recorded study activity and schedules through
 `sync.study.context.journal_summary`. That read-only interface owns knowledge of
