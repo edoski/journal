@@ -22,6 +22,7 @@ and holds LearnHarness (`learnharness/`), the study app that runs lessons on the
   with its history by `git subtree` and licensed AGPL-3.0 in its own `LICENSE`. It runs the
   lesson and keeps no learner state; its own `AGENTS.md`, `docs/architecture.md` and
   `docs/merged-study-system.md` govern its code. Its `.github/` is upstream's and does not run.
+  What it takes from upstream, and the commit reviewed through, is recorded in `learnharness/UPSTREAM.md`.
 - `tests/`: behavior, external integrations, and rendering fixtures.
 - `tools/check.py`: full, package-focused or app quality checks.
 - `macos/Journal/`: native app and bundled sync runtime.

@@ -2,7 +2,7 @@ import { Agent } from "@earendil-works/pi-agent-core";
 import type { AgentEvent, AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import { invalidInputResult, questionResult } from "./tool-execute.ts";
 import { providerEventObserver } from "./provider-events.ts";
-import type { Usage } from "@earendil-works/pi-ai";
+import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import { PATHS } from "../../config.ts";
 import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
 import { courseRecordPrompt, effectivePromptSegments } from "./prompt-segments.ts";
@@ -18,6 +18,10 @@ import {
 import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
+import { createReadTool, readTool } from "./tools/read.ts";
+import { createFindTool, findTool } from "./tools/find.ts";
+import { createGrepTool, grepTool } from "./tools/grep.ts";
+import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
@@ -179,6 +183,25 @@ function makeQuestionStopper(kind: AgentKind) {
 	};
 }
 
+const SEARCH_TOOLS: Record<string, { shared: AgentTool<any>; create: (courseDir: string) => AgentTool<any> }> = {
+	find: { shared: findTool, create: createFindTool },
+	grep: { shared: grepTool, create: createGrepTool },
+	ls: { shared: lsTool, create: createLsTool },
+};
+
+/** The shared file tools, bound to this agent: `read` to its model, so
+ *  images fit its limits, and in a course session the searches to the course
+ *  folder, so a search with no path stays out of the rest of the learner's
+ *  home. A tool that is not the shared one is left as it is. */
+function sessionTool(tool: AgentTool<any, any>, model: Model<Api>, courseDir: string | undefined): AgentTool<any, any> {
+	if (tool.name === "read" && tool.execute === readTool.execute) {
+		return { ...tool, execute: createReadTool(model).execute as AgentTool<any>["execute"] };
+	}
+	const search = SEARCH_TOOLS[tool.name];
+	if (!courseDir || !search || tool.execute !== search.shared.execute) return tool;
+	return withArgumentHeal(search.create(courseDir));
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	// Practice never reaches the role fallback (the handler ALWAYS injects
 	// the session's conversation engine — practice rides the same
@@ -204,10 +227,12 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			thinkingLevel: engine.level,
 			// Conditional registry inclusion, like the graph-tool gates: when
 			// closed, neither the tool nor its usage instructions reach the model.
-			// Match Claude across providers (including OpenRouter), not the API
-			// transport. Explicit test registries remain caller-owned.
+			// The shared file tools are bound to this agent (sessionTool), in
+			// every registry including explicit ones. The
+			// send_to_user gate matches Claude across providers (including
+			// OpenRouter), not the API transport; explicit registries opt out.
 			tools: [
-				...tools,
+				...tools.map((tool) => sessionTool(tool, engine.model, opts.course?.course.workspace)),
 				...(opts.course ? Object.values(courseTools(opts.course)) : []),
 				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
 					? [withArgumentHeal(sendToUserTool)]

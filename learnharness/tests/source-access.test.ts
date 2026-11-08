@@ -35,6 +35,8 @@ async function link(target: string, alias: string, directory = false): Promise<v
 }
 
 await write("home/notes/topic.md", "ordinary study notes\n");
+await write("home/courses/stat/lecture-3.md", "the course's lecture\n");
+await write("home/Downloads/lecture-3-flyer.md", "an unrelated download\n");
 await write("home/..notes/also.md", "ordinary dot-prefixed notes\n");
 await write("home/.claudette/ok.md", "ordinary lookalike notes\n");
 await write("home/.ssh/id_ed25519");
@@ -65,10 +67,10 @@ await write("unrelated/.ssh/notes.md", "ordinary outside-home directory\n");
 for (const name of [".env", ".env.example", ".env.template", ".ENV.production"]) await write(`elsewhere/${name}`);
 
 const { isSensitivePath, resolveSourcePath, sensitiveHomeLocations, walkFiles } = await import("../src/agent/tools/fs-shared.ts");
-const { readTool } = await import("../src/agent/tools/read.ts");
-const { lsTool } = await import("../src/agent/tools/ls.ts");
-const { findTool } = await import("../src/agent/tools/find.ts");
-const { grepTool } = await import("../src/agent/tools/grep.ts");
+const { readTool, createReadTool } = await import("../src/agent/tools/read.ts");
+const { createLsTool, lsTool } = await import("../src/agent/tools/ls.ts");
+const { createFindTool, findTool } = await import("../src/agent/tools/find.ts");
+const { createGrepTool, grepTool } = await import("../src/agent/tools/grep.ts");
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
 const { createProberTools, createTeacherTools } = await import("../src/agent/tools.ts");
 const { practiceTools } = await import("../src/agent/tools/practice.ts");
@@ -156,6 +158,19 @@ describe("source access: canonical roots and all tool paths", () => {
 		await assert.rejects(readTool.execute!("s", { path: path.join(root, "transcripts", "projects", "session.jsonl") }), denied);
 	});
 
+	it("in a course, a search with no path stays in the course folder; an explicit path still reaches home", async () => {
+		const course = path.join(home, "courses", "stat");
+		const found = await text(createFindTool(course), { pattern: "lecture*" });
+		assert.equal(found, "~/courses/stat/lecture-3.md", "a course-folder result is a path read opens as given");
+		assert.match(await text(readTool, { path: found }), /the course's lecture/);
+		assert.equal(await text(createLsTool(course), {}), "~/courses/stat/lecture-3.md");
+		assert.match(await text(createGrepTool(course), { pattern: "lecture" }), /^~\/courses\/stat\/lecture-3\.md:1: the course's lecture$/);
+		assert.equal(await text(createLsTool(course), { path: "~/courses/stat" }), "lecture-3.md", "an explicit path keeps pi's relative output");
+		assert.match(await text(createFindTool(course), { pattern: "lecture*", path: "~/Downloads" }), /lecture-3-flyer\.md/);
+		const everywhere = await text(findTool, { pattern: "lecture*" });
+		assert.match(everywhere, /Downloads\/lecture-3-flyer\.md/, "without a course the default is still home");
+	});
+
 	it("canonicalizes an aliased HOME, including default and relative paths", async () => {
 		process.env.HOME = process.env.USERPROFILE = path.join(root, "home-alias");
 		try {
@@ -201,7 +216,7 @@ describe("source access: canonical roots and all tool paths", () => {
 		});
 	}
 
-	it("applies unchanged to prober, teacher and practice registrations", async () => {
+	it("applies unchanged to prober, teacher and practice registrations and model-bound reads", async () => {
 		const ctx = { chatId: "synthetic", chatStore: { getChat: () => null } as unknown as ChatStore, jobStore: {} as JobStore, spawn: () => {}, deliver: () => {} };
 		for (const tools of [createProberTools(ctx), createTeacherTools(ctx), practiceTools(ctx)]) {
 			await assert.rejects(tools.read!.execute!("s", { path: auth }), denied);
@@ -209,6 +224,8 @@ describe("source access: canonical roots and all tool paths", () => {
 			await assert.rejects(tools.find!.execute!("s", { path: "~/.ssh", pattern: "*" }), denied);
 			await assert.rejects(tools.grep!.execute!("s", { path: auth, pattern: "x" }), denied);
 		}
+		const model = createFauxCore({ tokenSize: { min: 64, max: 64 } }).getModel();
+		await assert.rejects(createReadTool(model).execute!("s", { path: auth }), denied);
 	});
 
 	it("normal image reading still works; protected image reads fail at the shared gate", async () => {
