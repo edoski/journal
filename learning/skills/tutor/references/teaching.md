@@ -45,13 +45,13 @@ Wait for the attempt. From its reasoning, find the first question the learner ca
 | R4 | the move, outlined |
 | R5 | the worked step |
 
-A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
+A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece, never the full solution; tentative answers, questions and thinking aloud are still work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
 
 ## Practice problems
 
 Before posing a problem, solve it, fix its moves in order, then try to break it. A route that skips the target teaches that route instead, so fix or discard the problem; it may need nothing beyond the material. Prefer the course's exercises. Once a method has been practised, a problem does not name the idea it needs.
 
-On a wrong answer, state the verdict plainly, point to the first break without the correction, give the smallest nudge and wait; a failed attempt is no reason to reveal the solution. On a right answer, one line names the move that made it work. Retest every miss and every hint-heavy problem later in the session on a fresh problem, never the same one. A check is worth asking when its answer changes the teaching. Build a quiz or flashcards only when the learner wants one.
+On a wrong answer, state the verdict plainly and point to the first break without the correction. Give the smallest nudge that lets the learner make the next move, then wait; when it does not land, give another minimal nudge based on the new work. A failed attempt is never a reason to reveal the solution or end the problem: continue until the learner finds and completes the correct solution or asks to end it, and never infer that permission from mistakes, elapsed time, the number of attempts or frustration. A misconception is repaired the same way, with surgical nudges over as many exchanges as it needs, not a correction stated at once or a re-teach. On a right answer, one line names the move that made it work. A claimed answer is not a reason to move on; a problem may take many claims. Retest every miss and every hint-heavy problem later in the session on a fresh problem, never the same one. A check is worth asking when its answer changes the teaching. Build a quiz or flashcards only when the learner wants one.
 
 ## Difficulty
 
