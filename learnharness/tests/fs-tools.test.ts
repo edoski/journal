@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { expandBraces, globToRegex, isSensitivePath, matchGlob, resolveSourcePath, walkFiles } from "../src/agent/tools/fs-shared.ts";
+import { claudeWorkDirPath } from "../src/agent/claude-cli.ts";
 import { findTool } from "../src/agent/tools/find.ts";
 import { grepTool } from "../src/agent/tools/grep.ts";
 import { lsTool } from "../src/agent/tools/ls.ts";
@@ -221,6 +222,11 @@ describe("sensitive locations under home are off-limits", () => {
 		const home = path.join(os.tmpdir(), "h");
 		assert.equal(isSensitivePath(path.join(home, ".claude"), home), true);
 		assert.equal(isSensitivePath(path.join(home, ".claude", "projects", "x.jsonl"), home), true);
+		for (const location of [".claude.json", ".claude-3/projects/x.jsonl", ".Claude-2/.credentials.json", ".claude_work/x", ".claude4", ".t3/userdata/secrets/provider-env-x.bin", ".T3/userdata/statev2.sqlite"]) {
+			assert.equal(isSensitivePath(path.join(home, ...location.split("/")), home), true, location);
+		}
+		assert.equal(isSensitivePath(path.join(home, "notes", ".claude-2", "x.md"), home), false, "only home's own .claude… entries");
+		assert.equal(isSensitivePath(path.join(home, ".t3x", "x.md"), home), false);
 		assert.equal(isSensitivePath(path.join(home, ".SSH", "id_rsa"), home), true);
 		assert.equal(isSensitivePath(path.join(home, ".config", "gcloud", "credentials.db"), home), true);
 		assert.equal(isSensitivePath(path.join(home, "Library", "Keychains", "login.keychain-db"), home), true);
@@ -232,6 +238,10 @@ describe("sensitive locations under home are off-limits", () => {
 		assert.equal(isSensitivePath(path.join(home, ".config", "nvim", "init.lua"), home), false);
 		assert.equal(isSensitivePath(path.join(home, "notes", "environment.md"), home), false);
 		assert.equal(isSensitivePath(path.join(os.tmpdir(), ".ssh", "id_rsa"), home), false);
+	});
+
+	it("the app's own Claude work dir, where token accounts keep their config, is refused", () => {
+		assert.throws(() => resolveSourcePath(path.join(claudeWorkDirPath(), "accounts", "x", ".claude.json")), /Access denied: .* is a protected location/);
 	});
 
 	it("walkFiles never enters them", async () => {

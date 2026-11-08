@@ -3,6 +3,8 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AUTH_FILE } from "../../../config.ts";
+import { claudeProfileDirs } from "../claude-accounts.ts";
+import { claudeWorkDirPath } from "../claude-cli.ts";
 
 /**
  * Shared plumbing for the learner-filesystem tools (ls / find / grep) —
@@ -49,7 +51,7 @@ const EXCLUDED_DIR_NAMES = new Set(["node_modules", ".git", "Library", ".Trash"]
  * case-insensitively, including on case-sensitive filesystems.
  */
 const SENSITIVE_HOME_PATHS = [
-	".claude",
+	".t3",
 	".codex",
 	".cursor",
 	".gemini",
@@ -81,6 +83,11 @@ const SENSITIVE_HOME_PATHS = [
 	"AppData/Local/Microsoft/Edge",
 	"AppData/Roaming/Mozilla",
 ];
+
+/** Top-level home entries .claude, .claude.json, .claude-2, .claude_x, …:
+ *  Claude Code config dirs, one per account, and its state file. A longer
+ *  word such as .claudette is not one. */
+const SENSITIVE_HOME_PREFIX = /^\.claude(?:$|[-_.\d])/i;
 
 /** Templates are deliberately included: their names do not guarantee safe contents. */
 const ENV_FILE = /^\.env(\..*)?$/i;
@@ -120,12 +127,20 @@ function isCredentialTemp(absolute: string, directory: string): boolean {
 	return path.relative(comparisonPath(directory), path.dirname(file)) === "" && CREDENTIAL_TEMP.test(path.basename(file));
 }
 
+/** The first segment below home, or "" outside it. Case-insensitive like the home denials. */
+function homeTopLevel(file: string, home: string): string {
+	const rel = path.relative(comparisonPath(home).toLowerCase(), file.toLowerCase());
+	if (rel === "" || rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) return "";
+	return rel.split(path.sep)[0]!;
+}
+
 /** String-only check, also usable with synthetic home/credential locations.
  *  The runtime guard below additionally resolves both sources and protected roots.
  *  Only credentials are app-private denials: learning data remains readable. */
 export function isSensitivePath(absolute: string, home: string = os.homedir(), authFile: string = AUTH_FILE): boolean {
 	const file = comparisonPath(absolute);
 	return ENV_FILE.test(path.basename(file)) ||
+		SENSITIVE_HOME_PREFIX.test(homeTopLevel(file, home)) ||
 		SENSITIVE_HOME_PATHS.some((p) => isWithin(file, path.join(home, p), true)) ||
 		credentialFiles(authFile).some((p) => isWithin(file, p)) ||
 		isCredentialTemp(file, path.dirname(authFile));
@@ -171,7 +186,8 @@ export function sensitiveHomeLocations(
 		}
 		return listings.get(directory)!;
 	};
-	return SENSITIVE_HOME_PATHS.flatMap((location) => {
+	const prefixed = entries(home).filter((entry) => SENSITIVE_HOME_PREFIX.test(entry)).map((entry) => path.join(/* turbopackIgnore: true */ home, entry));
+	return [...prefixed, ...SENSITIVE_HOME_PATHS.flatMap((location) => {
 		let candidates = [home];
 		for (const segment of location.split("/")) {
 			candidates = candidates.flatMap((parent) => {
@@ -180,14 +196,14 @@ export function sensitiveHomeLocations(
 			});
 		}
 		return candidates;
-	});
+	})];
 }
 
 /** One snapshot per resolution/walk, not per visited entry. Resolve protected
  *  roots too: a sensitive directory or AUTH_FILE can itself be a symlink to
  *  a location outside home. Never read credential contents or app records. */
 function sourcePathCheck(home = os.homedir()): (absolute: string) => boolean {
-	const homeRoots = sensitiveHomeLocations(home).map(protectedRealPath);
+	const homeRoots = [...sensitiveHomeLocations(home), ...claudeProfileDirs(), claudeWorkDirPath()].map(protectedRealPath);
 	const files = credentialFiles(AUTH_FILE).map(protectedRealPath);
 	const credentialDir = protectedRealPath(path.dirname(AUTH_FILE));
 	return (absolute) => isSensitivePath(absolute, home) ||

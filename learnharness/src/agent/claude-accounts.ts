@@ -83,6 +83,12 @@ function readToken(path: string, label: string): string {
 	return token;
 }
 
+/** The Claude Code config dirs of the profile accounts: each holds that
+ * account's credentials and transcripts, wherever the user put it. */
+export function claudeProfileDirs(paths: ClaudeAccountPaths = {}): string[] {
+	return loadClaudeAccounts(paths).flatMap((account) => account.auth === "profile" ? [account.configDir] : []);
+}
+
 /** The client-safe view: no token, no paths. */
 export function publicClaudeAccount({ providerId, label, email, auth }: LoadedClaudeAccount): ClaudeAccount {
 	return { providerId, label, email, auth };

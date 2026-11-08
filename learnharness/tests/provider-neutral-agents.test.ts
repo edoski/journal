@@ -6,7 +6,7 @@
  */
 import assert from "node:assert/strict";
 import path from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, it } from "node:test";
 import {
@@ -24,6 +24,10 @@ import { providerEventsDir } from "../src/agent/provider-events.ts";
 const OR_KEY = "dummy-openrouter-MUST-NOT-REACH-other-endpoints";
 const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="white"/></svg>';
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
+/** A copy outside the checkout: a checkout under a protected home folder
+ *  (an agent worktree in ~/.t3) is itself off-limits to the file tools. */
+const SOURCE = path.join(realpathSync.native(mkdtempSync(path.join(tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
+copyFileSync(FIXTURE, SOURCE);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==", "base64");
 const FINAL = "Verified offline output (p. 1). Pages consulted: 1";
 const LOOPS = ["visual", "pdf"] as const;
@@ -87,7 +91,7 @@ function fakeHeadless(renders: string[]): HeadlessApi {
 			return PNG;
 		},
 		renderPdfPages: async (file, pages, opts) => {
-			assert.equal(file, FIXTURE);
+			assert.equal(file, SOURCE);
 			assert.deepEqual(pages, [1]);
 			assert.equal(opts?.dpi, 100);
 			renders.push("pdf:1");
@@ -109,7 +113,7 @@ async function runLoop(loop: Loop, engine: PiEngine, signal = new AbortControlle
 	};
 	const result = loop === "visual"
 		? await runVisualMaker({ brief: "A white square, no external resources" }, opts)
-		: await runPdfReaderAgent({ path: FIXTURE, question: "Read page 1" }, opts);
+		: await runPdfReaderAgent({ path: SOURCE, question: "Read page 1" }, opts);
 	return { result, renders, activities, usages };
 }
 
@@ -119,7 +123,7 @@ function assertSuccess(loop: Loop, run: Awaited<ReturnType<typeof runLoop>>) {
 		assert.equal(run.result.notes, FINAL);
 	} else {
 		assert.equal(run.result.brief, FINAL);
-		assert.equal(run.result.path, FIXTURE);
+		assert.equal(run.result.path, SOURCE);
 		assert.deepEqual(run.result.pagesRead, [1]);
 		assert.deepEqual(run.result.pagesConsulted, [1]);
 	}

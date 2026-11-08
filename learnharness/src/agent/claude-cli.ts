@@ -170,11 +170,17 @@ export function claudeMcpConfig(toolsFile: string, runtime = process.execPath): 
 	return JSON.stringify({ mcpServers: { [CLAUDE_MCP_SERVER]: { type: "stdio", command: runtime, args: ["-e", CLAUDE_MCP_SCRIPT], env: { ELECTRON_RUN_AS_NODE: "1", [TOOLS_ENV]: toolsFile, CLAUDE_CODE_OAUTH_TOKEN: "" } } } });
 }
 
+/** Where claudeWorkDir lives, without creating it. */
+export function claudeWorkDirPath(): string {
+	const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+	return join(tmpdir(), `learnharness-claude${uid === undefined ? "" : `-${uid}`}`);
+}
+
 /** An app-owned neutral working directory, private to this OS user: Claude
  * Code reads project settings from its cwd, so nobody else may write here. */
 export function claudeWorkDir(): string {
 	const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
-	const dir = join(tmpdir(), `learnharness-claude${uid === undefined ? "" : `-${uid}`}`);
+	const dir = claudeWorkDirPath();
 	mkdirSync(dir, { recursive: true, mode: 0o700 });
 	const stat = statSync(dir);
 	if (uid !== undefined && stat.uid !== uid) throw new Error(`${dir} belongs to another user`);
