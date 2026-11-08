@@ -123,14 +123,13 @@ def runup_course(tmp_path: Path, exam_offset: int) -> Workspace:
         {
             "exam": {"date": day(exam_offset)},
             "topics": {
-                "rank": {},
+                "rank": {"introduced": day(-14)},
                 "span": {"needs": ["rank"]},
                 "eigen": {"needs": ["span"]},
                 "basis": {},
             },
             "path": {"order": ["rank", "span", "eigen", "basis"]},
             "observations": [
-                attempt("rank", -15, text="taught"),
                 attempt("rank", -13),
                 attempt("span", -15),
                 attempt("basis", -3, "partial"),

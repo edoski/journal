@@ -49,7 +49,7 @@ A topic is one idea or method you would check separately: `title`, `needs` (prer
 
 How the helper judges and schedules. Each attempt gets a grade: `solid` (correct, unaided, no `uncertain`, not a guess), `helped` (correct with help, partial, or correct but `uncertain` or a guess) or `missed` (incorrect). Each day of attempts on a topic counts at most once, as one verdict:
 
-- the learning day (the earlier of `introduced` and the first attempt) takes its best grade, at most `helped`: success on the day a topic is learned is not yet independence, so `solid` needs a later day, and the next day is the first retrieval;
+- the learning day (the earlier of `introduced` and the first attempt, and the `introduced` day itself) takes its best grade, at most `helped`: success on the day a topic is learned is not yet independence, so `solid` needs a later day, and the next day is the first retrieval;
 - a day on or after the expected review, or any day with an `exam`, is a probe: the first try counts, lowered to `missed` only by a later unaided incorrect that day, so retries are relearning;
 - any other day is practice: only an unaided incorrect counts, so help, retries and massed repetition before the review earn nothing.
 

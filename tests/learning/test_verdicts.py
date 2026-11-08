@@ -103,6 +103,21 @@ def test_known_well_needs_success_on_two_separate_days() -> None:
     assert course.due == on(5).isoformat()
 
 
+def test_the_day_a_topic_is_taught_is_capped_even_after_an_earlier_probe() -> None:
+    course = learned(att("incorrect", text="probed before teaching"))
+    course.save(4, {"topics": {"a": {"introduced": True}}})
+    course.attempts(4, att("correct", text="right after the lesson"))
+    assert course.verdicts[-1] == (on(4).isoformat(), "helped")
+    assert course.standing["level"] == "assisted"
+    assert course.due == on(5).isoformat()
+
+
+def test_a_transfer_on_the_learning_day_does_not_count() -> None:
+    course = learned(att("correct", text="new setting", transfer=True))
+    course.attempts(2, att("correct", text="next day"))
+    assert course.standing["level"] == "independent"
+
+
 def test_the_day_after_teaching_is_the_first_retrieval() -> None:
     course = learned(att("correct", "Worked example"))
     assert course.due == on(2).isoformat()

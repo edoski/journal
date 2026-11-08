@@ -125,7 +125,8 @@ exam date.
 
 - a partial brain dump on the learning day takes the day's best grade, so it
   cannot lapse the topic;
-- multi-day teaching registers only unaided failures;
+- multi-day teaching registers only unaided failures (since 8 Nov 2026 the day
+  after a learning day is its first retrieval, so it opens with an unaided try);
 - the first retrieval counts as a probe;
 - `transferred` is reachable;
 - massed daily practice no longer climbs the ladder.
@@ -438,7 +439,7 @@ implicit credit.
 | Error-type enum vs method choice | **`chose: <topic>`**, with choice errors derived. `contrasts` only for methods known to compete. | One field carries the wrong-method signal and the pair (open decision 3). |
 | MCQ | **Not used.** Method choice is answered free-response. | Recognition inflation (Kang 2007). |
 | Next review after a failed probe | **From the first try:** 1 day if missed, 2 if helped. | A same-day retry does not erase a failure. |
-| First-learning day | **Best grade counts, at most `helped`** (8 Nov 2026); the first retrieval, the next day, is a probe. | Success on the day a topic is taught is recency, not independence: a topic is `independent` only after success on two separate days. |
+| First-learning day | **Best grade counts, at most `helped`** (8 Nov 2026); the first retrieval, the next day, is a probe. | Success on the day a topic is taught is recency, not independence: a topic is `independent` only after an unaided success on a later day. |
 | Massed daily practice | **Practice days count only failures.** | Spacing, not repetition, earns the next rung. |
 | `event` ids vs duplicate window | **A 30-minute window;** no ids. | Retries ask different questions, so only re-sent saves stay identical. |
 | No new topics while a backlog exists (survey) | **Not enforced.** The cap of 5 plus `pace` show the trade-off. | Topics, not cards, bound the load. |
@@ -501,16 +502,18 @@ documentation. Every phase:
 
 **Tests:**
 
-- The bug case: day 1 `solid`; day 5 (a probe) `missed` then correct. Expect
-  `independent` and `lapsed`, next review on day 6, `unaided_days` 1.
+- The bug case: day 1 `solid` (a first retrieval); day 5 (a probe) `missed`
+  then correct. Expect `independent` and `lapsed`, next review on day 6,
+  `unaided_days` 1.
 - Learning day: a partial brain dump after an unaided correct gives `helped`
   (the best grade, capped), and the topic is not lapsed.
-- Multi-day teaching: day 2 assisted attempts before the expected due date
-  change nothing. An unaided incorrect on day 2 gives `missed`.
+- Multi-day teaching: day 2, the first retrieval, is a probe; hinted attempts
+  there give `helped`, and an unaided incorrect gives `missed`.
 - First retrieval: introduced on day 1 with no attempts. A day-2 correct
   answer is a probe and `solid`.
-- Massed practice: unaided correct answers on days 1–4, with the expected due
-  date on day 4. Days 2–3 add nothing; day 4 is the second `solid`.
+- Massed practice: after a `solid` first retrieval on day 1, unaided correct
+  answers on days 2–3 add nothing; day 4, the expected date, is the second
+  `solid`.
 - A probe's first try is `helped`, then an unaided incorrect comes later:
   `missed`. A first try `solid`, then a later partial: still `solid`.
 - `transferred` is reachable on a practice day, and unreachable on a `missed`

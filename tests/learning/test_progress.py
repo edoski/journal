@@ -125,25 +125,22 @@ def test_corrected_observations_do_not_count() -> None:
 def test_standing_reports_counts_last_attempt_and_flags() -> None:
     record = course(
         [
-            attempt("rank", offset=-10),
             attempt("rank", offset=-8),
             attempt("rank", offset=-5),
             attempt("rank", "incorrect", "Hint", offset=-1),
-        ]
+        ],
+        introduced=day(-9),
     )
     standing = progress.standing(record, "rank")
     assert standing == {
         "level": "retained",
-        "attempts": 4,
+        "attempts": 3,
         "unaided_days": 2,
-        "last": {"id": "o4", "date": day(-1), "result": "incorrect", "unaided": False},
+        "last": {"id": "o3", "date": day(-1), "result": "incorrect", "unaided": False},
     }
     lapsed = course(
-        [
-            attempt("rank", offset=-7),
-            attempt("rank", offset=-5),
-            attempt("rank", "incorrect", offset=-1),
-        ]
+        [attempt("rank", offset=-5), attempt("rank", "incorrect", offset=-1)],
+        introduced=day(-6),
     )
     assert progress.standing(lapsed, "rank")["lapsed"] is True
     never = course(

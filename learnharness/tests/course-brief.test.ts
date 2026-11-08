@@ -54,7 +54,7 @@ function realResumes(): { open: Resume; focused: Resume } {
 		title: "Linear Algebra",
 		exam: { date: "2026-11-17" },
 		topics: {
-			systems: { title: "Linear systems" },
+			systems: { title: "Linear systems", introduced: "2026-11-03" },
 			pivots: {},
 			rank: { title: "Rank", needs: ["systems"], gap: "counts vectors, not independent ones" },
 			eigen: { gap: "confuses eigenvalue with eigenvector" },
@@ -68,7 +68,6 @@ function realResumes(): { open: Resume; focused: Resume } {
 		knowledge: { notation: { text: "rows first", pinned: true }, other: { text: "unpinned fact" } },
 		preferences: { explanation_length: "short" },
 		observations: [
-			{ topics: ["systems"], text: "Taught: a 1x1 system", help: "none", result: "correct", date: "2026-11-03" },
 			{ topics: ["systems"], text: "Solve a 2x2 system", help: "none", result: "correct" },
 			{ topics: ["rank"], text: "Rank of [[1,2],[2,4]]?", response: "2", help: "none", result: "incorrect", sure: "confident", chose: "pivots" },
 		],

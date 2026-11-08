@@ -218,9 +218,8 @@ def pinned(offsets: dict[str, int], **extra: Any) -> dict[str, Any]:
 def test_a_lapsed_topic_comes_before_a_more_overdue_one() -> None:
     record = course(
         {
-            "topics": {"old": {}, "lapsed": {}},
+            "topics": {"old": {}, "lapsed": {"introduced": day(-10)}},
             "observations": [
-                attempt("lapsed", date=day(-11), text="taught"),
                 attempt("lapsed", date=day(-9)),
                 attempt("lapsed", result="incorrect", date=day(-2), text="probe"),
             ],
@@ -241,11 +240,8 @@ def test_a_lapsed_topic_comes_before_a_more_overdue_one() -> None:
 
 def test_within_21_days_of_the_exam_unready_topics_come_before_overdue_ones() -> None:
     patch = {
-        "topics": {"overdue": {}, "unready": {}},
-        "observations": [
-            attempt("overdue", date=day(-5), text="taught"),
-            attempt("overdue", date=day(-3)),
-        ],
+        "topics": {"overdue": {"introduced": day(-4)}, "unready": {}},
+        "observations": [attempt("overdue", date=day(-3))],
     }
     record = apply(
         course(patch),
@@ -285,11 +281,8 @@ def test_the_most_overdue_review_is_named_when_it_falls_past_the_first_five(
         workspace,
         {
             "exam": {"date": day(10)},
-            "topics": {"old": {}, **unready},
-            "observations": [
-                attempt("old", date=day(-5), text="taught"),
-                attempt("old", date=day(-3)),
-            ],
+            "topics": {"old": {"introduced": day(-4)}, **unready},
+            "observations": [attempt("old", date=day(-3))],
         },
     )
     records.save(
