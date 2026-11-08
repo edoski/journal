@@ -136,7 +136,7 @@ export const concludeInputObject = Type.Object({
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the hint-ladder rung the problem needed: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
 	),
 	missClass: Type.Union(
 		[

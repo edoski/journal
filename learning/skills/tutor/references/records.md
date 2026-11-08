@@ -43,7 +43,7 @@ The receipt returns new observation ids, the reviews it set, level changes, the 
 A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `contrasts` (topics whose methods are known to compete; symmetric), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
 
 - `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
-- `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved.
+- `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved, as [evidence.md](evidence.md) defines.
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
 - `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then and `{"points": ["...", "..."]}` lists the one to five key points an answer is marked against. The fields merge; pin only for a reason, otherwise the helper schedules.
 
@@ -61,7 +61,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 ## Path and tasks
 
-`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
+`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. A new topic takes its place in `order` (the list is replaced whole) and joins the `needs` of the topics that build on it. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
 A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 

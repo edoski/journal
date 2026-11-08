@@ -38,14 +38,14 @@ Wait for the attempt. From its reasoning, find the first question the learner ca
 
 | Rung | Gives |
 | --- | --- |
-| R0 | where to look ("re-read the second given") |
+| R0 | where to look ("re-read the second given"), never what to do there |
 | R1 | the pattern ("this is a sum of many small things"), no idea named |
 | R2 | the family of ideas that applies |
 | R3 | the idea, named; carrying it out remains |
 | R4 | the move, outlined |
 | R5 | the worked step |
 
-A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
+A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. Record the rung of what the hint said, not of what was asked or meant. A pointer that also says what to do there ("count the one way it fails") gives the family of ideas or the idea, R2 or R3, however it is worded, and a hint with several parts takes its strongest part's rung. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
 
 ## Practice problems
 
