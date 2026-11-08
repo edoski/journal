@@ -47,6 +47,7 @@ export function sumSteps(steps: readonly CallUsage[]): CallUsage {
  * Pi's fresh input excludes both cache buckets. Weight by prompt tokens,
  * never by call percentages; writes count once (the 1h bucket is a subset).
  * Missing cache counts mean no recorded reuse, not proven cache misses.
+ * Compaction summaries are turns too, and their fresh prompt counts here.
  * Hide until positive reads exist; incomplete/invalid input cannot yield a rate.
  */
 export function sessionCacheHitRate(record: Pick<ChatRecord, "turns">): number | null {
