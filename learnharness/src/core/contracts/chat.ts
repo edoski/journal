@@ -276,6 +276,9 @@ export interface ChatSummary {
 	/** Practice sessions (2026-10-04): a posed problem with no conclude —
 	 *  the sidebar meta's "Problem waiting". False on teaching sessions. */
 	pendingProblem: boolean;
+	/** The course the session studies (the record's own field, carried by
+	 *  the summary spread); absent on sessions older than the course rule. */
+	course?: CourseLink;
 	/** The record's model-control settings — rides the list payload via the
 	 *  summary spread (the picker never needs it from here; the full record
 	 *  is its source). */

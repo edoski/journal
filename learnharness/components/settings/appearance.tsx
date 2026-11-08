@@ -21,6 +21,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { FACTORY_SETTINGS, type AppearanceSettings } from "@/src/core";
+import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
 
 /** The resolved, fully-concrete appearance view (delta + factory merged). */
 export function resolveAppearance(delta: AppearanceSettings | undefined) {
@@ -74,7 +75,11 @@ export function derivedPalette(background: string): Record<string, string> {
 /** THE mapping: resolved appearance → the CSS variables to set on <html>.
  *  Absent entries = leave the factory stylesheet value in place. Pure —
  *  exported for tests. */
-export function appearanceVars(a: ReturnType<typeof resolveAppearance>): Record<string, string> {
+export function appearanceVars(
+	a: ReturnType<typeof resolveAppearance>,
+	design: DesignVariant = "current",
+): Record<string, string> {
+	if (design === "proposed") return proposedAppearanceVars(a);
 	const vars: Record<string, string> = {};
 	if (a.background !== null) Object.assign(vars, derivedPalette(a.background));
 	if (a.fontFamily !== null) {
@@ -90,6 +95,17 @@ export function appearanceVars(a: ReturnType<typeof resolveAppearance>): Record<
 	// Markdown rendering: heading weight + the emphasis inks (the vars
 	// were built "ready for the settings UI").
 	vars["--lh-heading-weight"] = String(a.mdRendering.headingWeight);
+	if (a.mdRendering.boldColor !== null) vars["--lh-ink-strong"] = a.mdRendering.boldColor;
+	if (a.mdRendering.italicColor !== null) vars["--lh-ink-italic"] = a.mdRendering.italicColor;
+	return vars;
+}
+
+/** Under the Proposed design the stylesheet owns the palette, the fonts and
+ *  the heading weight (owner: SF Pro everywhere, one dark ramp), and inline
+ *  values on <html> would outrank its tokens. Only the learner's reading size
+ *  and any emphasis inks they chose still apply. */
+function proposedAppearanceVars(a: ReturnType<typeof resolveAppearance>): Record<string, string> {
+	const vars: Record<string, string> = { "--lh-prose-size": `${a.proseFontSize}px` };
 	if (a.mdRendering.boldColor !== null) vars["--lh-ink-strong"] = a.mdRendering.boldColor;
 	if (a.mdRendering.italicColor !== null) vars["--lh-ink-italic"] = a.mdRendering.italicColor;
 	return vars;
@@ -128,7 +144,8 @@ export function AppearanceProvider({ children }: { children: React.ReactNode }) 
 	const appliedRef = useRef<string>("");
 
 	// The vars apply on every change — stringified as the change signal.
-	const vars = useMemo(() => appearanceVars(resolveAppearance(delta)), [delta]);
+	const design = useDesignVariant();
+	const vars = useMemo(() => appearanceVars(resolveAppearance(delta), design), [delta, design]);
 	const key = useMemo(() => JSON.stringify(vars), [vars]);
 	// REMOVAL is half the job (owner repro, fix wave): a later write that
 	// OMITS a var (empty field = factory, serif toggle back on) must clear

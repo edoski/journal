@@ -118,10 +118,13 @@
 	   fonts: `font-mono`/`font-sans` utilities would otherwise fall to the
 	   SYSTEM stacks — a fourth font the app never chose — and streamdown's
 	   code-block chrome + mermaid-error + demo-card all use them. */
-	--font-ui: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
-	--font-prose: var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
-	--font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
-	--font-sans: var(--font-sans3), ui-sans-serif, system-ui, sans-serif;
+	/* Each value the Proposed design changes reads its --lh-* token first; the
+	   fallback is the Current value, so Current computes exactly as before
+	   (the Proposed block at the end of this file defines the tokens). */
+	--font-ui: var(--lh-font-ui, var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace);
+	--font-prose: var(--lh-font-prose, var(--font-sans3), ui-sans-serif, system-ui, sans-serif);
+	--font-mono: var(--lh-font-mono, var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace);
+	--font-sans: var(--lh-font-sans, var(--font-sans3), ui-sans-serif, system-ui, sans-serif);
 	/* The modular type ladder — each size carries its own line-height.
 	   Component sizes must pull from this ladder. (owner, typography
 	   round 4: the 10px rung is merged into 11 — one pixel apart was a
@@ -135,25 +138,45 @@
 	   toggle write a runtime --font-title no consumer ever read (owner, fix
 	   wave: toggle looked dead). Non-inline emits :root { --font-title: … }
 	   and the utility reads var(--font-title) — appearance overrides win. */
-	--text-xs: 11px;
-	--text-xs--line-height: 1.4;
-	--text-sm: 12.5px;
-	--text-sm--line-height: 1.4;
-	--text-base: 14px;
-	--text-base--line-height: 1.45;
-	--text-lg: 16px;
-	--text-lg--line-height: 1.45;
-	--text-xl: 20px;
-	--text-xl--line-height: 1.4;
-	--text-2xl: 25px;
-	--text-2xl--line-height: 1.3;
-	--text-3xl: 32px;
-	--text-3xl--line-height: 1.25;
+	--text-xs: var(--lh-text-xs, 11px);
+	--text-xs--line-height: var(--lh-text-xs-leading, 1.4);
+	--text-sm: var(--lh-text-sm, 12.5px);
+	--text-sm--line-height: var(--lh-text-sm-leading, 1.4);
+	--text-base: var(--lh-text-base, 14px);
+	--text-base--line-height: var(--lh-text-base-leading, 1.45);
+	--text-lg: var(--lh-text-lg, 16px);
+	--text-lg--line-height: var(--lh-text-lg-leading, 1.45);
+	--text-xl: var(--lh-text-xl, 20px);
+	--text-xl--line-height: var(--lh-text-xl-leading, 1.4);
+	--text-2xl: var(--lh-text-2xl, 25px);
+	--text-2xl--line-height: var(--lh-text-2xl-leading, 1.3);
+	--text-3xl: var(--lh-text-3xl, 32px);
+	--text-3xl--line-height: var(--lh-text-3xl-leading, 1.25);
+	/* The Proposed scale by role (T3 Code and Apple, agent-apps.md): one
+	   name per job, the same in both designs; only Proposed uses them. */
+	--text-caption: 11px;
+	--text-caption--line-height: calc(14 / 11);
+	--text-label: 12px;
+	--text-label--line-height: calc(16 / 12);
+	--text-row: 13px;
+	--text-row--line-height: calc(18 / 13);
+	--text-control: 14px;
+	--text-control--line-height: calc(20 / 14);
+	--text-prose: 16px;
+	--text-prose--line-height: calc(26 / 16);
+	--text-subheading: 18px;
+	--text-subheading--line-height: calc(24 / 18);
+	--text-heading: 20px;
+	--text-heading--line-height: calc(26 / 20);
+	--text-display: 30px;
+	--text-display--line-height: calc(36 / 30);
+	--text-display--letter-spacing: -0.025em;
 	/* Radii ladder — 4/8/12/16 multiples of the 4px base. */
-	--radius-sm: 4px;
-	--radius-md: 8px;
-	--radius-lg: 12px;
-	--radius-xl: 16px;
+	--radius-sm: var(--lh-radius-sm, 4px);
+	--radius-md: var(--lh-radius-md, 8px);
+	--radius-lg: var(--lh-radius-lg, 12px);
+	--radius-xl: var(--lh-radius-xl, 16px);
+	--radius-2xl: var(--lh-radius-2xl, 16px);
 	--radius: 8px;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
@@ -173,6 +196,13 @@
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
+	/* Proposed-only colours (defined in the Proposed block; Current uses none). */
+	--color-link: var(--lh-link);
+	--color-danger: var(--lh-danger);
+	--color-success: var(--lh-success);
+	--color-warning: var(--lh-warning);
+	--color-fill-hover: var(--lh-fill-hover);
+	--color-fill-selected: var(--lh-fill-selected);
 }
 
 * {
@@ -201,12 +231,12 @@ body {
    font takes it, and CMU (a single 700 face) snaps to its nearest
    available weight — the same rendering it already had. */
 .font-title {
-	font-weight: 900;
+	font-weight: var(--lh-title-weight, 900);
 }
 
 .lh-prose :where(strong, b) {
 	color: var(--lh-ink-strong);
-	font-weight: 700;
+	font-weight: var(--lh-strong-weight, 700);
 }
 
 .lh-prose :where(em, i) {
@@ -602,3 +632,95 @@ body {
 	outline: 1px solid var(--border);
 	border-radius: 0.25rem;
 }
+
+/* ============================================================
+ * THE PROPOSED DESIGN (polish pass, 9 Nov 2026). The dev-only design
+ * switch (components/dev/polish-switcher.js) sets data-polish-design on
+ * <html>; production never does, so production stays on the tokens above.
+ * Shipping Proposed = this selector becomes the token source and the
+ * Current values above go. Sources: research/agent-apps.md (T3 Code,
+ * Codex, Claude desktop tokens), Apple HIG, the owner's decisions: SF Pro
+ * everywhere, dark only, one accent.
+ * html[...] outranks :root and .dark, which set the same names.
+ * AppearanceProvider writes some of these inline on <html>; under
+ * Proposed it writes only the reading size and the emphasis inks
+ * (components/settings/appearance.tsx), so these values hold.
+ * ============================================================ */
+html[data-polish-design="proposed"] {
+	/* Type: the system font (SF Pro on macOS) for chrome and prose alike. */
+	--lh-font-sans: -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", system-ui, sans-serif;
+	--lh-font-ui: var(--lh-font-sans);
+	--lh-font-prose: var(--lh-font-sans);
+	--lh-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+	--font-title: var(--lh-font-sans);
+	--lh-title-weight: 600;
+	--lh-strong-weight: 600;
+	--lh-heading-weight: 600;
+	--lh-prose-size: 16px;
+	--lh-prose-leading: calc(26 / 16);
+	/* The old ladder snapped onto the Proposed scale, so screens not yet
+	   rebuilt read on it: 11 caption, 13 rows, 14 controls, 16 prose,
+	   20 headings, 30 display. */
+	--lh-text-xs: 11px;
+	--lh-text-xs-leading: calc(14 / 11);
+	--lh-text-sm: 13px;
+	--lh-text-sm-leading: calc(18 / 13);
+	--lh-text-base: 14px;
+	--lh-text-base-leading: calc(20 / 14);
+	--lh-text-lg: 16px;
+	--lh-text-lg-leading: 1.5;
+	--lh-text-xl: 20px;
+	--lh-text-xl-leading: calc(26 / 20);
+	--lh-text-2xl: 20px;
+	--lh-text-2xl-leading: calc(26 / 20);
+	--lh-text-3xl: 30px;
+	--lh-text-3xl-leading: calc(36 / 30);
+
+	/* Colour: one neutral ramp, edges and fills as white alpha (T3, Codex),
+	   one accent (blue, T3's hue) for the primary action, focus and links.
+	   The shadcn surface names (secondary, muted, accent) stay opaque: older
+	   screens paint tooltips and menus with them. New rows use the alpha
+	   fill-hover and fill-selected. */
+	--background: #121212;
+	--foreground: #ededed;
+	--card: #1a1a1a;
+	--card-foreground: #ededed;
+	--popover: #1c1c1c;
+	--popover-foreground: #ededed;
+	--primary: oklch(0.58 0.2 262);
+	--primary-foreground: #ffffff;
+	--secondary: #1c1c1c;
+	--secondary-foreground: #ededed;
+	--muted: #1a1a1a;
+	--muted-foreground: #a1a1a1;
+	--accent: #232323;
+	--accent-foreground: #ededed;
+	--destructive: var(--lh-danger);
+	--border: rgb(255 255 255 / 0.08);
+	--input: rgb(255 255 255 / 0.11);
+	--ring: oklch(0.68 0.16 258);
+	--lh-link: oklch(0.74 0.13 255);
+	--lh-fill-hover: rgb(255 255 255 / 0.04);
+	--lh-fill-selected: rgb(255 255 255 / 0.07);
+	--lh-danger: oklch(0.7 0.19 22);
+	--lh-success: oklch(0.76 0.15 155);
+	--lh-warning: oklch(0.82 0.15 80);
+
+	/* Shape: 8 controls and rows, 12 cards, docks and menus, 20 the composer. */
+	--lh-radius-sm: 8px;
+	--lh-radius-md: 8px;
+	--lh-radius-lg: 12px;
+	--lh-radius-xl: 12px;
+	--lh-radius-2xl: 20px;
+
+	/* Motion: 150ms on colour and opacity, T3's standard easing. */
+	--default-transition-duration: 150ms;
+	--default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-polish-design="proposed"] {
+		--default-transition-duration: 0s;
+	}
+}
+

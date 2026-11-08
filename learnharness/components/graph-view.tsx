@@ -110,8 +110,9 @@ import {
 } from "@/src/core";
 
 /** The uniform node look (no state classes — canvas wants hex, not oklch):
- *  the accent color, until the state model lands. */
-const NODE_COLOR_TOKEN = "--primary";
+ *  the text ink, until the state model lands. The graph is drawn in neutral
+ *  ink; the accent is kept for actions, focus and links. */
+const NODE_COLOR_TOKEN = "--foreground";
 
 /** Per-device graph camera persistence (zoom+pan view state). v1 in the
  *  key: the stored shape is the renderer's d3 transform {k, x, y}. */
@@ -1428,7 +1429,7 @@ export function GraphView({
 			clusters: snapshot.clusters.map((c) => ({ id: c.id, label: c.label, members: c.members })),
 			colors: {
 				node: tokenHex(NODE_COLOR_TOKEN),
-				edge: tokenHex("--ring"),
+				edge: tokenHex("--muted-foreground"),
 				label: tokenHex("--muted-foreground"),
 				hoverText: tokenHex("--foreground"),
 			},

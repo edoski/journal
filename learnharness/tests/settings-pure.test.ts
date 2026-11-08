@@ -103,6 +103,28 @@ describe("appearanceVars — the mapping the provider applies", () => {
 		assert.equal(vars["--font-title"], "var(--font-prose)");
 		assert.equal(Object.keys(vars).length, 3, "prose-size, heading-weight, font-title only");
 	});
+
+	it("Proposed design: the stylesheet keeps palette, fonts and heading weight; reading size and inks still apply", () => {
+		const vars = appearanceVars(
+			resolveAppearance({
+				background: "#101820",
+				fontFamily: "Georgia",
+				proseFontSize: 18,
+				sessionNameSerif: false,
+				mdRendering: { headingWeight: 700, boldColor: "#ff0000", italicColor: "#00ff00" },
+			}),
+			"proposed",
+		);
+		assert.deepEqual(vars, { "--lh-prose-size": "18px", "--lh-ink-strong": "#ff0000", "--lh-ink-italic": "#00ff00" });
+	});
+
+	it("switching to Proposed clears the inline values the Proposed tokens own", () => {
+		const current = appearanceVars(resolveAppearance({ background: "#101820", sessionNameSerif: false }));
+		const proposed = appearanceVars(resolveAppearance({ background: "#101820", sessionNameSerif: false }), "proposed");
+		const stale = staleVarNames(Object.keys(current), proposed);
+		for (const name of ["--background", "--border", "--font-title", "--lh-heading-weight"]) assert.ok(stale.includes(name), name);
+		assert.ok(!stale.includes("--lh-prose-size"));
+	});
 });
 
 describe("staleVarNames — the removal half of application (owner repro: resets never reverted)", () => {
