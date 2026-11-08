@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeLaunch, loadClaudeAccounts, publicClaudeAccount, type LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
+import { claudeConfigDirs, claudeLaunch, loadClaudeAccounts, publicClaudeAccount, type LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 import { claudeChildEnv } from "../src/agent/claude-cli.ts";
 import { resetClaudeConnections, type ClaudeRunner } from "../src/agent/claude-connection.ts";
 import { resetClaudeUsage } from "../src/agent/claude-usage.ts";
@@ -51,6 +51,12 @@ test("enabled claudeAgent instances become accounts; the default home keeps the 
 	assert.equal(main.token(), "fake-token-main", "the token is read trimmed, at call time");
 	assert.equal(second.token(), "fake-token-second");
 	assert.equal(profile.configDir, join(home, ".claude-4"), "~ expands to the home");
+});
+
+test("every config dir T3 Code names is one the file tools refuse, enabled or not, token or profile, plus CLAUDE_CONFIG_DIR", () => {
+	const home = fakeHome({ instances: { ...FOUR, elsewhere: { driver: "claudeAgent", enabled: true, config: { homePath: "/Volumes/Data/claude-work" }, environment: tokenEnv } } });
+	assert.deepEqual(claudeConfigDirs({ home }, {}), [join(home, ".claude-2"), join(home, ".claude-off"), join(home, ".claude-4"), "/Volumes/Data/claude-work"]);
+	assert.deepEqual(claudeConfigDirs({ home: fakeHome({}) }, { CLAUDE_CONFIG_DIR: "~/profiles/work" }), [join(root, `home-${homes}`, "profiles", "work")]);
 });
 
 test("an absolute homePath equal to ~/.claude is the default home too, and a profile there runs without a config dir", () => {

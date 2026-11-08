@@ -15,6 +15,11 @@ import { runPdfReaderAgent } from "../src/agent/subagents/pdf-reader.ts";
 import type { HeadlessApi } from "../src/agent/subagents/headless.ts";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
+/** The loop reads a copy outside the checkout: a checkout under a protected
+ *  home folder (an agent worktree in ~/.t3) is itself off-limits. */
+const SOURCE = path.join(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
+fs.copyFileSync(FIXTURE, SOURCE);
+process.on("exit", () => fs.rmSync(path.dirname(SOURCE), { recursive: true, force: true }));
 
 function fauxEngine(steps: FauxResponseStep[]): PiEngine {
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });
@@ -60,7 +65,7 @@ describe("pdf-reader source paths", () => {
 	const originalUserProfile = process.env.USERPROFILE;
 
 	before(() => {
-		home = fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-home-"));
+		home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-home-")));
 		const target = path.join(home, relativePath);
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.copyFileSync(FIXTURE, target);
@@ -76,10 +81,10 @@ describe("pdf-reader source paths", () => {
 		fs.rmSync(home, { recursive: true, force: true });
 	});
 
-	for (const kind of ["absolute", "home-relative"] as const) {
+	for (const kind of ["absolute", "home-relative", "tilde"] as const) {
 		it(`${kind} path reaches text tools and rendering as the same absolute path`, async () => {
 			const absolutePath = path.join(home, relativePath);
-			const inputPath = kind === "absolute" ? absolutePath : relativePath;
+			const inputPath = { absolute: absolutePath, "home-relative": relativePath, tilde: `~/${relativePath}` }[kind];
 			assert.equal(os.homedir(), home);
 			assert.notEqual(path.resolve(relativePath), absolutePath, "cwd is not the learner's home");
 			const headless = fakeHeadless();
@@ -137,10 +142,10 @@ describe("pdf-reader loop (faux engine)", () => {
 			fauxAssistantMessage([fauxText("The integral rule appears on page 1 (p. 1). Pages consulted: 1, 2")]),
 		]);
 		const result = await runPdfReaderAgent(
-			{ path: FIXTURE, question: "what is the integral of x?" },
+			{ path: SOURCE, question: "what is the integral of x?" },
 			{ engine },
 		);
-		assert.equal(result.path, FIXTURE);
+		assert.equal(result.path, SOURCE);
 		assert.match(result.brief, /integral rule/);
 		assert.deepEqual(result.pagesRead, [1, 2], "extracted pages are read pages");
 		assert.deepEqual(result.pagesConsulted, [1, 2]);
@@ -160,7 +165,7 @@ describe("pdf-reader loop (faux engine)", () => {
 			fauxAssistantMessage([fauxText("Found it on page 1 (p. 1): the integral of x dx.")]),
 		]);
 		const result = await runPdfReaderAgent(
-			{ path: FIXTURE, question: "integral of x?" },
+			{ path: SOURCE, question: "integral of x?" },
 			{ engine, onActivity: (line) => void (line && (nudged ||= line.startsWith("pdf_search"))) },
 		);
 		assert.match(result.brief, /Found it on page 1/);
@@ -180,7 +185,7 @@ describe("pdf-reader loop (faux engine)", () => {
 			fauxAssistantMessage([fauxText("The physics formula is visible on page 2 (p. 2).")]),
 		]);
 		const result = await runPdfReaderAgent(
-			{ path: FIXTURE, question: "what is the force formula?" },
+			{ path: SOURCE, question: "what is the force formula?" },
 			{ engine, headless },
 		);
 		assert.deepEqual(result.pagesRead, [2, 3], "rendered pages are read pages");
@@ -200,7 +205,7 @@ describe("pdf-reader loop (faux engine)", () => {
 			fauxAssistantMessage([fauxText("Extracted instead: the calculus line (p. 1).")]),
 		]);
 		const result = await runPdfReaderAgent(
-			{ path: FIXTURE, question: "page 1 content?" },
+			{ path: SOURCE, question: "page 1 content?" },
 			{
 				engine,
 				headless: {
