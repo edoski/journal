@@ -720,7 +720,7 @@ export function Chat({
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
 	// Compaction (owner round 14): the RUNNING state — compaction-changed
-	// flips it; the send paths, canSend, and the docks gate on it (the
+	// flips it; the send paths, sendAllowed, and the docks gate on it (the
 	// server's registry mutex is the structural gate; this is the
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
@@ -1683,7 +1683,7 @@ export function Chat({
 					plan={hasPlan ? <PlanMarginalia messages={messages} /> : undefined}
 					onOpenPlan={() => setPlanOpen(true)}
 					requiresReveal={requiresReveal}
-					readingThinking={readingThinkingSeed.value}
+					readingThinking={readingThinkingRef.current}
 					readingThinkingRevision={readingThinkingSeed.revision}
 					onReadingThinking={applyReadingThinking}
 					phase={phases.at(-1) ?? "probe"}
@@ -1938,8 +1938,9 @@ function DockOverlay({
 	onSubmitThinking: (text: string, confidence: Confidence) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
-	/** The reading-thinking draft (owner 2026-10-03) — owned by ChatView so
-	 *  the submit + dismissal seams (outside this overlay) can merge it. */
+	/** The reading-thinking draft (owner 2026-10-03), read from ChatView's
+	 *  ref so a remount shows the latest text; the revision resyncs the field
+	 *  on explicit resets. The submit and dismissal seams read the ref. */
 	readingThinking: string;
 	readingThinkingRevision: number;
 	onReadingThinking: (v: string) => void;
@@ -2291,7 +2292,7 @@ function DockOverlay({
 			if (el.getAnimations().length === 0) {
 				const h = el.getBoundingClientRect().height;
 				p.height = h;
-				measureBlock(); // typing growth → the spacer grows with the box
+				measureBlock();
 			}
 			return;
 		}

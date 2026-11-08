@@ -287,12 +287,12 @@ describe("session text fields keep keystrokes local", () => {
 		const field = fieldIn(host);
 		await typeText(field, "typed thoughts");
 		await act(async () => {
-			inputEvent(field, "typed thoughts spoken tail");
-			assert.equal(latest, "typed thoughts spoken tail", "a submit right after the append sees the tail");
-			inputEvent(field, "typed thoughts spoken tail and a second burst");
-			assert.equal(latest, "typed thoughts spoken tail and a second burst");
+			inputEvent(field, "typed thoughts appended tail");
+			assert.equal(latest, "typed thoughts appended tail", "a submit right after the append sees the tail");
+			inputEvent(field, "typed thoughts appended tail and a second burst");
+			assert.equal(latest, "typed thoughts appended tail and a second burst");
 		});
-		assert.equal(field.value, "typed thoughts spoken tail and a second burst");
+		assert.equal(field.value, "typed thoughts appended tail and a second burst");
 		assert.equal(forwardedEdits, 3, "each edit forwards its synchronous snapshot exactly once");
 	});
 });
