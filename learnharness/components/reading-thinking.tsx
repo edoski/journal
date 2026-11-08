@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback, useLayoutEffect, useState } from "react";
+
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
  * teaching unit"): a quiet textarea for thinking WHILE READING the
@@ -12,16 +14,24 @@
  */
 export function ReadingThinkingField({
 	value,
+	revision,
 	onChange,
 	onOpen,
 }: {
 	value: string;
+	revision: number;
 	onChange: (v: string) => void;
 	/** The check waits CLOSED — Enter opens it (owner, keyboard round
 	 *  2026-10-06). Absent = the check is open: Enter keeps the dumping
 	 *  convention. */
 	onOpen?: () => void;
 }) {
+	const [draft, setDraft] = useState(value);
+	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
+	const applyDraft = useCallback((next: string) => {
+		setDraft(next);
+		onChange(next);
+	}, [onChange]);
 	return (
 		<div
 			data-testid="reading-thinking-field"
@@ -31,8 +41,8 @@ export function ReadingThinkingField({
 				Thinking while reading
 			</div>
 			<textarea
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
+				value={draft}
+				onChange={(e) => applyDraft(e.target.value)}
 				/* py-0.5 (owner round, 2026-10-07): the scrollbar fix. Source
 				   Sans 3's font box is 22px at 16px; lh-input's 1.25 leading
 				   gives a 20px line box — the content area sticks 1px below the
