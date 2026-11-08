@@ -24,7 +24,7 @@ In a session that taught a new topic, unless the learner is leaving, write its `
 
 ## The week
 
-At the first session of a new week, offer a look at the week in one line after today's review. On acceptance, read every course's `week`:
+At the first session of a new week, offer a look at the week in one line after today's review. On acceptance, read every course's week figures:
 
 1. Look back in four to six plain lines per course: what moved (`levels`), what is shaky and why, the wrong-method pairs (`choice_errors`), and how many answers were confidently wrong (`confident_errors`). No percentages or streaks.
 2. Propose one mixed set per course: four to six problems from the course sheets or past papers on two or three topics linked by `contrasts` or recent wrong-method errors, at level `assisted` or better. Problems do not reveal their type and no two in a row use the same method; each answer starts with the method and a one-line reason, then the solve (paper and photos are fine). Give feedback after each full answer; the set takes 30–45 minutes. The first time, say once that mixing feels harder and works better.
@@ -32,7 +32,7 @@ At the first session of a new week, offer a look at the week in one line after t
 
 ## Exam run-up
 
-Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam. Within 21 days of the exam the record's `runup` lists the path topics `not_introduced`, the `unready` ones (no `solid` verdict in two weeks) and, when the Journal has a schedule, the `study_days` until a week before the exam and the `pace` of new topics per study day. The phase follows `days_left`:
+Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam. Within 21 days of the exam the course's run-up figures list the path topics `not_introduced`, the `unready` ones (no `solid` verdict in two weeks) and, when the Journal has a schedule, the `study_days` until a week before the exam and the `pace` of new topics per study day. The phase follows `days_left`:
 
 | Days left | Phase |
 | --- | --- |

@@ -104,11 +104,11 @@ Measured sizes, from copies of the real SMM and AIKR records and the app's compo
 | --- | --- | --- | --- |
 | App system prompt (unchanged by this work) | 13,156 | 35,893 | 25,497 |
 | App tool schemas | 9,228 | 11,900 | 7,420 |
-| Course doctrine (the app's adapter and the engine's `evidence.md`) | 7,001 | 7,001 | 7,001 |
+| Course doctrine (the app's adapter and the engine's `evidence.md`) | 7,474 | 7,474 | 7,474 |
 | `course_*` tool schemas | 2,202 | 2,202 | 2,202 |
 | Course brief, SMM / AIKR | 2,322 / 1,411 | 2,322 / 1,411 | 2,322 / 1,411 |
 
-The course adds about 11.5 KB per turn on SMM (doctrine, tools and brief), against 20 KB for the first bridge, which carried the full `resume`. Composing the engine's observation rules after the move took the doctrine from 3,838 to 5,533 bytes, and E3's whole `evidence.md` to 7,001: it adds the evidence rules the app's prompts lacked (what counts, the miss classes, recurring errors, confidence and self-reports, the learner's work). The app's dedupe wins it back on the system-prompt row, where the duplicate doctrine sits (`practice/10-doctrine.md` alone is 14,947 bytes). The practice brief equals the teach brief on these records, because their `resume` lists due topics without review prompts; the practice agent reads them with `course_show`. In the live run on a throwaway course before the move (8 Nov, Claude Opus 5.5 through the Claude subscription), the prober's first call carried 11,277 prompt tokens by the provider's count, and later calls in the turn read about 10,600 of them from the cache.
+The course adds about 12.0 KB per turn on SMM (doctrine, tools and brief), against 20 KB for the first bridge, which carried the full `resume`. Composing the engine's observation rules after the move took the doctrine from 3,838 to 5,533 bytes, and E3's whole `evidence.md` to 7,474: it adds the evidence rules the app's prompts lacked (what counts, the miss classes, recurring errors, confidence and self-reports, the learner's work). The app's dedupe wins it back on the system-prompt row, where the duplicate doctrine sits (`practice/10-doctrine.md` alone is 14,947 bytes). The practice brief equals the teach brief on these records, because their `resume` lists due topics without review prompts; the practice agent reads them with `course_show`. In the live run on a throwaway course before the move (8 Nov, Claude Opus 5.5 through the Claude subscription), the prober's first call carried 11,277 prompt tokens by the provider's count, and later calls in the turn read about 10,600 of them from the cache.
 
 ## Delivery
 
@@ -130,7 +130,7 @@ The course adds about 11.5 KB per turn on SMM (doctrine, tools and brief), again
 ## Decisions taken by default, which Edoardo can change
 
 - Practice attempts count as evidence. This overturns the 29 Sep 2026 ruling that practice is "strengthening, not assessment" and that grading writes nothing; the merged system follows the lead thread's mapping of practice answers to engine attempts.
-- A prediction stated before teaching is saved as an attempt, as the tutor skill's practice reference says ("only the prediction is evidence").
+- A prediction before a plot, simulation or run of code on what was taught is saved as an attempt; a prediction before a step not yet taught is not (8 Nov: recording it would let a guess about untaught material mark a topic lapsed on a later day).
 
 - Graph per course, in the app's data dir. The alternative is next to the course record in the vault, where the tutor could read it too.
 - Multiple-choice graded questions are deleted, not kept for practice-only drills.

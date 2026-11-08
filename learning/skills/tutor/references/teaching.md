@@ -11,7 +11,8 @@ Each remaining prerequisite, and the topic itself when the learner may know part
 - Enter near the hardest thing the goal needs and let a miss walk you down. Never open below what the session has already demonstrated.
 - Correct and confident: jump up sharply. Correct but guessed or thinly reasoned: step up gently. Wrong: narrow back down to pin the ceiling.
 - A miss is one coordinate. A slip, a gap and a misconception look alike, so probe around it, and map a misconception's extent before moving on.
-- Every question moves an edge; never re-ask what an answer already settled. A strand that never breaks is not done.
+- Every question moves an edge; never re-ask what an answer already settled. A strand that never breaks has no ceiling yet.
+- Stop once each edge is placed; before a lesson that is usually three questions or fewer.
 
 Record each answer as an attempt on the topic it tests. A probed topic without a `review.prompt` gets its prompt and `review.points` at the same time.
 
@@ -21,11 +22,11 @@ Work out the chain from what the learner holds to the target: steps that are eac
 
 Each conceptual step, one per message, is predict, teach, check:
 
-1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet. Skip it when there is nothing to anticipate, as in a repair.
+1. **Predict.** Before the step, point at the problem it solves and ask what has to give. The prediction need not be answerable yet, and it is not recorded. Skip it when there is nothing to anticipate, as in a repair.
 2. **Teach.** Open by resolving the prediction (what they said, what is true, and why), then give the whole step before any check.
 3. **Check.** Ask a question that needs the step's reason and is answerable from what was taught: "why is that row operation allowed?", not "does that make sense?". Repair a failed check before the next step; never build on a step the learner has not demonstrated.
 
-Before a plot, a simulation or a run of code, ask for a prediction the same way.
+Before a plot, a simulation or a run of code on what was taught, ask for a prediction the same way; that one is an attempt.
 
 A procedure goes from one worked example with the reason for each step, to a partly worked problem where the learner supplies the decisive step, to an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence.
 
@@ -44,7 +45,7 @@ Wait for the attempt. From its reasoning, find the first question the learner ca
 | R4 | the move, outlined |
 | R5 | the worked step |
 
-A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me". The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
+A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
 
 ## Practice problems
 

@@ -475,7 +475,7 @@ def skill_body() -> str:
     return text.strip()
 
 
-def skill_section(title: str, guide: str) -> str:
+def guide_section(title: str, guide: str) -> str:
     """One section of a guide, without its heading.
 
     A ``##`` section runs to the next ``##`` heading; a ``###`` one also stops
@@ -511,7 +511,7 @@ def get_prompt(name: str, arguments: Any) -> Json:
             "below, in that order, with this protocol; answer in the learner's "
             "language, keep bookkeeping silent and `save` once, at the end or when "
             "the learner leaves.",
-            skill_section("Today's review", "reviews"),
+            guide_section("Today's review", "reviews"),
             _resume(chosen),
         ]
     elif name == "mock_exam":
@@ -525,16 +525,17 @@ def get_prompt(name: str, arguments: Any) -> Json:
             "the course's recorded exam format, covering the study path and "
             "weighted to `unready` topics, with this protocol; answer in the "
             "learner's language and keep bookkeeping silent.",
-            skill_section("Oral mock" if oral else "Written mock", "reviews"),
+            guide_section("Oral mock" if oral else "Written mock", "reviews"),
             _resume(chosen),
         ]
     else:
         text, _failed = run(None, ["plan", "--all", "--days=7"])
         parts = [
-            "You are the learner's tutor. Look back at the week and propose mixed "
-            "sets across these courses with this protocol; answer in the learner's "
-            "language and keep bookkeeping silent.",
-            skill_section("The week", "reviews"),
+            "You are the learner's tutor. The learner accepted the week's "
+            "look-back: look back at the week and propose mixed sets across these "
+            "courses with this protocol, without offering it first; answer in the "
+            "learner's language and keep bookkeeping silent.",
+            guide_section("The week", "reviews"),
             f"Plan (`plan --all`):\n{text}",
         ]
     return {
