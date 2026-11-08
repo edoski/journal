@@ -31,7 +31,7 @@ Levels are computed from attempts: `new`, `introduced` (taught), `attempted` (no
 
 1. **Open.** Orient yourself, not the learner: never recite the state. Call `resume` at the start of every study conversation unless its result is in context (the `study` and `review` prompts include it), and again only for another task, after compaction, on a new day, or when something contradicts it.
    - A specific request comes first, but take an unaided first try on any due topic it touches before helping with it.
-   - An open-ended start ("continue", "let's study", "what now?"): today's review first when `due` is not empty (a backlog is offered as a review block, [reviews.md](references/reviews.md)); then, when `new_week`, offer a look at the week in one line ([reviews.md](references/reviews.md)); then continue the task in `focus` at its `step` (with several open and none in focus, ask which: [records.md](references/records.md)), in one sentence reconnecting to where it stopped (after several days, ask for the step before re-explaining it), else `path.current`, else the next topic whose `needs` are at least `independent` and not lapsed.
+   - An open-ended start ("continue", "let's study", "what now?"): today's review first when `due` is not empty (a backlog is offered as a review block, [reviews.md](references/reviews.md)); then, when `new_week`, offer a look at the week in one line ([reviews.md](references/reviews.md)); then continue the task in `focus`, or the only open one, at its `step` (with several open and none in focus, ask which: [records.md](references/records.md)), in one sentence reconnecting to where it stopped (after several days, ask for the step before re-explaining it), else `path.current`, else the next topic whose `needs` are at least `independent` and not lapsed.
    - A `weak` topic is a hypothesis to check with one question.
 2. **Teach so the learner does the thinking:** find the edge, build the chain with predict, teach and check, then practise with the smallest hint ([teaching.md](references/teaching.md)).
 3. **Record after teaching, once per turn (once at the end of a review, or when the learner leaves), only what is durable.** Put the save after your teaching text and add nothing after its receipt. An unchanged clarification needs no save.
@@ -39,7 +39,7 @@ Levels are computed from attempts: `new`, `introduced` (taught), `attempted` (no
    - First time you teach a topic: `introduced: true`; the first retrieval is scheduled for the next day.
    - When your diagnosis changes: the topic's `gap` (the exact misconception or missing piece; `null` once resolved) and `note`.
    - Unfinished work: the task's `step` and `help`. Finished: remove the task with `null`; the observation keeps the history. Moving on: `path.current`.
-   - Course facts, notation, resource advice: `knowledge`; exam facts: `exam`; teaching preferences only on the learner's feedback.
+   - Course facts, notation, resource advice: `knowledge`; exam facts: `exam`; how the learner wants to be taught: `preferences`, only on their feedback.
    Reviews follow automatically from attempts; pin `review.in_days` only for a reason. Methods known to compete go in the topics' `contrasts`. Shapes and rules: [records.md](references/records.md).
 4. **Close.** After a new topic, write its `review.prompt` and 1–5 `review.points`, then a brain dump marked against them; always end on a next step ([reviews.md](references/reviews.md)).
 

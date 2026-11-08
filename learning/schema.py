@@ -340,13 +340,14 @@ def _unknown_field(name: str, fields: Collection[str], path: str) -> str:
     )
 
 
-def _misfiled(kind: str, value: dict[str, Any]) -> str:
+def _misfiled(kind: str, path: str, name: str, value: Any) -> str:
     """Points a knowledge entry that calls itself a preference to ``preferences``."""
-    if kind != "knowledge" or "prefer" not in str(value).casefold():
+    named = f"{path} {name} {value if isinstance(value, str) else ''}".casefold()
+    if kind != "knowledge" or "prefer" not in named:
         return ""
     return (
-        '; a teaching preference is not knowledge: save it under "preferences", '
-        'e.g. {"preferences": {"explanation_length": "short"}}'
+        "; if this is how the learner wants to be taught, it is not knowledge: "
+        'save it as {"preferences": {"explanation_depth": "Short first"}}'
     )
 
 
@@ -579,9 +580,12 @@ def entry(
     helpers = {} if patch else HELPERS.get(kind, {})
     for name in value:
         if name not in allowed and name not in helpers:
-            raise ValueError(
-                _unknown_field(name, allowed, path) + _misfiled(kind, value)
+            hint = (
+                ""
+                if name in HELPER_FIELDS
+                else _misfiled(kind, path, name, value[name])
             )
+            raise ValueError(_unknown_field(name, allowed, path) + hint)
     order = value if patch else [*allowed, *helpers]
     result: dict[str, Any] = {}
     for name in order:

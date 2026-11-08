@@ -8,7 +8,7 @@
 4. Put the next question in the same message. No recap.
 5. Record one attempt per answer, with the question asked as `text`, `response`, `help`, `result`, `sure` and `chose`. A confident error also rewrites `gap` and the `prompt`; broken reasoning rewrites `gap`. Only the first try on a due day counts; retries are relearning.
 
-When more than five topics are due, or any are due within 21 days of the exam, an open-ended start says so in one line (how many, and the most overdue) and proposes a review block before new material; the learner decides.
+When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line (how many are due, and the most overdue) and proposes a review block, today's review and as far past it as the learner wants, before new material; the learner decides.
 
 Ask once per course whether reviews are done with closed notes and store the answer as the course preference `review_notes`; with open notes, attempts are `uncertain`. A mock replaces the day's review for the topics it covers.
 

@@ -47,7 +47,7 @@ const saveInput = Type.Object({
 	changes: Type.Record(Type.String(), Type.Unknown(), {
 		description:
 			"One JSON merge patch for the course record: only what changed. `observations` is a list of new entries; " +
-			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam` merge by field.",
+			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam`, `preferences` merge by field; `focus` names the task to continue.",
 	}),
 });
 

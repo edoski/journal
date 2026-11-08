@@ -272,10 +272,11 @@ def test_a_preference_filed_as_knowledge_is_pointed_to_preferences() -> None:
         course(BASE),
         patch,
         'knowledge.short_explanations: unknown field "kind"',
-        '{"preferences": {"explanation_length": "short"}}',
+        '{"preferences": {"explanation_depth": "Short first"}}',
     )
+    fact = {"text": "The lecturer prefers row vectors", "source": "slides"}
     with pytest.raises(ValueError) as caught:
-        apply(course(BASE), {"knowledge": {"notation": {"txt": "Rows first"}}})
+        apply(course(BASE), {"knowledge": {"notation": fact}})
     assert "preferences" not in str(caught.value)
 
 
