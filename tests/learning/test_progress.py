@@ -64,16 +64,29 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
         ([attempt("rank", "incorrect"), attempt("rank", "incorrect")], {}, "attempted"),
         ([attempt("rank", "incorrect"), attempt("rank", "partial")], {}, "assisted"),
         ([attempt("rank", "correct", "Hinted at row 3")], {}, "assisted"),
-        ([attempt("rank", "incorrect"), attempt("rank")], {}, "independent"),
-        ([attempt("rank", offset=-3), attempt("rank")], {}, "retained"),
+        ([attempt("rank", "incorrect"), attempt("rank")], {}, "assisted"),
+        (
+            [attempt("rank", offset=-5), attempt("rank", offset=-3), attempt("rank")],
+            {},
+            "retained",
+        ),
         ([attempt("rank", offset=-2), attempt("rank")], {}, "independent"),
         ([attempt("rank", offset=-1), attempt("rank")], {}, "independent"),
         (
-            [attempt("rank", offset=-3), attempt("rank", "correct", "Hint", offset=0)],
+            [
+                attempt("rank", offset=-5),
+                attempt("rank", offset=-3),
+                attempt("rank", "correct", "Hint", offset=0),
+            ],
             {},
             "independent",
         ),
-        ([attempt("rank", transfer=True)], {}, "transferred"),
+        ([attempt("rank", transfer=True)], {}, "assisted"),
+        (
+            [attempt("rank", offset=-1), attempt("rank", transfer=True)],
+            {},
+            "transferred",
+        ),
         ([attempt("rank", "correct", "Hint", transfer=True)], {}, "assisted"),
         (
             [
@@ -112,6 +125,7 @@ def test_corrected_observations_do_not_count() -> None:
 def test_standing_reports_counts_last_attempt_and_flags() -> None:
     record = course(
         [
+            attempt("rank", offset=-10),
             attempt("rank", offset=-8),
             attempt("rank", offset=-5),
             attempt("rank", "incorrect", "Hint", offset=-1),
@@ -120,12 +134,16 @@ def test_standing_reports_counts_last_attempt_and_flags() -> None:
     standing = progress.standing(record, "rank")
     assert standing == {
         "level": "retained",
-        "attempts": 3,
+        "attempts": 4,
         "unaided_days": 2,
-        "last": {"id": "o3", "date": day(-1), "result": "incorrect", "unaided": False},
+        "last": {"id": "o4", "date": day(-1), "result": "incorrect", "unaided": False},
     }
     lapsed = course(
-        [attempt("rank", offset=-5), attempt("rank", "incorrect", offset=-1)]
+        [
+            attempt("rank", offset=-7),
+            attempt("rank", offset=-5),
+            attempt("rank", "incorrect", offset=-1),
+        ]
     )
     assert progress.standing(lapsed, "rank")["lapsed"] is True
     never = course(
@@ -208,16 +226,20 @@ def test_an_exam_tomorrow_puts_the_review_on_the_exam_day(days: int) -> None:
 def test_new_attempts_climb_the_ladder_and_keep_the_prompt() -> None:
     record = course(review={"prompt": "Rank of a 3x3, unaided"})
     record, scheduled = save(record, {"observations": [attempt("rank")]})
-    assert scheduled.reviews == {"rank": {"due": day(3), "by": "engine"}}
+    assert scheduled.reviews == {"rank": {"due": day(1), "by": "engine"}}
     assert record["topics"]["rank"]["review"] == {
-        "due": day(3),
+        "due": day(1),
         "prompt": "Rank of a 3x3, unaided",
         "by": "engine",
     }
     record, scheduled = save(
-        record, {"observations": [attempt("rank", offset=3)]}, TODAY + timedelta(days=3)
+        record, {"observations": [attempt("rank", offset=1)]}, TODAY + timedelta(days=1)
     )
-    assert scheduled.reviews["rank"]["due"] == day(3 + 7)
+    assert scheduled.reviews["rank"]["due"] == day(1 + 3)
+    record, scheduled = save(
+        record, {"observations": [attempt("rank", offset=4)]}, TODAY + timedelta(days=4)
+    )
+    assert scheduled.reviews["rank"]["due"] == day(4 + 7)
 
 
 def test_a_tutor_date_in_the_same_patch_wins_and_moves_before_the_exam() -> None:
@@ -251,7 +273,7 @@ def test_introducing_a_topic_schedules_the_first_retrieval() -> None:
             "observations": [attempt("rank", "partial")],
         },
     )
-    assert scheduled.reviews == {"rank": {"due": day(2), "by": "engine"}}
+    assert scheduled.reviews == {"rank": {"due": day(1), "by": "engine"}}
     assert not any("first retrieval" in note for note in scheduled.notes)
 
 

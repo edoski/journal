@@ -86,7 +86,7 @@ def test_the_week_replays_levels_from_the_window_start() -> None:
     summary = progress.week(record, TODAY)
     assert summary["levels"] == {
         "span": {"from": "new", "to": "assisted"},
-        "eigen": {"from": "independent", "to": "retained"},
+        "eigen": {"from": "assisted", "to": "independent"},
     }
     assert "rank" not in summary["levels"]
 
@@ -130,6 +130,7 @@ def runup_course(tmp_path: Path, exam_offset: int) -> Workspace:
             },
             "path": {"order": ["rank", "span", "eigen", "basis"]},
             "observations": [
+                attempt("rank", -15, text="taught"),
                 attempt("rank", -13),
                 attempt("span", -15),
                 attempt("basis", -3, "partial"),

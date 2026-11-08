@@ -136,8 +136,12 @@ def _probe(items: list[dict[str, Any]]) -> str:
     return grade(items[0])
 
 
-def _best(items: list[dict[str, Any]]) -> str:
-    return max((grade(item) for item in items), key=GRADES.index)
+def _learned(items: list[dict[str, Any]]) -> str:
+    """The learning day's best grade, at most ``helped``: success on the day a
+    topic is learned is not yet evidence it is held, so ``solid`` takes a
+    later day."""
+    best = max((grade(item) for item in items), key=GRADES.index)
+    return "helped" if best == "solid" else best
 
 
 def interval(verdict: str, streak: int) -> int:
@@ -163,7 +167,7 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
     """Classify each attempted day and replay the verdicts in day order.
 
     The learning day (the earlier of ``introduced`` and the first attempt) takes
-    its best grade. A later day on or after the expected review, or any day with
+    its best grade, at most ``helped``, and the next day is its first retrieval. A later day on or after the expected review, or any day with
     an ``exam``, is a probe: the first try counts, lowered only by a later unaided
     incorrect. Any other day is practice: only an unaided incorrect counts.
     """
@@ -185,7 +189,7 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
         ):
             result.days[day], verdict = PROBE, _probe(items)
         elif day == learning:
-            result.days[day], verdict = LEARNING, _best(items)
+            result.days[day], verdict = LEARNING, _learned(items)
         else:
             missed = any(_unaided_miss(item) for item in items)
             result.days[day], verdict = PRACTICE, "missed" if missed else None
@@ -193,9 +197,12 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
             continue
         result.verdicts.append((day, verdict))
         result.streak = result.streak + 1 if verdict == "solid" else 0
-        result.expected = review_day(
-            date.fromisoformat(day), interval(verdict, result.streak), exam
+        days_on = (
+            FIRST_RETRIEVAL_DAYS
+            if result.days[day] == LEARNING
+            else interval(verdict, result.streak)
         )
+        result.expected = review_day(date.fromisoformat(day), days_on, exam)
     return result
 
 

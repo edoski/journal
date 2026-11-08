@@ -56,7 +56,7 @@ def test_a_missing_course_loads_empty_and_the_first_save_creates_it(
         "changed": True,
         "observations": ["o1"],
         "duplicates": [],
-        "reviews": {"rank": {"due": "2026-10-12", "by": "engine"}},
+        "reviews": {"rank": {"due": "2026-10-11", "by": "engine"}},
         "levels": {"rank": {"from": "new", "to": "assisted"}},
         "focus": "ex5",
         "path_current": "rank",
@@ -78,8 +78,8 @@ def test_receipts_report_level_changes_reviews_and_stale_judgements(
     records.save(workspace, COURSE)
     monkeypatch.setenv("LEARNING_TODAY", TODAY)
     receipt = records.save(workspace, {"observations": [attempt()]})
-    assert receipt["levels"] == {"rank": {"from": "new", "to": "independent"}}
-    assert receipt["reviews"] == {"rank": {"due": "2026-10-13", "by": "engine"}}
+    assert receipt["levels"] == {"rank": {"from": "new", "to": "assisted"}}
+    assert receipt["reviews"] == {"rank": {"due": "2026-10-11", "by": "engine"}}
     assert receipt["notes"] == [
         "rank: gap was judged before o1; revise or clear it if the diagnosis changed"
     ]
