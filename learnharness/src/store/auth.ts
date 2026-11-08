@@ -18,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { AUTH_FILE } from "../../config.ts";
 import type { AuthStore } from "../core/ports.ts";
-import { writeFileAtomicSync } from "./atomic-write.ts";
+import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
 /** The flat string→string map, or {} for absent/corrupt/non-object. */
 function readMap(): Record<string, string> {
@@ -40,6 +40,8 @@ function readMap(): Record<string, string> {
 function writeMap(map: Record<string, string>): void {
 	fs.mkdirSync(path.dirname(AUTH_FILE), { recursive: true });
 	writeFileAtomicSync(AUTH_FILE, `${JSON.stringify(map, null, "\t")}\n`, { mode: 0o600 });
+	// A crash leftover would keep a removed key on disk; the file just written is the newest copy.
+	removeLeftoverTemps(AUTH_FILE);
 }
 
 export const authStore: AuthStore = {

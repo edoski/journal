@@ -72,6 +72,15 @@ describe("AuthStore adapter", () => {
 		assert.deepEqual(authStore.authVars(), { B: "2" });
 	});
 
+	it("removing a key also removes crash leftovers that still hold it", () => {
+		fs.writeFileSync(AUTH_FILE, JSON.stringify({ GONE: "sk-old", KEPT: "1" }));
+		const leftover = `${AUTH_FILE}.tmp-6f1c2a4e-8b3d-4f5a-9c7e-1d2b3c4d5e6f`;
+		fs.writeFileSync(leftover, JSON.stringify({ GONE: "sk-old", KEPT: "1" }));
+		authStore.deleteAuthVar("GONE");
+		assert.equal(fs.existsSync(leftover), false, "the removed key survives in no temp beside auth.json");
+		assert.deepEqual(authStore.authVars(), { KEPT: "1" });
+	});
+
 	it("the actual auth writer's complete 0600 temp is denied before replacement", (t) => {
 		const rename = fs.renameSync;
 		let observed = false;
