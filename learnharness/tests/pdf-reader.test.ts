@@ -19,6 +19,7 @@ const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
  *  home folder (an agent worktree in ~/.t3) is itself off-limits. */
 const SOURCE = path.join(fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
 fs.copyFileSync(FIXTURE, SOURCE);
+process.on("exit", () => fs.rmSync(path.dirname(SOURCE), { recursive: true, force: true }));
 
 function fauxEngine(steps: FauxResponseStep[]): PiEngine {
 	const faux = createFauxCore({ tokenSize: { min: 64, max: 64 } });

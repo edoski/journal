@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { AUTH_FILE } from "../../../config.ts";
-import { claudeProfileDirs } from "../claude-accounts.ts";
+import { claudeConfigDirs } from "../claude-accounts.ts";
 import { claudeWorkDirPath } from "../claude-cli.ts";
 
 /**
@@ -186,7 +186,9 @@ export function sensitiveHomeLocations(
 		}
 		return listings.get(directory)!;
 	};
-	const prefixed = entries(home).filter((entry) => SENSITIVE_HOME_PREFIX.test(entry)).map((entry) => path.join(/* turbopackIgnore: true */ home, entry));
+	// The literal names stay even when home cannot be listed.
+	const prefixed = [...new Set([".claude", ".claude.json", ...entries(home).filter((entry) => SENSITIVE_HOME_PREFIX.test(entry))])]
+		.map((entry) => path.join(/* turbopackIgnore: true */ home, entry));
 	return [...prefixed, ...SENSITIVE_HOME_PATHS.flatMap((location) => {
 		let candidates = [home];
 		for (const segment of location.split("/")) {
@@ -203,7 +205,7 @@ export function sensitiveHomeLocations(
  *  roots too: a sensitive directory or AUTH_FILE can itself be a symlink to
  *  a location outside home. Never read credential contents or app records. */
 function sourcePathCheck(home = os.homedir()): (absolute: string) => boolean {
-	const homeRoots = [...sensitiveHomeLocations(home), ...claudeProfileDirs(), claudeWorkDirPath()].map(protectedRealPath);
+	const homeRoots = [...sensitiveHomeLocations(home), ...claudeConfigDirs({ home }), claudeWorkDirPath()].map(protectedRealPath);
 	const files = credentialFiles(AUTH_FILE).map(protectedRealPath);
 	const credentialDir = protectedRealPath(path.dirname(AUTH_FILE));
 	return (absolute) => isSensitivePath(absolute, home) ||

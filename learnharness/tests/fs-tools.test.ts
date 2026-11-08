@@ -201,6 +201,13 @@ describe("sensitive locations under home are off-limits", () => {
 		await fs.writeFile(path.join(home, ".ssh", "id_ed25519"), "eigenvector PRIVATE KEY\n");
 		await fs.writeFile(path.join(home, "code", ".env.local"), "EIGENVECTOR_API_KEY=sk-secret-token\n");
 		await fs.symlink(path.join(home, ".ssh"), path.join(home, "notes", "keys"), process.platform === "win32" ? "junction" : "dir");
+		await fs.mkdir(path.join(home, ".claude-2"), { recursive: true });
+		await fs.writeFile(path.join(home, ".claude-2", ".credentials.json"), '{"eigenvector":"sk-secret-token"}\n');
+		await fs.mkdir(path.join(home, ".t3", "userdata", "secrets"), { recursive: true });
+		await fs.writeFile(path.join(home, ".t3", "userdata", "secrets", "provider-env-x.bin"), "eigenvector sk-secret-token\n");
+		await fs.mkdir(path.join(home, "work-claude"), { recursive: true });
+		await fs.writeFile(path.join(home, "work-claude", ".credentials.json"), '{"eigenvector":"sk-secret-token"}\n');
+		await fs.writeFile(path.join(home, ".t3", "userdata", "settings.json"), JSON.stringify({ providerInstances: { w: { driver: "claudeAgent", enabled: false, config: { homePath: "~/work-claude" } } } }));
 		await fs.mkdir(path.join(home, ".claudette"), { recursive: true });
 		await fs.writeFile(path.join(home, ".claudette", "ok.md"), "eigenvector lookalike\n");
 		const originalHome = process.env.HOME;
@@ -244,6 +251,14 @@ describe("sensitive locations under home are off-limits", () => {
 		assert.throws(() => resolveSourcePath(path.join(claudeWorkDirPath(), "accounts", "x", ".claude.json")), /Access denied: .* is a protected location/);
 	});
 
+	it("T3 Code's data, every .claude… dir and each config dir T3 Code names are refused by path", async () => {
+		await withSensitiveHome(async (home) => {
+			for (const file of [".claude-2/.credentials.json", ".t3/userdata/secrets/provider-env-x.bin", "work-claude/.credentials.json"]) {
+				await assert.rejects(readTool.execute!("s", { path: path.join(home, ...file.split("/")) }), /Access denied: .* is a protected location/, file);
+			}
+		});
+	});
+
 	it("walkFiles never enters them", async () => {
 		await withSensitiveHome(async (home) => {
 			const realHome = await fs.realpath(home);
@@ -254,7 +269,7 @@ describe("sensitive locations under home are off-limits", () => {
 			});
 			assert.ok(seen.includes("notes/calculus.md"));
 			assert.ok(seen.includes(".claudette/ok.md"), "a lookalike name is still walked");
-			assert.ok(!seen.some((f) => f.startsWith(".claude/") || f.startsWith(".ssh/") || f.endsWith(".env.local")), seen.join(", "));
+			assert.ok(!seen.some((f) => /^(\.claude|\.claude-2|\.t3|\.ssh|work-claude)\//.test(f) || f.endsWith(".env.local")), seen.join(", "));
 		});
 	});
 

@@ -83,10 +83,21 @@ function readToken(path: string, label: string): string {
 	return token;
 }
 
-/** The Claude Code config dirs of the profile accounts: each holds that
- * account's credentials and transcripts, wherever the user put it. */
-export function claudeProfileDirs(paths: ClaudeAccountPaths = {}): string[] {
-	return loadClaudeAccounts(paths).flatMap((account) => account.auth === "profile" ? [account.configDir] : []);
+/** Every Claude Code config dir T3 Code names (enabled or not, token or
+ * profile) plus an inherited CLAUDE_CONFIG_DIR: each holds an account's
+ * credentials and transcripts, wherever the user put it. Reads only T3
+ * Code's settings, never a `.claude.json`. */
+export function claudeConfigDirs({ t3Dir, home: homeArg }: ClaudeAccountPaths = {}, env: Record<string, string | undefined> = process.env): string[] {
+	const home = homeArg ?? homedir();
+	const t3 = t3Dir ?? join(home, ".t3");
+	const instances = record(record(json(join(t3, "userdata", "settings.json")))?.providerInstances) ?? {};
+	const dirs = Object.values(instances).flatMap((raw) => {
+		const instance = record(raw);
+		const homePath = instance?.driver === T3_DRIVER ? text(record(instance.config)?.homePath) : null;
+		return homePath === null ? [] : [resolve(expandHome(homePath, home))];
+	});
+	const inherited = text(env.CLAUDE_CONFIG_DIR);
+	return inherited === null ? dirs : [...dirs, resolve(expandHome(inherited, home))];
 }
 
 /** The client-safe view: no token, no paths. */

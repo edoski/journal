@@ -28,6 +28,7 @@ const FIXTURE = path.join(import.meta.dirname, "fixtures", "sample-3page.pdf");
  *  (an agent worktree in ~/.t3) is itself off-limits to the file tools. */
 const SOURCE = path.join(realpathSync.native(mkdtempSync(path.join(tmpdir(), "lh-pdf-src-"))), "sample-3page.pdf");
 copyFileSync(FIXTURE, SOURCE);
+process.on("exit", () => rmSync(path.dirname(SOURCE), { recursive: true, force: true }));
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==", "base64");
 const FINAL = "Verified offline output (p. 1). Pages consulted: 1";
 const LOOPS = ["visual", "pdf"] as const;
