@@ -40,8 +40,7 @@ import {
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsSection } from "./controls.tsx";
-import { UpdateSettings } from "./update-settings.tsx";
+import { SettingsRow, SettingsSection } from "./controls.tsx";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
@@ -66,6 +65,8 @@ const SECTIONS = [
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
+const APP_VERSION = process.env.LH_VERSION ?? "";
+
 const DialogContext = createContext<{ open: (section?: string) => void }>({ open: () => {} });
 
 /** AppShell-level mount: the sidebar row and the mod+, chord call this.
@@ -82,7 +83,6 @@ export function SettingsDialogProvider({
 		setLandOn(section ? section as SectionId : "keys");
 		setShow(true);
 	}, []);
-	useEffect(() => window.lh?.onOpenSettings?.((section) => open(section)), [open]);
 	return (
 		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>
 			{children}
@@ -226,7 +226,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "general" | "agent" | "models" | "appearance" | "graph" | "compaction",
+			section: "agent" | "models" | "appearance" | "graph" | "compaction",
 			body: object,
 		) => {
 			setError(null);
@@ -365,12 +365,7 @@ export function SettingsDialogBody({
 									title="General"
 									testid="section-general"
 								>
-									<UpdateSettings
-										autoUpdate={record.general?.autoUpdate ?? true}
-										onAutoUpdateChange={(on) =>
-											void write("general", { ...record.general, autoUpdate: on })
-										}
-									/>
+									<SettingsRow label={`Version ${APP_VERSION || "unknown"}`} testid="row-version">{null}</SettingsRow>
 								</SettingsSection>
 							)}
 							{active === "keys" && (
