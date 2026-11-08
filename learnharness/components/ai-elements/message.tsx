@@ -359,7 +359,7 @@ export const streamdownPlugins = {
 // partial tag and deletes the remaining source before math can tokenize.
 // Preserve that text (unfinished prose HTML may show literally); Streamdown's
 // separate sanitization/hardening and all other Markdown repairs stay enabled.
-export const streamdownRemend = { htmlTags: false };
+export const streamdownRemend = { htmlTags: false } satisfies NonNullable<ComponentProps<typeof Streamdown>["remend"]>;
 
 export const MessageResponse = memo(
   ({ className, children, ...props }: MessageResponseProps) => {
