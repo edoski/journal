@@ -42,7 +42,7 @@ import { probeDoneInputSchema, type ProbeDoneInput } from "./contracts/probe.ts"
  *  exact input the boundary accepted — an invisible pending question and a
  *  learner lockout. Every display parse converts first, exactly like the
  *  boundary; Convert mutates, so the input is cloned before touching. */
-function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
+export function boundaryParse<T>(schema: TSchema, input: unknown): T | undefined {
 	if (typeof input !== "object" || input === null) return undefined;
 	// The record keeps raw arguments; the boundary healed them before
 	// validation, so the display heals the same way.

@@ -234,7 +234,7 @@ describe("a course-linked turn", () => {
 			() => fauxAssistantMessage([
 				fauxToolCall("conclude", {
 					outcome: "solvedWithHints", verdict: "Correct after one nudge.", rung: "R1", missClass: "cue", retest: false,
-					result: "correct", response: "1, the rows are dependent", firstTry: { result: "incorrect", response: "2" },
+					result: "correct", response: "1, the rows are dependent", firstTry: { result: "incorrect", response: "2", sure: "guessing" },
 				}, { id: "c1" }),
 			], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxText("Clean.")]),
@@ -254,7 +254,7 @@ describe("a course-linked turn", () => {
 		const statement = "Find the rank of $\\begin{bmatrix}1&2\\\\2&4\\end{bmatrix}$.";
 		assert.deepEqual(JSON.parse(save.stdin), {
 			observations: [
-				{ topics: ["rank"], text: statement, response: "2", help: "none", result: "incorrect", sure: "confident" },
+				{ topics: ["rank"], text: statement, response: "2", help: "none", result: "incorrect", sure: "guess" },
 				{ topics: ["rank"], text: statement, response: "1, the rows are dependent", help: "Hint R1: re-described the pattern class", result: "correct", sure: "confident" },
 			],
 		}, "conclude is the single write: the first unaided try, then the assisted success");
