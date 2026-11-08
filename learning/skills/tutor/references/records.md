@@ -1,6 +1,6 @@
 # The course record
 
-A workspace holds one course. Its record has course facts (`title`, `goal`, `exam`, `journal`), `sources`, `topics` (the knowledge path), `observations` (learner evidence), `knowledge` (what you know about the course), `tasks` (unfinished activities), `focus` (the current task), `path` (study order and position) and course `preferences`. The helper owns ids, dates, revisions and everything it computes.
+A workspace holds one course. Its record has course facts (`title`, `goal`, `exam`, `journal`), `sources`, `topics` (the knowledge path), `observations` (learner evidence, recorded as [evidence.md](evidence.md) says), `knowledge` (what you know about the course), `tasks` (unfinished activities), `focus` (the current task), `path` (study order and position) and course `preferences`. The helper owns ids, dates, revisions and everything it computes.
 
 ## Saving
 
@@ -37,20 +37,6 @@ A typical turn after a hinted attempt on an exercise:
 ```
 
 The receipt returns new observation ids, the reviews it set, level changes, the current `focus` and `path_current`, the number of due reviews, and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
-
-## Observations
-
-One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `result`, `sure`, `chose`, `transfer`, `date` (the event day when it is not today), `task`, `refs`, `corrects`, `uncertain`.
-
-| `kind` | When | Required |
-| --- | --- | --- |
-| `attempt` (default) | the learner tried something with you | `help` (`"none"` when unaided) and `result` (`correct`, `partial`, `incorrect`) |
-| `exam` | graded work from outside the session | `result`, no `help`; counts as unaided |
-| `self_report` | the learner's statement about their own understanding | no `result`, `help`, `sure` or `transfer` |
-
-`help` describes what you gave before or during the attempt: a hint, a worked example of the same step, a reminder of the method. A solution reproduced right after your explanation is assisted. `transfer: true` marks success on a meaningfully different problem, representation or context than the one taught. `chose` names the topic of a method the learner wrongly chose; record the attempt on the topic that should have been chosen, with a result that is not `correct`. `uncertain` records doubt about the evidence (the answer may have been read from notes, a symbol was illegible, the work was done where you could not see it); an `uncertain` attempt is never `solid`. `sure` is how sure the learner said they were of an answer: `guess` or `confident`, omitted when they did not say (`neutral` is for apps that ask all three). A `guess` is never `solid`; a `confident` answer that is `incorrect` is a confident error.
-
-Corrections: when an observation was misrecorded, append a new one describing what really happened with `corrects: ["o7"]`; the original stays visible but stops counting. Without a `date`, a correction takes the day of the earliest observation it corrects, and it takes that observation's place in the day's order. Later improvement is simply a new observation. Delete only on the learner's explicit request ([lifecycle.md](lifecycle.md)).
 
 ## Topics and the knowledge path
 

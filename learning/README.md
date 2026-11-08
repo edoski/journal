@@ -32,7 +32,7 @@ python -m learning.install --study-root DIR                      # offer the MCP
 | `note --title T` | write a Markdown note from stdin to `study-notes/` |
 | `init`, `link`, `unlink`, `readiness` | workspace lifecycle and host checks |
 
-The [skill](skills/tutor/SKILL.md) is the agent's playbook; its references define the [record and patch rule](skills/tutor/references/records.md), [practice and reviews](skills/tutor/references/practice.md), [course, exam and path](skills/tutor/references/course.md), [memory, planning and hosts](skills/tutor/references/lifecycle.md) and [research](skills/tutor/references/research.md).
+The [skill](skills/tutor/SKILL.md) is the agent's playbook; its references define the [record and patch rule](skills/tutor/references/records.md), [evidence and grading](skills/tutor/references/evidence.md), [teaching](skills/tutor/references/teaching.md), [reviews and exams](skills/tutor/references/reviews.md), [course, exam and path](skills/tutor/references/course.md), [memory, planning and hosts](skills/tutor/references/lifecycle.md) and [research](skills/tutor/references/research.md).
 
 ## Record model
 

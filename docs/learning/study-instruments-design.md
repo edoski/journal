@@ -718,7 +718,8 @@ Where the implementation departs from, or settles, the text above:
   untaught ones included. `pace` is rounded to two decimals.
 - `mock_exam`'s `part` selects the oral mock when it says "oral", else the
   written one. `mock_exam` and `plan_week` carry their protocols from
-  `practice.md` ("Written mock", "Oral mock", "The week").
+  `reviews.md` ("Written mock", "Oral mock", "The week"; `practice.md` until
+  the doctrine split of 8 Nov 2026).
 
 ## 12. Revision 2026-10-28: ideas from LearnHarness
 
