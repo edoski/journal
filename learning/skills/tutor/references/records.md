@@ -61,7 +61,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 ## Path and tasks
 
-`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. A new topic takes its place in `order` (the list is replaced whole) and joins the `needs` of the topics that build on it. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
+`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. A new topic takes its place in `order` and is added to the `needs` of the topics that build on it; both lists are replaced whole, so send each with its other entries kept. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
 A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 
