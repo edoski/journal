@@ -43,7 +43,7 @@ The receipt returns new observation ids, the reviews it set, level changes, the 
 A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `contrasts` (topics whose methods are known to compete; symmetric), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
 
 - `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
-- `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved.
+- `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved, as [evidence.md](evidence.md) defines.
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
 - `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then and `{"points": ["...", "..."]}` lists the one to five key points an answer is marked against. The fields merge; pin only for a reason, otherwise the helper schedules.
 
@@ -53,7 +53,7 @@ How the helper judges and schedules. Each attempt gets a grade: `solid` (correct
 - a day on or after the expected review, or any day with an `exam`, is a probe: the first try counts, lowered to `missed` only by a later unaided incorrect that day, so retries are relearning;
 - any other day is practice: only an unaided incorrect counts, so help, retries and massed repetition before the review earn nothing.
 
-After the learning day the next expected review is the next day; after any other verdict it is 1 day after `missed`, 2 after `helped`, and 3, 7, 16, 35, 75 then 160 days after consecutive `solid` verdicts. Before an exam the gap stays within a third of the time left. A save that creates or changes a verdict sets the review to that date; practice on a day when the review was already due moves it there too. A date you pin wins, but an attempt before the expected review is still practice. A `self_report` does not reschedule.
+After the learning day the next expected review is the next day; after any other verdict it is 1 day after `missed`, 2 after `helped`, and 3, 7, 16, 35, 75 then 160 days after consecutive `solid` verdicts. Before an exam the gap stays within a third of the time left. A save that creates or changes a verdict sets the review to that date; practice on a day when the review was already due moves it there too. A date you pin wins, but an attempt before the expected review is still practice. A `self_report` does not reschedule. A correction that supersedes an attempt reschedules that attempt's topics from the verdicts left.
 
 The `standing` of a topic (in `resume` and `show`) gives its level, attempt count, unaided days (`solid` verdicts), the last attempt, `lapsed` (the latest verdict is not `solid` after an earlier `solid` one), `choice_errors` (wrongly chosen methods since the last `solid` verdict, with counts), `confident_errors` (confident errors since the last `solid` verdict) and `stale` (the gap or note was judged on an earlier day than the latest evidence). Levels: `attempted` (only `missed` verdicts), `assisted` (no `solid` verdict), `independent` (one), `retained` (two or more), `transferred` (a `solid` `transfer` attempt on a day not `missed`).
 
@@ -61,7 +61,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 ## Path and tasks
 
-`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
+`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. A new topic takes its place in `order` and is added to the `needs` of the topics that build on it; both lists are replaced whole, so send each with its other entries kept. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
 A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 

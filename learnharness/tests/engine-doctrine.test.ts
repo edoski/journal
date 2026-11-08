@@ -98,6 +98,18 @@ describe("engine doctrine", () => {
 		}
 	});
 
+	it("every agent reads what resolves a gap, how a new topic joins the path, and how a hint's rung is judged", () => {
+		for (const agent of ["prober", "teacher", "practice"] as const) {
+			const prompt = normalize(courseRecordPrompt(agent));
+			assert.ok(prompt.includes("A `gap` is resolved, and set to `null`, only by an unaided correct answer to a question that invites it, on a later day than its repair"), `${agent}: a resolved gap`);
+			assert.ok(prompt.includes("A new topic takes its place in `order` and is added to the `needs` of the topics that build on it"), `${agent}: a new topic`);
+		}
+		for (const agent of ["teacher", "practice"] as const) {
+			assert.ok(normalize(courseRecordPrompt(agent)).includes("Record the rung of what the hint said, not of what was asked or meant."), `${agent}: the rung given`);
+		}
+		assert.ok(normalize(courseRecordPrompt("practice")).includes("once one other problem has come between, the retest comes next"), "practice: an owed retest");
+	});
+
 	it("carries the practice rules approved in the app, word for word", () => {
 		const practice = normalize(courseRecordPrompt("practice"));
 		for (const approved of [

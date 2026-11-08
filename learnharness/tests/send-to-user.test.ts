@@ -1,5 +1,6 @@
 /** Explicit Claude output: closed-network synthetic fixtures only. Native
- * history stays native; UI, extraction, and Markdown read the same prose. */
+ * history stays native; UI, extraction, and Markdown read the same prose,
+ * except that the UI hides plain text after a turn's last delivery. */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
@@ -161,10 +162,10 @@ describe("send_to_user transcript projection", () => {
 		]), ack()];
 		const before = structuredClone(messages);
 		const view = projectView(messages);
-		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-explain", "text"]);
-		assert.deepEqual(prose(view), ["Before.", "**The lesson.** $x = 1$", "After."]);
+		assert.deepEqual(view[0]!.parts.map((p) => p.type), ["step-start", "reasoning", "text", "text", "tool-explain"]);
+		assert.deepEqual(prose(view), ["Before.", "**The lesson.** $x = 1$"], "text after the turn's last delivery is not shown");
 		assert.equal(view[0]!.parts.find((p) => p.type === "reasoning")!.text, "Private reasoning.");
-		assert.deepEqual(view[0]!.parts.filter((p) => p.type === "text").map((p) => p.id), ["a1-t0", "a1-t1", "a1-t2"]);
+		assert.deepEqual(view[0]!.parts.filter((p) => p.type === "text").map((p) => p.id), ["a1-t0", "a1-t1"]);
 		assert.deepEqual(messages, before, "projection never rewrites native content");
 		assert.deepEqual(projectView(JSON.parse(JSON.stringify(messages))), view, "reload is identical, without consulting a provider gate");
 	});
@@ -194,6 +195,82 @@ describe("send_to_user transcript projection", () => {
 		});
 		assert.deepEqual(prose(live), []);
 		assert.equal(live[0]!.parts[1]!.state, "output-error");
+	});
+});
+
+describe("plain text after a turn's last send_to_user", () => {
+	const learner = (text: string, id: string): LhMessage => ({ ...newUserMessage(text), id }) as LhMessage;
+
+	it("is dropped, whether in the same message or a later one of the turn", () => {
+		const messages = [
+			learner("can you keep explanations short?", "u1"),
+			assistant([outputCall("Got it, short from now on.")], "a1"),
+			ack(),
+			assistant([fauxText("I've saved your preference for short explanations.")], "a2"),
+			assistant([fauxText("The session is closed and the next step has been sent.")], "a3"),
+		];
+		assert.deepEqual(prose(projectView(messages)), ["Got it, short from now on."]);
+	});
+
+	it("stays when it sits between two deliveries, or when the turn delivered nothing", () => {
+		const between = [
+			learner("hi", "u1"),
+			assistant([outputCall("First.", "send-1"), fauxText("Bridge."), outputCall("Second.", "send-2")], "a1"),
+			ack("send-1"), ack("send-2"),
+		];
+		assert.deepEqual(prose(projectView(between)), ["First.", "Bridge.", "Second."]);
+		const plainOnly = [learner("hi", "u1"), assistant([fauxText("A model without send_to_user answers in plain text.")], "a1")];
+		assert.deepEqual(prose(projectView(plainOnly)), ["A model without send_to_user answers in plain text."]);
+	});
+
+	it("stays when it leads into a question card, and a failed later delivery keeps its fallback", () => {
+		const leadIn = [
+			learner("hi", "u1"),
+			assistant([outputCall("The step."), fauxText("Take your time."), fauxToolCall("explain", { question: "Why?" }, { id: "q1" })], "a1"),
+			ack(),
+		];
+		assert.deepEqual(prose(projectView(leadIn)), ["The step.", "Take your time."]);
+		const retried = [
+			learner("hi", "u1"),
+			assistant([outputCall("First.", "send-1")], "a1"), ack("send-1"),
+			assistant([outputCall("Second.", "send-2")], "a2"), ack("send-2", true),
+			assistant([fauxText("Second, in plain text.")], "a3"),
+		];
+		assert.deepEqual(prose(projectView(retried)), ["First.", "Second, in plain text."]);
+	});
+
+	it("a question answer and a practice submission start a new turn; the course brief does not", () => {
+		const answer: LhMessage = {
+			id: "r-q1", role: "toolResult", toolCallId: "q1", toolName: "explain", content: [{ type: "text", text: "answer" }],
+			details: { kind: "explain", questionText: "Why?", answers: [], answeredAt: "2026-11-16T10:00:00Z", text: "because" }, isError: false, timestamp: 2,
+		} as LhMessage;
+		const thinking: LhMessage = {
+			id: "m-t1", role: "custom", customType: "practice-thinking", content: "Your thinking:\n2", display: true, details: { problemCallId: "p1", text: "2" }, timestamp: 3,
+		} as LhMessage;
+		const brief: LhMessage = { id: "m-b1", role: "custom", customType: "course-context", content: "[Course record]", display: false, details: {}, timestamp: 4 } as LhMessage;
+		const messages = [
+			learner("teach me", "u1"),
+			assistant([outputCall("The step.", "send-1"), fauxToolCall("explain", { question: "Why?" }, { id: "q1" })], "a1"), ack("send-1"),
+			answer,
+			assistant([fauxText("Plain reply to the answer.")], "a2"),
+			thinking,
+			assistant([outputCall("Verdict.", "send-3")], "a3"), ack("send-3"),
+			brief,
+			assistant([fauxText("The attempt is saved.")], "a4"),
+		];
+		assert.deepEqual(prose(projectView(messages)), ["The step.", "Plain reply to the answer.", "Verdict."]);
+	});
+
+	it("is shown again in the next turn, and a failed delivery does not count", () => {
+		const messages = [
+			learner("one", "u1"),
+			assistant([outputCall("Reply one.", "send-1")], "a1"), ack("send-1"),
+			learner("two", "u2"),
+			assistant([fauxText("Reply two, in plain text.")], "a2"),
+			learner("three", "u3"),
+			assistant([outputCall("Broken.", "send-3"), fauxText("Fallback text.")], "a3"), ack("send-3", true),
+		];
+		assert.deepEqual(prose(projectView(messages)), ["Reply one.", "Reply two, in plain text.", "Fallback text."]);
 	});
 });
 

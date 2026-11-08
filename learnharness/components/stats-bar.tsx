@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL, subscriptionLabels, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
+import { CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL, sessionCacheHitRate, subscriptionLabels, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
 import { formatTokens, formatUsd, planCostLabel, prettyModel } from "@/components/usage-format";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
 
@@ -86,6 +86,7 @@ export function StatsBar({
 	const limits = useMemo(() => (catalog ? catalogLimits(catalog) : undefined), [catalog]);
 	const limit = selectedModel ? limits?.get(selectedModel) ?? null : null;
 	const contextLabel = formatContextMeasurement(contextTokens, limit);
+	const cacheHitRate = useMemo(() => sessionCacheHitRate({ turns }), [turns]);
 	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
 	// Honest cost: show dollars only when at least one turn priced;
 	// otherwise "—" (never a fake $0.0000).
@@ -149,6 +150,12 @@ export function StatsBar({
 								<span>{subscription ? "Usage" : "Total cost"}</span>
 								<span className="tabular-nums text-card-foreground">{costLabel}</span>
 							</div>
+							{cacheHitRate !== null && (
+								<div data-testid="stats-cache-hit-rate" className="flex justify-between gap-2">
+									<span>Cache hit rate</span>
+									<span className="tabular-nums text-card-foreground">{(cacheHitRate * 100).toFixed(1)}%</span>
+								</div>
+							)}
 							{providers.includes("ChatGPT") && <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer" className="underline underline-offset-2">Manage ChatGPT usage</a>}
 							{providers.includes(CLAUDE_SUBSCRIPTION.label) && <a href={CLAUDE_USAGE_URL} target="_blank" rel="noreferrer" className="underline underline-offset-2">Manage Claude usage</a>}
 							{unpriced > 0 && (

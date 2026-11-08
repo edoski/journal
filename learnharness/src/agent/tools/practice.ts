@@ -23,18 +23,15 @@ import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
+import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
 import type { CourseToolContext } from "./course.ts";
 import type { LhMarkerMessage } from "../../core/native-messages.ts";
 import { CONCLUDE_ACK_TEXT } from "../../core/contracts/chat.ts";
-import {
-	conclusionProblem,
-	practiceObservations,
-	type PracticeConclusion,
-	type SubmissionConfidence,
-} from "../../core/practice-attempts.ts";
+import { CONFIDENCE_STATES } from "../../core/contracts/course.ts";
+import { conclusionProblem, practiceObservations, type PracticeConclusion } from "../../core/practice-attempts.ts";
 
 
 /** The record-reading context the gates need (the plan-tools idiom). */
@@ -120,6 +117,19 @@ export function problemTool(gate: PracticeGate): AgentTool<typeof problemInputOb
 
 // ─── conclude: the end of a problem ──────────────────────────────────────────
 
+function attemptResult(description: string) {
+	return Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], { description });
+}
+
+function byTopicField() {
+	return Type.Optional(
+		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
+			description:
+				"When the pose's topics went differently in this answer (a multi-part problem with one part right): the result of each topic that differs from result, by its handle in the pose's topics. Topics left out take result.",
+		}),
+	);
+}
+
 export const concludeInputObject = Type.Object({
 	outcome: Type.Union(
 		[
@@ -136,7 +146,7 @@ export const concludeInputObject = Type.Object({
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the hint-ladder rung the problem needed: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
 	),
 	missClass: Type.Union(
 		[
@@ -150,21 +160,33 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
-	result: Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], {
-		description:
-			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
-	}),
+	result: attemptResult(
+		"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
+	),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
 	chose: Type.Optional(
-		Type.String({ minLength: 1, description: "On a discrimination miss: the course topic handle of the method he wrongly chose." }),
+		Type.String({
+			minLength: 1,
+			description:
+				"When his final answer used a wrongly chosen method: that method's course topic handle. A wrong method he later corrected goes in firstTry.chose.",
+		}),
 	),
+	byTopic: byTopicField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
-				result: Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")]),
-				response: Type.String({ description: "His first answer, in a short line." }),
+				result: attemptResult("REQUIRED — the result of his first answer."),
+				response: Type.String({ description: "REQUIRED — his first answer, in a short line." }),
+				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
+					description:
+						"REQUIRED — the Confidence line of the submission that made this first claim (guessing, neutral or confident), or null when it had none. A working note before the claim is not the claim.",
+				}),
+				chose: Type.Optional(
+					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
+				),
+				byTopic: byTopicField(),
 			},
-			{ description: "When the problem took more than one answer: his first unaided answer and its result." },
+			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
 	),
 });
@@ -178,39 +200,44 @@ export interface ConcludeRecording {
 	course: CourseToolContext;
 }
 
-/** The confidence of the first and last submission on one problem. */
-function submissionConfidence(messages: readonly LhMessage[], problemCallId: string): SubmissionConfidence {
+/** The confidence of the last submission on one problem: the one the
+ *  final answer came with. */
+function lastSubmissionConfidence(messages: readonly LhMessage[], problemCallId: string): string | undefined {
 	const states = messages
 		.filter((m): m is LhMessage & LhMarkerMessage => (m as { customType?: string }).customType === "practice-thinking")
 		.map((m) => m.details as { problemCallId?: unknown; confidence?: unknown } | null)
 		.filter((d) => d?.problemCallId === problemCallId)
 		.map((d) => (typeof d?.confidence === "string" ? d.confidence : undefined));
-	return { first: states[0], last: states[states.length - 1] };
+	return states[states.length - 1];
 }
 
 /** Save a concluded problem's attempts; a refusal names what to fix. */
 async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
 	if (input.outcome === "dismissed") return { text: "" };
+	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
+	const active = record ? activeProblemOf(record.messages) : null;
+	// The record keeps the pose's raw arguments, so it is read the way the
+	// tool boundary accepted it (a `topics` sent as a JSON string included).
+	const pose = active ? boundaryParse<ProblemInput>(problemInputObject, active.input) : undefined;
+	if (!record || !active || !pose) {
+		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
+	}
+	const topics = pose.topics;
 	const conclusion: PracticeConclusion = {
 		outcome: input.outcome,
 		rung: input.rung,
 		result: input.result,
 		response: input.response,
 		...(input.chose ? { chose: input.chose } : {}),
+		...(input.byTopic ? { byTopic: input.byTopic } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
-	const problem = conclusionProblem(conclusion);
+	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
-	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
-	const active = record ? activeProblemOf(record.messages) : null;
-	const pose = active?.input as { statement?: unknown; topics?: unknown } | undefined;
-	if (!record || !active || typeof pose?.statement !== "string" || !Array.isArray(pose.topics)) {
-		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
-	}
 	const observations = practiceObservations(
-		{ statement: pose.statement, topics: pose.topics.filter((t): t is string => typeof t === "string") },
+		{ statement: pose.statement, topics },
 		conclusion,
-		submissionConfidence(record.messages, active.toolCallId),
+		lastSubmissionConfidence(record.messages, active.toolCallId),
 	);
 	const saved = await rec.course.records.run(rec.course.course.workspace, { verb: "save", changes: { observations } });
 	if (saved.ok) return { text: `Course record: ${JSON.stringify(saved.json)}` };
@@ -218,7 +245,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	// fact, so holding the problem open would lock the session.
 	const repair =
 		saved.kind === "validation"
-			? "Repair it with course_save (for example, create the missing topic in the same patch) and send these observations: "
+			? "Repair it with course_save (for example, create the missing topic in the same patch, placed in the path) and send these observations: "
 			: "On your next turn, re-send exactly this with course_save: ";
 	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations })}` };
 }

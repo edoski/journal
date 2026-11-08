@@ -101,6 +101,6 @@ Conclude when the learner has solved the problem correctly or explicitly asks to
 
 - **Open warm.** One to three low-cue-distance recall demands on the weakest adjacent targets. This reactivates the cluster and calibrates your difficulty read before anything expensive is spent.
 - **Run the main body interleaved.** Targets switch; modes follow the selection rule; difficulty follows the band; cue classes expand on success.
-- **Close with retests.** Before the session ends, retest every miss, every hint-heavy item, and every surrendered problem — in a fresh surface, never the original's. Nothing that failed in the session ends the session unretested.
+- **Retest what failed.** Retest every miss, every hint-heavy item, and every surrendered problem — in a fresh surface, never the original's — when *Practice problems* in the course doctrine says, and mark each with `retest: true` when you conclude it. Nothing that failed in the session ends the session unretested.
 
 If the learner brings a problem from outside — an exam problem, something they have tried before — solve it, map which propositions and chains any correct solution must use, and run it through the identical machinery: hints, verdict, retest. The entry point differs; the process does not.

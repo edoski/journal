@@ -20,9 +20,10 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
 import { Separator } from "@/components/ui/separator";
 import { AnsweredCard } from "@/components/answered-card";
+import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
-import { Composer } from "@/components/composer";
+import { ChatSessionComposer } from "@/components/composer";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { dockStateKey } from "@/components/dock-state-key";
@@ -70,6 +71,8 @@ import { CoverageRing } from "@/components/extraction-coverage";
 import { Button } from "@/components/ui/button";
 import {
 	activeProblemOf,
+	pendingQuestionOf,
+	malformedQuestionsOf,
 	dismissedAnswer,
 	endsInFailedTurn,
 	failedResponseAtEnd,
@@ -420,6 +423,7 @@ export function Chat({
 				void dismissQuestion(
 					p.toolCallId,
 					reading ? { ...answer, readingThinking: reading } : answer,
+					p.key,
 				);
 				if (busyRef.current) abortInFlightTurn();
 				return;
@@ -451,7 +455,8 @@ export function Chat({
 		// mount-only by design (turnInFlight read at initial value)
 	}, []);
 
-	const pending = findPendingToolCall(messages);
+	const pending = findPendingToolCall(messages, pendingQuestionOf(nativeMessages));
+	const malformedQuestions = malformedQuestionsOf(nativeMessages);
 	// The abort handler reads the pending question from a ref (the window
 	// listener is mount-scoped; the value it needs is render-scoped).
 	const pendingRef = useRef(pending);
@@ -521,7 +526,7 @@ export function Chat({
 	 * thinking while reading the teaching prose, mounted while a check waits
 	 * behind its reveal, riding the check answer (or its dismissal) as the
 	 * separate `readingThinking` field. Reset per pending question. */
-	const [readingThinking, setReadingThinking] = useState("");
+	const [readingThinkingSeed, setReadingThinkingSeed] = useState({ questionId: null as string | null, value: "", revision: 0 });
 	const readingThinkingRef = useRef("");
 
 	// ⌘T (toggle-user-thinking, owner round 2026-10-07): set EVERY user
@@ -534,19 +539,22 @@ export function Chat({
 	}, []);
 	const applyReadingThinking = useCallback((v: string) => {
 		readingThinkingRef.current = v;
-		setReadingThinking(v);
 	}, []);
 	const clearReadingThinking = useCallback(() => {
 		readingThinkingRef.current = "";
-		setReadingThinking("");
+		setReadingThinkingSeed((previous) => ({ ...previous, value: "", revision: previous.revision + 1 }));
 	}, []);
-	const pendingQuestionId = pending?.toolCallId ?? null;
-	useEffect(() => {
+	const pendingQuestionId = pending?.key ?? null;
+	useIsoLayoutEffect(() => {
 		// Different calls never share a draft; a failed submission of THIS
 		// call restores the reading channel alongside the form's snapshot.
-		const reading = pendingQuestionId ? questionDraft(pendingQuestionId)?.readingThinking ?? "" : "";
-		readingThinkingRef.current = reading;
-		setReadingThinking(reading);
+		const value = pendingQuestionId ? questionDraft(pendingQuestionId)?.readingThinking ?? "" : "";
+		readingThinkingRef.current = value;
+		setReadingThinkingSeed((previous) =>
+			previous.questionId === pendingQuestionId && previous.value === value
+				? previous
+				: { questionId: pendingQuestionId, value, revision: previous.revision + 1 },
+		);
 	}, [pendingQuestionId, questionDraft]);
 
 	// The phase at every message (one linear fold): the transcript draws a
@@ -554,11 +562,17 @@ export function Chat({
 	// session's current phase.
 	const phases = useMemo(() => phaseTimeline(messages), [messages]);
 
-	const [text, setText] = useState("");
+	const [composerDraftRevision, setComposerDraftRevision] = useState(0);
+	/* The composer draft ref is synchronous, so sends read the latest text
+	 * without a parent render per input event. Explicit resets still bump a
+	 * revision so the local field can sync. */
 	const textRef = useRef("");
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
-		setText(v);
+		setComposerDraftRevision((revision) => revision + 1);
+	}, []);
+	const recordComposerText = useCallback((v: string) => {
+		textRef.current = v;
 	}, []);
 	// Saved slot completeness is live, but the session's selected route
 	// comes from its own ordinary model control, never today's Strong pin.
@@ -706,7 +720,7 @@ export function Chat({
 	// composer, and there is no live turn to steer anyway — questions end
 	// turns).
 	// Compaction (owner round 14): the RUNNING state — compaction-changed
-	// flips it; the send paths, canSend, and the docks gate on it (the
+	// flips it; the send paths, sendAllowed, and the docks gate on it (the
 	// server's registry mutex is the structural gate; this is the
 	// affordance).
 	const [compacting, setCompacting] = useState(initiallyCompacting);
@@ -718,8 +732,7 @@ export function Chat({
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
 	const failure = failedResponseAtEnd(nativeMessages);
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
-	const canSend =
-		text.trim().length > 0 && !pending && !activeProblem && !compacting;
+	const sendAllowed = !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1555,6 +1568,13 @@ export function Chat({
 													case "tool-ask_user_question":
 													case "tool-explain":
 													case "tool-recall": {
+														const malformed = !busy && malformedQuestions.find(call => call.messageId === part.sourceMessageId && call.contentIndex === part.sourceContentIndex && call.toolCallId === part.toolCallId);
+														if (malformed) return <MalformedQuestion key={pi} disabled={!!pending || compacting}
+															reason={pending ? "Answer or discard the remaining question first." : undefined}
+															onRetry={() => {
+																draftRef.current = null;
+																void send({ type: "retry-question", messageId: malformed.messageId, contentIndex: malformed.contentIndex, toolCallId: malformed.toolCallId });
+															}} />;
 														// Pending/streaming questions live in the dock, not the
 														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
@@ -1653,8 +1673,8 @@ export function Chat({
 				    fold) and NEVER overlaps the composer. */}
 				{!course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
-					initialQuestionDraft={pending ? questionDraft(pending.toolCallId)?.form : undefined}
-					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.toolCallId, { form }); }}
+					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
+					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
 					practice={activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
@@ -1663,7 +1683,8 @@ export function Chat({
 					plan={hasPlan ? <PlanMarginalia messages={messages} /> : undefined}
 					onOpenPlan={() => setPlanOpen(true)}
 					requiresReveal={requiresReveal}
-					readingThinking={readingThinking}
+					readingThinking={readingThinkingRef.current}
+					readingThinkingRevision={readingThinkingSeed.revision}
 					onReadingThinking={applyReadingThinking}
 					phase={phases.at(-1) ?? "probe"}
 					turns={turns}
@@ -1690,17 +1711,18 @@ export function Chat({
 						)
 					}
 					composer={
-						<Composer
+						<ChatSessionComposer
 							// Stop aborts ANY in-flight turn (stream-reattach wave): the
 							// square renders while a reattached/wake turn runs too — the
 							// abort channel kills it server-side; stop() alone would
 							// only detach our view.
 							busy={busy}
-							value={text}
-							onChange={applyText}
+							value={textRef.current}
+							revision={composerDraftRevision}
+							onChange={recordComposerText}
 							onSend={onSend}
 							onStop={abortInFlightTurn}
-							canSend={canSend}
+							sendAllowed={sendAllowed}
 							// The pause affordance (owner round 16): the placeholder
 							// IS the hint — empty state, exactly where Enter-on-empty
 							// applies.
@@ -1719,11 +1741,11 @@ export function Chat({
 						// ride the same callback (QuestionAnswerData.dismissed). The
 						// reading-thinking draft rides along (owner 2026-10-03) — the
 						// check answer is its only carrier.
-						saveQuestionDraft(pending.toolCallId, { readingThinking: readingThinkingRef.current });
+						saveQuestionDraft(pending.key, { readingThinking: readingThinkingRef.current });
 						const reading = readingThinkingRef.current.trim() || undefined;
 						// The pending-id effect clears this only when the question
 						// actually leaves. An offline preflight keeps the draft visible.
-						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output);
+						submitAnswer(pending.tool, pending.toolCallId, reading ? { ...output, readingThinking: reading } : output, pending.key);
 					}}
 				/>}
 				</Conversation>
@@ -1886,6 +1908,7 @@ function DockOverlay({
 	onSubmitThinking,
 	requiresReveal,
 	readingThinking,
+	readingThinkingRevision,
 	onReadingThinking,
 	phase,
 	turns,
@@ -1901,7 +1924,7 @@ function DockOverlay({
 	setupCta,
 	queuedSteers,
 }: {
-	pending: ReturnType<typeof findPendingToolCall>;
+	pending: ReturnType<typeof pendingQuestionOf>;
 	initialQuestionDraft?: QuestionFormDraft;
 	onSaveQuestionDraft: (draft: QuestionFormDraft) => void;
 	/** Compaction running for this chat (round 14) — the docks' submit
@@ -1915,9 +1938,11 @@ function DockOverlay({
 	onSubmitThinking: (text: string, confidence: Confidence) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
-	/** The reading-thinking draft (owner 2026-10-03) — owned by ChatView so
-	 *  the submit + dismissal seams (outside this overlay) can merge it. */
+	/** The reading-thinking draft (owner 2026-10-03), read from ChatView's
+	 *  ref so a remount shows the latest text; the revision resyncs the field
+	 *  on explicit resets. The submit and dismissal seams read the ref. */
 	readingThinking: string;
+	readingThinkingRevision: number;
 	onReadingThinking: (v: string) => void;
 	/** Session phase at the pending question — scales the thinking field. */
 	phase: Phase3;
@@ -1961,7 +1986,7 @@ function DockOverlay({
 	const [revealed, setRevealed] = useState(false);
 	const revealPending = requiresReveal && !revealed;
 
-	const pendingId = pending?.toolCallId ?? null;
+	const pendingId = pending?.key ?? null;
 	const initialPendingRef = useRef(pendingId);
 
 	// Teach-question ARRIVAL state, applied during render — BEFORE the
@@ -2024,7 +2049,7 @@ function DockOverlay({
 	const shellRef = useRef<HTMLDivElement>(null);
 	const contentRef = useRef<HTMLDivElement>(null);
 	const mode = pending
-		? `question:${pending.toolCallId}`
+		? `question:${pending.key}`
 		: practice
 			? `practice:${practice.toolCallId}`
 			: "chat";
@@ -2267,7 +2292,7 @@ function DockOverlay({
 			if (el.getAnimations().length === 0) {
 				const h = el.getBoundingClientRect().height;
 				p.height = h;
-				measureBlock(); // typing growth → the spacer grows with the box
+				measureBlock();
 			}
 			return;
 		}
@@ -2304,6 +2329,7 @@ function DockOverlay({
 					{pending && requiresReveal && (
 						<ReadingThinkingField
 							value={readingThinking}
+							revision={readingThinkingRevision}
 							onChange={onReadingThinking}
 							onOpen={!expanded ? () => expandAndRevealRef.current() : undefined}
 						/>

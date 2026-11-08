@@ -338,14 +338,22 @@ def _clamp_tutor_dates(
         scheduled.reviews[key] = _with_review(record, key, due, "tutor")
 
 
-def _touched(record: dict[str, Any], changes: PatchResult) -> list[str]:
-    """Topics of the attempts and exams this save added."""
-    topics: dict[str, None] = {}
-    for key in changes.observations:
-        item = record["observations"][key]
-        if item["kind"] in SCHEDULING_KINDS:
-            topics.update(dict.fromkeys(item["topics"]))
-    return list(topics)
+def _attempt_ids(history: _History) -> list[str]:
+    return [key for key, _ in history.attempts]
+
+
+def _clear_due(record: dict[str, Any], topic: str) -> None:
+    entry = record["topics"][topic]
+    review = {
+        name: value
+        for name, value in entry.get("review", {}).items()
+        if name not in ("due", "by")
+    }
+    record["topics"][topic] = (
+        {**entry, "review": review}
+        if review
+        else {name: value for name, value in entry.items() if name != "review"}
+    )
 
 
 def _practice_moved(
@@ -368,26 +376,40 @@ def _reschedule(
 ) -> None:
     """Set the next expected review where this save created or changed a verdict.
 
-    A practice day that leaves the verdicts unchanged moves a review due on or
-    before it to the expected day, so a topic cannot stay due forever.
+    A topic is replayed when this save changed the attempts that count for it:
+    a new attempt, or one a correction superseded. A practice day that leaves
+    the verdicts unchanged moves a review due on or before it to the expected
+    day, so a topic cannot stay due forever. A correction that leaves a topic
+    no attempts clears the date the engine had set for it.
     """
     new = set(changes.observations)
+    observations = record["observations"]
     before = _histories(
-        {key: item for key, item in record["observations"].items() if key not in new}
+        {key: item for key, item in observations.items() if key not in new}
     )
+    named = {topic for key in new for topic in observations[key]["topics"]}
     exam = _exam(record)
-    for key in _touched(record, changes):
-        if key in changes.tutor_reviews:
+    for key, topic in list(record["topics"].items()):
+        now, then = histories.get(key, _History()), before.get(key, _History())
+        if key in changes.tutor_reviews or _attempt_ids(now) == _attempt_ids(then):
             continue
-        topic = record["topics"][key]
-        after = replay(topic, histories[key].attempts, exam)
-        previous = replay(topic, before.get(key, _History()).attempts, exam)
-        days = {item["date"] for name, item in histories[key].attempts if name in new}
+        after = replay(topic, now.attempts, exam)
+        previous = replay(topic, then.attempts, exam)
+        days = {item["date"] for name, item in now.attempts if name in new}
         changed = after.verdicts != previous.verdicts
-        if after.expected is not None and (
-            changed or _practice_moved(topic, days, after)
-        ):
+        if after.expected is None:
+            if topic.get("review", {}).get("by") == "engine":
+                _clear_due(record, key)
+                scheduled.notes.append(
+                    f"{key}: review date cleared, a correction left it no attempts"
+                )
+        elif changed or _practice_moved(topic, days, after):
             scheduled.reviews[key] = _with_review(record, key, after.expected, "engine")
+            if key not in named:
+                scheduled.notes.append(
+                    f"{key}: review moved to {after.expected.isoformat()} after a "
+                    "correction"
+                )
 
 
 def _first_retrievals(
@@ -449,7 +471,8 @@ def schedule(
     unless the same patch dated its review; a practice day leaves the date alone
     unless the review was already due by then. Newly introduced topics without
     attempts or a date get a first retrieval. Gap or note judged on an earlier
-    day than the new evidence gets a note. Self-reports never reschedule.
+    day than the new evidence gets a note. A self-report adds no verdict, but
+    any observation that supersedes an attempt replays that attempt's topics.
     """
     result = {**record, "topics": dict(record["topics"])}
     scheduled = Scheduled()
