@@ -635,7 +635,7 @@ export function toLlmMessages(messages: readonly AgentMessage[]): Message[] {
 			const marker = m as LhMarkerMessage;
 			// UI-only markers: plan blocks, and problem dismissals (the
 			// synthesized conclude pair carries the model's face).
-			if (marker.customType === "plan-block" || marker.customType === "problem-dismissed") continue;
+			if (isUiOnlyMarker(marker)) continue;
 			// The head supersedes every compaction marker, not only its own
 			// stored position. Without a resolved head, preserve the existing
 			// full-history fallback, including the summary text.
@@ -756,9 +756,15 @@ export function hasUnresolvedQuestion(messages: readonly LhMessage[]): boolean {
 	return questionCallsOf(messages).length > 0;
 }
 
-/** Client placeholders are loop acknowledgements, not learner answers. */
+/** The one recovery authority, for the transcript's Retry button and the
+ * server alike. Only while the malformed batch ends the record: after later
+ * learner input, an appended result would follow that input on the wire,
+ * and providers reject every later turn. Client placeholders are loop
+ * acknowledgements, not learner answers. */
 export function malformedQuestionsOf(messages: readonly LhMessage[]): QuestionCall[] {
-	return questionCallsOf(messages.filter(message => !isLiveQuestionPlaceholder(message))).filter(call => call.status === "malformed");
+	const settled = messages.filter(message => !isLiveQuestionPlaceholder(message));
+	if (trailingBatchOwner(settled) < 0) return [];
+	return questionCallsOf(settled).filter(call => call.status === "malformed");
 }
 
 /** Successful probe_done result MESSAGE ids, in transcript order. A call
@@ -790,12 +796,6 @@ export function probeDoneResultIds(messages: readonly LhMessage[]): Set<string> 
  *  only a concluded call plus a matching successful result means teach. */
 export function hasProbeDone(messages: readonly LhMessage[]): boolean {
 	return probeDoneResultIds(messages).size > 0;
-}
-
-/** Every toolResult id in the record — answer-event validation (the call
- *  must be a DANGLING question call, not an already-answered one). */
-export function answeredCallIds(messages: readonly LhMessage[]): Set<string> {
-	return resultIdsFrom(messages);
 }
 
 // ─── the continuation fold (Wave D: the SDK's
@@ -900,19 +900,26 @@ export function reconstructRequestCause(messages: readonly LhMessage[]): Reconst
 	return resolve();
 }
 
+/** Markers toLlmMessages drops: the model never sees them between a call
+ *  and its result. */
+function isUiOnlyMarker(m: LhMessage): boolean {
+	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed");
+}
+
+/** The index of the assistant whose call batch ends the record: only its
+ *  tool results and UI-only markers follow it (contiguous by construction —
+ *  the agent appends its batch; the question gate keeps a quiz call and its
+ *  learner answer adjacent). -1 when model-facing input, a context marker,
+ *  or a compaction follows the newest assistant. */
+function trailingBatchOwner(messages: readonly LhMessage[]): number {
+	let i = messages.length - 1;
+	while (i >= 0 && (messages[i]!.role === "toolResult" || isUiOnlyMarker(messages[i]!))) i--;
+	return messages[i]?.role === "assistant" ? i : -1;
+}
+
 export function needsContinuation(messages: readonly LhMessage[]): boolean {
 	const last = messages[messages.length - 1];
 	if (!last || (last as { role?: string }).role !== "toolResult") return false;
-	// The trailing results batch (contiguous by construction — the agent
-	// appends its batch; the question gate keeps a quiz call and its
-	// learner answer adjacent).
-	let start = messages.length - 1;
-	while (
-		start > 0 &&
-		(messages[start - 1] as { role?: string } | undefined)?.role === "toolResult"
-	) {
-		start--;
-	}
 	// The dismissal rule (A2 + owner ruling 2026-10-03, round-1 incident):
 	// the batch's LAST resolution decides. Ending on a dismissal = the
 	// user signaled STOP — no wake, no reaction owed now; the answers'
@@ -923,11 +930,11 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 	if (isDismissedResult(messages[messages.length - 1]!) || endsInQuestionRecovery(messages)) {
 		return false;
 	}
-	const owner = messages[start - 1];
-	if (!owner || (owner as { role?: string }).role !== "assistant") return false;
-	const content = (owner as { content?: unknown }).content;
+	const start = trailingBatchOwner(messages);
+	if (start < 0) return false;
+	const content = (messages[start] as { content?: unknown }).content;
 	if (!Array.isArray(content)) return false;
-	const results = messages.slice(start) as ToolResultMessage[];
+	const results = messages.slice(start + 1).filter((m) => m.role === "toolResult") as ToolResultMessage[];
 	// PRACTICE (owner design, 2026-10-04): a batch acking a problem POSE
 	// owes nothing — terminate:true ended that turn DELIBERATELY (the
 	// learner's next thinking submission is the next turn), and unlike a

@@ -103,38 +103,20 @@ export function filterEnabledTools<T>(tools: Record<string, T>, enabled?: Enable
 	return out;
 }
 
-function findPending(messages: UIMessage[], names: readonly string[], authority?: string | PendingQuestion): PendingToolCall | null {
-	for (let m = messages.length - 1; m >= 0; m--) {
-		const msg = messages[m]!;
-		for (let p = 0; p < msg.parts.length; p++) {
-			const part = msg.parts[p]!;
-			if (isToolUIPart(part) && part.state === "input-available") {
-				const tool = part.type.slice("tool-".length);
-				if (!names.includes(tool)) continue;
-				if (typeof authority === "object") {
-					if (part.toolCallId !== authority.toolCallId || tool !== authority.tool ||
-						part.sourceMessageId !== authority.messageId || part.sourceContentIndex !== authority.contentIndex) continue;
-					return authority;
-				}
-				if (authority === undefined || part.toolCallId === authority) {
-					return { toolCallId: part.toolCallId as string, tool, input: part.input };
-				}
-			}
-		}
-	}
-	return null;
-}
-
 /** Grouped view messages lose native assistant boundaries. Native callers
  * supply the exact occurrence, not just an id: its OWN part must have cleared
  * validation. Never fall back to an older available question.
- * null means no native pending question; undefined keeps view-only callers.
- * The string overload is retained for view-only/id-filter consumers. */
-export function findPendingToolCall(messages: UIMessage[], authority: PendingQuestion | null): PendingQuestion | null;
-export function findPendingToolCall(messages: UIMessage[], authority?: string | null): PendingToolCall | null;
-export function findPendingToolCall(messages: UIMessage[], authority?: string | PendingQuestion | null): PendingToolCall | null {
+ * null means no native pending question. */
+export function findPendingToolCall(messages: UIMessage[], authority: PendingQuestion | null): PendingQuestion | null {
 	if (authority === null) return null;
-	return findPending(messages, QUESTION_TOOLS, authority);
+	for (let m = messages.length - 1; m >= 0; m--) {
+		for (const part of messages[m]!.parts) {
+			if (part.state === "input-available" && part.type === `tool-${authority.tool}` &&
+				part.toolCallId === authority.toolCallId && part.sourceMessageId === authority.messageId &&
+				part.sourceContentIndex === authority.contentIndex) return authority;
+		}
+	}
+	return null;
 }
 
 // ─── Turn activity label (2026-09-19, the “Writing a question…” fix) ──────

@@ -27,7 +27,7 @@ const { handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
 const { SessionModel } = await import("../components/session-core.ts");
-const { pendingQuestionOf, danglingQuestionOf, hasUnresolvedQuestion, malformedQuestionsOf, newUserMessage, newAnswerResult, needsContinuation, nativeInputCause } = await import("../src/core/native-messages.ts");
+const { pendingQuestionOf, danglingQuestionOf, hasUnresolvedQuestion, malformedQuestionsOf, newUserMessage, newAnswerResult, newCourseContextMessage, newPlanBlockMessage, needsContinuation, nativeInputCause, toLlmMessages } = await import("../src/core/native-messages.ts");
 const { findPendingToolCall } = await import("../src/core/pending.ts");
 const { projectView } = await import("../src/core/view.ts");
 const { parseQuestionInput } = await import("../src/core/tool-parts.ts");
@@ -300,4 +300,31 @@ test("reload offers recovery without generating; ordinary composer input also wo
 	assert.equal((await turn(id, { type: "text", text: "Let's take another approach" }, engine)).status, 200);
 	assert.match(JSON.stringify(histories[0]), /Let's take another approach/);
 	assert.deepEqual(chatStore.getChat(id)!.messages.slice(0, before.length), before);
+});
+
+test("a recovery after a later learner message is refused by the server and not offered in the UI", async () => {
+	// The learner's turn died before any assistant message was saved.
+	const before = [newUserMessage("fixture"), assistant(), newCourseContextMessage("Course brief", "fixture"), newUserMessage("Let's move on")];
+	const id = configured(before);
+	const model = new SessionModel({ chatId: id, initialMessages: before, fetch: async () => { throw new Error("Unexpected automatic request"); } });
+	assert.equal(malformedQuestionsOf(model.getState().nativeMessages).length, 0, "no Retry question button");
+	assert.throws(() => questionRecoveryAppends(before, recover()), /no longer available/);
+	const { engine, histories } = scripted([replacement]);
+	assert.equal((await turn(id, recover(), engine)).status, 400);
+	assert.equal(histories.length, 0);
+	assert.deepEqual(chatStore.getChat(id)!.messages, before, "no result lands after the learner's message");
+});
+
+test("a plan block after the malformed question keeps recovery offered, and the result stays adjacent on the wire", async () => {
+	const before = [newUserMessage("fixture"), assistant(), newPlanBlockMessage("plan", {})];
+	const id = configured(before);
+	assert.equal(malformedQuestionsOf(before).length, 1);
+	const { engine, histories } = scripted([replacement]);
+	assert.equal((await turn(id, recover(), engine)).status, 200);
+	assert.equal(histories.length, 1);
+	const wire = toLlmMessages(chatStore.getChat(id)!.messages);
+	const call = wire.findIndex(m => m.role === "assistant" && m.content.some(b => b.type === "toolCall" && b.id === "bad"));
+	const next = wire[call + 1];
+	assert.equal(next?.role === "toolResult" && next.toolCallId, "bad");
+	assert.equal(pendingQuestionOf(chatStore.getChat(id)!.messages)?.toolCallId, "replacement");
 });

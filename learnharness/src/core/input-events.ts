@@ -40,6 +40,7 @@ import {
 	newThinkingMessage,
 	newUserMessage,
 	newMessageId,
+	malformedQuestionsOf,
 	questionCallsOf,
 	pendingProblemDismissalOf,
 } from "./native-messages.ts";
@@ -273,16 +274,18 @@ export function inputAppends(
 
 /** Validate before any turn effects, then again against current saved truth.
  * Never accepts a failed/aborted generation (the existing Retry/new-message
- * paths own those), a stale occurrence, or an answerable sibling. */
+ * paths own those), a stale occurrence, a batch later input has passed, or
+ * an answerable sibling. */
 export function questionRecoveryAppends(
 	messages: readonly LhMessage[],
 	input: Extract<ChatInput, { type: "retry-question" }>,
 ): LhMessage[] {
-	const calls = questionCallsOf(messages);
-	const target = calls.find(call => call.messageId === input.messageId && call.contentIndex === input.contentIndex && call.toolCallId === input.toolCallId);
-	if (!target || target.status !== "malformed") throw new ChatInputError("This malformed question is no longer available to retry. Refresh the session.");
-	if (calls.some(call => call.status === "answerable")) throw new ChatInputError("Answer or discard the remaining question before retrying this one.");
-	return calls.filter(call => call.status === "malformed").map(call => ({
+	const malformed = malformedQuestionsOf(messages);
+	if (!malformed.some(call => call.messageId === input.messageId && call.contentIndex === input.contentIndex && call.toolCallId === input.toolCallId)) {
+		throw new ChatInputError("This malformed question is no longer available to retry. Refresh the session.");
+	}
+	if (questionCallsOf(messages).some(call => call.status === "answerable")) throw new ChatInputError("Answer or discard the remaining question before retrying this one.");
+	return malformed.map(call => ({
 		id: newMessageId(), role: "toolResult", toolCallId: call.toolCallId, toolName: call.tool,
 		content: [{ type: "text", text: `Tool call "${call.tool}" could not be displayed as a complete question. The learner requested a replacement, not an answer: save no attempt for it. Re-issue the question with complete, valid arguments.` }],
 		details: { questionRecovery: true }, isError: true, timestamp: Date.now(),
