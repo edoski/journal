@@ -46,7 +46,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, danglingQuestionOf } from "../core/native-messages.ts";
+import { hasProbeDone, hasUnresolvedQuestion } from "../core/native-messages.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
@@ -57,6 +57,7 @@ import {
 	ChatInputError,
 	inputAppends,
 	parseChatInput,
+	questionRecoveryAppends,
 	retryDrops,
 	type TurnInput,
 } from "../core/input-events.ts";
@@ -195,6 +196,14 @@ export async function handleChatInput(
 		}
 	}
 
+	if (input.type === "retry-question") {
+		try { questionRecoveryAppends(record.messages, input); }
+		catch (err) {
+			if (err instanceof ChatInputError) return Response.json({ error: err.message }, { status: 400 });
+			throw err;
+		}
+	}
+
 	// THE UNIVERSAL TURN GATE (BYOK, owner, 2026-09-22): a turn needs the
 	// CONVERSATION chain — the chat's own model override over the strong
 	// slot — and there is no factory floor; when both are empty the turn
@@ -269,8 +278,9 @@ export async function handleChatInput(
 		chatId,
 	);
 	// The course brief rides learner input only, fetched before the record
-	// is re-read below.
-	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "continue";
+	// is re-read below. A question recovery is a retry: its results must stay
+	// adjacent to their calls and end the record, so it carries no brief.
+	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
 	const courseBrief = learnerInput ? await fetchCourseBrief(record) : null;
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
@@ -318,7 +328,7 @@ export async function handleChatInput(
 	// the sibling question permanently pre-fix). Nothing else can generate
 	// while a question dangles (job wakes wait, continuation folds refuse,
 	// the composer gates), so adjacency holds by construction.
-	if (input.type === "answer" && danglingQuestionOf([...record.messages, ...appends]) !== null) {
+	if (input.type === "answer" && hasUnresolvedQuestion([...record.messages, ...appends])) {
 		const merged = [...record.messages, ...appends];
 		try { stores.chatStore.saveMessages(chatId, merged); }
 		catch (err) {

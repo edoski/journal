@@ -38,6 +38,16 @@ export interface PendingToolCall {
 	input: unknown;
 }
 
+/** Client-only identity: projection may group several native assistants.
+ * Never persisted or sent as part of an answer event. */
+export interface PendingQuestion extends PendingToolCall {
+	messageId: string;
+	contentIndex: number;
+	/** Unique call ids stay stable across live → persisted message stamps.
+	 * Reused ids include their native occurrence instead. */
+	key: string;
+}
+
 /** Tools that render in the question dock and gate the composer. The
  *  probe-phase name (recall, owner 2026-10-09) joins its teach twin. The
  *  removed multiple-choice tools (quiz, probe — 7 Nov 2026) are absent:
@@ -93,24 +103,20 @@ export function filterEnabledTools<T>(tools: Record<string, T>, enabled?: Enable
 	return out;
 }
 
-function findPending(messages: UIMessage[], names: readonly string[]): PendingToolCall | null {
+/** Grouped view messages lose native assistant boundaries. Native callers
+ * supply the exact occurrence, not just an id: its OWN part must have cleared
+ * validation. Never fall back to an older available question.
+ * null means no native pending question. */
+export function findPendingToolCall(messages: UIMessage[], authority: PendingQuestion | null): PendingQuestion | null {
+	if (authority === null) return null;
 	for (let m = messages.length - 1; m >= 0; m--) {
-		const msg = messages[m]!;
-		for (let p = 0; p < msg.parts.length; p++) {
-			const part = msg.parts[p]!;
-			if (isToolUIPart(part) && part.state === "input-available") {
-				const tool = part.type.slice("tool-".length);
-				if (names.includes(tool)) {
-					return { toolCallId: part.toolCallId as string, tool, input: part.input };
-				}
-			}
+		for (const part of messages[m]!.parts) {
+			if (part.state === "input-available" && part.type === `tool-${authority.tool}` &&
+				part.toolCallId === authority.toolCallId && part.sourceMessageId === authority.messageId &&
+				part.sourceContentIndex === authority.contentIndex) return authority;
 		}
 	}
 	return null;
-}
-
-export function findPendingToolCall(messages: UIMessage[]): PendingToolCall | null {
-	return findPending(messages, QUESTION_TOOLS);
 }
 
 // ─── Turn activity label (2026-09-19, the “Writing a question…” fix) ──────

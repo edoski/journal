@@ -23,19 +23,28 @@
  */
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { healEncodedArguments } from "../../core/argument-heal.ts";
+import { healEncodedArguments, unparsableArguments } from "../../core/argument-heal.ts";
 
 export { healEncodedArguments };
 
 /** Wrap ONE tool with the standard heal: the tool's own prepareArguments
  *  (options-unwrap, target normalization, …) runs first, then the heal
  *  against the tool's declared schema. Spread-safe (these are plain
- *  object literals) and idempotent. */
+ *  object literals) and idempotent. An object or array argument left as a
+ *  string JSON cannot parse is refused here, with the parse error: pi turns
+ *  the throw into the tool's error result. */
 export function withArgumentHeal(tool: AgentTool<any>): AgentTool<any> {
 	const inner = tool.prepareArguments;
 	return {
 		...tool,
-		prepareArguments: (args: unknown) => healEncodedArguments(inner ? inner(args) : args, tool.parameters),
+		prepareArguments: (args: unknown) => {
+			const healed = healEncodedArguments(inner ? inner(args) : args, tool.parameters);
+			const unparsable = unparsableArguments(healed, tool.parameters);
+			if (unparsable.length > 0) {
+				throw new Error(`Validation failed for tool "${tool.name}":\n${unparsable.map((p) => `  - ${p}`).join("\n")}`);
+			}
+			return healed;
+		},
 	};
 }
 

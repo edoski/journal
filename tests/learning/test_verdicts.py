@@ -205,6 +205,42 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
     assert course.due == on(12).isoformat()
 
 
+def test_a_topic_dropped_by_a_correction_is_rescheduled() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", topics=["a", "b"], text="mixed problem"))
+    assert course.due == on(6).isoformat()
+    course.attempts(
+        5, att("incorrect", topics=["b"], text="mixed problem, b only", corrects=["o2"])
+    )
+    assert course.verdicts == [(on(1).isoformat(), "solid")]
+    assert course.scheduled.reviews == {"a": {"due": on(4).isoformat(), "by": "engine"}}
+    assert course.scheduled.notes == [
+        f"a: review moved to {on(4).isoformat()} after a correction"
+    ]
+    assert course.due == on(4).isoformat()
+
+
+def test_a_correction_that_leaves_a_topic_no_attempts_clears_its_date() -> None:
+    course = started(att("incorrect", topics=["a", "b"], text="mixed problem"))
+    assert course.due == on(2).isoformat()
+    course.attempts(
+        1, att("incorrect", topics=["b"], text="mixed problem, b only", corrects=["o1"])
+    )
+    assert "review" not in course.record["topics"]["a"]
+    assert course.scheduled.notes == [
+        "a: review date cleared, a correction left it no attempts"
+    ]
+
+
+def test_a_self_report_that_supersedes_a_miss_reschedules_its_topic() -> None:
+    course = started(att("correct"))
+    course.attempts(5, att("incorrect", text="typo"))
+    assert course.due == on(6).isoformat()
+    report = {"kind": "self_report", "topics": ["a"], "text": "That was a typo"}
+    course.attempts(5, {**report, "corrects": ["o2"]})
+    assert course.due == on(4).isoformat()
+
+
 def test_the_exam_clamp_applies_to_every_replayed_interval() -> None:
     course = Course({**TOPICS, "exam": {"date": on(10).isoformat()}})
     course.attempts(1, att("correct"))

@@ -13,7 +13,7 @@ import * as path from "node:path";
 import { after, describe, it } from "node:test";
 import { probeDoneTool } from "../src/agent/tools/probe.ts";
 import type { SteerMessage } from "../src/core/contracts.ts";
-import { hasProbeDone, type LhMessage } from "../src/core/native-messages.ts";
+import { hasProbeDone, newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 import { phaseAt3Lh } from "../src/core/phases.ts";
 import { HANDOFF_TEXT } from "../src/core/contracts.ts";
 import { chatStore } from "../src/store/chats.ts";
@@ -99,6 +99,22 @@ describe("probe_done: the probe→planning seam", () => {
 		assert.match(res.error!, /question is still open/i);
 		assert.equal(delivered.length, 0, "nothing queued on refusal");
 	});
+
+	for (const [name, question] of [
+		["malformed", assistantWithCall("m1", "recall", { question: "What follows from $\\frac" })],
+		["failed", { ...assistantWithCall("m1", "recall", { question: "q?", correctAnswer: "a" }), stopReason: "error" } as LhMessage],
+	] as const) {
+		it(`concludes in the turn the learner continues past a ${name} question`, async () => {
+			const chatId = newChat(`Probe: past a ${name} question`);
+			chatStore.saveMessages(chatId, [question, newUserMessage("Let's move on")]);
+			const delivered: SteerMessage[] = [];
+			const tools = probeDoneTool({ chatId, chatStore, deliver: (s) => delivered.push(s) });
+
+			const res = await execute(tools, { assessment: ASSESSMENT });
+			assert.equal(res.ok, true);
+			assert.equal(delivered.length, 1);
+		});
+	}
 
 	it("REFUSES a second conclusion — probe_done fires exactly once", async () => {
 		const chatId = newChat("Probe: twice");

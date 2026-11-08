@@ -34,7 +34,16 @@
 
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
-import { modelSolutionForConclude, PRACTICE_CONCLUDE_TOOL, problemInputForConclude, SEND_TO_USER_TOOL, sendToUserText } from "./native-messages.ts";
+import {
+	failedOutputCallIds,
+	modelSolutionForConclude,
+	opensTurn,
+	PRACTICE_CONCLUDE_TOOL,
+	PRACTICE_PROBLEM_TOOL,
+	problemInputForConclude,
+	SEND_TO_USER_TOOL,
+	sendToUserText,
+} from "./native-messages.ts";
 import { activeCompactionOf, type CompactionDetails } from "./compaction.ts";
 import { QUESTION_TOOLS } from "./pending.ts";
 import type { SubagentArtifactData, SubagentResultMeta } from "./contracts/jobs.ts";
@@ -52,6 +61,9 @@ export interface LhViewPart extends Record<string, unknown> {
 	text?: string;
 	state?: string;
 	toolCallId?: string;
+	/** Native location, retained across display grouping (client-only). */
+	sourceMessageId?: string;
+	sourceContentIndex?: number;
 	input?: unknown;
 	output?: unknown;
 	rawInput?: unknown;
@@ -120,6 +132,44 @@ function lastSuccessfulPlanInit(parts: LhViewPart[]): number {
 	return idx;
 }
 
+/** The plain text blocks, as `messageId:contentIndex`, that follow a turn's
+ *  last delivered `send_to_user`. The model is told to end the turn there;
+ *  what it writes after is talk about the session ("the attempt is saved",
+ *  a closing message sent twice), never part of the message. A turn starts
+ *  at each learner or automatic input. Text before a later delivery, a
+ *  question or a pose stays, and a failed delivery ends nothing. */
+function textAfterFinalOutput(messages: readonly LhMessage[], live: LiveTurnState | undefined): ReadonlySet<string> {
+	const dropped = new Set<string>();
+	const failed = new Set(failedOutputCallIds(messages));
+	for (const [id, execution] of live?.executions ?? []) if (execution.isError) failed.add(id);
+	let delivered = false;
+	let sinceDelivery: string[] = [];
+	for (const m of messages) {
+		if (m.role !== "assistant") {
+			if (opensTurn(m)) {
+				delivered = false;
+				sinceDelivery = [];
+			}
+			continue;
+		}
+		m.content.forEach((block, index) => {
+			if (block.type === "text" && delivered) {
+				const key = `${m.id}:${index}`;
+				dropped.add(key);
+				sinceDelivery.push(key);
+				return;
+			}
+			if (block.type !== "toolCall") return;
+			const output = block.name === SEND_TO_USER_TOOL && sendToUserText(block) !== undefined;
+			if (!output && block.name !== PRACTICE_PROBLEM_TOOL && !(QUESTION_TOOLS as readonly string[]).includes(block.name)) return;
+			for (const key of sinceDelivery) dropped.delete(key);
+			sinceDelivery = [];
+			delivered = !(output && failed.has(block.id));
+		});
+	}
+	return dropped;
+}
+
 /** Project the native record (+ live turn working list) into the client's
  *  view messages. Pure: the same input always projects to the same list. */
 export function projectView(messages: readonly LhMessage[], live?: LiveTurnState): LhViewMessage[] {
@@ -132,6 +182,8 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			outputErrors.set(message.toolCallId, message);
 		}
 	}
+
+	const afterFinalOutput = textAfterFinalOutput(messages, live);
 
 	const lastAssistant = (): LhViewMessage | undefined => {
 		const last = out[out.length - 1];
@@ -219,13 +271,18 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			// back to a spinner mid-transcript; live cards belong at the
 			// bottom, and this gate is what puts them there by construction).
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
-			for (const block of assistant.content) {
+			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
+					if (afterFinalOutput.has(`${m.id}:${contentIndex}`)) continue;
 					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
 				} else if (block.type === "toolCall") {
 					const part = toolPartOf(block, live, streamingMessage);
+					if ((QUESTION_TOOLS as readonly string[]).includes(block.name)) {
+						part.sourceMessageId = m.id;
+						part.sourceContentIndex = contentIndex;
+					}
 					if (block.name === SEND_TO_USER_TOOL) {
 						// Failed/aborted generations never execute their calls;
 						// the provider error/abort UI already owns that outcome.
