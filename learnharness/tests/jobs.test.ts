@@ -45,6 +45,7 @@ import {
 	buildProbeHandoffSteer,
 } from "../src/core/contracts.ts";
 import { composeInstructions, createTeacherAgent } from "../src/agent/teacher-agent.ts";
+import { courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 import { createTeacherTools } from "../src/agent/tools.ts";
 import { createWebTools } from "../src/agent/tools/web.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
@@ -1426,10 +1427,10 @@ describe("prompt composition", () => {
 
 	it("the predict-check cycle composes into the teacher; the craft chunk reaches BOTH agents (owner 2026-10-03)", () => {
 		const teacher = composeInstructions("teacher");
-		// the cycle doctrine (28-predictions.md) — teacher-only
-		assert.ok(teacher.includes("predict → teach → check"), "the cycle line is in");
+		// the cycle is the engine's chain; the app maps its two questions onto `type`
+		assert.ok(courseRecordPrompt("teacher").includes("is predict, teach, check"), "the cycle line is in");
+		assert.ok(courseRecordPrompt("teacher").includes("Skip it when there is nothing to anticipate"), "the skip rule is in");
 		assert.ok(teacher.includes('The prediction (`type: "predict"`)'), "the prediction role section is in");
-		assert.ok(teacher.includes("Skip the prediction"), "the skip rule is in");
 		assert.ok(teacher.includes('The check (`type: "check"`)'), "the check role section is in");
 		// the craft + thinking channels (shared/20-question-tools.md) — BOTH agents
 		const prober = composeInstructions("prober");
@@ -1442,7 +1443,8 @@ describe("prompt composition", () => {
 			assert.ok(prompt.includes("thinkingWhileReading"), `${name} knows the reading channel`);
 		}
 		// the cycle is teach-phase doctrine — it never composes into the prober
-		assert.ok(!prober.includes("predict → teach → check"), "the teaching cycle stays out of the prober");
+		assert.ok(!prober.includes('type: "predict"'), "the question types stay out of the prober");
+		assert.ok(!courseRecordPrompt("prober").includes("## The chain"), "the teaching cycle stays out of the prober");
 	});
 
 	it("the sources-v0 prompt lines compose: read/pdf doctrine in the teacher, the read line in the prober", () => {

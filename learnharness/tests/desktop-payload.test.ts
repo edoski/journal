@@ -27,6 +27,8 @@ function withPayload(test: (fixture: {
 	};
 	try {
 		write(path.join("..", REFERENCES, "evidence.md"), "# Evidence");
+		write(path.join("..", REFERENCES, "teaching.md"), "# Teaching");
+		write(path.join("..", REFERENCES, "reviews.md"), "# Reviews");
 		write(path.join("scripts", "build-server.mjs"), source);
 		write(path.join(STANDALONE, "server.js"));
 		write(path.join(".next", "static", "runtime.js"));

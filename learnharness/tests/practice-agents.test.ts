@@ -21,7 +21,7 @@ import {
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import { concludeInputObject, concludeTool, createPracticeGate, problemTool, practiceTools } from "../src/agent/tools/practice.ts";
 import { composeInstructions, createPracticeAgent } from "../src/agent/teacher-agent.ts";
-import { allSegmentPaths } from "../src/agent/prompt-segments.ts";
+import { allSegmentPaths, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
 // ── fixtures ─────────────────────────────────────────────────────────────────
 
@@ -199,24 +199,29 @@ describe("the practice agent", () => {
 describe("persistent practice nudges", () => {
 	const doctrine = readFileSync(new URL("../src/agent/prompts/practice/10-doctrine.md", import.meta.url), "utf8");
 	const normalizeWhitespace = (text: string) => text.replace(/\s+/g, " ").trim();
-	const approvedParagraphs = [
-		"- When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress.",
-		"**On a wrong answer**, state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution.",
-		"Conclude when the learner has solved the problem correctly or explicitly asks to end it. Do not infer permission to end it from mistakes, elapsed time, the number of attempts, frustration, or an apparent inability to proceed.",
+	// What the practice agent reads in a course session: its own prompt, then
+	// the course doctrine with the engine's hints, verdicts and miss classes.
+	const practicePrompt = () => `${composeInstructions("practice")}\n\n---\n\n${courseRecordPrompt("practice")}`;
+	const approvedConclude = "Conclude when the learner has solved the problem correctly or explicitly asks to end it. Do not infer permission to end it from mistakes, elapsed time, the number of attempts, frustration, or an apparent inability to proceed.";
+	const approvedRules = [
+		"When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece, never the full solution; tentative answers, questions and thinking aloud are still work in progress.",
+		"On a wrong answer, state the verdict plainly and point to the first break without the correction. Give the smallest nudge that lets the learner make the next move, then wait; when it does not land, give another minimal nudge based on the new work.",
+		"A failed attempt is never a reason to reveal the solution or end the problem: continue until the learner finds and completes the correct solution or asks to end it, and never infer that permission from mistakes, elapsed time, the number of attempts or frustration.",
+		"A misconception is repaired the same way, with surgical nudges over as many exchanges as it needs, not a correction stated at once or a re-teach.",
 	];
 
-	it("preserves the approved paragraphs in source and the effective default prompt", () => {
+	it("preserves the approved rules in source and the effective course prompt", () => {
 		// Pin approved wording and Markdown, but allow incidental line wrapping.
 		for (const text of [doctrine, composeInstructions("practice")]) {
 			const paragraphs = text.split(/\n\s*\n|\n(?=- )/).map(normalizeWhitespace);
-			for (const approved of approvedParagraphs) {
-				assert.ok(paragraphs.includes(approved), `missing approved paragraph: ${approved}`);
-			}
+			assert.ok(paragraphs.includes(approvedConclude), "missing the approved conclude paragraph");
 		}
+		const prompt = normalizeWhitespace(practicePrompt());
+		for (const approved of approvedRules) assert.ok(prompt.includes(approved), `missing approved rule: ${approved}`);
 	});
 
 	it("does not compose the retired attempt cutoff, failed-repair reveal, or automatic-abort instructions", () => {
-		for (const text of [doctrine, composeInstructions("practice")]) {
+		for (const text of [doctrine, practicePrompt()]) {
 			const normalized = normalizeWhitespace(text);
 			assert.doesNotMatch(normalized, /\b(?:one|single|1) bounded attempt\b/i);
 			assert.doesNotMatch(normalized, /If the repair attempt fails, reveal and move on/i);
@@ -228,18 +233,16 @@ describe("persistent practice nudges", () => {
 		}
 	});
 
-	it("preserves the approved concluded-problem switch and unbounded structural repair in source and the effective default prompt", () => {
+	it("preserves the approved concluded-problem switch, the miss classes and unbounded structural repair in the effective course prompt", () => {
 		const approvedDifficulty = "3. **Difficulty** — from the last outcomes on this target: clean success, one notch up; success that needed hints, hold; a miss, one notch down and consider dropping a mode. Two missed concluded problems in a row on this target: switch targets for the next demand. Never switch away from an active problem because of the number of attempts.";
-		const approvedClassification = "Classify every miss: cue miss (nothing came), discrimination error (wrong candidate won), execution slip (right proposition, wrong run), careless, or structural (the retrieved proposition is itself wrong — a misconception). The first four are practice information. Structural misses call for minimal nudges toward repairing the misconception, not an immediate correction or re-teaching. Keep each nudge surgical; do not impose a one-line or one-attempt limit on the repair as a whole.";
-		for (const text of [doctrine, composeInstructions("practice")]) {
-			const normalized = normalizeWhitespace(text);
-			assert.ok(normalized.includes(approvedDifficulty), "preserve the difficulty readout and exact approved switching rule");
-			assert.ok(normalized.includes(approvedClassification), "preserve the miss taxonomy and exact approved structural-repair rule");
-			assert.doesNotMatch(normalized, /two misses in a row, switch targets/i);
-			assert.doesNotMatch(normalized, /Structural gets one surgical line/i);
-			assert.doesNotMatch(normalized, /the correction, stated once/i);
-			assert.doesNotMatch(normalized, /if a repair needs more than a line/i);
-		}
+		assert.ok(normalizeWhitespace(doctrine).includes(approvedDifficulty), "preserve the difficulty readout and exact approved switching rule");
+		const normalized = normalizeWhitespace(practicePrompt());
+		assert.ok(normalized.includes(approvedDifficulty), "preserve the difficulty readout and exact approved switching rule");
+		assert.ok(normalized.includes("cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception;"), "preserve the miss taxonomy");
+		assert.doesNotMatch(normalized, /two misses in a row, switch targets/i);
+		assert.doesNotMatch(normalized, /Structural gets one surgical line/i);
+		assert.doesNotMatch(normalized, /the correction, stated once/i);
+		assert.doesNotMatch(normalized, /if a repair needs more than a line/i);
 	});
 
 	it("preserves the approved misconception introduction without an affirmative one-line repair cap", () => {
@@ -254,8 +257,9 @@ describe("persistent practice nudges", () => {
 	it("keeps the many-claims default, hint ladder, dismissal, and explicit-go-ahead pause", () => {
 		const prompt = normalizeWhitespace(composeInstructions("practice"));
 		assert.match(prompt, /A problem may take many claims; staying is the default/);
+		const course = courseRecordPrompt("practice");
 		for (const rung of ["R0", "R1", "R2", "R3", "R4", "R5"]) {
-			assert.ok(prompt.includes(`**${rung} —`));
+			assert.ok(course.includes(`| ${rung} |`), `the hint ladder lost ${rung}`);
 		}
 		assert.match(prompt, /Concluding ends your turn; the next problem is posed only when the learner explicitly moves on/);
 		assert.match(prompt, /After the conclude's result.*END YOUR TURN: no further tool calls in that reply, never another problem/);
@@ -288,7 +292,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// The base's voice section and the doctrine's spine are present…
 		assert.match(prompt, /Everything in this section deletes a default/);
 		assert.match(prompt, /You run practice sessions\./);
-		assert.match(prompt, /## Standing prohibitions/);
+		assert.match(prompt, /## IX\. The arc/);
 		// …and nothing from the teaching system prompt or shared fragments.
 		assert.doesNotMatch(prompt, /install understanding/);
 		// The shared 20-question-tools doctrine (predict/check) must not
@@ -330,12 +334,14 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 	});
 
 	it("the prober doctrine steers difficulty by evidence (owner round, 2026-10-07)", () => {
-		const prober = composeInstructions("prober");
-		assert.match(prober, /Enter near the top, not the bottom/);
-		assert.match(prober, /Strands inform each other/);
-		assert.match(prober, /never descending into already-bracketed territory/);
+		// the bracketing is the engine's Finding the edge, composed for the prober
+		const prober = courseRecordPrompt("prober");
+		assert.match(prober, /Enter near the hardest thing the goal needs and let a miss walk you down/);
+		assert.match(prober, /Never open below what the session has already demonstrated/);
+		assert.match(prober, /never re-ask what an answer already settled/);
 		// the confidence + thinking signals are wired into question selection
-		assert.match(prober, /whether his answer is right, the reasoning in it, and his confidence together set where the next question should sit/);
+		assert.match(prober, /choose each next one from the last answer's result, reasoning and confidence/);
+		assert.match(composeInstructions("prober"), /an adult reaching for advanced material almost always holds the school-level basics/);
 	});
 
 	it("the SHARED formatting guide composes (owner, 2026-10-04 late): LaTeX delimiters in every setting", () => {

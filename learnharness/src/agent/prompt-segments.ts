@@ -124,19 +124,52 @@ export function effectivePromptSegments(
 	});
 }
 
-/** The engine's host-neutral doctrine files the course prompt composes
- *  whole, from the tutor skill's references, so the tutor and the app read
- *  one text. */
-export const ENGINE_DOCTRINE: readonly string[] = ["evidence.md"];
+/** One file of the engine's doctrine: whole, or its opening (the text
+ *  before its first `## ` heading) followed by the listed `## ` sections. */
+export type DoctrinePart = { readonly file: string; readonly sections?: readonly string[] };
 
-/** The course-record doctrine, appended to any agent's prompt when its
- *  session is linked to a course (and only then: the course tools exist
- *  only there): the app's adapter, then each engine doctrine file read from
- *  `dir`. Throws when a file is missing, so a rename in the engine fails
- *  the doctrine test instead of a lesson. Not an override segment. */
-export function courseRecordPrompt(dir: string = PATHS.tutorReferences): string {
+/** What each agent composes from the tutor skill's host-neutral references,
+ *  so the tutor and the app teach from one text and each agent reads only
+ *  the parts its job uses. The exam run-up and the week are left out: they
+ *  read figures the app's course brief does not carry. */
+export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
+	prober: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["Finding the edge"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
+	],
+	teacher: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
+		{ file: "reviews.md", sections: ["Review prompts and key points", "Missed reviews and lapses", "The close"] },
+	],
+	practice: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Difficulty", "Mixing methods", "Transfer", "Corrections and diagrams"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+	],
+};
+
+function doctrineText(dir: string, { file, sections }: DoctrinePart): string {
+	const text = fs.readFileSync(path.join(dir, file), "utf-8").trim();
+	if (!sections) return text;
+	const [opening = "", ...rest] = text.split(/\r?\n(?=## )/);
+	const picked = sections.map((title) => {
+		const section = rest.find((part) => part.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
+		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${file}`);
+		return section.trim();
+	});
+	return [opening.trim(), ...picked].join("\n\n");
+}
+
+/** The course-record doctrine, appended to every agent's prompt in a
+ *  course session: the app's adapter, then the agent's engine doctrine read
+ *  from `dir`. Throws when a listed file or section is missing, so a rename
+ *  in the engine fails the doctrine test instead of a lesson. Not an
+ *  override segment. */
+export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutorReferences): string {
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
-	return [adapter, ...ENGINE_DOCTRINE.map((file) => fs.readFileSync(path.join(dir, file), "utf-8").trim())].join("\n\n");
+	return [adapter, ...ENGINE_DOCTRINE[agent].map((part) => doctrineText(dir, part))].join("\n\n");
 }
 
 /** Every known segment path across both agents (route validation). */
