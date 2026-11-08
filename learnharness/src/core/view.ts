@@ -35,11 +35,11 @@
 import type { AssistantMessage, ToolResultMessage } from "@earendil-works/pi-ai";
 import type { LhMarkerMessage, LhMessage } from "./native-messages.ts";
 import {
-	asAgentMessages,
 	failedOutputCallIds,
 	modelSolutionForConclude,
-	nativeInputCause,
+	opensTurn,
 	PRACTICE_CONCLUDE_TOOL,
+	PRACTICE_PROBLEM_TOOL,
 	problemInputForConclude,
 	SEND_TO_USER_TOOL,
 	sendToUserText,
@@ -136,34 +136,37 @@ function lastSuccessfulPlanInit(parts: LhViewPart[]): number {
  *  last delivered `send_to_user`. The model is told to end the turn there;
  *  what it writes after is talk about the session ("the attempt is saved",
  *  a closing message sent twice), never part of the message. A turn starts
- *  at each learner or automatic input. */
-export function textAfterFinalOutput(messages: readonly LhMessage[]): ReadonlySet<string> {
+ *  at each learner or automatic input. Text before a later delivery, a
+ *  question or a pose stays, and a failed delivery ends nothing. */
+function textAfterFinalOutput(messages: readonly LhMessage[], live: LiveTurnState | undefined): ReadonlySet<string> {
 	const dropped = new Set<string>();
-	const failed = failedOutputCallIds(messages);
-	const history = asAgentMessages(messages);
+	const failed = new Set(failedOutputCallIds(messages));
+	for (const [id, execution] of live?.executions ?? []) if (execution.isError) failed.add(id);
 	let delivered = false;
 	let sinceDelivery: string[] = [];
-	messages.forEach((m, i) => {
+	for (const m of messages) {
 		if (m.role !== "assistant") {
-			// The whole record serves as history: it only looks up the call an answer answers.
-			if (nativeInputCause(history[i]!, history) === "neutral") return;
-			delivered = false;
-			sinceDelivery = [];
-			return;
+			if (opensTurn(m)) {
+				delivered = false;
+				sinceDelivery = [];
+			}
+			continue;
 		}
 		m.content.forEach((block, index) => {
 			if (block.type === "text" && delivered) {
 				const key = `${m.id}:${index}`;
 				dropped.add(key);
 				sinceDelivery.push(key);
-			} else if (block.type === "toolCall" && block.name === SEND_TO_USER_TOOL && !failed.has(block.id) && sendToUserText(block)) {
-				// Text between two deliveries stays: only the turn's last one ends it.
-				for (const key of sinceDelivery) dropped.delete(key);
-				sinceDelivery = [];
-				delivered = true;
+				return;
 			}
+			if (block.type !== "toolCall") return;
+			const output = block.name === SEND_TO_USER_TOOL && sendToUserText(block) !== undefined;
+			if (!output && block.name !== PRACTICE_PROBLEM_TOOL && !(QUESTION_TOOLS as readonly string[]).includes(block.name)) return;
+			for (const key of sinceDelivery) dropped.delete(key);
+			sinceDelivery = [];
+			delivered = !(output && failed.has(block.id));
 		});
-	});
+	}
 	return dropped;
 }
 
@@ -180,7 +183,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 		}
 	}
 
-	const afterFinalOutput = textAfterFinalOutput(messages);
+	const afterFinalOutput = textAfterFinalOutput(messages, live);
 
 	const lastAssistant = (): LhViewMessage | undefined => {
 		const last = out[out.length - 1];
