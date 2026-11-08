@@ -90,12 +90,16 @@ verb through its `CourseRecords` adapter, so the CLI is the contract and grading
 levels and scheduling exist only in Python. The engine root defaults to the
 repository root with its `.venv/bin/python`; `LH_LEARNING_ENGINE` and
 `LH_LEARNING_PYTHON` override them, which a packaged desktop app outside the
-repository needs. Its course prompt composes the engine's teaching doctrine from
-`learning/skills/tutor/references/` by repository-relative path: the sections
-listed in its `ENGINE_DOCTRINE`, today the observation rules in `records.md`. Its
-desktop build copies that folder beside the server payload, and its tests fail when
-a listed file or heading is missing. Splitting those references into host-neutral
-`evidence.md`, `teaching.md` and `reviews.md` (request E3) is the next step.
+repository needs. The tutor's teaching doctrine is host-neutral: `evidence.md`
+(attempts, grading, confidence), `teaching.md` (the edge, predict-teach-check,
+hints, practice problems) and `reviews.md` (reviews, the close, the week, the exam
+run-up) in `learning/skills/tutor/references/` name no tools, and each host maps
+them to its own tools (the skill's tool table, the app's course adapter). The app's
+course prompt composes the files listed in its `ENGINE_DOCTRINE`, whole, by
+repository-relative path, today `evidence.md`. Its desktop build copies that folder
+beside the server payload, and its tests fail when a listed file is missing.
+Composing `teaching.md` and `reviews.md` and deleting the app's duplicate doctrine
+is the next step.
 
 ## Finance
 

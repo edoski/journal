@@ -63,9 +63,9 @@ aliases.
   `learning/packing.py`; the CLI verb table to `learning/cli.py`.
 - `learnharness` reaches the engine only by running `python -m learning` (its
   `CourseRecords` adapter, from the repository root's `.venv/bin/python` unless
-  `LH_LEARNING_ENGINE`/`LH_LEARNING_PYTHON` say otherwise) and by composing sections of
-  `learning/skills/tutor/references/` named in its `ENGINE_DOCTRINE`; renaming such a
-  file or `## ` heading fails the app's tests. The Python packages never import or read
+  `LH_LEARNING_ENGINE`/`LH_LEARNING_PYTHON` say otherwise) and by composing whole files of
+  `learning/skills/tutor/references/` listed in its `ENGINE_DOCTRINE` (today `evidence.md`);
+  renaming such a file fails the app's tests. Those doctrine files name no tools. The Python packages never import or read
   `learnharness`.
 
 ### Rendering architecture
