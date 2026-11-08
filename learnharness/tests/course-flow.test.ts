@@ -263,6 +263,18 @@ describe("a course-linked turn", () => {
 		assert.match(ack.content[0]!.text, /Course record: \{"revision":1,"changed":true,"observations":\["o1","o2"\]\}/);
 	});
 
+	it("a course session's file search defaults to the course folder", () => {
+		const agent = createPracticeAgent(
+			{ chatId: "chat_files", chatStore },
+			{ engine: scripted([]), course: { course: { workspace: LINALG, title: "Linear Algebra" }, records: {} as never } },
+		);
+		for (const name of ["find", "grep", "ls"]) {
+			const tool = agent.state.tools.find((t) => t.name === name)!;
+			const description = (tool.parameters as { properties: { path: { description: string } } }).properties.path.description;
+			assert.match(description, /default: the course folder/, name);
+		}
+	});
+
 	it("probe phase: a course-linked prober asks by free recall, even under the retired multiple-choice setting", async () => {
 		const tools: string[][] = [];
 		const build = (chatId: string): Factory => (opts) => {

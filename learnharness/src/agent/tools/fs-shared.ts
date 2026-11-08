@@ -234,9 +234,11 @@ function checkedSourcePath(absolute: string, denied: (absolute: string) => boole
 /** Relative/absent → home; leading ~ expands, ~user stays literal. Return
  *  the CHECKED canonical location for IO, not an unchecked symlink alias.
  *  These path checks are not protection against a hostile concurrent OS user. */
-export function resolveSourcePath(p?: string): string {
+/** A path the model gave, resolved against the learner's home; with none,
+ *  `defaultDir` (the session's course folder) or else home. */
+export function resolveSourcePath(p?: string, defaultDir?: string): string {
 	const home = os.homedir();
-	const resolved = !p ? home : p === "~" || p.startsWith("~/") || p.startsWith(`~${path.sep}`)
+	const resolved = !p ? (defaultDir ?? home) : p === "~" || p.startsWith("~/") || p.startsWith(`~${path.sep}`)
 		? path.join(home, p.slice(1))
 		: path.resolve(home, p);
 	return checkedSourcePath(resolved, sourcePathCheck(home));

@@ -19,6 +19,9 @@ import { practiceTools, type PracticeToolContext } from "./tools/practice.ts";
 import { healToolRecord, withArgumentHeal } from "./tools/heal.ts";
 import { sendToUserTool } from "./tools/send-to-user.ts";
 import { createReadTool, readTool } from "./tools/read.ts";
+import { createFindTool, findTool } from "./tools/find.ts";
+import { createGrepTool, grepTool } from "./tools/grep.ts";
+import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
 import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
 import { toLlmMessages, nativeInputCause, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
@@ -180,6 +183,21 @@ function makeQuestionStopper(kind: AgentKind) {
 	};
 }
 
+const SEARCH_TOOLS: Record<string, { shared: AgentTool<any>; create: (courseDir: string) => AgentTool<any> }> = {
+	find: { shared: findTool, create: createFindTool },
+	grep: { shared: grepTool, create: createGrepTool },
+	ls: { shared: lsTool, create: createLsTool },
+};
+
+/** In a course session, a file search with no path stays in the course
+ *  folder rather than the learner's whole home. */
+function courseRooted(tool: AgentTool<any, any>, courseDir: string | undefined): AgentTool<any, any> {
+	const search = courseDir ? SEARCH_TOOLS[tool.name] : undefined;
+	if (!search || tool.execute !== search.shared.execute) return tool;
+	const rooted = search.create(courseDir!);
+	return { ...tool, parameters: rooted.parameters, execute: rooted.execute };
+}
+
 function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: AgentTool<any, any>[]) {
 	// Practice never reaches the role fallback (the handler ALWAYS injects
 	// the session's conversation engine — practice rides the same
@@ -210,9 +228,12 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 			// send_to_user gate matches Claude across providers (including
 			// OpenRouter), not the API transport; explicit registries opt out.
 			tools: [
-				...tools.map((tool) => tool.name === "read" && tool.execute === readTool.execute
-					? { ...tool, execute: createReadTool(engine.model).execute as AgentTool<any>["execute"] }
-					: tool),
+				...tools.map((tool) => courseRooted(
+					tool.name === "read" && tool.execute === readTool.execute
+						? { ...tool, execute: createReadTool(engine.model).execute as AgentTool<any>["execute"] }
+						: tool,
+					opts.course?.course.workspace,
+				)),
 				...(opts.course ? Object.values(courseTools(opts.course)) : []),
 				...(opts.tools === undefined && engine.model.id.toLowerCase().includes("claude")
 					? [withArgumentHeal(sendToUserTool)]

@@ -35,6 +35,8 @@ async function link(target: string, alias: string, directory = false): Promise<v
 }
 
 await write("home/notes/topic.md", "ordinary study notes\n");
+await write("home/courses/stat/lecture-3.md", "the course's lecture\n");
+await write("home/Downloads/lecture-3-flyer.md", "an unrelated download\n");
 await write("home/..notes/also.md", "ordinary dot-prefixed notes\n");
 await write("home/.claudette/ok.md", "ordinary lookalike notes\n");
 await write("home/.ssh/id_ed25519");
@@ -66,9 +68,9 @@ for (const name of [".env", ".env.example", ".env.template", ".ENV.production"])
 
 const { isSensitivePath, resolveSourcePath, sensitiveHomeLocations, walkFiles } = await import("../src/agent/tools/fs-shared.ts");
 const { readTool, createReadTool } = await import("../src/agent/tools/read.ts");
-const { lsTool } = await import("../src/agent/tools/ls.ts");
-const { findTool } = await import("../src/agent/tools/find.ts");
-const { grepTool } = await import("../src/agent/tools/grep.ts");
+const { createLsTool, lsTool } = await import("../src/agent/tools/ls.ts");
+const { createFindTool, findTool } = await import("../src/agent/tools/find.ts");
+const { createGrepTool, grepTool } = await import("../src/agent/tools/grep.ts");
 const { runPdfReaderAgent } = await import("../src/agent/subagents/pdf-reader.ts");
 const { createProberTools, createTeacherTools } = await import("../src/agent/tools.ts");
 const { practiceTools } = await import("../src/agent/tools/practice.ts");
@@ -154,6 +156,16 @@ describe("source access: canonical roots and all tool paths", () => {
 			await assert.rejects(walkFiles(folder, () => assert.fail("must not visit")), denied);
 		}
 		await assert.rejects(readTool.execute!("s", { path: path.join(root, "transcripts", "projects", "session.jsonl") }), denied);
+	});
+
+	it("in a course, a search with no path stays in the course folder; an explicit path still reaches home", async () => {
+		const course = path.join(home, "courses", "stat");
+		assert.equal(await text(createFindTool(course), { pattern: "lecture*" }), "lecture-3.md");
+		assert.equal(await text(createLsTool(course), {}), "lecture-3.md");
+		assert.match(await text(createGrepTool(course), { pattern: "lecture" }), /^lecture-3\.md:1: the course's lecture$/);
+		assert.match(await text(createFindTool(course), { pattern: "lecture*", path: "~/Downloads" }), /lecture-3-flyer\.md/);
+		const everywhere = await text(findTool, { pattern: "lecture*" });
+		assert.match(everywhere, /Downloads\/lecture-3-flyer\.md/, "without a course the default is still home");
 	});
 
 	it("canonicalizes an aliased HOME, including default and relative paths", async () => {
