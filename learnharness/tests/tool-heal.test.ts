@@ -127,4 +127,19 @@ describe("an object argument sent as a broken JSON string", () => {
 		);
 		assert.deepEqual(tool.prepareArguments!({ changes: '{"path":{"current":"x"}}' }), { changes: { path: { current: "x" } } });
 	});
+
+	it("an array argument refuses only a broken JSON array; a bare string still converts", async () => {
+		const { Type } = await import("typebox");
+		const { withArgumentHeal } = await import("../src/agent/tools/heal.ts");
+		const tool = withArgumentHeal({
+			name: "course_show",
+			label: "course_show",
+			description: "",
+			parameters: Type.Object({ handles: Type.Array(Type.String()) }),
+			execute: async () => ({ content: [], details: {} }),
+		});
+		assert.throws(() => tool.prepareArguments!({ handles: '["o12", ' }), /handles: arrived as a string that failed to parse as JSON/);
+		const bare = tool.prepareArguments!({ handles: "o12" });
+		assert.deepEqual(validateToolArguments(tool, { type: "toolCall", id: "t", name: "course_show", arguments: bare as never }), { handles: ["o12"] });
+	});
 });

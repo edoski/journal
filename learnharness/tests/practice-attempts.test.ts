@@ -100,6 +100,19 @@ describe("a concluded practice problem as engine observations", () => {
 		assert.deepEqual(observations.map((o) => [o.topics, o.chose]), [[["hypergeometric"], "binomial"], [["binomial"], undefined]]);
 	});
 
+	it("a wrong method is charged to the topic that should have been chosen, not the method chosen", () => {
+		const pose = { statement: "which model fits?", topics: ["hypergeometric", "binomial"] };
+		const [o] = practiceObservations(pose, { outcome: "movedOn", rung: null, result: "incorrect", response: "binomial", chose: "binomial" }, undefined);
+		assert.deepEqual([o!.topics, o!.chose], [["hypergeometric"], "binomial"]);
+	});
+
+	it("a surrendered multi-part problem still credits the part answered right", () => {
+		const pose = { statement: "two parts", topics: ["hypergeometric", "binomial"] };
+		const gaveUp: PracticeConclusion = { outcome: "surrendered", rung: "R5", result: "incorrect", response: "(a) 0.217, (b) no idea", byTopic: { hypergeometric: "correct" } };
+		assert.equal(conclusionProblem(gaveUp, pose.topics), null);
+		assert.deepEqual(practiceObservations(pose, gaveUp, undefined).map((o) => [o.topics, o.result]), [[["hypergeometric"], "correct"], [["binomial"], "incorrect"]]);
+	});
+
 	it("refuses conclusions that contradict their outcome or the pose", () => {
 		const topics = POSE.topics;
 		assert.match(conclusionProblem({ ...base, outcome: "surrendered" }, topics)!, /incorrect/);
@@ -112,7 +125,7 @@ describe("a concluded practice problem as engine observations", () => {
 			/^firstTry\.chose/,
 		);
 		assert.match(conclusionProblem({ ...base, byTopic: { rank: "incorrect" } }, topics)!, /byTopic names rank, which the problem was not posed with/);
-		assert.match(conclusionProblem({ ...base, byTopic: { linearity: "incorrect" } }, topics)!, /correct or partial/);
+		assert.match(conclusionProblem({ ...base, byTopic: { linearity: "incorrect" } }, topics)!, /byTopic marks linearity incorrect/);
 		assert.equal(conclusionProblem({ ...base, result: "partial" }, topics), null, "a guessed right answer is partial");
 		assert.equal(conclusionProblem({ ...base, outcome: "movedOn", result: "incorrect" }, topics), null);
 	});

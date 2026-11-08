@@ -60,12 +60,17 @@ function answerProblem(topics: readonly string[], answer: GradedAnswer, label: s
 	return null;
 }
 
-/** Why a conclusion cannot be recorded as given, or null when it can. */
+/** Why a conclusion cannot be recorded as given, or null when it can. A
+ *  surrendered problem may still credit the parts answered before. */
 export function conclusionProblem(c: PracticeConclusion, topics: readonly string[]): string | null {
-	const results = topicResults(topics, c).map(([, r]) => r);
-	if (c.outcome === "surrendered" && results.some((r) => r !== "incorrect")) return "a surrendered problem's result is incorrect";
-	if ((c.outcome === "solved" || c.outcome === "solvedWithHints") && results.includes("incorrect")) {
-		return "a solved problem's result is correct or partial";
+	if (c.outcome === "surrendered" && c.result !== "incorrect") return "a surrendered problem's result is incorrect";
+	if (c.outcome === "solved" || c.outcome === "solvedWithHints") {
+		const unsolved = topicResults(topics, c).filter(([, r]) => r === "incorrect").map(([t]) => t);
+		if (unsolved.length > 0) {
+			return c.result === "incorrect"
+				? "a solved problem's result is correct or partial"
+				: `a solved problem is correct or partial on every topic, but byTopic marks ${unsolved.join(", ")} incorrect`;
+		}
 	}
 	if (c.outcome === "solvedWithHints" && c.rung === null) return "solvedWithHints needs the rung of the strongest hint given";
 	if (c.outcome === "solved" && c.rung !== null) return "a problem solved after a hint is solvedWithHints";
@@ -82,15 +87,13 @@ function answerObservations(
 ): Record<string, unknown>[] {
 	const groups = new Map<AttemptResult, string[]>();
 	for (const [topic, result] of topicResults(pose.topics, answer)) groups.set(result, [...(groups.get(result) ?? []), topic]);
-	return [...groups].map(([result, topics]) => ({
-		topics,
-		text: pose.statement,
-		response: answer.response,
-		help,
-		result,
-		...(answer.chose && result !== "correct" ? { chose: answer.chose } : {}),
-		...sure,
-	}));
+	return [...groups].map(([result, topics]) => {
+		const chose = answer.chose && result !== "correct" ? answer.chose : undefined;
+		// A wrong choice is evidence on the topic that should have been
+		// chosen, never on the method chosen, even when both were posed.
+		const charged = chose && topics.length > 1 ? topics.filter((t) => t !== chose) : topics;
+		return { topics: charged, text: pose.statement, response: answer.response, help, result, ...(chose ? { chose } : {}), ...sure };
+	});
 }
 
 function sameResults(topics: readonly string[], a: GradedAnswer, b: GradedAnswer): boolean {

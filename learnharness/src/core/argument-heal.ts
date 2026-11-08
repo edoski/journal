@@ -59,12 +59,15 @@ function tryParse(raw: string): unknown {
 
 /** The object and array arguments that arrived as a string JSON cannot
  *  parse, each named with the parse error. Validation alone says only
- *  "must be object", and the model resent the same broken string. */
+ *  "must be object", and the model resent the same broken string. An array
+ *  counts only when its string opens with "[": pi converts a bare string
+ *  such as "o12" into a one-item array. */
 export function unparsableArguments(args: unknown, schema: { properties?: Record<string, PropSchema> }): string[] {
 	if (typeof args !== "object" || args === null || Array.isArray(args)) return [];
 	return Object.entries(schema.properties ?? {}).flatMap(([key, prop]) => {
 		const raw = (args as Record<string, unknown>)[key];
-		if (typeof raw !== "string" || (prop.type !== "object" && prop.type !== "array")) return [];
+		if (typeof raw !== "string") return [];
+		if (prop.type !== "object" && !(prop.type === "array" && raw.trimStart().startsWith("["))) return [];
 		try {
 			JSON.parse(raw);
 			return [];

@@ -23,6 +23,7 @@ import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
+import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
 import { concludeResult, invalidInputResult, problemResult } from "../tool-execute.ts";
 import { healEncodedArguments, healToolRecord } from "./heal.ts";
@@ -215,13 +216,13 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	if (input.outcome === "dismissed") return { text: "" };
 	const record = rec.ctx.chatStore.getChat(rec.ctx.chatId);
 	const active = record ? activeProblemOf(record.messages) : null;
-	// The record keeps the pose's raw arguments, so a `topics` the model sent
-	// as a JSON string heals here as it did at the tool boundary.
-	const pose = healEncodedArguments(active?.input, problemInputObject) as { statement?: unknown; topics?: unknown } | undefined;
-	if (!record || !active || typeof pose?.statement !== "string" || !Array.isArray(pose.topics)) {
+	// The record keeps the pose's raw arguments, so it is read the way the
+	// tool boundary accepted it (a `topics` sent as a JSON string included).
+	const pose = active ? boundaryParse<ProblemInput>(problemInputObject, active.input) : undefined;
+	if (!record || !active || !pose) {
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
 	}
-	const topics = pose.topics.filter((t): t is string => typeof t === "string");
+	const topics = pose.topics;
 	const conclusion: PracticeConclusion = {
 		outcome: input.outcome,
 		rung: input.rung,
