@@ -157,3 +157,19 @@ describe("workflow action versions", () => {
 	});
 });
 
+describe("journal CI standalone job", () => {
+	type Step = { run?: string; env?: Record<string, string> };
+	type Workflow = { jobs: Record<string, { steps: Step[]; strategy?: { matrix: { include: { os: string; platform: string }[] } } }> };
+	const yaml = require("js-yaml") as { load(source: string): Workflow };
+	const job = yaml.load(readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8")).jobs.standalone;
+
+	it("runs the native renderer tests in Electron's Node and boot-smokes the payload under Electron", () => {
+		assert.ok(job);
+		const native = job.steps.find(step => step.run?.includes("pdf-native-render.test.ts"));
+		assert.ok(native?.run?.startsWith("npx electron --import tsx --test "));
+		assert.equal(native?.env?.ELECTRON_RUN_AS_NODE, "1");
+		assert.ok(job.steps.some(step => step.run === "node scripts/smoke-server.mjs --electron"));
+		assert.equal(job.strategy?.matrix.include.find(entry => entry.platform === "mac-arm64")?.os, "macos-15");
+	});
+});
+
