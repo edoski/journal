@@ -326,12 +326,17 @@ def _clamp_tutor_dates(
 
 
 def _touched(record: dict[str, Any], changes: PatchResult) -> list[str]:
-    """Topics of the attempts and exams this save added."""
+    """Topics of the attempts and exams this save added or corrected."""
+    observations = record["observations"]
     topics: dict[str, None] = {}
     for key in changes.observations:
-        item = record["observations"][key]
-        if item["kind"] in SCHEDULING_KINDS:
-            topics.update(dict.fromkeys(item["topics"]))
+        item = observations[key]
+        for affected in (
+            item,
+            *(observations[name] for name in item.get("corrects", ())),
+        ):
+            if affected["kind"] in SCHEDULING_KINDS:
+                topics.update(dict.fromkeys(affected["topics"]))
     return list(topics)
 
 
