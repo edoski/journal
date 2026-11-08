@@ -1,6 +1,6 @@
 /**
  * The per-role context cost of a course-linked lesson, in bytes: the app's
- * system prompt, the course doctrine, the tool schemas, and the course
+ * system prompt, its course doctrine, the tool schemas, and the course
  * brief for each `resume` JSON file given. Provider token counts come from
  * a live run's usage log; this script reproduces the byte side.
  *
@@ -23,17 +23,16 @@ const schemaBytes = (tools: Record<string, { name: string; description: string; 
 const chatStore = { getChat: () => ({ messages: [] }) } as never;
 const job = { chatId: "c", chatStore, jobStore: {} as never, spawn: () => {}, deliver: () => {} } as never;
 const course = courseTools({ course: { workspace: "/w", title: "Course" }, records: {} as never }) as never;
-const doctrine = bytes(courseRecordPrompt());
 const rows = [
-	{ role: "prober", prompt: composeInstructions("prober"), tools: createProberTools(job) },
-	{ role: "teacher", prompt: composeInstructions("teacher"), tools: createTeacherTools(job) },
-	{ role: "practice", prompt: composeInstructions("practice"), tools: practiceTools({ chatId: "c", chatStore }) },
+	{ role: "prober" as const, prompt: composeInstructions("prober"), tools: createProberTools(job) },
+	{ role: "teacher" as const, prompt: composeInstructions("teacher"), tools: createTeacherTools(job) },
+	{ role: "practice" as const, prompt: composeInstructions("practice"), tools: practiceTools({ chatId: "c", chatStore }) },
 ];
 const resumes = process.argv.slice(2).map((file) => ({ name: path.basename(file), json: JSON.parse(fs.readFileSync(file, "utf-8")) as unknown }));
 
-console.log(`course doctrine ${doctrine} B, course tool schemas ${schemaBytes(course)} B`);
+console.log(`course tool schemas ${schemaBytes(course)} B`);
 for (const { name, json } of resumes) console.log(`full resume ${name}: ${bytes(JSON.stringify(json))} B`);
 for (const row of rows) {
 	const briefs = resumes.map(({ name, json }) => `${name} ${bytes(projectCourseBrief(json, row.role === "practice" ? "practice" : "teach").text)} B`);
-	console.log(`${row.role}: app prompt ${bytes(row.prompt)} B, app tool schemas ${schemaBytes(row.tools as never)} B, brief ${briefs.join(", ") || "n/a"}`);
+	console.log(`${row.role}: app prompt ${bytes(row.prompt)} B, course doctrine ${bytes(courseRecordPrompt(row.role))} B, app tool schemas ${schemaBytes(row.tools as never)} B, brief ${briefs.join(", ") || "n/a"}`);
 }

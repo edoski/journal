@@ -1426,10 +1426,9 @@ describe("prompt composition", () => {
 
 	it("the predict-check cycle composes into the teacher; the craft chunk reaches BOTH agents (owner 2026-10-03)", () => {
 		const teacher = composeInstructions("teacher");
-		// the cycle doctrine (28-predictions.md) — teacher-only
-		assert.ok(teacher.includes("predict → teach → check"), "the cycle line is in");
+		// the cycle is the engine's chain (tests/engine-doctrine.test.ts); the app maps its two questions onto `type`
+		assert.ok(teacher.includes("as *The chain* in the course doctrine sets out"), "the cycle points to the chain");
 		assert.ok(teacher.includes('The prediction (`type: "predict"`)'), "the prediction role section is in");
-		assert.ok(teacher.includes("Skip the prediction"), "the skip rule is in");
 		assert.ok(teacher.includes('The check (`type: "check"`)'), "the check role section is in");
 		// the craft + thinking channels (shared/20-question-tools.md) — BOTH agents
 		const prober = composeInstructions("prober");
@@ -1442,7 +1441,7 @@ describe("prompt composition", () => {
 			assert.ok(prompt.includes("thinkingWhileReading"), `${name} knows the reading channel`);
 		}
 		// the cycle is teach-phase doctrine — it never composes into the prober
-		assert.ok(!prober.includes("predict → teach → check"), "the teaching cycle stays out of the prober");
+		assert.ok(!prober.includes('type: "predict"'), "the question types stay out of the prober");
 	});
 
 	it("the sources-v0 prompt lines compose: read/pdf doctrine in the teacher, the read line in the prober", () => {

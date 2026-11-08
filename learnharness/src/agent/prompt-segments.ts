@@ -124,19 +124,60 @@ export function effectivePromptSegments(
 	});
 }
 
-/** The engine's host-neutral doctrine files the course prompt composes
- *  whole, from the tutor skill's references, so the tutor and the app read
- *  one text. */
-export const ENGINE_DOCTRINE: readonly string[] = ["evidence.md"];
+/** One file of the engine's doctrine: whole, or its opening (the title and
+ *  the text before its first `## ` heading) followed by the listed `## `
+ *  sections. `intro: false` keeps only the title of the opening, for an agent
+ *  whose job the opening's general rules do not fit. */
+export type DoctrinePart =
+	| { readonly file: string }
+	| { readonly file: string; readonly sections: readonly string[]; readonly intro?: false };
 
-/** The course-record doctrine, appended to any agent's prompt when its
- *  session is linked to a course (and only then: the course tools exist
- *  only there): the app's adapter, then each engine doctrine file read from
- *  `dir`. Throws when a file is missing, so a rename in the engine fails
- *  the doctrine test instead of a lesson. Not an override segment. */
-export function courseRecordPrompt(dir: string = PATHS.tutorReferences): string {
+/** What each agent composes from the tutor skill's host-neutral references,
+ *  so the tutor and the app teach from one text and each agent reads only
+ *  the parts its job uses. Left out: the week and the exam run-up, which
+ *  read figures the app's course brief does not carry, and *Difficulty*,
+ *  which practice states more specifically in its own doctrine. The prober
+ *  skips teaching.md's opening: it measures, and the lesson's teaching
+ *  rules belong to the teacher. */
+export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart[]>> = {
+	prober: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["Finding the edge"], intro: false },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses"] },
+	],
+	teacher: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["The chain", "Hints", "Corrections and diagrams"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+	],
+	practice: [
+		{ file: "evidence.md" },
+		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+	],
+};
+
+function doctrineText(dir: string, part: DoctrinePart): string {
+	const text = fs.readFileSync(path.join(dir, part.file), "utf-8").trim();
+	if (!("sections" in part)) return text;
+	const [opening = "", ...rest] = `\n${text}`.split(/\r?\n(?=## )/);
+	const picked = part.sections.map((title) => {
+		const section = rest.find((chunk) => chunk.split(/\r?\n/, 1)[0]?.trim() === `## ${title}`);
+		if (!section) throw new Error(`engine doctrine: no "## ${title}" in ${part.file}`);
+		return section.trim();
+	});
+	const head = part.intro === false ? (opening.trim().split(/\r?\n/, 1)[0] ?? "") : opening.trim();
+	return [head, ...picked].filter(Boolean).join("\n\n");
+}
+
+/** The course-record doctrine, appended to every agent's prompt in a
+ *  course session: the app's adapter, then the agent's engine doctrine read
+ *  from `dir`. Throws when a listed file or section is missing, so a rename
+ *  in the engine fails the doctrine test instead of a lesson. Not an
+ *  override segment. */
+export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutorReferences): string {
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
-	return [adapter, ...ENGINE_DOCTRINE.map((file) => fs.readFileSync(path.join(dir, file), "utf-8").trim())].join("\n\n");
+	return [adapter, ...ENGINE_DOCTRINE[agent].map((part) => doctrineText(dir, part))].join("\n\n");
 }
 
 /** Every known segment path across both agents (route validation). */

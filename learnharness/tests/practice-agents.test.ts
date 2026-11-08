@@ -199,19 +199,15 @@ describe("the practice agent", () => {
 describe("persistent practice nudges", () => {
 	const doctrine = readFileSync(new URL("../src/agent/prompts/practice/10-doctrine.md", import.meta.url), "utf8");
 	const normalizeWhitespace = (text: string) => text.replace(/\s+/g, " ").trim();
-	const approvedParagraphs = [
-		"- When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress.",
-		"**On a wrong answer**, state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution.",
-		"Conclude when the learner has solved the problem correctly or explicitly asks to end it. Do not infer permission to end it from mistakes, elapsed time, the number of attempts, frustration, or an apparent inability to proceed.",
-	];
+	// The hint, verdict and repair rules are the engine's teaching.md, pinned
+	// in tests/engine-doctrine.test.ts; these pin the practice agent's own.
+	const approvedConclude = "Conclude when the learner has solved the problem correctly or explicitly asks to end it. Do not infer permission to end it from mistakes, elapsed time, the number of attempts, frustration, or an apparent inability to proceed.";
 
-	it("preserves the approved paragraphs in source and the effective default prompt", () => {
+	it("preserves the approved conclude paragraph in source and the effective default prompt", () => {
 		// Pin approved wording and Markdown, but allow incidental line wrapping.
 		for (const text of [doctrine, composeInstructions("practice")]) {
 			const paragraphs = text.split(/\n\s*\n|\n(?=- )/).map(normalizeWhitespace);
-			for (const approved of approvedParagraphs) {
-				assert.ok(paragraphs.includes(approved), `missing approved paragraph: ${approved}`);
-			}
+			assert.ok(paragraphs.includes(approvedConclude), "missing the approved conclude paragraph");
 		}
 	});
 
@@ -228,17 +224,12 @@ describe("persistent practice nudges", () => {
 		}
 	});
 
-	it("preserves the approved concluded-problem switch and unbounded structural repair in source and the effective default prompt", () => {
+	it("preserves the approved concluded-problem switch in source and the effective default prompt", () => {
 		const approvedDifficulty = "3. **Difficulty** — from the last outcomes on this target: clean success, one notch up; success that needed hints, hold; a miss, one notch down and consider dropping a mode. Two missed concluded problems in a row on this target: switch targets for the next demand. Never switch away from an active problem because of the number of attempts.";
-		const approvedClassification = "Classify every miss: cue miss (nothing came), discrimination error (wrong candidate won), execution slip (right proposition, wrong run), careless, or structural (the retrieved proposition is itself wrong — a misconception). The first four are practice information. Structural misses call for minimal nudges toward repairing the misconception, not an immediate correction or re-teaching. Keep each nudge surgical; do not impose a one-line or one-attempt limit on the repair as a whole.";
 		for (const text of [doctrine, composeInstructions("practice")]) {
 			const normalized = normalizeWhitespace(text);
 			assert.ok(normalized.includes(approvedDifficulty), "preserve the difficulty readout and exact approved switching rule");
-			assert.ok(normalized.includes(approvedClassification), "preserve the miss taxonomy and exact approved structural-repair rule");
 			assert.doesNotMatch(normalized, /two misses in a row, switch targets/i);
-			assert.doesNotMatch(normalized, /Structural gets one surgical line/i);
-			assert.doesNotMatch(normalized, /the correction, stated once/i);
-			assert.doesNotMatch(normalized, /if a repair needs more than a line/i);
 		}
 	});
 
@@ -254,9 +245,7 @@ describe("persistent practice nudges", () => {
 	it("keeps the many-claims default, hint ladder, dismissal, and explicit-go-ahead pause", () => {
 		const prompt = normalizeWhitespace(composeInstructions("practice"));
 		assert.match(prompt, /A problem may take many claims; staying is the default/);
-		for (const rung of ["R0", "R1", "R2", "R3", "R4", "R5"]) {
-			assert.ok(prompt.includes(`**${rung} —`));
-		}
+		assert.match(prompt, /The ladder is \*Hints\* in the course doctrine/);
 		assert.match(prompt, /Concluding ends your turn; the next problem is posed only when the learner explicitly moves on/);
 		assert.match(prompt, /After the conclude's result.*END YOUR TURN: no further tool calls in that reply, never another problem/);
 		assert.match(prompt, /A clarification question is never the go-ahead; when in doubt, answer and wait/);
@@ -288,7 +277,7 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		// The base's voice section and the doctrine's spine are present…
 		assert.match(prompt, /Everything in this section deletes a default/);
 		assert.match(prompt, /You run practice sessions\./);
-		assert.match(prompt, /## Standing prohibitions/);
+		assert.match(prompt, /## IX\. The arc/);
 		// …and nothing from the teaching system prompt or shared fragments.
 		assert.doesNotMatch(prompt, /install understanding/);
 		// The shared 20-question-tools doctrine (predict/check) must not
@@ -334,8 +323,10 @@ describe("practice prompt composition (own directory + the formatting appendix)"
 		assert.match(prober, /Enter near the top, not the bottom/);
 		assert.match(prober, /Strands inform each other/);
 		assert.match(prober, /never descending into already-bracketed territory/);
-		// the confidence + thinking signals are wired into question selection
-		assert.match(prober, /whether his answer is right, the reasoning in it, and his confidence together set where the next question should sit/);
+		assert.match(prober, /A strand that never breaks is not done — escalate until it does/);
+		// the bracketing itself, with confidence wired into question selection,
+		// is the engine's Finding the edge (pinned in tests/engine-doctrine.test.ts)
+		assert.match(prober, /Find each strand's edge as \*Finding the edge\* in the course doctrine says/);
 	});
 
 	it("the SHARED formatting guide composes (owner, 2026-10-04 late): LaTeX delimiters in every setting", () => {
