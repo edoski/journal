@@ -326,14 +326,18 @@ body {
  * unlayered author CSS wins regardless of order).
  * ============================================================ */
 
-/* Code blocks: no header bar — one quiet rounded tint so code reads as a
-   unit. The tint is DARKER than the page (muted #1c1c1c was LIGHTER than the
-   background #141414 and read as raised — owner note, chrome-melt tweaks
-   2026-09-19) plus a subtle hairline outline. (md-blocks renders its own
-   hover copy corner.) */
+/* Code surface: one quiet tint DARKER than the page (muted #1c1c1c was
+   LIGHTER than the background #141414 and read as raised — owner note,
+   chrome-melt tweaks 2026-09-19) plus a subtle hairline outline. Inline code
+   shares only this surface, keeping its inline geometry. */
+[data-streamdown="inline-code"],
 [data-streamdown="code-block"] {
 	border: 1px solid var(--border);
 	background: color-mix(in oklab, var(--background) 86%, black);
+}
+/* Code blocks: no header bar, rounded so code reads as a unit. (md-blocks
+   renders its own hover copy corner.) */
+[data-streamdown="code-block"] {
 	border-radius: 0.75rem;
 	padding: 0.375rem;
 }
