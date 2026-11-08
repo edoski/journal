@@ -146,7 +146,7 @@ export const concludeInputObject = Type.Object({
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the hint-ladder rung the problem needed: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
 	),
 	missClass: Type.Union(
 		[
@@ -245,7 +245,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	// fact, so holding the problem open would lock the session.
 	const repair =
 		saved.kind === "validation"
-			? "Repair it with course_save (for example, create the missing topic in the same patch) and send these observations: "
+			? "Repair it with course_save (for example, create the missing topic in the same patch, placed in the path) and send these observations: "
 			: "On your next turn, re-send exactly this with course_save: ";
 	return { text: `The attempt was not saved (${saved.message}). ${repair}${JSON.stringify({ observations })}` };
 }

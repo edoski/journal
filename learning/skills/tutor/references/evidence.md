@@ -26,7 +26,7 @@ A misrecorded observation is superseded by a new one, describing what really hap
 
 Grade the answer as it stands, in `result`: `correct` (a right guess too, with `sure: "guess"`; the record treats it as helped), `partial` (a right result on reasoning that does not hold) or `incorrect` ("I don't know" included: a gap, not an error).
 
-Classify a miss by its first break: cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception; it goes in the topic's `gap`). Before recording an error, check the loaded evidence for it. When it recurs, name the earlier observation in the topic's `note`, and make the topic's `review.prompt` a problem that invites it.
+Classify a miss by its first break: cue miss (nothing came to mind), discrimination error (a competing method won; record `chose`), execution slip (the right idea run wrongly), careless, or structural (a misconception; it goes in the topic's `gap`). A `gap` is resolved, and set to `null`, only by an unaided correct answer to a question that invites it, on a later day than its repair; a repair or an assisted check the same day rewrites the `gap` to what is left to check. Before recording an error, check the loaded evidence for it. When it recurs, name the earlier observation in the topic's `note`, and make the topic's `review.prompt` a problem that invites it.
 
 ## Confidence and self-reports
 

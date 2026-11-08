@@ -38,20 +38,20 @@ Wait for the attempt. From its reasoning, find the first question the learner ca
 
 | Rung | Gives |
 | --- | --- |
-| R0 | where to look ("re-read the second given") |
+| R0 | where to look ("re-read the second given"), never what to do there |
 | R1 | the pattern ("this is a sum of many small things"), no idea named |
 | R2 | the family of ideas that applies |
 | R3 | the idea, named; carrying it out remains |
 | R4 | the move, outlined |
 | R5 | the worked step |
 
-A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
+A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. Record the rung of what the hint said, not of what was asked or meant. A pointer that also says what to do there ("count the one way it fails") is R2 or higher by the table, however it is worded, and a hint with several parts takes its strongest part's rung. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
 
 ## Practice problems
 
 Before posing a problem, solve it, fix its moves in order, then try to break it. A route that skips the target teaches that route instead, so fix or discard the problem; it may need nothing beyond the material. Prefer the course's exercises. Once a method has been practised, a problem does not name the idea it needs.
 
-On a wrong answer, state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution. Structural misses call for minimal nudges toward repairing the misconception, not an immediate correction or re-teaching. Keep each nudge surgical; do not impose a one-line or one-attempt limit on the repair as a whole. On a right answer, one line names the move that made it work. Retest every miss and every hint-heavy problem later in the session on a fresh problem, never the same one. A check is worth asking when its answer changes the teaching. Build a quiz or flashcards only when the learner wants one.
+On a wrong answer, state the verdict plainly and localize the first break without giving the correction. Give the smallest nudge that lets the learner make the next move, then wait. If that nudge does not land, give another minimal nudge based on the new thinking. A failed attempt is never a reason to reveal the correction or conclude the problem. Continue until the learner finds and completes the correct solution. Structural misses call for minimal nudges toward repairing the misconception, not an immediate correction or re-teaching. Keep each nudge surgical; do not impose a one-line or one-attempt limit on the repair as a whole. On a right answer, one line names the move that made it work. Retest every miss and every hint-heavy problem later in the session on a fresh problem, never the same one: once one other problem has come between, the retest comes next, ahead of new material and further reviews. Each is retested once; a retest that misses goes back to the ordinary choice of what to practise. A check is worth asking when its answer changes the teaching. Build a quiz or flashcards only when the learner wants one.
 
 ## Difficulty
 
