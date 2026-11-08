@@ -124,33 +124,19 @@ export function effectivePromptSegments(
 	});
 }
 
-/** The engine's teaching doctrine the course prompt composes: sections of
- *  the tutor skill's references, by file and `## ` heading, so the tutor and
- *  the app read one text. The split into host-neutral whole files (engine
- *  request E3) replaces these entries. */
-export const ENGINE_DOCTRINE: ReadonlyArray<{ file: string; section: string }> = [
-	{ file: "records.md", section: "Observations" },
-];
-
-/** One `## ` section of a reference file, heading included. Throws when the
- *  file or the heading is missing, so a rename in the engine fails the
- *  doctrine test instead of a lesson. */
-export function engineDoctrineSection(dir: string, entry: { file: string; section: string }): string {
-	const text = fs.readFileSync(path.join(dir, entry.file), "utf-8");
-	const lines = text.split(/\r?\n/);
-	const start = lines.indexOf(`## ${entry.section}`);
-	if (start === -1) throw new Error(`engine doctrine: no "## ${entry.section}" in ${entry.file}`);
-	const end = lines.findIndex((line, i) => i > start && line.startsWith("## "));
-	return lines.slice(start, end === -1 ? undefined : end).join("\n").trim();
-}
+/** The engine's host-neutral doctrine files the course prompt composes
+ *  whole, from the tutor skill's references, so the tutor and the app read
+ *  one text. */
+export const ENGINE_DOCTRINE: readonly string[] = ["evidence.md"];
 
 /** The course-record doctrine, appended to any agent's prompt when its
  *  session is linked to a course (and only then: the course tools exist
- *  only there): the app's adapter, then the engine's doctrine. Not an
- *  override segment. */
-export function courseRecordPrompt(): string {
+ *  only there): the app's adapter, then each engine doctrine file read from
+ *  `dir`. Throws when a file is missing, so a rename in the engine fails
+ *  the doctrine test instead of a lesson. Not an override segment. */
+export function courseRecordPrompt(dir: string = PATHS.tutorReferences): string {
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
-	return [adapter, ...ENGINE_DOCTRINE.map((entry) => engineDoctrineSection(PATHS.tutorReferences, entry))].join("\n\n");
+	return [adapter, ...ENGINE_DOCTRINE.map((file) => fs.readFileSync(path.join(dir, file), "utf-8").trim())].join("\n\n");
 }
 
 /** Every known segment path across both agents (route validation). */

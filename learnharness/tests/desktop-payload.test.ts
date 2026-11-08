@@ -26,7 +26,7 @@ function withPayload(test: (fixture: {
 		fs.writeFileSync(target, content);
 	};
 	try {
-		write(path.join("..", REFERENCES, "records.md"), "## Observations");
+		write(path.join("..", REFERENCES, "evidence.md"), "# Evidence");
 		write(path.join("scripts", "build-server.mjs"), source);
 		write(path.join(STANDALONE, "server.js"));
 		write(path.join(".next", "static", "runtime.js"));
@@ -96,7 +96,7 @@ describe("desktop standalone payload", () => {
 			write(path.join(".next", REFERENCES, "deleted-by-the-engine.md"));
 			const result = run();
 			assert.equal(result.status, 0, String(result.stderr));
-			assert.equal(fs.readFileSync(path.join(root, ".next", REFERENCES, "records.md"), "utf8"), "## Observations");
+			assert.equal(fs.readFileSync(path.join(root, ".next", REFERENCES, "evidence.md"), "utf8"), "# Evidence");
 			assert.equal(fs.existsSync(path.join(root, ".next", REFERENCES, "deleted-by-the-engine.md")), false);
 		});
 	});
