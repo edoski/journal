@@ -188,10 +188,10 @@ def test_resume_selects_the_focused_task_and_its_topics(workspace: Workspace) ->
         "current": "eigen",
         "basis": "Syllabus",
         "topics": [
-            ["systems", "independent"],
+            ["systems", "assisted"],
             ["span", "new"],
             ["rank", "attempted"],
-            ["eigen", "independent"],
+            ["eigen", "assisted"],
         ],
     }
     assert list(result["evidence"]) == ["o3", "o2", "o1"]
@@ -524,7 +524,7 @@ def test_show_returns_whole_items_with_context(workspace: Workspace) -> None:
     assert rank["kind"] == "topic"
     assert rank["observations"] == ["o5", "o4", "o3", "o2", "o1"]
     assert rank["tasks"] == ["ex5"] and rank["knowledge"] == ["pivots"]
-    assert rank["standing"]["level"] == "independent"
+    assert rank["standing"]["level"] == "assisted"
     assert result["items"]["o2"]["kind"] == "attempt"
     assert result["items"]["o2"]["corrected_by"] == ["o5"]
     assert result["items"]["pivots"]["kind"] == "knowledge"

@@ -136,8 +136,12 @@ def _probe(items: list[dict[str, Any]]) -> str:
     return grade(items[0])
 
 
-def _best(items: list[dict[str, Any]]) -> str:
-    return max((grade(item) for item in items), key=GRADES.index)
+def _learned(items: list[dict[str, Any]]) -> str:
+    """The learning day's best grade, at most ``helped``: success on the day a
+    topic is learned is not yet evidence it is held, so ``solid`` takes a
+    later day."""
+    best = max((grade(item) for item in items), key=GRADES.index)
+    return "helped" if best == "solid" else best
 
 
 def interval(verdict: str, streak: int) -> int:
@@ -162,10 +166,12 @@ def review_day(base: date, days: int, exam: date | None) -> date:
 def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) -> Replay:
     """Classify each attempted day and replay the verdicts in day order.
 
-    The learning day (the earlier of ``introduced`` and the first attempt) takes
-    its best grade. A later day on or after the expected review, or any day with
-    an ``exam``, is a probe: the first try counts, lowered only by a later unaided
-    incorrect. Any other day is practice: only an unaided incorrect counts.
+    A learning day (the earlier of ``introduced`` and the first attempt, and the
+    ``introduced`` day itself) takes its best grade, at most ``helped``, and the
+    next day is its first retrieval. A later day on or after the expected review,
+    or any day with an ``exam``, is a probe: the first try counts, lowered only by
+    a later unaided incorrect. Any other day is practice: only an unaided
+    incorrect counts.
     """
     result = Replay()
     days = [item["date"] for _, item in attempts]
@@ -173,19 +179,19 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
         days.append(topic["introduced"])
     if not days:
         return result
-    learning = min(days)
+    learning = {min(days), topic.get("introduced", min(days))}
     result.expected = review_day(
-        date.fromisoformat(learning), FIRST_RETRIEVAL_DAYS, exam
+        date.fromisoformat(min(days)), FIRST_RETRIEVAL_DAYS, exam
     )
     for day, group in groupby(attempts, key=lambda pair: pair[1]["date"]):
         items = [item for _, item in group]
         verdict: str | None
         if any(item["kind"] == "exam" for item in items) or (
-            day != learning and day >= result.expected.isoformat()
+            day not in learning and day >= result.expected.isoformat()
         ):
             result.days[day], verdict = PROBE, _probe(items)
-        elif day == learning:
-            result.days[day], verdict = LEARNING, _best(items)
+        elif day in learning:
+            result.days[day], verdict = LEARNING, _learned(items)
         else:
             missed = any(_unaided_miss(item) for item in items)
             result.days[day], verdict = PRACTICE, "missed" if missed else None
@@ -193,16 +199,23 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
             continue
         result.verdicts.append((day, verdict))
         result.streak = result.streak + 1 if verdict == "solid" else 0
-        result.expected = review_day(
-            date.fromisoformat(day), interval(verdict, result.streak), exam
+        days_on = (
+            FIRST_RETRIEVAL_DAYS
+            if result.days[day] == LEARNING
+            else interval(verdict, result.streak)
         )
+        result.expected = review_day(date.fromisoformat(day), days_on, exam)
     return result
 
 
 def _transferred(attempts: list[Attempt], replayed: Replay) -> bool:
+    """A ``solid`` transfer on a day neither missed nor a learning day."""
     missed = {day for day, verdict in replayed.verdicts if verdict == "missed"}
     return any(
-        item.get("transfer") and grade(item) == "solid" and item["date"] not in missed
+        item.get("transfer")
+        and grade(item) == "solid"
+        and item["date"] not in missed
+        and replayed.days.get(item["date"]) != LEARNING
         for _, item in attempts
     )
 

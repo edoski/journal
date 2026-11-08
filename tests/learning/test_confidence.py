@@ -97,30 +97,39 @@ def test_a_stored_record_with_an_unknown_state_is_refused() -> None:
 # --- a guess caps the grade -----------------------------------------------------
 
 
-def test_a_right_guess_on_the_learning_day_is_helped_and_returns_in_two_days() -> None:
+def test_a_right_guess_on_the_first_retrieval_is_helped_and_returns_in_two_days() -> (
+    None
+):
+    taught = saved(schema.empty(), {**TOPICS, "observations": [attempt()]}, TODAY)
+    retrieval = TODAY + timedelta(days=1)
     guessed = saved(
-        schema.empty(), {**TOPICS, "observations": [attempt(sure="guess")]}, TODAY
+        taught, {"observations": [attempt(text="Next day", sure="guess")]}, retrieval
     )
-    assert progress.replays(guessed)["rank"].verdicts == [(day(0), "helped")]
+    assert progress.replays(guessed)["rank"].verdicts[-1] == (day(1), "helped")
     assert progress.standing(guessed, "rank")["level"] == "assisted"
-    assert guessed["topics"]["rank"]["review"]["due"] == day(2)
+    assert guessed["topics"]["rank"]["review"]["due"] == day(3)
     sure = saved(
-        schema.empty(), {**TOPICS, "observations": [attempt(sure="confident")]}, TODAY
+        taught,
+        {"observations": [attempt(text="Next day", sure="confident")]},
+        retrieval,
     )
-    assert progress.replays(sure)["rank"].verdicts == [(day(0), "solid")]
-    assert sure["topics"]["rank"]["review"]["due"] == day(3)
+    assert progress.replays(sure)["rank"].verdicts[-1] == (day(1), "solid")
+    assert sure["topics"]["rank"]["review"]["due"] == day(4)
 
 
 def test_a_right_guess_on_a_review_day_does_not_climb_the_ladder() -> None:
-    first = saved(schema.empty(), {**TOPICS, "observations": [attempt()]}, TODAY)
-    review = TODAY + timedelta(days=3)
+    taught = saved(schema.empty(), {**TOPICS, "observations": [attempt()]}, TODAY)
+    first = saved(
+        taught, {"observations": [attempt(text="Next day")]}, TODAY + timedelta(days=1)
+    )
+    review = TODAY + timedelta(days=4)
     probe = {"observations": [attempt(text="Review", sure="guess")]}
     guessed = saved(first, probe, review)
-    assert progress.replays(guessed)["rank"].verdicts[-1] == (day(3), "helped")
-    assert guessed["topics"]["rank"]["review"]["due"] == day(5)
+    assert progress.replays(guessed)["rank"].verdicts[-1] == (day(4), "helped")
+    assert guessed["topics"]["rank"]["review"]["due"] == day(6)
     assert progress.standing(guessed, "rank")["unaided_days"] == 1
     known = saved(first, {"observations": [attempt(text="Review")]}, review)
-    assert known["topics"]["rank"]["review"]["due"] == day(10)
+    assert known["topics"]["rank"]["review"]["due"] == day(11)
 
 
 def test_a_guess_never_counts_as_transfer() -> None:

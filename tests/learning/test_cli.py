@@ -65,7 +65,7 @@ def test_save_then_read_through_every_read_verb(
     _, resumed = run(capsys, monkeypatch, workspace, "resume")
     assert resumed["revision"] == 1 and resumed["task"] is None
     _, shown = run(capsys, monkeypatch, workspace, "show", "rank", "--limit", "1")
-    assert shown["items"]["rank"]["standing"]["level"] == "independent"
+    assert shown["items"]["rank"]["standing"]["level"] == "assisted"
     _, everything = run(capsys, monkeypatch, workspace, "show", "--all")
     assert everything["standings"]["rank"]["attempts"] == 1
     _, found = run(capsys, monkeypatch, workspace, "search", "Rango")

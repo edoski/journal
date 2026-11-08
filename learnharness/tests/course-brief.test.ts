@@ -54,7 +54,7 @@ function realResumes(): { open: Resume; focused: Resume } {
 		title: "Linear Algebra",
 		exam: { date: "2026-11-17" },
 		topics: {
-			systems: { title: "Linear systems" },
+			systems: { title: "Linear systems", introduced: "2026-11-03" },
 			pivots: {},
 			rank: { title: "Rank", needs: ["systems"], gap: "counts vectors, not independent ones" },
 			eigen: { gap: "confuses eigenvalue with eigenvector" },

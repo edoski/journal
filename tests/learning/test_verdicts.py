@@ -58,8 +58,17 @@ class Course:
         return progress.replays(self.record)["a"].verdicts
 
 
-def started(*observations: dict[str, Any]) -> Course:
+def learned(*observations: dict[str, Any]) -> Course:
+    """Day 1 is the learning day: the topic's first attempts."""
     return Course({**TOPICS, "observations": list(observations)})
+
+
+def started(*observations: dict[str, Any]) -> Course:
+    """Taught the day before, so day 1 is the first retrieval."""
+    course = Course(
+        {"topics": {**TOPICS["topics"], "a": {"title": "A", "introduced": True}}}, day=0
+    )
+    return course.attempts(1, *observations)
 
 
 def test_the_audit_bug_a_failed_probe_lapses_despite_a_correct_retry() -> None:
@@ -72,22 +81,54 @@ def test_the_audit_bug_a_failed_probe_lapses_despite_a_correct_retry() -> None:
     assert course.due == on(6).isoformat()
 
 
-def test_the_learning_day_takes_its_best_grade() -> None:
-    course = started(att("correct"), att("partial", text="Brain dump"))
-    assert course.verdicts == [(on(1).isoformat(), "solid")]
-    assert "lapsed" not in course.standing
-    assert course.due == on(4).isoformat()
-
-
-def test_multi_day_teaching_counts_only_unaided_failures() -> None:
-    course = started(att("correct", "Worked example"))
-    assert course.due == on(3).isoformat()
-    course.attempts(2, att("correct", "Hint"), att("partial", "Hint", text="next"))
+def test_the_learning_day_takes_its_best_grade_at_most_helped() -> None:
+    course = learned(att("correct"), att("partial", text="Brain dump"))
     assert course.verdicts == [(on(1).isoformat(), "helped")]
-    assert course.scheduled.reviews == {}
+    assert course.standing["level"] == "assisted"
+    assert "lapsed" not in course.standing
+    assert course.due == on(2).isoformat()
+
+
+def test_known_well_needs_success_on_two_separate_days() -> None:
+    course = learned(
+        att("incorrect", text="floor"), att("correct", text="after the lesson")
+    )
+    assert course.standing["level"] == "assisted"
+    course.attempts(2, att("correct", text="next day, unaided"))
+    assert course.verdicts == [
+        (on(1).isoformat(), "helped"),
+        (on(2).isoformat(), "solid"),
+    ]
+    assert course.standing["level"] == "independent"
+    assert course.due == on(5).isoformat()
+
+
+def test_the_day_a_topic_is_taught_is_capped_even_after_an_earlier_probe() -> None:
+    course = learned(att("incorrect", text="probed before teaching"))
+    course.save(4, {"topics": {"a": {"introduced": True}}})
+    course.attempts(4, att("correct", text="right after the lesson"))
+    assert course.verdicts[-1] == (on(4).isoformat(), "helped")
+    assert course.standing["level"] == "assisted"
+    assert course.due == on(5).isoformat()
+
+
+def test_a_transfer_on_the_learning_day_does_not_count() -> None:
+    course = learned(att("correct", text="new setting", transfer=True))
+    course.attempts(2, att("correct", text="next day"))
+    assert course.standing["level"] == "independent"
+
+
+def test_the_day_after_teaching_is_the_first_retrieval() -> None:
+    course = learned(att("correct", "Worked example"))
+    assert course.due == on(2).isoformat()
+    course.attempts(2, att("correct", "Hint"), att("partial", "Hint", text="next"))
+    assert course.verdicts[-1] == (on(2).isoformat(), "helped")
+    assert progress.replays(course.record)["a"].days[on(2).isoformat()] == "probe"
     course.attempts(2, att("incorrect", text="alone"))
     assert course.verdicts[-1] == (on(2).isoformat(), "missed")
     assert course.due == on(3).isoformat()
+    course.attempts(3, att("correct", "Hint", text="more teaching"))
+    assert progress.replays(course.record)["a"].days[on(3).isoformat()] == "probe"
 
 
 def test_the_first_retrieval_after_teaching_is_a_probe() -> None:
@@ -221,7 +262,7 @@ def test_a_topic_dropped_by_a_correction_is_rescheduled() -> None:
 
 
 def test_a_correction_that_leaves_a_topic_no_attempts_clears_its_date() -> None:
-    course = started(att("incorrect", topics=["a", "b"], text="mixed problem"))
+    course = learned(att("incorrect", topics=["a", "b"], text="mixed problem"))
     assert course.due == on(2).isoformat()
     course.attempts(
         1, att("incorrect", topics=["b"], text="mixed problem, b only", corrects=["o1"])
@@ -229,6 +270,20 @@ def test_a_correction_that_leaves_a_topic_no_attempts_clears_its_date() -> None:
     assert "review" not in course.record["topics"]["a"]
     assert course.scheduled.notes == [
         "a: review date cleared, a correction left it no attempts"
+    ]
+
+
+def test_a_correction_that_leaves_a_taught_topic_no_attempts_keeps_its_first_retrieval() -> (
+    None
+):
+    course = started(att("incorrect", topics=["a", "b"], text="mixed problem"))
+    assert course.due == on(2).isoformat()
+    course.attempts(
+        1, att("incorrect", topics=["b"], text="mixed problem, b only", corrects=["o1"])
+    )
+    assert course.due == on(1).isoformat()
+    assert course.scheduled.notes == [
+        "a: review moved to " + on(1).isoformat() + " after a correction"
     ]
 
 
