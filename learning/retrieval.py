@@ -277,11 +277,20 @@ def _other_tasks(record: dict[str, Any], selected: str | None) -> list[dict[str,
             {
                 "key": key,
                 "title": tasks[key].get("title"),
+                "step": tasks[key].get("step"),
                 "updated": tasks[key].get("updated"),
             }
         )
         for key in keys
     ]
+
+
+def _oldest_unlisted(due: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The most overdue review when it falls past the listed ones."""
+    oldest = max(due, key=lambda item: item["overdue"], default=None)
+    if oldest is None or oldest in due[:DUE_LIMIT]:
+        return None
+    return {"topic": oldest["topic"], "overdue": oldest["overdue"]}
 
 
 def _course(record: dict[str, Any], today: date) -> dict[str, Any]:
@@ -327,6 +336,7 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
         "new_week": True if new_week(record, today) else None,
         "due": [_brief(item, topics) for item in due[:DUE_LIMIT]],
         "due_more": max(0, len(due) - DUE_LIMIT) or None,
+        "due_oldest": _oldest_unlisted(due),
         "path": compact(
             {
                 "current": path.get("current"),

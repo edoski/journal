@@ -208,6 +208,26 @@ def test_resume_selects_the_focused_task_and_its_topics(workspace: Workspace) ->
         retrieval.resume(workspace, task="ex7")
 
 
+def test_without_a_focus_every_open_task_is_listed_with_its_step(
+    workspace: Workspace,
+) -> None:
+    records.save(
+        workspace,
+        {
+            "tasks": {
+                "ex5": {"title": "Exercise 5", "step": "Finish part b"},
+                "ex6": {"title": "Exercise 6", "step": "Check the base case"},
+            }
+        },
+    )
+    result = retrieval.resume(workspace)
+    assert result["task"] is None
+    assert sorted((item["key"], item["step"]) for item in result["tasks"]) == [
+        ("ex5", "Finish part b"),
+        ("ex6", "Check the base case"),
+    ]
+
+
 def test_resume_without_tasks_follows_the_path(workspace: Workspace) -> None:
     records.save(
         workspace,
