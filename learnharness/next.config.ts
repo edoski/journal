@@ -88,7 +88,7 @@ const nextConfig: NextConfig = {
 			"node_modules/@earendil-works/pi-ai/dist/auth/oauth/{load,github-copilot,xai,device-code}.js",
 			"node_modules/@earendil-works/pi-ai/dist/utils/sleep.js",
 			"node_modules/@earendil-works/pi-agent-core/dist/**/*.json",
-			// Next 16.3.2 native Turbopack applies unanchored excludes while
+			// Next 16.3.2 and 16.4.3 native Turbopack apply unanchored excludes while
 			// traversing modules; **/data/**/* still prunes gcp-metadata and
 			// its private runtime chain. Includes are applied after traversal.
 			// This is the verified GoogleAuth closure, not a general dep copy;
