@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import { documentToMarkdown, type PdfPage } from "./pdf-markdown.ts";
 
 /**
  * PDF plumbing for the pdf-reader sub-agent — sources v0 (2026-09): Node
@@ -8,6 +9,8 @@ import { fileURLToPath } from "node:url";
  * pdf_search / pdf_render), on the user-chosen hybrid stack:
  *
  * - TEXT (info / extract / search): pdfjs-dist — pure JS, no native deps.
+ *   extract and search read pdf-markdown's Markdown, so words and lines
+ *   survive (the raw text items glued "lecture" + "Plants").
  * - RENDER: subagents/headless.ts uses the same pdfjs engine with
  *   @napi-rs/canvas (Skia), in-process — no browser needed.
  *
@@ -53,8 +56,11 @@ export function standardFontsDir(): string {
 }
 
 async function openDocument(filePath: string) {
+	return openBytes(new Uint8Array(await fs.readFile(filePath)));
+}
+
+async function openBytes(data: Uint8Array) {
 	const pdfjs = await loadPdfjs();
-	const data = new Uint8Array(await fs.readFile(filePath));
 	// The legacy build in plain node runs on a main-thread fake worker (no
 	// workerSrc needed); teardown is the loading task's destroy().
 	// verbosity 0 = errors only — scanned PDFs (JBIG2 XObjects) otherwise
@@ -108,7 +114,15 @@ export async function pdfProbe(filePath: string): Promise<void> {
 /** pdf_info: page count + per-page triage signals. ALWAYS run first. */
 export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 	const pdfjs = await loadPdfjs(); // OPS constant for the operator-list scan
-	const { doc } = await openDocument(filePath);
+	const { doc, task } = await openDocument(filePath);
+	try {
+		return await documentInfo(filePath, doc, pdfjs.OPS.paintImageXObject);
+	} finally {
+		await task.destroy();
+	}
+}
+
+async function documentInfo(filePath: string, doc: Awaited<ReturnType<typeof openDocument>>["doc"], paintImage: number): Promise<PdfInfo> {
 	const pages: PdfPageInfo[] = [];
 	let totalText = 0;
 	for (let i = 1; i <= doc.numPages; i++) {
@@ -119,7 +133,7 @@ export async function pdfInfo(filePath: string): Promise<PdfInfo> {
 		const ops = await page.getOperatorList();
 		let imageCount = 0;
 		for (const fn of ops.fnArray) {
-			if (fn === pdfjs.OPS.paintImageXObject) imageCount++;
+			if (fn === paintImage) imageCount++;
 		}
 		totalText += text.length;
 		pages.push({
@@ -158,19 +172,47 @@ export function parsePageSpec(spec: string, total: number): number[] {
 	return [...pages].sort((a, b) => a - b);
 }
 
-/** pdf_extract: text of the requested pages, `--- Page N ---` headed. */
-export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
-	const { doc } = await openDocument(filePath);
-	const pages = parsePageSpec(pageSpec, doc.numPages);
-	if (pages.length === 0) return "No pages selected — page spec matched nothing.";
-	const out: string[] = [];
-	for (const i of pages) {
-		const page = await doc.getPage(i);
-		const content = await page.getTextContent();
-		out.push(`--- Page ${i} ---`);
-		out.push(itemsToText(content.items as unknown[]));
+export type PdfConversion =
+	| { kind: "converted"; pages: PdfPage[] }
+	| { kind: "too-long"; pageCount: number }
+	/** Broken, encrypted, or not a PDF at all: pdfjs could not read it. */
+	| { kind: "unreadable" };
+
+/** An uploaded PDF's pages as Markdown (the notes import's door). The page
+ *  cap is checked before any page is read. */
+export async function convertPdf(data: Uint8Array, maxPages: number): Promise<PdfConversion> {
+	let opened: Awaited<ReturnType<typeof openBytes>>;
+	try {
+		opened = await openBytes(data);
+	} catch {
+		return { kind: "unreadable" };
 	}
-	return out.join("\n");
+	try {
+		if (opened.doc.numPages > maxPages) return { kind: "too-long", pageCount: opened.doc.numPages };
+		return { kind: "converted", pages: await documentToMarkdown(opened.doc) };
+	} catch {
+		return { kind: "unreadable" };
+	} finally {
+		await opened.task.destroy();
+	}
+}
+
+/** A page's Markdown, or "" for a page with no text (the agent renders those). */
+function pageMarkdown(page: PdfPage): string {
+	return page.kind === "text" ? page.markdown : "";
+}
+
+/** pdf_extract: Markdown of the requested pages, `--- Page N ---` headed. */
+export async function pdfExtract(filePath: string, pageSpec: string): Promise<string> {
+	const { doc, task } = await openDocument(filePath);
+	try {
+		const pages = parsePageSpec(pageSpec, doc.numPages);
+		if (pages.length === 0) return "No pages selected — page spec matched nothing.";
+		const converted = await documentToMarkdown(doc, pages);
+		return converted.map((page) => `--- Page ${page.number} ---\n${pageMarkdown(page)}`).join("\n");
+	} finally {
+		await task.destroy(); // operator lists and decoded images stay cached until then
+	}
 }
 
 export interface PdfSearchHit {
@@ -189,7 +231,6 @@ export async function pdfSearch(
 	opts?: { contextLines?: number; literal?: boolean },
 ): Promise<{ hits: PdfSearchHit[]; pageTexts: Map<number, string> }> {
 	const contextLines = opts?.contextLines ?? 3;
-	const { doc } = await openDocument(filePath);
 	let pattern: RegExp;
 	if (opts?.literal) {
 		pattern = new RegExp(escapeRegex(query), "i");
@@ -202,10 +243,16 @@ export async function pdfSearch(
 	}
 	const hits: PdfSearchHit[] = [];
 	const pageTexts = new Map<number, string>();
-	for (let i = 1; i <= doc.numPages; i++) {
-		const page = await doc.getPage(i);
-		const content = await page.getTextContent();
-		const text = itemsToText(content.items as unknown[]);
+	const { doc, task } = await openDocument(filePath);
+	let converted;
+	try {
+		converted = await documentToMarkdown(doc);
+	} finally {
+		await task.destroy();
+	}
+	for (const page of converted) {
+		const i = page.number;
+		const text = pageMarkdown(page);
 		pageTexts.set(i, text);
 		const lines = text.split("\n");
 		for (let ln = 0; ln < lines.length; ln++) {
