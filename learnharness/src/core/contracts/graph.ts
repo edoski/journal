@@ -200,10 +200,9 @@ export interface CoverageEntry {
  * reasoning chains — propositions (lonely relevant ones included) plus
  * follows/supports edges; the auditor NEVER sees
  * the source — its job is preparing the merge: identity verdicts
- * (link-or-create, merging equivalent forms of the same proposition) via
- * graph-exploration tools (find / list_sessions / list_propositions), and
- * it may draw BRIDGING edges from existing graph nodes to the new
- * propositions; the merger (core/graph.ts, deterministic) applies the
+ * (link-or-create, merging equivalent forms of the same proposition) from
+ * ranked candidates (preloaded, paged with find_candidates) and the
+ * list_sessions / list_propositions tools; the merger (core/graph.ts, deterministic) applies the
  * verdicts and appends. Quiz events and understanding observations are
  * GONE — the pipeline is the only session→graph bridge, and it carries
  * propositions + edges, nothing else.

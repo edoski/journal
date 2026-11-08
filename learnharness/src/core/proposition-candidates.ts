@@ -34,14 +34,19 @@ export interface CandidateBatch {
 
 export const CANDIDATE_PAGE_SIZE = 5;
 
-// Keep negation and domain vocabulary. These are only common English function
-// words; Unicode words (including mathematical symbols expressed as letters)
-// remain searchable, with no English-only stemming or substring/glob syntax.
+// Keep negation and domain vocabulary. These are only common English and
+// Italian function words (the owner's course records are Italian); Unicode
+// words (including mathematical symbols expressed as letters) remain
+// searchable, with no stemming or substring/glob syntax.
 const STOP_WORDS = new Set((
 	"a an the and or of to in on at by for from with as is are was were be been being " +
 	"it its this that these those which who whose their them they we our you your " +
 	"can could may might must will would should has have had does do did " +
-	"such than then when where each every any all also into through"
+	"such than then when where each every any all also into through " +
+	"il lo la i gli le l un uno una di del dello della dei degli delle d da dal dallo dalla dai dagli dalle " +
+	"in nel nello nella nei negli nelle su sul sullo sulla sui sugli sulle con per tra fra " +
+	"e ed o è sono che chi cui come se si ci ne questo questa questi queste quello quella quelli quelle " +
+	"ha hanno essere al allo alla ai agli alle anche più"
 ).split(" "));
 
 function words(text: string): string[] {

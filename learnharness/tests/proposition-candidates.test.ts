@@ -101,6 +101,7 @@ describe("proposition candidate retrieval", () => {
 	it("handles an empty graph and function-word-only queries honestly", () => {
 		assert.deepEqual(createPropositionCandidateSearch([])(proposition("p", "amber")), []);
 		assert.deepEqual(createPropositionCandidateSearch([node("n", "Amber", "Canoe")])(proposition("p", "the and of")), []);
+		assert.deepEqual(createPropositionCandidateSearch([node("n", "La derivata", "La derivata di una funzione è il limite")])(proposition("p", "la di una è il")), [], "Italian function words match nothing");
 	});
 
 	it("conflicting duplicate ids in FINDINGS search the FIRST occurrence, as the merger does", () => {

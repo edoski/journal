@@ -61,10 +61,11 @@ import { runSubmitAgent, healStringifiedArrays } from "./submit-agent.ts";
  *                    downstream re-checks it.
  *   auditor (LLM)    never sees the source. Its job is IDENTITY: for each
  *                    NEW proposition, linkTo an existing graph node or
- *                    create — decided by EXPLORING the graph through
- *                    tools (find / list_sessions / list_propositions),
- *                    not by an injected graph dump (context bloat,
- *                    owner 2026-09-27). Links are its ONLY deliverable
+ *                    create — decided from ranked candidate batches
+ *                    preloaded per finding and paged with
+ *                    find_candidates (plus list_sessions /
+ *                    list_propositions), not by a whole-graph dump
+ *                    (context bloat, owner 2026-09-27). Links are its ONLY deliverable
  *                    — it never mints edges (owner 2026-09-28: the
  *                    graph connects across sources solely through
  *                    identified equivalences). Input is PROPOSITIONS
