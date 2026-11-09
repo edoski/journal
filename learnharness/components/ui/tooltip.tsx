@@ -51,10 +51,11 @@ function TooltipTrigger({
 }
 
 /** "proposed": the popover surface with a hairline edge, 12px, radius 8
- *  (the Proposed design's one tooltip style). */
+ *  (the Proposed design's one tooltip style), at z 80 so a hint inside a
+ *  menu or popover (z 70, overlay.ts) draws above it. */
 const CONTENT_LOOK = {
   current: "rounded-md bg-accent px-2 py-1 text-[11px] text-foreground/85",
-  proposed: "flex items-center gap-1.5 rounded-md border bg-popover px-2 py-1 text-label text-popover-foreground shadow-md",
+  proposed: "z-80 flex items-center gap-1.5 rounded-md border bg-popover px-2 py-1 text-label text-popover-foreground shadow-md",
 } as const
 
 function TooltipContent({

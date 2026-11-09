@@ -1,6 +1,6 @@
 # Menu
 
-The anatomy every dropdown, context menu and picker draws under the Proposed design: the sidebar's session menu, the knowledge graph's node menu, the model, thinking, provider and font pickers in Settings, setup and the lesson's details. `MenuShell` (components/menu-shell.tsx) owns placement, focus and the arrow-key walk; these class strings (components/ui/menu.ts) own the look.
+The anatomy every dropdown, context menu and picker draws under the Proposed design. The shadcn primitives carry it as their default classes: `dropdown-menu.tsx` (which exports the shared strings), `context-menu.tsx`, `select.tsx` and `command.tsx`, keyed on Radix's and cmdk's state attributes (`data-highlighted`, `data-state=checked`, `data-selected`). Proposed surfaces not yet moved to them still draw these class strings (components/ui/menu.ts) inside `MenuShell`; both go when Proposed ships.
 
 ## Anatomy
 
