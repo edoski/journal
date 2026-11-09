@@ -38,6 +38,7 @@ import {
 	isProviderKeyRefusal,
 	firstSourceTextParts,
 	messageAnchorId,
+	sessionModeOf,
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
@@ -60,7 +61,7 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
-import type { CourseLink, LhViewMessage } from "@/src/core";
+import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
 import { CHIP_LABEL, PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
 	CompactionCutDivider,
@@ -232,7 +233,7 @@ export function Chat({
 	initiallyInFlight,
 	initiallyCompacting = false,
 	initialConfigured = false,
-	kind = "teach",
+	startedIn,
 	course,
 }: {
 	chatId: string;
@@ -243,10 +244,10 @@ export function Chat({
 	initialMessages: LhMessage[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
-	/** The session kind (practice sessions, owner 2026-10-04): practice
-	 *  renders no phase chip (no probe→teach arc applies) and a Practice
-	 *  tag rides the header instead. */
-	kind?: "teach" | "practice";
+	/** The mode an older record stored at creation. The mode now is folded
+	 *  over the transcript from it: practice renders a Practice tag in
+	 *  place of the phase chip, and no coverage ring. */
+	startedIn?: SessionMode;
 	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
@@ -483,6 +484,7 @@ export function Chat({
 	// replaces the composer. Computed from the NATIVE record (the fold is
 	// the gate the tools themselves read), not the projected view.
 	const activeProblem = activeProblemOf(nativeMessages);
+	const mode = sessionModeOf(nativeMessages, startedIn);
 	const activeProblemRef = useRef(activeProblem);
 	activeProblemRef.current = activeProblem;
 
@@ -755,7 +757,7 @@ export function Chat({
 	 * has ever been posed (the fresh session's opening turn is owed, not
 	 * the move-on). Enter-on-empty and the Next chip both key on it. */
 	const nextReady =
-		kind === "practice" &&
+		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
 		!compacting &&
@@ -1345,7 +1347,7 @@ export function Chat({
 								)
 							}
 							course={course?.title}
-							phase={kind === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
+							phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 							onOpenPlan={planTree ? () => setPlanOpen((o) => !o) : undefined}
 							details={
 								<LessonDetails
@@ -1355,7 +1357,7 @@ export function Chat({
 									pricing={pricing}
 									selectedModel={selectedModel}
 									onModelChange={setSelectedModel}
-									extraction={kind !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
+									extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
 								/>
 							}
 						/>
@@ -1441,10 +1443,10 @@ export function Chat({
 					{/* Practice (owner, 2026-10-04): the coverage ring hides —
 				    practice never extracts, so an ever-filling ring with no
 				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
+					{mode !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
 					{/* Practice sessions: no phase arc — a quiet Practice tag
 					    instead of the phase chip. */}
-					{kind === "practice" ? (
+					{mode === "practice" ? (
 						<span
 							data-testid="phase-chip"
 							data-phase="practice"

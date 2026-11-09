@@ -39,8 +39,10 @@ import { QUESTION_TOOLS, type PendingQuestion } from "./pending.ts";
 import {
 	CONCLUDE_ACK_TEXT,
 	HANDOFF_TEXT,
+	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	THINKING_LABEL,
+	type SessionMode,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
 import type { Confidence } from "./contracts/course.ts";
@@ -71,6 +73,8 @@ export interface LhMarkerMessage {
 		| "graph-context"
 		| "course-context"
 		| "probe-handoff"
+		| "session-mode"
+		| "mode-handoff"
 		| "subagent-steer"
 		| "subagent-abort"
 		| "plan-block"
@@ -216,6 +220,79 @@ export function newHandoffMessage(chatId: string): LhMarkerMessage {
 		details: { chatId },
 		timestamp: Date.now(),
 	};
+}
+
+// ─── the session's mode: teaching or practice ───────────────────────────────
+
+/** The handoff tools, by the mode each one switches the session to. */
+export const MODE_HANDOFF_TOOLS: Readonly<Record<string, SessionMode>> = { practice: "practice", teach: "teach" };
+
+/** The mode a session starts in, chosen at creation (Current design's
+ *  Teach/Practice switch). UI-only: the model never sees it, since the
+ *  agent's system prompt already says what it runs. */
+export function newSessionModeMessage(mode: SessionMode): LhMarkerMessage {
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "session-mode",
+		content: "",
+		display: false,
+		details: { mode },
+		timestamp: Date.now(),
+	};
+}
+
+/** The wake a handoff queues: it starts the new mode's agent, which reads
+ *  the handoff call's arguments above it. One per handoff call. */
+export function newModeHandoffMessage(chatId: string, toolCallId: string, mode: SessionMode): LhMarkerMessage {
+	return {
+		id: `steer_mode_${toolCallId}`,
+		role: "custom",
+		customType: "mode-handoff",
+		content: MODE_HANDOFF_TEXT[mode],
+		display: true,
+		details: { chatId, mode },
+		timestamp: Date.now(),
+	};
+}
+
+/** Walks the transcript's mode: `written[i]` is the mode message i was
+ *  written in, `now` the mode after the last one. `initial` is a record's
+ *  stored `kind` (sessions made before modes followed the transcript),
+ *  else teach. A session-mode marker sets the mode; a handoff call
+ *  switches it from its successful result on. A call from a failed or
+ *  aborted generation, an error result or a refusal (`details.ok: false`)
+ *  switches nothing. */
+function foldModes(messages: readonly LhMessage[], initial: SessionMode): { written: SessionMode[]; now: SessionMode } {
+	let mode = initial;
+	const calls = new Map<string, SessionMode>();
+	const written = messages.map((m) => {
+		const at = mode;
+		if (m.role === "custom" && m.customType === "session-mode") {
+			mode = (m.details as { mode?: unknown } | null)?.mode === "practice" ? "practice" : "teach";
+			return mode;
+		}
+		if (m.role === "assistant" && m.stopReason !== "error" && m.stopReason !== "aborted") {
+			for (const block of m.content) {
+				if (block.type === "toolCall" && MODE_HANDOFF_TOOLS[block.name]) calls.set(block.id, MODE_HANDOFF_TOOLS[block.name]!);
+			}
+		} else if (m.role === "toolResult" && !m.isError && (m.details as { ok?: unknown } | null | undefined)?.ok !== false) {
+			const target = calls.get(m.toolCallId);
+			if (target && MODE_HANDOFF_TOOLS[m.toolName] === target) mode = target;
+		}
+		return at;
+	});
+	return { written, now: mode };
+}
+
+/** The mode each message was written in, index for index. */
+export function sessionModesOf(messages: readonly LhMessage[], initial: SessionMode = "teach"): SessionMode[] {
+	return foldModes(messages, initial).written;
+}
+
+/** The mode the session is in now: the one its next turn runs. */
+export function sessionModeOf(messages: readonly LhMessage[], initial: SessionMode = "teach"): SessionMode {
+	return foldModes(messages, initial).now;
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no
@@ -850,7 +927,7 @@ export type RequestCause = "foreground" | "background";
 export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
-const NEUTRAL_MARKERS = ["graph-context", "course-context", "plan-block", "problem-dismissed", "compaction"];
+const NEUTRAL_MARKERS = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction"];
 
 /** Whether a message is an input that starts a new agent turn: exactly
  *  the messages `nativeInputCause` does not call neutral, decided without
@@ -868,7 +945,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "user") return "learner";
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
-		if (["probe-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
+		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
 		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
@@ -917,7 +994,7 @@ export function reconstructRequestCause(messages: readonly LhMessage[]): Reconst
 /** Markers toLlmMessages drops: the model never sees them between a call
  *  and its result. */
 function isUiOnlyMarker(m: LhMessage): boolean {
-	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed");
+	return m.role === "custom" && (m.customType === "plan-block" || m.customType === "problem-dismissed" || m.customType === "session-mode");
 }
 
 /** The index of the assistant whose call batch ends the record: only its

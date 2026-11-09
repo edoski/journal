@@ -7,7 +7,7 @@
 
 import type { ChatRecord } from "../core/contracts/chat.ts";
 import { projectCourseBrief } from "../core/course-brief.ts";
-import { newCourseContextMessage, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
+import { newCourseContextMessage, sessionModeOf, visibleCourseBriefKey, type LhMessage } from "../core/native-messages.ts";
 import { stores } from "./stores.ts";
 
 export type CourseBrief = { key: string; text: string };
@@ -16,7 +16,7 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 	if (!record.course) return null;
 	try {
 		const resumed = await stores.courseRecords.run(record.course.workspace, { verb: "resume" });
-		if (resumed.ok) return projectCourseBrief(resumed.json, record.kind === "practice" ? "practice" : "teach");
+		if (resumed.ok) return projectCourseBrief(resumed.json, sessionModeOf(record.messages, record.kind));
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);

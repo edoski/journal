@@ -22,7 +22,7 @@
 import { createHash } from "node:crypto";
 
 import type { CoverageEntry } from "./contracts/graph.ts";
-import { failedOutputCallIds, userFacingTextOf, type LhMessage } from "./native-messages.ts";
+import { failedOutputCallIds, sessionModesOf, userFacingTextOf, type LhMessage } from "./native-messages.ts";
 
 export type { CoverageEntry };
 
@@ -91,10 +91,13 @@ export interface CoverageSlot {
  *  and the coverage view — one derivation everywhere). */
 export function coverageSlots(messages: ReadonlyArray<LhMessage>): CoverageSlot[] {
 	const failedOutputCalls = failedOutputCallIds(messages);
-	return messages.map((message) => ({
+	// Practice prose is verdicts and nudges, not teaching: a session that
+	// moved between modes extracts only what was written while teaching.
+	const modes = sessionModesOf(messages);
+	return messages.map((message, i) => ({
 		message,
 		fp: messageFingerprint(message, failedOutputCalls),
-		tokens: viewTokens(messageViewLines(message, message.id, failedOutputCalls)),
+		tokens: modes[i] === "practice" ? 0 : viewTokens(messageViewLines(message, message.id, failedOutputCalls)),
 	}));
 }
 

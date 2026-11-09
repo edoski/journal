@@ -30,7 +30,7 @@ import { createPracticeAgent } from "../src/agent/teacher-agent.ts";
 import { handleChatRequest } from "../src/server/chat-handler.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
 import { chatStore } from "../src/store/chats.ts";
-import { activeProblemOf, needsContinuation } from "../src/core/index.ts";
+import { activeProblemOf, needsContinuation, newSessionModeMessage } from "../src/core/index.ts";
 import { PATHS } from "../config.ts";
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
@@ -70,9 +70,18 @@ after(() => {
 	}
 });
 
-function createPracticeChat(title: string) {
-	const chat = chatStore.createChat(title, "practice");
+/** A session started in practice (the Current design's Practice switch
+ *  writes the same starting-mode marker), or, with `stored`, a record made
+ *  before modes followed the transcript, which stored `kind` instead. */
+function createPracticeChat(title: string, stored = false) {
+	const chat = chatStore.createChat(title);
 	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	if (stored) {
+		const file = path.join(PATHS.chats, `${chat.id}.json`);
+		fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf-8")), kind: "practice" }));
+	} else {
+		chatStore.saveMessages(chat.id, [newSessionModeMessage("practice") as LhMessage]);
+	}
 	createdChats.push(chat.id);
 	return chat;
 }
@@ -108,9 +117,13 @@ async function drainTurn(req: Request, factory: Parameters<typeof handleChatRequ
 	return new Response(handle.subscribe()).text();
 }
 
-/** The practice agent factory (the handler's kind branch, test-shaped). */
+/** The practice agent with the scripted engine, built only where the
+ *  handler's mode fold picked practice. */
 function practiceFactory(chatId: string, engine: PiEngine): Parameters<typeof handleChatRequest>[1] {
-	return (opts) => createPracticeAgent({ chatId, chatStore }, { engine, messages: opts.messages });
+	return (opts) => {
+		assert.equal(opts.agent, "practice", "the handler runs the practice agent");
+		return createPracticeAgent({ chatId, chatStore }, { engine, messages: opts.messages });
+	};
 }
 
 /** Each step records the prompt it received — the transcript the model
@@ -172,6 +185,15 @@ describe("practice flow (scripted model)", () => {
 		// The turn continued past conclude to the reveal text.
 		assert.ok(afterConclude.some((m) => (m as { role?: string }).role === "assistant" && JSON.stringify((m as { content?: unknown }).content).includes("Clean proof.")));
 		assert.equal(activeProblemOf(afterConclude), null);
+	});
+
+	it("a record that stored kind practice still runs the practice agent", async () => {
+		const chat = createPracticeChat("Test: older practice record", true);
+		const { engine } = scripted([
+			() => fauxAssistantMessage([fauxToolCall("problem", POSE, { id: "call-legacy" })], { stopReason: "toolUse" }),
+		]);
+		await drainTurn(post(chat.id, { type: "text", text: "go" }), practiceFactory(chat.id, engine));
+		assert.equal(activeProblemOf(chatStore.getChat(chat.id)!.messages)?.toolCallId, "call-legacy");
 	});
 
 	it("a working-trace submission keeps the problem active", async () => {

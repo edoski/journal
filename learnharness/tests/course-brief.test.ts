@@ -149,7 +149,7 @@ describe("course brief markers", () => {
 
 describe("course brief injection", () => {
 	it("a linked session's learner turn carries one brief; the next turn with the same key adds none", async () => {
-		const chat = chatStore.createChat("rank", undefined, { workspace: "/study/linalg", title: "Linear Algebra" });
+		const chat = chatStore.createChat("rank", { workspace: "/study/linalg", title: "Linear Algebra" });
 		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 		const faux = createFauxCore({});
 		faux.setResponses([fauxAssistantMessage([fauxText("Where shall we start?")]), fauxAssistantMessage([fauxText("Go on.")])]);

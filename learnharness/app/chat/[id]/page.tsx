@@ -24,7 +24,7 @@ export default async function ChatPage({
 			key={chat.id}
 			chatId={chat.id}
 			title={chat.title}
-			kind={chat.kind ?? "teach"}
+			startedIn={chat.kind}
 			course={chat.course}
 			// Wave D: the record IS native agent history — the client view is
 				// derived app-side (core/view.ts projectView; GET serves the same

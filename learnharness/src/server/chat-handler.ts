@@ -4,6 +4,7 @@ import {
 	createProberAgent,
 	createTeacherAgent,
 	type AgentBuildOptions,
+	type AgentKind,
 	type TeachingAgent,
 } from "../agent/teacher-agent.ts";
 import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
@@ -46,7 +47,8 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, hasUnresolvedQuestion } from "../core/native-messages.ts";
+import { hasProbeDone, hasUnresolvedQuestion, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
+import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
 import { catalogContextLimits, refreshConnectionCatalog } from "./model-catalog.ts";
@@ -143,12 +145,24 @@ function resolveEngine(role: ModelRole): PiEngine | undefined {
 	return spec ? piEngineForSpec(spec) : undefined;
 }
 
+/** The agent a turn over these messages runs: practice in practice mode;
+ *  in teaching the prober until its probe concludes, then the teacher. */
+function agentKindOf(messages: readonly LhMessage[], startedIn?: SessionMode): AgentKind {
+	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
+	return hasProbeDone(messages) ? "teacher" : "prober";
+}
+
+function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
+	const agent = agentKindOf(record.messages, record.kind);
+	return agent === "practice" ? "practice" : agent === "teacher" ? "teach" : "probe";
+}
+
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(
 	req: Request,
-	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent,
+	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent,
 ): Promise<Response> {
 	let body: { chatId?: unknown; input?: unknown };
 	try {
@@ -178,7 +192,7 @@ export async function handleChatRequest(
 export async function handleChatInput(
 	chatId: string,
 	input: TurnInput,
-	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent,
+	buildAgent?: (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent,
 ): Promise<Response> {
 	let record = stores.chatStore.getChat(chatId);
 	if (!record) {
@@ -268,12 +282,12 @@ export async function handleChatInput(
 			engine: piEngineForSpec(conversation, true),
 			canStart: () => connectionBackgroundAllowed(conversation.provider),
 			modelId: modelIdForCompaction,
-			kind: record.kind === "practice" ? "practice" : hasProbeDone(record.messages) ? "teach" : "probe",
+			kind: compactionKind(record),
 			thresholdTokens: effectiveThresholdTokens(
 				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
-			systemPromptTokens: Math.ceil(composeInstructions(record.kind === "practice" ? "practice" : "teacher").length / 4),
+			systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(record.messages, record.kind)).length / 4),
 		},
 		chatId,
 	);
@@ -281,7 +295,9 @@ export async function handleChatInput(
 	// is re-read below. A question recovery is a retry: its results must stay
 	// adjacent to their calls and end the record, so it carries no brief.
 	const learnerInput = input.type !== "steers" && input.type !== "retry" && input.type !== "retry-question" && input.type !== "continue";
-	const courseBrief = learnerInput ? await fetchCourseBrief(record) : null;
+	// A mode handoff starts the other agent, whose brief differs.
+	const handoffWake = input.type === "steers" && input.steers.some((s) => s.role === "custom" && s.customType === "mode-handoff");
+	const courseBrief = learnerInput || handoffWake ? await fetchCourseBrief(record) : null;
 	const compactedRecord = stores.chatStore.getChat(chatId);
 	if (!compactedRecord) return Response.json({ error: "Unknown chat" }, { status: 404 });
 	record = compactedRecord;
@@ -399,12 +415,13 @@ export async function handleChatInput(
 	};
 
 	// AGENT CONSTRUCTION BRANCH (docs/probe-teach-split.md §2): the transcript
-	// is the seam — a probe_done call in the record means the probe is
-	// concluded: build the TEACHER (planning + the full toolset). Otherwise
-	// the session is still probing: build the PROBER (quiz/ask + probe_done).
-	// Both share this whole composition (write-ahead persist, liveness,
-	// steers, usage, extraction) — only the agent differs.
-	const teaching = hasProbeDone(agentMessages);
+	// is the seam. Its mode picks practice or teaching; in teaching a
+	// concluded probe_done means the TEACHER (planning + the full toolset),
+	// else the PROBER (quiz/ask + probe_done). All three share this whole
+	// composition (write-ahead persist, liveness, steers, usage) — only the
+	// agent differs.
+	const agentKind = agentKindOf(agentMessages, record.kind);
+	const teaching = agentKind === "teacher";
 	// BYOK (owner, 2026-09-22): the conversation chain was resolved by the
 	// turn gate above (chat.model override → strong slot → refused) — the
 	// engine build is pure from here; thinking levels clamp natively.
@@ -453,14 +470,13 @@ export async function handleChatInput(
 		// record through the engine, whatever the agent kind.
 		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),
 	};
-	// PRACTICE BRANCH (owner design, 2026-10-04): a kind:"practice"
-	// session builds the practitioner from turn 1 — no prober→teacher
-	// split, no plan/question/job tools; the whole registry is
-	// problem + conclude. buildAgent stays honored (the test seam is
-	// uniform across kinds).
+	// PRACTICE BRANCH (owner design, 2026-10-04): practice mode builds the
+	// practitioner — no plan/question tools; problem + conclude, and the
+	// handoff back to teaching. buildAgent stays honored (the test seam is
+	// uniform across agents).
 	const constructed: TeachingAgent = buildAgent
-		? buildAgent({ ...agentOpts, teaching })
-		: record.kind === "practice"
+		? buildAgent({ ...agentOpts, teaching, agent: agentKind })
+		: agentKind === "practice"
 			? createPracticeAgent(
 					{
 						chatId,
@@ -594,7 +610,7 @@ export async function handleChatInput(
 				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
 				// no extraction, no graph, no coverage (v1: the session itself
 				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && record.kind !== "practice" && extractionEnabled(effective.graph)) {
+				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice" && extractionEnabled(effective.graph)) {
 					// Fresh per-turn read of the graph section's chunk budget
 					// (extraction-UX redesign, 2026-09-24): the trigger compares
 					// against it and the pipeline's batches share it.
@@ -650,12 +666,12 @@ export async function handleChatInput(
 							engine: kickEngine,
 							canStart: () => connectionBackgroundAllowed(spec.provider),
 							modelId: kickModelId,
-							kind: freshRecord.kind === "practice" ? "practice" : hasProbeDone(freshRecord.messages) ? "teach" : "probe",
+							kind: compactionKind(freshRecord),
 							thresholdTokens: effectiveThresholdTokens(
 								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
 							),
-							systemPromptTokens: Math.ceil(composeInstructions(freshRecord.kind === "practice" ? "practice" : "teacher").length / 4),
+							systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(freshRecord.messages, freshRecord.kind)).length / 4),
 						};
 					}, chatId);
 			},
