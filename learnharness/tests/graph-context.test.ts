@@ -27,7 +27,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 const COURSE = { workspace: "/study/course" };
 useFakeEngine(TMP_DATA, [{ ...COURSE, title: "Course" }]);
 
-const { newGraphContextMessage } = await import("../src/core/native-messages.ts");
+const { newGraphContextMessage, sessionModeOf } = await import("../src/core/native-messages.ts");
 const { toLlmMessages } = await import("../src/core/native-messages.ts");
 import type { LhMessage } from "../src/core/native-messages.ts";
 const { projectView } = await import("../src/core/view.ts");
@@ -106,7 +106,7 @@ describe("initialPromptOwed", () => {
 
 // ── the route (picks ride the creation) ─────────────────────────────────────
 
-describe("POST /api/chats — graphContext becomes message[0]", () => {
+describe("POST /api/chats — the starting mode and the picks ride the creation", () => {
 	it("writes the marker before any user message; chains derive from the live graph", async () => {
 		// Seed the map: two picked nodes joined by one chain.
 		const node = (id: string, name: string, statement: string) => ({
@@ -133,8 +133,9 @@ describe("POST /api/chats — graphContext becomes message[0]", () => {
 		const { id } = (await res.json()) as { id: string };
 
 		const record = chatStore.getChat(id)!;
-		assert.equal(record.messages.length, 1, "the marker is message[0], alone until the first turn");
-		const m = record.messages[0] as { role: string; customType: string; content: string };
+		assert.equal(record.messages.length, 2, "the starting mode and the picks, alone until the first turn");
+		assert.equal(sessionModeOf(record.messages, record.kind), "practice", "the Practice switch starts the session in practice");
+		const m = record.messages[1] as { role: string; customType: string; content: string };
 		assert.equal(m.role, "custom");
 		assert.equal(m.customType, "graph-context");
 		assert.ok(m.content.includes("- Modus ponens: If P implies Q and P holds, Q holds."));

@@ -50,7 +50,8 @@ budget; it also forgets exact items. Consumers read validated
 
 `retrieval.py` builds `resume` (the session opener: time, due reviews, the path
 with levels, weak topics, the open task, evidence and knowledge within byte
-budgets), `show` (whole items) and `search` (accent-insensitive lexical
+budgets), `show` (whole items), `map` (every topic with its edges, level,
+review and weak verdict, uncapped and without evidence text) and `search` (accent-insensitive lexical
 discovery with light stemming) on the one packer in `packing.py`. Whole items are
 kept or omitted, never clipped, and omissions are reported. `planning.py` joins
 reviews and open work across registered workspaces with Journal effort, the week

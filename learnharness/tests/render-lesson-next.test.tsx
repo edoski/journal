@@ -180,12 +180,16 @@ describe("Proposed lesson cards", () => {
 
 	it("the course link banner is one line with one Link action", () => {
 		const choice = {
-			state: { status: "ready", courses: [{ workspace: "/s", title: "SMM", due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null }], roots: [] },
+			state: { status: "ready", courses: [{ workspace: "/s", title: "SMM", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }], roots: [] },
 			workspace: "/s", notice: null, choose: () => {}, add: () => {}, requireCourse: () => "/s",
 		} as unknown as CourseChoice;
 		const banner = documentFor(<CourseLinkBody choice={choice} busy={false} error={null} onLink={() => {}} variant="proposed" />).querySelector('[data-testid="course-link-banner"]')!;
 		assert.match(banner.textContent!, /Link this session to a course to continue\./);
-		assert.equal(banner.querySelectorAll('button:not([data-testid="course-picker"])').length, 1, "the course chip, then one action");
+		assert.deepEqual(
+			[...banner.querySelectorAll("button")].filter((b) => b.getAttribute("data-testid") !== "course-picker").map((b) => b.textContent),
+			["Link"],
+			"besides the course chip, Link is the one action",
+		);
 		assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
 	});
 });

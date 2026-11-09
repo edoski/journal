@@ -30,8 +30,10 @@
 
 import type { QuestionAnswerData } from "./question-core.ts";
 import type { LhMessage } from "./native-messages.ts";
+import type { SessionMode } from "./contracts/chat.ts";
 import {
 	activeProblemOf,
+	sessionModeOf,
 	concludedByDismissalPair,
 	danglingQuestionOf,
 	newAnswerResult,
@@ -228,7 +230,7 @@ export function parseChatInput(input: unknown): ChatInput {
  * double-answering.
  */
 export function inputAppends(
-	record: { messages: LhMessage[]; kind?: string },
+	record: { messages: LhMessage[]; kind?: SessionMode },
 	input: ChatInput,
 ): LhMessage[] {
 	switch (input.type) {
@@ -258,10 +260,10 @@ export function inputAppends(
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a
-			// between-problems affordance — practice sessions only, nothing
+			// between-problems affordance — practice mode only, nothing
 			// active (mid-problem input rides the dock), and the client gates
 			// make violations unreachable in practice anyway.
-			if (record.kind !== "practice") {
+			if (sessionModeOf(record.messages, record.kind) !== "practice") {
 				throw new ChatInputError("next input is a practice-session affordance");
 			}
 			if (activeProblemOf(record.messages)) {

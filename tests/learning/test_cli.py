@@ -68,6 +68,9 @@ def test_save_then_read_through_every_read_verb(
     assert shown["items"]["rank"]["standing"]["level"] == "assisted"
     _, everything = run(capsys, monkeypatch, workspace, "show", "--all")
     assert everything["standings"]["rank"]["attempts"] == 1
+    _, mapped = run(capsys, monkeypatch, workspace, "map")
+    assert mapped["current"] == "rank"
+    assert mapped["topics"][0]["level"] == "assisted"
     _, found = run(capsys, monkeypatch, workspace, "search", "Rango")
     assert found["hits"][0]["handle"] == "rank"
     _, words = run(capsys, monkeypatch, workspace, "search", "found", "rank")

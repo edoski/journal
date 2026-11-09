@@ -12,7 +12,8 @@
  */
 
 import { spawn } from "node:child_process";
-import type { CourseResult, CourseSummary, CourseVerb } from "../core/contracts/course.ts";
+import { courseLabel, type CourseResult, type CourseSummary, type CourseVerb, type DueReview } from "../core/contracts/course.ts";
+import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
 export interface EngineCommand {
@@ -76,6 +77,8 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 			return { args: ["search", "--", verb.query], stdin: "" };
 		case "save":
 			return { args: ["save"], stdin: JSON.stringify(verb.changes) };
+		case "plan":
+			return { args: ["plan", "--days", "1"], stdin: "" };
 	}
 }
 
@@ -139,11 +142,13 @@ function summaryOf(entry: unknown): CourseSummary | null {
 		workspace,
 		title: str(e.title),
 		due: due.length + dueMore,
+		reviews: due.map(reviewOf).filter((r): r is DueReview => r !== null),
 		current: str(e.current),
+		currentTitle: str(e.current_title),
 		task: str(task.title),
 		step: str(task.step),
 		exam: examOf(e.exam),
-		mostOverdue: mostOverdueTitle(due),
+		lastActiveDaysAgo: daysAgoOf(e.last_activity),
 	};
 }
 
@@ -154,18 +159,106 @@ function examOf(value: unknown): CourseSummary["exam"] {
 	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
 }
 
-/** The title of the listed due entry with the most days overdue (the first
- *  on a tie); a field selection, the engine's `overdue` count decides. */
-function mostOverdueTitle(due: readonly unknown[]): string | null {
-	let best: { title: string; overdue: number } | null = null;
-	for (const entry of due) {
-		if (typeof entry !== "object" || entry === null) continue;
-		const { title, topic, overdue } = entry as Record<string, unknown>;
-		const name = str(title) ?? str(topic);
-		const days = typeof overdue === "number" ? overdue : 0;
-		if (name && (best === null || days > best.overdue)) best = { title: name, overdue: days };
+/** One `due` entry, `{topic, title?, overdue, gap?}`; null when it names no topic. */
+function reviewOf(entry: unknown): DueReview | null {
+	if (typeof entry !== "object" || entry === null) return null;
+	const { title, topic, overdue, gap } = entry as Record<string, unknown>;
+	const name = str(title) ?? str(topic);
+	return name ? { title: name, overdue: typeof overdue === "number" ? overdue : 0, gap: str(gap) } : null;
+}
+
+/** `last_activity: {date, days_ago}`, or null when the record was never saved. */
+function daysAgoOf(value: unknown): number | null {
+	if (typeof value !== "object" || value === null) return null;
+	const { days_ago: daysAgo } = value as Record<string, unknown>;
+	return typeof daysAgo === "number" ? daysAgo : null;
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function strings(value: unknown): string[] {
+	return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+}
+
+function count(value: unknown): number {
+	return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+/** One `map` topic; null when it lacks a handle or an engine level. */
+function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contrasts: string[] }) | null {
+	const e = record(entry);
+	const handle = str(e?.topic);
+	if (!e || !handle || !isTopicLevel(e.level)) return null;
+	const reviewDate = str(e.review);
+	const choiceErrors: Record<string, number> = {};
+	for (const [method, times] of Object.entries(record(e.choice_errors) ?? {})) if (count(times)) choiceErrors[method] = count(times);
+	return {
+		handle: handle as TopicHandle,
+		title: str(e.title) ?? handle,
+		level: e.level,
+		introduced: str(e.introduced),
+		review: reviewDate
+			? typeof e.overdue === "number"
+				? { kind: "due", date: reviewDate, overdue: count(e.overdue) }
+				: { kind: "scheduled", date: reviewDate }
+			: null,
+		weak: e.weak === true,
+		signals: {
+			gap: str(e.gap),
+			lapsed: e.lapsed === true,
+			stale: e.stale === true,
+			choiceErrors,
+			confidentErrors: count(e.confident_errors),
+		},
+		tasks: strings(e.tasks),
+		needs: strings(e.needs),
+		contrasts: strings(e.contrasts),
+	};
+}
+
+/** The engine's `map` output as a CourseMap: field renaming, and the
+ *  per-topic `needs` and symmetric `contrasts` lists flattened into edges
+ *  (one per unordered contrast pair). Edges to topics the map does not list
+ *  are dropped; null when the output is not a map at all. */
+export function courseMapOf(workspace: string, json: unknown): CourseMap | null {
+	const m = record(json);
+	if (!m || !Array.isArray(m.topics) || typeof m.today !== "string") return null;
+	const parsed = m.topics.map(mapTopicOf).filter((t) => t !== null);
+	const listed = new Set<string>(parsed.map((t) => t.handle));
+	const edges: CourseMapEdge[] = [];
+	const paired = new Set<string>();
+	for (const topic of parsed) {
+		for (const need of topic.needs) {
+			if (listed.has(need)) edges.push({ kind: "needs", prerequisite: need as TopicHandle, topic: topic.handle });
+		}
+		for (const other of topic.contrasts) {
+			const key = [topic.handle, other].sort().join("\u0000");
+			if (!listed.has(other) || paired.has(key)) continue;
+			paired.add(key);
+			edges.push({ kind: "contrasts", pair: [topic.handle, other as TopicHandle] });
+		}
 	}
-	return best?.title ?? null;
+	const topics = parsed.map(({ needs: _needs, contrasts: _contrasts, ...topic }) => topic);
+	const current = str(m.current);
+	const tasks = (Array.isArray(m.tasks) ? m.tasks : []).flatMap((entry) => {
+		const t = record(entry);
+		const key = str(t?.key);
+		return t && key ? [{ key, title: str(t.title) ?? key, step: str(t.step) }] : [];
+	});
+	return {
+		workspace,
+		title: str(m.title) ?? courseLabel({ workspace, title: null }),
+		today: m.today,
+		revision: count(m.revision),
+		exam: examOf(m.exam),
+		current: current && listed.has(current) ? (current as TopicHandle) : null,
+		focus: str(m.focus),
+		tasks,
+		topics,
+		edges,
+	};
 }
 
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
@@ -182,6 +275,12 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
 			return toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
+		},
+		async map(workspace) {
+			const result = toResult(await exec(engine, ["--workspace", workspace, "map"], ""), "map");
+			if (!result.ok) return result;
+			const map = courseMapOf(workspace, result.json);
+			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
 		},
 		async create(directory, title) {
 			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");

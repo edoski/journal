@@ -134,9 +134,10 @@ export type DoctrinePart =
 
 /** What each agent composes from the tutor skill's host-neutral references,
  *  so the tutor and the app teach from one text and each agent reads only
- *  the parts its job uses. Left out: the week and the exam run-up, which
- *  read figures the app's course brief does not carry, and *Difficulty*,
- *  which practice states more specifically in its own doctrine. The prober
+ *  the parts its job uses. Practice reads the exam run-up, whose figures
+ *  its course brief carries. Left out: the week, which reads figures no
+ *  brief carries, and *Difficulty*, which practice states more
+ *  specifically in its own doctrine. The prober
  *  skips teaching.md's opening: it measures, and the lesson's teaching
  *  rules belong to the teacher. From records.md and course.md every agent
  *  reads only what keeps the record coherent across sessions: tasks and
@@ -162,7 +163,7 @@ export const ENGINE_DOCTRINE: Readonly<Record<PromptAgent, readonly DoctrinePart
 	practice: [
 		{ file: "evidence.md" },
 		{ file: "teaching.md", sections: ["Hints", "Practice problems", "Mixing methods", "Transfer", "Corrections and diagrams"] },
-		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close"] },
+		{ file: "reviews.md", sections: ["Today's review", "Review prompts and key points", "Missed reviews and lapses", "The close", "Exam run-up"] },
 		...ACROSS_SESSIONS,
 	],
 };

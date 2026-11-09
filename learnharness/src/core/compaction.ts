@@ -194,7 +194,7 @@ export function estimateTokens(messages: readonly (LhMessage | AgentMessage)[]):
  * markers have no context, just like native metadata entries. */
 function cutMessage(message: LhMessage): LhMessage | null {
 	if (message.role !== "custom") return message;
-	if (["compaction", "plan-block", "problem-dismissed"].includes(message.customType)) return null;
+	if (["compaction", "plan-block", "problem-dismissed", "session-mode"].includes(message.customType)) return null;
 	return message;
 }
 
@@ -334,7 +334,7 @@ export function serializeForSummary(messages: readonly LhMessage[]): string {
 			);
 		} else if (role === "custom") {
 			const marker = m as LhMarkerMessage;
-			if (marker.customType === "plan-block") continue; // UI-only
+			if (marker.customType === "plan-block" || marker.customType === "session-mode") continue; // UI-only
 			lines.push(`[SYSTEM NOTE] ${marker.content}`);
 		}
 	}

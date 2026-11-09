@@ -13,7 +13,7 @@ import { after, describe, it, mock } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxText, fauxToolCall, type FauxResponseStep } from "@earendil-works/pi-ai";
 import { transformMessages } from "@earendil-works/pi-ai/api/transform-messages";
 import { Type } from "typebox";
-import type { AgentBuildOptions, TeachingAgent } from "../src/agent/teacher-agent.ts";
+import type { AgentBuildOptions, AgentKind, TeachingAgent } from "../src/agent/teacher-agent.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { QuestionData } from "../src/core/question-core.ts";
@@ -37,7 +37,7 @@ const { jobStore } = await import("../src/store/jobs.ts");
 const { subscribe } = await import("../src/core/events.ts");
 const { buildAnswer } = await import("../src/core/question-core.ts");
 const { ChatInputError, endsInFailedTurn, failedResponseAtEnd, inputAppends, parseChatInput, retryDrops } = await import("../src/core/input-events.ts");
-const { INTERRUPTED_TEXT, asAgentMessages, hasProbeDone, newHandoffMessage, newPlanBlockMessage, newUserMessage, reconstructRequestCause, toLlmMessages } = await import("../src/core/native-messages.ts");
+const { INTERRUPTED_TEXT, asAgentMessages, hasProbeDone, newHandoffMessage, newPlanBlockMessage, newSessionModeMessage, newUserMessage, reconstructRequestCause, toLlmMessages } = await import("../src/core/native-messages.ts");
 const { phaseAt3Lh } = await import("../src/core/phases.ts");
 const { newCompactionMarker } = await import("../src/core/compaction.ts");
 
@@ -76,7 +76,7 @@ function post(chatId: string, input: unknown): Request {
 	});
 }
 
-type AgentFactory = (opts: AgentBuildOptions & { teaching: boolean }) => TeachingAgent;
+type AgentFactory = (opts: AgentBuildOptions & { teaching: boolean; agent: AgentKind }) => TeachingAgent;
 
 /** POST one event; after acceptance drain the server-owned turn. */
 async function turn(engine: PiEngine, chatId: string, input: unknown, buildAgent?: AgentFactory): Promise<Response> {
@@ -91,8 +91,8 @@ async function turn(engine: PiEngine, chatId: string, input: unknown, buildAgent
 	return ack;
 }
 
-function createConfiguredChat(title: string, kind?: "practice") {
-	const chat = chatStore.createChat(title, kind);
+function createConfiguredChat(title: string) {
+	const chat = chatStore.createChat(title);
 	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 	chatStore.saveTree(chat.id, { nodes: [{ id: "planet-order", title: "Planet order" }], edges: [], version: 1 });
 	return chat;
@@ -329,8 +329,8 @@ describe("failed-response Retry (issue #110)", () => {
 	for (const kind of ["prober", "teacher", "practice"] as const) {
 		it(`uses the same retained-history retry boundary for the ${kind}`, async () => {
 			const { engine, contexts } = scripted([() => fauxAssistantMessage("Recovered response.")]);
-			const chat = createConfiguredChat(`Test: ${kind} retry`, kind === "practice" ? "practice" : undefined);
-			const before: LhMessage[] = [newUserMessage("hello")];
+			const chat = createConfiguredChat(`Test: ${kind} retry`);
+			const before: LhMessage[] = kind === "practice" ? [newSessionModeMessage("practice"), newUserMessage("hello")] : [newUserMessage("hello")];
 			if (kind === "teacher") {
 				before.push({ ...fauxAssistantMessage([fauxToolCall("probe_done", {}, { id: "probe-1" })], { stopReason: "toolUse" }), id: "probe-response" });
 				before.push({ id: "probe-result", role: "toolResult", toolCallId: "probe-1", toolName: "probe_done", content: [], details: { ok: true }, isError: false, timestamp: 1 });
@@ -339,6 +339,7 @@ describe("failed-response Retry (issue #110)", () => {
 			chatStore.saveMessages(chat.id, before);
 			const factory: AgentFactory = (opts) => {
 				assert.equal(opts.teaching, kind === "teacher");
+				assert.equal(opts.agent, kind);
 				assert.ok(opts.messages?.every((m) => m.role !== "assistant" || m.stopReason !== "error"));
 				if (kind === "practice") return createPracticeAgent({ chatId: chat.id, chatStore }, { ...opts, engine });
 				if (kind === "prober") return createProberAgent({ chatId: chat.id, chatStore, jobStore, deliver: () => {}, spawn: () => {} }, { ...opts, engine });

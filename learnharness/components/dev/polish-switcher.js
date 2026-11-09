@@ -19,14 +19,27 @@
  *     `[data-polish-sidebar="proposed"] .row { … }`.
  *   - The event `polish:change` on window, with `detail: { group, variant }`, for code that renders differently.
  *
+ * A group's `variants` list Explore candidates and `fallback` names the variant shown while none is stored.
+ *
  * Keys: Alt+1 to Alt+9 run through every group's variants in order (by default Current then Proposed per group),
  * and Alt+T flips light and dark. The overlay's Theme row does the same with the mouse.
  * At rest the overlay is a small "Polish" tag in a corner; hovering or focusing it opens the switchers.
  */
 const DEFAULT_VARIANTS = ["current", "proposed"];
-// A group may list more variants for Explore mode, e.g. ["current", "proposed-a", "proposed-b"].
+// A group may list more variants for Explore mode, e.g. ["current", "proposed-a", "proposed-b"], and name the one
+// it falls back to when nothing valid is stored (by default "current").
 const known = new Map();
+const fallbacks = new Map();
 const variantsOf = (group) => known.get(group) ?? DEFAULT_VARIANTS;
+
+/** Registers groups' variants and fallbacks without drawing the overlay, so a reader rendering before
+ *  `installPolishSwitcher` runs (React renders children before a parent's effect) already sees them. */
+export function definePolishGroups(groups) {
+  for (const { id, variants, fallback } of groups) {
+    if (variants) known.set(id, variants);
+    if (fallback) fallbacks.set(id, fallback);
+  }
+}
 const EVENT = "polish:change";
 const storageKey = (group) => `polish:${group}`;
 
@@ -37,9 +50,9 @@ export function polishVariant(group) {
     // variants overwrite each other through the storage event without end.
     if (variantsOf(group).includes(fromUrl)) return fromUrl;
     const stored = localStorage.getItem(storageKey(group));
-    return variantsOf(group).includes(stored) ? stored : "current";
+    return variantsOf(group).includes(stored) ? stored : (fallbacks.get(group) ?? "current");
   } catch {
-    return "current";
+    return fallbacks.get(group) ?? "current";
   }
 }
 
@@ -77,10 +90,8 @@ export function installPolishSwitcher({ groups, appearance, corner = "top-right"
   if (!Array.isArray(groups) || groups.length === 0) throw new Error("polish: pass groups: [{ id, label }]");
   if (!appearance || ["read", "set", "subscribe"].some((key) => typeof appearance[key] !== "function"))
     throw new Error("polish: pass appearance: { read, set, subscribe } wired to the app's own theme setting");
-  for (const { id, variants } of groups) {
-    if (variants) known.set(id, variants);
-    document.documentElement.setAttribute(`data-polish-${id}`, polishVariant(id));
-  }
+  definePolishGroups(groups);
+  for (const { id } of groups) document.documentElement.setAttribute(`data-polish-${id}`, polishVariant(id));
 
   const host = document.createElement("div");
   host.setAttribute("data-polish-switcher", "");

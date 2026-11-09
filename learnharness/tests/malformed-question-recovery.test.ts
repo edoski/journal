@@ -50,7 +50,7 @@ function scripted(steps: FauxResponseStep[]) {
 }
 const replacement = () => fauxAssistantMessage([fauxToolCall("explain", valid, { id: "replacement" })], { stopReason: "toolUse" });
 function configured(messages: LhMessage[] = [], course = false) {
-	const chat = chatStore.createChat("Offline malformed question", undefined, course ? { workspace: COURSE, title: "Fixture course" } : undefined);
+	const chat = chatStore.createChat("Offline malformed question", course ? { workspace: COURSE, title: "Fixture course" } : undefined);
 	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
 	chatStore.saveTree(chat.id, { nodes: [{ id: "fixture", title: "Fixture" }], edges: [], version: 1 });
 	chatStore.saveMessages(chat.id, messages);

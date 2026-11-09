@@ -1,4 +1,4 @@
-import type { Phase3 } from "@/src/core";
+import type { Phase3, SessionMode } from "@/src/core";
 import { SectionBreak } from "@/components/lesson/section-break";
 
 /**
@@ -67,13 +67,23 @@ export function PhaseDivider({ phase, nodeCount, variant = "current" }: {
 	variant?: "current" | "proposed";
 }) {
 	if (phase === "probe") return null;
-	if (variant === "proposed") return <SectionBreak testId={`phase-divider-${phase}`} label={CHIP_LABEL[phase]} />;
 	const label =
-		phase === "plan" && nodeCount
+		phase === "plan" && nodeCount && variant !== "proposed"
 			? `Plan · ${nodeCount} node${nodeCount === 1 ? "" : "s"}`
 			: CHIP_LABEL[phase];
+	return <TranscriptRule testId={`phase-divider-${phase}`} label={label} variant={variant} />;
+}
+
+/** The rule where a handoff moves the session between teaching and
+ *  practice. */
+export function ModeDivider({ mode, variant = "current" }: { mode: SessionMode; variant?: "current" | "proposed" }) {
+	return <TranscriptRule testId={`mode-divider-${mode}`} label={mode === "practice" ? "Practice" : "Teaching"} variant={variant} />;
+}
+
+function TranscriptRule({ testId, label, variant }: { testId: string; label: string; variant: "current" | "proposed" }) {
+	if (variant === "proposed") return <SectionBreak testId={testId} label={label} />;
 	return (
-		<div className="my-4 flex w-full items-center gap-3" data-testid={`phase-divider-${phase}`}>
+		<div className="my-4 flex w-full items-center gap-3" data-testid={testId}>
 			<span className="h-0 flex-1 border-t-2 border-dotted border-border/50" aria-hidden />
 			<span className="rounded-full border border-border/80 px-2.5 py-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
 				{label}

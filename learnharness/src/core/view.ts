@@ -429,6 +429,8 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 	switch (marker.customType) {
 		case "course-context":
 			return; // model-facing course brief: nothing to render
+		case "session-mode":
+			return; // the creation's starting mode: nothing to render
 		case "graph-context": {
 			// The session's map context (owner, 2026-10-04): user-side —
 			// a minimal collapsible card ABOVE the first user message;
@@ -445,6 +447,14 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-probe-handoff", id: `ph_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "mode-handoff": {
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-mode-handoff", id: `mh_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}

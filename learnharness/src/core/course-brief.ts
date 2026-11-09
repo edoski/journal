@@ -106,8 +106,30 @@ function taskLines(r: Json): string[] {
 	];
 }
 
-/** The brief for one role, and the key that decides when it is re-sent. */
-export function projectCourseBrief(resume: unknown, role: BriefRole): { key: string; text: string } {
+/** The exam run-up's figures, as the engine's `plan` reports them, named
+ *  as the run-up doctrine names them. Null outside the run-up. */
+function runupLine(plan: unknown, workspace: string): string | null {
+	const course = list(obj(plan).courses).map(obj).find((c) => c.workspace === workspace);
+	const runup = obj(course?.runup);
+	if (typeof runup.days_left !== "number") return null;
+	const parts = [`${runup.days_left} days left`];
+	const named = (field: string) => list(runup[field]).filter((t): t is string => typeof t === "string");
+	if (named("not_introduced").length > 0) parts.push(`not_introduced: ${named("not_introduced").join(", ")}`);
+	if (named("unready").length > 0) parts.push(`unready: ${named("unready").join(", ")}`);
+	if (typeof runup.study_days === "number") parts.push(`study_days: ${runup.study_days}`);
+	if (typeof runup.pace === "number") parts.push(`pace: ${runup.pace} new topics a study day`);
+	return `Exam run-up: ${parts.join("; ")}`;
+}
+
+/** The brief for one role, and the key that decides when it is re-sent.
+ *  Practice also reads the run-up from the engine's `plan` for the course
+ *  at `workspace`; its figures move with the day (in the key) and with
+ *  saves (in the receipts), as levels do. */
+export function projectCourseBrief(
+	resume: unknown,
+	role: BriefRole,
+	runup?: { plan: unknown; workspace: string },
+): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
 	const exam = obj(course.exam);
@@ -122,6 +144,8 @@ export function projectCourseBrief(resume: unknown, role: BriefRole): { key: str
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
 	if (topics.length > 0) lines.push(`Path${str(path.current) ? `, current ${path.current}` : ""}: ${topics.join(", ")}`);
+	const runupText = role === "practice" && runup ? runupLine(runup.plan, runup.workspace) : null;
+	if (runupText) lines.push(runupText);
 	const detail = obj(r.topics);
 	if (due.length > 0) {
 		lines.push(dueHeading(r, due.length), ...due.map((d) => dueLine(withDetail(d, detail), role)));

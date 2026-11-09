@@ -28,14 +28,15 @@ import type {
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
 import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb } from "./contracts/course.ts";
+import type { CourseMap } from "./contracts/course-map.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
 export interface ChatStore {
-	/** Create a session record; kind "practice" marks a practice session
-	 *  (absent = teach, the default); `course` links the session to one
-	 *  registered course for its whole life. */
-	createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord;
+	/** Create a session record; `course` links the session to one
+	 *  registered course for its whole life. A session's mode lives in its
+	 *  transcript (a session-mode marker, then the agents' handoffs). */
+	createChat(title: string, course?: CourseLink): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -240,6 +241,8 @@ export interface CourseRecords {
 	list(): Promise<{ available: true; courses: CourseSummary[] } | Extract<CourseListing, { available: false }>>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+	/** The course map: the engine's read-only `map` verb, parsed. */
+	map(workspace: string): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
 	/** Make an existing empty directory a titled, registered course: the
 	 *  engine's `init` there, then a save of the title. `workspace` is the
 	 *  directory as the engine registered it. */

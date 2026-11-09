@@ -238,6 +238,32 @@ describe("batchTag — deterministic, ref-stable, mutation-sensitive", () => {
 	});
 });
 
+describe("only teaching is extracted", () => {
+	const handoff = (id: string, name: "practice" | "teach"): LhMessage[] => [
+		{ ...assistantWithCalls(`a_${id}`, [{ id, name, args: { scope: "rank", topic: "rank", reason: "asked" } }]), stopReason: "toolUse" } as LhMessage,
+		{ id: `r_${id}`, role: "toolResult", toolCallId: id, toolName: name, content: [{ type: "text", text: "ok" }], details: { ok: true }, isError: false, timestamp: 1 } as LhMessage,
+	];
+
+	it("prose written in practice is invisible; teaching before and after it is extracted", () => {
+		const messages = [
+			teacher("t1", "Rank counts independent columns."),
+			...handoff("h1", "practice"),
+			teacher("p1", "Close: check the second row again."),
+			...handoff("h2", "teach"),
+			teacher("t2", "Now the nullity."),
+		];
+		const cov = coverageOf(messages, [], "c1");
+		assert.deepEqual(cov.uncovered.map((i) => cov.slots[i]!.message.id), ["t1", "t2"]);
+	});
+
+	it("a record that stored kind practice starts in practice: its prose before a teach handoff is invisible", () => {
+		const messages = [teacher("p1", "Close: check the second row again."), ...handoff("h1", "teach"), teacher("t1", "Rank counts independent columns.")];
+		const cov = coverageOf(messages, [], "c1", "practice");
+		assert.deepEqual(cov.uncovered.map((i) => cov.slots[i]!.message.id), ["t1"]);
+		assert.deepEqual(coverageOf(messages, [], "c1").uncovered.length, 2, "without the stored mode both read as teaching");
+	});
+});
+
 describe("the all-sessions coverage GET is dead (extraction-UX close-out, 2026-09-24)", () => {
 	it("the route file is gone — the only coverage endpoint is the Extract POST", () => {
 		// UI confirmation (ff1ec7a): nothing client-side consumes the

@@ -23,8 +23,13 @@ export interface CourseSummary {
 	title: string | null;
 	/** Topics due for review today. */
 	due: number;
+	/** The due topics the engine lists (at most five of `due`), in its
+	 *  order, each by title. */
+	reviews: DueReview[];
 	/** The path's current topic handle, when set. */
 	current: string | null;
+	/** That topic's title, when it has one. */
+	currentTitle: string | null;
 	/** The open task's title, when there is one. */
 	task: string | null;
 	/** The open task's current step, when the task has one. */
@@ -32,8 +37,18 @@ export interface CourseSummary {
 	/** The exam, when the record has a date for it: `daysLeft` is the
 	 *  engine's own count from the study day. */
 	exam: { date: string; daysLeft: number } | null;
-	/** The title of the listed due topic the engine reports most overdue. */
-	mostOverdue: string | null;
+	/** Days since the record was last saved; null when it never was. */
+	lastActiveDaysAgo: number | null;
+}
+
+/** One due review as `plan` lists it. */
+export interface DueReview {
+	/** The topic's title, else its handle. */
+	title: string;
+	/** Days past its review date. */
+	overdue: number;
+	/** The engine's note on what the learner gets wrong, when it has one. */
+	gap: string | null;
 }
 
 /** What the chooser endpoint returns. `roots` are the study folders a new
@@ -51,12 +66,14 @@ export type CourseResult =
 	| { ok: true; json: unknown }
 	| { ok: false; kind: "validation" | "io" | "unavailable"; message: string };
 
-/** The engine's read and write verbs a lesson uses. */
+/** The engine's read and write verbs a lesson uses. `plan` is read for
+ *  the exam run-up's figures. */
 export type CourseVerb =
 	| { verb: "resume"; task?: string }
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
-	| { verb: "save"; changes: unknown };
+	| { verb: "save"; changes: unknown }
+	| { verb: "plan" };
 
 /** Display label for a course: its title, else the directory name. */
 export function courseLabel(course: { workspace: string; title: string | null }): string {
