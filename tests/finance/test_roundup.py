@@ -8,7 +8,7 @@ import json
 import pytest
 
 from finance.config import Paths, Settings
-from finance.roundup import round_up
+from finance.roundup import Debit, RoundUp, resolve, round_up
 from finance.rules import UNRESOLVED, Booking, Categorised, RulesError, parse_rules
 
 from tests.finance.fake_bank import tx
@@ -156,7 +156,7 @@ def test_two_choices_that_pass_on_the_same_round_ups_still_match() -> None:
     assert found.runs[0].status == "matched"
 
 
-def test_two_windows_with_the_same_sum_are_ambiguous() -> None:
+def test_one_debit_two_windows_with_its_sum_still_match() -> None:
     found = classify(
         [
             card("2026-10-28", "9.50"),  # 0.50, certainly the first run's
@@ -168,12 +168,13 @@ def test_two_windows_with_the_same_sum_are_ambiguous() -> None:
             ),  # 0.30, paid 30 Oct to 2 Nov: the 2nd's or the 9th's
             card(
                 "2026-11-02", "0.80"
-            ),  # 0.50 and one 0.30, but which decides the 9th's sum
+            ),  # 0.50 and one 0.30: which one only the 9th's sum can tell
         ]
     )
     (only,) = found.runs
-    assert (only.status, only.candidates) == ("ambiguous", (3,))
-    assert found.matches[3].label == UNRESOLVED
+    assert (only.status, only.debit) == ("matched", 3)
+    assert sorted(only.covers) in ([0, 1], [0, 2])  # one of the two
+    assert found.matches[3].label == "Round up"
     assert found.matches[2].label is None
 
 
@@ -385,3 +386,61 @@ def test_after_an_unmatched_run_the_next_still_matches() -> None:
     assert [r.status for r in found.runs] == ["matched", "unmatched", "matched"]
     assert found.matches[-1].label == "Round up"
     assert sorted(found.runs[2].covers) == [12, 13]
+
+
+ROUNDUP_TERMS = RoundUp(1, (2, 9, 16, 23), datetime.date(2026, 10, 23))
+# Trade Republic's debits from 24 Oct to 6 Nov 2026 (bank data). The 2 Nov run,
+# EUR 3.21, is 25.80 (0.20) and 9.00, 7.00 and 21.00 (EUR 1 each) with either
+# 22.99 (0.01, booked within LAG of since) or 203.99 (0.01, booked 4 Nov).
+REAL = [
+    ("2026-10-24", 2299),
+    ("2026-10-29", 2580),
+    ("2026-11-02", 900),
+    ("2026-11-02", 700),
+    ("2026-11-02", 321),
+    ("2026-11-02", 2100),
+    ("2026-11-04", 20399),
+    ("2026-11-06", 1000),
+    ("2026-11-06", 2800),
+]
+
+
+def debits(rows: list[tuple[str, int]]) -> list[Debit]:
+    return [
+        Debit(i, datetime.date.fromisoformat(day), cents)
+        for i, (day, cents) in enumerate(rows)
+    ]
+
+
+@pytest.mark.parametrize("ninth", [200, 201])  # with or without 203.99's 0.01
+def test_a_debit_matched_whichever_payments_near_the_cut_off_it_took(
+    ninth: int,
+) -> None:
+    rows = REAL + [("2026-11-09", ninth)]
+    found, runs = resolve("TR", debits(rows), ROUNDUP_TERMS, datetime.date(2026, 11, 9))
+    assert found == {4: True, 9: True}
+    second, ninth_run = runs
+    assert (second.day, second.status, second.debit) == (
+        datetime.date(2026, 11, 2),
+        "matched",
+        4,
+    )
+    assert sorted(second.covers) in ([0, 1, 2, 3, 5], [1, 2, 3, 5, 6])
+    assert (ninth_run.status, ninth_run.debit) == ("matched", 9)
+    assert sorted(ninth_run.covers) == ([7, 8] if ninth == 200 else [6, 7, 8])
+
+
+def test_two_debits_each_matching_with_the_cut_off_open_stay_ambiguous() -> None:
+    rows = REAL + [("2026-11-02", 321)]  # a card payment of the same amount
+    found, runs = resolve("TR", debits(rows), ROUNDUP_TERMS, datetime.date(2026, 11, 6))
+    assert found == {4: False, 9: False}
+    (only,) = runs
+    assert (only.status, only.candidates) == ("ambiguous", (4, 9))
+
+
+def test_after_an_open_cut_off_a_payment_lag_days_later_is_still_optional() -> None:
+    rows = REAL + [("2026-11-05", 450), ("2026-11-09", 200)]  # 0.50 3 days after
+    found, runs = resolve("TR", debits(rows), ROUNDUP_TERMS, datetime.date(2026, 11, 9))
+    assert found == {4: True, 10: True}
+    assert [r.status for r in runs] == ["matched", "matched"]
+    assert sorted(runs[1].covers) == [7, 8]

@@ -253,9 +253,11 @@ Trade Republic's Round up (`finance/roundup.py`, a `roundup` rule in `categories
 with the multiplier, run days, start day and, once switched off or changed, last run):
 each run's debit is taken only when the card payments' round-ups add up to it to the
 cent, trying both sides of the run's cut-off for payments booked near it (a payment
-is booked up to 3 days late). A run that matches no debit, or more than one, or with
-more than one set of payments passed on to the next run, is reported in
-`debits --json` `roundups` and its candidate debits stay Other; nothing is guessed.
+is booked up to 3 days late). A run that matches no debit, or more than one, is
+reported in `debits --json` `roundups` and its candidate debits stay Other; nothing
+is guessed. When one debit matches but the payments near its cut-off can be split
+more than one way, the run is matched and the next run treats those payments as
+optional.
 
 Consent renewal (Trade Republic every 90 days, FinecoBank every 180): after fetching
 every bank, `fetch` renews each consent that ends today or has ended (never earlier),
