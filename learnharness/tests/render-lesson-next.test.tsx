@@ -185,7 +185,11 @@ describe("Proposed lesson cards", () => {
 		} as unknown as CourseChoice;
 		const banner = documentFor(<CourseLinkBody choice={choice} busy={false} error={null} onLink={() => {}} variant="proposed" />).querySelector('[data-testid="course-link-banner"]')!;
 		assert.match(banner.textContent!, /Link this session to a course to continue\./);
-		assert.equal(banner.querySelectorAll("button").length, 1);
+		assert.deepEqual(
+			[...banner.querySelectorAll("button")].filter((b) => b.getAttribute("data-testid") !== "course-picker").map((b) => b.textContent),
+			["Link"],
+			"besides the course chip, Link is the one action",
+		);
 		assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
 	});
 });
