@@ -28,6 +28,7 @@ import type {
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
 import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb } from "./contracts/course.ts";
+import type { CourseMap } from "./contracts/course-map.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
 
@@ -240,6 +241,8 @@ export interface CourseRecords {
 	list(): Promise<{ available: true; courses: CourseSummary[] } | Extract<CourseListing, { available: false }>>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+	/** The course map: the engine's read-only `map` verb, parsed. */
+	map(workspace: string): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
 	/** Make an existing empty directory a titled, registered course: the
 	 *  engine's `init` there, then a save of the title. `workspace` is the
 	 *  directory as the engine registered it. */
