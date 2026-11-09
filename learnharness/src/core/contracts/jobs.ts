@@ -8,7 +8,7 @@
  */
 import type { CallUsage } from "./chat.ts";
 import type { LhMessage, LhMarkerMessage } from "../native-messages.ts";
-import { newHandoffMessage } from "../native-messages.ts";
+import { newHandoffMessage, newModeHandoffMessage } from "../native-messages.ts";
 
 // ─── Async sub-agent jobs (vision §2.5; plan.md Wave 0 protocol) ────────────
 
@@ -427,6 +427,12 @@ function abortText(kind: JobKind): string {
 
 export function buildProbeHandoffSteer(chatId: string): SteerMessage {
 	return newHandoffMessage(chatId);
+}
+
+/** A mode handoff's wake (tools/handoff.ts): like the probe handoff, it
+ *  starts the next agent's run and never rides a live one. One per call. */
+export function buildModeHandoffSteer(chatId: string, toolCallId: string, mode: "teach" | "practice"): SteerMessage {
+	return newModeHandoffMessage(chatId, toolCallId, mode);
 }
 
 /** True when the transcript already carries this steer — idempotent

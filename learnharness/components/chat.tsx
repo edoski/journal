@@ -62,7 +62,7 @@ import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
-import { CHIP_LABEL, PhaseChip, PhaseDivider } from "@/components/phase-divider";
+import { CHIP_LABEL, ModeDivider, PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
 	CompactionCutDivider,
 	CompactionMomentDivider,
@@ -213,6 +213,12 @@ function SystemLine({ children, testId }: { children: React.ReactNode; testId?: 
 
 function isSubagentSteer(m: LhViewMessage): boolean {
 	return (m.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
+}
+
+/** The mode a handoff marker's view part moves the session to. */
+function modeHandoffTarget(m: LhViewMessage): SessionMode {
+	const part = m.parts.find((p) => p.type === "data-mode-handoff") as { data?: { mode?: unknown } } | undefined;
+	return part?.data?.mode === "practice" ? "practice" : "teach";
 }
 
 /**
@@ -1493,6 +1499,10 @@ export function Chat({
 								// assistant group — is gone). Never a user bubble: the wake is
 								// scaffolding; the model-facing instruction lives in the adapter.
 								<PhaseDivider key={m.id || `m-${mi}`} phase="plan" variant={design} />
+							) : m.role === "user" && m.parts.some((p) => p.type === "data-mode-handoff") ? (
+								// A handoff between teaching and practice: the rule where
+								// the next agent takes over, never a user bubble.
+								<ModeDivider key={m.id || `m-${mi}`} mode={modeHandoffTarget(m)} variant={design} />
 							) : m.role === "user" && m.parts.length > 0 && m.parts.every((p) => p.type.startsWith("data-")) ? (
 								// Marker cards (custom messages, 2026-10-04): user-side
 								// scaffolding — the graph-context pick, the practice

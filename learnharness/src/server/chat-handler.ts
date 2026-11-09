@@ -491,6 +491,7 @@ export async function handleChatInput(
 							spawn: (job, input) => void jobRunner.runJob(job.id, input),
 						},
 						...(graphToolsEnabled(effective) ? { graph: { chatStore: stores.chatStore, graphStore: stores.graphStore } } : {}),
+						deliver: (steer) => void deliverJobResult(steer),
 					},
 					agentOpts,
 				)
@@ -501,6 +502,7 @@ export async function handleChatInput(
 						chatStore: stores.chatStore,
 						jobStore: stores.jobStore,
 						spawn: (job, input) => void jobRunner.runJob(job.id, input),
+						deliver: (steer) => void deliverJobResult(steer),
 					},
 					agentOpts,
 				)

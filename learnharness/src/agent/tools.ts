@@ -10,11 +10,12 @@ import {
 	parseOptionsIfString,
 } from "../core/question-core.ts";
 import { filterEnabledTools, type EnabledTools } from "../core/pending.ts";
-import type { JobRecord } from "../core/contracts.ts";
+import type { JobRecord, SteerMessage } from "../core/contracts.ts";
 import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
+import { practiceHandoffTool } from "./tools/handoff.ts";
 import { proberGraphTools } from "./tools/graph.ts";
 import { readTool } from "./tools/read.ts";
 import { lsTool } from "./tools/ls.ts";
@@ -229,6 +230,8 @@ export function createProberTools(
 		// quizzing switch must never drop the only graded tool.
 		recall: probeExplainTool,
 		...done,
+		// The prober routes the opening: a request to practise hands off.
+		...practiceHandoffTool(ctx),
 	});
 }
 
@@ -258,6 +261,9 @@ export interface TeacherToolContext extends PlanToolContext {
 	 *  rides along — the spawn fires mid-stream, before the tool part is
 	 *  persisted to the transcript (a transcript scan would race it). */
 	spawn: (job: JobRecord, input: ResearchInput | DemoInput | VisualInput | PdfInput) => void;
+	/** Queue a handoff's wake: present = the `practice` handoff is
+	 *  registered (the composition root always passes it). */
+	deliver?: (steer: SteerMessage) => void;
 }
 
 /**
@@ -295,5 +301,6 @@ export function createTeacherTools(
 		enabled,
 		),
 		explain: teachExplainToolFor(ctx),
+		...(ctx.deliver ? practiceHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }) : {}),
 	});
 }
