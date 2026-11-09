@@ -342,7 +342,7 @@ export function displayCostTotals(costs: Pick<GraphCostSummary, "stages">): {
  */
 /** Exported for the chains home (graph rendering off, owner
  * 2026-10-06): the same bare cumulative-dollars pill + panel. */
-export function GraphCostControl({ costs, variant = "current" }: { costs: GraphCostSummary; variant?: "current" | "proposed" }) {
+export function GraphCostControl({ costs }: { costs: GraphCostSummary }) {
 	const [open, setOpen] = useState(false);
 	// Click anywhere outside (or Escape) closes the panel — the root
 	// wraps button + panel, so the toggle itself keeps working.
@@ -359,9 +359,7 @@ export function GraphCostControl({ costs, variant = "current" }: { costs: GraphC
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
-				className={variant === "proposed"
-					? `h-7 rounded-md px-2 text-label tabular-nums outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${open ? "text-foreground" : "text-muted-foreground"}`
-					: `rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${
+				className={`rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${
 					open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
 				}`}
 			>
@@ -387,7 +385,7 @@ export function GraphCostControl({ costs, variant = "current" }: { costs: GraphC
  * not tracked anymore — the headline sums the displayed stages only and
  * naming-kind runs never reach the list.
  */
-function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
+function GraphCostPanel({ costs, embedded = false }: { costs: GraphCostSummary; embedded?: boolean }) {
 	const stageRows: [string, GraphCostSummary["stages"]["extraction"]][] = [
 		["Extraction", costs.stages.extraction],
 		["Audit", costs.stages.audit],
@@ -396,10 +394,10 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 	// the pill and this panel must agree).
 	const { unpricedRuns } = displayCostTotals(costs);
 	return (
-		<div className="w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border bg-card/95 p-3 text-xs shadow-lg backdrop-blur">
+		<div className={embedded ? "text-xs" : "w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border bg-card/95 p-3 text-xs shadow-lg backdrop-blur"}>
 			<div className="mb-2 flex items-baseline justify-between">
 				<span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-					Graph pipeline costs
+					{embedded ? "Costs" : "Graph pipeline costs"}
 				</span>
 				<span className="text-foreground tabular-nums">
 					{graphUsageLabel(costs)}
@@ -455,9 +453,13 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 function GraphSettingsControl({
 	settings,
 	changeSettings,
+	costs,
 	variant = "current",
 }: {
 	variant?: "current" | "proposed";
+	/** Proposed: the graph pipeline's costs, at the foot of the panel
+	 *  (cost figures live in settings and details, not on the study views). */
+	costs?: GraphCostSummary | null;
 	settings: GraphRenderSettings;
 	changeSettings: (update: (cur: RenderSettings) => RenderSettings) => void;
 }) {
@@ -831,6 +833,11 @@ function GraphSettingsControl({
 									}))}
 							/>
 						</div>
+						{costs && costs.runs.length > 0 && (
+							<div data-testid="graph-settings-costs" className="mt-1.5 border-t pt-1.5">
+								<GraphCostPanel costs={costs} embedded />
+							</div>
+						)}
 					</div>
 				</div>
 			)}
@@ -867,10 +874,13 @@ export function GraphChromeRow({
 	settings,
 	changeSettings,
 	onOpenChains,
+	costs,
 	variant = "current",
 }: {
 	/** The design: "proposed" draws the controls as CHROME_NEXT. */
 	variant?: "current" | "proposed";
+	/** Proposed only: shown inside the gear's panel (GraphSettingsControl). */
+	costs?: GraphCostSummary | null;
 	isEmpty: boolean;
 	query: string;
 	onQuery: (v: string) => void;
@@ -975,7 +985,7 @@ export function GraphChromeRow({
 				// is a plain shrink-0 flex child — the panel itself positions
 				// within GraphSettingsControl's own relative root, unaffected.
 				<div className="graph-chrome-fade-in shrink-0">
-					<GraphSettingsControl settings={settings} changeSettings={changeSettings} variant={variant} />
+					<GraphSettingsControl settings={settings} changeSettings={changeSettings} costs={next ? costs : null} variant={variant} />
 				</div>
 			)}
 		</>
@@ -1640,6 +1650,7 @@ export function GraphView({
 					settings={settings}
 					changeSettings={changeSettings}
 					onOpenChains={() => setChainsOpen(true)}
+					costs={costs}
 					variant={variant}
 				/>
 			</div>
@@ -1652,7 +1663,7 @@ export function GraphView({
 			    row so narrow windows can never push it over the composer
 			    the way the old bottom-left stack did; the whole top-right
 			    cluster is one column, right-aligned. */}
-			{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} variant={variant} />}
+			{costs && costs.runs.length > 0 && variant !== "proposed" && <GraphCostControl costs={costs} />}
 			{pipelineRuns.map((run) => (
 				<div
 					key={run.id}

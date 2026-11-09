@@ -80,3 +80,9 @@ describe("computeMenuPlacement — cap + position", () => {
 		assert.ok(!("right" in p.style));
 	});
 });
+describe("computeMenuPlacement — width", () => {
+	it("sizes a field's menu to the field and leaves other menus to their class", () => {
+		assert.equal(computeMenuPlacement(rect(100, 136), viewport(800), 200, "down", "left", true).style.width, 200);
+		assert.equal(computeMenuPlacement(rect(100, 136), viewport(800), 200, "down", "left").style.width, undefined);
+	});
+});

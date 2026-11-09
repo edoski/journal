@@ -179,7 +179,7 @@ export function SetupKeysBody({
 							className={cn("h-9 w-full px-3 text-control", !provider && "text-muted-foreground")}
 						/>
 						{menuOpen && (
-							<MenuShell anchorRef={menuAnchor} testid="setup-key-provider-menu" preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-[22rem]")}>
+							<MenuShell anchorRef={menuAnchor} testid="setup-key-provider-menu" preferredSide="down" align="left" matchAnchorWidth menuClass={MENU_SURFACE}>
 								<ProviderMenuList variant="proposed" providers={providers ?? []} onPick={onPick} />
 							</MenuShell>
 						)}

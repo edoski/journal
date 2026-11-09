@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { GraduationCapIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, GraduationCapIcon } from "lucide-react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
+import { MenuShell } from "@/components/menu-shell";
+import { MENU_ITEM, MENU_ITEM_SELECTED, MENU_SURFACE } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
 import { Input, inputVariants } from "@/components/ui/input";
 import { DialogContent, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
@@ -199,6 +201,82 @@ function rootLabel(root: string): string {
 	return root.split("/").filter(Boolean).slice(-2).join("/");
 }
 
+/** The New course dialog's study root under the Proposed design: a field
+ *  that opens the shared menu (components/ui/menu.md) at its own width.
+ *  An open menu takes the first Esc, so the dialog closes only on the next. */
+function RootMenuField({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
+	const [open, setOpen] = useState(false);
+	const triggerRef = useRef<HTMLButtonElement>(null);
+	const close = useCallback((refocus: boolean) => {
+		setOpen(false);
+		if (refocus) triggerRef.current?.focus();
+	}, []);
+	useEffect(() => {
+		if (!open) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key !== "Escape") return;
+			e.preventDefault();
+			e.stopPropagation();
+			close(true);
+		};
+		const onPointerDown = (e: PointerEvent) => {
+			const t = e.target;
+			if (t instanceof Node && triggerRef.current?.contains(t)) return;
+			if (t instanceof Element && t.closest("[data-lh-menu]")) return;
+			close(false);
+		};
+		document.addEventListener("keydown", onKeyDown, true);
+		document.addEventListener("pointerdown", onPointerDown);
+		return () => {
+			document.removeEventListener("keydown", onKeyDown, true);
+			document.removeEventListener("pointerdown", onPointerDown);
+		};
+	}, [open, close]);
+	return (
+		<>
+			<button
+				ref={triggerRef}
+				type="button"
+				aria-haspopup="menu"
+				aria-expanded={open}
+				disabled={roots.length === 0}
+				title={value || undefined}
+				data-testid="new-course-root"
+				onClick={() => setOpen((o) => !o)}
+				onKeyDown={(e) => {
+					if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+					e.preventDefault();
+					setOpen(true);
+				}}
+				className={cn(inputVariants(), "flex items-center gap-2 text-left font-normal hover:bg-fill-hover")}
+			>
+				<span className="min-w-0 flex-1 truncate">{value ? rootLabel(value) : "No study root"}</span>
+				<ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+			</button>
+			{open && (
+				<MenuShell anchorRef={triggerRef} testid="new-course-root-menu" preferredSide="down" align="left" matchAnchorWidth menuClass={MENU_SURFACE}>
+					{roots.map((r) => (
+						<button
+							key={r}
+							type="button"
+							title={r}
+							data-testid="new-course-root-option"
+							onClick={() => {
+								onChange(r);
+								close(true);
+							}}
+							className={cn(MENU_ITEM, "justify-between", r === value && MENU_ITEM_SELECTED)}
+						>
+							<span className="min-w-0 truncate">{rootLabel(r)}</span>
+							{r === value && <CheckIcon aria-hidden className="size-3.5! text-muted-foreground" />}
+						</button>
+					))}
+				</MenuShell>
+			)}
+		</>
+	);
+}
+
 /** The New course form: a title and the study root it goes in. The server
  *  creates `<root>/<slug>` and has the engine make it a course. */
 export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, variant = "current" }: {
@@ -247,19 +325,7 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 						</label>
 						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
 							Study root
-							<select
-								value={root}
-								onChange={(e) => setRoot(e.target.value)}
-								disabled={roots.length === 0}
-								data-testid="new-course-root"
-								className={cn(inputVariants(), "font-normal")}
-							>
-								{roots.map((r) => (
-									<option key={r} value={r} title={r}>
-										{rootLabel(r)}
-									</option>
-								))}
-							</select>
+							<RootMenuField roots={roots} value={root} onChange={setRoot} />
 						</label>
 						{roots.length === 0 && (
 							<p className="text-row text-muted-foreground">

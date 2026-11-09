@@ -76,6 +76,8 @@ export function computeMenuPlacement(
 	contentHeight: number,
 	preferredSide: MenuSide,
 	align: MenuAlign,
+	/** A field's menu: as wide as the field that opens it. */
+	matchAnchorWidth = false,
 ): MenuPlacement {
 	const availDown = viewport.height - EDGE - (rect.bottom + GAP);
 	const availUp = rect.top - GAP - EDGE;
@@ -95,7 +97,8 @@ export function computeMenuPlacement(
 		align === "right" ? { right: viewport.width - rect.right } : { left: rect.left };
 	const vertical: Record<string, number> =
 		side === "down" ? { top: rect.bottom + GAP } : { bottom: viewport.height - rect.top + GAP };
-	return { side, style: { ...horizontal, ...vertical }, maxHeight };
+	const width: Record<string, number> = matchAnchorWidth ? { width: rect.right - rect.left } : {};
+	return { side, style: { ...horizontal, ...vertical, ...width }, maxHeight };
 }
 
 /** The shared shell. Exactly one anchor seam: pass `anchorRef` (a live
@@ -107,6 +110,7 @@ export function MenuShell({
 	testid,
 	preferredSide,
 	align = "right",
+	matchAnchorWidth = false,
 	menuClass,
 	children,
 }: {
@@ -118,6 +122,8 @@ export function MenuShell({
 	preferredSide: MenuSide;
 	/** Which anchor edge the menu's horizontal position keys off. */
 	align?: MenuAlign;
+	/** Size the menu to the anchor's width (a full-width field's menu). */
+	matchAnchorWidth?: boolean;
 	/** The menu body classes: width, border, bg, padding, text — the
 	 *  shell adds position, z-index, the height cap, and scrolling. */
 	menuClass: string;
@@ -204,6 +210,7 @@ export function MenuShell({
 				menuRef.current.scrollHeight,
 				preferredSide,
 				align,
+				matchAnchorWidth,
 			);
 			setPlaced(p);
 		};
@@ -219,7 +226,7 @@ export function MenuShell({
 			window.removeEventListener("scroll", rePlace, true);
 			window.removeEventListener("resize", rePlace);
 		};
-	}, [anchorRef, anchorTestid, preferredSide, align]);
+	}, [anchorRef, anchorTestid, preferredSide, align, matchAnchorWidth]);
 
 	// First pass: mounted hidden at the viewport's top-left so the layout
 	// effect can measure the real content height before anything is seen.

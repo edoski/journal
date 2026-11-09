@@ -17,7 +17,7 @@ import { AppearanceSection, GraphSection } from "../components/settings/appearan
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
-import { ThinkingMenuList } from "../components/settings/model-menu.tsx";
+import { priceLabel, ThinkingMenuList } from "../components/settings/model-menu.tsx";
 import { NewCourseBody } from "../components/course-picker.tsx";
 import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
 import { DeleteNodeBody } from "../components/delete-node-dialog.tsx";
@@ -119,6 +119,15 @@ describe("the Proposed thinking menu", () => {
 	});
 });
 
+describe("the Proposed model menu's prices", () => {
+	it("prints every price with two decimals, beside Current's trimmed form", () => {
+		const cost = { input: 0.1, output: 0.5, cacheRead: 0, cacheWrite: 0 };
+		assert.equal(priceLabel(cost, "proposed"), "$0.10/$0.50");
+		assert.equal(priceLabel({ ...cost, input: 3, output: 15 }, "proposed"), "$3.00/$15.00");
+		assert.equal(priceLabel(cost), "$0.1/$0.5");
+	});
+});
+
 describe("Proposed dialogs keep their actions", () => {
 	it("New course: a title field, a study root, Cancel, and Create disabled until there is a title", () => {
 		const doc = documentFor(<NewCourseBody variant="proposed" roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />);
@@ -126,7 +135,10 @@ describe("Proposed dialogs keep their actions", () => {
 		assert.equal(dialog?.getAttribute("role"), "dialog");
 		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
 		assert.ok(doc.querySelector('[data-testid="new-course-title"]'));
-		assert.equal(doc.querySelector('[data-testid="new-course-root"] option')?.textContent, "study/courses");
+		const root = doc.querySelector('[data-testid="new-course-root"]');
+		assert.equal(root?.tagName, "BUTTON", "the study root opens the shared menu, not a browser select");
+		assert.equal(root?.textContent, "study/courses");
+		assert.equal(root?.getAttribute("aria-haspopup"), "menu");
 		assert.equal(doc.querySelector('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
 		assert.ok([...doc.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
 	});

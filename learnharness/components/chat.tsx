@@ -92,6 +92,8 @@ import { LessonDesignContext } from "@/components/lesson/lesson-design";
 import { LessonDetails, LessonTopBar } from "@/components/lesson/lesson-top-bar";
 import { PlanCard, PlanPanel } from "@/components/lesson/plan-map";
 import { ActivityLine } from "@/components/lesson/activity-line";
+import { TurnError } from "@/components/lesson/turn-error";
+import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
@@ -268,6 +270,7 @@ export function Chat({
 	// or, for registry-rendered parts, through LessonDesignContext.
 	const design = useDesignVariant();
 	const proposed = design === "proposed";
+	const { open: openSettings } = useSettingsDialog();
 
 	// THE SESSION HOOK (Wave D, owner-approved 2026-09-26): the app-owned
 	// replacement for useChat + the AI-SDK transport. The record is native
@@ -1748,15 +1751,9 @@ export function Chat({
 							)}
 							{openingError && <p role="alert" className={proposed ? "text-row text-danger" : "text-sm text-destructive"}>{OPENING_PROMPT_FAILURE}</p>}
 							{error && proposed && (
-								<div role="alert" data-testid="turn-error" className="flex flex-wrap items-center gap-x-3 gap-y-1 text-row">
-									<span className="min-w-0 text-danger">Something went wrong: {error.message}</span>
+								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} chatId={chatId} failure={claudeLimit} onContinue={retryFailedTurn} variant="proposed" />}
-									{retryable && (
-										<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={retryFailedTurn} className="-ml-2 h-8 px-2 text-row font-medium text-foreground">
-											Retry
-										</Button>
-									)}
-								</div>
+								</TurnError>
 							)}
 							{error && !proposed && (
 								<div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm">

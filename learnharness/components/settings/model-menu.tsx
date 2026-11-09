@@ -30,8 +30,10 @@ import { MENU_DETAIL, MENU_ITEM, MENU_ITEM_SELECTED, MENU_ITEM_WALKED, MENU_NOTE
 
 type MenuVariant = "current" | "proposed";
 
-function priceLabel(cost: ModelCatalogEntry["cost"]): string {
-	const fmt = (n: number) => `$${n < 1 ? n.toFixed(2).replace(/0$/, "") : n.toFixed(2)}`;
+/** USD per 1M tokens in/out. Proposed keeps two decimals on every price
+ *  (one format in a column of figures); Current trims a trailing zero under $1. */
+export function priceLabel(cost: ModelCatalogEntry["cost"], variant: MenuVariant = "current"): string {
+	const fmt = (n: number) => `$${variant === "proposed" || n >= 1 ? n.toFixed(2) : n.toFixed(2).replace(/0$/, "")}`;
 	return `${fmt(cost.input)}/${fmt(cost.output)}`;
 }
 
@@ -82,7 +84,7 @@ export function ModelMenuList({
 				renderItem={(m) => proposed ? <>
 					<span className="flex items-center justify-between gap-3">
 						<span className="truncate">{m.name}</span>
-						<span className={cn(MENU_DETAIL, "shrink-0")}>{subscriptionLabel(`${m.provider}:${m.id}`) ?? priceLabel(m.cost)}</span>
+						<span className={cn(MENU_DETAIL, "shrink-0")}>{subscriptionLabel(`${m.provider}:${m.id}`) ?? priceLabel(m.cost, "proposed")}</span>
 					</span>
 					<span className={cn(MENU_DETAIL, "flex items-center justify-between gap-3")}>
 						<span className="truncate">{subscriptionLabel(`${m.provider}:${m.id}`) ? `${subscriptionLabel(`${m.provider}:${m.id}`)} (subscription)` : m.provider} · {m.id}</span>
