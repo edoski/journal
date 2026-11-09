@@ -56,14 +56,14 @@ async function escapeReachesWindow(): Promise<boolean> {
 }
 
 describe("Proposed course chip", () => {
-	it("opens a menu of the courses with their due counts, then New course", async () => {
+	it("opens a menu of the courses by name, with no counts, then New course", async () => {
 		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} />);
 		const chip = element('[data-testid="course-picker"]');
 		assert.equal(chip.textContent, "SMM");
 		assert.equal(document.querySelectorAll("select").length, 0, "no browser select");
 		await press(chip, "pointerdown");
 		const rows = [...document.querySelectorAll('[data-testid="course-option"]')];
-		assert.deepEqual(rows.map((r) => r.textContent), ["SMM2 due", "untitled-dir"]);
+		assert.deepEqual(rows.map((r) => r.textContent), ["SMM", "untitled-dir"]);
 		assert.equal(rows[0]!.getAttribute("aria-checked"), "true", "the picked course is the checked one");
 		assert.equal(element('[data-testid="course-new"]').textContent, "New course…");
 	});

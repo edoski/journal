@@ -15,7 +15,6 @@ import {
 	DropdownMenuRadioGroup,
 	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
-	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,8 +219,8 @@ export function CoursePicker(props: {
 	);
 }
 
-/** The Proposed course chip: the courses as one choice, each with its due
- *  count, then "New course…" as an action. */
+/** The Proposed course chip: the courses as one choice, then "New course…"
+ *  as an action. No due counts: Today says what is waiting, in words. */
 function CourseMenu({ courses, workspace, onChange, onNew }: {
 	courses: readonly CourseSummary[];
 	workspace: string;
@@ -251,7 +250,6 @@ function CourseMenu({ courses, workspace, onChange, onNew }: {
 							{courses.map((c) => (
 								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option">
 									<span className="min-w-0 flex-1 truncate">{courseLabel(c)}</span>
-									{c.due > 0 && <DropdownMenuShortcut>{c.due} due</DropdownMenuShortcut>}
 								</DropdownMenuRadioItem>
 							))}
 						</DropdownMenuRadioGroup>

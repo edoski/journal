@@ -9,6 +9,7 @@ import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { timeAgo } from "@/components/sidebar";
 import { resolveSettings } from "@/src/core";
+import { cn } from "@/lib/utils";
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked

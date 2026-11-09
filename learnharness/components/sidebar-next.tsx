@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { BookIcon, CircleDashedIcon, NetworkIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
+import { BookIcon, CircleDashedIcon, MapIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { courseLabel, type ChatListItem } from "@/src/core";
 import { fetchCourses } from "@/components/course-picker";
 import { examText } from "@/components/start/course-facts";
@@ -264,7 +264,7 @@ function CoverageItemNext({ chatId }: { chatId: string }) {
 }
 
 /** The Proposed sidebar: the app mark and collapse, New lesson, Today and
- *  Knowledge, a quiet search, sessions under collapsible courses, background
+ *  Map, a quiet search, sessions under collapsible courses, background
  *  agents only while one runs, Settings at the foot. */
 export function SidebarNext() {
 	const { open, toggle } = useSidebar();
@@ -330,11 +330,11 @@ export function SidebarNext() {
 							<NavRowLabel>Today</NavRowLabel>
 						</Link>
 					</NavRow>
-					<Hint label="Knowledge" action="jump-graph" side="right">
+					<Hint label="Map" action="jump-graph" side="right">
 						<NavRow asChild active={s.pathname === "/knowledge"}>
 							<Link href="/knowledge" onClick={blurAfterPointerClick}>
-								<NetworkIcon />
-								<NavRowLabel>Knowledge</NavRowLabel>
+								<MapIcon />
+								<NavRowLabel>Map</NavRowLabel>
 							</Link>
 						</NavRow>
 					</Hint>
