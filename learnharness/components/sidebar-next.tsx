@@ -1,24 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { DumbbellIcon, NetworkIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
+import { BookIcon, CircleDashedIcon, NetworkIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { courseLabel, type ChatListItem } from "@/src/core";
 import { fetchCourses } from "@/components/course-picker";
 import { examText } from "@/components/start/course-facts";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
-import { MenuShell } from "@/components/menu-shell";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, useActivity } from "@/components/activity-dock";
-import { CoverageMenuBlock } from "@/components/extraction-coverage";
+import { coverageItem, useSessionCoverage } from "@/components/extraction-coverage";
 import { LhMark } from "@/components/lh-mark";
-import { MENU_ITEM, MENU_SEPARATOR, MENU_SURFACE } from "@/components/ui/menu";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
-import { NavSection } from "@/components/nav/nav-section";
+import { NavGroup } from "@/components/nav/nav-group";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,59 +75,61 @@ export function shortTimeAgo(iso: string, now = new Date()): string {
 	return `${Math.floor(d / 365)}y`;
 }
 
-/** What the session waits on, if anything: the tutor's question or a posed
- *  practice problem. */
-function waitingFor(chat: ChatListItem): string | null {
-	if (chat.pendingQuestion) return "Waiting for input";
-	if (chat.kind === "practice" && chat.pendingProblem) return "Problem waiting";
-	return null;
+/** What a session row says about the session: the tutor is writing, the
+ *  tutor waits on the learner (a question or a posed practice problem
+ *  alike, since teaching and practice are routed for the learner), or
+ *  nothing is pending. Pure. */
+export type SessionState = "working" | "your-turn" | "idle";
+
+export function sessionState(chat: ChatListItem): SessionState {
+	if (chat.busy || chat.compacting) return "working";
+	if (chat.pendingQuestion || chat.pendingProblem) return "your-turn";
+	return "idle";
 }
 
-/** One session: its title, then a practice glyph, a dot when it waits on the
- *  learner, and how long ago, or the spinner while a turn runs. */
+/** One session under its course: the title on the course name's edge, and
+ *  one trailing item, "Your turn" in the accent, the spinner while the
+ *  tutor writes, or how long ago. Only "Your turn" lifts the title to full
+ *  ink at 500; working and finished sessions stay muted. */
 export function SessionRowNext({
 	chat,
 	active,
 	highlighted = false,
 	onOpen,
-	onContextMenu,
-}: {
+	...props
+}: Omit<React.ComponentProps<"button">, "onClick"> & {
 	chat: ChatListItem;
 	active: boolean;
 	highlighted?: boolean;
 	onOpen: () => void;
-	onContextMenu?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
-	const waiting = waitingFor(chat);
-	const working = chat.busy || chat.compacting;
+	const state = sessionState(chat);
 	return (
 		<NavRow
+			{...props}
+			inset
 			active={active}
 			highlighted={highlighted}
+			attention={state === "your-turn"}
 			onClick={(e) => {
 				onOpen();
 				blurAfterPointerClick(e);
 			}}
-			onContextMenu={onContextMenu}
 			data-testid={highlighted ? "session-row-kbd" : "session-row"}
 		>
 			<NavRowLabel>{chat.title}</NavRowLabel>
 			<NavRowTrailing>
-				{chat.kind === "practice" && <DumbbellIcon className="size-4" aria-label="Practice session" />}
-				{waiting && !working && (
-					<span data-testid="session-waiting" className="size-1.5 rounded-full bg-link">
-						<span className="sr-only">{waiting}</span>
-					</span>
-				)}
-				{working ? (
-					<span className="flex items-center">
+				{state === "working" ? (
+					<>
 						<BrailleSpinner />
 						<span className="sr-only">{chat.compacting ? "Compacting context" : "Working"}</span>
+					</>
+				) : state === "your-turn" ? (
+					<span data-testid="session-waiting" className="font-medium text-link">
+						<span className="sr-only">, </span>Your turn
 					</span>
 				) : (
-					<time dateTime={chat.updatedAt} className="min-w-6 text-right">
-						{shortTimeAgo(chat.updatedAt)}
-					</time>
+					<time dateTime={chat.updatedAt}>{shortTimeAgo(chat.updatedAt)}</time>
 				)}
 			</NavRowTrailing>
 		</NavRow>
@@ -154,7 +163,7 @@ function RenameRowNext({ chat, onCommit, onCancel }: { chat: ChatListItem; onCom
 				}}
 				aria-label="Rename session"
 				data-testid="session-rename-input"
-				className="bg-fill-selected hover:bg-fill-selected focus-visible:bg-fill-selected"
+				className="bg-fill-selected pl-8 hover:bg-fill-selected focus-visible:bg-fill-selected"
 			/>
 		</div>
 	);
@@ -188,9 +197,75 @@ function useExamCountdowns(): ReadonlyMap<string, string> {
 	return exams;
 }
 
-/** The Proposed sidebar: the app mark and collapse, one New lesson action
- *  (practice beside it), Today and Knowledge, a quiet search, sessions by
- *  course, background agents only while one runs, Settings at the foot. */
+/** Which courses the learner folded, by workspace ("" is No course), kept
+ *  across windows and launches. Every course starts open. */
+const COLLAPSED_KEY = "lh:sidebar-collapsed-courses";
+const COLLAPSED_EVENT = "lh:sidebar-collapsed-courses";
+
+function parseCollapsed(raw: string | null): ReadonlySet<string> {
+	try {
+		const list: unknown = JSON.parse(raw ?? "[]");
+		return new Set(Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : []);
+	} catch {
+		return new Set();
+	}
+}
+
+function subscribeCollapsed(onChange: () => void): () => void {
+	window.addEventListener("storage", onChange);
+	window.addEventListener(COLLAPSED_EVENT, onChange);
+	return () => {
+		window.removeEventListener("storage", onChange);
+		window.removeEventListener(COLLAPSED_EVENT, onChange);
+	};
+}
+
+function useCollapsedCourses(): [ReadonlySet<string>, (key: string, collapsed: boolean) => void] {
+	const raw = useSyncExternalStore(
+		subscribeCollapsed,
+		() => localStorage.getItem(COLLAPSED_KEY),
+		() => null,
+	);
+	const collapsed = useMemo(() => parseCollapsed(raw), [raw]);
+	const setCollapsed = useCallback((key: string, fold: boolean) => {
+		const next = new Set(parseCollapsed(localStorage.getItem(COLLAPSED_KEY)));
+		if (fold) next.add(key);
+		else next.delete(key);
+		localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+		window.dispatchEvent(new Event(COLLAPSED_EVENT));
+	}, []);
+	return [collapsed, setCollapsed];
+}
+
+/** The session menu's last item: what the extractor hasn't read yet, and
+ *  Extract. Choosing it keeps the menu open, so the label turns to
+ *  "Extracting notes…" in place. Nothing shows until the first read. */
+function CoverageItemNext({ chatId }: { chatId: string }) {
+	const { coverage, extracting, extract } = useSessionCoverage(chatId);
+	if (coverage === null) return null;
+	const item = coverageItem(coverage, extracting);
+	return (
+		<>
+			<ContextMenuSeparator />
+			<ContextMenuItem
+				data-testid="ctx-extract"
+				className="whitespace-nowrap"
+				disabled={item.disabled}
+				onSelect={(e) => {
+					e.preventDefault();
+					extract();
+				}}
+			>
+				<span data-testid={item.running ? "ctx-coverage-running" : "ctx-coverage"}>{item.label}</span>
+				{item.detail && <ContextMenuShortcut>{item.detail}</ContextMenuShortcut>}
+			</ContextMenuItem>
+		</>
+	);
+}
+
+/** The Proposed sidebar: the app mark and collapse, New lesson, Today and
+ *  Knowledge, a quiet search, sessions under collapsible courses, background
+ *  agents only while one runs, Settings at the foot. */
 export function SidebarNext() {
 	const { open, toggle } = useSidebar();
 	const { open: openSettings } = useSettingsDialog();
@@ -198,10 +273,17 @@ export function SidebarNext() {
 	const running = feed.jobs.length > 0 || feed.extractions.length > 0;
 	const s = useSessionsSidebar({ open, toggle });
 	const exams = useExamCountdowns();
+	const [collapsed, setCollapsed] = useCollapsedCourses();
 
+	// A search shows every match, folded courses included.
+	const searching = s.query.trim() !== "";
 	const groups = useMemo(() => (s.chats ? groupByCourse(filterSessions(s.chats, s.query)) : null), [s.chats, s.query]);
+	const isOpen = (key: string) => searching || !collapsed.has(key);
 	// The search walks the rows in the order they are drawn.
-	const shown = useMemo(() => groups?.flatMap((g) => g.sessions) ?? null, [groups]);
+	const shown = useMemo(
+		() => groups?.flatMap((g) => (searching || !collapsed.has(g.key) ? g.sessions : [])) ?? null,
+		[groups, searching, collapsed],
+	);
 	const walked = s.kbdIndex !== null ? shown?.[s.kbdIndex]?.id : undefined;
 
 	return (
@@ -230,36 +312,18 @@ export function SidebarNext() {
 				</div>
 
 				<nav aria-label="App" className="flex shrink-0 flex-col px-2">
-					<div className="relative">
-						<Hint label="New lesson" action="new-session" side="right">
-							<NavRow
-								data-testid="new-session"
-								onClick={(e) => {
-									s.router.push("/chat/new");
-									blurAfterPointerClick(e);
-								}}
-								className="pr-9"
-							>
-								<PlusIcon />
-								<NavRowLabel>New lesson</NavRowLabel>
-							</NavRow>
-						</Hint>
-						<Hint label="New practice session" side="right">
-							<Button
-								variant="quiet"
-								size="icon-inline"
-								data-testid="new-session-practice"
-								aria-label="New practice session"
-								onClick={(e) => {
-									s.router.push("/chat/new?mode=practice");
-									blurAfterPointerClick(e);
-								}}
-								className="absolute right-1 top-1"
-							>
-								<DumbbellIcon className="size-4" />
-							</Button>
-						</Hint>
-					</div>
+					<Hint label="New lesson" action="new-session" side="right">
+						<NavRow
+							data-testid="new-session"
+							onClick={(e) => {
+								s.router.push("/chat/new");
+								blurAfterPointerClick(e);
+							}}
+						>
+							<PlusIcon />
+							<NavRowLabel>New lesson</NavRowLabel>
+						</NavRow>
+					</Hint>
 					<NavRow asChild active={s.pathname === "/"}>
 						<Link href="/" onClick={blurAfterPointerClick}>
 							<SunIcon />
@@ -292,39 +356,69 @@ export function SidebarNext() {
 					</Hint>
 				</nav>
 
-				<div ref={s.listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-2 pt-4">
-					{groups === null ? (
-						<p className="px-2 text-row text-muted-foreground">Loading…</p>
-					) : groups.length === 0 ? (
-						<p className="px-2 text-row text-muted-foreground">
-							{s.query.trim() ? "No sessions match." : "No sessions yet."}
-						</p>
-					) : (
-						groups.map((group) => (
-							<NavSection key={group.key} title={group.label} trailing={exams.get(group.key)}>
-								{group.sessions.map((c) =>
-									s.renamingId === c.id ? (
-										<RenameRowNext
-											key={c.id}
-											chat={c}
-											onCommit={(next) => void s.commitRename(c.id, next)}
-											onCancel={() => s.setRenamingId(null)}
-										/>
-									) : (
-										<SessionRowNext
-											key={c.id}
-											chat={c}
-											active={s.pathname === `/chat/${c.id}`}
-											highlighted={c.id === walked}
-											onOpen={() => s.openChat(c.id)}
-											onContextMenu={(e) => s.openContext(e, c)}
-										/>
-									),
-								)}
-							</NavSection>
-						))
-					)}
-				</div>
+				<ScrollArea
+					viewportRef={s.listRef}
+					className="min-h-0 flex-1"
+					viewportClassName="[&>div]:block! focus-visible:ring-inset"
+				>
+					<div className="flex flex-col gap-2 px-2 pb-2 pt-4">
+						{groups === null ? (
+							<p className="px-2 text-row text-muted-foreground">Loading…</p>
+						) : groups.length === 0 ? (
+							<p className="px-2 text-row text-muted-foreground">
+								{s.query.trim() ? "No sessions match." : "No sessions yet."}
+							</p>
+						) : (
+							groups.map((group) => (
+								<NavGroup
+									key={group.key}
+									icon={group.key ? <BookIcon /> : <CircleDashedIcon />}
+									title={group.label}
+									trailing={exams.get(group.key)}
+									attention={group.sessions.some((c) => sessionState(c) === "your-turn")}
+									open={isOpen(group.key)}
+									onOpenChange={(next) => {
+										if (!searching) setCollapsed(group.key, !next);
+									}}
+								>
+									{group.sessions.map((c) =>
+										s.renamingId === c.id ? (
+											<RenameRowNext
+												key={c.id}
+												chat={c}
+												onCommit={(next) => void s.commitRename(c.id, next)}
+												onCancel={() => s.setRenamingId(null)}
+											/>
+										) : (
+											<ContextMenu key={c.id}>
+												<ContextMenuTrigger asChild>
+													<SessionRowNext
+														chat={c}
+														active={s.pathname === `/chat/${c.id}`}
+														highlighted={c.id === walked}
+														onOpen={() => s.openChat(c.id)}
+													/>
+												</ContextMenuTrigger>
+												<ContextMenuContent data-testid="session-context-menu" className="w-64">
+													<ContextMenuItem data-testid="ctx-rename" onSelect={() => s.renameChat(c.id)}>
+														Rename
+													</ContextMenuItem>
+													<ContextMenuItem data-testid="ctx-export-md" onSelect={() => s.exportChat(c.id)}>
+														Export as Markdown…
+													</ContextMenuItem>
+													<ContextMenuItem data-testid="ctx-delete" variant="destructive" onSelect={() => s.deleteChat(c.id)}>
+														Delete…
+													</ContextMenuItem>
+													<CoverageItemNext chatId={c.id} />
+												</ContextMenuContent>
+											</ContextMenu>
+										),
+									)}
+								</NavGroup>
+							))
+						)}
+					</div>
+				</ScrollArea>
 
 				{running && <ActivitySection variant="proposed" />}
 
@@ -343,27 +437,6 @@ export function SidebarNext() {
 					</Hint>
 				</div>
 			</div>
-
-			{s.ctxChatId !== null && (
-				<MenuShell
-					anchorRef={s.ctxAnchorRef}
-					testid="session-context-menu"
-					preferredSide="down"
-					menuClass={cn(MENU_SURFACE, "w-56")}
-				>
-					<button type="button" data-testid="ctx-rename" onClick={s.renameFromMenu} className={MENU_ITEM}>
-						Rename
-					</button>
-					<button type="button" data-testid="ctx-export-md" onClick={s.exportFromMenu} className={MENU_ITEM}>
-						Export as Markdown…
-					</button>
-					<button type="button" data-testid="ctx-delete" onClick={s.deleteFromMenu} className={cn(MENU_ITEM, "text-danger")}>
-						Delete…
-					</button>
-					<div className={MENU_SEPARATOR} aria-hidden="true" />
-					<CoverageMenuBlock chatId={s.ctxChatId} variant="proposed" />
-				</MenuShell>
-			)}
 
 			<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
 		</aside>

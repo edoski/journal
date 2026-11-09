@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** A titled group of rows (spec: nav-section.md): a 12px sentence-case
+/** A titled, fixed group of rows (spec: nav-section.md): a 12px sentence-case
  *  muted header over its rows, with an optional trailing fact. */
 export function NavSection({
 	title,

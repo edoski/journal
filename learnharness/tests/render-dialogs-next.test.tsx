@@ -24,7 +24,6 @@ import { DeleteNodeBody } from "../components/delete-node-dialog.tsx";
 import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
-import { CoverageMenuBody } from "../components/extraction-coverage.tsx";
 import { hintBinding, hintText } from "../components/ui/hint.tsx";
 import { bindingForAction, formatBinding, KEYBOARD_ACTIONS } from "../src/core/index.ts";
 import type { GraphChain, GraphNode } from "../src/core/contracts.ts";
@@ -260,26 +259,5 @@ describe("the Proposed chain table", () => {
 	it("keeps the Current headings in the Current design", () => {
 		const doc = documentFor(<ChainTableBody {...props} />);
 		assert.match(doc.querySelector('[data-testid="sort-props"]')?.textContent ?? "", /^Props/);
-	});
-});
-
-describe("the Proposed session menu's extraction item", () => {
-	const coverage = (over: Record<string, unknown>) =>
-		({ uncoveredTokens: 81, uncoveredCount: 2, running: false, ...over }) as unknown as Parameters<typeof CoverageMenuBody>[0]["coverage"];
-
-	it("offers Extract notes with the backlog beside it", () => {
-		const doc = documentFor(<CoverageMenuBody variant="proposed" coverage={coverage({})} extracting={false} onExtract={() => {}} />);
-		const item = doc.querySelector('[data-testid="ctx-extract"]');
-		assert.equal(item?.hasAttribute("disabled"), false);
-		assert.match(item?.textContent ?? "", /^Extract notes81 tok · 2 messages$/);
-	});
-
-	it("is disabled and says so while extracting and once everything is extracted", () => {
-		const running = documentFor(<CoverageMenuBody variant="proposed" coverage={coverage({ running: true })} extracting={false} onExtract={() => {}} />);
-		assert.equal(running.querySelector('[data-testid="ctx-extract"]')?.textContent, "Extracting notes…");
-		assert.equal(running.querySelector('[data-testid="ctx-extract"]')?.hasAttribute("disabled"), true);
-		const done = documentFor(<CoverageMenuBody variant="proposed" coverage={coverage({ uncoveredTokens: 0, uncoveredCount: 0 })} extracting={false} onExtract={() => {}} />);
-		assert.equal(done.querySelector('[data-testid="ctx-extract"]')?.textContent, "Notes fully extracted");
-		assert.equal(done.querySelector('[data-testid="ctx-extract"]')?.hasAttribute("disabled"), true);
 	});
 });

@@ -1,7 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { MENU_DETAIL, MENU_ITEM } from "@/components/ui/menu";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -110,7 +108,20 @@ async function requestExtract(chatId: string): Promise<boolean> {
  * in flight so the numbers settle live. No coverage (fetch failed, 404):
  * the whole block renders nothing — no fake zeros.
  */
-export function CoverageMenuBlock({ chatId, variant = "current" }: { chatId: string; variant?: "current" | "proposed" }) {
+export function CoverageMenuBlock({ chatId }: { chatId: string }) {
+	const { coverage, extracting, extract } = useSessionCoverage(chatId);
+	if (coverage === null) return null;
+	return <CoverageMenuBody coverage={coverage} extracting={extracting} onExtract={extract} />;
+}
+
+/** One session's coverage while its menu is open, and the manual Extract:
+ *  the block's data, shared by both designs' menus. `coverage` stays null
+ *  until the first read lands, and when it fails. */
+export function useSessionCoverage(chatId: string): {
+	coverage: SessionCoverage | null;
+	extracting: boolean;
+	extract: () => void;
+} {
 	const refreshActivity = useActivity().refresh;
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
 	const [extracting, setExtracting] = useState(false); // optimistic until the server says running
@@ -151,8 +162,6 @@ export function CoverageMenuBlock({ chatId, variant = "current" }: { chatId: str
 		return () => clearInterval(timer);
 	}, [load, coverage?.running, extracting]);
 
-	if (coverage === null) return null;
-
 	const onExtract = async () => {
 		setExtracting(true);
 		// The dock's start-site nudge (the 202 registers the run before the
@@ -163,14 +172,27 @@ export function CoverageMenuBlock({ chatId, variant = "current" }: { chatId: str
 		if (!started) setExtracting(false);
 		void load();
 	};
-	return (
-		<CoverageMenuBody
-			variant={variant}
-			coverage={coverage}
-			extracting={extracting}
-			onExtract={() => void onExtract()}
-		/>
-	);
+	return { coverage, extracting, extract: () => void onExtract() };
+}
+
+/** The Proposed menu's one coverage item (components/ui/menu.md): its label,
+ *  the backlog as its detail while there is one, and whether Extract can
+ *  run. Pure. */
+export function coverageItem(
+	coverage: SessionCoverage,
+	extracting: boolean,
+): { label: string; detail: string | null; running: boolean; disabled: boolean } {
+	const running = coverage.running || extracting;
+	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
+	return {
+		label: running ? "Extracting notes…" : complete ? "Notes fully extracted" : "Extract notes",
+		detail:
+			running || complete
+				? null
+				: `${formatTokens(coverage.uncoveredTokens)} tok · ${coverage.uncoveredCount} message${coverage.uncoveredCount === 1 ? "" : "s"}`,
+		running,
+		disabled: running || complete,
+	};
 }
 
 /** The block's presentational core (exported for static-render tests):
@@ -180,10 +202,7 @@ export function CoverageMenuBody({
 	coverage,
 	extracting,
 	onExtract,
-	variant = "current",
 }: {
-	/** "proposed": one menu item (components/ui/menu.md) with the backlog as its detail. */
-	variant?: "current" | "proposed";
 	coverage: SessionCoverage;
 	/** Click-pending (optimistic) until the server says running. */
 	extracting: boolean;
@@ -191,26 +210,6 @@ export function CoverageMenuBody({
 }) {
 	const busy = coverage.running || extracting;
 	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
-	if (variant === "proposed") {
-		return (
-			<button
-				type="button"
-				data-testid="ctx-extract"
-				onClick={onExtract}
-				disabled={busy || complete}
-				className={cn(MENU_ITEM, "justify-between gap-3")}
-			>
-				<span data-testid={busy ? "ctx-coverage-running" : "ctx-coverage"}>
-					{busy ? "Extracting notes…" : complete ? "Notes fully extracted" : "Extract notes"}
-				</span>
-				{!busy && !complete && (
-					<span className={MENU_DETAIL}>
-						{formatTokens(coverage.uncoveredTokens)} tok · {coverage.uncoveredCount} message{coverage.uncoveredCount === 1 ? "" : "s"}
-					</span>
-				)}
-			</button>
-		);
-	}
 	return (
 		<div data-testid="ctx-coverage" className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
 			{busy ? (
