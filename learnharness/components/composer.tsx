@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useState } from "react";
-import { ArrowRightIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
+import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
+import { ArrowRightIcon, ArrowUpIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
 
@@ -99,6 +99,8 @@ export function Composer({
 	placeholder = "Ask, answer, or steer the lesson…",
 	nextProblem = false,
 	onNext,
+	variant = "current",
+	toolbar,
 }: {
 	busy: boolean;
 	value: string;
@@ -107,6 +109,12 @@ export function Composer({
 	onStop: () => void;
 	canSend: boolean;
 	autoFocus?: boolean;
+	/** The design (spec: composer.md). "proposed" draws the composer as its
+	 *  own rounded surface with a toolbar row under the text; its host adds
+	 *  no shell around it. */
+	variant?: "current" | "proposed";
+	/** Proposed only: the controls on the toolbar's left (course, mode). */
+	toolbar?: ReactNode;
 	/** The textarea's placeholder (owner refinement round, 2026-09-24):
 	 *  active sessions read "Ask, answer, or steer the lesson…"; the fresh
 	 *  new-session page asks the graph view's opening question instead. */
@@ -125,6 +133,21 @@ export function Composer({
 		else if (action === "send") onSend();
 		else if (action === "next") onNext?.();
 	};
+	if (variant === "proposed") {
+		return (
+			<ComposerNext
+				busy={busy}
+				value={value}
+				onChange={onChange}
+				onAct={act}
+				canSend={canSend}
+				autoFocus={autoFocus}
+				placeholder={placeholder}
+				nextProblem={nextProblem}
+				toolbar={toolbar}
+			/>
+		);
+	}
 	return (
 		<form
 			data-testid="composer"
@@ -190,6 +213,89 @@ export function Composer({
 						{busy && !canSend ? <SquareIcon className="size-4" /> : <CornerDownLeftIcon className="size-5" />}
 					</button>
 				)}
+		</form>
+	);
+}
+
+/** The Proposed composer (spec: composer.md): one rounded surface, the text
+ *  on top, a toolbar row under it with muted controls on the left and one
+ *  round send on the right. Enter, the stop morph and the practice pause
+ *  behave as in the current composer. */
+function ComposerNext({
+	busy,
+	value,
+	onChange,
+	onAct,
+	canSend,
+	autoFocus,
+	placeholder,
+	nextProblem,
+	toolbar,
+}: {
+	busy: boolean;
+	value: string;
+	onChange: (v: string) => void;
+	onAct: () => void;
+	canSend: boolean;
+	autoFocus?: boolean;
+	placeholder: string;
+	nextProblem: boolean;
+	toolbar?: ReactNode;
+}) {
+	const stopping = busy && !canSend;
+	return (
+		<form
+			data-testid="composer"
+			data-slot="composer"
+			className="flex flex-col rounded-[20px] border bg-card shadow-xs outline-1 -outline-offset-1 outline-transparent transition-[outline-color] has-[textarea:focus]:outline-ring/50 motion-reduce:transition-none"
+			onSubmit={(e) => {
+				e.preventDefault();
+				onAct();
+			}}
+		>
+			<textarea
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
+						e.preventDefault();
+						onAct();
+					}
+				}}
+				placeholder={placeholder}
+				autoFocus={autoFocus}
+				rows={1}
+				className="field-sizing-content max-h-48 min-h-12 resize-none bg-transparent px-4 pb-2 pt-3.5 text-control text-foreground outline-none placeholder:text-muted-foreground"
+			/>
+			<div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-1 p-2">
+				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{toolbar}</div>
+				{nextProblem && !busy && !canSend ? (
+					<button
+						type="submit"
+						data-testid="next-problem-button"
+						aria-label="Next problem"
+						className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-row font-medium text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none"
+					>
+						Next problem
+						<ArrowRightIcon className="size-4" />
+					</button>
+				) : (
+					<button
+						type="submit"
+						data-slot="composer-send"
+						aria-label={stopping ? "Stop" : "Send"}
+						disabled={!busy && !canSend}
+						className={cn(
+							"flex size-8 shrink-0 items-center justify-center rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none",
+							stopping
+								? "bg-fill-selected text-foreground hover:opacity-90"
+								: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40",
+						)}
+					>
+						{stopping ? <SquareIcon className="size-4" /> : <ArrowUpIcon className="size-4" />}
+					</button>
+				)}
+			</div>
 		</form>
 	);
 }

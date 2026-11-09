@@ -15,6 +15,8 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
+import { useDesignVariant } from "@/components/design-variant";
+import { StartScreen } from "@/components/start/start-screen";
 
 /**
  * Home — the knowledge graph is the main view, full-bleed edge to edge
@@ -22,7 +24,15 @@ import type { TurnUsage } from "@/src/core";
  * under the header and the new-session dock, both of which float over it
  * with no gradient scrims. Sessions live in the toggleable sidebar.
  */
-export function Home({
+export function Home(props: { initialConfigured: boolean; rendering?: boolean }) {
+	return useDesignVariant() === "proposed" ? (
+		<StartScreen initialConfigured={props.initialConfigured} today />
+	) : (
+		<HomeCurrent {...props} />
+	);
+}
+
+function HomeCurrent({
 	initialConfigured,
 	rendering = true,
 }: {

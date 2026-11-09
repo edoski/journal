@@ -54,11 +54,41 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(listing, {
 			available: true,
 			courses: [
-				{ workspace: "/s/smm", title: "SMM", due: 5, current: "rank", task: "Exercise 5" },
-				{ workspace: "/s/bare", title: null, due: 0, current: null, task: null },
+				{ workspace: "/s/smm", title: "SMM", due: 5, current: "rank", task: "Exercise 5", step: null, exam: null, mostOverdue: "a" },
+				{ workspace: "/s/bare", title: null, due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null },
 			],
 		});
 		assert.deepEqual(calls()[0]!.args, ["plan", "--all", "--days", "1"]);
+	});
+
+	it("carries the exam countdown, the open task's step and the most overdue due topic for Today", async () => {
+		const { engine } = fakeEngine({
+			today: "2026-11-08",
+			courses: [
+				{
+					workspace: "/s/linalg",
+					title: "Linear Algebra",
+					exam: { date: "2026-11-29", days_left: 21 },
+					due: [
+						{ topic: "span", title: "Span", overdue: 10 },
+						{ topic: "independence", title: "Linear independence", overdue: 16 },
+						{ topic: "rank", title: "Rank", overdue: 16 },
+					],
+					due_more: 1,
+					task: { key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" },
+					current: "rank",
+				},
+				{ workspace: "/s/prob", title: "Probability", exam: null, due: [], task: null },
+			],
+		});
+		const listing = await createCourseRecords(engine).list();
+		assert.ok(listing.available);
+		const [linalg, prob] = listing.courses;
+		assert.deepEqual(
+			{ due: linalg!.due, exam: linalg!.exam, mostOverdue: linalg!.mostOverdue, task: linalg!.task, step: linalg!.step },
+			{ due: 4, exam: { date: "2026-11-29", daysLeft: 21 }, mostOverdue: "Linear independence", task: "Problem sheet 4", step: "Part (c)" },
+		);
+		assert.deepEqual({ exam: prob!.exam, mostOverdue: prob!.mostOverdue, step: prob!.step }, { exam: null, mostOverdue: null, step: null });
 	});
 
 	it("a save sends the patch on stdin to the selected workspace and returns the receipt", async () => {

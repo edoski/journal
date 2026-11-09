@@ -15,6 +15,8 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { ChatSettings, GraphSnapshot } from "@/src/core";
+import { useDesignVariant } from "@/components/design-variant";
+import { StartScreen } from "@/components/start/start-screen";
 
 /** The draft's pick set (owner round 10): the SAME shape the home pick
  *  bar lifts — resolved nodes as the learner SAW them at pick time. */
@@ -194,7 +196,15 @@ export function DraftShell({
 	);
 }
 
-export function NewSession({ initialConfigured, mode = "teach" }: { initialConfigured: boolean; mode?: "teach" | "practice" }) {
+export function NewSession(props: { initialConfigured: boolean; mode?: "teach" | "practice" }) {
+	return useDesignVariant() === "proposed" ? (
+		<StartScreen initialConfigured={props.initialConfigured} initialMode={props.mode} />
+	) : (
+		<NewSessionCurrent {...props} />
+	);
+}
+
+function NewSessionCurrent({ initialConfigured, mode = "teach" }: { initialConfigured: boolean; mode?: "teach" | "practice" }) {
 	const router = useRouter();
 	const [text, setText] = useState("");
 	const [busy, setBusy] = useState(false);

@@ -133,13 +133,39 @@ function summaryOf(entry: unknown): CourseSummary | null {
 	// An entry with `error` is a record the engine could not read: not linkable.
 	if (!workspace || "error" in e) return null;
 	const dueMore = typeof e.due_more === "number" ? e.due_more : 0;
+	const due = Array.isArray(e.due) ? (e.due as unknown[]) : [];
+	const task = typeof e.task === "object" && e.task !== null ? (e.task as Record<string, unknown>) : {};
 	return {
 		workspace,
 		title: str(e.title),
-		due: (Array.isArray(e.due) ? e.due.length : 0) + dueMore,
+		due: due.length + dueMore,
 		current: str(e.current),
-		task: str((e.task as { title?: unknown } | undefined)?.title),
+		task: str(task.title),
+		step: str(task.step),
+		exam: examOf(e.exam),
+		mostOverdue: mostOverdueTitle(due),
 	};
+}
+
+/** `plan`'s `exam: {date, days_left}`, or null when it has no date. */
+function examOf(value: unknown): CourseSummary["exam"] {
+	if (typeof value !== "object" || value === null) return null;
+	const { date, days_left: daysLeft } = value as Record<string, unknown>;
+	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
+}
+
+/** The title of the listed due entry with the most days overdue (the first
+ *  on a tie); a field selection, the engine's `overdue` count decides. */
+function mostOverdueTitle(due: readonly unknown[]): string | null {
+	let best: { title: string; overdue: number } | null = null;
+	for (const entry of due) {
+		if (typeof entry !== "object" || entry === null) continue;
+		const { title, topic, overdue } = entry as Record<string, unknown>;
+		const name = str(title) ?? str(topic);
+		const days = typeof overdue === "number" ? overdue : 0;
+		if (name && (best === null || days > best.overdue)) best = { title: name, overdue: days };
+	}
+	return best?.title ?? null;
 }
 
 export function createCourseRecords(engine: EngineCommand): CourseRecords {

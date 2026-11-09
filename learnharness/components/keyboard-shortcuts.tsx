@@ -25,6 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
+import { useDesignVariant } from "@/components/design-variant";
 import {
 	actionForBinding,
 	bindingForAction,
@@ -45,6 +46,8 @@ export function KeyboardShortcuts() {
 	const router = useRouter();
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
+	// The graph is home in the current design and its own view in the proposed one.
+	const graphPath = useDesignVariant() === "proposed" ? "/knowledge" : "/";
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
@@ -52,8 +55,9 @@ export function KeyboardShortcuts() {
 		router: ReturnType<typeof useRouter>;
 		setCheatOpen: (v: boolean) => void;
 		openSettings: () => void;
-	}>({ router, setCheatOpen, openSettings });
-	handlersRef.current = { router, setCheatOpen, openSettings };
+		graphPath: string;
+	}>({ router, setCheatOpen, openSettings, graphPath });
+	handlersRef.current = { router, setCheatOpen, openSettings, graphPath };
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -116,7 +120,7 @@ export function KeyboardShortcuts() {
 					handlersRef.current.openSettings();
 					break;
 				case "jump-graph":
-					handlersRef.current.router.push("/");
+					handlersRef.current.router.push(handlersRef.current.graphPath);
 					break;
 				case "cheat-sheet":
 					handlersRef.current.setCheatOpen(true);

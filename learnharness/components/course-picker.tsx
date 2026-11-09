@@ -84,11 +84,16 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 
 /** The composer row's course control: the picker, or one line saying why
  *  no course can be picked. Nothing while the engine is being asked. */
-export function CourseControl({ choice }: { choice: CourseChoice }) {
+export function CourseControl({ choice, variant = "current" }: {
+	choice: CourseChoice;
+	/** "proposed": the composer toolbar's chip only; the host shows the
+	 *  unavailable line and the notice under the composer. */
+	variant?: "current" | "proposed";
+}) {
 	const [creating, setCreating] = useState(false);
 	const { state } = choice;
 	if (state.status === "loading") return null;
-	if (state.status === "unavailable") return <CoursesUnavailable reason={state.reason} />;
+	if (state.status === "unavailable") return variant === "proposed" ? null : <CoursesUnavailable reason={state.reason} />;
 	return (
 		<>
 			<CoursePicker
@@ -96,8 +101,9 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 				workspace={choice.workspace}
 				onChange={choice.choose}
 				onNew={() => setCreating(true)}
+				variant={variant}
 			/>
-			{choice.notice && (
+			{choice.notice && variant === "current" && (
 				<span role="alert" data-testid="course-notice" className="font-ui text-xs text-destructive">
 					{choice.notice}
 				</span>
@@ -118,7 +124,15 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 
 /** No lesson exists outside a course, so this line replaces the picker and
  *  every send is blocked with the same words. */
-export function CoursesUnavailable({ reason }: { reason: string }) {
+export function CoursesUnavailable({ reason, variant = "current" }: { reason: string; variant?: "current" | "proposed" }) {
+	if (variant === "proposed") {
+		return (
+			<p role="alert" data-testid="courses-unavailable" className="text-row text-muted-foreground">
+				<span className="text-danger">{unavailableMessage(reason)}.</span> If the engine is not found, set
+				LH_LEARNING_ENGINE to its folder and LH_LEARNING_PYTHON to its Python, then restart.
+			</p>
+		);
+	}
 	return (
 		<p role="alert" data-testid="courses-unavailable" className="font-ui text-xs text-destructive">
 			{unavailableMessage(reason)}.{" "}
@@ -131,22 +145,28 @@ export function CoursesUnavailable({ reason }: { reason: string }) {
 
 /** The course pill: which course record the session studies from and saves
  *  into. The last entry opens the New course dialog. */
-export function CoursePicker({ courses, workspace, onChange, onNew }: {
+export function CoursePicker({ courses, workspace, onChange, onNew, variant = "current" }: {
 	courses: readonly CourseSummary[];
 	workspace: string;
 	onChange: (workspace: string) => void;
 	onNew: () => void;
+	/** "proposed": a quiet 32px pill for the composer toolbar. */
+	variant?: "current" | "proposed";
 }) {
 	const picked = courses.find((c) => c.workspace === workspace);
 	return (
 		<label
 			data-testid="course-picker"
+			data-slot={variant === "proposed" ? "composer-chip" : undefined}
 			className={
-				"relative flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 font-ui text-xs transition-colors hover:bg-accent " +
-				(picked ? "border-border bg-card text-foreground" : "border-dashed border-border/80 text-muted-foreground hover:text-foreground")
+				variant === "proposed"
+					? "relative flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-row transition-colors hover:bg-fill-hover hover:text-foreground has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring motion-reduce:transition-none " +
+						(picked ? "text-foreground" : "text-muted-foreground")
+					: "relative flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 font-ui text-xs transition-colors hover:bg-accent " +
+						(picked ? "border-border bg-card text-foreground" : "border-dashed border-border/80 text-muted-foreground hover:text-foreground")
 			}
 		>
-			<GraduationCapIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
+			<GraduationCapIcon aria-hidden="true" className={variant === "proposed" ? "size-4 shrink-0 text-muted-foreground" : "size-3.5 text-muted-foreground"} />
 			<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : "Pick a course"}</span>
 			<select
 				aria-label="Course"
@@ -276,7 +296,7 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 	);
 }
 
-function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void }) {
+export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void }) {
 	const { onClose } = props;
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {

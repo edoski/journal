@@ -27,6 +27,13 @@ export interface CourseSummary {
 	current: string | null;
 	/** The open task's title, when there is one. */
 	task: string | null;
+	/** The open task's current step, when the task has one. */
+	step: string | null;
+	/** The exam, when the record has a date for it: `daysLeft` is the
+	 *  engine's own count from the study day. */
+	exam: { date: string; daysLeft: number } | null;
+	/** The title of the listed due topic the engine reports most overdue. */
+	mostOverdue: string | null;
 }
 
 /** What the chooser endpoint returns. `roots` are the study folders a new

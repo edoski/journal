@@ -237,11 +237,9 @@ export function SidebarNext() {
 							<NavRowLabel>Today</NavRowLabel>
 						</Link>
 					</NavRow>
-					{/* The knowledge graph gets its own view in the next phase; until
-					    then it lives on the home page. */}
 					<Hint label="Knowledge" action="jump-graph" side="right">
-						<NavRow asChild>
-							<Link href="/" onClick={blurAfterPointerClick}>
+						<NavRow asChild active={s.pathname === "/knowledge"}>
+							<Link href="/knowledge" onClick={blurAfterPointerClick}>
 								<NetworkIcon />
 								<NavRowLabel>Knowledge</NavRowLabel>
 							</Link>

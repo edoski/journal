@@ -76,6 +76,7 @@ import { useServerEvent, useServerResync } from "@/components/server-events";
 import { MenuShell } from "@/components/menu-shell.tsx";
 import { DeleteNodeDialog } from "@/components/delete-node-dialog.tsx";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
+import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
 import {
 	ARROW_LENGTH_LADDER,
@@ -340,7 +341,7 @@ export function displayCostTotals(costs: Pick<GraphCostSummary, "stages">): {
  */
 /** Exported for the chains home (graph rendering off, owner
  * 2026-10-06): the same bare cumulative-dollars pill + panel. */
-export function GraphCostControl({ costs }: { costs: GraphCostSummary }) {
+export function GraphCostControl({ costs, variant = "current" }: { costs: GraphCostSummary; variant?: "current" | "proposed" }) {
 	const [open, setOpen] = useState(false);
 	// Click anywhere outside (or Escape) closes the panel — the root
 	// wraps button + panel, so the toggle itself keeps working.
@@ -357,7 +358,9 @@ export function GraphCostControl({ costs }: { costs: GraphCostSummary }) {
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
-				className={`rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${
+				className={variant === "proposed"
+					? `h-7 rounded-md px-2 text-label tabular-nums outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none ${open ? "text-foreground" : "text-muted-foreground"}`
+					: `rounded-lg px-2 py-1 text-xs tabular-nums transition-colors hover:bg-accent ${
 					open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
 				}`}
 			>
@@ -451,7 +454,9 @@ function GraphCostPanel({ costs }: { costs: GraphCostSummary }) {
 function GraphSettingsControl({
 	settings,
 	changeSettings,
+	variant = "current",
 }: {
+	variant?: "current" | "proposed";
 	settings: GraphRenderSettings;
 	changeSettings: (update: (cur: RenderSettings) => RenderSettings) => void;
 }) {
@@ -473,7 +478,9 @@ function GraphSettingsControl({
 				type="button"
 				aria-expanded={open}
 				onClick={() => setOpen((o) => !o)}
-				className={`flex size-9 items-center justify-center rounded-xl border bg-card/85 shadow-lg backdrop-blur transition-colors hover:bg-accent ${
+				className={variant === "proposed"
+					? cn(CHROME_NEXT.control, "w-8 justify-center px-0", open && "text-foreground")
+					: `flex size-9 items-center justify-center rounded-xl border bg-card/85 shadow-lg backdrop-blur transition-colors hover:bg-accent ${
 					open ? "text-foreground" : "text-muted-foreground hover:text-foreground"
 				}`}
 			>
@@ -830,6 +837,15 @@ function GraphSettingsControl({
 	);
 }
 
+/** The Proposed design's graph chrome (Knowledge view): every control one
+ *  32px glass box, radius 8, 13px text, 16px icons, the 2px focus ring. */
+const CHROME_NEXT = {
+	box: "border bg-card/85 backdrop-blur",
+	control:
+		"flex h-8 items-center gap-1.5 rounded-md border bg-card/85 px-3 text-row text-muted-foreground outline-none backdrop-blur transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none disabled:opacity-50",
+	icon: "size-4",
+};
+
 /** The top-chrome actions row's body (empty-graph chrome wave, owner
  *  2026-09-25): Import Notes renders ALWAYS (graph enabled) — it's the
  *  one action that works on an empty graph, the entry point itself;
@@ -850,7 +866,10 @@ export function GraphChromeRow({
 	settings,
 	changeSettings,
 	onOpenChains,
+	variant = "current",
 }: {
+	/** The design: "proposed" draws the controls as CHROME_NEXT. */
+	variant?: "current" | "proposed";
 	isEmpty: boolean;
 	query: string;
 	onQuery: (v: string) => void;
@@ -867,10 +886,11 @@ export function GraphChromeRow({
 	 *  2026-09-29). */
 	onOpenChains: () => void;
 }) {
+	const next = variant === "proposed";
 	return (
 		<>
 			{!isEmpty && (
-				<div className="graph-chrome-fade-in w-56 min-w-0 shrink rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
+				<div className={next ? "graph-chrome-fade-in w-56 min-w-0 shrink" : "graph-chrome-fade-in w-56 min-w-0 shrink rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur"}>
 					<Hint
 						// ⌘F focuses node search (surface-scoped registry action).
 						label="Search nodes"
@@ -878,7 +898,7 @@ export function GraphChromeRow({
 						side="bottom"
 					>
 					<div className="relative">
-						<SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<SearchIcon className={next ? "pointer-events-none absolute left-2.5 top-1/2 z-10 size-4 -translate-y-1/2 text-muted-foreground" : "absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"} />
 						<input
 							ref={searchInputRef}
 							value={query}
@@ -886,27 +906,29 @@ export function GraphChromeRow({
 							placeholder="Search nodes…"
 							aria-label="Search nodes"
 							spellCheck={false}
-							className="h-7 w-full rounded-lg border bg-background pl-8 text-xs outline-none placeholder:text-muted-foreground focus:border-ring"
+							className={next
+								? `h-8 w-full rounded-md pl-8 pr-2 text-row text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring ${CHROME_NEXT.box}`
+								: "h-7 w-full rounded-lg border bg-background pl-8 text-xs outline-none placeholder:text-muted-foreground focus:border-ring"}
 						/>
 					</div>
 					</Hint>
 					{noMatch && (
-						<div className="px-1.5 pt-1 text-[11px] text-muted-foreground">No matching nodes.</div>
+						<div className={next ? "px-2.5 pt-1 text-label text-muted-foreground" : "px-1.5 pt-1 text-[11px] text-muted-foreground"}>No matching nodes.</div>
 					)}
 				</div>
 			)}
 			{/* The chain table (chains overlay, owner plan 2026-09-29). Own
 			    container (36px band), between the search and Import. */}
 			{!isEmpty && (
-				<div className="graph-chrome-fade-in shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
+				<div className={next ? "graph-chrome-fade-in shrink-0" : "graph-chrome-fade-in shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur"}>
 					<Hint label="Every reasoning chain" side="bottom">
 						<button
 							type="button"
 							onClick={onOpenChains}
 							data-testid="open-chain-table"
-							className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent"
+							className={next ? CHROME_NEXT.control : "flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent"}
 						>
-							<ListTreeIcon className="size-3" />
+							<ListTreeIcon className={next ? CHROME_NEXT.icon : "size-3"} />
 							Chains
 						</button>
 					</Hint>
@@ -914,7 +936,7 @@ export function GraphChromeRow({
 			)}
 			{/* Import notes — its own container (36px, header band); ALWAYS
 			    rendered (the empty-graph ruling above — the entry point). */}
-			<div className="shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur">
+			<div className={next ? "shrink-0" : "shrink-0 rounded-xl border bg-card/85 px-1 py-[3px] shadow-lg backdrop-blur"}>
 				<input
 					ref={fileInputRef}
 					type="file"
@@ -938,9 +960,9 @@ export function GraphChromeRow({
 						disabled={importing}
 						onClick={() => fileInputRef.current?.click()}
 						data-testid="import-notes"
-					className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+					className={next ? CHROME_NEXT.control : "flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"}
 				>
-						<UploadIcon className="size-3" />
+						<UploadIcon className={next ? CHROME_NEXT.icon : "size-3"} />
 						{importing ? "Importing…" : "Import notes…"}
 					</button>
 				</Hint>
@@ -952,7 +974,7 @@ export function GraphChromeRow({
 				// is a plain shrink-0 flex child — the panel itself positions
 				// within GraphSettingsControl's own relative root, unaffected.
 				<div className="graph-chrome-fade-in shrink-0">
-					<GraphSettingsControl settings={settings} changeSettings={changeSettings} />
+					<GraphSettingsControl settings={settings} changeSettings={changeSettings} variant={variant} />
 				</div>
 			)}
 		</>
@@ -964,7 +986,10 @@ export function GraphView({
 	practiceSelection,
 	onPracticeSelectionChange,
 	onChainSelectClose,
+	variant = "current",
 }: {
+	/** The design of the graph's controls (the canvas is the same in both). */
+	variant?: "current" | "proposed";
 	/** PRACTICE SELECT (owner vision, 2026-10-04): the LIFTED, persistent
 	 *  pick set — every check/clear in the chain table (however opened)
 	 *  reports the full node list up immediately; the composer-side chip
@@ -1614,6 +1639,7 @@ export function GraphView({
 					settings={settings}
 					changeSettings={changeSettings}
 					onOpenChains={() => setChainsOpen(true)}
+					variant={variant}
 				/>
 			</div>
 
@@ -1625,7 +1651,7 @@ export function GraphView({
 			    row so narrow windows can never push it over the composer
 			    the way the old bottom-left stack did; the whole top-right
 			    cluster is one column, right-aligned. */}
-			{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} />}
+			{costs && costs.runs.length > 0 && <GraphCostControl costs={costs} variant={variant} />}
 			{pipelineRuns.map((run) => (
 				<div
 					key={run.id}

@@ -76,7 +76,7 @@ export async function createCourse(root: string, title: string): Promise<CourseC
 	}
 	const created = await stores.courseRecords.create(directory, name);
 	if (!created.ok) return { ok: false, status: 502, code: "engine_failed", error: created.message };
-	return { ok: true, course: { workspace: created.workspace, title: name, due: 0, current: null, task: null } };
+	return { ok: true, course: { workspace: created.workspace, title: name, due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null } };
 }
 
 /** True when the session exists and has no course: its learner turns are
