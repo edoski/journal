@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import type { ArtifactPartProps } from "@/src/core";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
 
 /**
  * The generic tool-call card (sources v1, 2026-09-19): a quiet, collapsed
@@ -64,6 +65,13 @@ function outputText(output: unknown): string | null {
 }
 
 export function ToolCallCard({ part }: ArtifactPartProps) {
+	// The Proposed lesson keeps tool calls out of the column (agent chrome
+	// out); while one runs, the activity line says so.
+	if (useLessonDesign().variant === "proposed") return null;
+	return <ToolCallRow part={part} />;
+}
+
+function ToolCallRow({ part }: Pick<ArtifactPartProps, "part">) {
 	const p = part as ToolCallPart;
 	const tool = p.type.replace(/^tool-/, "");
 	const arg = headlineArg(tool, p.input);

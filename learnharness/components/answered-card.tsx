@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import type { QuestionAnswerData } from "@/src/core";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
+import { LessonCard } from "@/components/lesson/lesson-card";
 
 /**
  * Static rendering of an answered question (tool part in `output-available`).
@@ -16,8 +17,14 @@ import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/
  * removed multiple-choice tools (quiz, probe) in older transcripts render
  * the same plain way: the question and the option he picked, no grading.
  */
-export function AnsweredCard({ answer: savedAnswer, input }: { answer: QuestionAnswerData; input?: unknown }) {
+export function AnsweredCard({ answer: savedAnswer, input, variant = "current" }: {
+	answer: QuestionAnswerData;
+	input?: unknown;
+	/** "proposed": a LessonCard (lesson/lesson-card.md), sentence case. */
+	variant?: "current" | "proposed";
+}) {
 	const answer = answerForPresentation(savedAnswer, input);
+	if (variant === "proposed") return <AnsweredCardNext answer={answer} input={input} />;
 	if (answer.dismissed) {
 		return (
 			<div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
@@ -142,6 +149,72 @@ export function AnsweredCard({ answer: savedAnswer, input }: { answer: QuestionA
 				</div>
 			)}
 		</div>
+		</>
+	);
+}
+
+/** The Proposed answered card: the question as it was asked, what the
+ *  learner said (and their thinking), then the committed answer under a
+ *  hairline. No verdict: the tutor's next reply is the grading. */
+function AnsweredCardNext({ answer, input }: { answer: ReturnType<typeof answerForPresentation>; input?: unknown }) {
+	if (answer.dismissed) {
+		return (
+			<LessonCard data-testid="answered-card" className="text-row text-muted-foreground">
+				Skipped: {answer.questionText}
+			</LessonCard>
+		);
+	}
+	const isExplain = answer.kind === "explain";
+	const selectedIdx = new Set(answer.answers.map((a) => a.index));
+	const confidenceLabel = isExplain ? CONFIDENCE_CHOICES.find((c) => c.state === answer.confidence)?.label : undefined;
+	const askInput = answer.kind === "ask" ? parseAskInput(input) : undefined;
+	const descByIndex = new Map((askInput?.options ?? []).map((o, i) => [i + 1, o.description]));
+	const small = "text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]";
+	return (
+		<>
+			{answer.readingThinking && (
+				<ThinkingBlock testId="reading-thinking-block" label="YOUR THINKING" text={answer.readingThinking} defaultOpen variant="proposed" />
+			)}
+			<LessonCard
+				data-testid="answered-card"
+				label={answer.tool === "recall" ? "Recall" : isExplain ? "Explain" : "Question"}
+				note={confidenceLabel && <span data-testid="answered-confidence">{confidenceLabel}</span>}
+			>
+				<ToolContentResponse>{answer.questionText}</ToolContentResponse>
+				{askInput?.details && <ToolContentResponse className={cn("mt-1", small)}>{askInput.details}</ToolContentResponse>}
+				{((answer.options?.length ?? 0) > 0 || answer.other) && (
+					<ul className="mt-3 flex flex-col gap-1">
+						{answer.options?.map((opt) => {
+							const sel = selectedIdx.has(opt.index);
+							return (
+								<li key={opt.index} className="flex items-start gap-3">
+									<span aria-hidden className={cn("mt-[9px] size-2 shrink-0 rounded-full", sel ? "bg-primary" : "ring-1 ring-inset ring-muted-foreground")} />
+									<span className={cn("min-w-0", !sel && "text-muted-foreground")}>
+										<ToolContentResponse>{opt.label}</ToolContentResponse>
+										{descByIndex.get(opt.index) && <ToolContentResponse className={small}>{descByIndex.get(opt.index)}</ToolContentResponse>}
+									</span>
+								</li>
+							);
+						})}
+						{answer.other && (
+							<li data-testid="answered-other" className="flex items-start gap-3">
+								<span aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full bg-primary" />
+								<span className="lh-prose">“{answer.other}”</span>
+							</li>
+						)}
+					</ul>
+				)}
+				{answer.text && <p className="lh-prose mt-3 whitespace-pre-wrap">“{answer.text}”</p>}
+				{(answer.thinking ?? answer.note) && (
+					<ThinkingBlock testId="your-thinking" label="YOUR THINKING" text={answer.thinking ?? answer.note ?? ""} inCard variant="proposed" />
+				)}
+				{isExplain && answer.committed && (
+					<div className="mt-3 border-t pt-3">
+						<div className="mb-1 text-row text-muted-foreground">The answer</div>
+						<ToolContentResponse>{answer.committed}</ToolContentResponse>
+					</div>
+				)}
+			</LessonCard>
 		</>
 	);
 }

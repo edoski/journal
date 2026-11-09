@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRightIcon } from "lucide-react";
+import { ArrowDownIcon, ChevronRightIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
@@ -46,9 +46,12 @@ export interface PracticeDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
+	/** The design (spec: lesson/dock-surface.md): "proposed" is content for
+	 *  the Proposed dock surface, the question dock's anatomy. */
+	variant?: "current" | "proposed";
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, compactionRunning = false }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, compactionRunning = false, variant = "current" }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
 
@@ -66,6 +69,72 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	 * the trace. Mounted
 	 * while the dock is — collapsed bar included (the trace survives). */
 	useEnterSubmits(submit);
+
+	if (variant === "proposed") {
+		if (!expanded) {
+			return (
+				<button
+					type="button"
+					data-testid="practice-dock-bar"
+					onClick={onExpand}
+					className="flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+				>
+					<span className="shrink-0 text-muted-foreground">Problem</span>
+					<span className="min-w-0 flex-1 truncate text-muted-foreground">{input.statement}</span>
+					<span className="flex shrink-0 items-center gap-1 text-foreground">
+						Answer
+						<ArrowDownIcon className="size-4" />
+					</span>
+				</button>
+			);
+		}
+		return (
+			<div data-testid="practice-dock" data-problem={problemCallId}>
+				<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-4">
+					<ToolContentResponse>{input.statement}</ToolContentResponse>
+				</div>
+				<div className="mx-4 mt-3 border-t" />
+				<textarea
+					data-testid="practice-thinking-field"
+					aria-label="Your thinking"
+					value={thinking}
+					onChange={(e) => setThinking(e.target.value)}
+					onKeyDown={(e) => {
+						// The field claims Esc so the window chain doesn't open
+						// the problem's dismiss confirm under the cursor.
+						if (e.key === "Escape") {
+							e.preventDefault();
+							e.stopPropagation();
+							return;
+						}
+						// Enter sends; Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
+						if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+							e.preventDefault();
+							submit();
+						}
+					}}
+					placeholder="Work here, think out loud."
+					rows={3}
+					className="field-sizing-content block max-h-64 min-h-20 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground"
+				/>
+				<div className="flex items-center gap-3 p-2 pl-3">
+					<ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />
+					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
+						{compactionRunning ? "Compacting the conversation…" : "↵ to submit · ⇧↵ for a new line"}
+					</span>
+					<Button
+						type="button"
+						data-testid="practice-send"
+						disabled={thinking.trim().length === 0 || compactionRunning}
+						onClick={() => submit()}
+						className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+					>
+						Submit
+					</Button>
+				</div>
+			</div>
+		);
+	}
 
 	/* ── the collapsed bar ── */
 	if (!expanded) {

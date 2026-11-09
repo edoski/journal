@@ -6,6 +6,8 @@ import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
 import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { ActivityLine } from "@/components/lesson/activity-line";
 
 /**
  * The dispatch card (contracts.ts "THE ASYNC PROTOCOL" §4): the tool-call
@@ -19,6 +21,14 @@ import { BrailleSpinner } from "@/components/braille-spinner";
  *                 itself arrives in the steer message right below, so the
  *                 box must not duplicate it.
  */
+/** The Proposed lesson's one muted line while a helper works. */
+const KIND_ACTIVITY: Record<JobKind, string> = {
+	research: "Checking sources…",
+	demo: "Building a demo…",
+	visual: "Making a figure…",
+	pdf: "Reading the PDF…",
+};
+
 const KIND_LABEL: Record<JobKind, string> = {
 	research: "Research agent",
 	demo: "Demo agent",
@@ -30,7 +40,9 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
 	const label = KIND_LABEL[kind];
+	const quiet = useLessonDesign().variant === "proposed";
 
+	if (quiet && (!job || job.status === "running")) return <ActivityLine testId="dispatch-card" label={KIND_ACTIVITY[kind]} />;
 	if (!job || job.status === "running") {
 		return <DispatchActivityCard job={job} label={label} />;
 	}
@@ -47,6 +59,9 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 		return <DispatchRefusedCard label={label} line="needs a provider key" button="Add a key" />;
 	}
 	const failed = job.status === "error";
+	// Delivered: the result arrives in the steer card right below; the
+	// Proposed lesson marks only a failure.
+	if (quiet && !failed) return null;
 	return (
 		<div
 			className="flex items-center gap-2 text-xs text-muted-foreground"

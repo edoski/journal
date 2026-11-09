@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
 import { ArrowRightIcon, ArrowUpIcon, CornerDownLeftIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
+import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 
 /**
  * The chat composer — content row ONLY (the persistent rounded shell lives in
@@ -53,10 +54,13 @@ export function ChatSessionComposer({
 	placeholder,
 	nextProblem,
 	onNext,
+	variant = "current",
 }: {
 	busy: boolean;
 	value: string;
 	revision: number;
+	/** The design (composer.md): "proposed" in the Proposed lesson dock. */
+	variant?: "current" | "proposed";
 	onChange: (value: string) => void;
 	onSend: () => void;
 	onStop: () => void;
@@ -84,6 +88,7 @@ export function ChatSessionComposer({
 			placeholder={placeholder}
 			nextProblem={nextProblem}
 			onNext={onNext}
+			variant={variant}
 		/>
 	);
 }
@@ -247,7 +252,7 @@ function ComposerNext({
 		<form
 			data-testid="composer"
 			data-slot="composer"
-			className="flex flex-col rounded-[20px] border bg-card shadow-xs outline-1 -outline-offset-1 outline-transparent transition-[outline-color] has-[textarea:focus]:outline-ring/50 motion-reduce:transition-none"
+			className={`flex flex-col ${DOCK_SURFACE}`}
 			onSubmit={(e) => {
 				e.preventDefault();
 				onAct();

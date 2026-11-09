@@ -7,6 +7,7 @@ import { isSubagentFailure } from "@/src/core";
 import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
 
 /**
  * The sub-agent result delivery card (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -66,10 +67,11 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
  * teacher's wake turn acknowledges the abort in the lesson itself,
  * this just marks what happened. */
 function AbortedBadge({ kind }: { kind: string }) {
+	const quiet = useLessonDesign().variant === "proposed";
 	return (
-		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-xs text-muted-foreground">
-			<CircleX className="size-3.5" />
-			<span className="font-medium uppercase tracking-wide">{kind}</span>
+		<div data-testid="job-aborted-badge" className={quiet ? "flex items-center gap-2 text-row text-muted-foreground" : "flex items-center gap-2 text-xs text-muted-foreground"}>
+			<CircleX className={quiet ? "size-4" : "size-3.5"} />
+			<span className={quiet ? "first-letter:uppercase" : "font-medium uppercase tracking-wide"}>{kind}</span>
 			<span>aborted by the learner</span>
 		</div>
 	);
@@ -80,22 +82,23 @@ function AbortedBadge({ kind }: { kind: string }) {
  * the badge marks delivery, the collapsed details carries the full text
  * + consulted pages. */
 function PdfCompleteBadge({ result }: { result: PdfResult }) {
+	const quiet = useLessonDesign().variant === "proposed";
 	// The honest count is READ pages (extract/render — sources v1 split);
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
 	return (
-		<details data-testid="pdf-complete-badge" className="group w-full text-xs text-muted-foreground">
+		<details data-testid="pdf-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className="size-3.5" />
-				<span className="font-medium uppercase tracking-wide">PDF</span>
+				<CheckIcon className={quiet ? "size-4" : "size-3.5"} />
+				<span className={quiet ? "" : "font-medium uppercase tracking-wide"}>PDF</span>
 				<span>reading complete</span>
 				{readPages.length > 0 && (
 					<span>
 						· read {readPages.length} page{readPages.length === 1 ? "" : "s"}
 					</span>
 				)}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
+				<span className={quiet ? "ml-1 group-open:hidden" : "ml-1 text-xs text-muted-foreground/70 group-open:hidden"}>{quiet ? "· View brief" : "view brief"}</span>
+				<span className={quiet ? "ml-1 hidden group-open:inline" : "ml-1 hidden text-xs text-muted-foreground/70 group-open:inline"}>{quiet ? "· Hide brief" : "hide brief"}</span>
 			</summary>
 			<div className="mt-2">
 				<PdfBriefCard output={result} />
@@ -110,15 +113,16 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
  * affordance): full markdown + sources, one click away, no extra fetch —
  * the artifact part in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
+	const quiet = useLessonDesign().variant === "proposed";
 	return (
-		<details data-testid="research-complete-badge" className="group w-full text-xs text-muted-foreground">
+		<details data-testid="research-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className="size-3.5" />
-				<span className="font-medium uppercase tracking-wide">Research</span>
+				<CheckIcon className={quiet ? "size-4" : "size-3.5"} />
+				<span className={quiet ? "" : "font-medium uppercase tracking-wide"}>Research</span>
 				<span>complete</span>
 				{result.sources.length > 0 && <span>· {result.sources.length} sources</span>}
-				<span className="ml-1 text-xs text-muted-foreground/70 group-open:hidden">view brief</span>
-				<span className="ml-1 hidden text-xs text-muted-foreground/70 group-open:inline">hide brief</span>
+				<span className={quiet ? "ml-1 group-open:hidden" : "ml-1 text-xs text-muted-foreground/70 group-open:hidden"}>{quiet ? "· View brief" : "view brief"}</span>
+				<span className={quiet ? "ml-1 hidden group-open:inline" : "ml-1 hidden text-xs text-muted-foreground/70 group-open:inline"}>{quiet ? "· Hide brief" : "hide brief"}</span>
 			</summary>
 			<div className="mt-2">
 				<ResearchBriefCard output={result} />

@@ -3,6 +3,8 @@
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
 import { MessageResponse } from "@/components/ai-elements/message";
 import type { ArtifactPartProps, PdfResult, ResearchResult } from "@/src/core";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { LessonCard } from "@/components/lesson/lesson-card";
 
 /**
  * The research tool-call box (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -77,6 +79,7 @@ export function PdfBriefCard({ output }: { output: unknown }) {
  * the steer card (sub-agent result delivery) renders the same artifact.
  */
 export function ResearchBriefCard({ output }: { output: unknown }) {
+	const quiet = useLessonDesign().variant === "proposed";
 	const result = output as ResearchResult | undefined;
 	if (!result || typeof result.brief !== "string") {
 		return (
@@ -86,6 +89,24 @@ export function ResearchBriefCard({ output }: { output: unknown }) {
 		);
 	}
 	const failed = result.brief.startsWith("Research failed");
+	if (quiet) {
+		return (
+			<LessonCard data-testid="research-brief-card" label="Research brief" note={failed ? <span className="text-danger">Failed</span> : undefined}>
+				<MessageResponse>{result.brief}</MessageResponse>
+				{result.sources.length > 0 && (
+					<ul className="mt-3 flex flex-col gap-1 border-t pt-3 text-row">
+						{result.sources.map((s) => (
+							<li key={s.url} className="truncate">
+								<a href={s.url} target="_blank" rel="noopener noreferrer" className="text-link underline-offset-2 hover:underline">
+									{s.title}
+								</a>
+							</li>
+						))}
+					</ul>
+				)}
+			</LessonCard>
+		);
+	}
 	return (
 		<div className="rounded-xl border bg-card p-4 text-card-foreground" data-testid="research-brief-card">
 			<div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

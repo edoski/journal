@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import { CONFIDENCE_CHOICES, type Confidence } from "@/src/core";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
  * The learner's one-tap confidence read (Edoardo, 7 Nov 2026): three
@@ -14,10 +15,59 @@ export function ConfidenceChoice({
 	value,
 	onChange,
 	disabled = false,
+	variant = "current",
 }: {
 	value: Confidence;
 	onChange: (state: Confidence) => void;
 	disabled?: boolean;
+	/** "proposed": the shared segmented toggle group (ui/toggle-group.md),
+	 *  sentence case, one item always on. */
+	variant?: "current" | "proposed";
+}) {
+	if (variant === "proposed") {
+		// ←/→ move the choice, not only the focus, as in the radio group.
+		const step = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+			if (e.altKey || e.metaKey || e.ctrlKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+			e.preventDefault();
+			e.stopPropagation();
+			const i = CONFIDENCE_CHOICES.findIndex((c) => c.state === value);
+			const next = CONFIDENCE_CHOICES[Math.min(CONFIDENCE_CHOICES.length - 1, Math.max(0, i + (e.key === "ArrowRight" ? 1 : -1)))]!;
+			onChange(next.state);
+			e.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-confidence="${next.state}"]`)?.focus();
+		};
+		return (
+			<ToggleGroup
+				type="single"
+				variant="segmented"
+				size="segment"
+				aria-label="Confidence"
+				data-testid="confidence-choice"
+				value={value}
+				disabled={disabled}
+				onValueChange={(next) => {
+					if (next) onChange(next as Confidence);
+				}}
+				className="shrink-0"
+			>
+				{CONFIDENCE_CHOICES.map(({ state, label }) => (
+					<ToggleGroupItem key={state} value={state} data-confidence={state} onKeyDown={step}>
+						{label}
+					</ToggleGroupItem>
+				))}
+			</ToggleGroup>
+		);
+	}
+	return <ConfidenceRadios value={value} onChange={onChange} disabled={disabled} />;
+}
+
+function ConfidenceRadios({
+	value,
+	onChange,
+	disabled,
+}: {
+	value: Confidence;
+	onChange: (state: Confidence) => void;
+	disabled: boolean;
 }) {
 	const groupRef = useRef<HTMLDivElement>(null);
 	const step = (delta: number) => {

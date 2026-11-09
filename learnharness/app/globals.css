@@ -687,7 +687,8 @@ html[data-polish-design="proposed"] {
 	--card-foreground: #ededed;
 	--popover: #1c1c1c;
 	--popover-foreground: #ededed;
-	--primary: oklch(0.58 0.2 262);
+	/* 0.56, not 0.58: white 13px labels on it need 4.5:1 (4.83 here; 4.43 at 0.58). */
+	--primary: oklch(0.56 0.2 262);
 	--primary-foreground: #ffffff;
 	--secondary: #1c1c1c;
 	--secondary-foreground: #ededed;
@@ -724,3 +725,105 @@ html[data-polish-design="proposed"] {
 	}
 }
 
+/* The lesson's markdown under the Proposed design (phase 3). Streamdown
+   draws the elements, so their type lives here with the other .lh-prose
+   rules, keyed on the same switch selector: T3 Code's scale (headings
+   20/18/16 at 600, leading 1.3, 20 above and 8 below; paragraphs .65rem
+   apart; lists on a 1.25rem gutter), SF Mono code (inline .85em on a 10%
+   fill, blocks 13px at radius 8), quotes and callouts on the same
+   tokens. Tables keep the prose size (owner, 2026-09-19) and KaTeX keeps
+   its own scale relative to the text. Sources: research/agent-apps.md. */
+html[data-polish-design="proposed"] .lh-prose :where(h1, h2, h3, h4, h5, h6) {
+	line-height: 1.3;
+	margin-top: 20px;
+	margin-bottom: 8px;
+}
+html[data-polish-design="proposed"] .lh-prose :where(h1) {
+	font-size: 20px;
+}
+html[data-polish-design="proposed"] .lh-prose :where(h2) {
+	font-size: 18px;
+}
+html[data-polish-design="proposed"] .lh-prose :where(h3, h4, h5, h6) {
+	font-size: 16px;
+}
+html[data-polish-design="proposed"] .lh-prose :where(p) {
+	margin-block: 0.65rem;
+}
+html[data-polish-design="proposed"] .lh-prose > :where(:first-child) {
+	margin-top: 0;
+}
+html[data-polish-design="proposed"] .lh-prose > :where(:last-child) {
+	margin-bottom: 0;
+}
+html[data-polish-design="proposed"] .lh-prose :where(ul, ol) {
+	padding-left: 1.25rem;
+	margin-block: 0.65rem;
+}
+html[data-polish-design="proposed"] .lh-prose :where(li) {
+	padding-block: 0;
+}
+html[data-polish-design="proposed"] .lh-prose :where(li + li) {
+	margin-top: 0.25rem;
+}
+html[data-polish-design="proposed"] [data-streamdown="inline-code"] {
+	border: 0;
+	border-radius: 4px;
+	padding: 0.1em 0.3em;
+	font-size: 0.85em;
+	background: color-mix(in oklab, var(--foreground) 10%, transparent);
+}
+html[data-polish-design="proposed"] [data-streamdown="code-block"] {
+	border-radius: 8px;
+	padding: 0;
+	background: color-mix(in oklab, var(--background) 70%, black);
+}
+html[data-polish-design="proposed"] [data-streamdown="code-block-body"] {
+	padding: 0.8rem 0.9rem;
+	font-size: 13px;
+	line-height: 1.55;
+}
+html[data-polish-design="proposed"] [data-streamdown="code-block-body"] :where(pre, code) {
+	font-size: inherit;
+}
+html[data-polish-design="proposed"] [data-streamdown="blockquote"] {
+	border-left-width: 2px;
+	border-color: var(--border);
+	font-style: normal;
+}
+html[data-polish-design="proposed"] [data-testid="md-callout"] {
+	border-color: var(--border);
+	border-radius: 12px;
+	background: var(--card);
+}
+html[data-polish-design="proposed"] [data-streamdown="table"] :where(th) {
+	font-weight: 600;
+}
+
+/* Mermaid in the Proposed lesson: nodes on the card surface with a quiet
+   edge and radius 8, lines and arrowheads in muted ink. Mermaid inlines an
+   id-scoped stylesheet in each svg, hence !important. */
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg :is(.node rect, .node polygon, .node circle, .node ellipse, .node path) {
+	fill: var(--card) !important;
+	stroke: color-mix(in oklab, var(--foreground) 22%, transparent) !important;
+	stroke-width: 1px !important;
+}
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg .node rect {
+	rx: 8px;
+	ry: 8px;
+}
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg :is(.flowchart-link, .edgePath .path, .relation, .messageLine0, .messageLine1) {
+	stroke: var(--muted-foreground) !important;
+}
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg :is(marker path, .marker, .arrowheadPath) {
+	fill: var(--muted-foreground) !important;
+	stroke: var(--muted-foreground) !important;
+}
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg :is(.nodeLabel, .edgeLabel, .label) {
+	color: var(--foreground) !important;
+	fill: var(--foreground) !important;
+}
+html[data-polish-design="proposed"] [data-streamdown="mermaid"] svg .edgeLabel :is(rect, p, span) {
+	background-color: var(--background) !important;
+	fill: var(--background) !important;
+}

@@ -1,4 +1,5 @@
 import type { Phase3 } from "@/src/core";
+import { SectionBreak } from "@/components/lesson/section-break";
 
 /**
  * The in-session phase presentation (owner, minimal-color round —
@@ -25,7 +26,7 @@ import type { Phase3 } from "@/src/core";
  */
 
 /** Header-chip labels: the phases as the learner thinks of them. */
-const CHIP_LABEL: Record<Phase3, string> = {
+export const CHIP_LABEL: Record<Phase3, string> = {
 	probe: "Probing",
 	plan: "Planning",
 	teach: "Teaching",
@@ -59,8 +60,14 @@ export function PhaseChip({ phase }: { phase: Phase3 }) {
  * Null for probe (defensive — the fold never emits a probe transition
  * after the start).
  */
-export function PhaseDivider({ phase, nodeCount }: { phase: Phase3; nodeCount?: number }) {
+export function PhaseDivider({ phase, nodeCount, variant = "current" }: {
+	phase: Phase3;
+	nodeCount?: number;
+	/** "proposed": the lesson's quiet section break (lesson/section-break.md). */
+	variant?: "current" | "proposed";
+}) {
 	if (phase === "probe") return null;
+	if (variant === "proposed") return <SectionBreak testId={`phase-divider-${phase}`} label={CHIP_LABEL[phase]} />;
 	const label =
 		phase === "plan" && nodeCount
 			? `Plan · ${nodeCount} node${nodeCount === 1 ? "" : "s"}`

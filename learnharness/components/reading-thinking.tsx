@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useState } from "react";
+import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 
 /**
  * The reading-thinking field (owner design 2026-10-03, "two questions per
@@ -17,6 +18,7 @@ export function ReadingThinkingField({
 	revision,
 	onChange,
 	onOpen,
+	variant = "current",
 }: {
 	value: string;
 	revision: number;
@@ -25,6 +27,8 @@ export function ReadingThinkingField({
 	 *  2026-10-06). Absent = the check is open: Enter keeps the dumping
 	 *  convention. */
 	onOpen?: () => void;
+	/** "proposed": the Proposed dock surface, sentence-case label. */
+	variant?: "current" | "proposed";
 }) {
 	const [draft, setDraft] = useState(value);
 	useLayoutEffect(() => { setDraft(value); }, [revision, value]);
@@ -32,12 +36,14 @@ export function ReadingThinkingField({
 		setDraft(next);
 		onChange(next);
 	}, [onChange]);
+	const proposed = variant === "proposed";
 	return (
 		<div
 			data-testid="reading-thinking-field"
-			className="pointer-events-auto mb-2 rounded-2xl border bg-card/60 px-3 py-2 transition-colors focus-within:border-primary/50"
+			data-slot={proposed ? "dock-surface" : undefined}
+			className={proposed ? `pointer-events-auto mb-2 px-4 pb-2 pt-3 ${DOCK_SURFACE}` : "pointer-events-auto mb-2 rounded-2xl border bg-card/60 px-3 py-2 transition-colors focus-within:border-primary/50"}
 		>
-			<div className="pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+			<div className={proposed ? "pb-1 text-row text-muted-foreground" : "pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"}>
 				Thinking while reading
 			</div>
 			<textarea
@@ -80,7 +86,11 @@ export function ReadingThinkingField({
 				}}
 				placeholder="Whatever comes to mind as you read."
 				rows={1}
-				className="field-sizing-content lh-input max-h-40 w-full resize-none bg-transparent py-0.5 outline-none placeholder:text-muted-foreground/70"
+				className={
+					proposed
+						? "field-sizing-content max-h-40 w-full resize-none bg-transparent py-0.5 text-control text-foreground outline-none placeholder:text-muted-foreground"
+						: "field-sizing-content lh-input max-h-40 w-full resize-none bg-transparent py-0.5 outline-none placeholder:text-muted-foreground/70"
+				}
 			/>
 		</div>
 	);

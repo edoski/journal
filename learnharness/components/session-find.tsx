@@ -62,9 +62,11 @@ export function sessionFindHasForegroundLayer(doc: Document): boolean {
 /** Mounted for the lifetime of ONE Chat (which is keyed by chatId). Closing
  * keeps the query/reading position; changing sessions resets all local state.
  * The bar lives outside scopeRef, so it never finds its own query or count. */
-export function SessionFind({ scopeRef, scrollContextRef }: {
+export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }: {
 	scopeRef: RefObject<HTMLDivElement | null>;
 	scrollContextRef: RefObject<SessionScrollContext | null>;
+	/** "proposed": the slim Proposed bar (13/14px, quiet 32px buttons). */
+	variant?: "current" | "proposed";
 }) {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
@@ -159,13 +161,16 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 	};
 
 	if (!open) return null;
-	const buttonClass = "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
+	const proposed = variant === "proposed";
+	const buttonClass = proposed
+		? "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 motion-reduce:transition-none"
+		: "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
 	return (
 		<div
 			role="search"
 			aria-label="Session Find"
 			data-testid="session-find"
-			className="lh-no-drag flex h-10 shrink-0 items-center gap-2 border-b border-border px-6 font-ui text-sm"
+			className={proposed ? "lh-no-drag flex h-11 shrink-0 items-center gap-1 border-b border-border px-4 text-control" : "lh-no-drag flex h-10 shrink-0 items-center gap-2 border-b border-border px-6 font-ui text-sm"}
 			onKeyDown={(event) => {
 				if (event.key === "Enter") {
 					event.stopPropagation(); // NEVER reach question/global Enter submits.
@@ -187,9 +192,9 @@ export function SessionFind({ scopeRef, scrollContextRef }: {
 				value={query}
 				onChange={(event) => setQuery(event.target.value)}
 				spellCheck={false}
-				className="lh-input min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+				className={proposed ? "ml-1 min-w-0 flex-1 bg-transparent text-control text-foreground outline-none placeholder:text-muted-foreground" : "lh-input min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"}
 			/>
-			<output aria-live="polite" data-testid="session-find-count" className="shrink-0 text-xs tabular-nums text-muted-foreground">
+			<output aria-live="polite" data-testid="session-find-count" className={proposed ? "mr-1 shrink-0 text-label tabular-nums text-muted-foreground" : "shrink-0 text-xs tabular-nums text-muted-foreground"}>
 				{query ? `${result.index + 1}/${result.count}` : ""}
 			</output>
 			<button type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" className={buttonClass}

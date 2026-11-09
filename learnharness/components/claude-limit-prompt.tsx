@@ -47,7 +47,14 @@ type Prompt = { state: "checking" } | { state: "ready"; statuses: ClaudeAccountS
 
 /** Shown under a turn that stopped at a Claude account's plan limit. Never
  * switches by itself: the learner clicks. */
-export function ClaudeLimitPrompt({ chatId, failure, onContinue }: { chatId: string; failure: { provider: string; model: string }; onContinue: () => void }) {
+export function ClaudeLimitPrompt({ chatId, failure, onContinue, variant = "current" }: {
+	chatId: string;
+	failure: { provider: string; model: string };
+	onContinue: () => void;
+	/** "proposed": the lesson's error line register (13px, a quiet button). */
+	variant?: "current" | "proposed";
+}) {
+	const quiet = variant === "proposed";
 	const [prompt, setPrompt] = useState<Prompt>({ state: "checking" });
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -73,19 +80,19 @@ export function ClaudeLimitPrompt({ chatId, failure, onContinue }: { chatId: str
 		}
 	}
 
-	if (prompt.state === "checking") return <span className="text-xs text-muted-foreground" data-testid="claude-limit-checking">Checking your other Claude accounts…</span>;
+	if (prompt.state === "checking") return <span className={quiet ? "text-row text-muted-foreground" : "text-xs text-muted-foreground"} data-testid="claude-limit-checking">Checking your other Claude accounts…</span>;
 	if (prompt.state === "failed") return null;
 	const next = nextClaudeAccount(failure.provider, prompt.statuses);
 	if (!next) {
 		const reset = soonestClaudeReset(prompt.statuses);
-		return <span className="text-xs" data-testid="claude-limit-none">All Claude accounts are at their limit{reset ? ` · the first resets ${claudeResetLabel(reset)}` : ""}</span>;
+		return <span className={quiet ? "text-row text-muted-foreground" : "text-xs"} data-testid="claude-limit-none">All Claude accounts are at their limit{reset ? ` · the first resets ${claudeResetLabel(reset)}` : ""}</span>;
 	}
 	const left = next.usage ? ` (${next.usage.percentLeft}% left)` : "";
 
 	return <span className="flex flex-wrap items-center gap-2">
-		<Button variant="outline" size="xs" data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
+		<Button variant={quiet ? "quiet" : "outline"} size={quiet ? "sm" : "xs"} className={quiet ? "h-8 px-2 text-row font-medium text-foreground" : undefined} data-testid="claude-limit-continue" disabled={busy} onClick={() => void continueOn(next.account.providerId)}>
 			Continue on {next.account.label}{left}
 		</Button>
-		{error && <span role="alert" className="text-xs text-destructive">{error}</span>}
+		{error && <span role="alert" className={quiet ? "text-row text-danger" : "text-xs text-destructive"}>{error}</span>}
 	</span>;
 }

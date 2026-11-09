@@ -18,7 +18,11 @@ export interface QueuedSteerLine {
 
 /** The pure body (SSR-pinnable): one right-aligned truncated line per
  *  queued steer, stacked. */
-export function QueuedSteersBody({ steers }: { steers: QueuedSteerLine[] }) {
+export function QueuedSteersBody({ steers, variant = "current" }: {
+	steers: QueuedSteerLine[];
+	/** "proposed": the 12px label size in muted ink (4.5:1), on the scale. */
+	variant?: "current" | "proposed";
+}) {
 	if (steers.length === 0) return null;
 	return (
 		<div className="flex flex-col items-end gap-0.5 pb-1 pr-4" data-testid="queued-steers">
@@ -26,7 +30,7 @@ export function QueuedSteersBody({ steers }: { steers: QueuedSteerLine[] }) {
 				<span
 					key={s.id}
 					title={s.text}
-					className="block max-w-[240px] truncate font-ui text-[11px] text-muted-foreground/60"
+					className={variant === "proposed" ? "block max-w-[240px] truncate text-label text-muted-foreground" : "block max-w-[240px] truncate font-ui text-[11px] text-muted-foreground/60"}
 				>
 					{s.text}
 				</span>

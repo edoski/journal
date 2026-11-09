@@ -72,6 +72,7 @@ export function ThinkingBlock({
 	dataCommit,
 	defaultOpen = false,
 	inCard = false,
+	variant = "current",
 }: {
 	label?: string;
 	text: string;
@@ -82,6 +83,9 @@ export function ThinkingBlock({
 	defaultOpen?: boolean;
 	/** On the card's own background: no band (the accent read too light). */
 	inCard?: boolean;
+	/** "proposed": the learner's quiet surface (radius 12, card fill, no
+	 *  rail), a sentence-case label; in a card, no surface. */
+	variant?: "current" | "proposed";
 }) {
 	const [open, setOpen] = useState(() => resolveUserThinkingOpen(defaultOpen));
 	// ⌘T: an explicit global set overrides every row (once set, rows re-sync).
@@ -90,6 +94,31 @@ export function ThinkingBlock({
 		() => subscribeUserThinking((o) => { syncedRef.current = true; setOpen(o); }),
 		[],
 	);
+	if (variant === "proposed") {
+		return (
+			<div
+				data-testid={testId}
+				data-slot="learner-note"
+				data-commit={dataCommit === undefined ? undefined : dataCommit ? "true" : "false"}
+				className={cn("lh-card-enter w-full", inCard ? "mt-3" : "my-1 rounded-xl bg-card px-4 py-3")}
+			>
+				<button
+					type="button"
+					data-testid={testId ? `${testId}-trigger` : undefined}
+					onClick={(e) => {
+						setOpen((v) => !v);
+						blurAfterPointerClick(e);
+					}}
+					aria-expanded={open}
+					className="-mx-1 flex items-center gap-1 rounded-md px-1 text-row text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+				>
+					{label === "YOUR THINKING" ? "Your thinking" : label}
+					<ChevronDownIcon className={cn("size-4 shrink-0 transition-transform motion-reduce:transition-none", open ? "rotate-180" : "rotate-0")} />
+				</button>
+				{open && <p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground">{text}</p>}
+			</div>
+		);
+	}
 	return (
 		/* The rail GROUPS and the rail IS THE MISSING CHARACTER (owner
 		   rounds, 2026-10-05): the heading sits INSIDE the rail, and the

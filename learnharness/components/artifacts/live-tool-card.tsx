@@ -5,6 +5,7 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { toolActivityLabel } from "@/src/core";
 import type { ArtifactPartProps } from "@/src/core";
+import { ActivityLine } from "@/components/lesson/activity-line";
 
 /**
  * The LIVE tool-input card (owner, streaming round 2026-10-01): what a
@@ -27,9 +28,11 @@ interface StreamingToolPart {
 	input?: unknown;
 }
 
-export function LiveToolCard({ part }: ArtifactPartProps) {
+export function LiveToolCard({ part, variant = "current" }: ArtifactPartProps & { variant?: "current" | "proposed" }) {
 	const p = part as StreamingToolPart;
 	const tool = p.type.replace(/^tool-/, "");
+	// The Proposed lesson: one muted line, no arguments, no input to open.
+	if (variant === "proposed") return <ActivityLine testId="live-tool-card" label={toolActivityLabel(tool)} />;
 	const inp = (p.input ?? {}) as Record<string, unknown>;
 	// The headline argument (ToolCallCard's rule, shown as given): path for
 	// read/ls, pattern for find/grep, session for list_propositions.

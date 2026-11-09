@@ -2,6 +2,8 @@
 
 import { ClipboardCheckIcon } from "lucide-react";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { LessonCard } from "@/components/lesson/lesson-card";
 
 /**
  * The probe conclusion card (docs/probe-teach-split.md §2): renders the
@@ -22,6 +24,7 @@ import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
  * the UI wave; this card just guarantees the data is never invisible.
  */
 export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unknown; state?: unknown } }) {
+	const quiet = useLessonDesign().variant === "proposed";
 	const output = part.output as ProbeDoneResult | undefined;
 	const state = typeof part.state === "string" ? part.state : "";
 
@@ -39,6 +42,29 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 	const assessment = input?.assessment;
 	const strands = assessment && Array.isArray(assessment.strands) ? assessment.strands : null;
 
+	if (quiet) {
+		return (
+			<LessonCard data-testid="probe-done-card" label="Where you are starting from" className="my-2">
+				{output && !output.ok ? (
+					<p className="text-row text-muted-foreground">The prober retried: {output.error}</p>
+				) : state === "output-error" ? (
+					<p className="text-row text-muted-foreground">The assessment was malformed; the prober retried with a corrected one.</p>
+				) : strands ? (
+					<div className="flex flex-col gap-3">
+						{strands.map((s, i) => (
+							<div key={i}>
+								<div className="text-prose font-semibold">{s.strand}</div>
+								<div className="text-row text-muted-foreground">{s.assessment}</div>
+							</div>
+						))}
+						{assessment?.summary && <p className="text-prose">{assessment.summary}</p>}
+					</div>
+				) : (
+					<p className="text-row text-muted-foreground">Writing the assessment…</p>
+				)}
+			</LessonCard>
+		);
+	}
 	return (
 		<div data-testid="probe-done-card" className="my-3 rounded-xl border bg-card/60 p-3">
 			<div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

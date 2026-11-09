@@ -24,6 +24,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { ThinkingBlock } from "@/components/thinking-block";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { LessonCard } from "@/components/lesson/lesson-card";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
 
 /** The practice-thinking marker's details (native-messages.ts). */
@@ -41,8 +43,18 @@ export function ProblemCard({ part }: ArtifactPartProps) {
 	// statement — same container + eyebrow discipline as the answered card
 	// and the dock (which mirrors this in Slice D). The commitment never
 	// renders — only the call's statement.
+	const design = useLessonDesign();
 	const input = (part.input ?? {}) as { statement?: string };
 	const statement = typeof input.statement === "string" ? input.statement : "";
+	if (design.variant === "proposed") {
+		// The problem reads once: while the dock works on it, the dock shows it.
+		if (part.toolCallId === design.activeProblemCallId) return null;
+		return (
+			<LessonCard data-testid="problem-card" label="Problem" className="my-1">
+				<ToolContentResponse>{statement}</ToolContentResponse>
+			</LessonCard>
+		);
+	}
 	return (
 		<div data-testid="problem-card" className="lh-card-enter my-1 rounded-xl border bg-card p-4">
 			<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Problem</div>
@@ -81,6 +93,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 	// below in the quiz-explanation register (small, muted, low-key).
 	// Nothing collapsible. Legacy inputs (pre-slim records) that carry
 	// their own solutionReveal fall back to it.
+	const quiet = useLessonDesign().variant === "proposed";
 	const input = (part.input ?? {}) as { outcome?: string; verdict?: string; solutionReveal?: string };
 	const outcome = typeof input.outcome === "string" ? input.outcome : "";
 	const verdict = typeof input.verdict === "string" ? input.verdict : "";
@@ -89,6 +102,33 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 
 	// The dismissal synthesis: no verdict, no reveal — one muted line (the
 	// learner clicked; the record needs only the fact).
+	if (quiet) {
+		if (outcome === "dismissed") {
+			return (
+				<p data-testid="conclude-card" className="my-1 text-row text-muted-foreground">
+					Problem dismissed.
+				</p>
+			);
+		}
+		return (
+			<LessonCard data-testid="conclude-card" label="Concluded" note={OUTCOME_LABEL[outcome]} className="my-1">
+				{verdict.length > 0 && (
+					<ToolContentResponse className="text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">{verdict}</ToolContentResponse>
+				)}
+				{reveal.length > 0 && (
+					<div className="mt-3 border-t pt-3">
+						<div className="mb-1 text-row text-muted-foreground">Model solution</div>
+						<ToolContentResponse>{reveal}</ToolContentResponse>
+					</div>
+				)}
+				<MetadataPopover
+					quiet
+					concludeInput={input}
+					problemInput={(part.problemInput ?? {}) as { mode?: unknown; topics?: unknown }}
+				/>
+			</LessonCard>
+		);
+	}
 	if (outcome === "dismissed") {
 		return (
 			<div data-testid="conclude-card" className="my-1 px-1 text-sm text-muted-foreground/70">
@@ -154,7 +194,10 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 function MetadataPopover({
 	concludeInput,
 	problemInput,
+	quiet = false,
 }: {
+	/** The Proposed card: a sentence-case "Details" trigger at 13px. */
+	quiet?: boolean;
 	concludeInput: { outcome?: string; rung?: unknown; missClass?: unknown; retest?: unknown };
 	problemInput: { mode?: unknown; topics?: unknown };
 }) {
@@ -206,9 +249,9 @@ function MetadataPopover({
 					});
 				}}
 				aria-expanded={open}
-				className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+				className={quiet ? "flex items-center gap-1 text-row text-muted-foreground transition-colors hover:text-foreground" : "flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"}
 			>
-				Metadata
+				{quiet ? "Details" : "Metadata"}
 			</button>
 			{open &&
 				anchor &&
@@ -245,10 +288,10 @@ function MetadataPopover({
 	);
 }
 
-export function ThinkingCard({ data }: { data: PracticeThinkingData }) {
+export function ThinkingCard({ data, variant = "current" }: { data: PracticeThinkingData; variant?: "current" | "proposed" }) {
 	// The unified row (owner rounds, 2026-10-05): one style, one label —
 	// 50%-italic quote block on expand. Legacy records' commit flag is
 	// deliberately unread (one lane now). A TRANSCRIPT row (owner round,
 	// 2026-10-07): full-width band + rail, arriving expanded.
-	return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen />;
+	return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen variant={variant} />;
 }

@@ -10,6 +10,25 @@ export function formatContextMeasurement(tokens: number | null, limit: number | 
 	return limit === null ? numerator : `${numerator} / ${formatTokens(limit)}`;
 }
 
+/** The session's two footprint labels, shared by the stats bar and the
+ *  lesson's details menu: context as "used / limit" (catalog denominator
+ *  only) and cost, honest "—" until at least one turn priced. */
+export function sessionStatLabels({ turns, contextTokens, pricing, limit }: {
+	turns: TurnUsage[];
+	contextTokens: number | null;
+	pricing?: SessionPricing;
+	limit: number | null;
+}): { contextLabel: string; costLabel: string; providers: string[] } {
+	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
+	const pricedCount = turns.length - unpriced - subscription;
+	const providers = pricing?.subscriptionProviders ?? subscriptionLabels(turns.map((turn) => turn.model));
+	return {
+		contextLabel: formatContextMeasurement(contextTokens, limit),
+		costLabel: planCostLabel(pricedCount > 0 ? cost : null, providers),
+		providers,
+	};
+}
+
 /**
  * The below-composer stats bar (wave 4 observability): the session's
  * money/context footprint as one quiet row beneath the composer —
@@ -85,14 +104,9 @@ export function StatsBar({
 	const { catalog } = useModelCatalog();
 	const limits = useMemo(() => (catalog ? catalogLimits(catalog) : undefined), [catalog]);
 	const limit = selectedModel ? limits?.get(selectedModel) ?? null : null;
-	const contextLabel = formatContextMeasurement(contextTokens, limit);
 	const cacheHitRate = useMemo(() => sessionCacheHitRate({ turns }), [turns]);
-	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
-	// Honest cost: show dollars only when at least one turn priced;
-	// otherwise "—" (never a fake $0.0000).
-	const pricedCount = turns.length - unpriced - subscription;
-	const providers = pricing?.subscriptionProviders ?? subscriptionLabels(turns.map((turn) => turn.model));
-	const costLabel = planCostLabel(pricedCount > 0 ? cost : null, providers);
+	const { unpriced = turns.length, subscription = 0 } = pricing ?? {};
+	const { contextLabel, costLabel, providers } = sessionStatLabels({ turns, contextTokens, pricing, limit });
 
 	return (
 		<div
