@@ -76,7 +76,7 @@ describe("course map words", () => {
 });
 
 describe("course map page states", () => {
-	const ready = { status: "ready" as const, courses: [{ workspace: "/study/linalg", title: "Linear Algebra", due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null }], roots: [] };
+	const ready = { status: "ready" as const, courses: [{ workspace: "/study/linalg", title: "Linear Algebra", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }], roots: [] };
 	it("shows one state at a time from the listing and the map fetch", () => {
 		assert.equal(mapBody({ status: "loading" }, null, "").kind, "loading");
 		assert.deepEqual(mapBody({ status: "unavailable", reason: "no python" }, null, ""), { kind: "unavailable", reason: "no python" });

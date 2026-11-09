@@ -19,12 +19,12 @@ import { Composer } from "../components/composer.tsx";
 import type { CourseSummary } from "../src/core/index.ts";
 
 function course(over: Partial<CourseSummary>): CourseSummary {
-	return { workspace: "/study/linalg", title: "Linear Algebra", due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null, ...over };
+	return { workspace: "/study/linalg", title: "Linear Algebra", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null, ...over };
 }
 
 const LINALG = course({
 	due: 6,
-	mostOverdue: "Linear independence",
+	reviews: [{ title: "Linear independence", overdue: 16, gap: null }],
 	exam: { date: "2026-11-29", daysLeft: 21 },
 	task: "Problem sheet 4",
 	step: "Part (c)",

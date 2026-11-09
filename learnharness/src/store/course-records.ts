@@ -12,7 +12,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { courseLabel, type CourseResult, type CourseSummary, type CourseVerb } from "../core/contracts/course.ts";
+import { courseLabel, type CourseResult, type CourseSummary, type CourseVerb, type DueReview } from "../core/contracts/course.ts";
 import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
 
@@ -142,11 +142,13 @@ function summaryOf(entry: unknown): CourseSummary | null {
 		workspace,
 		title: str(e.title),
 		due: due.length + dueMore,
+		reviews: due.map(reviewOf).filter((r): r is DueReview => r !== null),
 		current: str(e.current),
+		currentTitle: str(e.current_title),
 		task: str(task.title),
 		step: str(task.step),
 		exam: examOf(e.exam),
-		mostOverdue: mostOverdueTitle(due),
+		lastActiveDaysAgo: daysAgoOf(e.last_activity),
 	};
 }
 
@@ -157,18 +159,19 @@ function examOf(value: unknown): CourseSummary["exam"] {
 	return typeof date === "string" && typeof daysLeft === "number" ? { date, daysLeft } : null;
 }
 
-/** The title of the listed due entry with the most days overdue (the first
- *  on a tie); a field selection, the engine's `overdue` count decides. */
-function mostOverdueTitle(due: readonly unknown[]): string | null {
-	let best: { title: string; overdue: number } | null = null;
-	for (const entry of due) {
-		if (typeof entry !== "object" || entry === null) continue;
-		const { title, topic, overdue } = entry as Record<string, unknown>;
-		const name = str(title) ?? str(topic);
-		const days = typeof overdue === "number" ? overdue : 0;
-		if (name && (best === null || days > best.overdue)) best = { title: name, overdue: days };
-	}
-	return best?.title ?? null;
+/** One `due` entry, `{topic, title?, overdue, gap?}`; null when it names no topic. */
+function reviewOf(entry: unknown): DueReview | null {
+	if (typeof entry !== "object" || entry === null) return null;
+	const { title, topic, overdue, gap } = entry as Record<string, unknown>;
+	const name = str(title) ?? str(topic);
+	return name ? { title: name, overdue: typeof overdue === "number" ? overdue : 0, gap: str(gap) } : null;
+}
+
+/** `last_activity: {date, days_ago}`, or null when the record was never saved. */
+function daysAgoOf(value: unknown): number | null {
+	if (typeof value !== "object" || value === null) return null;
+	const { days_ago: daysAgo } = value as Record<string, unknown>;
+	return typeof daysAgo === "number" ? daysAgo : null;
 }
 
 function record(value: unknown): Record<string, unknown> | null {

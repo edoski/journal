@@ -105,8 +105,8 @@ describe("course chooser routes", () => {
 		assert.deepEqual(listing, {
 			available: true,
 			courses: [
-				{ workspace: LINALG, title: "Linear Algebra", due: 1, current: "rank", task: null, step: null, exam: null, mostOverdue: "rank" },
-				{ workspace: RUST, title: "Rust", due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null },
+				{ workspace: LINALG, title: "Linear Algebra", due: 1, reviews: [{ title: "rank", overdue: 0, gap: null }], current: "rank", currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
+				{ workspace: RUST, title: "Rust", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
 			],
 			roots: [LEARN, STUDY],
 		});
@@ -136,7 +136,7 @@ describe("new course", () => {
 		const res = await createCourse({ root: STUDY, title: "  Measure Theory & Probability!  " });
 		assert.equal(res.status, 200, await res.clone().text());
 		const directory = path.join(STUDY, "measure-theory-probability");
-		assert.deepEqual(await res.json(), { workspace: directory, title: "Measure Theory & Probability!", due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null });
+		assert.deepEqual(await res.json(), { workspace: directory, title: "Measure Theory & Probability!", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null });
 		assert.ok(fs.statSync(directory).isDirectory());
 		const writes = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === directory);
 		assert.deepEqual(writes.map((c) => c.args.slice(2)), [["init"], ["save"]]);

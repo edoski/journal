@@ -44,7 +44,7 @@ describe("course records adapter (fake engine)", () => {
 		const { engine, calls } = fakeEngine({
 			today: "2026-11-07",
 			courses: [
-				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", task: { key: "t", title: "Exercise 5" } },
+				{ workspace: "/s/smm", title: "SMM", due: [{ topic: "a" }, { topic: "b" }], due_more: 3, current: "rank", current_title: "Rank", task: { key: "t", title: "Exercise 5" }, last_activity: { date: "2026-11-05", days_ago: 2 } },
 				{ workspace: "/s/bare" },
 				{ title: "no workspace, skipped" },
 				{ workspace: "/s/broken", error: "course.json is not valid JSON" },
@@ -54,14 +54,28 @@ describe("course records adapter (fake engine)", () => {
 		assert.deepEqual(listing, {
 			available: true,
 			courses: [
-				{ workspace: "/s/smm", title: "SMM", due: 5, current: "rank", task: "Exercise 5", step: null, exam: null, mostOverdue: "a" },
-				{ workspace: "/s/bare", title: null, due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null },
+				{
+					workspace: "/s/smm",
+					title: "SMM",
+					due: 5,
+					reviews: [
+						{ title: "a", overdue: 0, gap: null },
+						{ title: "b", overdue: 0, gap: null },
+					],
+					current: "rank",
+					currentTitle: "Rank",
+					task: "Exercise 5",
+					step: null,
+					exam: null,
+					lastActiveDaysAgo: 2,
+				},
+				{ workspace: "/s/bare", title: null, due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
 			],
 		});
 		assert.deepEqual(calls()[0]!.args, ["plan", "--all", "--days", "1"]);
 	});
 
-	it("carries the exam countdown, the open task's step and the most overdue due topic for Today", async () => {
+	it("carries the exam countdown, the open task's step and the due topics by title with their gaps for Today", async () => {
 		const { engine } = fakeEngine({
 			today: "2026-11-08",
 			courses: [
@@ -71,7 +85,7 @@ describe("course records adapter (fake engine)", () => {
 					exam: { date: "2026-11-29", days_left: 21 },
 					due: [
 						{ topic: "span", title: "Span", overdue: 10 },
-						{ topic: "independence", title: "Linear independence", overdue: 16 },
+						{ topic: "independence", title: "Linear independence", overdue: 16, gap: "Treats pairwise non-parallel vectors as independent" },
 						{ topic: "rank", title: "Rank", overdue: 16 },
 					],
 					due_more: 1,
@@ -85,10 +99,20 @@ describe("course records adapter (fake engine)", () => {
 		assert.ok(listing.available);
 		const [linalg, prob] = listing.courses;
 		assert.deepEqual(
-			{ due: linalg!.due, exam: linalg!.exam, mostOverdue: linalg!.mostOverdue, task: linalg!.task, step: linalg!.step },
-			{ due: 4, exam: { date: "2026-11-29", daysLeft: 21 }, mostOverdue: "Linear independence", task: "Problem sheet 4", step: "Part (c)" },
+			{ due: linalg!.due, exam: linalg!.exam, reviews: linalg!.reviews, task: linalg!.task, step: linalg!.step },
+			{
+				due: 4,
+				exam: { date: "2026-11-29", daysLeft: 21 },
+				reviews: [
+					{ title: "Span", overdue: 10, gap: null },
+					{ title: "Linear independence", overdue: 16, gap: "Treats pairwise non-parallel vectors as independent" },
+					{ title: "Rank", overdue: 16, gap: null },
+				],
+				task: "Problem sheet 4",
+				step: "Part (c)",
+			},
 		);
-		assert.deepEqual({ exam: prob!.exam, mostOverdue: prob!.mostOverdue, step: prob!.step }, { exam: null, mostOverdue: null, step: null });
+		assert.deepEqual({ exam: prob!.exam, reviews: prob!.reviews, step: prob!.step }, { exam: null, reviews: [], step: null });
 	});
 
 	it("a save sends the patch on stdin to the selected workspace and returns the receipt", async () => {

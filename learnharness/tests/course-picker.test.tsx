@@ -10,8 +10,8 @@ import { CourseControl, CoursePicker, NewCourseBody, PICK_A_COURSE, type CourseC
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
 
 const COURSES = [
-	{ workspace: "/study/smm", title: "SMM", due: 2, current: "rank", task: null, step: null, exam: null, mostOverdue: null },
-	{ workspace: "/study/untitled-dir", title: null, due: 0, current: null, task: null, step: null, exam: null, mostOverdue: null },
+	{ workspace: "/study/smm", title: "SMM", due: 2, reviews: [], current: "rank", currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
+	{ workspace: "/study/untitled-dir", title: null, due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
 ];
 const READY: CourseState = { status: "ready", courses: COURSES, roots: ["/vault/learn", "/vault/university/msc"] };
 
