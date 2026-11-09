@@ -122,7 +122,7 @@ export function LessonDetails({
 				<dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 [&_dt]:whitespace-nowrap">
 					<dt className="text-muted-foreground">Model</dt>
 					<dd className="flex justify-end whitespace-nowrap">
-						<ModelControl chatId={chatId} onModelChange={onModelChange} />
+						<ModelControl chatId={chatId} onModelChange={onModelChange} variant="proposed" />
 					</dd>
 					<dt className="text-muted-foreground">Context</dt>
 					<dd data-testid="stats-context" className="text-right tabular-nums">{contextLabel}</dd>

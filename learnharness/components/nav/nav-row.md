@@ -1,6 +1,6 @@
 # NavRow
 
-The sidebar's one row: navigation (Today, Knowledge, New lesson, Settings) and sessions alike. `data-slot="nav-row"`.
+The sidebar's one row: navigation (Today, Knowledge, New lesson, Settings), sessions and, while one runs, background agents alike; the Settings sheet's section list uses it too. `data-slot="nav-row"`.
 
 ## Anatomy
 
@@ -11,7 +11,7 @@ The sidebar's one row: navigation (Today, Knowledge, New lesson, Settings) and s
 | label | `NavRowLabel` | 13/18, weight 400, truncates |
 | trailing | `NavRowTrailing` | 12/16, tabular figures, right column: a relative time, a status dot, a 16px glyph |
 
-A row may also carry an absolutely placed 24px action (`Button size="icon-inline"`) at its right edge, as the New lesson row does for practice; the row then pads its label clear of it.
+A row may also carry an absolutely placed 24px action (`Button size="icon-inline"`) at its right edge, as the New lesson row does for practice and a background agent's row does for Stop; the row then pads its label clear of it. A background agent's row shows the session it works for and its elapsed time; a click opens its detail (what it is doing, cost, context, model, steps) under the row in 12px muted text on the label's edge.
 
 ## States
 

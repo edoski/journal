@@ -25,7 +25,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AuthKeyStatus } from "@/src/core";
-import { SettingsGroup } from "./controls.tsx";
+import { SETTINGS_FIELD, SettingsGroup } from "./controls.tsx";
+import { useSettingsProposed } from "./settings-design";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { MENU_SURFACE } from "@/components/ui/menu";
+import { PlusIcon } from "lucide-react";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
 import { MenuShell } from "@/components/menu-shell";
@@ -115,6 +120,7 @@ function KeyTableRow({
 	testid: string;
 }) {
 	const envOwned = status.source === "env";
+	const proposed = useSettingsProposed();
 	const [value, setValue] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -133,6 +139,73 @@ function KeyTableRow({
 	// table-like"): the expanded row becomes the editor itself — label
 	// left, the paste field filling the middle, Save | Cancel (| Delete)
 	// right — instead of a second line beneath the row.
+	if (expanded && !envOwned && proposed) {
+		return (
+			<div data-testid={testid} className="flex flex-col gap-2 px-4 py-2.5">
+				<div className="flex items-center gap-2" data-testid={`${testid}-editor`}>
+					<span className="w-24 shrink-0 truncate text-row text-foreground">{label}</span>
+					<input
+						type="text"
+						value={value}
+						onChange={(e) => setValue(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Enter") void save();
+						}}
+						placeholder="Paste key"
+						aria-label={`${label} key`}
+						data-testid={`${testid}-input`}
+						disabled={busy}
+						autoFocus
+						className={cn(SETTINGS_FIELD, "min-w-0 flex-1 font-mono")}
+					/>
+					{status.present && status.source === "file" && onDelete && (
+						<Button variant="quiet" size="sm" onClick={() => void onDelete()} disabled={busy} data-testid={`${testid}-delete`} className="h-7 px-2 font-normal hover:text-danger">
+							Delete
+						</Button>
+					)}
+					<Button variant="quiet" size="sm" onClick={onCancel} disabled={busy} data-testid={`${testid}-cancel`} className="h-7 px-2 font-normal">
+						Cancel
+					</Button>
+					<Button size="sm" onClick={() => void save()} disabled={busy || !value.trim()} data-testid={`${testid}-save`} className="h-7 px-3">
+						Save
+					</Button>
+				</div>
+				{error && (
+					<p role="alert" data-testid={`${testid}-error`} className="text-label text-danger">
+						{error}
+					</p>
+				)}
+			</div>
+		);
+	}
+
+	if (proposed) {
+		return (
+			<div data-testid={testid} className={envOwned ? "opacity-50" : undefined}>
+				<button
+					type="button"
+					aria-expanded={expanded}
+					data-testid={`${testid}-row`}
+					onClick={() => !envOwned && onToggle()}
+					className={cn(
+						"flex min-h-12 w-full items-center justify-between gap-4 px-4 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+						envOwned ? "cursor-default" : "cursor-pointer transition-colors hover:bg-fill-hover motion-reduce:transition-none",
+					)}
+				>
+					<span className="text-row text-foreground">{label}</span>
+					<span data-testid={`${testid}-status`} className="text-label tabular-nums text-muted-foreground">
+						{keyStatusLine(status)}
+					</span>
+				</button>
+				{error && (
+					<p role="alert" data-testid={`${testid}-error`} className="px-4 pb-2 text-label text-danger">
+						{error}
+					</p>
+				)}
+			</div>
+		);
+	}
+
 	if (expanded && !envOwned) {
 		return (
 			<div data-testid={testid}>
@@ -227,6 +300,7 @@ function AddProviderRow({
 }) {
 	const [open, setOpen] = useState(false);
 	const anchorRef = useRef<HTMLDivElement>(null);
+	const proposed = useSettingsProposed();
 
 	useEffect(() => {
 		if (!open) return;
@@ -257,21 +331,35 @@ function AddProviderRow({
 				aria-expanded={open}
 				data-testid="add-provider"
 				onClick={() => setOpen((v) => !v)}
-				className="flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				className={
+					proposed
+						? "flex min-h-12 w-full items-center gap-2 px-4 py-2 text-left text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+						: "flex w-full items-center justify-between gap-3 rounded-sm px-1 py-1.5 text-left font-ui text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+				}
 			>
-				<span>+ Add provider key</span>
-				{addable.length > 0 && <span className="font-mono text-[11px]">{addable.length}</span>}
+				{proposed ? (
+					<>
+						<PlusIcon aria-hidden className="size-4 shrink-0" />
+						<span className="flex-1">Add provider key</span>
+					</>
+				) : (
+					<>
+						<span>+ Add provider key</span>
+						{addable.length > 0 && <span className="font-mono text-[11px]">{addable.length}</span>}
+					</>
+				)}
 			</button>
 			{open && (
 				<MenuShell
 					anchorRef={anchorRef}
 					testid="add-provider-menu"
 					preferredSide="down"
-					menuClass="flex w-72 flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
+					menuClass={proposed ? cn(MENU_SURFACE, "w-72") : "flex w-72 flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"}
 				>
 					{/* Close on pick (owner, fix wave): a chosen provider ends
 					    the dropdown — the paste row is the next step. */}
 					<ProviderMenuList
+						variant={proposed ? "proposed" : "current"}
 						providers={addable}
 						onPick={(p) => {
 							setOpen(false);
@@ -293,6 +381,7 @@ export function KeysSection() {
 	/** The paste editor for a freshly chosen Add-provider target. */
 	const [adding, setAdding] = useState<ProviderKeyInfo | null>(null);
 	const [addError, setAddError] = useState<string | null>(null);
+	const proposed = useSettingsProposed();
 
 	// Escape folds any open editor (unfolded row or the Add-provider paste)
 	// WITHOUT closing the dialog. Claimed at document CAPTURE phase — the
@@ -350,7 +439,7 @@ export function KeysSection() {
 	}
 
 	if (loading || statuses === null) {
-		return <p className="px-6 py-5 text-xs text-muted-foreground/70">Loading keys…</p>;
+		return <p className={proposed ? "text-row text-muted-foreground" : "px-6 py-5 text-xs text-muted-foreground/70"}>Loading keys…</p>;
 	}
 
 	const { providerRows, unknownRows, addable } = classifyKeys(statuses, providers);
@@ -394,15 +483,15 @@ export function KeysSection() {
 					/>
 				)}
 				{adding && (
-					<div className="flex items-center gap-2 rounded-sm px-1 py-1.5" data-testid={`key-${adding.id}-editor`}>
-						<span className="shrink-0 font-ui text-xs text-foreground">{adding.label}</span>
+					<div className={proposed ? "flex flex-wrap items-center gap-2 px-4 py-2.5" : "flex items-center gap-2 rounded-sm px-1 py-1.5"} data-testid={`key-${adding.id}-editor`}>
+						<span className={proposed ? "w-24 shrink-0 truncate text-row text-foreground" : "shrink-0 font-ui text-xs text-foreground"}>{adding.label}</span>
 						<AddProviderEditor provider={adding} onSave={(v) => void saveNewProvider(adding, v)} onCancel={() => setAdding(null)} error={addError} />
 					</div>
 				)}
 				{unknownRows.length > 0 && <div data-testid="group-unknown-keys">
-					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className="flex items-center justify-between gap-3 px-1 py-1.5 opacity-40">
-						<span className="font-mono text-xs text-foreground">{status.id}</span>
-						<span className="font-mono text-[11px] text-muted-foreground">{status.masked}</span>
+					{unknownRows.map((status) => <div key={status.id} data-testid={`unknown-${status.id}`} className={proposed ? "flex min-h-12 items-center justify-between gap-4 px-4 py-2 opacity-50" : "flex items-center justify-between gap-3 px-1 py-1.5 opacity-40"}>
+						<span className={proposed ? "text-row text-foreground" : "font-mono text-xs text-foreground"}>{status.id}</span>
+						<span className={proposed ? "text-label tabular-nums text-muted-foreground" : "font-mono text-[11px] text-muted-foreground"}>{status.masked}</span>
 					</div>)}
 				</div>}
 			</SettingsGroup>
@@ -428,6 +517,36 @@ function AddProviderEditor({
 	error: string | null;
 }) {
 	const [value, setValue] = useState("");
+	if (useSettingsProposed()) {
+		return (
+			<>
+				<input
+					type="text"
+					value={value}
+					onChange={(e) => setValue(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Enter" && value.trim()) onSave(value);
+					}}
+					placeholder="Paste key"
+					aria-label={`${provider.label} key`}
+					data-testid={`key-${provider.id}-input`}
+					autoFocus
+					className={cn(SETTINGS_FIELD, "min-w-0 flex-1 font-mono")}
+				/>
+				<Button variant="quiet" size="sm" onClick={onCancel} data-testid={`key-${provider.id}-cancel`} className="h-7 px-2 font-normal">
+					Cancel
+				</Button>
+				<Button size="sm" onClick={() => value.trim() && onSave(value)} disabled={!value.trim()} data-testid={`key-${provider.id}-save`} className="h-7 px-3">
+					Save
+				</Button>
+				{error && (
+					<p role="alert" className="w-full text-label text-danger" data-testid={`key-${provider.id}-error`}>
+						{error}
+					</p>
+				)}
+			</>
+		);
+	}
 	return (
 		<>
 			<input

@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { useDesignVariant } from "@/components/design-variant";
+import { Button } from "@/components/ui/button";
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 
 /** The 409 extraction_running line (owner phrasing, node interlude):
  *  the server's error names the extraction; the ACTIVITY DOCK is the
@@ -35,6 +38,7 @@ export function DeleteNodeBody({
 	failure,
 	onClose,
 	onRun,
+	variant = "current",
 }: {
 	/** One node (the canvas context menu) or many (the chain table's
 	 *  selection). One names it alone; many pluralize the title and
@@ -44,7 +48,49 @@ export function DeleteNodeBody({
 	failure: { code: string; error: string } | null;
 	onClose: () => void;
 	onRun: () => void;
+	/** "proposed": the shared dialog anatomy (components/ui/dialog.md). */
+	variant?: "current" | "proposed";
 }) {
+	if (variant === "proposed") {
+		return (
+			<DialogContent aria-label="Delete node" data-testid="delete-node-dialog">
+				<DialogHeader>
+					<DialogTitle>{nodes.length === 1 ? "Delete node?" : `Delete ${nodes.length} nodes?`}</DialogTitle>
+					{nodes.length === 1 ? (
+						<p data-testid="node-name-code" className="text-control font-medium text-foreground">
+							{nodes[0]?.name}
+						</p>
+					) : (
+						<p data-testid="node-names-code" className="text-control font-medium text-foreground">
+							{nodes.slice(0, 8).map((n) => n.name).join(", ")}
+							{nodes.length > 8 ? `, and ${nodes.length - 8} more` : ""}
+						</p>
+					)}
+					<DialogDescription data-testid="node-permanence-line">
+						{nodes.length === 1
+							? "This permanently deletes the node — this cannot be undone."
+							: `This permanently deletes all ${nodes.length} nodes — this cannot be undone.`}
+					</DialogDescription>
+				</DialogHeader>
+				{failure && (
+					<p role="alert" data-testid="node-delete-failure" className="text-row text-danger">
+						{failure.code === "extraction_running" ? EXTRACTION_RETRY_LINE : failure.error}{" "}
+						<button type="button" data-testid="node-delete-retry" onClick={onRun} disabled={busy} className="text-foreground underline-offset-2 hover:underline disabled:opacity-50">
+							Try again
+						</button>
+					</p>
+				)}
+				<DialogFooter className="pt-2">
+					<Button variant="quiet" data-testid="node-delete-cancel" onClick={onClose} disabled={busy}>
+						Cancel
+					</Button>
+					<Button variant="destructive" data-testid="node-delete-confirm" onClick={onRun} disabled={busy}>
+						{busy ? "Deleting…" : "Delete"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		);
+	}
 	return (
 		<div
 			role="dialog"
@@ -151,6 +197,7 @@ export function DeleteNodeDialog({
 		if (!busy) onClose();
 	});
 	const [failure, setFailure] = useState<{ code: string; error: string } | null>(null);
+	const variant = useDesignVariant();
 
 	// Fresh state per dialog: closing resets.
 	useEffect(() => {
@@ -215,6 +262,14 @@ export function DeleteNodeDialog({
 
 	if (!nodes || nodes.length === 0) return null;
 
+	if (variant === "proposed") {
+		return createPortal(
+			<DialogOverlay {...backdropDismiss}>
+				<DeleteNodeBody variant="proposed" nodes={nodes} busy={busy} failure={failure} onClose={onClose} onRun={() => void run()} />
+			</DialogOverlay>,
+			document.body,
+		);
+	}
 	return createPortal(
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"

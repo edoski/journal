@@ -7,6 +7,10 @@ import type { CallUsage, JobKind, JobRecord } from "@/src/core";
 import { isModelsRefusal, isProviderKeyRefusal, subscriptionLabel, subscriptionLabels } from "@/src/core";
 import { formatTokens, planCostLabel } from "@/components/usage-format";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
+import { NavSection } from "@/components/nav/nav-section";
+import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 
 /**
  * THE BACKGROUND-AGENTS SECTION (owner, sidebar round — the successor of
@@ -288,7 +292,7 @@ const KIND_ICON: Record<JobKind, typeof SearchIcon> = {
 /** Abort states per blob id: pending (fired) / failed (backend absent). */
 type AbortState = "pending" | "failed";
 
-export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
+export function ActivitySection({ feed: feedProp, variant = "current" }: { feed?: ActivityFeed; variant?: "current" | "proposed" }) {
 	const ctx = useContext(ActivityContext);
 	const feed = feedProp ?? ctx.feed;
 	const refresh = ctx.refresh;
@@ -338,6 +342,29 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 		}
 	}, []);
 
+	if (variant === "proposed") {
+		// The sidebar's own anatomy (nav-section.md, nav-row.md): a quiet
+		// header and one 32px row per process, its detail opening under it.
+		// Cost and context live in the detail, not on the row's face.
+		return (
+			<NavSection data-testid="activity-section" title="Background agents" className="shrink-0 px-2 pt-2">
+				<div className="flex max-h-[40dvh] flex-col overflow-y-auto">
+					{blobs.map((blob) => (
+						<ActivityRowNext
+							key={blob.id}
+							blob={blob}
+							now={now}
+							detailOpen={openBlob === blob.id}
+							onToggleDetail={() => setOpenBlob((id) => (id === blob.id ? null : blob.id))}
+							abortState={abortStates[blob.id]}
+							onAbort={() => void abort(blob)}
+						/>
+					))}
+				</div>
+			</NavSection>
+		);
+	}
+
 	// Sidebar-native skin (owner, sidebar round): part of the sidebar's
 	// surface, not a floating card — the border-t separator matches the
 	// sidebar's own edge line, the header matches the "Sessions" label, the
@@ -370,6 +397,106 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 			</div>
 			)}
 		</section>
+	);
+}
+
+/** What a blob is, in words: "Researcher", "Extraction — merging". */
+function blobLabel(blob: ActivityBlob): string {
+	if (blob.process === "extraction") return `Extraction — ${blob.phase ?? "running"}`;
+	switch (blob.jobKind) {
+		case "research":
+			return "Researcher";
+		case "demo":
+			return "Demo builder";
+		case "visual":
+			return "Figure maker";
+		case "pdf":
+			return "PDF reader";
+		default:
+			return "Sub-agent";
+	}
+}
+
+/** One process as a sidebar row (Proposed): kind icon, what it is, the
+ *  session it works for, elapsed time, and a stop button at the right
+ *  edge; a click opens its detail (what it is doing, cost, context,
+ *  model, steps, the session link) under the row. */
+function ActivityRowNext({
+	blob,
+	now,
+	detailOpen,
+	onToggleDetail,
+	abortState,
+	onAbort,
+}: {
+	blob: ActivityBlob;
+	now: number;
+	detailOpen: boolean;
+	onToggleDetail: () => void;
+	abortState: AbortState | undefined;
+	onAbort: () => void;
+}) {
+	const Icon = blob.process === "extraction" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
+	const label = blobLabel(blob);
+	const elapsed = formatElapsed(now - blob.startedAt);
+	return (
+		<div data-testid={`activity-blob-${blob.process}`} className="relative">
+			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="pr-9">
+				<Icon />
+				<NavRowLabel>{blob.title}</NavRowLabel>
+				<NavRowTrailing data-testid="activity-blob-elapsed">{elapsed}</NavRowTrailing>
+			</NavRow>
+			<Hint label={abortState === "failed" ? "Abort failed — try again" : "Stop"} side="right">
+				<Button
+					variant="quiet"
+					size="icon-inline"
+					data-testid="activity-abort"
+					onClick={onAbort}
+					disabled={abortState !== undefined}
+					aria-label={`End ${label} in ${blob.title}`}
+					className="absolute right-1 top-1 hover:text-danger"
+				>
+					<SquareIcon />
+				</Button>
+			</Hint>
+			{detailOpen && (
+				<dl
+					data-testid="activity-blob-detail"
+					className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground"
+				>
+					<dt className="col-span-2 text-foreground">{label}</dt>
+					{blob.activity && <dd className="col-span-2 break-words">{blob.activity}</dd>}
+					<dt>Cost</dt>
+					<dd data-testid="activity-blob-cost" className="text-right tabular-nums text-foreground">
+						{planCostLabel(blob.cost, subscriptionLabel(blob.model))}
+					</dd>
+					<dt>Context</dt>
+					<dd data-testid="activity-blob-context" className="text-right tabular-nums text-foreground">
+						{blob.context === null ? "—" : `${formatTokens(blob.context.used)} / ${formatTokens(blob.context.limit)}`}
+					</dd>
+					{blob.model && (
+						<>
+							<dt>Model</dt>
+							<dd className="truncate text-right text-foreground">{blob.model}</dd>
+						</>
+					)}
+					{blob.steps !== undefined && (
+						<>
+							<dt>Steps</dt>
+							<dd className="text-right tabular-nums text-foreground">{blob.steps}</dd>
+						</>
+					)}
+					<dd className="col-span-2">
+						<a href={`/chat/${blob.chatId}`} className="text-link underline-offset-2 hover:underline">
+							Open session
+						</a>
+					</dd>
+					{abortState && (
+						<dd className="col-span-2">{abortState === "failed" ? "Abort failed — try again" : "Stopping…"}</dd>
+					)}
+				</dl>
+			)}
+		</div>
 	);
 }
 

@@ -50,19 +50,28 @@ function TooltipTrigger({
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
 }
 
+/** "proposed": the popover surface with a hairline edge, 12px, radius 8
+ *  (the Proposed design's one tooltip style). */
+const CONTENT_LOOK = {
+  current: "rounded-md bg-accent px-2 py-1 text-[11px] text-foreground/85",
+  proposed: "flex items-center gap-1.5 rounded-md border bg-popover px-2 py-1 text-label text-popover-foreground shadow-md",
+} as const
+
 function TooltipContent({
   className,
   sideOffset = 6,
+  variant = "current",
   children,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+}: React.ComponentProps<typeof TooltipPrimitive.Content> & { variant?: keyof typeof CONTENT_LOOK }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) animate-in rounded-md bg-accent px-2 py-1 text-[11px] text-foreground/85 text-balance fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) animate-in text-balance fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          CONTENT_LOOK[variant],
           className
         )}
         {...props}

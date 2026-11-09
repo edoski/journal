@@ -1,9 +1,11 @@
 "use client";
+import { useDesignVariant } from "@/components/design-variant";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { NATIVE_SUBSCRIPTIONS, type NativeSubscriptionProviderId, type NativeSubscriptionStatus } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
-import { ConnectionDialog, ConnectionFooter, ConnectionRow } from "./connection-controls";
+import { ConnectionDialog, ConnectionFooter, ConnectionRow, connectionBlockClass, connectionNoteClass } from "./connection-controls";
+import { useSettingsProposed } from "./settings-design";
 import { ChatGPTConnection } from "./chatgpt-connection";
 import { ClaudeConnectionRow } from "./claude-connection";
 import { Toggle } from "./controls";
@@ -18,6 +20,7 @@ const Context = createContext({ statuses: [] as NativeSubscriptionStatus[], busy
 const CONTROL_ERROR = "The connection could not be changed. Try again.";
 
 export function NativeSubscriptionUIProvider({ children }: { children: React.ReactNode }) {
+	const proposed = useDesignVariant() === "proposed";
 	const bridge = useNativeSubscriptionBridge();
 	const web = typeof window !== "undefined" && bridge !== window.lh?.subscriptions;
 	const [statuses, setStatuses] = useState<NativeSubscriptionStatus[]>([]);
@@ -83,20 +86,20 @@ export function NativeSubscriptionUIProvider({ children }: { children: React.Rea
 	return <Context.Provider value={{ statuses, busy: !!operation, open }}>
 		{children}
 		{dialog && descriptor && status && <ConnectionDialog key={`${dialog}:${view}:${confirm}`} label={`${descriptor.label} connection`} testid="subscription-connection-dialog" backdropTestid="subscription-dialog-backdrop" busy={busy} onClose={close}>
-			<h2 className="text-sm font-semibold text-foreground">{descriptor.label}</h2>
+			<h2 className={proposed ? "pr-8 text-subheading font-semibold text-foreground" : "text-sm font-semibold text-foreground"}>{descriptor.label}</h2>
 			{confirm ? <>
-				<p className="mt-3 text-sm font-semibold text-red-400">Disconnect {descriptor.label}?</p>
-				<p className="mt-3 text-xs leading-relaxed text-muted-foreground">{subscriptionDisconnectCopy(descriptor.label, web)}</p>
+				<p className={proposed ? "mt-3 text-control font-medium text-danger" : "mt-3 text-sm font-semibold text-red-400"}>Disconnect {descriptor.label}?</p>
+				<p className={proposed ? "mt-3 text-control text-muted-foreground" : "mt-3 text-xs leading-relaxed text-muted-foreground"}>{subscriptionDisconnectCopy(descriptor.label, web)}</p>
 			</> : view === "notice" ? <>
-				<p className="mt-3 text-xs leading-relaxed text-muted-foreground" data-testid="subscription-privacy-notice">{subscriptionNotice(descriptor.label, web)}</p>
-				{dialog === "github-copilot" && <p className="mt-3 text-xs leading-relaxed text-muted-foreground" data-testid="copilot-policy-notice">{COPILOT_POLICY_NOTICE}</p>}
+				<p className={proposed ? "mt-3 text-control text-muted-foreground" : "mt-3 text-xs leading-relaxed text-muted-foreground"} data-testid="subscription-privacy-notice">{subscriptionNotice(descriptor.label, web)}</p>
+				{dialog === "github-copilot" && <p className={proposed ? "mt-3 text-control text-muted-foreground" : "mt-3 text-xs leading-relaxed text-muted-foreground"} data-testid="copilot-policy-notice">{COPILOT_POLICY_NOTICE}</p>}
 			</> : <>
-				<div className="mt-4 flex items-center gap-3 text-xs text-foreground">
+				<div className={proposed ? "mt-4 flex items-center gap-3 text-row text-foreground" : "mt-4 flex items-center gap-3 text-xs text-foreground"}>
 					<Toggle label="Allow background use" checked={management ? status.allowBackgroundUse : background} disabled={busy || !!operation || status.pending || !status.available} onChange={(enabled) => { setBackground(enabled); if (management && bridge) void control(() => bridge.consent(dialog, enabled)); else setBackgroundDirty(true); }} />
 					<span>Allow background use<span className="mt-1 block leading-relaxed text-muted-foreground">{SUBSCRIPTION_BACKGROUND_HINT}</span></span>
 				</div>
-				{!status.available && <p className="mt-3 text-xs text-muted-foreground">Subscription sign-in requires the desktop app's private server connection. API-key connections remain available here.</p>}
-				{view === "connection" && interaction && <div className="mt-3 space-y-3 text-xs" data-testid="subscription-login-interaction">
+				{!status.available && <p className={proposed ? "mt-3 text-control text-muted-foreground" : "mt-3 text-xs text-muted-foreground"}>Subscription sign-in requires the desktop app's private server connection. API-key connections remain available here.</p>}
+				{view === "connection" && interaction && <div className={proposed ? "mt-3 space-y-3 text-row" : "mt-3 space-y-3 text-xs"} data-testid="subscription-login-interaction">
 					{interaction.progress && <p role="status" className="text-muted-foreground">{interaction.progress}</p>}
 					{interaction.userCode && <p>Device code: <code className="select-text font-mono">{interaction.userCode}</code></p>}
 					{interaction.browser && <Button variant="outline" size="sm" disabled={busy} onClick={() => bridge && void bridge.open(dialog, interaction.attemptId, interaction.browser!.id).catch(() => setError("The browser could not be opened. Try again."))}>Open browser</Button>}
@@ -107,7 +110,7 @@ export function NativeSubscriptionUIProvider({ children }: { children: React.Rea
 					</form>}
 				</div>}
 			</>}
-			{(error || status.error) && <p role="alert" className="mt-3 text-xs text-red-400">{error || status.error}</p>}
+			{(error || status.error) && <p role="alert" className={proposed ? "mt-3 text-row text-danger" : "mt-3 text-xs text-red-400"}>{error || status.error}</p>}
 			<ConnectionFooter testid="subscription-connection-footer" leading={!confirm && management && status.connectionId && !status.pending && <Button variant="ghost" size="sm" className="cursor-pointer text-red-400 hover:bg-red-500/10 hover:text-red-300" disabled={busy || !!operation} onClick={() => setConfirm(true)}>Disconnect</Button>}>
 				{!confirm && management && status.connectionId && status.available && !status.connected && !!status.error && !status.pending && <>
 					{status.error && <Button variant="outline" size="sm" disabled={busy || !!operation} onClick={() => bridge && void control(() => bridge.retry(dialog))}>Retry</Button>}
@@ -123,16 +126,18 @@ export function NativeSubscriptionUIProvider({ children }: { children: React.Rea
 export function NativeSubscriptionConnection({ providerId, labelClassName }: { providerId: NativeSubscriptionProviderId; labelClassName?: string }) {
 	const ui = useContext(Context), descriptor = NATIVE_SUBSCRIPTIONS.find((p) => p.providerId === providerId)!;
 	const status = ui.statuses.find((s) => s.providerId === providerId) ?? emptySubscriptionStatus(providerId);
-	return <div className="flex flex-col gap-2" data-testid={`${providerId}-connection`}>
+	const proposed = useSettingsProposed();
+	return <div className={connectionBlockClass(proposed, "flex flex-col gap-2")} data-testid={`${providerId}-connection`}>
 		<ConnectionRow label={descriptor.label} labelClassName={labelClassName} action={status.connectionId ? "Manage…" : "Connect"} disabled={ui.busy || !status.available || ui.statuses.some((s) => s.pending)} onAction={() => ui.open(providerId)} />
-		{status.error && <p role="alert" className="text-xs text-red-400">{status.error}</p>}
+		{status.error && <p role="alert" className={connectionNoteClass(proposed, "danger", "text-xs text-red-400")}>{status.error}</p>}
 	</div>;
 }
 export function SubscriptionConnections({ setup = false }: { setup?: boolean }) {
 	// Providers uses ordinary settings-label typography. The setup surface
 	// keeps its existing compact labels; dialogs and actions are untouched.
 	const labelClassName = setup ? undefined : "font-prose text-(length:--lh-prose-size) text-foreground";
-	return <div className="space-y-3" data-testid="subscription-connections"><ChatGPTConnection setup={setup} labelClassName={labelClassName} /><ClaudeConnectionRow labelClassName={labelClassName} />{NATIVE_SUBSCRIPTIONS.map((p) => <NativeSubscriptionConnection key={p.providerId} providerId={p.providerId} labelClassName={labelClassName} />)}</div>;
+	const proposed = useSettingsProposed();
+	return <div className={proposed ? "flex flex-col divide-y" : "space-y-3"} data-testid="subscription-connections"><ChatGPTConnection setup={setup} labelClassName={labelClassName} /><ClaudeConnectionRow labelClassName={labelClassName} />{NATIVE_SUBSCRIPTIONS.map((p) => <NativeSubscriptionConnection key={p.providerId} providerId={p.providerId} labelClassName={labelClassName} />)}</div>;
 }
 export function NativeSubscriptionBackgroundAccess({ provider }: { provider: string | undefined }) {
 	const ui = useContext(Context), descriptor = NATIVE_SUBSCRIPTIONS.find((p) => p.logicalId === provider);

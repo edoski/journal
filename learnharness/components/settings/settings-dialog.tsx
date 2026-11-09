@@ -40,7 +40,7 @@ import {
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
-import { SettingsRow, SettingsSection } from "./controls.tsx";
+import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
@@ -50,6 +50,13 @@ import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
+import { SettingsDesignContext } from "./settings-design";
+import { useDesignVariant } from "@/components/design-variant";
+import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
+import { NavSection } from "@/components/nav/nav-section";
+import { Button } from "@/components/ui/button";
+import { DialogOverlay } from "@/components/ui/dialog";
+import { XIcon } from "lucide-react";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
 /** Owner (2026-09-20): hints earn their place — mechanics-explaining
@@ -105,6 +112,17 @@ function SettingsDialog({
 	initialSection: SectionId;
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
+	const design = useDesignVariant();
+	if (design === "proposed") {
+		return createPortal(
+			<SettingsDesignContext.Provider value="proposed">
+				<DialogOverlay data-testid="settings-backdrop" {...backdropDismiss}>
+					<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
+				</DialogOverlay>
+			</SettingsDesignContext.Provider>,
+			document.body,
+		);
+	}
 	// Plain dim backdrop (no blur — nothing decorative); a genuine
 	// backdrop click closes, the dialog body stops propagation.
 	return createPortal(
@@ -266,6 +284,154 @@ export function SettingsDialogBody({
 		[onAppearanceChange],
 	);
 
+	const proposed = useDesignVariant() === "proposed";
+	const sections = (
+		<>
+					{error && (
+						<p
+							role="alert"
+							className={proposed ? "mx-6 mt-6 text-row text-danger" : "m-4 rounded-sm border border-red-500/40 px-3 py-2 text-xs text-red-500"}
+							data-testid="settings-error"
+						>
+							{error}
+						</p>
+					)}
+					{record === undefined ? (
+						<p className={proposed ? "px-6 py-6 text-row text-muted-foreground" : "px-6 py-5 text-xs text-muted-foreground/70"}>
+							Loading settings…
+						</p>
+					) : record === null ? (
+						<p className={proposed ? "px-6 py-6 text-row text-muted-foreground" : "px-6 py-5 text-xs text-muted-foreground/70"}>
+							Settings could not be loaded — refresh to retry.
+						</p>
+					) : (
+						<div>
+							{active === "general" && (
+								<SettingsSection
+									title="General"
+									testid="section-general"
+								>
+									{proposed ? (
+										<SettingsGroup label="About">
+											<SettingsRow label="Version" testid="row-version">
+												<span className="text-row tabular-nums text-muted-foreground">{APP_VERSION || "unknown"}</span>
+											</SettingsRow>
+										</SettingsGroup>
+									) : (
+										<SettingsRow label={`Version ${APP_VERSION || "unknown"}`} testid="row-version">{null}</SettingsRow>
+									)}
+								</SettingsSection>
+							)}
+							{active === "keys" && (
+								<SettingsSection title="Providers" testid="section-keys">
+									<KeysSection />
+								</SettingsSection>
+							)}
+							{active === "agent" && (
+								<SettingsSection
+									title="Agent"
+									testid="section-agent"
+								>
+									<AgentSection
+										agent={record.agent}
+										models={record.models}
+										graph={record.graph}
+										compaction={record.compaction}
+										onModelsChange={(next: ModelsSettings) =>
+											void write("models", next)
+										}
+										onSectionChange={(next: AgentSettings) =>
+											void write("agent", next)
+										}
+										onCompactionChange={(next: CompactionSettings) =>
+											void write("compaction", next)
+										}
+									/>
+								</SettingsSection>
+							)}
+							{active === "appearance" && (
+								<SettingsSection
+									title="Appearance"
+									testid="section-appearance"
+								>
+									<AppearanceSection
+										appearance={record.appearance}
+										onSectionChange={(next: AppearanceSettings) =>
+											void write("appearance", next)
+										}
+									/>
+								</SettingsSection>
+							)}
+							{active === "graph" && (
+								<SettingsSection
+									title="Graph"
+									testid="section-graph"
+								>
+									<GraphSection
+										graph={record.graph}
+										onSectionChange={(next: GraphSettings) =>
+											void write("graph", next)
+										}
+									/>
+								</SettingsSection>
+							)}
+							{active === "keyboard" && (
+								<SettingsSection
+									title="Keyboard"
+									hint="Stored on this device"
+									testid="section-keyboard"
+								>
+									<KeyboardSection />
+								</SettingsSection>
+							)}
+						</div>
+					)}
+		</>
+	);
+
+	if (proposed) {
+		// The Proposed frame (spec: settings.md): one raised surface, the
+		// section list on the left in the sidebar's row anatomy, the
+		// section's grouped rows on the right, a quiet ✕ in the corner.
+		return (
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-label="Settings"
+				data-testid="settings-dialog"
+				className="settings-dialog-pop flex h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-2xl"
+				onClick={(e) => e.stopPropagation()}
+			>
+				<nav aria-label="Settings sections" data-testid="settings-nav" className="flex w-52 shrink-0 flex-col border-r p-2">
+					<NavSection title="Settings">
+						{SECTIONS.map((s) => (
+							<NavRow key={s.id} data-testid={`settings-nav-${s.id}`} active={active === s.id} onClick={() => setActive(s.id)}>
+								<NavRowLabel>{s.label}</NavRowLabel>
+							</NavRow>
+						))}
+					</NavSection>
+				</nav>
+				<div className="relative flex min-w-0 flex-1 flex-col">
+					<Hint label="Close" binding="escape" side="left">
+						<Button
+							variant="quiet"
+							size="icon-row"
+							aria-label="Close settings"
+							data-testid="settings-close"
+							onClick={onClose}
+							className="absolute right-3 top-3 z-10"
+						>
+							<XIcon />
+						</Button>
+					</Hint>
+					<div ref={contentRef} className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
+						{sections}
+					</div>
+				</div>
+			</div>
+		);
+	}
+
 	return (
 		<div
 			role="dialog"
@@ -341,97 +507,7 @@ export function SettingsDialogBody({
 					className="min-w-0 flex-1 overflow-y-auto"
 					data-testid="settings-content"
 				>
-					{error && (
-						<p
-							role="alert"
-							className="m-4 rounded-sm border border-red-500/40 px-3 py-2 text-xs text-red-500"
-							data-testid="settings-error"
-						>
-							{error}
-						</p>
-					)}
-					{record === undefined ? (
-						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Loading settings…
-						</p>
-					) : record === null ? (
-						<p className="px-6 py-5 text-xs text-muted-foreground/70">
-							Settings could not be loaded — refresh to retry.
-						</p>
-					) : (
-						<div>
-							{active === "general" && (
-								<SettingsSection
-									title="General"
-									testid="section-general"
-								>
-									<SettingsRow label={`Version ${APP_VERSION || "unknown"}`} testid="row-version">{null}</SettingsRow>
-								</SettingsSection>
-							)}
-							{active === "keys" && (
-								<SettingsSection title="Providers" testid="section-keys">
-									<KeysSection />
-								</SettingsSection>
-							)}
-							{active === "agent" && (
-								<SettingsSection
-									title="Agent"
-									testid="section-agent"
-								>
-									<AgentSection
-										agent={record.agent}
-										models={record.models}
-										graph={record.graph}
-										compaction={record.compaction}
-										onModelsChange={(next: ModelsSettings) =>
-											void write("models", next)
-										}
-										onSectionChange={(next: AgentSettings) =>
-											void write("agent", next)
-										}
-										onCompactionChange={(next: CompactionSettings) =>
-											void write("compaction", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "appearance" && (
-								<SettingsSection
-									title="Appearance"
-									testid="section-appearance"
-								>
-									<AppearanceSection
-										appearance={record.appearance}
-										onSectionChange={(next: AppearanceSettings) =>
-											void write("appearance", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "graph" && (
-								<SettingsSection
-									title="Graph"
-									testid="section-graph"
-								>
-									<GraphSection
-										graph={record.graph}
-										onSectionChange={(next: GraphSettings) =>
-											void write("graph", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "keyboard" && (
-								<SettingsSection
-									title="Keyboard"
-									hint="Stored on this device"
-									testid="section-keyboard"
-								>
-									<KeyboardSection />
-								</SettingsSection>
-							)}
-						</div>
-					)}
+					{sections}
 				</div>
 			</div>
 		</div>

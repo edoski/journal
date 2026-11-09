@@ -75,6 +75,7 @@ import { useActivity } from "@/components/activity-dock";
 import { useServerEvent, useServerResync } from "@/components/server-events";
 import { MenuShell } from "@/components/menu-shell.tsx";
 import { DeleteNodeDialog } from "@/components/delete-node-dialog.tsx";
+import { MENU_ITEM, MENU_SURFACE } from "@/components/ui/menu";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { cn } from "@/lib/utils";
 import { Hint } from "@/components/ui/hint";
@@ -1556,7 +1557,7 @@ export function GraphView({
 					anchorRef={ctxAnchorRef}
 					testid="node-context-menu"
 					preferredSide="down"
-					menuClass="flex w-fit flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass={variant === "proposed" ? cn(MENU_SURFACE, "w-44") : "flex w-fit flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"}
 				>
 					<button
 						type="button"
@@ -1565,9 +1566,9 @@ export function GraphView({
 							setDeletingNode({ id: ctxNode.id, name: ctxNode.name });
 							setCtxNode(null);
 						}}
-						className="flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"
+						className={variant === "proposed" ? cn(MENU_ITEM, "text-danger") : "flex items-center rounded-lg px-2.5 py-1.5 text-left text-muted-foreground/80 transition-colors hover:bg-accent hover:text-foreground"}
 					>
-						Delete
+						{variant === "proposed" ? "Delete…" : "Delete"}
 					</button>
 				</MenuShell>
 			)}
@@ -1643,8 +1644,8 @@ export function GraphView({
 				/>
 			</div>
 
-			<NotesImportErrors errors={notesImport.errors} />
-			<NotesImportNotices notices={notesImport.notices} />
+			<NotesImportErrors errors={notesImport.errors} variant={variant} />
+			<NotesImportNotices notices={notesImport.notices} variant={variant} />
 			{/* Top-right tail (owner, 2026-09-20): the pipeline cost number —
 			    just a number, hover-highlighted, dropdown breakdown — then
 			    the running-pipeline pills under it. Lives BELOW the actions

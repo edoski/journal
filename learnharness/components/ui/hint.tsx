@@ -2,6 +2,8 @@
 
 import * as React from "react"
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { Kbd } from "@/components/ui/kbd"
+import { useDesignVariant } from "@/components/design-variant"
 import { bindingForAction, formatBinding, type KeyAction } from "@/src/core"
 
 /**
@@ -35,20 +37,31 @@ interface HintProps {
 /** The composition itself, pure — "Model selector" + ⌘K → "Model selector (⌘K)". Exported
  *  for the mechanism pins (tests/tooltip-mechanism.test.tsx). */
 export function hintText(label: string, action?: KeyAction, binding?: string): string {
-	const live = action
-		? formatBinding(bindingForAction(action))
-		: binding
-			? formatBinding(binding)
-			: ""
+	const live = hintBinding(action, binding)
 	return live ? `${label} (${live})` : label
 }
 
+/** The live shortcut glyphs for a hint, "" when it has none. */
+export function hintBinding(action?: KeyAction, binding?: string): string {
+	return action ? formatBinding(bindingForAction(action)) : binding ? formatBinding(binding) : ""
+}
+
 export function Hint({ label, action, binding, side = "top", children }: HintProps) {
+	// Proposed: the label, then the shortcut as muted glyphs (kbd.md), not in parentheses.
+	const proposed = useDesignVariant() === "proposed"
+	const live = proposed ? hintBinding(action, binding) : ""
 	return (
 		<TooltipProvider>
 			<Tooltip>
 				<TooltipTrigger asChild>{children}</TooltipTrigger>
-				<TooltipContent side={side}>{hintText(label, action, binding)}</TooltipContent>
+				{proposed ? (
+					<TooltipContent side={side} variant="proposed">
+						<span>{label}</span>
+						{live && <Kbd>{live}</Kbd>}
+					</TooltipContent>
+				) : (
+					<TooltipContent side={side}>{hintText(label, action, binding)}</TooltipContent>
+				)}
 			</Tooltip>
 		</TooltipProvider>
 	)

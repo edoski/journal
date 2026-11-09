@@ -25,7 +25,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
-import { useDesignVariant } from "@/components/design-variant";
+import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
+import { DialogClose, DialogContent, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { Hint } from "@/components/ui/hint";
+import { Kbd } from "@/components/ui/kbd";
 import {
 	actionForBinding,
 	bindingForAction,
@@ -47,7 +50,8 @@ export function KeyboardShortcuts() {
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
 	// The graph is home in the current design and its own view in the proposed one.
-	const graphPath = useDesignVariant() === "proposed" ? "/knowledge" : "/";
+	const design = useDesignVariant();
+	const graphPath = design === "proposed" ? "/knowledge" : "/";
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
@@ -139,13 +143,13 @@ export function KeyboardShortcuts() {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [cheatOpen]);
 
-	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} />;
+	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} variant={design} />;
 }
 
 /** The ? overlay — the registry rendered as a table (grouped by scope).
  *  Until the settings milestone ships an editor, this is how shortcuts
  *  stay discoverable. */
-function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => void; variant: DesignVariant }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 	if (!open) return null;
 	const scopes = ["global", "chat", "graph"] as const;
@@ -154,6 +158,37 @@ function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 		chat: "Chat",
 		graph: "Graph view",
 	};
+	if (variant === "proposed") {
+		// The dialog anatomy (dialog.md) with a two-column list: the action,
+		// then its keys as plain glyphs (kbd.md).
+		return (
+			<DialogOverlay {...backdropDismiss}>
+				<DialogContent aria-label="Keyboard shortcuts" data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Keyboard shortcuts</DialogTitle>
+					</DialogHeader>
+					<Hint label="Close" binding="escape" side="left">
+						<DialogClose aria-label="Close shortcuts" onClick={onClose} />
+					</Hint>
+					{scopes.map((scope) => {
+						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+						if (actions.length === 0) return null;
+						return (
+							<section key={scope} aria-label={scopeLabels[scope]} className="flex flex-col">
+								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{scopeLabels[scope]}</h3>
+								{actions.map((a) => (
+									<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
+										<span className="truncate text-foreground">{a.label}</span>
+										<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
+									</div>
+								))}
+							</section>
+						);
+					})}
+				</DialogContent>
+			</DialogOverlay>
+		);
+	}
 	return (
 		<div
 			data-testid="cheat-sheet"

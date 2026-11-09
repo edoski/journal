@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import { MENU_DETAIL, MENU_ITEM } from "@/components/ui/menu";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
@@ -108,7 +110,7 @@ async function requestExtract(chatId: string): Promise<boolean> {
  * in flight so the numbers settle live. No coverage (fetch failed, 404):
  * the whole block renders nothing — no fake zeros.
  */
-export function CoverageMenuBlock({ chatId }: { chatId: string }) {
+export function CoverageMenuBlock({ chatId, variant = "current" }: { chatId: string; variant?: "current" | "proposed" }) {
 	const refreshActivity = useActivity().refresh;
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
 	const [extracting, setExtracting] = useState(false); // optimistic until the server says running
@@ -163,6 +165,7 @@ export function CoverageMenuBlock({ chatId }: { chatId: string }) {
 	};
 	return (
 		<CoverageMenuBody
+			variant={variant}
 			coverage={coverage}
 			extracting={extracting}
 			onExtract={() => void onExtract()}
@@ -177,7 +180,10 @@ export function CoverageMenuBody({
 	coverage,
 	extracting,
 	onExtract,
+	variant = "current",
 }: {
+	/** "proposed": one menu item (components/ui/menu.md) with the backlog as its detail. */
+	variant?: "current" | "proposed";
 	coverage: SessionCoverage;
 	/** Click-pending (optimistic) until the server says running. */
 	extracting: boolean;
@@ -185,6 +191,26 @@ export function CoverageMenuBody({
 }) {
 	const busy = coverage.running || extracting;
 	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
+	if (variant === "proposed") {
+		return (
+			<button
+				type="button"
+				data-testid="ctx-extract"
+				onClick={onExtract}
+				disabled={busy || complete}
+				className={cn(MENU_ITEM, "justify-between gap-3")}
+			>
+				<span data-testid={busy ? "ctx-coverage-running" : "ctx-coverage"}>
+					{busy ? "Extracting notes…" : complete ? "Notes fully extracted" : "Extract notes"}
+				</span>
+				{!busy && !complete && (
+					<span className={MENU_DETAIL}>
+						{formatTokens(coverage.uncoveredTokens)} tok · {coverage.uncoveredCount} message{coverage.uncoveredCount === 1 ? "" : "s"}
+					</span>
+				)}
+			</button>
+		);
+	}
 	return (
 		<div data-testid="ctx-coverage" className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
 			{busy ? (

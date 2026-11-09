@@ -63,6 +63,10 @@ import {
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
 import { SettingsGroup, SettingsRow, SettingsMenuTrigger, Toggle, CommitInput } from "./controls.tsx";
+import { useSettingsProposed } from "./settings-design";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { MENU_SURFACE } from "@/components/ui/menu";
 import { ModelMenuList, ThinkingMenuList } from "./model-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
@@ -78,6 +82,14 @@ const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
 /** The owner's final toggleable-tool list (confirm with the user before
  *  changing — the Teacher stream settled this 2026-09-19). */
 export const TOGGLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
+
+/** The tool rows' names under the Proposed design, where the group already says "Tools". */
+const TOOL_LABEL: Record<(typeof TOGGLE_TOOLS)[number], string> = {
+	research: "Research",
+	demo: "Demos",
+	visual: "Figures",
+	pdf: "PDF reading",
+};
 
 const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
 
@@ -260,6 +272,8 @@ export function AgentSection({
 	/** One open dropdown for the whole section: which slot, which kind. */
 	const [openMenu, setOpenMenu] = useState<{ target: ModelSlotName; kind: "model" | "thinking" } | null>(null);
 	const menuAnchorRef = useRef<HTMLSpanElement>(null);
+	const proposed = useSettingsProposed();
+	const menuVariant = proposed ? "proposed" : "current";
 
 	/** Re-read the prompt-segment view — the signal seam for the
 	 *  2026-09-26 state-echo fix: the view's `enabled` flags DERIVE from
@@ -365,6 +379,79 @@ export function AgentSection({
 		readPrompts();
 		setSegmentStatus("Deleted");
 	}
+
+	/** One prompt part as a grouped row (Proposed): its name, Show text and
+	 *  the switch on the row; the source and your version open under it. */
+	const segmentRowNext = (info: SegmentInfo) => {
+		const fileExists = info.overrideText !== null;
+		const open = openSegment === info.path;
+		const draft = segmentDraft[info.path] ?? info.overrideText ?? "";
+		const dirty = draft !== (info.overrideText ?? "");
+		return (
+			<div key={info.path} data-testid={`prompt-segment-${info.path}`}>
+				<SettingsRow label={info.path} hint={info.enabled ? PROMPT_IN_USE_HINT : undefined} testid={`prompt-row-${info.path}`}>
+					<span className="flex shrink-0 items-center gap-2">
+						<Button
+							variant="quiet"
+							size="sm"
+							aria-expanded={open}
+							onClick={() => {
+								setOpenSegment(open ? null : info.path);
+								setSegmentStatus(null);
+							}}
+							className="h-7 px-2 font-normal"
+						>
+							{open ? "Hide text" : "Show text"}
+						</Button>
+						<Toggle
+							checked={info.enabled}
+							disabled={!fileExists}
+							label={`prompt ${info.path}`}
+							onChange={(on) => onSectionChange(composePromptSwitch(agent, info.path, on))}
+						/>
+					</span>
+				</SettingsRow>
+				{open && (
+					<div className="flex flex-col gap-3 px-4 pb-4">
+						<label className="flex flex-col gap-1.5 text-label text-muted-foreground">
+							Original
+							<textarea
+								readOnly
+								value={info.sourceText}
+								aria-label="The original instructions"
+								className="h-28 w-full resize-y rounded-md border bg-fill-hover p-2 text-row text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+						</label>
+						<label className="flex flex-col gap-1.5 text-label text-muted-foreground">
+							Your version
+							<textarea
+								value={draft}
+								onChange={(e) => setSegmentDraft({ ...segmentDraft, [info.path]: e.target.value })}
+								aria-label="Your version of the instructions"
+								placeholder="Add your own instructions…"
+								className="h-28 w-full resize-y rounded-md border border-input bg-transparent p-2 text-row text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+						</label>
+						<div className="flex items-center justify-end gap-2">
+							{segmentStatus && (
+								<p className="mr-auto text-label text-muted-foreground" data-testid="segment-status">
+									{segmentStatus}
+								</p>
+							)}
+							{fileExists && (
+								<Button variant="quiet" size="sm" onClick={() => void deleteSegment(info.path)} className="h-7 px-2 font-normal hover:text-danger">
+									Delete
+								</Button>
+							)}
+							<Button size="sm" disabled={!dirty} onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")} className="h-7 px-3">
+								Save
+							</Button>
+						</div>
+					</div>
+				)}
+			</div>
+		);
+	};
 
 	const segmentRow = (info: SegmentInfo) => {
 		const fileExists = info.overrideText !== null;
@@ -484,7 +571,7 @@ export function AgentSection({
 	return (
 		<>
 			<SettingsGroup label="Models" testid="group-models">
-				{catalogFailed && <p role="alert" className="text-xs text-red-400">Model catalog could not be loaded. Check the connection and retry. <button type="button" className="underline" onClick={refreshCatalog}>Retry</button></p>}
+				{catalogFailed && <p role="alert" className={proposed ? "px-4 py-2.5 text-label text-danger" : "text-xs text-red-400"}>Model catalog could not be loaded. Check the connection and retry. <button type="button" className="underline" onClick={refreshCatalog}>Retry</button></p>}
 				{MODEL_SLOTS.map((slot) => {
 					const override = models?.[slot];
 					const modelId = override?.model?.id ?? "";
@@ -528,7 +615,7 @@ export function AgentSection({
 									testid={`slot-model-${slot}`}
 									open={thisMenuOpen === "model"}
 									onClick={() => setOpenMenu(thisMenuOpen === "model" ? null : { target: slot, kind: "model" })}
-									widthClass="min-w-20"
+									widthClass={proposed ? "w-40" : "min-w-20"}
 								/>
 								<MenuTrigger
 									// Legacy display (chunk 2 item 4): no stored level + a known
@@ -540,16 +627,17 @@ export function AgentSection({
 									testid={`slot-thinking-${slot}`}
 									open={thisMenuOpen === "thinking"}
 									onClick={() => setOpenMenu(thisMenuOpen === "thinking" ? null : { target: slot, kind: "thinking" })}
-									widthClass="w-20"
+									widthClass={proposed ? "w-24" : "w-20"}
 								/>
 								{thisMenuOpen === "model" && (
 									<MenuShell
 										preferredSide="down"
 											anchorTestid={`slot-model-${slot}`}
 										testid={`slot-model-menu-${slot}`}
-										menuClass="flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
+										menuClass={proposed ? cn(MENU_SURFACE, "w-[22rem]") : "flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"}
 									>
 										<ModelMenuList
+											variant={menuVariant}
 											models={slotCatalog ?? undefined}
 											effectiveId={modelId}
 											effectiveProvider={provider}
@@ -574,9 +662,10 @@ export function AgentSection({
 										preferredSide="down"
 											anchorTestid={`slot-thinking-${slot}`}
 										testid={`slot-thinking-menu-${slot}`}
-										menuClass="flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
+										menuClass={proposed ? cn(MENU_SURFACE, "w-44") : "flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"}
 									>
 										<ThinkingMenuList
+											variant={menuVariant}
 											levels={levels.map(String)}
 											// The ✓ sits on the RESOLVED level for legacy unset records —
 											// the same one the trigger shows.
@@ -623,7 +712,7 @@ export function AgentSection({
 				{TOGGLE_TOOLS.map((id) => (
 					<SettingsRow
 						key={id}
-						label={`Tool · ${id}`}
+						label={proposed ? TOOL_LABEL[id] : `Tool · ${id}`}
 						testid={`tool-row-${id}`}
 					>
 						<Toggle
@@ -668,6 +757,26 @@ export function AgentSection({
 				</SettingsRow>
 			</SettingsGroup>
 
+			{proposed ? (
+				prompts === null ? (
+					<SettingsGroup label="System prompts" testid="group-prompts">
+						<p className="px-4 py-3 text-row text-muted-foreground">Loading prompt segments…</p>
+					</SettingsGroup>
+				) : (
+					<div data-testid="group-prompts" className="contents">
+						{sectionedSegments(prompts).map((section) => (
+							<SettingsGroup
+								key={section.id}
+								label={`System prompts · ${section.label}`}
+								description={section.hint}
+								testid={`prompt-section-${section.id}`}
+							>
+								{section.segments.map((info) => segmentRowNext(info))}
+							</SettingsGroup>
+						))}
+					</div>
+				)
+			) : (
 			<SettingsGroup label="System prompts" testid="group-prompts">
 				{prompts === null ? (
 					<p className="text-xs text-muted-foreground/70">Loading prompt segments…</p>
@@ -693,6 +802,7 @@ export function AgentSection({
 					</div>
 				)}
 			</SettingsGroup>
+			)}
 		</>
 	);
 }

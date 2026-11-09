@@ -11,6 +11,7 @@ import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, useActivity } from "@/components/activity-dock";
 import { CoverageMenuBlock } from "@/components/extraction-coverage";
 import { LhMark } from "@/components/lh-mark";
+import { MENU_ITEM, MENU_SEPARATOR, MENU_SURFACE } from "@/components/ui/menu";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
@@ -157,8 +158,6 @@ function RenameRowNext({ chat, onCommit, onCancel }: { chat: ChatListItem; onCom
 	);
 }
 
-const MENU_ITEM =
-	"flex h-8 items-center rounded-md px-2 text-left outline-none transition-colors hover:bg-fill-hover focus-visible:bg-fill-hover motion-reduce:transition-none";
 
 /** The Proposed sidebar: the app mark and collapse, one New lesson action
  *  (practice beside it), Today and Knowledge, a quiet search, sessions by
@@ -297,7 +296,7 @@ export function SidebarNext() {
 					)}
 				</div>
 
-				{running && <ActivitySection />}
+				{running && <ActivitySection variant="proposed" />}
 
 				<div className="shrink-0 px-2 pb-2 pt-1">
 					<Hint label="Settings" action="open-settings" side="right">
@@ -320,7 +319,7 @@ export function SidebarNext() {
 					anchorRef={s.ctxAnchorRef}
 					testid="session-context-menu"
 					preferredSide="down"
-					menuClass="flex w-56 flex-col rounded-xl border bg-popover p-1 text-row shadow-lg"
+					menuClass={cn(MENU_SURFACE, "w-56")}
 				>
 					<button type="button" data-testid="ctx-rename" onClick={s.renameFromMenu} className={MENU_ITEM}>
 						Rename
@@ -331,8 +330,8 @@ export function SidebarNext() {
 					<button type="button" data-testid="ctx-delete" onClick={s.deleteFromMenu} className={cn(MENU_ITEM, "text-danger")}>
 						Delete…
 					</button>
-					<div className="my-1 border-t" aria-hidden="true" />
-					<CoverageMenuBlock chatId={s.ctxChatId} />
+					<div className={MENU_SEPARATOR} aria-hidden="true" />
+					<CoverageMenuBlock chatId={s.ctxChatId} variant="proposed" />
 				</MenuShell>
 			)}
 

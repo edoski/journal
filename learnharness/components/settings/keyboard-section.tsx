@@ -26,7 +26,10 @@ import {
 	type KeyAction,
 	type KeyScope,
 } from "@/src/core";
-import { SettingsRow } from "./controls.tsx";
+import { SettingsGroup, SettingsRow } from "./controls.tsx";
+import { useSettingsProposed } from "./settings-design";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 
 const SCOPES: { scope: KeyScope; label: string }[] = [
 	{ scope: "global", label: "Global" },
@@ -48,6 +51,7 @@ export function nextOverrides(
 }
 
 export function KeyboardSection() {
+	const proposed = useSettingsProposed();
 	const [overrides, setOverrides] = useState<Partial<Record<KeyAction, string>>>({});
 	const [rebinding, setRebinding] = useState<KeyAction | null>(null);
 	const [nonce, setNonce] = useState(0);
@@ -93,6 +97,57 @@ export function KeyboardSection() {
 	}
 
 	const overridden = (id: KeyAction) => overrides[id] !== undefined;
+
+	if (proposed) {
+		const action = "h-7 px-2 font-normal";
+		return (
+			<>
+				{SCOPES.map(({ scope, label }) => {
+					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+					if (!actions.length) return null;
+					return (
+						<SettingsGroup key={scope} label={label} testid={`kbd-scope-${scope}`}>
+							{actions.map((def) => (
+								<SettingsRow
+									key={def.id}
+									label={def.label}
+									hint={def.displayOnly ? "Fixed — part of this screen" : undefined}
+									testid={`kbd-row-${def.id}`}
+								>
+									<span className="flex shrink-0 items-center gap-1">
+										<Kbd className={rebinding === def.id ? "mr-1 text-foreground" : "mr-1"}>
+											{rebinding === def.id ? "Press keys…" : formatBinding(overrides[def.id] ?? def.binding)}
+										</Kbd>
+										{def.displayOnly ? null : rebinding === def.id ? (
+											<Button variant="quiet" size="sm" className={action} onClick={() => setRebinding(null)}>
+												Cancel
+											</Button>
+										) : (
+											<>
+												{overridden(def.id) && (
+													<Button variant="quiet" size="sm" className={action} onClick={() => resetOne(def.id)} data-testid={`kbd-reset-${def.id}`}>
+														Reset
+													</Button>
+												)}
+												<Button variant="quiet" size="sm" className={action} onClick={() => setRebinding(def.id)} data-testid={`kbd-rebind-${def.id}`}>
+													Change
+												</Button>
+											</>
+										)}
+									</span>
+								</SettingsRow>
+							))}
+						</SettingsGroup>
+					);
+				})}
+				<div className="flex justify-end">
+					<Button variant="quiet" size="sm" className={action} onClick={resetAll} data-testid="kbd-reset-all">
+						Reset all to defaults
+					</Button>
+				</div>
+			</>
+		);
+	}
 
 	return (
 		<>

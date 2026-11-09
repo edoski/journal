@@ -3,6 +3,9 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { useDesignVariant } from "@/components/design-variant";
+import { Button } from "@/components/ui/button";
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -52,16 +55,42 @@ export function AbortTurnBody({
 	onClose,
 	onConfirm,
 	busy = false,
+	variant = "current",
 }: {
 	mode: AbortMode;
 	onClose: () => void;
 	onConfirm: () => void;
+	/** "proposed": the shared dialog anatomy (components/ui/dialog.md). */
+	variant?: "current" | "proposed";
 	/** The dismiss doubles as the abort when a turn is still running
 	 * (owner, 2026-10-04): the line says so. */
 	busy?: boolean;
 }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 	const copy = COPY[mode];
+	if (variant === "proposed") {
+		return (
+			<DialogOverlay {...backdropDismiss}>
+				<DialogContent aria-label={copy.title} data-testid="abort-turn-dialog" className="max-w-sm">
+					<DialogHeader>
+						<DialogTitle data-testid="abort-turn-title">{copy.title}</DialogTitle>
+						<DialogDescription data-testid="abort-turn-line">
+							{copy.line}
+							{busy && mode !== "turn" ? " The working turn stops too." : ""}
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter className="pt-2">
+						<Button variant="quiet" data-testid="abort-turn-cancel" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
+							{copy.action}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</DialogOverlay>
+		);
+	}
 	return (
 		<div
 			role="dialog"
@@ -119,6 +148,7 @@ export function AbortTurnDialog({
 	onConfirm: (mode: AbortMode) => void;
 	busy?: boolean;
 }) {
+	const variant = useDesignVariant();
 	// Esc cancels the popup (claimed — never a chained abort).
 	useEffect(() => {
 		if (mode === null) return;
@@ -138,7 +168,7 @@ export function AbortTurnDialog({
 
 	if (mode === null || typeof document === "undefined") return null;
 	return createPortal(
-		<AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} />,
+		<AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} variant={variant} />,
 		document.body,
 	);
 }

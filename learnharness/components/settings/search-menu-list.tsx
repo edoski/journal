@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fuzzyScore } from "@/src/core";
+import { cn } from "@/lib/utils";
+import { MENU_ITEM, MENU_ITEM_SELECTED, MENU_ITEM_TALL, MENU_ITEM_WALKED, MENU_NOTE, MENU_SEARCH } from "@/components/ui/menu";
 
 /** The model picker's search, arrow-walk, row styling and scrolling machine.
  * Models supply only their catalog and row content.
@@ -10,6 +12,7 @@ export function SearchMenuList<T>({
 	items, itemKey, searchTerms, compare, isSelected, onPick, renderItem,
 	searchTestid, listTestid, optionTestid, placeholder, ariaLabel, loading, empty,
 	disabled = false,
+	variant = "current",
 }: {
 	items: readonly T[] | undefined;
 	itemKey: (item: T) => string;
@@ -26,7 +29,10 @@ export function SearchMenuList<T>({
 	loading?: string;
 	empty: string;
 	disabled?: boolean;
+	/** "proposed": the shared menu anatomy (components/ui/menu.md). */
+	variant?: "current" | "proposed";
 }) {
+	const proposed = variant === "proposed";
 	const [query, setQuery] = useState("");
 	const [menuIdx, setMenuIdx] = useState<number | null>(null);
 	const searchRef = useRef<HTMLInputElement>(null);
@@ -71,11 +77,11 @@ export function SearchMenuList<T>({
 				}
 			}}
 			placeholder={placeholder}
-			className="lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
+			className={proposed ? MENU_SEARCH : "lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"}
 		/>
-		{!items && loading && <div className="px-2 py-3 text-center text-muted-foreground">{loading}</div>}
-		{items && results.length === 0 && <div className="px-2 py-3 text-center text-muted-foreground">{empty}</div>}
-		<ul ref={listRef} data-testid={listTestid} className="flex max-h-72 flex-col overflow-y-auto px-1">
+		{!items && loading && <div className={proposed ? MENU_NOTE : "px-2 py-3 text-center text-muted-foreground"}>{loading}</div>}
+		{items && results.length === 0 && <div className={proposed ? MENU_NOTE : "px-2 py-3 text-center text-muted-foreground"}>{empty}</div>}
+		<ul ref={listRef} data-testid={listTestid} className={proposed ? "flex max-h-72 flex-col overflow-y-auto" : "flex max-h-72 flex-col overflow-y-auto px-1"}>
 			{results.map((item, i) => <li key={itemKey(item)}>
 				<button
 					type="button"
@@ -83,9 +89,11 @@ export function SearchMenuList<T>({
 					data-idx={i}
 					disabled={disabled}
 					onClick={() => onPick(item)}
-					className={`flex w-full flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
-						i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
-					}${isSelected(item) && i !== menuIdx ? " bg-muted/60" : ""}`}
+					className={proposed
+						? cn(MENU_ITEM, MENU_ITEM_TALL, i === menuIdx ? MENU_ITEM_WALKED : isSelected(item) && MENU_ITEM_SELECTED)
+						: `flex w-full flex-col gap-0.5 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
+							i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
+						}${isSelected(item) && i !== menuIdx ? " bg-muted/60" : ""}`}
 				>{renderItem(item)}</button>
 			</li>)}
 		</ul>

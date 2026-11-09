@@ -10,7 +10,14 @@
  */
 
 import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
+import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettingsProposed } from "./settings-design";
+
+/** The Proposed field look (spec: settings.md): 28px, radius 8, the input
+ *  edge (white 11%), 13px, the 2px focus ring. */
+export const SETTINGS_FIELD =
+	"h-7 rounded-md border border-input bg-transparent px-2 text-row text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
 
 /** A section block: pronounced mono heading + content. */
 export function SettingsSection({
@@ -25,6 +32,15 @@ export function SettingsSection({
 	children: React.ReactNode;
 	testid?: string;
 }) {
+	if (useSettingsProposed()) {
+		// The left list names the section, so the pane repeats no title.
+		return (
+			<section data-testid={testid} aria-label={title} data-slot="settings-section" className="flex flex-col gap-6 px-6 pb-8 pt-6">
+				{hint && <p className="-mb-2 px-1 text-label text-muted-foreground">{hint}</p>}
+				{children}
+			</section>
+		);
+	}
 	return (
 		<section data-testid={testid} className="px-6 py-5">
 			<h2 className="text-sm uppercase tracking-widest text-foreground">{title}</h2>
@@ -38,13 +54,25 @@ export function SettingsSection({
  *  separation — Models / Tools / Prompts read as three blocks). */
 export function SettingsGroup({
 	label,
+	description,
 	children,
 	testid,
 }: {
 	label: string;
+	/** Proposed only: one quiet line under the header. */
+	description?: string;
 	children: React.ReactNode;
 	testid?: string;
 }) {
+	if (useSettingsProposed()) {
+		return (
+			<div data-testid={testid} data-slot="settings-group" className="flex flex-col gap-2">
+				<h3 className="px-1 text-label font-medium text-muted-foreground">{label}</h3>
+				{description && <p className="-mt-1 px-1 text-label text-muted-foreground">{description}</p>}
+				<div className="flex flex-col divide-y rounded-lg border">{children}</div>
+			</div>
+		);
+	}
 	return (
 		<div data-testid={testid} className="mt-5 border-t border-border/60 pt-4 first:mt-0 first:border-t-0 first:pt-0">
 			<p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
@@ -70,6 +98,21 @@ export function SettingsRow({
 	 *  control is inert (parent off, no file yet, …). */
 	dimmed?: boolean;
 }) {
+	if (useSettingsProposed()) {
+		return (
+			<div
+				data-testid={testid}
+				data-slot="settings-row"
+				className={cn("flex min-h-12 items-center justify-between gap-4 px-4 py-2", dimmed && "opacity-50")}
+			>
+				<span className="min-w-0">
+					<span className="block text-row text-foreground">{label}</span>
+					{hint && <span className="block text-label text-muted-foreground">{hint}</span>}
+				</span>
+				{children}
+			</div>
+		);
+	}
 	return (
 		<div data-testid={testid} className={cn("flex items-center justify-between gap-4 py-1", dimmed && "opacity-40")}>
 			<span className="min-w-0">
@@ -90,6 +133,24 @@ export function SettingsMenuTrigger({
 	value: string;
 	unavailable?: boolean;
 }) {
+	if (useSettingsProposed()) {
+		return <button
+			type="button"
+			{...props}
+			disabled={disabled}
+			data-slot="settings-menu-trigger"
+			className={cn(
+				SETTINGS_FIELD,
+				"flex items-center gap-1.5 pr-1.5 text-left",
+				!(disabled || unavailable) && "hover:bg-fill-hover",
+				unavailable && "cursor-not-allowed",
+				className,
+			)}
+		>
+			<span className="min-w-0 flex-1 truncate">{value}</span>
+			<ChevronDownIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+		</button>;
+	}
 	return <button
 		type="button"
 		{...props}
@@ -126,6 +187,35 @@ export function Toggle({
 	/** Optional native tooltip on the switch. */
 	title?: string;
 }) {
+	if (useSettingsProposed() && !discIcon) {
+		// Owner (2026-09-20): on is a grey track with a white disc, not a bright one.
+		return (
+			<button
+				type="button"
+				role="switch"
+				aria-checked={checked}
+				aria-label={label}
+				{...(title ? { title } : {})}
+				disabled={disabled}
+				data-slot="settings-switch"
+				data-testid={`toggle-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+				onClick={() => onChange(!checked)}
+				className={cn(
+					"relative inline-flex h-5 w-8 shrink-0 items-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover motion-reduce:transition-none",
+					checked ? "bg-muted-foreground" : "bg-input",
+					disabled && "cursor-not-allowed opacity-50",
+				)}
+			>
+				<span
+					aria-hidden
+					className={cn(
+						"size-4 rounded-full shadow-sm transition-transform motion-reduce:transition-none",
+						checked ? "translate-x-3.5 bg-foreground" : "translate-x-0.5 bg-muted-foreground",
+					)}
+				/>
+			</button>
+		);
+	}
 	return (
 		<button
 			type="button"
@@ -185,6 +275,7 @@ export function ThinSelect({
 	testid?: string;
 	disabled?: boolean;
 }) {
+	const proposed = useSettingsProposed();
 	return (
 		<select
 			value={value}
@@ -192,7 +283,7 @@ export function ThinSelect({
 			data-testid={testid}
 			disabled={disabled}
 			onChange={(e) => onChange(e.target.value)}
-			className={cn(
+			className={proposed ? SETTINGS_FIELD : cn(
 				"h-7 rounded-sm border border-border bg-background px-1.5 font-ui text-xs text-foreground outline-none",
 				disabled && "cursor-not-allowed",
 			)}
@@ -228,6 +319,7 @@ export function CommitInput({
 	// what landed.
 	const [draft, setDraft] = useState(value);
 	const [editing, setEditing] = useState(false);
+	const proposed = useSettingsProposed();
 	return (
 		<input
 			type={type}
@@ -252,7 +344,7 @@ export function CommitInput({
 					e.currentTarget.blur();
 				}
 			}}
-			className="h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
+			className={proposed ? cn(SETTINGS_FIELD, "w-32 text-right tabular-nums") : "h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground outline-none placeholder:text-muted-foreground/60"}
 		/>
 	);
 }

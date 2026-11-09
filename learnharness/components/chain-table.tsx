@@ -54,6 +54,7 @@
  * Read-only toward the graph.
  */
 
+import { useDesignVariant } from "@/components/design-variant";
 import { useEffect, useMemo, useState } from "react";
 import {
 	ChevronDownIcon,
@@ -93,6 +94,72 @@ interface ClusterGroup {
 	newestCreatedAt: string;
 }
 
+/** The table's classes per design ("proposed": spec chain-table.md). */
+const LOOK = {
+	current: {
+		count: "min-w-0 flex-1 truncate text-xs text-muted-foreground",
+		searchIcon: "absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground",
+		search: "lh-no-drag h-8 w-56 rounded-lg border bg-background pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-ring",
+		close: "lh-no-drag flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+		head: "sticky top-0 z-10 flex items-center gap-1 border-b border-border/60 bg-background/80 px-3 py-1.5 text-[11px] uppercase tracking-widest text-muted-foreground/70 backdrop-blur",
+		sortName: "flex flex-1 items-center gap-1 text-left transition-colors hover:text-foreground",
+		sortProps: "flex w-14 shrink-0 items-center justify-end gap-1 text-right transition-colors hover:text-foreground",
+		sortCreated: "flex w-20 shrink-0 items-center justify-end gap-1 text-right transition-colors hover:text-foreground",
+		nomatch: "px-4 pt-3 text-xs text-muted-foreground",
+		group: "relative border-b border-border/60",
+		thread: "pointer-events-none absolute bottom-[8px] left-[37px] top-[23px] w-px bg-border/50",
+		clusterRow: "flex items-center gap-1 px-3 py-1.5",
+		clusterName: "min-w-0 flex-1 truncate text-sm font-medium",
+		unlabeled: "text-muted-foreground/60",
+		notesTag: "ml-2 text-[11px] uppercase tracking-widest text-muted-foreground/60",
+		numCol: "w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground",
+		dateCol: "w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground",
+		chainThread: "pointer-events-none absolute bottom-[8px] left-[73px] top-[22px] w-px bg-border/50",
+		chainLine: "flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1 text-[13px] leading-tight",
+		chip: "rounded border border-border/70 bg-muted/30 px-1.5 py-0.5",
+		statement: "min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground",
+		numSpacer: "w-14 shrink-0",
+		dateSpacer: "w-20 shrink-0",
+		bar: "pointer-events-auto flex items-center gap-3 rounded-full border bg-card py-2 pl-4 pr-2 shadow-lg",
+		summary: "text-xs font-medium",
+		clear: "rounded-full px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+		done: "flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/80",
+		divider: "h-4 w-px bg-border/70",
+		delete: "flex items-center gap-1.5 rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20",
+	},
+	proposed: {
+		count: "min-w-0 flex-1 truncate text-row tabular-nums text-muted-foreground",
+		searchIcon: "pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground",
+		search: "lh-no-drag h-8 w-56 rounded-md border border-input bg-transparent pl-8 pr-3 text-row text-foreground outline-none transition-colors placeholder:text-muted-foreground hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+		close: "lh-no-drag flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+		head: "sticky top-0 z-10 flex h-8 items-center gap-1 border-b bg-background px-3 text-label font-medium text-muted-foreground",
+		sortName: "flex flex-1 items-center gap-2 rounded-sm text-left outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+		sortProps: "flex w-20 shrink-0 items-center justify-end gap-2 rounded-sm text-right outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+		sortCreated: "flex w-24 shrink-0 items-center justify-end gap-2 rounded-sm text-right outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+		nomatch: "px-4 pt-3 text-row text-muted-foreground",
+		group: "relative border-b",
+		thread: "pointer-events-none absolute bottom-[8px] left-[37px] top-[23px] w-px bg-border",
+		clusterRow: "flex items-center gap-1 px-3 py-1.5 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
+		clusterName: "min-w-0 flex-1 truncate text-row font-medium text-foreground",
+		unlabeled: "font-normal text-muted-foreground",
+		notesTag: "ml-2 text-label font-normal text-muted-foreground",
+		numCol: "w-20 shrink-0 text-right text-label tabular-nums text-muted-foreground",
+		dateCol: "w-24 shrink-0 text-right text-label tabular-nums text-muted-foreground",
+		chainThread: "pointer-events-none absolute bottom-[8px] left-[73px] top-[22px] w-px bg-border",
+		chainLine: "flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1 text-row",
+		chip: "rounded-md bg-fill-selected px-1.5 py-0.5 text-foreground",
+		statement: "min-w-0 flex-1 text-row text-muted-foreground",
+		numSpacer: "w-20 shrink-0",
+		dateSpacer: "w-24 shrink-0",
+		bar: "pointer-events-auto flex items-center gap-2 rounded-full border bg-popover py-1.5 pl-4 pr-1.5 shadow-lg",
+		summary: "text-row tabular-nums text-foreground",
+		clear: "h-8 rounded-full px-3 text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+		done: "flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-row font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+		divider: "h-4 w-px bg-border",
+		delete: "flex h-8 items-center gap-1.5 rounded-full px-3 text-row font-medium text-danger outline-none transition-colors hover:bg-danger/10 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none",
+	},
+} as const;
+
 /** The table's pure body — exported for SSR pins (the render-suite
  *  discipline). All state (query, sort, selection, expansion) arrives
  *  via props; the overlay wrapper below owns it. */
@@ -116,7 +183,10 @@ export function ChainTableBody({
 	onClose,
 	selectMode,
 	onSelect,
+	variant = "current",
 }: {
+	/** "proposed": the Proposed design (spec: chain-table.md). */
+	variant?: "current" | "proposed";
 	nodes: GraphNode[];
 	chains: GraphChain[];
 	sessions: Record<string, string>;
@@ -230,10 +300,11 @@ export function ChainTableBody({
 		return chainsForSelection(selectedNodes, storedChains);
 	}, [selection, byId, storedChains]);
 
+	const L = LOOK[variant];
 	const nameOf = (id: string) => byId.get(id)?.name ?? id;
 	const dateOf = (id: string) => byId.get(id)?.createdAt.slice(0, 10) ?? "";
 	const dirIcon = (col: ChainSortCol) =>
-		sort.col !== col ? null : sort.dir === 1 ? <ChevronUpIcon className="size-3" /> : <ChevronDownIcon className="size-3" />;
+		sort.col !== col ? null : sort.dir === 1 ? <ChevronUpIcon className={variant === "proposed" ? "size-3.5" : "size-3"} /> : <ChevronDownIcon className={variant === "proposed" ? "size-3.5" : "size-3"} />;
 
 	return (
 		<div data-testid="chain-table" className="relative flex h-full min-h-0 flex-col">
@@ -245,11 +316,11 @@ export function ChainTableBody({
 			    close only. Search + close carve out with lh-no-drag (the mask
 			    law: later in the DOM). */}
 			<TopBar>
-				<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+				<span className={L.count}>
 					{chains.length} {chains.length === 1 ? "chain" : "chains"} · {nodes.length} {nodes.length === 1 ? "node" : "nodes"}
 				</span>
 				<div className="relative shrink-0">
-					<SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+					<SearchIcon className={L.searchIcon} />
 					<input
 						value={query}
 						data-testid="chain-table-search"
@@ -257,7 +328,7 @@ export function ChainTableBody({
 						placeholder="Search nodes…"
 						aria-label="Search nodes"
 						spellCheck={false}
-						className="lh-no-drag h-8 w-56 rounded-lg border bg-background pl-8 pr-3 text-xs outline-none placeholder:text-muted-foreground focus:border-ring"
+						className={L.search}
 					/>
 				</div>
 			<button
@@ -265,7 +336,7 @@ export function ChainTableBody({
 					data-testid="chain-table-close"
 					onClick={onClose}
 					aria-label="Close chains"
-					className="lh-no-drag flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					className={L.close}
 				>
 					<XIcon className="size-4" />
 				</button>
@@ -280,13 +351,13 @@ export function ChainTableBody({
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				{/* The TOP rule (owner round 5: the table is framed — a line under
 			    the header, a line under the last group, lines between groups). */}
-				<div className="sticky top-0 z-10 flex items-center gap-1 border-b border-border/60 bg-background/80 px-3 py-1.5 text-[11px] uppercase tracking-widest text-muted-foreground/70 backdrop-blur">
+				<div className={L.head}>
 					<button
 						type="button"
 						data-testid="sort-name"
 						onClick={() => onSort("name")}
 						aria-sort={sort.col === "name" ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
-						className="flex flex-1 items-center gap-1 text-left transition-colors hover:text-foreground"
+						className={L.sortName}
 					>
 						Name {dirIcon("name")}
 					</button>
@@ -295,23 +366,23 @@ export function ChainTableBody({
 						data-testid="sort-props"
 						onClick={() => onSort("props")}
 						aria-sort={sort.col === "props" ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
-						className="flex w-14 shrink-0 items-center justify-end gap-1 text-right transition-colors hover:text-foreground"
+						className={L.sortProps}
 					>
-						Props {dirIcon("props")}
+						{variant === "proposed" ? "Statements" : "Props"} {dirIcon("props")}
 					</button>
 					<button
 						type="button"
 						data-testid="sort-created"
 						onClick={() => onSort("created")}
 						aria-sort={sort.col === "created" ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
-						className="flex w-20 shrink-0 items-center justify-end gap-1 text-right transition-colors hover:text-foreground"
+						className={L.sortCreated}
 					>
 						Created {dirIcon("created")}
 					</button>
 				</div>
 
 				{groups.length === 0 && (
-					<div data-testid="chain-table-nomatch" className="px-4 pt-3 text-xs text-muted-foreground">
+					<div data-testid="chain-table-nomatch" className={L.nomatch}>
 						No matching chains.
 					</div>
 				)}
@@ -326,7 +397,7 @@ export function ChainTableBody({
 							// The horizontal rules (owner rulings, rounds 2 + 5): between
 							// cluster groups AND under the last one — the table is framed
 							// top (header) and bottom. Never on individual rows.
-							className="relative border-b border-border/60"
+							className={L.group}
 						>
 							{/* The TREE THREAD (owner rounds 5–6): a vertical guide at the
 							    expander arrow's column (center 37px: pl-3 + checkbox 14 +
@@ -338,30 +409,31 @@ export function ChainTableBody({
 							{open && group.chains.length > 0 && (
 								<div
 									data-testid={`cluster-thread-${group.key}`}
-									className="pointer-events-none absolute bottom-[8px] left-[37px] top-[23px] w-px bg-border/50"
+									className={L.thread}
 								/>
 							)}
 							{/* The cluster row: birth-session group header. */}
-							<div className="flex items-center gap-1 px-3 py-1.5">
+							<div className={L.clusterRow}>
 								<RowCheckbox
+	variant={variant}
 									checked={selectedCount === group.nodeIds.length && group.nodeIds.length > 0}
 									indeterminate={selectedCount > 0 && selectedCount < group.nodeIds.length}
 									onToggle={(next) => onToggleNodes(group.nodeIds, next)}
 									testid={`cluster-checkbox-${group.key}`}
 									label={`Select everything born in ${group.label ?? "unlabeled"}`}
 								/>
-								<Expander open={open} onClick={() => onToggleCluster(group.key)} testid={`cluster-toggle-${group.key}`} label={`Expand cluster ${group.label ?? "unlabeled"}`} />
+								<Expander variant={variant} open={open} onClick={() => onToggleCluster(group.key)} testid={`cluster-toggle-${group.key}`} label={`Expand cluster ${group.label ?? "unlabeled"}`} />
 								<span className="flex shrink-0 items-center justify-center text-muted-foreground">
 									{open ? <FolderOpenIcon className="size-3.5" /> : <FolderIcon className="size-3.5" />}
 								</span>
-								<span className="min-w-0 flex-1 truncate text-sm font-medium">
-									{group.label ?? <span className="text-muted-foreground/60">unlabeled</span>}
-									{group.kind === "notes" && <span className="ml-2 text-[11px] uppercase tracking-widest text-muted-foreground/60">notes</span>}
+								<span className={L.clusterName}>
+									{group.label ?? <span className={L.unlabeled}>{variant === "proposed" ? "Unlabeled" : "unlabeled"}</span>}
+									{group.kind === "notes" && <span className={L.notesTag}>{variant === "proposed" ? "Notes" : "notes"}</span>}
 								</span>
-								<span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+								<span className={L.numCol}>
 									{group.nodeIds.length}
 								</span>
-								<span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+								<span className={L.dateCol}>
 									{group.newestCreatedAt.slice(0, 10)}
 								</span>
 							</div>
@@ -384,7 +456,7 @@ export function ChainTableBody({
 												{chainOpen && memberIds.length > 0 && (
 													<div
 														data-testid={`chain-thread-${chain.id}`}
-														className="pointer-events-none absolute bottom-[8px] left-[73px] top-[22px] w-px bg-border/50"
+														className={L.chainThread}
 													/>
 												)}
 											<div
@@ -393,13 +465,14 @@ export function ChainTableBody({
 												className="flex items-center gap-1 py-1 pl-12 pr-3"
 											>
 												<RowCheckbox
+	variant={variant}
 													checked={selectedInChain === memberIds.length && memberIds.length > 0}
 													indeterminate={selectedInChain > 0 && selectedInChain < memberIds.length}
 													onToggle={(next) => onToggleNodes(memberIds, next)}
 													testid={`chain-checkbox-${chain.id}`}
 													label={`Select chain ${nameOf(chain.conclusion)}`}
 												/>
-												<Expander open={chainOpen} onClick={() => onToggleChain(chain.id)} testid={`chain-toggle-${chain.id}`} label={`Expand chain ${nameOf(chain.conclusion)}`} />
+												<Expander variant={variant} open={chainOpen} onClick={() => onToggleChain(chain.id)} testid={`chain-toggle-${chain.id}`} label={`Expand chain ${nameOf(chain.conclusion)}`} />
 												{/* The chain line: proposition names as faint-outlined
 												    chips. THE LOGIC IS THE PAYLOAD (owner rulings,
 												    2026-09-30): premises join with the LaTeX LAND (∧),
@@ -410,7 +483,7 @@ export function ChainTableBody({
 												    (white), not the old dim gray. A lonely chip reads
 												    as a standalone proposition (no glyphs at all);
 												    the row's aria-label keeps the plain-text form. */}
-												<span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-0.5 gap-y-1 text-[13px] leading-tight">
+												<span className={L.chainLine}>
 													{memberIds.map((id, i) => {
 														const isConclusion = i === memberIds.length - 1;
 														return (
@@ -430,7 +503,7 @@ export function ChainTableBody({
 																))}
 																<span
 																	data-testid={`prop-chip-${id}`}
-																	className="rounded border border-border/70 bg-muted/30 px-1.5 py-0.5"
+																	className={L.chip}
 																>
 																	{nameOf(id)}
 																</span>
@@ -438,10 +511,10 @@ export function ChainTableBody({
 														);
 													})}
 												</span>
-												<span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+												<span className={L.numCol}>
 													{memberIds.length}
 												</span>
-												<span className="w-20 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+												<span className={L.dateCol}>
 													{dateOf(chain.conclusion)}
 												</span>
 											</div>
@@ -462,16 +535,17 @@ export function ChainTableBody({
 															className="flex items-start gap-2 py-1 pl-21 pr-3"
 														>
 															<RowCheckbox
+	variant={variant}
 																checked={selection.has(id)}
 																onToggle={(next) => onToggleNodes([id], next)}
 																testid={`prop-checkbox-${id}`}
 																label={`Select node ${node.name}`}
 															/>
-															<span className="min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground">
+															<span className={L.statement}>
 																{node.statement}
 															</span>
-															<span className="w-14 shrink-0" />
-															<span className="w-20 shrink-0" />
+															<span className={L.numSpacer} />
+															<span className={L.dateSpacer} />
 														</div>
 													);
 												})}
@@ -490,9 +564,9 @@ export function ChainTableBody({
 				<div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-4">
 					<div
 						data-testid="chain-selection-bar"
-						className="pointer-events-auto flex items-center gap-3 rounded-full border bg-card py-2 pl-4 pr-2 shadow-lg"
+						className={L.bar}
 					>
-						<span data-testid="chain-selected-summary" className="text-xs font-medium">
+						<span data-testid="chain-selected-summary" className={L.summary}>
 							{selection.size} {selection.size === 1 ? "node" : "nodes"} →{" "}
 							{derived.length} {derived.length === 1 ? "chain" : "chains"}
 						</span>
@@ -500,7 +574,7 @@ export function ChainTableBody({
 							type="button"
 							data-testid="chain-clear"
 							onClick={onClear}
-							className="rounded-full px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+							className={L.clear}
 						>
 							Clear
 						</button>
@@ -510,7 +584,7 @@ export function ChainTableBody({
 								data-testid="chain-practice-done"
 								onClick={onSelect}
 								aria-label={`Done picking — ${selection.size} ${selection.size === 1 ? "proposition" : "propositions"} selected`}
-								className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+								className={L.done}
 							>
 								<DumbbellIcon aria-hidden="true" className="size-3.5" />
 								Done
@@ -521,13 +595,13 @@ export function ChainTableBody({
 								    the destructive action at the bar's right end — the
 								    safe actions and the kill switch never blend. The
 								    full-death confirm dialog catches the misclick. */}
-							<span data-testid="chain-danger-divider" aria-hidden="true" className="h-4 w-px bg-border/70" />
+							<span data-testid="chain-danger-divider" aria-hidden="true" className={L.divider} />
 							<button
 								type="button"
 								data-testid="chain-delete"
 								onClick={onDelete}
 								aria-label={`Delete ${selection.size} selected ${selection.size === 1 ? "node" : "nodes"}`}
-								className="flex items-center gap-1.5 rounded-full border border-destructive/50 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+								className={L.delete}
 							>
 								<Trash2Icon aria-hidden="true" className="size-3.5" />
 								Delete
@@ -543,7 +617,7 @@ export function ChainTableBody({
 
 /** The rotating chevron — collapsed points right, expanded rotates down
  *  (owner ruling: the affordance must read on every expandable row). */
-function Expander({ open, onClick, testid, label }: { open: boolean; onClick: () => void; testid: string; label: string }) {
+function Expander({ open, onClick, testid, label, variant = "current" }: { open: boolean; onClick: () => void; testid: string; label: string; variant?: "current" | "proposed" }) {
 	return (
 		<button
 			type="button"
@@ -551,7 +625,12 @@ function Expander({ open, onClick, testid, label }: { open: boolean; onClick: ()
 			onClick={onClick}
 			aria-label={label}
 			aria-expanded={open}
-			className="flex h-5 w-3.5 shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+			className={
+				variant === "proposed"
+					? // A 24px target over the 14×20 slot the thread lines are measured to.
+						"-mx-[5px] -my-0.5 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+					: "flex h-5 w-3.5 shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-accent hover:text-foreground"
+			}
 		>
 			<ChevronRightIcon className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
 		</button>
@@ -566,7 +645,9 @@ function RowCheckbox({
 	onToggle,
 	testid,
 	label,
+	variant = "current",
 }: {
+	variant?: "current" | "proposed";
 	checked: boolean;
 	indeterminate?: boolean;
 	onToggle: (next: boolean) => void;
@@ -583,7 +664,11 @@ function RowCheckbox({
 			data-testid={testid}
 			aria-label={label}
 			onChange={(e) => onToggle(e.target.checked)}
-			className="size-3.5 shrink-0 accent-primary"
+			className={
+				variant === "proposed"
+					? "size-3.5 shrink-0 accent-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+					: "size-3.5 shrink-0 accent-primary"
+			}
 		/>
 	);
 }
@@ -626,6 +711,7 @@ export function ChainTableOverlay({
 	const [expandedClusters, setExpandedClusters] = useState<ReadonlySet<string>>(() => new Set());
 	const [expandedChains, setExpandedChains] = useState<ReadonlySet<string>>(() => new Set());
 	const [deleteOpen, setDeleteOpen] = useState(false);
+	const variant = useDesignVariant();
 
 	// Controlled when the caller lifts the selection (the practice pick
 	// set); internal (uncontrolled) otherwise — the delete flow's own.
@@ -682,6 +768,7 @@ export function ChainTableOverlay({
 				className="absolute inset-0 z-40 flex flex-col bg-background/80 backdrop-blur-sm"
 			>
 				<ChainTableBody
+					variant={variant}
 					nodes={nodes}
 					chains={storedChains}
 					sessions={sessions}

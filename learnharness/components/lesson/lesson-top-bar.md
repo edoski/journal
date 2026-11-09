@@ -15,7 +15,7 @@ The session's top bar under the Proposed design, rendered in the shared `TopBar`
 
 ## Details panel
 
-352px, `popover` fill, radius 12, padding 12, opening under its button at the right edge. A two-column list at 13/18: Model (the session's `ModelControl`: model and thinking level), Context ("19.4k / 1M"), Cost, and in teaching sessions Notes extracted (the coverage ring). It stays mounted while closed (`hidden`), so the model control keeps reporting the session's model to the send gate. Esc or a click outside closes it; the model menus' own portals count as inside.
+352px, `popover` fill, radius 12, padding 12, opening under its button at the right edge. A two-column list at 13/18: Model (the session's `ModelControl` at `variant="proposed"`: two 28px field-style triggers for the model and thinking level, opening menus in the shared anatomy, components/ui/menu.md), Context ("19.4k / 1M"), Cost, and in teaching sessions Notes extracted (the coverage ring). It stays mounted while closed (`hidden`), so the model control keeps reporting the session's model to the send gate. Esc or a click outside closes it; the model menus' own portals count as inside.
 
 ## Sources
 

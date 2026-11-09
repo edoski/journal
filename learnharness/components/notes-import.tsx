@@ -96,15 +96,15 @@ export function useNotesImport(callbacks: { onStart?: () => void; onFinish?: () 
 	};
 }
 
-export function NotesImportErrors({ errors }: { errors: readonly string[] }) {
+export function NotesImportErrors({ errors, variant = "current" }: { errors: readonly string[]; variant?: "current" | "proposed" }) {
 	return <>{errors.map((error, i) => (
-		<p key={i} role="alert" className="max-w-full whitespace-pre-wrap break-words text-xs text-red-400">{error}</p>
+		<p key={i} role="alert" className={variant === "proposed" ? "max-w-full whitespace-pre-wrap break-words text-row text-danger" : "max-w-full whitespace-pre-wrap break-words text-xs text-red-400"}>{error}</p>
 	))}</>;
 }
 
 /** Caveats on imports that succeeded: muted, not alarming. */
-export function NotesImportNotices({ notices }: { notices: readonly string[] }) {
+export function NotesImportNotices({ notices, variant = "current" }: { notices: readonly string[]; variant?: "current" | "proposed" }) {
 	return <>{notices.map((notice, i) => (
-		<p key={i} role="status" className="max-w-full whitespace-pre-wrap break-words text-xs text-muted-foreground">{notice}</p>
+		<p key={i} role="status" className={variant === "proposed" ? "max-w-full whitespace-pre-wrap break-words text-row text-muted-foreground" : "max-w-full whitespace-pre-wrap break-words text-xs text-muted-foreground"}>{notice}</p>
 	))}</>;
 }

@@ -30,7 +30,7 @@
  * as text".
  */
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
 	EXTRACTION_CHUNK_TOKENS_FLOOR,
 	resolveSettings,
@@ -41,7 +41,8 @@ import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
 import { useAppearance } from "./appearance.tsx";
 import { FontMenuList } from "./model-menu";
-import { CommitInput, SettingsMenuTrigger, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
+import { CommitInput, SettingsGroup, SettingsMenuTrigger, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
+import { useSettingsProposed } from "./settings-design";
 
 /** The factory reading family — the DEFAULT row's identity (unset =
  *  this). Exported for tests. */
@@ -151,6 +152,20 @@ export function AppearanceSection({
 		});
 	};
 
+	const proposed = useSettingsProposed();
+	const commitProseSize = (v: string) => {
+		// Empty = factory default (owner, fix wave): omit the key so the record
+		// UNSETS and the field stays empty (absence, not null, is the
+		// unset for numbers). Number("") is 0, so the old clamp wrote 12.
+		if (v === "") {
+			onSectionChange({ ...appearance, proseFontSize: undefined });
+			return;
+		}
+		const n = Number(v);
+		if (!Number.isFinite(n)) return; // bad input: no write, factory stays
+		onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
+	};
+
 	const pickFont = (family: string | null) => {
 		setFontMenuOpen(false);
 		onSectionChange(composeFontFamily(appearance, family));
@@ -184,6 +199,45 @@ export function AppearanceSection({
 		};
 	}, [fontMenuOpen]);
 
+	// Proposed is dark only, in SF Pro, with fixed heading weights and
+	// palette (the owner's decisions), and the stylesheet ignores those
+	// settings there (appearance.tsx). So their rows would be controls that
+	// do nothing: mode, background, reading font, serif session names and
+	// heading weight are left out; reading size and the emphasis inks stay.
+	if (proposed) {
+		return (
+			<SettingsGroup label="Reading" testid="group-reading">
+				<SettingsRow label="Text size" hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
+					<CommitInput
+						type="number"
+						value={String(appearance?.proseFontSize ?? "")}
+						placeholder="16"
+						ariaLabel="prose font size"
+						testid="input-prose-size"
+						onCommit={commitProseSize}
+					/>
+				</SettingsRow>
+				<SettingsRow label="Bold color" hint="Empty = same as text" testid="row-bold-color">
+					<CommitInput
+						value={md?.boldColor ?? ""}
+						placeholder="same as text"
+						ariaLabel="bold color"
+						testid="input-bold-color"
+						onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
+					/>
+				</SettingsRow>
+				<SettingsRow label="Italic color" hint="Empty = same as text" testid="row-italic-color">
+					<CommitInput
+						value={md?.italicColor ?? ""}
+						placeholder="same as text"
+						ariaLabel="italic color"
+						testid="input-italic-color"
+						onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
+					/>
+				</SettingsRow>
+			</SettingsGroup>
+		);
+	}
 	return (
 		<>
 			<SettingsRow label="Mode" hint="Coming soon" testid="row-mode" dimmed>
@@ -267,18 +321,7 @@ export function AppearanceSection({
 					placeholder="16"
 					ariaLabel="prose font size"
 					testid="input-prose-size"
-					onCommit={(v) => {
-						// Empty = factory default (owner, fix wave): omit the key so the record
-						// UNSETS and the field stays empty (absence, not null, is the
-						// unset for numbers). Number("") is 0, so the old clamp wrote 12.
-						if (v === "") {
-							onSectionChange({ ...appearance, proseFontSize: undefined });
-							return;
-						}
-						const n = Number(v);
-						if (!Number.isFinite(n)) return; // bad input: no write, factory stays
-						onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
-					}}
+					onCommit={commitProseSize}
 				/>
 			</SettingsRow>
 			<SettingsRow label="Session names in serif" testid="row-session-serif">
@@ -355,8 +398,10 @@ export function GraphSection({
 	// the hint and placeholder report exactly the number the trigger waits
 	// for — never a second hand-rolled default.
 	const resolved = resolveSettings(graph === undefined ? null : { version: 1, graph }).graph;
+	const proposed = useSettingsProposed();
+	const Rows = proposed ? GraphRowsGroup : Fragment;
 	return (
-		<>
+		<Rows>
 			{/* EXTRACTION (renamed, owner 2026-10-06): this switch is the DATA
 			    channel — the pipeline, the auditor, the prober's graph tools. It
 			    was born labeled "Graph" and that label lied once the rendering
@@ -379,7 +424,7 @@ export function GraphSection({
 			    round): display-only. Off = the home shows the chains view
 			    instead of the canvas. The ledgers, the pipeline, everything
 			    data keeps working — that is the extraction switch above. */}
-			<SettingsRow label="Graph rendering" hint="Off = home shows the chains view" testid="graph-row-rendering">
+			<SettingsRow label="Graph rendering" hint={proposed ? "Off = Knowledge shows the chains view" : "Off = home shows the chains view"} testid="graph-row-rendering">
 				<Toggle
 					checked={graph?.rendering ?? true}
 					label="graph rendering enabled"
@@ -416,6 +461,10 @@ export function GraphSection({
 					}}
 				/>
 			</SettingsRow>
-		</>
+		</Rows>
 	);
+}
+/** The Graph section's rows as one group (Proposed). */
+function GraphRowsGroup({ children }: { children: React.ReactNode }) {
+	return <SettingsGroup label="Knowledge graph" testid="group-graph">{children}</SettingsGroup>;
 }

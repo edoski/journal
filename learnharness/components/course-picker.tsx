@@ -4,6 +4,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { GraduationCapIcon } from "lucide-react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { useDesignVariant } from "@/components/design-variant";
+import { Button } from "@/components/ui/button";
+import { Input, inputVariants } from "@/components/ui/input";
+import { DialogContent, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { courseLabel, type CourseListing, type CourseSummary } from "@/src/core";
 
 /** Where the last picked course is remembered (per device). */
@@ -196,11 +201,13 @@ function rootLabel(root: string): string {
 
 /** The New course form: a title and the study root it goes in. The server
  *  creates `<root>/<slug>` and has the engine make it a course. */
-export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: {
+export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, variant = "current" }: {
 	roots: readonly string[];
 	onClose: () => void;
 	onCreated: (course: CourseSummary) => void;
 	fetchLike?: typeof fetch;
+	/** "proposed": the shared dialog anatomy (components/ui/dialog.md). */
+	variant?: "current" | "proposed";
 }) {
 	const [title, setTitle] = useState("");
 	const [root, setRoot] = useState(roots[0] ?? "");
@@ -226,6 +233,53 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 			setBusy(false);
 		}
 	};
+	if (variant === "proposed") {
+		return (
+			<DialogOverlay {...backdropDismiss}>
+				<DialogContent aria-label="New course" data-testid="new-course-dialog" className="max-w-md">
+					<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
+						<DialogHeader>
+							<DialogTitle>New course</DialogTitle>
+						</DialogHeader>
+						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
+							Title
+							<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required data-testid="new-course-title" className="font-normal" />
+						</label>
+						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
+							Study root
+							<select
+								value={root}
+								onChange={(e) => setRoot(e.target.value)}
+								disabled={roots.length === 0}
+								data-testid="new-course-root"
+								className={cn(inputVariants(), "font-normal")}
+							>
+								{roots.map((r) => (
+									<option key={r} value={r} title={r}>
+										{rootLabel(r)}
+									</option>
+								))}
+							</select>
+						</label>
+						{roots.length === 0 && (
+							<p className="text-row text-muted-foreground">
+								No study root is known yet: register a first course with the engine&apos;s <code>study init</code>.
+							</p>
+						)}
+						{error && <p role="alert" className="text-row text-danger">{error}</p>}
+						<DialogFooter className="pt-2">
+							<Button type="button" variant="quiet" onClick={onClose}>
+								Cancel
+							</Button>
+							<Button type="submit" data-testid="new-course-create" disabled={!title.trim() || !root || busy}>
+								{busy ? "Creating…" : "Create"}
+							</Button>
+						</DialogFooter>
+					</form>
+				</DialogContent>
+			</DialogOverlay>
+		);
+	}
 	return (
 		<div
 			role="dialog"
@@ -308,6 +362,7 @@ export function NewCourseDialog(props: { roots: readonly string[]; onClose: () =
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
 	}, [onClose]);
+	const variant = useDesignVariant();
 	if (typeof document === "undefined") return null;
-	return createPortal(<NewCourseBody {...props} />, document.body);
+	return createPortal(<NewCourseBody {...props} variant={variant} />, document.body);
 }

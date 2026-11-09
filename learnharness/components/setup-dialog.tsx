@@ -55,6 +55,19 @@ import { NativeSubscriptionBackgroundAccess, SubscriptionConnections } from "@/c
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
 import { ThinkingMenuList } from "@/components/settings/model-menu";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+import { useDesignVariant } from "@/components/design-variant";
+import { SettingsDesignContext, useSettingsProposed } from "@/components/settings/settings-design";
+import { SETTINGS_FIELD, SettingsGroup, SettingsMenuTrigger, SettingsRow } from "@/components/settings/controls";
+import { Button } from "@/components/ui/button";
+import { DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { MENU_SURFACE } from "@/components/ui/menu";
+import { cn } from "@/lib/utils";
+
+/** The stage's one line under the title (Proposed: the dialog's description). */
+const STAGE_LINE = {
+	keys: "Choose your AI provider and paste its API key. You’ll pick your models next.",
+	pickers: "Pick the model for each tier. All three are required before chats can start.",
+} as const;
 
 /** The pickers' slot identity — same roster language as the Agent
  *  section's slot rows. */
@@ -152,6 +165,58 @@ export function SetupKeysBody({
 	/** The MenuShell anchor — wired by the wrapper (its triggerRef). */
 	menuAnchor: React.RefObject<HTMLDivElement | null>;
 }) {
+	if (useSettingsProposed()) {
+		return (
+			<div className="flex flex-col gap-6" data-testid="setup-stage-keys">
+				<div className="flex flex-col gap-2">
+					<div ref={menuAnchor} className="relative">
+						<SettingsMenuTrigger
+							value={provider ? provider.label : "Pick a provider…"}
+							aria-label="Provider"
+							data-testid="setup-key-provider"
+							aria-expanded={menuOpen}
+							onClick={onToggleMenu}
+							className={cn("h-9 w-full px-3 text-control", !provider && "text-muted-foreground")}
+						/>
+						{menuOpen && (
+							<MenuShell anchorRef={menuAnchor} testid="setup-key-provider-menu" preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-[22rem]")}>
+								<ProviderMenuList variant="proposed" providers={providers ?? []} onPick={onPick} />
+							</MenuShell>
+						)}
+					</div>
+					{provider && (
+						<div className="flex items-center gap-2">
+							<input
+								type="text"
+								value={value}
+								onChange={(e) => onValue(e.target.value)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" && value.trim()) onSave();
+								}}
+								placeholder="Paste key"
+								aria-label={`${provider.label} key`}
+								data-testid="setup-key-input"
+								disabled={saving}
+								autoFocus
+								className={cn(SETTINGS_FIELD, "h-9 min-w-0 flex-1 px-3 font-mono text-control")}
+							/>
+							<Button onClick={onSave} disabled={saving || !value.trim()} data-testid="setup-key-save">
+								{saving ? "Saving…" : "Save key"}
+							</Button>
+						</div>
+					)}
+					{error && (
+						<p role="alert" data-testid="setup-key-error" className="text-row text-danger">
+							{error}
+						</p>
+					)}
+				</div>
+				<SettingsGroup label="Subscriptions">
+					<SubscriptionConnections setup />
+				</SettingsGroup>
+			</div>
+		);
+	}
 	return (
 		<div className="flex flex-col gap-3 px-6 py-5" data-testid="setup-stage-keys">
 			<p className="text-xs text-muted-foreground">
@@ -271,6 +336,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 	// Stage 2's slot menus anchor by anchorTestid instead — see the slot
 	// MenuShell below for why a freshly attached ref cannot work there.
 	const keyTriggerRef = useRef<HTMLDivElement>(null);
+	const proposed = useDesignVariant() === "proposed";
 
 	// The keys signal (zero-keys wave): keys-section saves/deletes AND
 	// THIS dialog's own first-key save dispatch it; the fetch effect below
@@ -432,6 +498,118 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 		onValue={setKeyValue}
 		onSave={() => void saveKey()}
 	/>;
+
+	if (proposed) {
+		return createPortal(
+			<SettingsDesignContext.Provider value="proposed">
+				<DialogOverlay data-testid="setup-backdrop" {...backdropDismiss}>
+					<DialogContent aria-label="Set up your models" data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto">
+						<DialogHeader>
+							<DialogTitle>Set up your models</DialogTitle>
+							{stage !== "loading" && <DialogDescription>{STAGE_LINE[stage]}</DialogDescription>}
+						</DialogHeader>
+						<Hint label="Close" binding="escape" side="left">
+							<DialogClose aria-label="Close setup" data-testid="setup-close" onClick={onClose} />
+						</Hint>
+						{failed && (
+							<p role="alert" data-testid="setup-catalog-error" className="text-row text-danger">
+								Model catalog could not be loaded. Check the connection and retry.{" "}
+								<button type="button" data-testid="setup-retry" className="text-link underline-offset-2 hover:underline" onClick={refresh}>
+									Retry
+								</button>
+							</p>
+						)}
+						{stage === "loading" ? (
+							!failed && <p data-testid="setup-stage-loading" role="status" className="text-row text-muted-foreground">Loading models…</p>
+						) : stage === "keys" ? (
+							keysBody
+						) : (
+							<>
+								<div data-testid="setup-stage-pickers">
+									<SettingsGroup label="Models">
+										{SLOT_ORDER.map((slot) => {
+											const entry = picked[slot];
+											const level = levels[slot];
+											const metadata = catalog?.models.find((m) => m.id === entry?.id && m.provider === entry.provider);
+											const levelsForEntry = metadata?.supportedLevels ?? (entry ? Object.keys(THINKING_LABEL) : []);
+											const available = catalog?.models ?? (failed ? [] : undefined);
+											const slotCatalog = slot === "vision" ? available?.filter((m) => m.input.includes("image")) : available;
+											const modelOpen = openMenu?.slot === slot && openMenu.kind === "model";
+											const thinkingOpen = openMenu?.slot === slot && openMenu.kind === "thinking";
+											return (
+												<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`setup-slot-${slot}`}>
+													<span className="relative flex shrink-0 items-center gap-2">
+														{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
+														<Hint label={entry ? `${entry.provider}:${entry.id}` : "Pick a model…"}>
+															<SettingsMenuTrigger
+																value={entry ? prettyModel(entry.id) : "Pick a model…"}
+																aria-label={`${SLOT_META[slot].label} model`}
+																data-testid={`setup-trigger-${slot}`}
+																aria-expanded={modelOpen}
+																onClick={() => setOpenMenu(modelOpen ? null : { slot, kind: "model" })}
+																className={cn("w-40", !entry && "text-muted-foreground")}
+															/>
+														</Hint>
+														<SettingsMenuTrigger
+															value={entry ? (level ? THINKING_LABEL[level] ?? level : "…") : "—"}
+															aria-label={`${SLOT_META[slot].label} thinking`}
+															data-testid={`setup-thinking-${slot}`}
+															aria-expanded={thinkingOpen}
+															disabled={!entry}
+															onClick={() => setOpenMenu(thinkingOpen ? null : { slot, kind: "thinking" })}
+															className="w-24"
+														/>
+														{modelOpen && (
+															<MenuShell anchorTestid={`setup-trigger-${slot}`} testid={`setup-menu-${slot}`} preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-[22rem]")}>
+																<ModelMenuList
+																	variant="proposed"
+																	models={slotCatalog}
+																	effectiveId={entry?.id}
+																	effectiveProvider={entry?.provider}
+																	onPick={(m) => {
+																		editedSlots.current.add(slot);
+																		setPicked((prev) => ({ ...prev, [slot]: m }));
+																		setLevels((prev) => ({ ...prev, [slot]: populateLevel(prev[slot], m.supportedLevels) }));
+																		setOpenMenu(null);
+																	}}
+																	footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Add a provider key with access to a vision model." : undefined}
+																/>
+															</MenuShell>
+														)}
+														{thinkingOpen && (
+															<MenuShell anchorTestid={`setup-thinking-${slot}`} testid={`setup-thinking-menu-${slot}`} preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-44")}>
+																<ThinkingMenuList
+																	variant="proposed"
+																	levels={levelsForEntry.map(String)}
+																	effectiveLevel={level}
+																	onPick={(lv) => {
+																		editedSlots.current.add(slot);
+																		setLevels((prev) => ({ ...prev, [slot]: lv as ThinkingLevel }));
+																		setOpenMenu(null);
+																	}}
+																/>
+															</MenuShell>
+														)}
+													</span>
+												</SettingsRow>
+											);
+										})}
+									</SettingsGroup>
+								</div>
+								<DialogFooter>
+									{error && <p className="mr-auto text-row text-danger">{error}</p>}
+									<Button data-testid="setup-save" disabled={!allPicked || saving} onClick={() => void save()}>
+										{saving ? "Saving…" : "Save models"}
+									</Button>
+								</DialogFooter>
+							</>
+						)}
+					</DialogContent>
+				</DialogOverlay>
+			</SettingsDesignContext.Provider>,
+			document.body,
+		);
+	}
 
 	return createPortal(
 		<div

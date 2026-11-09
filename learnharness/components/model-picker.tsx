@@ -8,6 +8,9 @@ import { ModelMenuList, ThinkingMenuList } from "@/components/settings/model-men
 import { composeSlotModel } from "@/components/settings/agent-section";
 import { MenuShell } from "@/components/menu-shell";
 import { Hint } from "@/components/ui/hint";
+import { ChevronDownIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { MENU_SURFACE } from "@/components/ui/menu";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { useModelCatalog } from "@/components/model-catalog";
 export { useModelCatalog } from "@/components/model-catalog";
@@ -23,6 +26,10 @@ import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/t
 export function catalogLimits(catalog: Pick<ModelCatalogResponse, "models">): Map<string, number> {
 	return new Map(catalog.models.map((m) => [`${m.provider}:${m.id}`, m.contextWindow]));
 }
+
+/** The Proposed trigger: the settings field look (settings.md), 28px. */
+const PROPOSED_TRIGGER =
+	"flex h-7 items-center gap-1.5 rounded-md border border-input bg-transparent pl-2.5 pr-1.5 text-row text-foreground outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
 
 /**
  * THE CONVERSATION MODEL CONTROL — dual-bound (owner, per-session models,
@@ -40,7 +47,18 @@ export function catalogLimits(catalog: Pick<ModelCatalogResponse, "models">): Ma
  * changing the new-session default. Unpicked reads "—" (the
  * no-factory-fallback language: the UI never presents a default model).
  */
-export function ModelControl({ chatId, onModelChange }: { chatId?: string; onModelChange?: (model: string | undefined) => void }) {
+export function ModelControl({
+	chatId,
+	onModelChange,
+	variant = "current",
+}: {
+	chatId?: string;
+	onModelChange?: (model: string | undefined) => void;
+	/** "proposed": quiet field-style triggers and the shared menu anatomy
+	 *  (the lesson's details menu, lesson-top-bar.md). */
+	variant?: "current" | "proposed";
+}) {
+	const proposed = variant === "proposed";
 	const { catalog, refresh } = useModelCatalog();
 	const [models, setModels] = useState<ModelsSettings | undefined>();
 	// A successful read with no settings is a legacy session; undefined
@@ -291,10 +309,10 @@ export function ModelControl({ chatId, onModelChange }: { chatId?: string; onMod
 				// view's floating top-right buttons (import notes, gear,
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
-				className="flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"
+				className={proposed ? PROPOSED_TRIGGER : "flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"}
 			>
 				<span className="text-card-foreground">{effectiveId ? prettyModel(effectiveId) : "—"}</span>
-				<span aria-hidden className="text-xs text-muted-foreground">▾</span>
+				{proposed ? <ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" /> : <span aria-hidden className="text-xs text-muted-foreground">▾</span>}
 			</button>
 			</Hint>
 			<Hint
@@ -319,14 +337,14 @@ export function ModelControl({ chatId, onModelChange }: { chatId?: string; onMod
 				// view's floating top-right buttons (import notes, gear,
 				// coverage) — blurred, fuller opacity, shadowed — so the
 				// graph no longer bleeds through these pills.
-				className="flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"
+				className={proposed ? PROPOSED_TRIGGER : "flex items-center gap-1.5 rounded-full border bg-card/85 px-2.5 py-1 shadow-lg backdrop-blur transition-colors hover:border-border hover:bg-muted"}
 			>
 				{/* Just the level — the button reads like the model button reads
 				   the model name (owner, stats-control round 1). */}
 				<span className="text-card-foreground">
 					{effectiveLevel === undefined ? "—" : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel)}
 				</span>
-				<span aria-hidden className="text-xs text-muted-foreground">▾</span>
+				{proposed ? <ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" /> : <span aria-hidden className="text-xs text-muted-foreground">▾</span>}
 			</button>
 			</Hint>
 
@@ -338,10 +356,11 @@ export function ModelControl({ chatId, onModelChange }: { chatId?: string; onMod
 					anchorRef={containerRef}
 					testid="model-menu"
 					preferredSide="up"
-					menuClass="flex w-[22rem] flex-col rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass={proposed ? cn(MENU_SURFACE, "w-[22rem]") : "flex w-[22rem] flex-col rounded-xl border bg-card p-2 text-xs shadow-xl"}
 				>
-					{error && <div className="mb-1.5 text-destructive">{error}</div>}
+					{error && <div className={proposed ? "px-2 py-1.5 text-label text-danger" : "mb-1.5 text-destructive"}>{error}</div>}
 					<ModelMenuList
+						variant={variant}
 						models={catalog?.models}
 						effectiveId={effectiveId}
 						effectiveProvider={effectiveProvider}
@@ -362,16 +381,17 @@ export function ModelControl({ chatId, onModelChange }: { chatId?: string; onMod
 					anchorRef={containerRef}
 					testid="thinking-menu"
 					preferredSide="up"
-					menuClass="flex w-44 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"
+					menuClass={proposed ? cn(MENU_SURFACE, "w-44") : "flex w-44 flex-col gap-0.5 rounded-xl border bg-card p-2 text-xs shadow-xl"}
 				>
 					<ThinkingMenuList
+						variant={variant}
 						levels={catalog ? levels : []}
 						effectiveLevel={effectiveLevel}
 						onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
 						empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
 						footer="Levels this model actually supports"
 					/>
-					{error && <div className="mt-1 text-destructive">{error}</div>}
+					{error && <div className={proposed ? "px-2 py-1.5 text-label text-danger" : "mt-1 text-destructive"}>{error}</div>}
 				</MenuShell>
 			)}
 		</div>

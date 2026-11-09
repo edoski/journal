@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
+import { useDesignVariant } from "@/components/design-variant";
+import { Button } from "@/components/ui/button";
+import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import type { ChatDeleteMode, ChatListItem } from "@/src/core";
 
 /** The graph-traces checkbox copy (owner, 2026-09-24 flow rework — was
@@ -60,6 +63,7 @@ export function DeleteSessionDialog({
 	// change of intent, honored as such — the checkbox is disabled while
 	// busy, so no mid-flight switches).
 	const [failure, setFailure] = useState<{ code: string; error: string } | null>(null);
+	const variant = useDesignVariant();
 
 	// Fresh state per session: closing resets, opening a new chat starts clean.
 	useEffect(() => {
@@ -116,6 +120,23 @@ export function DeleteSessionDialog({
 
 	if (!chat) return null;
 
+	if (variant === "proposed") {
+		return createPortal(
+			<DialogOverlay {...backdropDismiss}>
+				<DeleteSessionBody
+					variant="proposed"
+					chat={chat}
+					traces={traces}
+					busy={busy}
+					failure={failure}
+					onTraces={(next) => setTraces(next)}
+					onClose={onClose}
+					onRun={() => void run()}
+				/>
+			</DialogOverlay>,
+			document.body,
+		);
+	}
 	return createPortal(
 		<div
 			className="fixed inset-0 z-50 flex items-center justify-center bg-background/80"
@@ -145,6 +166,7 @@ export function DeleteSessionBody({
 	onTraces,
 	onClose,
 	onRun,
+	variant = "current",
 }: {
 	chat: Pick<ChatListItem, "id" | "title">;
 	/** The graph-traces checkbox — unchecked by default (preserve-graph). */
@@ -154,7 +176,55 @@ export function DeleteSessionBody({
 	onTraces: (next: boolean) => void;
 	onClose: () => void;
 	onRun: () => void;
+	/** "proposed": the shared dialog anatomy (components/ui/dialog.md). */
+	variant?: "current" | "proposed";
 }) {
+	if (variant === "proposed") {
+		return (
+			<DialogContent aria-label="Delete session" data-testid="delete-session-dialog">
+				<DialogHeader>
+					<DialogTitle>Delete session?</DialogTitle>
+					<p data-testid="session-name-code" className="text-control font-medium text-foreground">
+						{chat.title}
+					</p>
+					<DialogDescription>
+						This permanently removes the session — its messages, background jobs, and extraction records. Everything
+						it added to the graph stays unless you check below. This cannot be undone.
+					</DialogDescription>
+				</DialogHeader>
+				<label data-testid={TRACES_COPY.testid} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+					<input
+						type="checkbox"
+						data-testid={TRACES_COPY.checkbox}
+						checked={traces}
+						onChange={(e) => onTraces(e.target.checked)}
+						disabled={busy}
+						className="mt-0.5 size-4 shrink-0 accent-primary"
+					/>
+					<span className="flex min-w-0 flex-col gap-1">
+						<span className="text-row text-foreground">{TRACES_COPY.title}</span>
+						<span className="text-label text-muted-foreground">{TRACES_COPY.body}</span>
+					</span>
+				</label>
+				{failure && (
+					<p role="alert" data-testid="delete-failure" className="text-row text-danger">
+						{failure.error}{" "}
+						<button type="button" data-testid="delete-retry" onClick={onRun} disabled={busy} className="text-foreground underline-offset-2 hover:underline disabled:opacity-50">
+							Try again
+						</button>
+					</p>
+				)}
+				<DialogFooter className="pt-2">
+					<Button variant="quiet" data-testid="delete-cancel" onClick={onClose} disabled={busy}>
+						Cancel
+					</Button>
+					<Button variant="destructive" data-testid="delete-confirm" onClick={onRun} disabled={busy}>
+						{busy ? "Deleting…" : "Delete"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		);
+	}
 	return (
 		<div
 			role="dialog"

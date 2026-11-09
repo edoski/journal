@@ -24,6 +24,11 @@ import type { ModelCatalogEntry } from "@/src/core";
 import { fuzzyScore, subscriptionLabel } from "@/src/core";
 import { formatTokens } from "@/components/usage-format";
 import { SearchMenuList } from "./search-menu-list";
+import { CheckIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { MENU_DETAIL, MENU_ITEM, MENU_ITEM_SELECTED, MENU_ITEM_WALKED, MENU_NOTE, MENU_SEARCH, MENU_SEPARATOR } from "@/components/ui/menu";
+
+type MenuVariant = "current" | "proposed";
 
 function priceLabel(cost: ModelCatalogEntry["cost"]): string {
 	const fmt = (n: number) => `$${n < 1 ? n.toFixed(2).replace(/0$/, "") : n.toFixed(2)}`;
@@ -39,6 +44,7 @@ export function ModelMenuList({
 	effectiveProvider,
 	onPick,
 	footer,
+	variant = "current",
 }: {
 	/** The full catalog — undefined while it loads. */
 	models: ModelCatalogEntry[] | undefined;
@@ -53,10 +59,14 @@ export function ModelMenuList({
 	onPick: (entry: ModelCatalogEntry) => void;
 	/** Quiet footer note under the list (context-specific). */
 	footer?: string;
+	/** "proposed": the shared menu anatomy (components/ui/menu.md). */
+	variant?: MenuVariant;
 }) {
+	const proposed = variant === "proposed";
 	return (
 		<>
 			<SearchMenuList
+				variant={variant}
 				items={models}
 				itemKey={(m) => `${m.provider}/${m.id}`}
 				searchTerms={(m) => [m.provider, m.id, m.name]}
@@ -69,7 +79,16 @@ export function ModelMenuList({
 				placeholder="Search models…"
 				loading="Loading models…"
 				empty="No models match."
-				renderItem={(m) => <>
+				renderItem={(m) => proposed ? <>
+					<span className="flex items-center justify-between gap-3">
+						<span className="truncate">{m.name}</span>
+						<span className={cn(MENU_DETAIL, "shrink-0")}>{subscriptionLabel(`${m.provider}:${m.id}`) ?? priceLabel(m.cost)}</span>
+					</span>
+					<span className={cn(MENU_DETAIL, "flex items-center justify-between gap-3")}>
+						<span className="truncate">{subscriptionLabel(`${m.provider}:${m.id}`) ? `${subscriptionLabel(`${m.provider}:${m.id}`)} (subscription)` : m.provider} · {m.id}</span>
+						<span className="shrink-0">{formatTokens(m.contextWindow)}</span>
+					</span>
+				</> : <>
 					<span className="flex items-center justify-between gap-2">
 						<span className="truncate text-card-foreground">{m.name}</span>
 						<span className="shrink-0 tabular-nums text-muted-foreground" title={subscriptionLabel(`${m.provider}:${m.id}`) ? "Subscription connection" : "USD per 1M tokens in/out"}>
@@ -82,9 +101,14 @@ export function ModelMenuList({
 					</span>
 				</>}
 			/>
-			{footer && (
+			{footer && (proposed ? (
+				<>
+					<div className={MENU_SEPARATOR} />
+					<div className={MENU_NOTE}>{footer}</div>
+				</>
+			) : (
 				<div className="mt-1 border-t px-2 pt-1.5 text-xs text-muted-foreground">{footer}</div>
-			)}
+			))}
 		</>
 	);
 }
@@ -97,6 +121,7 @@ export function ThinkingMenuList({
 	onPick,
 	empty,
 	footer,
+	variant = "current",
 }: {
 	levels: string[];
 	effectiveLevel: string | undefined;
@@ -104,7 +129,36 @@ export function ThinkingMenuList({
 	/** Shown instead of the list when there are no levels. */
 	empty?: string;
 	footer?: string;
+	variant?: MenuVariant;
 }) {
+	if (variant === "proposed") {
+		return (
+			<>
+				{levels.length === 0 ? (
+					<div className={MENU_NOTE}>{empty ?? "No thinking levels."}</div>
+				) : (
+					levels.map((level) => (
+						<button
+							key={level}
+							type="button"
+							data-testid={`thinking-option-${level}`}
+							onClick={() => onPick(level)}
+							className={cn(MENU_ITEM, "justify-between", level === effectiveLevel && MENU_ITEM_SELECTED)}
+						>
+							<span>{level}</span>
+							{level === effectiveLevel && <CheckIcon aria-hidden className="size-3.5! text-muted-foreground" />}
+						</button>
+					))
+				)}
+				{footer && (
+					<>
+						<div className={MENU_SEPARATOR} />
+						<div className={MENU_NOTE}>{footer}</div>
+					</>
+				)}
+			</>
+		);
+	}
 	return (
 		<>
 			{levels.length === 0 ? (
@@ -140,10 +194,13 @@ export function ThinkingMenuList({
 export function ProviderMenuList({
 	providers,
 	onPick,
+	variant = "current",
 }: {
 	providers: { id: string; envVar: string; label: string }[];
 	onPick: (provider: { id: string; envVar: string; label: string }) => void;
+	variant?: MenuVariant;
 }) {
+	const proposed = variant === "proposed";
 	const [query, setQuery] = useState("");
 	const [menuIdx, setMenuIdx] = useState<number | null>(null);
 	const searchRef = useRef<HTMLInputElement>(null);
@@ -194,12 +251,12 @@ export function ProviderMenuList({
 					}
 				}}
 				placeholder="Search providers…"
-				className="lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
+				className={proposed ? MENU_SEARCH : "lh-input mb-1.5 w-full rounded-lg border bg-background px-2 py-1.5 text-foreground outline-none focus:ring-1 focus:ring-ring"}
 			/>
 			{results.length === 0 && (
-				<div className="px-2 py-3 text-center text-muted-foreground">No providers match.</div>
+				<div className={proposed ? MENU_NOTE : "px-2 py-3 text-center text-muted-foreground"}>No providers match.</div>
 			)}
-			<ul ref={listRef} data-testid="provider-list" className="flex max-h-72 flex-col overflow-y-auto px-1">
+			<ul ref={listRef} data-testid="provider-list" className={proposed ? "flex max-h-72 flex-col overflow-y-auto" : "flex max-h-72 flex-col overflow-y-auto px-1"}>
 				{results.map((p, i) => (
 					<li key={p.id}>
 						<button
@@ -207,12 +264,12 @@ export function ProviderMenuList({
 							data-testid={`provider-option-${p.id.replace(/[^a-z0-9-]/gi, "_")}`}
 							data-idx={i}
 							onClick={() => onPick(p)}
-							className={`flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
+							className={proposed ? cn(MENU_ITEM, "justify-between gap-3", i === menuIdx && MENU_ITEM_WALKED) : `flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left outline-none transition-colors hover:bg-muted ${
 								i === menuIdx ? "bg-accent/40 ring-1 ring-inset ring-border" : ""
 							}`}
 						>
-							<span className="truncate text-card-foreground">{p.label}</span>
-							<span className="shrink-0 font-mono text-[11px] text-muted-foreground">{p.envVar}</span>
+							<span className={proposed ? "truncate" : "truncate text-card-foreground"}>{p.label}</span>
+							<span className={proposed ? cn(MENU_DETAIL, "shrink-0") : "shrink-0 font-mono text-[11px] text-muted-foreground"}>{p.envVar}</span>
 						</button>
 					</li>
 				))}
