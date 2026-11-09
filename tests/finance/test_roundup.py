@@ -436,3 +436,11 @@ def test_two_debits_each_matching_with_the_cut_off_open_stay_ambiguous() -> None
     assert found == {4: False, 9: False}
     (only,) = runs
     assert (only.status, only.candidates) == ("ambiguous", (4, 9))
+
+
+def test_after_an_open_cut_off_a_payment_lag_days_later_is_still_optional() -> None:
+    rows = REAL + [("2026-11-05", 450), ("2026-11-09", 200)]  # 0.50 3 days after
+    found, runs = resolve("TR", debits(rows), ROUNDUP_TERMS, datetime.date(2026, 11, 9))
+    assert found == {4: True, 10: True}
+    assert [r.status for r in runs] == ["matched", "matched"]
+    assert sorted(runs[1].covers) == [7, 8]
