@@ -1130,7 +1130,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			// engines AND their providers' keys; a refusal lands BEFORE any
 			// stage runs (typed — the trigger skips, routes surface 503).
 			refuseIfStagesUnready();
-			const covered = coverageOf(record.messages, graphStore.readCoverage(), chatId);
+			const covered = coverageOf(record.messages, graphStore.readCoverage(), chatId, record.kind);
 			const failedOutputCalls = failedOutputCallIds(record.messages);
 			if (covered.uncovered.length === 0) {
 				console.info(`[extraction ${chatId}] nothing uncovered — no-op`);

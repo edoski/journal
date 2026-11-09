@@ -22,6 +22,7 @@
 import { createHash } from "node:crypto";
 
 import type { CoverageEntry } from "./contracts/graph.ts";
+import type { SessionMode } from "./contracts/chat.ts";
 import { failedOutputCallIds, sessionModesOf, userFacingTextOf, type LhMessage } from "./native-messages.ts";
 
 export type { CoverageEntry };
@@ -89,11 +90,12 @@ export interface CoverageSlot {
 
 /** Fingerprint a whole transcript, in order (used by the trigger, the run,
  *  and the coverage view — one derivation everywhere). */
-export function coverageSlots(messages: ReadonlyArray<LhMessage>): CoverageSlot[] {
+export function coverageSlots(messages: ReadonlyArray<LhMessage>, startedIn?: SessionMode): CoverageSlot[] {
 	const failedOutputCalls = failedOutputCallIds(messages);
 	// Practice prose is verdicts and nudges, not teaching: a session that
 	// moved between modes extracts only what was written while teaching.
-	const modes = sessionModesOf(messages);
+	// `startedIn` is the mode an older record stored at creation.
+	const modes = sessionModesOf(messages, startedIn);
 	return messages.map((message, i) => ({
 		message,
 		fp: messageFingerprint(message, failedOutputCalls),
@@ -119,6 +121,7 @@ export function coverageOf(
 	messages: ReadonlyArray<LhMessage>,
 	entries: ReadonlyArray<CoverageEntry>,
 	chatId: string,
+	startedIn?: SessionMode,
 ): {
 	slots: CoverageSlot[];
 	uncovered: number[];
@@ -128,7 +131,7 @@ export function coverageOf(
 	uncoveredCount: number;
 } {
 	const covered = coveredSet(entries, chatId);
-	const slots = coverageSlots(messages);
+	const slots = coverageSlots(messages, startedIn);
 	const uncovered: number[] = [];
 	let coveredTokens = 0;
 	let uncoveredTokens = 0;
