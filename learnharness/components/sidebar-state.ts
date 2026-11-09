@@ -224,15 +224,18 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		};
 	}, [ctxChatId]);
 
-	const renameFromMenu = () => {
-		setRenamingId(ctxChatId);
+	// The menu's actions take the session they act on: Current's menu acts
+	// on the right-clicked row (ctxChatId), Proposed's per-row menus pass
+	// their own.
+	const renameChat = (chatId: string | null) => {
+		setRenamingId(chatId);
 		setCtxChatId(null);
 	};
+	const renameFromMenu = () => renameChat(ctxChatId);
 
 	// Export as Markdown (owner, release polish 2026-10-06): same-origin
 	// anchor download; the route's Content-Disposition names the file.
-	const exportFromMenu = () => {
-		const chatId = ctxChatId;
+	const exportChat = (chatId: string | null) => {
 		setCtxChatId(null);
 		const a = document.createElement("a");
 		a.href = `/api/chats/${chatId}/markdown`;
@@ -241,12 +244,14 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		a.click();
 		a.remove();
 	};
+	const exportFromMenu = () => exportChat(ctxChatId);
 
-	const deleteFromMenu = () => {
-		const target = chats?.find((c) => c.id === ctxChatId);
+	const deleteChat = (chatId: string | null) => {
+		const target = chats?.find((c) => c.id === chatId);
 		if (target) setDeleting(target);
 		setCtxChatId(null);
 	};
+	const deleteFromMenu = () => deleteChat(ctxChatId);
 
 	// Inline rename (owner ruling, wave 6): the row swaps to a text input;
 	// commit rides the SAME plumbing as the header rename — PUT the title,
@@ -296,11 +301,11 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		return () => window.removeEventListener("lh:kbd-sessions-search", onFocusSearch);
 	}, [open, toggle]);
 
-	// Keep the kbd-selected row in view (the rows are the list's only
-	// buttons, so the index matches).
+	// Keep the kbd-selected row in view (the session rows, in drawn order,
+	// so the index matches; Proposed's course headers are buttons too).
 	useEffect(() => {
 		if (kbdIndex === null) return;
-		listRef.current?.querySelectorAll("button")[kbdIndex]?.scrollIntoView({ block: "nearest" });
+		listRef.current?.querySelectorAll('[data-testid^="session-row"]')[kbdIndex]?.scrollIntoView({ block: "nearest" });
 	}, [kbdIndex]);
 
 	useEffect(() => {
@@ -333,6 +338,9 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		renameFromMenu,
 		exportFromMenu,
 		deleteFromMenu,
+		renameChat,
+		exportChat,
+		deleteChat,
 		renamingId,
 		setRenamingId,
 		commitRename,

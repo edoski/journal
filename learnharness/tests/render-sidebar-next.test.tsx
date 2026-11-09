@@ -1,7 +1,8 @@
 /**
- * The Proposed sidebar (polish pass, 9 Nov 2026): sessions grouped by
- * course, a compact trailing time, and a dot when the session waits on the
- * learner. Same tsx classic-JSX shim as render-sidebar.test.tsx.
+ * The Proposed sidebar (polish pass, 9 Nov 2026; T3 Code's folder anatomy
+ * the same day): sessions under collapsible course headers, one trailing
+ * item per row ("Your turn", the spinner or how long ago), no mark for
+ * teaching or practice. Same tsx classic-JSX shim as render-sidebar.test.tsx.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -9,7 +10,10 @@ import React from "react";
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SessionRowNext, groupByCourse, shortTimeAgo } from "../components/sidebar-next.tsx";
+import { parseHTML } from "linkedom";
+import { SessionRowNext, groupByCourse, sessionState, shortTimeAgo } from "../components/sidebar-next.tsx";
+import { NavGroup } from "../components/nav/nav-group.tsx";
+import { coverageItem, type SessionCoverage } from "../components/extraction-coverage.tsx";
 import type { ChatListItem } from "../src/core/index.ts";
 
 function item(overrides: Partial<ChatListItem>): ChatListItem {
@@ -69,31 +73,122 @@ describe("shortTimeAgo", () => {
 	});
 });
 
+describe("sessionState", () => {
+	it("a question and a posed practice problem are the same state: the learner's turn", () => {
+		assert.equal(sessionState(item({ pendingQuestion: true })), "your-turn");
+		assert.equal(sessionState(item({ kind: "practice", pendingProblem: true })), "your-turn");
+	});
+
+	it("a running turn or a compaction outranks the learner's turn", () => {
+		assert.equal(sessionState(item({ busy: true, pendingQuestion: true })), "working");
+		assert.equal(sessionState(item({ compacting: true })), "working");
+	});
+
+	it("nothing pending is idle", () => {
+		assert.equal(sessionState(item({})), "idle");
+	});
+});
+
 describe("SessionRowNext", () => {
-	const render = (chat: ChatListItem) => renderToStaticMarkup(<SessionRowNext chat={chat} active={false} onOpen={() => {}} />);
+	const row = (chat: ChatListItem) => {
+		const { document } = parseHTML(
+			`<!doctype html><html><body>${renderToStaticMarkup(<SessionRowNext chat={chat} active={false} onOpen={() => {}} />)}</body></html>`,
+		);
+		const button = document.querySelector('[data-testid="session-row"]');
+		assert.ok(button, "the row renders");
+		return { button, trailing: button.querySelector('[data-slot="nav-row-trailing"]') };
+	};
 
-	it("a waiting question shows the dot, named for screen readers", () => {
-		const html = render(item({ pendingQuestion: true }));
-		assert.ok(html.includes('data-testid="session-waiting"'));
-		assert.ok(html.includes("Waiting for input"));
+	it("a waiting question says Your turn in the one trailing slot, and lifts the title", () => {
+		const { button, trailing } = row(item({ pendingQuestion: true }));
+		assert.equal(trailing?.textContent, ", Your turn");
+		assert.equal(trailing?.children.length, 1);
+		assert.match(button.getAttribute("class") ?? "", /font-medium text-foreground/);
 	});
 
-	it("a posed practice problem shows the dot and the practice glyph", () => {
-		const html = render(item({ kind: "practice", pendingProblem: true }));
-		assert.ok(html.includes("Problem waiting"));
-		assert.ok(html.includes('aria-label="Practice session"'));
+	it("a posed practice problem reads the same, with no practice mark", () => {
+		const { button, trailing } = row(item({ kind: "practice", pendingProblem: true }));
+		assert.equal(trailing?.textContent, ", Your turn");
+		assert.equal(button.querySelector("svg"), null);
+		assert.ok(!button.outerHTML.toLowerCase().includes("practice"));
 	});
 
-	it("an idle session shows only its time", () => {
-		const html = render(item({}));
-		assert.ok(!html.includes("session-waiting"));
-		assert.ok(html.includes("<time"));
+	it("an idle session shows only its time, muted", () => {
+		const { button, trailing } = row(item({}));
+		assert.equal(trailing?.children.length, 1);
+		assert.equal(trailing?.firstElementChild?.tagName, "TIME");
+		assert.doesNotMatch(button.getAttribute("class") ?? "", /font-medium/);
 	});
 
-	it("a running turn replaces the time and the dot with the spinner", () => {
-		const html = render(item({ busy: true, pendingQuestion: true }));
-		assert.ok(!html.includes("<time"));
-		assert.ok(!html.includes("session-waiting"));
-		assert.ok(html.includes("braille-spinner"));
+	it("a running turn shows the spinner instead, and the title stays muted", () => {
+		const { button, trailing } = row(item({ busy: true, pendingQuestion: true }));
+		assert.equal(trailing?.querySelector("time"), null);
+		assert.equal(trailing?.querySelector('[data-testid="session-waiting"]'), null);
+		assert.ok(trailing?.innerHTML.includes("braille-spinner"));
+		assert.doesNotMatch(button.getAttribute("class") ?? "", /font-medium/);
+	});
+
+	it("starts its title on the course name's edge", () => {
+		assert.match(row(item({})).button.getAttribute("class") ?? "", /\bpl-8\b/);
+	});
+});
+
+describe("NavGroup (the course header)", () => {
+	const header = (props: { open: boolean; trailing?: string; attention?: boolean }) => {
+		const html = renderToStaticMarkup(
+			<NavGroup icon={<svg />} title="Linear Algebra" onOpenChange={() => {}} {...props}>
+				<span data-testid="child" />
+			</NavGroup>,
+		);
+		const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+		const button = document.querySelector('[data-slot="nav-group-header"]');
+		assert.ok(button, "the header renders");
+		return { document, button };
+	};
+
+	it("is a 32px button that says whether it is open", () => {
+		const { button } = header({ open: true });
+		assert.equal(button.tagName, "BUTTON");
+		assert.equal(button.getAttribute("aria-expanded"), "true");
+		assert.match(button.getAttribute("class") ?? "", /\bh-8\b.*\btext-control\b.*\bfont-medium\b/);
+	});
+
+	it("open, it shows the countdown and its sessions", () => {
+		const { document, button } = header({ open: true, trailing: "Exam in 21 days" });
+		assert.match(button.textContent ?? "", /Exam in 21 days/);
+		assert.ok(document.querySelector('[data-testid="child"]'));
+	});
+
+	it("folded, it hides the countdown and the sessions, and marks a waiting session with the dot", () => {
+		const { document, button } = header({ open: false, trailing: "Exam in 21 days", attention: true });
+		assert.equal(button.getAttribute("aria-expanded"), "false");
+		assert.doesNotMatch(button.textContent ?? "", /Exam/);
+		assert.equal(document.querySelector('[data-testid="child"]'), null);
+		assert.ok(button.querySelector('[data-slot="nav-group-attention"]'));
+	});
+
+	it("folded with nothing waiting, it shows no dot", () => {
+		const { button } = header({ open: false, attention: false });
+		assert.equal(button.querySelector('[data-slot="nav-group-attention"]'), null);
+	});
+});
+
+describe("the session menu's extraction item", () => {
+	const coverage = (over: Partial<SessionCoverage>) => ({ uncoveredTokens: 81, uncoveredCount: 2, running: false, ...over }) as SessionCoverage;
+
+	it("offers Extract notes with the backlog beside it", () => {
+		assert.deepEqual(coverageItem(coverage({}), false), {
+			label: "Extract notes",
+			detail: "81 tok · 2 messages",
+			running: false,
+			disabled: false,
+		});
+	});
+
+	it("is disabled and says so while extracting, optimistic or not, and once everything is extracted", () => {
+		assert.equal(coverageItem(coverage({ running: true }), false).label, "Extracting notes…");
+		assert.equal(coverageItem(coverage({}), true).disabled, true);
+		const done = coverageItem(coverage({ uncoveredTokens: 0, uncoveredCount: 0 }), false);
+		assert.deepEqual([done.label, done.detail, done.disabled], ["Notes fully extracted", null, true]);
 	});
 });
