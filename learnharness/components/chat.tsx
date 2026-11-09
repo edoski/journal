@@ -1346,7 +1346,7 @@ export function Chat({
 							}
 							course={course?.title}
 							phase={kind === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
-							onOpenPlan={planTree ? () => setPlanOpen((o) => !o) : undefined}
+							plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
 							details={
 								<LessonDetails
 									chatId={chatId}
@@ -1355,7 +1355,7 @@ export function Chat({
 									pricing={pricing}
 									selectedModel={selectedModel}
 									onModelChange={setSelectedModel}
-									extraction={kind !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
+									extraction={kind !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} variant="proposed" /> : undefined}
 								/>
 							}
 						/>
@@ -1880,7 +1880,7 @@ export function Chat({
 						onClose={() => setFigureFocus(null)}
 					/>
 				)}
-				{planOpen && (proposed ? <PlanPanel messages={messages} onClose={closePlan} /> : <PlanPopup messages={messages} onClose={() => setPlanOpen(false)} />)}
+				{planOpen && !proposed && <PlanPopup messages={messages} onClose={() => setPlanOpen(false)} />}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
 				</div>
 			</div>

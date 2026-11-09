@@ -21,22 +21,36 @@ function PopoverTrigger({
 }
 
 /** The raised surface: popover fill, 1px edge, radius 12, padding 16, 13px.
- *  A picker (Command inside) passes `p-1` and its own width. */
+ *  A picker (Command inside) passes `p-1` and its own width. `forceMount`
+ *  keeps the content mounted while closed (the caller hides it). */
 function PopoverContent({
   className,
   align = "center",
   sideOffset = 4,
   onEscapeKeyDown,
+  ref,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  const node = React.useRef<HTMLDivElement | null>(null)
+  const claim = claimEscape(onEscapeKeyDown)
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal forceMount={props.forceMount}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         {...OVERLAY_ATTRS}
+        ref={(el) => {
+          node.current = el
+          if (typeof ref === "function") ref(el)
+          else if (ref) ref.current = el
+        }}
         align={align}
         sideOffset={sideOffset}
-        onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
+        // A force-mounted popover stays a Radix layer while closed: it must
+        // not take the Esc that belongs to whatever is open.
+        onEscapeKeyDown={(event) => {
+          if (node.current?.dataset.state === "closed") return
+          claim(event)
+        }}
         className={cn(
           OVERLAY_LAYER,
           OVERLAY_MOTION,

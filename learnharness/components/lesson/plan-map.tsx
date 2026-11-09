@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { derivedNodeStatus, derivePlanStatuses, type PlanBlockData, type PlanNodeStatus } from "@/src/core";
@@ -55,9 +55,9 @@ export function PlanMap({ steps }: { steps: readonly PlanMapStep[] }) {
 	);
 }
 
-/** The plan panel the top bar's plan toggle opens: the live map (statuses
- *  derived from the transcript's checks, the popup's rule), anchored under
- *  the toggle. Esc, a click outside or the close button dismisses it. */
+/** The plan panel's body, inside the top bar's plan popover: the live map
+ *  (statuses derived from the transcript's checks, the popup's rule) under
+ *  a title and a close button. */
 export function PlanPanel({ messages, onClose }: { messages: readonly PopupMessage[]; onClose: () => void }) {
 	const tree = useMemo(() => latestTree(messages), [messages]);
 	const steps = useMemo(() => {
@@ -65,34 +65,8 @@ export function PlanPanel({ messages, onClose }: { messages: readonly PopupMessa
 		const statuses = derivePlanStatuses(tree, messages as Parameters<typeof derivePlanStatuses>[1]);
 		return planMapSteps(tree.nodes, tree.edges, (id) => derivedNodeStatus(statuses, id));
 	}, [tree, messages]);
-	const rootRef = useRef<HTMLDivElement>(null);
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== "Escape") return;
-			e.preventDefault();
-			e.stopPropagation();
-			onClose();
-		};
-		const onPointerDown = (e: PointerEvent) => {
-			const t = e.target as Element | null;
-			if (!t || rootRef.current?.contains(t) || t.closest?.("[data-slot=plan-toggle]")) return;
-			onClose();
-		};
-		document.addEventListener("keydown", onKey);
-		document.addEventListener("pointerdown", onPointerDown);
-		return () => {
-			document.removeEventListener("keydown", onKey);
-			document.removeEventListener("pointerdown", onPointerDown);
-		};
-	}, [onClose]);
 	return (
-		<div
-			ref={rootRef}
-			role="dialog"
-			aria-label="Plan"
-			data-testid="plan-panel"
-			className="absolute right-4 top-2 z-40 w-80 max-w-[calc(100%-2rem)] rounded-xl border bg-popover p-2 shadow-lg"
-		>
+		<>
 			<div className="flex h-8 items-center justify-between pl-2">
 				<span className="text-row font-medium">Plan</span>
 				<Button variant="quiet" size="icon-row" aria-label="Close the plan" onClick={onClose}>
@@ -102,7 +76,7 @@ export function PlanPanel({ messages, onClose }: { messages: readonly PopupMessa
 			<div className="px-2 pb-1">
 				<PlanMap steps={steps} />
 			</div>
-		</div>
+		</>
 	);
 }
 

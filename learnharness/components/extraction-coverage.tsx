@@ -8,6 +8,7 @@ import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { useSettingsSaved } from "@/components/settings-signal";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { timeAgo } from "@/components/sidebar";
 import { resolveSettings } from "@/src/core";
 
@@ -266,13 +267,19 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
  * (resets as the fold drains coverage) + the settings signal (the
  * threshold/kill-switch re-read live).
  */
-export function CoverageRing({ chatId, refreshKey = 0 }: { chatId: string; refreshKey?: number }) {
+export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
+	chatId: string;
+	refreshKey?: number;
+	/** "proposed": the numbers open in the shared popover (popover.md). */
+	variant?: "current" | "proposed";
+}) {
+	const proposed = variant === "proposed";
 	const [graph, setGraph] = useState<GraphRead | null>(null);
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
 	const [open, setOpen] = useState(false);
 	const [nonce, setNonce] = useState(0);
 	const rootRef = useRef<HTMLDivElement>(null);
-	usePopoverDismiss(rootRef, open, () => setOpen(false));
+	usePopoverDismiss(rootRef, open && !proposed, () => setOpen(false));
 
 	// The activity/refresh chain (the dispatch's seam): runs can fire from
 	// OTHER surfaces (the sidebar menu's Extract, the turn pipeline, another
@@ -323,6 +330,26 @@ export function CoverageRing({ chatId, refreshKey = 0 }: { chatId: string; refre
 	if (graph === null || !graph.enabled || coverage === null) return null;
 
 	const fill = ringFill(coverage.uncoveredTokens, graph.chunkTokens);
+	if (proposed) {
+		return (
+			<Popover open={open} onOpenChange={setOpen}>
+				<Hint label="How much of this session isn't mapped yet" side="bottom">
+					<PopoverTrigger asChild>
+						<button
+							type="button"
+							data-testid="coverage-ring"
+							className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							<CoverageRingGlyph fill={fill} running={coverage.running} />
+						</button>
+					</PopoverTrigger>
+				</Hint>
+				<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
+					<CoverageRingDetail coverage={coverage} chunkTokens={graph.chunkTokens} variant="proposed" />
+				</PopoverContent>
+			</Popover>
+		);
+	}
 	return (
 		<div ref={rootRef} className="lh-no-drag relative shrink-0">
 			<Hint
@@ -384,13 +411,22 @@ export function CoverageRingGlyph({ fill, running }: { fill: number; running: bo
 /** The popover body (exported for static-render tests): the exact numbers —
  *  covered/uncovered tokens, message coverage, the threshold, the last
  *  fold's age. */
-export function CoverageRingDetail({ coverage, chunkTokens }: { coverage: SessionCoverage; chunkTokens: number }) {
+export function CoverageRingDetail({ coverage, chunkTokens, variant = "current" }: {
+	coverage: SessionCoverage;
+	chunkTokens: number;
+	/** "proposed": the popover's sentence-case title over 13px rows. */
+	variant?: "current" | "proposed";
+}) {
 	return (
 		<>
-			<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-				Extraction coverage
-			</div>
-			<div className="flex flex-col gap-1 text-muted-foreground">
+			{variant === "proposed" ? (
+				<PopoverTitle className="mb-2">Extraction coverage</PopoverTitle>
+			) : (
+				<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+					Extraction coverage
+				</div>
+			)}
+			<div className={cn("flex flex-col gap-1 text-muted-foreground", variant === "proposed" && "text-row")}>
 				<div className="flex justify-between gap-2">
 					<span>Uncovered</span>
 					<span className="tabular-nums text-card-foreground">

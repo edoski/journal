@@ -185,7 +185,7 @@ describe("Proposed lesson cards", () => {
 		} as unknown as CourseChoice;
 		const banner = documentFor(<CourseLinkBody choice={choice} busy={false} error={null} onLink={() => {}} variant="proposed" />).querySelector('[data-testid="course-link-banner"]')!;
 		assert.match(banner.textContent!, /Link this session to a course to continue\./);
-		assert.equal(banner.querySelectorAll("button").length, 1);
+		assert.equal(banner.querySelectorAll('button:not([data-testid="course-picker"])').length, 1, "the course chip, then one action");
 		assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
 	});
 });

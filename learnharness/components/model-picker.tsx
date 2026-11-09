@@ -11,6 +11,9 @@ import { Hint } from "@/components/ui/hint";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MENU_SURFACE } from "@/components/ui/menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ModelCommand, ThinkingMenuItems } from "@/components/settings/model-pickers";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { useModelCatalog } from "@/components/model-catalog";
 export { useModelCatalog } from "@/components/model-catalog";
@@ -140,7 +143,8 @@ export function ModelControl({
 	// it a row's pointerdown counts as outside and eats the pick —
 	// live-caught in the fix wave, broken since the MenuShell migration).
 	useEffect(() => {
-		if (open === null) return;
+		// Proposed: the Radix layers dismiss themselves (overlay.md).
+		if (open === null || proposed) return;
 		const onPointerDown = (e: PointerEvent) => {
 			const t = e.target as Element;
 			if (t instanceof Element && t.closest("[data-lh-menu]")) return;
@@ -162,7 +166,7 @@ export function ModelControl({
 			document.removeEventListener("pointerdown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [open]);
+	}, [open, proposed]);
 
 	// One write seam: composeSlotModel preserves the cheap/vision siblings
 	// (replace-whole-section discipline) and the per-field independence of
@@ -292,6 +296,62 @@ export function ModelControl({
 		setError(null);
 		if (kind === "model") refresh();
 	};
+
+	const modelLabel = effectiveId ? `${effectiveProvider ? `${effectiveProvider}:` : ""}${effectiveId}` : "Model selector";
+	const levelLabel = effectiveLevel === undefined ? "—" : (THINKING_LABEL[effectiveLevel] ?? effectiveLevel);
+	if (proposed) {
+		return (
+			<div className="flex items-center gap-1.5" data-testid="model-control">
+				<Popover open={open === "model"} onOpenChange={(next) => (next ? openMenu("model") : setOpen(null))}>
+					<Hint label={modelLabel} action="open-model-picker" side="bottom">
+						<PopoverTrigger asChild>
+							<button type="button" data-testid="stats-model" className={PROPOSED_TRIGGER}>
+								<span>{effectiveId ? prettyModel(effectiveId) : "—"}</span>
+								<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
+							</button>
+						</PopoverTrigger>
+					</Hint>
+					<PopoverContent align="end" className="w-[22rem] p-1" data-testid="model-menu">
+						<ModelCommand
+							models={catalog?.models}
+							effectiveId={effectiveId}
+							effectiveProvider={effectiveProvider}
+							onPick={pickModel}
+							error={error}
+							footer={
+								catalog && catalog.models.length === 0
+									? "No models — add a provider key in Keys"
+									: chatId
+										? "This session's model"
+										: "Strong tier — the default for new sessions"
+							}
+						/>
+					</PopoverContent>
+				</Popover>
+				{/* No model picked: nothing to set a level for, so no menu. */}
+				<DropdownMenu open={open === "thinking"} onOpenChange={(next) => (next && entry !== undefined ? openMenu("thinking") : setOpen(null))}>
+					<Hint label="Thinking" action="cycle-thinking" side="bottom">
+						<DropdownMenuTrigger asChild>
+							<button type="button" data-testid="stats-thinking" className={PROPOSED_TRIGGER}>
+								<span>{levelLabel}</span>
+								<ChevronDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
+							</button>
+						</DropdownMenuTrigger>
+					</Hint>
+					<DropdownMenuContent align="end" className="w-44" data-testid="thinking-menu">
+						<ThinkingMenuItems
+							levels={catalog ? levels : []}
+							effectiveLevel={effectiveLevel}
+							onPick={(level) => apply(effectiveProvider ?? "", effectiveId ?? "", level as ThinkingLevel)}
+							empty={catalog ? (effectiveId ? `${prettyModel(effectiveId)} has no thinking levels.` : "Pick a model first.") : "Loading…"}
+							footer="Levels this model actually supports"
+						/>
+						{error && <div className="px-2 py-1.5 text-label text-danger">{error}</div>}
+					</DropdownMenuContent>
+				</DropdownMenu>
+			</div>
+		);
+	}
 
 	return (
 		<div ref={containerRef} className="relative flex items-center gap-1.5" data-testid="model-control">

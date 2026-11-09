@@ -40,7 +40,15 @@ function installRadixDom() {
 		Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
 	}
 	Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800, ResizeObserver: NoopResizeObserver, getComputedStyle });
+	// React reads `oninput in document` once to choose real input events
+	// over its legacy polyfill, which needs focus events linkedom lacks.
+	Object.defineProperty(dom.document, "oninput", { configurable: true, writable: true, value: null });
+	// linkedom has no focus model; Radix and cmdk read document.activeElement.
+	let focused: Element | null = null;
+	Object.defineProperty(dom.document, "activeElement", { configurable: true, get: () => (focused?.isConnected ? focused : dom.document.body) });
 	Object.assign(dom.window.HTMLElement.prototype, {
+		focus(this: Element) { focused = this; },
+		blur(this: Element) { if (focused === this) focused = null; },
 		scrollIntoView() {},
 		hasPointerCapture: () => false,
 		setPointerCapture() {},

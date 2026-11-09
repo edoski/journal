@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { EllipsisIcon, WaypointsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
 import { sessionStatLabels } from "@/components/stats-bar";
 import type { SessionPricing, TurnUsage } from "@/src/core";
@@ -16,15 +17,15 @@ export function LessonTopBar({
 	title,
 	course,
 	phase,
-	onOpenPlan,
+	plan,
 	details,
 }: {
 	title: ReactNode;
 	course?: string;
 	/** Sentence case: "Probing", "Planning", "Teaching", "Practice". */
 	phase: string;
-	/** Present once the session has a plan. */
-	onOpenPlan?: () => void;
+	/** Present once the session has a plan: the toggle opens it as a popover. */
+	plan?: { open: boolean; onOpenChange: (open: boolean) => void; body: ReactNode };
 	details: ReactNode;
 }) {
 	return (
@@ -40,13 +41,20 @@ export function LessonTopBar({
 			<span data-testid="phase-chip" aria-hidden className="pointer-events-none shrink-0 select-none text-row text-muted-foreground">
 				{phase}
 			</span>
-			{onOpenPlan && (
-				<Hint label="Open the plan" side="bottom">
-					<Button variant="quiet" size="sm" data-slot="plan-toggle" data-testid="plan-chip" onClick={onOpenPlan} className="h-8 gap-1.5 px-2 text-row font-normal">
-						<WaypointsIcon />
-						Plan
-					</Button>
-				</Hint>
+			{plan && (
+				<Popover open={plan.open} onOpenChange={plan.onOpenChange}>
+					<Hint label="Open the plan" side="bottom">
+						<PopoverTrigger asChild>
+							<Button variant="quiet" size="sm" data-slot="plan-toggle" data-testid="plan-chip" className="h-8 gap-1.5 px-2 text-row font-normal">
+								<WaypointsIcon />
+								Plan
+							</Button>
+						</PopoverTrigger>
+					</Hint>
+					<PopoverContent align="end" aria-label="Plan" data-testid="plan-panel" className="w-80 p-2">
+						{plan.body}
+					</PopoverContent>
+				</Popover>
 			)}
 			{details}
 		</>
@@ -57,7 +65,7 @@ export function LessonTopBar({
  *  thinking level (the session's ModelControl), the context it has used,
  *  what it has cost, and, in teaching sessions, the extraction ring. The
  *  panel stays mounted while closed, so the model control keeps reporting
- *  the session's model to the send gate. */
+ *  the session's model to the send gate; ⌘K opens it with the model picker. */
 export function LessonDetails({
 	chatId,
 	turns,
@@ -77,48 +85,24 @@ export function LessonDetails({
 	extraction?: ReactNode;
 }) {
 	const [open, setOpen] = useState(false);
-	const rootRef = useRef<HTMLDivElement>(null);
 	const { catalog } = useModelCatalog();
 	const limit = useMemo(() => (catalog && selectedModel ? catalogLimits(catalog).get(selectedModel) ?? null : null), [catalog, selectedModel]);
 	const { contextLabel, costLabel } = sessionStatLabels({ turns, contextTokens, pricing, limit });
 	useEffect(() => {
-		if (!open) return;
-		const onPointerDown = (e: PointerEvent) => {
-			const t = e.target as Element | null;
-			if (!t || rootRef.current?.contains(t) || t.closest?.("[data-lh-menu]")) return;
-			setOpen(false);
-		};
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key !== "Escape") return;
-			e.stopPropagation();
-			setOpen(false);
-		};
-		document.addEventListener("pointerdown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("pointerdown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [open]);
+		const onOpenPicker = () => setOpen(true);
+		window.addEventListener("lh:kbd-open-model-picker", onOpenPicker);
+		return () => window.removeEventListener("lh:kbd-open-model-picker", onOpenPicker);
+	}, []);
 	return (
-		<div ref={rootRef} className="relative shrink-0">
+		<Popover open={open} onOpenChange={setOpen}>
 			<Hint label="Session details" side="bottom">
-				<Button
-					variant="quiet"
-					size="icon-row"
-					aria-label="Session details"
-					aria-expanded={open}
-					data-testid="session-details"
-					onClick={() => setOpen((o) => !o)}
-				>
-					<EllipsisIcon />
-				</Button>
+				<PopoverTrigger asChild>
+					<Button variant="quiet" size="icon-row" aria-label="Session details" data-testid="session-details" className="shrink-0">
+						<EllipsisIcon />
+					</Button>
+				</PopoverTrigger>
 			</Hint>
-			<div
-				hidden={!open}
-				data-testid="session-details-panel"
-				className="absolute right-0 top-full z-40 mt-1 w-[22rem] rounded-xl border bg-popover p-3 text-row shadow-lg"
-			>
+			<PopoverContent forceMount hidden={!open} align="end" data-testid="session-details-panel" className="w-[22rem] p-3">
 				<dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 [&_dt]:whitespace-nowrap">
 					<dt className="text-muted-foreground">Model</dt>
 					<dd className="flex justify-end whitespace-nowrap">
@@ -135,7 +119,7 @@ export function LessonDetails({
 						</>
 					)}
 				</dl>
-			</div>
-		</div>
+			</PopoverContent>
+		</Popover>
 	);
 }
