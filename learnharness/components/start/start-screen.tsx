@@ -10,11 +10,12 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
-import { CourseChips } from "@/components/start/course-chips";
-import { CHIP_OPENING } from "@/components/start/course-facts";
+import { CONTINUE_OPENING } from "@/components/start/course-facts";
+import { TodayWaiting } from "@/components/start/today-waiting";
+import { useTodayVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
 
-const CHIP_START_FAILURE = "Couldn’t open the session. Try again.";
+const TODAY_START_FAILURE = "Couldn’t open the session. Try again.";
 
 /** The heading over the composer: Today asks about the day, the draft
  *  about the session. Neither names a mode: the tutor routes the request
@@ -29,7 +30,7 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
 /**
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
  * anatomy: a light question, the composer centred in a 736px column, and
- * under it, on Today, one chip per course. Home
+ * under it, on Today, what is waiting (the Explore candidate). Home
  * (`today`) and the draft at /chat/new share it; a session is created only
  * when something is sent, through the same path the current screens use.
  */
@@ -38,7 +39,7 @@ export function StartScreen({
 	today = false,
 }: {
 	initialConfigured: boolean;
-	/** Home: the day's question and the course chips. */
+	/** Home: the day's question and what is waiting. */
 	today?: boolean;
 }) {
 	const router = useRouter();
@@ -51,6 +52,7 @@ export function StartScreen({
 	const [creatingCourse, setCreatingCourse] = useState(false);
 	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
+	const todayVariant = useTodayVariant();
 
 	const cycleComposer = useCallback(
 		(): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="composer"] textarea')),
@@ -97,11 +99,18 @@ export function StartScreen({
 		launch(draft, course, OPENING_PROMPT_FAILURE);
 	};
 
-	// A chip opens a session in its course; the tutor takes the reviews due
-	// first, then the open task (CHIP_OPENING).
+	// Today's Continue opens a session in its course; the tutor takes the
+	// reviews due first, then the open task (CONTINUE_OPENING).
 	const startCourse = (workspace: string) => {
 		if (startingRef.current || !canStart()) return;
-		launch(CHIP_OPENING, workspace, CHIP_START_FAILURE);
+		launch(CONTINUE_OPENING, workspace, TODAY_START_FAILURE);
+	};
+
+	// A suggestion becomes the draft, in its course, for the learner to send or edit.
+	const suggest = (request: string, workspace: string) => {
+		setText(request);
+		courseChoice.choose(workspace);
+		document.querySelector<HTMLTextAreaElement>('[data-slot="composer"] textarea')?.focus();
 	};
 
 	const { state } = courseChoice;
@@ -153,11 +162,13 @@ export function StartScreen({
 							<CoursesUnavailable reason={state.reason} variant="proposed" />
 						</div>
 					)}
-					{today && state.status === "ready" && (
-						<CourseChips
-							courses={state.courses}
-							disabled={busy}
-							onStart={(chip) => startCourse(chip.workspace)}
+					{today && (
+						<TodayWaiting
+							variant={todayVariant}
+							state={state}
+							busy={busy}
+							onStart={startCourse}
+							onSuggest={suggest}
 							onNewCourse={() => setCreatingCourse(true)}
 						/>
 					)}

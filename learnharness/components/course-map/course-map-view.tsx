@@ -13,7 +13,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
-import { CHIP_OPENING, examText } from "@/components/start/course-facts";
+import { CONTINUE_OPENING, examText } from "@/components/start/course-facts";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -232,7 +232,7 @@ export function CourseMapView() {
 						<CourseMapList key={map.workspace} map={map} layout={layout} onStudy={studyTopic} busy={studying} />
 					)
 				) : (
-					<MapNotice body={body} busy={studying} onStart={() => study(CHIP_OPENING)} onRetry={retry} />
+					<MapNotice body={body} busy={studying} onStart={() => study(CONTINUE_OPENING)} onRetry={retry} />
 				)}
 				<ChainTableOverlay
 					open={statementsOpen}
