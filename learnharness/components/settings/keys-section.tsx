@@ -25,7 +25,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AuthKeyStatus } from "@/src/core";
-import { SETTINGS_FIELD, SettingsGroup } from "./controls.tsx";
+import { SettingsGroup } from "./controls.tsx";
 import { useSettingsProposed } from "./settings-design";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,9 @@ import { MENU_SURFACE } from "@/components/ui/menu";
 import { PlusIcon } from "lucide-react";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { ProviderMenuList } from "./model-menu.tsx";
+import { ProviderCommand } from "./model-pickers.tsx";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MenuShell } from "@/components/menu-shell";
 import { notifySettingsSaved } from "@/components/settings-signal";
 
@@ -144,7 +147,8 @@ function KeyTableRow({
 			<div data-testid={testid} className="flex flex-col gap-2 px-4 py-2.5">
 				<div className="flex items-center gap-2" data-testid={`${testid}-editor`}>
 					<span className="w-24 shrink-0 truncate text-row text-foreground">{label}</span>
-					<input
+					<Input
+						variant="sm"
 						type="text"
 						value={value}
 						onChange={(e) => setValue(e.target.value)}
@@ -156,7 +160,7 @@ function KeyTableRow({
 						data-testid={`${testid}-input`}
 						disabled={busy}
 						autoFocus
-						className={cn(SETTINGS_FIELD, "min-w-0 flex-1 font-mono")}
+						className="flex-1 font-mono"
 					/>
 					{status.present && status.source === "file" && onDelete && (
 						<Button variant="quiet" size="sm" onClick={() => void onDelete()} disabled={busy} data-testid={`${testid}-delete`} className="h-7 px-2 font-normal hover:text-danger">
@@ -303,7 +307,8 @@ function AddProviderRow({
 	const proposed = useSettingsProposed();
 
 	useEffect(() => {
-		if (!open) return;
+		// Proposed: the Radix popover dismisses itself (overlay.md).
+		if (!open || proposed) return;
 		const onPointerDown = (e: PointerEvent) => {
 			const target = e.target as Node;
 			if (anchorRef.current?.contains(target)) return;
@@ -322,7 +327,34 @@ function AddProviderRow({
 			document.removeEventListener("pointerdown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [open]);
+	}, [open, proposed]);
+
+	if (proposed) {
+		return (
+			<Popover modal open={open} onOpenChange={setOpen}>
+				<PopoverTrigger asChild>
+					<button
+						type="button"
+						data-testid="add-provider"
+						className="flex min-h-12 w-full items-center gap-2 px-4 py-2 text-left text-row text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none"
+					>
+						<PlusIcon aria-hidden className="size-4 shrink-0" />
+						<span className="flex-1">Add provider key</span>
+					</button>
+				</PopoverTrigger>
+				{/* Close on pick (owner, fix wave): the paste row is the next step. */}
+				<PopoverContent align="start" className="w-72 p-1" data-testid="add-provider-menu">
+					<ProviderCommand
+						providers={addable}
+						onPick={(p) => {
+							setOpen(false);
+							onPick(p);
+						}}
+					/>
+				</PopoverContent>
+			</Popover>
+		);
+	}
 
 	return (
 		<div ref={anchorRef} className="relative">
@@ -520,7 +552,8 @@ function AddProviderEditor({
 	if (useSettingsProposed()) {
 		return (
 			<>
-				<input
+				<Input
+					variant="sm"
 					type="text"
 					value={value}
 					onChange={(e) => setValue(e.target.value)}
@@ -531,7 +564,7 @@ function AddProviderEditor({
 					aria-label={`${provider.label} key`}
 					data-testid={`key-${provider.id}-input`}
 					autoFocus
-					className={cn(SETTINGS_FIELD, "min-w-0 flex-1 font-mono")}
+					className="flex-1 font-mono"
 				/>
 				<Button variant="quiet" size="sm" onClick={onCancel} data-testid={`key-${provider.id}-cancel`} className="h-7 px-2 font-normal">
 					Cancel

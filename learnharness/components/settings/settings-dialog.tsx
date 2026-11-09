@@ -44,6 +44,7 @@ import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { KeysSection } from "./keys-section.tsx";
 import { Hint } from "@/components/ui/hint";
@@ -402,16 +403,21 @@ export function SettingsDialogBody({
 				className="settings-dialog-pop flex h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-2xl"
 				onClick={(e) => e.stopPropagation()}
 			>
+				<Tabs orientation="vertical" value={active} onValueChange={(v) => setActive(v as SectionId)} className="contents">
 				<nav aria-label="Settings sections" data-testid="settings-nav" className="flex w-52 shrink-0 flex-col border-r p-2">
 					<NavSection title="Settings">
-						{SECTIONS.map((s) => (
-							<NavRow key={s.id} data-testid={`settings-nav-${s.id}`} active={active === s.id} onClick={() => setActive(s.id)}>
-								<NavRowLabel>{s.label}</NavRowLabel>
-							</NavRow>
-						))}
+						<TabsList variant="line" className="w-full">
+							{SECTIONS.map((s) => (
+								<TabsTrigger key={s.id} value={s.id} asChild>
+									<NavRow data-testid={`settings-nav-${s.id}`} active={active === s.id}>
+										<NavRowLabel>{s.label}</NavRowLabel>
+									</NavRow>
+								</TabsTrigger>
+							))}
+						</TabsList>
 					</NavSection>
 				</nav>
-				<div className="relative flex min-w-0 flex-1 flex-col">
+				<TabsContent value={active} className="relative flex min-w-0 flex-1 flex-col">
 					<Hint label="Close" binding="escape" side="left">
 						<Button
 							variant="quiet"
@@ -427,7 +433,8 @@ export function SettingsDialogBody({
 					<div ref={contentRef} className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
 						{sections}
 					</div>
-				</div>
+				</TabsContent>
+				</Tabs>
 			</div>
 		);
 	}

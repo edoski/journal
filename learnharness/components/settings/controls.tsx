@@ -13,6 +13,9 @@ import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettingsProposed } from "./settings-design";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Hint } from "@/components/ui/hint";
 
 /** The Proposed field look (spec: settings.md): 28px, radius 8, the input
  *  edge (white 11%), 13px, the 2px focus ring. */
@@ -184,37 +187,20 @@ export function Toggle({
 	 *  toggle renders the half-filled contrast circle AS the disc — the icon
 	 *  carries the meaning; plain toggles keep the plain disc. */
 	discIcon?: ReactNode;
-	/** Optional native tooltip on the switch. */
+	/** Optional tooltip on the switch (native under Current). */
 	title?: string;
 }) {
 	if (useSettingsProposed() && !discIcon) {
-		// Owner (2026-09-20): on is a grey track with a white disc, not a bright one.
-		return (
-			<button
-				type="button"
-				role="switch"
-				aria-checked={checked}
+		const control = (
+			<Switch
+				checked={checked}
+				onCheckedChange={onChange}
 				aria-label={label}
-				{...(title ? { title } : {})}
 				disabled={disabled}
-				data-slot="settings-switch"
 				data-testid={`toggle-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-				onClick={() => onChange(!checked)}
-				className={cn(
-					"relative inline-flex h-5 w-8 shrink-0 items-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-popover motion-reduce:transition-none",
-					checked ? "bg-muted-foreground" : "bg-input",
-					disabled && "cursor-not-allowed opacity-50",
-				)}
-			>
-				<span
-					aria-hidden
-					className={cn(
-						"size-4 rounded-full shadow-sm transition-transform motion-reduce:transition-none",
-						checked ? "translate-x-3.5 bg-foreground" : "translate-x-0.5 bg-muted-foreground",
-					)}
-				/>
-			</button>
+			/>
 		);
+		return title ? <Hint label={title}>{control}</Hint> : control;
 	}
 	return (
 		<button
@@ -319,32 +305,35 @@ export function CommitInput({
 	// what landed.
 	const [draft, setDraft] = useState(value);
 	const [editing, setEditing] = useState(false);
-	const proposed = useSettingsProposed();
+	const field = {
+		type,
+		value: editing ? draft : value,
+		placeholder,
+		"aria-label": ariaLabel,
+		"data-testid": testid,
+		onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+			setEditing(true);
+			setDraft(e.target.value);
+		},
+		onBlur: () => {
+			if (!editing) return;
+			setEditing(false);
+			const next = draft.trim();
+			if (next !== value) onCommit(next);
+		},
+		onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === "Enter") e.currentTarget.blur();
+			if (e.key === "Escape") {
+				setEditing(false);
+				e.currentTarget.blur();
+			}
+		},
+	};
+	if (useSettingsProposed()) return <Input variant="sm" {...field} className="w-32 text-right tabular-nums" />;
 	return (
 		<input
-			type={type}
-			value={editing ? draft : value}
-			placeholder={placeholder}
-			aria-label={ariaLabel}
-			data-testid={testid}
-			onChange={(e) => {
-				setEditing(true);
-				setDraft(e.target.value);
-			}}
-			onBlur={() => {
-				if (!editing) return;
-				setEditing(false);
-				const next = draft.trim();
-				if (next !== value) onCommit(next);
-			}}
-			onKeyDown={(e) => {
-				if (e.key === "Enter") e.currentTarget.blur();
-				if (e.key === "Escape") {
-					setEditing(false);
-					e.currentTarget.blur();
-				}
-			}}
-			className={proposed ? cn(SETTINGS_FIELD, "w-32 text-right tabular-nums") : "h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground outline-none placeholder:text-muted-foreground/60"}
+			{...field}
+			className="h-7 w-40 rounded-sm border border-border bg-background px-2 font-ui text-xs text-foreground outline-none placeholder:text-muted-foreground/60"
 		/>
 	);
 }

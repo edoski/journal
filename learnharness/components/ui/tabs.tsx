@@ -62,15 +62,17 @@ function TabsList({
 }
 
 /** A 28px pill at 13px: muted until chosen, the chosen one on the selected
- *  fill, no weight change. */
+ *  fill, no weight change. With `asChild` the child brings its own look. */
 function TabsTrigger({
   className,
+  asChild,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      className={cn(
+      asChild={asChild}
+      className={asChild ? className : cn(
         "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-row whitespace-nowrap text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-fill-selected data-[state=active]:text-foreground group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}

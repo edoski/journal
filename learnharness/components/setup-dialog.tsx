@@ -57,10 +57,13 @@ import { ThinkingMenuList } from "@/components/settings/model-menu";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { useDesignVariant } from "@/components/design-variant";
 import { SettingsDesignContext, useSettingsProposed } from "@/components/settings/settings-design";
-import { SETTINGS_FIELD, SettingsGroup, SettingsMenuTrigger, SettingsRow } from "@/components/settings/controls";
+import { SettingsGroup, SettingsMenuTrigger, SettingsRow } from "@/components/settings/controls";
+import { ModelCommand, ProviderCommand, ThinkingMenuItems } from "@/components/settings/model-pickers";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
-import { MENU_SURFACE } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 
 /** The stage's one line under the title (Proposed: the dialog's description). */
@@ -169,24 +172,23 @@ export function SetupKeysBody({
 		return (
 			<div className="flex flex-col gap-6" data-testid="setup-stage-keys">
 				<div className="flex flex-col gap-2">
-					<div ref={menuAnchor} className="relative">
-						<SettingsMenuTrigger
-							value={provider ? provider.label : "Pick a provider…"}
-							aria-label="Provider"
-							data-testid="setup-key-provider"
-							aria-expanded={menuOpen}
-							onClick={onToggleMenu}
-							className={cn("h-9 w-full px-3 text-control", !provider && "text-muted-foreground")}
-						/>
-						{menuOpen && (
-							<MenuShell anchorRef={menuAnchor} testid="setup-key-provider-menu" preferredSide="down" align="left" matchAnchorWidth menuClass={MENU_SURFACE}>
-								<ProviderMenuList variant="proposed" providers={providers ?? []} onPick={onPick} />
-							</MenuShell>
-						)}
-					</div>
+					<Popover modal open={menuOpen} onOpenChange={(next) => next !== menuOpen && onToggleMenu()}>
+						<PopoverTrigger asChild>
+							<SettingsMenuTrigger
+								value={provider ? provider.label : "Pick a provider…"}
+								aria-label="Provider"
+								data-testid="setup-key-provider"
+								className={cn("h-9 w-full px-3 text-control", !provider && "text-muted-foreground")}
+							/>
+						</PopoverTrigger>
+						<PopoverContent align="start" className="w-(--radix-popover-trigger-width) p-1" data-testid="setup-key-provider-menu">
+							<ProviderCommand providers={providers ?? []} onPick={onPick} />
+						</PopoverContent>
+					</Popover>
 					{provider && (
 						<div className="flex items-center gap-2">
-							<input
+							<Input
+								variant="sm"
 								type="text"
 								value={value}
 								onChange={(e) => onValue(e.target.value)}
@@ -198,7 +200,7 @@ export function SetupKeysBody({
 								data-testid="setup-key-input"
 								disabled={saving}
 								autoFocus
-								className={cn(SETTINGS_FIELD, "h-9 min-w-0 flex-1 px-3 font-mono text-control")}
+								className="h-9 flex-1 px-3 font-mono text-control"
 							/>
 							<Button onClick={onSave} disabled={saving || !value.trim()} data-testid="setup-key-save">
 								{saving ? "Saving…" : "Save key"}
@@ -538,31 +540,21 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 											const thinkingOpen = openMenu?.slot === slot && openMenu.kind === "thinking";
 											return (
 												<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`setup-slot-${slot}`}>
-													<span className="relative flex shrink-0 items-center gap-2">
+													<span className="flex shrink-0 items-center gap-2">
 														{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
-														<Hint label={entry ? `${entry.provider}:${entry.id}` : "Pick a model…"}>
-															<SettingsMenuTrigger
-																value={entry ? prettyModel(entry.id) : "Pick a model…"}
-																aria-label={`${SLOT_META[slot].label} model`}
-																data-testid={`setup-trigger-${slot}`}
-																aria-expanded={modelOpen}
-																onClick={() => setOpenMenu(modelOpen ? null : { slot, kind: "model" })}
-																className={cn("w-40", !entry && "text-muted-foreground")}
-															/>
-														</Hint>
-														<SettingsMenuTrigger
-															value={entry ? (level ? THINKING_LABEL[level] ?? level : "…") : "—"}
-															aria-label={`${SLOT_META[slot].label} thinking`}
-															data-testid={`setup-thinking-${slot}`}
-															aria-expanded={thinkingOpen}
-															disabled={!entry}
-															onClick={() => setOpenMenu(thinkingOpen ? null : { slot, kind: "thinking" })}
-															className="w-24"
-														/>
-														{modelOpen && (
-															<MenuShell anchorTestid={`setup-trigger-${slot}`} testid={`setup-menu-${slot}`} preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-[22rem]")}>
-																<ModelMenuList
-																	variant="proposed"
+														<Popover modal open={modelOpen} onOpenChange={(next) => setOpenMenu(next ? { slot, kind: "model" } : null)}>
+															<Hint label={entry ? `${entry.provider}:${entry.id}` : "Pick a model…"}>
+																<PopoverTrigger asChild>
+																	<SettingsMenuTrigger
+																		value={entry ? prettyModel(entry.id) : "Pick a model…"}
+																		aria-label={`${SLOT_META[slot].label} model`}
+																		data-testid={`setup-trigger-${slot}`}
+																		className={cn("w-40", !entry && "text-muted-foreground")}
+																	/>
+																</PopoverTrigger>
+															</Hint>
+															<PopoverContent align="start" className="w-[22rem] p-1" data-testid={`setup-menu-${slot}`}>
+																<ModelCommand
 																	models={slotCatalog}
 																	effectiveId={entry?.id}
 																	effectiveProvider={entry?.provider}
@@ -574,12 +566,20 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 																	}}
 																	footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Add a provider key with access to a vision model." : undefined}
 																/>
-															</MenuShell>
-														)}
-														{thinkingOpen && (
-															<MenuShell anchorTestid={`setup-thinking-${slot}`} testid={`setup-thinking-menu-${slot}`} preferredSide="down" align="left" menuClass={cn(MENU_SURFACE, "w-44")}>
-																<ThinkingMenuList
-																	variant="proposed"
+															</PopoverContent>
+														</Popover>
+														<DropdownMenu open={thinkingOpen} onOpenChange={(next) => setOpenMenu(next ? { slot, kind: "thinking" } : null)}>
+															<DropdownMenuTrigger asChild>
+																<SettingsMenuTrigger
+																	value={entry ? (level ? THINKING_LABEL[level] ?? level : "…") : "—"}
+																	aria-label={`${SLOT_META[slot].label} thinking`}
+																	data-testid={`setup-thinking-${slot}`}
+																	disabled={!entry}
+																	className="w-24"
+																/>
+															</DropdownMenuTrigger>
+															<DropdownMenuContent align="start" className="w-44" data-testid={`setup-thinking-menu-${slot}`}>
+																<ThinkingMenuItems
 																	levels={levelsForEntry.map(String)}
 																	effectiveLevel={level}
 																	onPick={(lv) => {
@@ -588,8 +588,8 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 																		setOpenMenu(null);
 																	}}
 																/>
-															</MenuShell>
-														)}
+															</DropdownMenuContent>
+														</DropdownMenu>
 													</span>
 												</SettingsRow>
 											);

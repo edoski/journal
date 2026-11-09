@@ -98,7 +98,7 @@ export interface ProviderOption {
 
 /** The provider picker (Keys › Add provider key, setup): search, then each
  *  provider with its environment variable at the right. */
-export function ProviderCommand({ providers, onPick }: { providers: readonly ProviderOption[]; onPick: (provider: ProviderOption) => void }) {
+export function ProviderCommand<T extends ProviderOption>({ providers, onPick }: { providers: readonly T[]; onPick: (provider: T) => void }) {
 	const [query, setQuery] = useState("");
 	const results = useMemo(
 		() => ranked(providers, query, (p) => [p.id, p.envVar, p.label], (a, b) => a.id.localeCompare(b.id)),

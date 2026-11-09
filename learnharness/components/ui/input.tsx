@@ -15,6 +15,10 @@ const inputVariants = cva("", {
       // the 13px row text, a hover fill and the 2px focus ring.
       quiet:
         "h-8 w-full min-w-0 rounded-md border-0 bg-transparent px-2 text-row text-foreground outline-none transition-colors selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground hover:bg-fill-hover focus-visible:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none",
+      // The settings rows' field (settings.md): 28px, radius 8, the input
+      // edge, 13px, the 2px focus ring.
+      sm:
+        "h-7 min-w-0 rounded-md border border-input bg-transparent px-2 text-row text-foreground outline-none transition-colors selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none",
     },
   },
   defaultVariants: { variant: "default" },

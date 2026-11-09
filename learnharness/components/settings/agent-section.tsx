@@ -57,6 +57,7 @@ import {
 	type AgentSettings,
 	type CompactionSettings,
 	type GraphSettings,
+	type ModelCatalogEntry,
 	type ModelSlotName,
 	type ModelsSettings,
 } from "@/src/core";
@@ -66,8 +67,14 @@ import { SettingsGroup, SettingsRow, SettingsMenuTrigger, Toggle, CommitInput } 
 import { useSettingsProposed } from "./settings-design";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { MENU_SURFACE } from "@/components/ui/menu";
 import { ModelMenuList, ThinkingMenuList } from "./model-menu";
+import { ModelCommand, ThinkingMenuItems } from "./model-pickers";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
 import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
 
@@ -312,7 +319,8 @@ export function AgentSection({
 	// close. A pointerdown on the backdrop is left for the dialog (its own
 	// click closes everything); a click inside the dialog just closes us.
 	useEffect(() => {
-		if (openMenu === null) return;
+		// Proposed: the Radix layers dismiss themselves (overlay.md).
+		if (openMenu === null || proposed) return;
 		const onPointerDown = (e: PointerEvent) => {
 			const target = e.target as Node;
 			if (menuAnchorRef.current?.contains(target)) return;
@@ -334,7 +342,7 @@ export function AgentSection({
 			document.removeEventListener("pointerdown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [openMenu]);
+	}, [openMenu, proposed]);
 
 	async function saveSegment(path: string, text: string) {
 		setSegmentStatus(null);
@@ -388,21 +396,22 @@ export function AgentSection({
 		const draft = segmentDraft[info.path] ?? info.overrideText ?? "";
 		const dirty = draft !== (info.overrideText ?? "");
 		return (
-			<div key={info.path} data-testid={`prompt-segment-${info.path}`}>
+			<Collapsible
+				key={info.path}
+				data-testid={`prompt-segment-${info.path}`}
+				open={open}
+				onOpenChange={(next) => {
+					setOpenSegment(next ? info.path : null);
+					setSegmentStatus(null);
+				}}
+			>
 				<SettingsRow label={info.path} hint={info.enabled ? PROMPT_IN_USE_HINT : undefined} testid={`prompt-row-${info.path}`}>
 					<span className="flex shrink-0 items-center gap-2">
-						<Button
-							variant="quiet"
-							size="sm"
-							aria-expanded={open}
-							onClick={() => {
-								setOpenSegment(open ? null : info.path);
-								setSegmentStatus(null);
-							}}
-							className="h-7 px-2 font-normal"
-						>
-							{open ? "Hide text" : "Show text"}
-						</Button>
+						<CollapsibleTrigger asChild>
+							<Button variant="quiet" size="sm" className="h-7 px-2 font-normal">
+								{open ? "Hide text" : "Show text"}
+							</Button>
+						</CollapsibleTrigger>
 						<Toggle
 							checked={info.enabled}
 							disabled={!fileExists}
@@ -411,45 +420,43 @@ export function AgentSection({
 						/>
 					</span>
 				</SettingsRow>
-				{open && (
-					<div className="flex flex-col gap-3 px-4 pb-4">
-						<label className="flex flex-col gap-1.5 text-label text-muted-foreground">
-							Original
-							<textarea
-								readOnly
-								value={info.sourceText}
-								aria-label="The original instructions"
-								className="h-28 w-full resize-y rounded-md border bg-fill-hover p-2 text-row text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</label>
-						<label className="flex flex-col gap-1.5 text-label text-muted-foreground">
-							Your version
-							<textarea
-								value={draft}
-								onChange={(e) => setSegmentDraft({ ...segmentDraft, [info.path]: e.target.value })}
-								aria-label="Your version of the instructions"
-								placeholder="Add your own instructions…"
-								className="h-28 w-full resize-y rounded-md border border-input bg-transparent p-2 text-row text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						</label>
-						<div className="flex items-center justify-end gap-2">
-							{segmentStatus && (
-								<p className="mr-auto text-label text-muted-foreground" data-testid="segment-status">
-									{segmentStatus}
-								</p>
-							)}
-							{fileExists && (
-								<Button variant="quiet" size="sm" onClick={() => void deleteSegment(info.path)} className="h-7 px-2 font-normal hover:text-danger">
-									Delete
-								</Button>
-							)}
-							<Button size="sm" disabled={!dirty} onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")} className="h-7 px-3">
-								Save
+				<CollapsibleContent className="flex flex-col gap-3 px-4 pb-4">
+					<Label className="flex-col items-stretch gap-1.5 font-normal text-muted-foreground">
+						Original
+						<Textarea
+							readOnly
+							value={info.sourceText}
+							aria-label="The original instructions"
+							className="field-sizing-fixed h-28 resize-y border-border bg-fill-hover p-2 text-muted-foreground"
+						/>
+					</Label>
+					<Label className="flex-col items-stretch gap-1.5 font-normal text-muted-foreground">
+						Your version
+						<Textarea
+							value={draft}
+							onChange={(e) => setSegmentDraft({ ...segmentDraft, [info.path]: e.target.value })}
+							aria-label="Your version of the instructions"
+							placeholder="Add your own instructions…"
+							className="field-sizing-fixed h-28 resize-y p-2"
+						/>
+					</Label>
+					<div className="flex items-center justify-end gap-2">
+						{segmentStatus && (
+							<p className="mr-auto text-label text-muted-foreground" data-testid="segment-status">
+								{segmentStatus}
+							</p>
+						)}
+						{fileExists && (
+							<Button variant="quiet" size="sm" onClick={() => void deleteSegment(info.path)} className="h-7 px-2 font-normal hover:text-danger">
+								Delete
 							</Button>
-						</div>
+						)}
+						<Button size="sm" disabled={!dirty} onClick={() => void saveSegment(info.path, segmentDraft[info.path] ?? "")} className="h-7 px-3">
+							Save
+						</Button>
 					</div>
-				)}
-			</div>
+				</CollapsibleContent>
+			</Collapsible>
 		);
 	};
 
@@ -593,6 +600,48 @@ export function AgentSection({
 					// Vision slots pick from image-capable models only.
 					const slotCatalog =
 						slot === "vision" ? catalog?.filter((m) => m.input.includes("image")) : catalog;
+					const effectiveLevel = thinking || (chosen ? defaultOrderLevel(levels) : undefined);
+					const pickModel = (entry: ModelCatalogEntry) => {
+						// Auto-populate (chunk 2, owner: "populate everywhere"): the
+						// fresh pick writes a level — the stored one rides as-is
+						// (the write clamps server-side), else the ordering's level.
+						const next = populateLevel(thinking || undefined, entry.supportedLevels);
+						onModelsChange(composeSlotModel(models, slot, entry.provider, entry.id, next));
+						setOpenMenu(null);
+					};
+					const pickLevel = (level: string) => {
+						onModelsChange(composeSlotModel(models, slot, provider, modelId, level));
+						setOpenMenu(null);
+					};
+					const modelFooter = catalog && catalog.length === 0 ? "No models — add a provider key in Keys" : "Runs every agent of this tier";
+					if (proposed) {
+						const modelTrigger = (
+							<PopoverTrigger asChild>
+								<SettingsMenuTrigger value={modelId ? prettyModel(modelId) : "—"} aria-label={`${SLOT_META[slot].label} model`} data-testid={`slot-model-${slot}`} className="w-40" />
+							</PopoverTrigger>
+						);
+						return (
+							<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`slot-row-${slot}`}>
+								<span className="flex items-center gap-2">
+									{slot !== "strong" && <><ChatGPTBackgroundAccess provider={coord?.provider} /><NativeSubscriptionBackgroundAccess provider={coord?.provider} /></>}
+									<Popover modal open={thisMenuOpen === "model"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "model" } : null)}>
+										{modelId ? <Hint label={`${provider}:${modelId}`}>{modelTrigger}</Hint> : modelTrigger}
+										<PopoverContent align="end" className="w-[22rem] p-1" data-testid={`slot-model-menu-${slot}`}>
+											<ModelCommand models={slotCatalog ?? undefined} effectiveId={modelId} effectiveProvider={provider} onPick={pickModel} footer={modelFooter} />
+										</PopoverContent>
+									</Popover>
+									<DropdownMenu open={thisMenuOpen === "thinking"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "thinking" } : null)}>
+										<DropdownMenuTrigger asChild>
+											<SettingsMenuTrigger value={effectiveLevel ?? "—"} aria-label={`${SLOT_META[slot].label} thinking`} data-testid={`slot-thinking-${slot}`} className="w-24" />
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end" className="w-44" data-testid={`slot-thinking-menu-${slot}`}>
+											<ThinkingMenuItems levels={levels.map(String)} effectiveLevel={effectiveLevel} onPick={pickLevel} />
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</span>
+							</SettingsRow>
+						);
+					}
 					return (
 						<SettingsRow
 							key={slot}
