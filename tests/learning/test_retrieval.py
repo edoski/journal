@@ -553,6 +553,68 @@ def test_show_all_returns_the_record_with_standings(workspace: Workspace) -> Non
         retrieval.show(workspace, ["rank"], all=True)
 
 
+def test_map_lists_every_topic_uncapped_with_symmetric_contrasts(
+    workspace: Workspace,
+) -> None:
+    names = [f"step-{index}" for index in range(8)]
+    records.save(
+        workspace,
+        {
+            "title": "Algebra",
+            "exam": {"date": day(23)},
+            "topics": {
+                **{
+                    name: {
+                        "title": f"Step {index}",
+                        **({"needs": [names[index - 1]]} if index else {}),
+                        "gap": "Mixes up the signs",
+                    }
+                    for index, name in enumerate(names)
+                },
+                "cramer": {"needs": ["step-7"], "contrasts": ["step-0"]},
+            },
+            "path": {"current": "step-3"},
+            "tasks": {"sheet": {"title": "Sheet 1", "topics": ["step-2"]}},
+            "focus": "sheet",
+            "observations": [
+                attempt(name, text="Private working", date=day(-9)) for name in names
+            ],
+        },
+    )
+    stored = (workspace.root / "course.json").read_bytes()
+    result = retrieval.course_map(workspace)
+    assert (workspace.root / "course.json").read_bytes() == stored
+    assert result["today"] == TODAY.isoformat()
+    assert result["exam"] == {"date": day(23), "days_left": 23}
+    assert result["current"] == "step-3" and result["focus"] == "sheet"
+    assert result["tasks"] == [{"key": "sheet", "title": "Sheet 1"}]
+    topics = {item["topic"]: item for item in result["topics"]}
+    assert [item["topic"] for item in result["topics"]] == [*names, "cramer"]
+    assert all("overdue" in topics[name] for name in names)
+    assert len(names) > retrieval.DUE_LIMIT
+    assert all(topics[name]["weak"] for name in names)
+    assert len(names) > retrieval.WEAK_LIMIT
+    assert topics["step-0"]["contrasts"] == ["cramer"]
+    assert topics["cramer"] == {
+        "topic": "cramer",
+        "needs": ["step-7"],
+        "contrasts": ["step-0"],
+        "level": "new",
+        "weak": False,
+        "tasks": [],
+    }
+    assert topics["step-2"]["tasks"] == ["sheet"]
+    assert "Private working" not in json.dumps(result)
+
+
+def test_map_of_a_new_course_has_no_topics(workspace: Workspace) -> None:
+    assert retrieval.course_map(workspace) == {
+        "today": TODAY.isoformat(),
+        "revision": 0,
+        "topics": [],
+    }
+
+
 SEARCH_COURSE = {
     "topics": {
         "derivative": {"title": "Derivata direzionale", "aliases": ["perché funziona"]},

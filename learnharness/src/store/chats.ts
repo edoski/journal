@@ -15,7 +15,7 @@ import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
-import { activeProblemOf, danglingQuestionOf } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, sessionModeOf } from "../core/native-messages.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -34,7 +34,7 @@ function chatFile(id: string): string {
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, kind?: "practice", course?: CourseLink): ChatRecord {
+function createChat(title: string, course?: CourseLink): ChatRecord {
 	const now = new Date().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -42,9 +42,6 @@ function createChat(title: string, kind?: "practice", course?: CourseLink): Chat
 		createdAt: now,
 		updatedAt: now,
 		messages: [],
-		// Practice sessions carry the marker; teach stays ABSENT (absence
-		// reads as teach — pre-practice records never migrate).
-		...(kind === "practice" ? { kind: "practice" as const } : {}),
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
@@ -98,8 +95,9 @@ function listChats(): ChatSummary[] {
 						// summaries; usage aggregates ride the full record, the picker
 						// never needs them).
 						...summary,
-						// Normalized kind: absent record field reads as teach.
-						kind: summary.kind ?? "teach",
+						// The mode now, folded over the transcript from the
+						// mode an older record stored at creation.
+						kind: sessionModeOf(messages, summary.kind),
 						messageCount: messages.length,
 						// Record-derived status for the session picker: phase from the
 						// transcript's explicit events (probe_done concluded / verdict
@@ -110,10 +108,10 @@ function listChats(): ChatSummary[] {
 						// NOT record-derived — the API route merges it (ChatListItem).
 						phase: phaseAt3Lh(messages),
 						pendingQuestion: danglingQuestionOf(messages) !== null,
-						// Practice: a posed problem with no conclude (the sidebar's
-						// "Problem waiting"); false on teaching sessions, which
-						// have no problem tool.
-						pendingProblem: summary.kind === "practice" && activeProblemOf(messages) !== null,
+						// A posed problem with no conclude (the sidebar's "Problem
+						// waiting"); only practice poses, and a handoff to teaching
+						// is refused while one is active.
+						pendingProblem: activeProblemOf(messages) !== null,
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);

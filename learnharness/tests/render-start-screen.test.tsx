@@ -1,7 +1,7 @@
 /**
  * The Proposed start surface (polish pass phase 2): Today's course chips
  * read the engine's facts and start sessions through the shared path; the
- * shared composer's proposed variant. Same tsx classic-JSX shim as the
+ * screen asks without naming a mode; the shared composer's proposed variant. Same tsx classic-JSX shim as the
  * other render tests.
  */
 import React from "react";
@@ -13,7 +13,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { courseChip, examText } from "../components/start/course-facts.ts";
 import { CourseChips } from "../components/start/course-chips.tsx";
-import { startHeading } from "../components/start/start-screen.tsx";
+import { StartScreen } from "../components/start/start-screen.tsx";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { Composer } from "../components/composer.tsx";
 import type { CourseSummary } from "../src/core/index.ts";
 
@@ -70,9 +71,32 @@ describe("Today course chips", () => {
 		assert.match(empty.body.textContent ?? "", /New course/);
 	});
 
-	it("asks the day's question on Today and the session's on the draft", () => {
-		assert.equal(startHeading(true, "teach"), "What are we learning today?");
-		assert.equal(startHeading(false, "practice"), "What do you want to practise?");
+});
+
+describe("the start screen (Proposed)", () => {
+	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
+	const screen = (today: boolean) =>
+		documentFor(
+			<AppRouterContext.Provider value={router as never}>
+				<StartScreen initialConfigured today={today} />
+			</AppRouterContext.Provider>,
+		);
+
+	it("offers no Teach/Practice switch and no proposition picker: the tutor routes the request", () => {
+		for (const today of [true, false]) {
+			const doc = screen(today);
+			assert.equal(doc.querySelector('[data-testid="home-mode-switch"]'), null);
+			assert.equal(doc.querySelector('[role="radiogroup"]'), null);
+			assert.equal(doc.querySelector('[data-testid="practice-props-chip"]'), null);
+			assert.doesNotMatch(doc.body.textContent ?? "", /\bTeach\b|\bPractice\b/);
+		}
+	});
+
+	it("asks one neutral question and prompt, whichever entry opened the draft", () => {
+		assert.equal(screen(true).querySelector("h1")?.textContent, "What are we learning today?");
+		const draft = screen(false);
+		assert.equal(draft.querySelector("h1")?.textContent, "What do you want to work on?");
+		assert.equal(draft.querySelector("textarea")?.getAttribute("placeholder"), "Name a topic, ask a question or paste a problem");
 	});
 });
 

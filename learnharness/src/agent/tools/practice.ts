@@ -22,6 +22,8 @@ import { findTool } from "./find.ts";
 import { grepTool } from "./grep.ts";
 import { jobTools, type JobToolContext } from "./jobs.ts";
 import { proberGraphTools, type GraphToolContext } from "./graph.ts";
+import { teachHandoffTool } from "./handoff.ts";
+import type { SteerMessage } from "../../core/contracts/jobs.ts";
 import { activeProblemOf } from "../../core/native-messages.ts";
 import { boundaryParse } from "../../core/tool-parts.ts";
 import type { LhMessage } from "../../core/native-messages.ts";
@@ -44,6 +46,9 @@ export interface PracticeToolContext {
 	 *  Each absent context (tests) = absent from the registry. */
 	graph?: GraphToolContext;
 	jobs?: JobToolContext;
+	/** Queue a handoff's wake: present = the `teach` handoff is registered
+	 *  (the composition root always passes it). */
+	deliver?: (steer: SteerMessage) => void;
 }
 
 /** TURN-SCOPED GATE STATE (the BKT incident, 2026-10-05): the gates used
@@ -257,7 +262,7 @@ export function concludeTool(gate: PracticeGate, recording?: ConcludeRecording):
 		description:
 			"Conclude the active problem: records the outcome + verdict, reveals the committed solution, and frees " +
 			"the learner's composer. After the result, say your closing words about the learner's work if useful, then " +
-			"END YOUR TURN — no further tool calls. The next problem is NEVER posed here: it waits for the learner's " +
+			"END YOUR TURN — no further tool calls, except `teach` when he asked to be taught. The next problem is NEVER posed here: it waits for the learner's " +
 			"explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, " +
 			"answer their questions about the concluded one. Nothing may conclude unless a problem is active.",
 		parameters: concludeInputObject,
@@ -303,5 +308,6 @@ export function practiceTools(ctx: PracticeToolContext, course?: CourseToolConte
 		...(jobs?.research ? { research: jobs.research } : {}),
 		...(jobs ? { pdf: jobs.pdf! } : {}),
 		...(ctx.graph ? proberGraphTools(ctx.graph) : {}),
+		...(ctx.deliver ? teachHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }, gate) : {}),
 	});
 }

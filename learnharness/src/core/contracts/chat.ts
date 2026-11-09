@@ -22,11 +22,10 @@ import type { CourseLink } from "./course.ts";
  * is the client's own grouping fold (core/view.ts, Wave D) — a pending quiz
  * is an unanswered question tool call, which is exactly what makes
  * resume-mid-question free. */
-/** The session's kind (practice sessions, owner 2026-10-04): "teach" is
- *  the default and ABSENT on pre-practice records (no migration — absence
- *  reads as teach); "practice" marks an adaptive-practice session — the
- *  practice agent, its two tools, no extraction, no graph writes. */
-export type ChatKind = "teach" | "practice";
+/** What a session is doing: teaching (the prober, then the teacher) or
+ *  practice (the practice agent). It follows the transcript: the agents
+ *  hand the session to each other (core/native-messages.ts sessionModeOf). */
+export type SessionMode = "teach" | "practice";
 
 export interface ChatRecord {
 	id: string;
@@ -34,8 +33,9 @@ export interface ChatRecord {
 	createdAt: string;
 	updatedAt: string;
 	messages: LhMessage[];
-	/** The session's kind — absent = teach (pre-practice records). */
-	kind?: ChatKind;
+	/** The mode the session started in, on records made before the mode
+	 *  followed the transcript; never written now. Absent = teach. */
+	kind?: SessionMode;
 	/** The registered course this session studies, set at creation.
 	 *  Absent only on sessions older than that rule: they stay readable and
 	 *  take no learner turn until the learner links a course. */
@@ -196,6 +196,20 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+/** The model-facing text of a mode handoff's wake, by the mode it starts.
+ *  The new agent reads what to do from the handoff call above it: the
+ *  scope to practise, or the topic to teach. */
+export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
+	practice:
+		"[PRACTICE] — the session moves to practice, on the scope the handoff above names. Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
+	teach:
+		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
+};
+
+/** The handoff tools' ack: the turn ends at the handoff, and the next
+ *  agent's run starts from the wake. */
+export const MODE_HANDOFF_ACK_TEXT = "Handoff recorded. Say nothing more and end your turn: the next agent takes over from here.";
+
 // ─── Practice sessions (owner, 2026-10-04) — marker + ack texts ──────────────
 // Single-sourced here per the marker law: the model-facing text of every
 // custom marker lives in core/contracts, never in the flattening seam.
@@ -216,7 +230,7 @@ export const THINKING_LABEL = "Your thinking";
  *  stop calling tools); the next problem waits for the learner's
  *  explicit go-ahead. */
 export const CONCLUDE_ACK_TEXT =
-	"Problem concluded. Say your closing words about the learner's work if useful, then END YOUR TURN — no further tool calls. The next problem is NEVER posed here: it waits for the learner's explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, answer their questions about the concluded one.";
+	"Problem concluded. Say your closing words about the learner's work if useful, then END YOUR TURN — no further tool calls, except `teach` when he asked to be taught. The next problem is NEVER posed here: it waits for the learner's explicit go-ahead (a *Next problem* message, or their own words asking for the next one). Between problems, answer their questions about the concluded one.";
 
 /** The learner's explicit move-on signal (owner round 16, 2026-10-06):
  *  the model-facing text of the practice-next marker — single-sourced
@@ -266,8 +280,8 @@ export interface ChatSummary {
 	title: string;
 	createdAt: string;
 	updatedAt: string;
-	/** Normalized kind (absent record field reads as teach). */
-	kind: ChatKind;
+	/** The session's current mode (sessionModeOf over the transcript). */
+	kind: SessionMode;
 	messageCount: number;
 	/** The session's current phase, derived from the stored plan tree. */
 	phase: Phase3;

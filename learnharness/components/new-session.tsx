@@ -198,7 +198,7 @@ export function DraftShell({
 
 export function NewSession(props: { initialConfigured: boolean; mode?: "teach" | "practice" }) {
 	return useDesignVariant() === "proposed" ? (
-		<StartScreen initialConfigured={props.initialConfigured} initialMode={props.mode} />
+		<StartScreen initialConfigured={props.initialConfigured} />
 	) : (
 		<NewSessionCurrent {...props} />
 	);

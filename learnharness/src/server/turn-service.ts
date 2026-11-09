@@ -116,7 +116,7 @@ export function triggerExtraction(
 	try {
 		const record = deps.chatStore.getChat(chatId);
 		if (!record) return;
-		const covered = coverageOf(record.messages, deps.graphStore.readCoverage(), chatId);
+		const covered = coverageOf(record.messages, deps.graphStore.readCoverage(), chatId, record.kind);
 		if (covered.uncoveredTokens < chunkTokens) return;
 		void extraction.runExtraction(chatId).catch((err) => {
 			// BYOK (owner, 2026-09-22) + key presence (provider-key interlude,

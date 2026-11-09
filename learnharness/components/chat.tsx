@@ -38,6 +38,7 @@ import {
 	isProviderKeyRefusal,
 	firstSourceTextParts,
 	messageAnchorId,
+	sessionModeOf,
 	textPartMessageId,
 	kbdEventForAction as kbdEventForChat,
 	type ChatInput,
@@ -60,8 +61,8 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
-import type { CourseLink, LhViewMessage } from "@/src/core";
-import { CHIP_LABEL, PhaseChip, PhaseDivider } from "@/components/phase-divider";
+import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
+import { CHIP_LABEL, ModeDivider, PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
 	CompactionCutDivider,
 	CompactionMomentDivider,
@@ -214,6 +215,12 @@ function isSubagentSteer(m: LhViewMessage): boolean {
 	return (m.metadata as { subagentResult?: unknown } | undefined)?.subagentResult != null;
 }
 
+/** The mode a handoff marker's view part moves the session to. */
+function modeHandoffTarget(m: LhViewMessage): SessionMode {
+	const part = m.parts.find((p) => p.type === "data-mode-handoff") as { data?: { mode?: unknown } } | undefined;
+	return part?.data?.mode === "practice" ? "practice" : "teach";
+}
+
 /**
  * The teaching session. All chat state lives in useChat; the server persists
  * the canonical transcript after every turn.
@@ -232,7 +239,7 @@ export function Chat({
 	initiallyInFlight,
 	initiallyCompacting = false,
 	initialConfigured = false,
-	kind = "teach",
+	startedIn,
 	course,
 }: {
 	chatId: string;
@@ -243,10 +250,10 @@ export function Chat({
 	initialMessages: LhMessage[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
-	/** The session kind (practice sessions, owner 2026-10-04): practice
-	 *  renders no phase chip (no probe→teach arc applies) and a Practice
-	 *  tag rides the header instead. */
-	kind?: "teach" | "practice";
+	/** The mode an older record stored at creation. The mode now is folded
+	 *  over the transcript from it: practice renders a Practice tag in
+	 *  place of the phase chip, and no coverage ring. */
+	startedIn?: SessionMode;
 	initialPrompt?: string;
 	/** A teacher turn is running server-side but attached to no client
 	 * (navigated away mid-turn, returned while in flight). */
@@ -483,6 +490,7 @@ export function Chat({
 	// replaces the composer. Computed from the NATIVE record (the fold is
 	// the gate the tools themselves read), not the projected view.
 	const activeProblem = activeProblemOf(nativeMessages);
+	const mode = sessionModeOf(nativeMessages, startedIn);
 	const activeProblemRef = useRef(activeProblem);
 	activeProblemRef.current = activeProblem;
 
@@ -755,7 +763,7 @@ export function Chat({
 	 * has ever been posed (the fresh session's opening turn is owed, not
 	 * the move-on). Enter-on-empty and the Next chip both key on it. */
 	const nextReady =
-		kind === "practice" &&
+		mode === "practice" &&
 		!pending &&
 		!activeProblem &&
 		!compacting &&
@@ -1345,7 +1353,7 @@ export function Chat({
 								)
 							}
 							course={course?.title}
-							phase={kind === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
+							phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 							onOpenPlan={planTree ? () => setPlanOpen((o) => !o) : undefined}
 							details={
 								<LessonDetails
@@ -1355,7 +1363,7 @@ export function Chat({
 									pricing={pricing}
 									selectedModel={selectedModel}
 									onModelChange={setSelectedModel}
-									extraction={kind !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
+									extraction={mode !== "practice" ? <CoverageRing chatId={chatId} refreshKey={coverageTick} /> : undefined}
 								/>
 							}
 						/>
@@ -1441,10 +1449,10 @@ export function Chat({
 					{/* Practice (owner, 2026-10-04): the coverage ring hides —
 				    practice never extracts, so an ever-filling ring with no
 				    run behind it would lie. */}
-					{kind !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
+					{mode !== "practice" && <CoverageRing chatId={chatId} refreshKey={coverageTick} />}
 					{/* Practice sessions: no phase arc — a quiet Practice tag
 					    instead of the phase chip. */}
-					{kind === "practice" ? (
+					{mode === "practice" ? (
 						<span
 							data-testid="phase-chip"
 							data-phase="practice"
@@ -1491,6 +1499,10 @@ export function Chat({
 								// assistant group — is gone). Never a user bubble: the wake is
 								// scaffolding; the model-facing instruction lives in the adapter.
 								<PhaseDivider key={m.id || `m-${mi}`} phase="plan" variant={design} />
+							) : m.role === "user" && m.parts.some((p) => p.type === "data-mode-handoff") ? (
+								// A handoff between teaching and practice: the rule where
+								// the next agent takes over, never a user bubble.
+								<ModeDivider key={m.id || `m-${mi}`} mode={modeHandoffTarget(m)} variant={design} />
 							) : m.role === "user" && m.parts.length > 0 && m.parts.every((p) => p.type.startsWith("data-")) ? (
 								// Marker cards (custom messages, 2026-10-04): user-side
 								// scaffolding — the graph-context pick, the practice
