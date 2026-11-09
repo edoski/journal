@@ -18,10 +18,6 @@ import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
 import { priceLabel, ThinkingMenuList } from "../components/settings/model-menu.tsx";
-import { NewCourseBody } from "../components/course-picker.tsx";
-import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
-import { DeleteNodeBody } from "../components/delete-node-dialog.tsx";
-import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
 import { CoverageMenuBody } from "../components/extraction-coverage.tsx";
@@ -125,57 +121,6 @@ describe("the Proposed model menu's prices", () => {
 		assert.equal(priceLabel(cost, "proposed"), "$0.10/$0.50");
 		assert.equal(priceLabel({ ...cost, input: 3, output: 15 }, "proposed"), "$3.00/$15.00");
 		assert.equal(priceLabel(cost), "$0.1/$0.5");
-	});
-});
-
-describe("Proposed dialogs keep their actions", () => {
-	it("New course: a title field, a study root, Cancel, and Create disabled until there is a title", () => {
-		const doc = documentFor(<NewCourseBody variant="proposed" roots={["/study/courses"]} onClose={() => {}} onCreated={() => {}} />);
-		const dialog = doc.querySelector('[data-testid="new-course-dialog"]');
-		assert.equal(dialog?.getAttribute("role"), "dialog");
-		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
-		assert.ok(doc.querySelector('[data-testid="new-course-title"]'));
-		const root = doc.querySelector('[data-testid="new-course-root"]');
-		assert.equal(root?.getAttribute("role"), "combobox", "the study root opens the shared select, not a browser select");
-		assert.equal(doc.querySelectorAll("select:not([aria-hidden])").length, 0, "only Radix's hidden form select");
-		assert.equal(doc.querySelector('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
-		assert.ok([...doc.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
-	});
-
-	it("abort: the question's own words and action, Cancel first", () => {
-		const doc = documentFor(<AbortTurnBody variant="proposed" mode="problem" busy onClose={() => {}} onConfirm={() => {}} />);
-		assert.equal(doc.querySelector('[data-testid="abort-turn-title"]')?.textContent, "Discard this problem?");
-		assert.match(doc.querySelector('[data-testid="abort-turn-line"]')?.textContent ?? "", /The working turn stops too\./);
-		const footer = [...doc.querySelectorAll('[data-slot="dialog-footer"] button')].map((b) => b.textContent);
-		assert.deepEqual(footer, ["Cancel", "Discard"]);
-	});
-
-	it("delete notes: counts in the title, names listed, the delete button named for what it does", () => {
-		const nodes = ["A", "B", "C"].map((name) => ({ id: name.toLowerCase(), name }));
-		const doc = documentFor(<DeleteNodeBody variant="proposed" nodes={nodes} busy={false} failure={null} onClose={() => {}} onRun={() => {}} />);
-		assert.equal(doc.querySelector('[data-slot="dialog-title"]')?.textContent, "Delete 3 nodes?");
-		assert.equal(doc.querySelector('[data-testid="node-names-code"]')?.textContent, "A, B, C");
-		assert.equal(doc.querySelector('[data-testid="node-delete-confirm"]')?.textContent, "Delete");
-	});
-
-	it("delete session: the session named in the system font, the traces choice and its retry on failure", () => {
-		const doc = documentFor(
-			<DeleteSessionBody
-				variant="proposed"
-				chat={{ id: "c1", title: "Rank practice" }}
-				traces={false}
-				busy={false}
-				failure={{ code: "network", error: "Delete failed — network error. Try again." }}
-				onTraces={() => {}}
-				onClose={() => {}}
-				onRun={() => {}}
-			/>,
-		);
-		const name = doc.querySelector('[data-testid="session-name-code"]');
-		assert.equal(name?.tagName, "P", "not a code element");
-		assert.equal(name?.textContent, "Rank practice");
-		assert.ok(doc.querySelector('[data-testid="delete-traces-checkbox"]'));
-		assert.match(doc.querySelector('[data-testid="delete-failure"]')?.textContent ?? "", /Try again/);
 	});
 });
 

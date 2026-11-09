@@ -19,7 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DialogContent, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { courseLabel, type CourseListing, type CourseSummary } from "@/src/core";
 
@@ -330,8 +330,7 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 	};
 	if (variant === "proposed") {
 		return (
-			<DialogOverlay {...backdropDismiss}>
-				<DialogContent aria-label="New course" data-testid="new-course-dialog" className="max-w-md">
+				<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">
 					<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
 						<DialogHeader>
 							<DialogTitle>New course</DialogTitle>
@@ -360,7 +359,6 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 						</DialogFooter>
 					</form>
 				</DialogContent>
-			</DialogOverlay>
 		);
 	}
 	return (
@@ -435,7 +433,10 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 
 export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void }) {
 	const { onClose } = props;
+	const variant = useDesignVariant();
 	useEffect(() => {
+		// Proposed: the Radix dialog claims its Esc itself.
+		if (variant === "proposed") return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key !== "Escape") return;
 			e.preventDefault();
@@ -444,8 +445,14 @@ export function NewCourseDialog(props: { roots: readonly string[]; onClose: () =
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [onClose]);
-	const variant = useDesignVariant();
+	}, [onClose, variant]);
+	if (variant === "proposed") {
+		return (
+			<Dialog open onOpenChange={(open) => !open && onClose()}>
+				<NewCourseBody {...props} variant="proposed" />
+			</Dialog>
+		);
+	}
 	if (typeof document === "undefined") return null;
 	return createPortal(<NewCourseBody {...props} variant={variant} />, document.body);
 }

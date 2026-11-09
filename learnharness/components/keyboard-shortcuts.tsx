@@ -26,7 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
 import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
-import { DialogClose, DialogContent, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
 import {
@@ -162,13 +162,13 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 		// The dialog anatomy (dialog.md) with a two-column list: the action,
 		// then its keys as plain glyphs (kbd.md).
 		return (
-			<DialogOverlay {...backdropDismiss}>
-				<DialogContent aria-label="Keyboard shortcuts" data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
+			<Dialog open onOpenChange={(next) => !next && onClose()}>
+				<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
 					<DialogHeader>
 						<DialogTitle>Keyboard shortcuts</DialogTitle>
 					</DialogHeader>
 					<Hint label="Close" binding="escape" side="left">
-						<DialogClose aria-label="Close shortcuts" onClick={onClose} />
+						<DialogClose aria-label="Close shortcuts" />
 					</Hint>
 					{scopes.map((scope) => {
 						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
@@ -186,7 +186,7 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 						);
 					})}
 				</DialogContent>
-			</DialogOverlay>
+			</Dialog>
 		);
 	}
 	return (

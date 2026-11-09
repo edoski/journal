@@ -5,7 +5,15 @@ import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
-import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -70,25 +78,23 @@ export function AbortTurnBody({
 	const copy = COPY[mode];
 	if (variant === "proposed") {
 		return (
-			<DialogOverlay {...backdropDismiss}>
-				<DialogContent aria-label={copy.title} data-testid="abort-turn-dialog" className="max-w-sm">
-					<DialogHeader>
-						<DialogTitle data-testid="abort-turn-title">{copy.title}</DialogTitle>
-						<DialogDescription data-testid="abort-turn-line">
+			<AlertDialog open onOpenChange={(open) => !open && onClose()}>
+				<AlertDialogContent data-testid="abort-turn-dialog" className="max-w-sm">
+					<AlertDialogHeader>
+						<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
+						<AlertDialogDescription data-testid="abort-turn-line">
 							{copy.line}
 							{busy && mode !== "turn" ? " The working turn stops too." : ""}
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter className="pt-2">
-						<Button variant="quiet" data-testid="abort-turn-cancel" onClick={onClose}>
-							Cancel
-						</Button>
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter className="pt-2">
+						<AlertDialogCancel data-testid="abort-turn-cancel">Cancel</AlertDialogCancel>
 						<Button variant="destructive" data-testid="abort-turn-confirm" onClick={onConfirm}>
 							{copy.action}
 						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</DialogOverlay>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		);
 	}
 	return (
@@ -149,9 +155,10 @@ export function AbortTurnDialog({
 	busy?: boolean;
 }) {
 	const variant = useDesignVariant();
-	// Esc cancels the popup (claimed — never a chained abort).
+	// Esc cancels the popup (claimed — never a chained abort). Proposed: the
+	// alert dialog claims it itself.
 	useEffect(() => {
-		if (mode === null) return;
+		if (mode === null || variant === "proposed") return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// THE ONE-ESC LAW (keyboard round 2026-10-06): claim at the
@@ -164,9 +171,10 @@ export function AbortTurnDialog({
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [mode, onClose]);
+	}, [mode, onClose, variant]);
 
 	if (mode === null || typeof document === "undefined") return null;
+	if (variant === "proposed") return <AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} variant={variant} />;
 	return createPortal(
 		<AbortTurnBody mode={mode} onClose={onClose} onConfirm={() => onConfirm(mode)} busy={busy} variant={variant} />,
 		document.body,

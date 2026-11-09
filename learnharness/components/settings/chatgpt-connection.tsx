@@ -3,7 +3,7 @@
 import { useDesignVariant } from "@/components/design-variant";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ChatGPTStatus } from "@/src/core";
-import { ConnectionDialog, ConnectionFooter, ConnectionRow, connectionBlockClass, connectionNoteClass } from "./connection-controls";
+import { ConnectionDialog, ConnectionFooter, ConnectionRow, ConnectionSelect, connectionBlockClass, connectionNoteClass } from "./connection-controls";
 import { useSettingsProposed } from "./settings-design";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "./controls";
@@ -275,10 +275,7 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 			</div> : <>
 				{dialog.kind === "connect" ? <>
 					{status.accounts.length > 0 && <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-						<select aria-label="Saved ChatGPT account" value={registration} onChange={(event) => setRegistration(event.target.value)} disabled={busy || status.pending} className="min-w-0 rounded-sm border border-border bg-background px-2 py-1.5 text-foreground">
-							<option value="">Add another account or workspace</option>
-							{status.accounts.map((a) => <option key={a.id} value={a.id}>{a.email || "ChatGPT account"}</option>)}
-						</select>
+						<ConnectionSelect ariaLabel="Saved ChatGPT account" value={registration} onChange={setRegistration} disabled={busy || status.pending} placeholder={{ label: "Add another account or workspace", selectable: true }} options={status.accounts.map((a) => ({ value: a.id, label: a.email || "ChatGPT account" }))} current="min-w-0 rounded-sm border border-border bg-background px-2 py-1.5 text-foreground" />
 						{registration && <Button variant="ghost" size="xs" disabled={busy} onClick={() => context.manage(registration)}>Manage…</Button>}
 					</div>}
 					<p className={proposed ? "mt-3 text-control text-muted-foreground" : "mt-3 text-xs leading-relaxed text-muted-foreground"} data-testid="chatgpt-privacy-notice">{chatGPTNotice(web)}</p>
@@ -299,9 +296,7 @@ export function ChatGPTUIProvider({ children }: { children: React.ReactNode }) {
 				{context.error && <p role="alert" className={proposed ? "mt-3 text-row text-danger" : "mt-3 text-xs text-red-400"}>{context.error}</p>}
 				{dialog.kind === "manage" && managed && <div className="mt-4 flex flex-wrap items-center justify-between gap-3" data-testid="chatgpt-account-strip">
 					<div data-testid="chatgpt-managed-identity" className="flex min-w-0 items-center gap-2 text-xs text-foreground">
-						{status.accounts.length > 1 && managedPresent && !busy ? <select aria-label="Manage ChatGPT account" value={managed.id} onChange={(event) => context.manage(event.target.value)} className="min-w-0 rounded-sm border border-border bg-background px-2 py-1.5">
-							{status.accounts.map((a) => <option key={a.id} value={a.id}>{a.email || "ChatGPT account"}</option>)}
-						</select> : <span className="break-all">{managed.email || "ChatGPT account"}</span>}
+						{status.accounts.length > 1 && managedPresent && !busy ? <ConnectionSelect ariaLabel="Manage ChatGPT account" value={managed.id} onChange={context.manage} options={status.accounts.map((a) => ({ value: a.id, label: a.email || "ChatGPT account" }))} current="min-w-0 rounded-sm border border-border bg-background px-2 py-1.5" /> : <span className="break-all">{managed.email || "ChatGPT account"}</span>}
 					</div>
 					<Button variant="ghost" size="sm" data-testid="chatgpt-add-accounts" className="cursor-pointer text-muted-foreground disabled:cursor-not-allowed" onClick={() => openConnect()} disabled={busy || status.pending || !status.available}>Add accounts</Button>
 				</div>}
@@ -338,9 +333,7 @@ export function ChatGPTConnection({ labelClassName }: { setup?: boolean; labelCl
 	const proposed = useSettingsProposed();
 	return <div className={connectionBlockClass(proposed, "flex flex-col gap-2")} data-testid="chatgpt-connection">
 		<ConnectionRow label="ChatGPT" labelClassName={labelClassName} actionTestid={active ? undefined : "chatgpt-login"} action={active ? "Manage…" : "Connect"} disabled={!ui.status.available || ui.busy || ui.status.pending} onAction={() => active ? ui.manage(active.id) : ui.connect()}>
-			{active && <select aria-label="ChatGPT account" value={active.id} disabled={ui.busy || ui.status.pending} onChange={(event) => ui.select(event.target.value)} className="min-w-0 rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground">
-				{accounts.map((a) => <option key={a.id} value={a.id}>{a.email || "ChatGPT account"}</option>)}
-			</select>}
+			{active && <ConnectionSelect ariaLabel="ChatGPT account" value={active.id} disabled={ui.busy || ui.status.pending} onChange={ui.select} options={accounts.map((a) => ({ value: a.id, label: a.email || "ChatGPT account" }))} current="min-w-0 rounded-sm border border-border bg-background px-2 py-1 text-xs text-foreground" />}
 		</ConnectionRow>
 		{ui.inlineError && <p role="alert" className={connectionNoteClass(proposed, "danger", "text-xs text-red-400")}>{ui.inlineError}</p>}
 		{ui.warning && <div role="alert" data-testid="chatgpt-revocation-warning" className="rounded-sm border border-border px-3 py-2 text-xs text-muted-foreground">{ui.warning}<button type="button" className="ml-2 cursor-pointer underline underline-offset-2" onClick={ui.dismissWarning}>Dismiss</button></div>}

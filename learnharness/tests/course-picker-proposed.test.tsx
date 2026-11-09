@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
+import { Dialog } from "../components/ui/dialog.tsx";
 
 // The Proposed course chip and New course's study root, mounted on the real
 // Radix layers: what the learner picks reaches the host, and Esc stays put.
@@ -86,7 +87,11 @@ describe("Proposed course chip", () => {
 
 describe("Proposed New course study root", () => {
 	it("shows the root's last two folders and picks another from the shared select", async () => {
-		await mount(<NewCourseBody variant="proposed" roots={["/vault/learn", "/vault/university/msc"]} onClose={() => {}} onCreated={() => {}} />);
+		await mount(
+			<Dialog open>
+				<NewCourseBody variant="proposed" roots={["/vault/learn", "/vault/university/msc"]} onClose={() => {}} onCreated={() => {}} />
+			</Dialog>,
+		);
 		const trigger = element('[data-testid="new-course-root"]');
 		assert.equal(trigger.textContent, "vault/learn");
 		await press(trigger, "pointerdown");

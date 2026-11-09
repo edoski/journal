@@ -3,7 +3,8 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { Button } from "@/components/ui/button";
-import { DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDesignVariant } from "@/components/design-variant";
 import { SettingsDesignContext, useSettingsProposed } from "./settings-design";
 
@@ -46,6 +47,8 @@ export function ConnectionDialog({ children, onClose, busy, label, testid, backd
 	const backdropDismiss = useBackdropDismiss(() => { if (!busy) onClose(); });
 	const proposed = useDesignVariant() === "proposed";
 	useEffect(() => {
+		// Proposed: the Radix dialog owns focus, its trap and Esc.
+		if (proposed) return;
 		const previous = document.activeElement as HTMLElement | null;
 		const focusable = () => [...(ref.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled])') ?? [])];
 		focusable()[0]?.focus();
@@ -60,11 +63,48 @@ export function ConnectionDialog({ children, onClose, busy, label, testid, backd
 		};
 		document.addEventListener("keydown", key, true);
 		return () => { document.removeEventListener("keydown", key, true); if (previous?.isConnected) previous.focus(); };
-	}, []);
-	if (proposed) return createPortal(<DialogOverlay className="z-[60]" data-testid={backdropTestid} {...backdropDismiss}>
-		<DialogContent ref={ref} aria-label={label} aria-busy={busy} data-testid={testid} className="block max-h-[85vh] overflow-y-auto"><SettingsDesignContext.Provider value="proposed">{children}</SettingsDesignContext.Provider></DialogContent>
-	</DialogOverlay>, document.body);
+	}, [proposed]);
+	if (proposed) return <Dialog open onOpenChange={(open) => !open && onClose()}>
+		<DialogContent aria-describedby={undefined} aria-busy={busy} data-testid={testid} className="block max-h-[85vh] overflow-y-auto" onPointerDownOutside={(event) => { if (busy) event.preventDefault(); }}>
+			<DialogTitle className="sr-only">{label}</DialogTitle>
+			<SettingsDesignContext.Provider value="proposed">{children}</SettingsDesignContext.Provider>
+		</DialogContent>
+	</Dialog>;
 	return createPortal(<div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80" data-testid={backdropTestid} {...backdropDismiss}>
 		<div ref={ref} role="dialog" aria-modal="true" aria-label={label} aria-busy={busy} data-testid={testid} onClick={(event) => event.stopPropagation()} className="settings-dialog-pop mx-4 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-md border border-border bg-card p-5 shadow-xl">{children}</div>
 	</div>, document.body);
+}
+
+/** A short choice inside a connection row or dialog: a native select under
+ *  Current, the shadcn Select under Proposed. An empty value is the
+ *  placeholder option ("Add another account", "Select…"). */
+export function ConnectionSelect({ ariaLabel, value, onChange, options, placeholder, disabled, id, current }: {
+	ariaLabel?: string;
+	value: string;
+	onChange: (value: string) => void;
+	options: { value: string; label: string }[];
+	/** The empty value's label; Proposed shows it as the placeholder. */
+	placeholder?: { label: string; selectable: boolean };
+	disabled?: boolean;
+	id?: string;
+	/** Current's class string, unchanged. */
+	current: string;
+}) {
+	if (useSettingsProposed()) {
+		// Radix forbids an empty item value: a selectable placeholder rides a sentinel.
+		const NONE = "__none__";
+		return <Select value={value || (placeholder?.selectable ? NONE : undefined)} onValueChange={(next) => onChange(next === NONE ? "" : next)} disabled={disabled}>
+			<SelectTrigger id={id} size="sm" aria-label={ariaLabel} className="min-w-0 max-w-full">
+				<SelectValue placeholder={placeholder?.label} />
+			</SelectTrigger>
+			<SelectContent>
+				{placeholder?.selectable && <SelectItem value={NONE}>{placeholder.label}</SelectItem>}
+				{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+			</SelectContent>
+		</Select>;
+	}
+	return <select id={id} aria-label={ariaLabel} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} className={current}>
+		{placeholder && <option value="" disabled={!placeholder.selectable}>{placeholder.label}</option>}
+		{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+	</select>;
 }

@@ -53,7 +53,11 @@ export function Hint({ label, action, binding, side = "top", children }: HintPro
 	return (
 		<TooltipProvider>
 			<Tooltip>
-				<TooltipTrigger asChild>{children}</TooltipTrigger>
+				{/* Proposed: hover only. Tab is dead app-wide, so focus lands on a
+				    control only programmatically (a dialog's autofocus, a closed
+				    menu's return), and a tooltip opened then would take the next
+				    Esc meant for the dialog (overlay.md). */}
+				<TooltipTrigger asChild onFocus={proposed ? (e) => e.preventDefault() : undefined}>{children}</TooltipTrigger>
 				{proposed ? (
 					<TooltipContent side={side} variant="proposed">
 						<span>{label}</span>

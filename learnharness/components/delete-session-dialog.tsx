@@ -5,7 +5,16 @@ import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
-import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import type { ChatDeleteMode, ChatListItem } from "@/src/core";
 
 /** The graph-traces checkbox copy (owner, 2026-09-24 flow rework — was
@@ -76,7 +85,8 @@ export function DeleteSessionDialog({
 
 	// Esc closes (claimed — a menu/dialog Esc must not also abort a turn).
 	useEffect(() => {
-		if (!chat) return;
+		// Proposed: the alert dialog claims its Esc itself.
+		if (!chat || variant === "proposed") return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// THE ONE-ESC LAW (keyboard round 2026-10-06): claim at the
@@ -89,7 +99,7 @@ export function DeleteSessionDialog({
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [chat, onClose]);
+	}, [chat, onClose, variant]);
 
 	const run = async () => {
 		if (!chat || busy) return;
@@ -121,8 +131,8 @@ export function DeleteSessionDialog({
 	if (!chat) return null;
 
 	if (variant === "proposed") {
-		return createPortal(
-			<DialogOverlay {...backdropDismiss}>
+		return (
+			<AlertDialog open onOpenChange={(open) => !open && !busy && onClose()}>
 				<DeleteSessionBody
 					variant="proposed"
 					chat={chat}
@@ -133,8 +143,7 @@ export function DeleteSessionDialog({
 					onClose={onClose}
 					onRun={() => void run()}
 				/>
-			</DialogOverlay>,
-			document.body,
+			</AlertDialog>
 		);
 	}
 	return createPortal(
@@ -181,31 +190,30 @@ export function DeleteSessionBody({
 }) {
 	if (variant === "proposed") {
 		return (
-			<DialogContent aria-label="Delete session" data-testid="delete-session-dialog">
-				<DialogHeader>
-					<DialogTitle>Delete session?</DialogTitle>
+			<AlertDialogContent data-testid="delete-session-dialog">
+				<AlertDialogHeader>
+					<AlertDialogTitle>Delete session?</AlertDialogTitle>
 					<p data-testid="session-name-code" className="text-control font-medium text-foreground">
 						{chat.title}
 					</p>
-					<DialogDescription>
+					<AlertDialogDescription>
 						This permanently removes the session — its messages, background jobs, and extraction records. Everything
 						it added to the graph stays unless you check below. This cannot be undone.
-					</DialogDescription>
-				</DialogHeader>
-				<label data-testid={TRACES_COPY.testid} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
-					<input
-						type="checkbox"
+					</AlertDialogDescription>
+				</AlertDialogHeader>
+				<Label data-testid={TRACES_COPY.testid} className="cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal">
+					<Checkbox
 						data-testid={TRACES_COPY.checkbox}
 						checked={traces}
-						onChange={(e) => onTraces(e.target.checked)}
+						onCheckedChange={(next) => onTraces(next === true)}
 						disabled={busy}
-						className="mt-0.5 size-4 shrink-0 accent-primary"
+						className="mt-0.5"
 					/>
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="text-row text-foreground">{TRACES_COPY.title}</span>
 						<span className="text-label text-muted-foreground">{TRACES_COPY.body}</span>
 					</span>
-				</label>
+				</Label>
 				{failure && (
 					<p role="alert" data-testid="delete-failure" className="text-row text-danger">
 						{failure.error}{" "}
@@ -214,15 +222,15 @@ export function DeleteSessionBody({
 						</button>
 					</p>
 				)}
-				<DialogFooter className="pt-2">
+				<AlertDialogFooter className="pt-2">
 					<Button variant="quiet" data-testid="delete-cancel" onClick={onClose} disabled={busy}>
 						Cancel
 					</Button>
 					<Button variant="destructive" data-testid="delete-confirm" onClick={onRun} disabled={busy}>
 						{busy ? "Deleting…" : "Delete"}
 					</Button>
-				</DialogFooter>
-			</DialogContent>
+				</AlertDialogFooter>
+			</AlertDialogContent>
 		);
 	}
 	return (

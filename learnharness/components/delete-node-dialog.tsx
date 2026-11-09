@@ -5,7 +5,14 @@ import { createPortal } from "react-dom";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
-import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import {
+	AlertDialog,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /** The 409 extraction_running line (owner phrasing, node interlude):
  *  the server's error names the extraction; the ACTIVITY DOCK is the
@@ -53,9 +60,9 @@ export function DeleteNodeBody({
 }) {
 	if (variant === "proposed") {
 		return (
-			<DialogContent aria-label="Delete node" data-testid="delete-node-dialog">
-				<DialogHeader>
-					<DialogTitle>{nodes.length === 1 ? "Delete node?" : `Delete ${nodes.length} nodes?`}</DialogTitle>
+			<AlertDialogContent data-testid="delete-node-dialog">
+				<AlertDialogHeader>
+					<AlertDialogTitle>{nodes.length === 1 ? "Delete node?" : `Delete ${nodes.length} nodes?`}</AlertDialogTitle>
 					{nodes.length === 1 ? (
 						<p data-testid="node-name-code" className="text-control font-medium text-foreground">
 							{nodes[0]?.name}
@@ -66,12 +73,12 @@ export function DeleteNodeBody({
 							{nodes.length > 8 ? `, and ${nodes.length - 8} more` : ""}
 						</p>
 					)}
-					<DialogDescription data-testid="node-permanence-line">
+					<AlertDialogDescription data-testid="node-permanence-line">
 						{nodes.length === 1
 							? "This permanently deletes the node — this cannot be undone."
 							: `This permanently deletes all ${nodes.length} nodes — this cannot be undone.`}
-					</DialogDescription>
-				</DialogHeader>
+					</AlertDialogDescription>
+				</AlertDialogHeader>
 				{failure && (
 					<p role="alert" data-testid="node-delete-failure" className="text-row text-danger">
 						{failure.code === "extraction_running" ? EXTRACTION_RETRY_LINE : failure.error}{" "}
@@ -80,15 +87,15 @@ export function DeleteNodeBody({
 						</button>
 					</p>
 				)}
-				<DialogFooter className="pt-2">
+				<AlertDialogFooter className="pt-2">
 					<Button variant="quiet" data-testid="node-delete-cancel" onClick={onClose} disabled={busy}>
 						Cancel
 					</Button>
 					<Button variant="destructive" data-testid="node-delete-confirm" onClick={onRun} disabled={busy}>
 						{busy ? "Deleting…" : "Delete"}
 					</Button>
-				</DialogFooter>
-			</DialogContent>
+				</AlertDialogFooter>
+			</AlertDialogContent>
 		);
 	}
 	return (
@@ -209,7 +216,8 @@ export function DeleteNodeDialog({
 
 	// Esc closes (claimed — a dialog Esc must not also abort a turn).
 	useEffect(() => {
-		if (!nodes || nodes.length === 0) return;
+		// Proposed: the alert dialog claims its Esc itself.
+		if (!nodes || nodes.length === 0 || variant === "proposed") return;
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// THE ONE-ESC LAW (keyboard round 2026-10-06): claim at the
@@ -222,7 +230,7 @@ export function DeleteNodeDialog({
 		};
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
-	}, [nodes, onClose]);
+	}, [nodes, onClose, variant]);
 
 	// Sequential full deaths — never parallel (the store's revision
 	// counter and the sweep must observe them in order). A failure STOPS
@@ -263,11 +271,10 @@ export function DeleteNodeDialog({
 	if (!nodes || nodes.length === 0) return null;
 
 	if (variant === "proposed") {
-		return createPortal(
-			<DialogOverlay {...backdropDismiss}>
+		return (
+			<AlertDialog open onOpenChange={(open) => !open && !busy && onClose()}>
 				<DeleteNodeBody variant="proposed" nodes={nodes} busy={busy} failure={failure} onClose={onClose} onRun={() => void run()} />
-			</DialogOverlay>,
-			document.body,
+			</AlertDialog>
 		);
 	}
 	return createPortal(

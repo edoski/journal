@@ -63,7 +63,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 /** The stage's one line under the title (Proposed: the dialog's description). */
@@ -502,16 +502,16 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 	/>;
 
 	if (proposed) {
-		return createPortal(
+		return (
 			<SettingsDesignContext.Provider value="proposed">
-				<DialogOverlay data-testid="setup-backdrop" {...backdropDismiss}>
-					<DialogContent aria-label="Set up your models" data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto">
+				<Dialog open onOpenChange={(open) => !open && onClose()}>
+					<DialogContent data-testid="setup-dialog" className="max-h-[85vh] max-w-xl gap-6 overflow-y-auto">
 						<DialogHeader>
 							<DialogTitle>Set up your models</DialogTitle>
 							{stage !== "loading" && <DialogDescription>{STAGE_LINE[stage]}</DialogDescription>}
 						</DialogHeader>
 						<Hint label="Close" binding="escape" side="left">
-							<DialogClose aria-label="Close setup" data-testid="setup-close" onClick={onClose} />
+							<DialogClose aria-label="Close setup" data-testid="setup-close" />
 						</Hint>
 						{failed && (
 							<p role="alert" data-testid="setup-catalog-error" className="text-row text-danger">
@@ -605,9 +605,8 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 							</>
 						)}
 					</DialogContent>
-				</DialogOverlay>
-			</SettingsDesignContext.Provider>,
-			document.body,
+				</Dialog>
+			</SettingsDesignContext.Provider>
 		);
 	}
 

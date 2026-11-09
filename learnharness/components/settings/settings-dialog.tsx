@@ -44,6 +44,7 @@ import { SettingsGroup, SettingsRow, SettingsSection } from "./controls.tsx";
 import { AgentSection } from "./agent-section.tsx";
 import type { ModelsSettings } from "@/src/core";
 import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { KeysSection } from "./keys-section.tsx";
@@ -56,7 +57,6 @@ import { useDesignVariant } from "@/components/design-variant";
 import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
-import { DialogOverlay } from "@/components/ui/dialog";
 import { XIcon } from "lucide-react";
 import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
@@ -115,13 +115,21 @@ function SettingsDialog({
 	const backdropDismiss = useBackdropDismiss(onClose);
 	const design = useDesignVariant();
 	if (design === "proposed") {
-		return createPortal(
+		// The Proposed frame (spec: settings.md): one raised surface, the
+		// section list on the left, the section's grouped rows on the right.
+		return (
 			<SettingsDesignContext.Provider value="proposed">
-				<DialogOverlay data-testid="settings-backdrop" {...backdropDismiss}>
-					<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
-				</DialogOverlay>
-			</SettingsDesignContext.Provider>,
-			document.body,
+				<Dialog open onOpenChange={(open) => !open && onClose()}>
+					<DialogContent
+						aria-describedby={undefined}
+						data-testid="settings-dialog"
+						className="h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
+					>
+						<DialogTitle className="sr-only">Settings</DialogTitle>
+						<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
+					</DialogContent>
+				</Dialog>
+			</SettingsDesignContext.Provider>
 		);
 	}
 	// Plain dim backdrop (no blur — nothing decorative); a genuine
@@ -225,7 +233,10 @@ export function SettingsDialogBody({
 	// Escape closes — the layered-dismiss convention (Esc is dead for the
 	// sections' own editors while they hold focus; this listener is the
 	// dialog's outer layer).
+	const proposed = useDesignVariant() === "proposed";
 	useEffect(() => {
+		// Proposed: the Radix dialog claims its Esc itself.
+		if (proposed) return;
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
 				// THE ONE-ESC LAW (owner, keyboard round 2026-10-06): claim
@@ -238,7 +249,7 @@ export function SettingsDialogBody({
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [onClose]);
+	}, [onClose, proposed]);
 
 	/** ONE writer for the whole dialog: PUT the whole section, keep the
 	 *  record mirror in sync, surface route errors inline (a 400 is a
@@ -285,7 +296,6 @@ export function SettingsDialogBody({
 		[onAppearanceChange],
 	);
 
-	const proposed = useDesignVariant() === "proposed";
 	const sections = (
 		<>
 					{error && (
@@ -391,18 +401,9 @@ export function SettingsDialogBody({
 	);
 
 	if (proposed) {
-		// The Proposed frame (spec: settings.md): one raised surface, the
-		// section list on the left in the sidebar's row anatomy, the
-		// section's grouped rows on the right, a quiet ✕ in the corner.
+		// Inside the dialog's content (SettingsDialog): the section list in
+		// the sidebar's row anatomy, the pane, a quiet ✕ in the corner.
 		return (
-			<div
-				role="dialog"
-				aria-modal="true"
-				aria-label="Settings"
-				data-testid="settings-dialog"
-				className="settings-dialog-pop flex h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-2xl"
-				onClick={(e) => e.stopPropagation()}
-			>
 				<Tabs orientation="vertical" value={active} onValueChange={(v) => setActive(v as SectionId)} className="contents">
 				<nav aria-label="Settings sections" data-testid="settings-nav" className="flex w-52 shrink-0 flex-col border-r p-2">
 					<NavSection title="Settings">
@@ -435,7 +436,6 @@ export function SettingsDialogBody({
 					</div>
 				</TabsContent>
 				</Tabs>
-			</div>
 		);
 	}
 

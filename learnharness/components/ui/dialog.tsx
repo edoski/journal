@@ -1,41 +1,52 @@
+"use client";
+
 import * as React from "react";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DIALOG_LAYER, claimEscape } from "@/components/ui/overlay";
 
-/** The dialog anatomy (spec: dialog.md): shadcn's dialog slots and
- *  classes, presentational only. Each dialog keeps its own portal,
- *  backdrop dismissal and Esc handling, so menus portalled out of a dialog
- *  still count as inside it and one Esc does one thing. */
+/** shadcn's Radix dialog on the Proposed tokens (spec: dialog.md). Only
+ *  Proposed code imports it. Esc and a click on the dimmed layer close it;
+ *  the menus, selects and popovers inside are Radix layers too, so they
+ *  count as inside and take the first Esc (overlay.md). */
 
-/** The dimmed layer under a dialog; spread `useBackdropDismiss` onto it. */
-export function DialogOverlay({ className, ...props }: React.ComponentProps<"div">) {
+const Dialog = DialogPrimitive.Root;
+const DialogTrigger = DialogPrimitive.Trigger;
+
+/** The dimmed layer under a dialog: black 50%. */
+function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
 	return (
-		<div
+		<DialogPrimitive.Overlay
 			data-slot="dialog-overlay"
-			className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4", className)}
+			className={cn(
+				DIALOG_LAYER,
+				"fixed inset-0 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none",
+				className,
+			)}
 			{...props}
 		/>
 	);
 }
 
-/** The panel: radius 12, the raised popover fill, padding 24, slots 16 apart. */
-export function DialogContent({ className, onClick, ...props }: React.ComponentProps<"div">) {
+/** The panel, portalled over the overlay: centred, radius 12, the raised
+ *  popover fill, padding 24, slots 16 apart, 150ms fade and zoom in. */
+function DialogContent({ className, onEscapeKeyDown, ...props }: React.ComponentProps<typeof DialogPrimitive.Content>) {
 	return (
-		<div
-			role="dialog"
-			aria-modal="true"
-			data-slot="dialog-content"
-			className={cn(
-				"settings-dialog-pop relative flex w-full max-w-lg flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl",
-				className,
-			)}
-			onClick={(e) => {
-				e.stopPropagation();
-				onClick?.(e);
-			}}
-			{...props}
-		/>
+		<DialogPrimitive.Portal>
+			<DialogOverlay />
+			<DialogPrimitive.Content
+				data-slot="dialog-content"
+				onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
+				className={cn(
+					DIALOG_LAYER,
+					"fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none",
+					className,
+				)}
+				{...props}
+			/>
+		</DialogPrimitive.Portal>
 	);
 }
 
@@ -44,13 +55,13 @@ export function DialogHeader({ className, ...props }: React.ComponentProps<"div"
 }
 
 /** 18/24 at 600. */
-export function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
-	return <h2 data-slot="dialog-title" className={cn("text-subheading font-semibold text-foreground", className)} {...props} />;
+function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+	return <DialogPrimitive.Title data-slot="dialog-title" className={cn("text-subheading font-semibold text-foreground", className)} {...props} />;
 }
 
 /** 14/20, muted. */
-export function DialogDescription({ className, ...props }: React.ComponentProps<"p">) {
-	return <p data-slot="dialog-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
+function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
+	return <DialogPrimitive.Description data-slot="dialog-description" className={cn("text-control text-muted-foreground", className)} {...props} />;
 }
 
 /** Actions at the right, the primary one last. */
@@ -59,17 +70,21 @@ export function DialogFooter({ className, ...props }: React.ComponentProps<"div"
 }
 
 /** The quiet ✕ in the panel's top-right corner. */
-export function DialogClose({ className, ...props }: React.ComponentProps<typeof Button>) {
+function DialogClose({ className, ...props }: React.ComponentProps<typeof Button>) {
 	return (
-		<Button
-			type="button"
-			variant="quiet"
-			size="icon-row"
-			data-slot="dialog-close"
-			className={cn("absolute right-4 top-4", className)}
-			{...props}
-		>
-			<XIcon />
-		</Button>
+		<DialogPrimitive.Close asChild>
+			<Button
+				type="button"
+				variant="quiet"
+				size="icon-row"
+				data-slot="dialog-close"
+				className={cn("absolute right-4 top-4", className)}
+				{...props}
+			>
+				<XIcon />
+			</Button>
+		</DialogPrimitive.Close>
 	);
 }
+
+export { Dialog, DialogTrigger, DialogOverlay, DialogContent, DialogTitle, DialogDescription, DialogClose };
