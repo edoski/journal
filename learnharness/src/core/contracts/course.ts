@@ -51,12 +51,14 @@ export type CourseResult =
 	| { ok: true; json: unknown }
 	| { ok: false; kind: "validation" | "io" | "unavailable"; message: string };
 
-/** The engine's read and write verbs a lesson uses. */
+/** The engine's read and write verbs a lesson uses. `plan` is read for
+ *  the exam run-up's figures. */
 export type CourseVerb =
 	| { verb: "resume"; task?: string }
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
-	| { verb: "save"; changes: unknown };
+	| { verb: "save"; changes: unknown }
+	| { verb: "plan" };
 
 /** Display label for a course: its title, else the directory name. */
 export function courseLabel(course: { workspace: string; title: string | null }): string {

@@ -14,7 +14,7 @@ const ADAPTER = fs.readFileSync(path.join(PATHS.root, "src", "agent", "prompts",
 const AGENTS = ["prober", "teacher", "practice"] as const;
 /** Sections no agent composes, and why: the week and the exam run-up read
  *  figures the course brief lacks; practice states difficulty itself. */
-const LEFT_OUT = { "teaching.md": ["Difficulty"], "reviews.md": ["The week", "Exam run-up"] } as const;
+const LEFT_OUT = { "teaching.md": ["Difficulty"], "reviews.md": ["The week"] } as const;
 const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
 const headings = (text: string) => text.split(/\r?\n/).filter((line) => line.startsWith("## ")).map((line) => line.slice(3));
 
@@ -135,7 +135,9 @@ describe("engine doctrine", () => {
 		assert.ok(practice.includes("Practice problems") && practice.includes("Hints") && !practice.includes("Finding the edge"));
 		for (const agent of AGENTS) {
 			const prompt = headings(courseRecordPrompt(agent));
-			assert.ok(!prompt.includes("The week") && !prompt.includes("Exam run-up"), `${agent} reads no figures it lacks`);
+			assert.ok(!prompt.includes("The week"), `${agent} reads no figures it lacks`);
+			// Only practice's brief carries the run-up figures (course-brief tests).
+			assert.equal(prompt.includes("Exam run-up"), agent === "practice", `${agent}: the exam run-up`);
 		}
 	});
 

@@ -22,11 +22,12 @@ process.env.LH_LEARNING_PYTHON = PYTHON;
 process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
 
 const { projectCourseBrief } = await import("../src/core/course-brief.ts");
-const { visibleCourseBriefKey, newCourseContextMessage } = await import("../src/core/native-messages.ts");
-const { handleChatRequest } = await import("../src/server/chat-handler.ts");
+const { visibleCourseBriefKey, newCourseContextMessage, newUserMessage } = await import("../src/core/native-messages.ts");
+const { buildModeHandoffSteer } = await import("../src/core/contracts/jobs.ts");
+const { handleChatInput, handleChatRequest } = await import("../src/server/chat-handler.ts");
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { chatStore } = await import("../src/store/chats.ts");
-const { createProberAgent } = await import("../src/agent/teacher-agent.ts");
+const { createPracticeAgent, createProberAgent } = await import("../src/agent/teacher-agent.ts");
 
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
@@ -39,8 +40,9 @@ const realEngine = fs.existsSync(ENGINE_PYTHON);
 
 type Resume = Record<string, unknown>;
 
-/** `resume` with no task in focus, then with ex-5 in focus. */
-function realResumes(): { open: Resume; focused: Resume } {
+/** `resume` with no task in focus, then with ex-5 in focus, and the day's
+ *  `plan` for the course (10 days before its exam: in the run-up). */
+function realResumes(): { open: Resume; focused: Resume; plan: Resume } {
 	const home = fs.mkdtempSync(path.join(TMP, "home-"));
 	const workspace = fs.mkdtempSync(path.join(TMP, "course-"));
 	const engine = (day: string, args: string[], input?: unknown) =>
@@ -81,16 +83,18 @@ function realResumes(): { open: Resume; focused: Resume } {
 		},
 	});
 	const open = JSON.parse(engine("2026-11-07", ["resume"])) as Resume;
+	const plan = JSON.parse(engine("2026-11-07", ["plan", "--days", "1"])) as Resume;
 	engine("2026-11-07", ["save"], { focus: "ex-5" });
-	return { open, focused: JSON.parse(engine("2026-11-07", ["resume"])) as Resume };
+	return { open, focused: JSON.parse(engine("2026-11-07", ["resume"])) as Resume, plan };
 }
 
 // CI sets LH_REQUIRE_REAL_ENGINE, so a moved venv fails the gate instead of skipping these.
 describe("course brief projection of the real engine's resume", { skip: !realEngine && !process.env.LH_REQUIRE_REAL_ENGINE && "learning engine not installed" }, () => {
 	let RESUME: Resume = {};
 	let FOCUSED: Resume = {};
+	let PLAN: Resume = {};
 	before(() => {
-		({ open: RESUME, focused: FOCUSED } = realResumes());
+		({ open: RESUME, focused: FOCUSED, plan: PLAN } = realResumes());
 	});
 
 	it("teach: the weekday, levels, due topics without review keys, every weak gap, every open task's step, preferences and pinned knowledge", () => {
@@ -116,6 +120,28 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 		const { text } = projectCourseBrief(RESUME, "practice");
 		assert.match(text, /- rank \(attempted\)\n {2}prompt: Why is rank the dimension of the column space\?\n {2}points: span; independence\n {2}gap: counts vectors/);
 		assert.match(text, /wrongly chose pivots ×1/);
+	});
+
+	it("practice reads the run-up the real engine's plan reports for the course", () => {
+		const workspace = String((PLAN.courses as Resume[])[0]!.workspace);
+		const { text } = projectCourseBrief(RESUME, "practice", { plan: PLAN, workspace });
+		assert.match(text, /\nExam run-up: 10 days left; not_introduced: [^;\n]*eigen[^;\n]*; unready: [^;\n]*rank/);
+	});
+
+	it("practice carries the exam run-up's figures from the engine's plan; teaching does not", () => {
+		const plan = {
+			today: "2026-11-07",
+			courses: [
+				{ workspace: "/study/other", runup: { days_left: 3, not_introduced: ["x"] } },
+				{ workspace: "/study/linalg", runup: { days_left: 12, not_introduced: ["eigen"], unready: ["rank", "systems"], study_days: 6, pace: 0.17 } },
+			],
+		};
+		const runup = { plan, workspace: "/study/linalg" };
+		const practice = projectCourseBrief(RESUME, "practice", runup).text;
+		assert.match(practice, /\nExam run-up: 12 days left; not_introduced: eigen; unready: rank, systems; study_days: 6; pace: 0\.17 new topics a study day\n/);
+		assert.doesNotMatch(projectCourseBrief(RESUME, "teach", runup).text, /Exam run-up/);
+		const outside = { plan: { courses: [{ workspace: "/study/linalg" }] }, workspace: "/study/linalg" };
+		assert.doesNotMatch(projectCourseBrief(RESUME, "practice", outside).text, /Exam run-up/, "outside the run-up the engine reports none");
 	});
 
 	it("a focused task shows its goal and step and names the other open tasks", () => {
@@ -168,6 +194,35 @@ describe("course brief injection", () => {
 		const firstUser = messages.findIndex((m) => m.role === "user");
 		assert.equal(messages.indexOf(briefs[0]!), firstUser - 1, "the brief precedes the learner's words");
 		assert.match((briefs[0] as { content: string }).content, /Due today:\n- rank \(assisted\)/);
+	});
+
+	it("a handoff to practice re-sends the brief for practice, with the run-up", async () => {
+		const workspace = "/study/linalg";
+		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-07", courses: [{ workspace, runup: { days_left: 12, unready: ["rank"] } }] });
+		const chat = chatStore.createChat("practise rank", { workspace, title: "Linear Algebra" });
+		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		const handoff = { id: "h1", role: "assistant", content: [{ type: "toolCall", id: "call-h1", name: "practice", arguments: { scope: "rank", reason: "asked" } }], api: "faux", provider: "t", model: "t", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "toolUse", timestamp: 1 };
+		const result = { id: "r1", role: "toolResult", toolCallId: "call-h1", toolName: "practice", content: [{ type: "text", text: "ok" }], details: { ok: true, mode: "practice" }, isError: false, timestamp: 2 };
+		chatStore.saveMessages(chat.id, [newUserMessage("give me problems on rank"), handoff as never, result as never]);
+		const faux = createFauxCore({});
+		faux.setResponses([fauxAssistantMessage([fauxText("Rank first: it is due.")])]);
+		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
+		const factory = (opts: { agent: string }) => {
+			assert.equal(opts.agent, "practice");
+			return createPracticeAgent({ chatId: chat.id, chatStore }, { ...(opts as object), engine });
+		};
+		const steer = buildModeHandoffSteer(chat.id, "call-h1", "practice");
+		const ack = await handleChatInput(chat.id, { type: "steers", steers: [steer] }, factory as never);
+		assert.equal(ack.status, 200);
+		const handle = runningTurn(chat.id);
+		if (handle) await new Response(handle.subscribe()).text();
+		delete process.env.FAKE_ENGINE_PLAN;
+		const messages = chatStore.getChat(chat.id)!.messages;
+		const brief = messages.find((m) => (m as { customType?: string }).customType === "course-context") as { content: string; details: { key: string } } | undefined;
+		assert.ok(brief, "the wake carries a brief");
+		assert.equal(JSON.parse(brief.details.key).at(-1), "practice", "the brief is practice's");
+		assert.match(brief.content, /Exam run-up: 12 days left; unready: rank/);
+		assert.ok(messages.indexOf(brief as never) < messages.findIndex((m) => m.id === steer.id), "the brief precedes the wake");
 	});
 
 	it("an unlinked session gets no brief", async () => {

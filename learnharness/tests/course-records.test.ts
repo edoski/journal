@@ -226,7 +226,7 @@ describe("course composition into the agents", () => {
 			assert.match(linked.state.systemPrompt, /## The course record/);
 			const plain = build();
 			assert.ok(!plain.state.tools.some((t) => t.name.startsWith("course_")));
-			assert.doesNotMatch(plain.state.systemPrompt, /The course record/);
+			assert.doesNotMatch(plain.state.systemPrompt, /## The course record/);
 		});
 	}
 });
@@ -275,6 +275,11 @@ describe("course records adapter (the real engine, throwaway course)", { skip: !
 		const text = JSON.stringify(resumed.json);
 		assert.match(text, /Scratch algebra/);
 		assert.match(text, /"rank"/);
+
+		const planned = await records.run(workspace, { verb: "plan" });
+		assert.ok(planned.ok, !planned.ok ? planned.message : "");
+		const courses = (planned.json as { courses: Array<{ workspace: string; title: string }> }).courses;
+		assert.deepEqual(courses.map((c) => [fs.realpathSync(c.workspace), c.title]), [[fs.realpathSync(workspace), "Scratch algebra"]], "plan reads this course alone");
 	});
 
 	it("create makes a new folder a titled course that the listing shows at once", async () => {
