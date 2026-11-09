@@ -31,7 +31,7 @@ function Tabs({
 }
 
 const tabsListVariants = cva(
-  "group/tabs-list inline-flex w-fit items-center text-muted-foreground group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:items-stretch",
+  "group/tabs-list inline-flex w-fit items-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col group-data-[orientation=vertical]/tabs:items-stretch",
   {
     variants: {
       variant: {
@@ -81,6 +81,7 @@ function TabsTrigger({
   )
 }
 
+/** Radix makes the panel focusable (tabIndex 0): it shows the ring inset. */
 function TabsContent({
   className,
   ...props
@@ -88,7 +89,7 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn("flex-1 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset", className)}
       {...props}
     />
   )
