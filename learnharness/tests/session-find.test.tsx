@@ -148,6 +148,13 @@ describe("sessionFindHasForegroundLayer — the one-Esc law", () => {
 		mount(`<div role="dialog" data-state="closed"></div>`);
 		assert.equal(sessionFindHasForegroundLayer(document), false);
 	});
+
+	it("a force-mounted closed popover (the lesson's details) is not surfaced, through its Popper wrapper either", () => {
+		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-lh-menu data-state="closed" hidden></div></div>`);
+		assert.equal(sessionFindHasForegroundLayer(document), false);
+		mount(`<div data-radix-popper-content-wrapper><div role="dialog" data-lh-menu data-state="open"></div></div>`);
+		assert.equal(sessionFindHasForegroundLayer(document), true);
+	});
 });
 
 describe("injectFindStyles — ::highlight rules ship outside the PostCSS pipeline", () => {

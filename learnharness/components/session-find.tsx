@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { ChevronDownIcon, ChevronUpIcon, SearchIcon, XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { kbdEventForAction, stepSessionMatch } from "@/src/core";
 import {
 	sameSessionRange, sessionFindRanges, sessionRangeIdentity, type SessionRangeIdentity,
@@ -52,6 +54,10 @@ export function sessionFindHasForegroundLayer(doc: Document): boolean {
 		'[data-lh-menu], [data-radix-popper-content-wrapper], [role="menu"], [role="dialog"], [data-testid="cheat-sheet"]',
 	)).some((element) => {
 		if (element.getAttribute("data-state") === "closed" || element.hasAttribute("hidden")) return false;
+		// A force-mounted popover keeps its Popper wrapper while closed; the
+		// wrapper carries no state, its content does.
+		const content = element.hasAttribute("data-radix-popper-content-wrapper") ? element.firstElementChild : null;
+		if (content && (content.getAttribute("data-state") === "closed" || content.hasAttribute("hidden"))) return false;
 		const view = doc.defaultView;
 		if (typeof view?.getComputedStyle !== "function") return true;
 		const style = view.getComputedStyle(element);
@@ -162,9 +168,7 @@ export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }:
 
 	if (!open) return null;
 	const proposed = variant === "proposed";
-	const buttonClass = proposed
-		? "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40 motion-reduce:transition-none"
-		: "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
+	const buttonClass = "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
 	return (
 		<div
 			role="search"
@@ -197,6 +201,25 @@ export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }:
 			<output aria-live="polite" data-testid="session-find-count" className={proposed ? "mr-1 shrink-0 text-label tabular-nums text-muted-foreground" : "shrink-0 text-xs tabular-nums text-muted-foreground"}>
 				{query ? `${result.index + 1}/${result.count}` : ""}
 			</output>
+			{proposed ? (
+				<>
+					<Hint label="Previous match" binding="shift+enter" side="bottom">
+						<Button variant="quiet" size="icon-row" aria-label="Previous match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
+							<ChevronUpIcon aria-hidden />
+						</Button>
+					</Hint>
+					<Hint label="Next match" binding="enter" side="bottom">
+						<Button variant="quiet" size="icon-row" aria-label="Next match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(1)}>
+							<ChevronDownIcon aria-hidden />
+						</Button>
+					</Hint>
+					<Hint label="Close Find" binding="escape" side="bottom">
+						<Button variant="quiet" size="icon-row" aria-label="Close Find" onClick={close}>
+							<XIcon aria-hidden />
+						</Button>
+					</Hint>
+				</>
+			) : (<>
 			<button type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" className={buttonClass}
 				disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
 				<ChevronUpIcon className="size-4" aria-hidden />
@@ -208,6 +231,7 @@ export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }:
 			<button type="button" aria-label="Close Find" title="Close Find (Esc)" className={buttonClass} onClick={close}>
 				<XIcon className="size-4" aria-hidden />
 			</button>
+			</>)}
 		</div>
 	);
 }

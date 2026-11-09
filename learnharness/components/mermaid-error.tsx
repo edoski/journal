@@ -3,6 +3,35 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { MermaidErrorComponentProps } from "streamdown";
+import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+
+/** The failed diagram's source, collapsed. Proposed: the shadcn
+ *  Collapsible with a quiet 13px trigger. */
+function DiagramSource({ chart }: { chart: string }) {
+	if (useLessonDesign().variant === "proposed") {
+		return (
+			<Collapsible className="mt-3">
+				<CollapsibleTrigger className="-mx-1 rounded-md px-1 text-row text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:text-foreground motion-reduce:transition-none">
+					Show diagram source
+				</CollapsibleTrigger>
+				<CollapsibleContent>
+					<pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">{chart}</pre>
+				</CollapsibleContent>
+			</Collapsible>
+		);
+	}
+	return (
+		<details className="mt-3">
+			<summary className="cursor-pointer text-xs text-muted-foreground">
+				Show diagram source
+			</summary>
+			<pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">
+				{chart}
+			</pre>
+		</details>
+	);
+}
 
 /**
  * Fallback for mermaid diagrams that fail to parse — wired via Streamdown's
@@ -29,14 +58,7 @@ export const MermaidError = ({
 		<p className="mt-1 font-mono text-xs break-words text-muted-foreground">
 			{error}
 		</p>
-		<details className="mt-3">
-			<summary className="cursor-pointer text-xs text-muted-foreground">
-				Show diagram source
-			</summary>
-			<pre className="mt-2 overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">
-				{chart}
-			</pre>
-		</details>
+		<DiagramSource chart={chart} />
 		<Button className="mt-3" onClick={retry} size="sm" variant="outline">
 			Retry
 		</Button>

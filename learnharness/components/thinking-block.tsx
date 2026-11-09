@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { cn } from "@/lib/utils";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 /** The unified user-thinking row (owner round, 2026-10-05): ONE visual
  *  language for every surface where the learner's own thinking renders —
@@ -96,27 +97,26 @@ export function ThinkingBlock({
 	);
 	if (variant === "proposed") {
 		return (
-			<div
+			<Collapsible
+				open={open}
+				onOpenChange={setOpen}
 				data-testid={testId}
 				data-slot="learner-note"
 				data-commit={dataCommit === undefined ? undefined : dataCommit ? "true" : "false"}
 				className={cn("lh-card-enter w-full", inCard ? "mt-3" : "my-1 rounded-xl bg-card px-4 py-3")}
 			>
-				<button
-					type="button"
+				<CollapsibleTrigger
 					data-testid={testId ? `${testId}-trigger` : undefined}
-					onClick={(e) => {
-						setOpen((v) => !v);
-						blurAfterPointerClick(e);
-					}}
-					aria-expanded={open}
+					onClick={blurAfterPointerClick}
 					className="-mx-1 flex items-center gap-1 rounded-md px-1 text-row text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 				>
 					{label === "YOUR THINKING" ? "Your thinking" : label}
 					<ChevronDownIcon className={cn("size-4 shrink-0 transition-transform motion-reduce:transition-none", open ? "rotate-180" : "rotate-0")} />
-				</button>
-				{open && <p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground">{text}</p>}
-			</div>
+				</CollapsibleTrigger>
+				<CollapsibleContent asChild>
+					<p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground">{text}</p>
+				</CollapsibleContent>
+			</Collapsible>
 		);
 	}
 	return (

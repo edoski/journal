@@ -8,6 +8,7 @@ import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
 import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 /**
  * The sub-agent result delivery card (contracts.ts "THE ASYNC PROTOCOL" §4).
@@ -86,6 +87,13 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
 	// The honest count is READ pages (extract/render — sources v1 split);
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
+	if (quiet) {
+		return (
+			<BriefDisclosure testid="pdf-complete-badge" summary={`PDF reading complete${readPages.length > 0 ? ` · read ${readPages.length} page${readPages.length === 1 ? "" : "s"}` : ""}`}>
+				<PdfBriefCard output={result} />
+			</BriefDisclosure>
+		);
+	}
 	return (
 		<details data-testid="pdf-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
@@ -114,6 +122,13 @@ function PdfCompleteBadge({ result }: { result: PdfResult }) {
  * the artifact part in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 	const quiet = useLessonDesign().variant === "proposed";
+	if (quiet) {
+		return (
+			<BriefDisclosure testid="research-complete-badge" summary={`Research complete${result.sources.length > 0 ? ` · ${result.sources.length} sources` : ""}`}>
+				<ResearchBriefCard output={result} />
+			</BriefDisclosure>
+		);
+	}
 	return (
 		<details data-testid="research-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
 			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
@@ -128,5 +143,20 @@ function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
 				<ResearchBriefCard output={result} />
 			</div>
 		</details>
+	);
+}
+
+/** The Proposed complete badge: a quiet line that discloses the brief. */
+function BriefDisclosure({ testid, summary, children }: { testid: string; summary: string; children: React.ReactNode }) {
+	return (
+		<Collapsible data-testid={testid} className="group w-full text-row text-muted-foreground">
+			<CollapsibleTrigger className="-mx-1 flex items-center gap-2 rounded-md px-1 text-left outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none">
+				<CheckIcon className="size-4" />
+				<span>{summary}</span>
+				<span className="group-data-[state=open]:hidden">· View brief</span>
+				<span className="hidden group-data-[state=open]:inline">· Hide brief</span>
+			</CollapsibleTrigger>
+			<CollapsibleContent className="mt-2">{children}</CollapsibleContent>
+		</Collapsible>
 	);
 }

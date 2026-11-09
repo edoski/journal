@@ -1326,7 +1326,6 @@ export function Chat({
 										onBlur={() => void commitRename(titleDraft)}
 										spellCheck={false}
 										aria-label="Session title"
-										title="Rename this session"
 										className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-prose font-semibold caret-current outline-none [field-sizing:content]"
 									/>
 								) : (

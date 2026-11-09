@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { LessonCard } from "@/components/lesson/lesson-card";
 
 /** Recovery belongs to the transcript, never the answer dock. The caller
@@ -18,10 +19,12 @@ export function MalformedQuestion({ onRetry, disabled, reason, variant = "curren
 				<p>This question could not be displayed.{onRetry ? " Retry it or send a message to continue." : ""}</p>
 				{reason && <p className="mt-1">{reason}</p>}
 				{onRetry && (
-					<Button type="button" variant="quiet" size="sm" className="-ml-2 mt-2 h-8 px-2 text-row font-medium text-foreground" disabled={disabled}
-						title={reason ?? "Requests a replacement from the model."} data-testid="retry-malformed-question" onClick={onRetry}>
-						Retry question
-					</Button>
+					<Hint label={reason ?? "Requests a replacement from the model."}>
+						<Button type="button" variant="quiet" size="sm" className="-ml-2 mt-2 h-8 px-2 text-row font-medium text-foreground" disabled={disabled}
+							data-testid="retry-malformed-question" onClick={onRetry}>
+							Retry question
+						</Button>
+					</Hint>
 				)}
 			</LessonCard>
 		);
