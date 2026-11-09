@@ -40,7 +40,12 @@ function installRadixDom() {
 		Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
 	}
 	Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800, ResizeObserver: NoopResizeObserver, getComputedStyle });
-	dom.window.HTMLElement.prototype.scrollIntoView = () => {};
+	Object.assign(dom.window.HTMLElement.prototype, {
+		scrollIntoView() {},
+		hasPointerCapture: () => false,
+		setPointerCapture() {},
+		releasePointerCapture() {},
+	});
 	return dom;
 }
 

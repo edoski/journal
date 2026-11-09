@@ -1,14 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { CheckIcon, ChevronDownIcon, GraduationCapIcon } from "lucide-react";
+import { ChevronDownIcon, GraduationCapIcon, PlusIcon } from "lucide-react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
-import { MenuShell } from "@/components/menu-shell";
-import { MENU_ITEM, MENU_ITEM_SELECTED, MENU_SURFACE } from "@/components/ui/menu";
 import { Button } from "@/components/ui/button";
-import { Input, inputVariants } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
+import { Hint } from "@/components/ui/hint";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuSeparator,
+	DropdownMenuShortcut,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogContent, DialogFooter, DialogHeader, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { courseLabel, type CourseListing, type CourseSummary } from "@/src/core";
@@ -167,28 +177,27 @@ export function CoursesUnavailable({ reason, variant = "current" }: { reason: st
 
 /** The course pill: which course record the session studies from and saves
  *  into. The last entry opens the New course dialog. */
-export function CoursePicker({ courses, workspace, onChange, onNew, variant = "current" }: {
+export function CoursePicker(props: {
 	courses: readonly CourseSummary[];
 	workspace: string;
 	onChange: (workspace: string) => void;
 	onNew: () => void;
-	/** "proposed": a quiet 32px pill for the composer toolbar. */
+	/** "proposed": a quiet 32px pill for the composer toolbar that opens the
+	 *  shared dropdown menu. */
 	variant?: "current" | "proposed";
 }) {
+	if (props.variant === "proposed") return <CourseMenu {...props} />;
+	const { courses, workspace, onChange, onNew } = props;
 	const picked = courses.find((c) => c.workspace === workspace);
 	return (
 		<label
 			data-testid="course-picker"
-			data-slot={variant === "proposed" ? "composer-chip" : undefined}
 			className={
-				variant === "proposed"
-					? "relative flex h-8 min-w-0 cursor-pointer items-center gap-1.5 rounded-full px-3 text-row transition-colors hover:bg-fill-hover hover:text-foreground has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring motion-reduce:transition-none " +
-						(picked ? "text-foreground" : "text-muted-foreground")
-					: "relative flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 font-ui text-xs transition-colors hover:bg-accent " +
-						(picked ? "border-border bg-card text-foreground" : "border-dashed border-border/80 text-muted-foreground hover:text-foreground")
+				"relative flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 font-ui text-xs transition-colors hover:bg-accent " +
+				(picked ? "border-border bg-card text-foreground" : "border-dashed border-border/80 text-muted-foreground hover:text-foreground")
 			}
 		>
-			<GraduationCapIcon aria-hidden="true" className={variant === "proposed" ? "size-4 shrink-0 text-muted-foreground" : "size-3.5 text-muted-foreground"} />
+			<GraduationCapIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
 			<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : "Pick a course"}</span>
 			<select
 				aria-label="Course"
@@ -211,84 +220,77 @@ export function CoursePicker({ courses, workspace, onChange, onNew, variant = "c
 	);
 }
 
+/** The Proposed course chip: the courses as one choice, each with its due
+ *  count, then "New course…" as an action. */
+function CourseMenu({ courses, workspace, onChange, onNew }: {
+	courses: readonly CourseSummary[];
+	workspace: string;
+	onChange: (workspace: string) => void;
+	onNew: () => void;
+}) {
+	const picked = courses.find((c) => c.workspace === workspace);
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				data-testid="course-picker"
+				data-slot="composer-chip"
+				aria-label="Course"
+				className={cn(
+					"flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-row outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:bg-fill-hover motion-reduce:transition-none",
+					picked ? "text-foreground" : "text-muted-foreground",
+				)}
+			>
+				<GraduationCapIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+				<span className="max-w-[16rem] truncate">{picked ? courseLabel(picked) : "Pick a course"}</span>
+				<ChevronDownIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="start" className="w-64" data-testid="course-menu">
+				{courses.length > 0 && (
+					<>
+						<DropdownMenuRadioGroup value={picked ? workspace : ""} onValueChange={onChange}>
+							{courses.map((c) => (
+								<DropdownMenuRadioItem key={c.workspace} value={c.workspace} data-testid="course-option">
+									<span className="min-w-0 flex-1 truncate">{courseLabel(c)}</span>
+									{c.due > 0 && <DropdownMenuShortcut>{c.due} due</DropdownMenuShortcut>}
+								</DropdownMenuRadioItem>
+							))}
+						</DropdownMenuRadioGroup>
+						<DropdownMenuSeparator />
+					</>
+				)}
+				<DropdownMenuItem onSelect={onNew} data-testid="course-new">
+					<PlusIcon aria-hidden="true" />
+					New course…
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
 /** A root as the dialog shows it: its last two folders. */
 function rootLabel(root: string): string {
 	return root.split("/").filter(Boolean).slice(-2).join("/");
 }
 
-/** The New course dialog's study root under the Proposed design: a field
- *  that opens the shared menu (components/ui/menu.md) at its own width.
- *  An open menu takes the first Esc, so the dialog closes only on the next. */
-function RootMenuField({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
-	const [open, setOpen] = useState(false);
-	const triggerRef = useRef<HTMLButtonElement>(null);
-	const close = useCallback((refocus: boolean) => {
-		setOpen(false);
-		if (refocus) triggerRef.current?.focus();
-	}, []);
-	useEffect(() => {
-		if (!open) return;
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key !== "Escape") return;
-			e.preventDefault();
-			e.stopPropagation();
-			close(true);
-		};
-		const onPointerDown = (e: PointerEvent) => {
-			const t = e.target;
-			if (t instanceof Node && triggerRef.current?.contains(t)) return;
-			if (t instanceof Element && t.closest("[data-lh-menu]")) return;
-			close(false);
-		};
-		document.addEventListener("keydown", onKeyDown, true);
-		document.addEventListener("pointerdown", onPointerDown);
-		return () => {
-			document.removeEventListener("keydown", onKeyDown, true);
-			document.removeEventListener("pointerdown", onPointerDown);
-		};
-	}, [open, close]);
+/** The New course dialog's study root under the Proposed design: the
+ *  shared select at the field's width; the hint carries the full path. */
+function RootSelect({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
+	const trigger = (
+		<SelectTrigger data-testid="new-course-root" aria-label="Study root" disabled={roots.length === 0} className="w-full font-normal">
+			<SelectValue placeholder="No study root" />
+		</SelectTrigger>
+	);
 	return (
-		<>
-			<button
-				ref={triggerRef}
-				type="button"
-				aria-haspopup="menu"
-				aria-expanded={open}
-				disabled={roots.length === 0}
-				title={value || undefined}
-				data-testid="new-course-root"
-				onClick={() => setOpen((o) => !o)}
-				onKeyDown={(e) => {
-					if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-					e.preventDefault();
-					setOpen(true);
-				}}
-				className={cn(inputVariants(), "flex items-center gap-2 text-left font-normal hover:bg-fill-hover")}
-			>
-				<span className="min-w-0 flex-1 truncate">{value ? rootLabel(value) : "No study root"}</span>
-				<ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-			</button>
-			{open && (
-				<MenuShell anchorRef={triggerRef} testid="new-course-root-menu" preferredSide="down" align="left" matchAnchorWidth menuClass={MENU_SURFACE}>
-					{roots.map((r) => (
-						<button
-							key={r}
-							type="button"
-							title={r}
-							data-testid="new-course-root-option"
-							onClick={() => {
-								onChange(r);
-								close(true);
-							}}
-							className={cn(MENU_ITEM, "justify-between", r === value && MENU_ITEM_SELECTED)}
-						>
-							<span className="min-w-0 truncate">{rootLabel(r)}</span>
-							{r === value && <CheckIcon aria-hidden className="size-3.5! text-muted-foreground" />}
-						</button>
-					))}
-				</MenuShell>
-			)}
-		</>
+		<Select value={value || undefined} onValueChange={onChange}>
+			{value ? <Hint label={value}>{trigger}</Hint> : trigger}
+			<SelectContent data-testid="new-course-root-menu">
+				{roots.map((r) => (
+					<SelectItem key={r} value={r} data-testid="new-course-root-option">
+						{rootLabel(r)}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
 	);
 }
 
@@ -340,7 +342,7 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 						</label>
 						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
 							Study root
-							<RootMenuField roots={roots} value={root} onChange={setRoot} />
+							<RootSelect roots={roots} value={root} onChange={setRoot} />
 						</label>
 						{roots.length === 0 && (
 							<p className="text-row text-muted-foreground">

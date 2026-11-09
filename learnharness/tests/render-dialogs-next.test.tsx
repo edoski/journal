@@ -136,9 +136,8 @@ describe("Proposed dialogs keep their actions", () => {
 		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
 		assert.ok(doc.querySelector('[data-testid="new-course-title"]'));
 		const root = doc.querySelector('[data-testid="new-course-root"]');
-		assert.equal(root?.tagName, "BUTTON", "the study root opens the shared menu, not a browser select");
-		assert.equal(root?.textContent, "study/courses");
-		assert.equal(root?.getAttribute("aria-haspopup"), "menu");
+		assert.equal(root?.getAttribute("role"), "combobox", "the study root opens the shared select, not a browser select");
+		assert.equal(doc.querySelectorAll("select:not([aria-hidden])").length, 0, "only Radix's hidden form select");
 		assert.equal(doc.querySelector('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
 		assert.ok([...doc.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
 	});
