@@ -126,6 +126,7 @@ def _course(
     due = progress.due(record, today, levels=levels, order=order)
     key, task = selected_task(record)
     countdown = exam(record, today)
+    current = record.get("path", {}).get("current")
     return compact(
         {
             "workspace": str(workspace.directory),
@@ -138,7 +139,10 @@ def _course(
             "due": due[:DUE_LIMIT],
             "due_more": max(0, len(due) - DUE_LIMIT) or None,
             "upcoming": progress.upcoming(record, today, days, order=order),
-            "current": record.get("path", {}).get("current"),
+            "current": current,
+            "current_title": record["topics"][current].get("title")
+            if current
+            else None,
             "task": compact(
                 {"key": key, "title": task.get("title"), "step": task.get("step")}
             )

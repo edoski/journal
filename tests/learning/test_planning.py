@@ -51,7 +51,11 @@ ALGEBRA = {
     "journal": "SMM",
     "topics": {
         "systems": {"review": {"due": day(-2), "prompt": "Solve unaided"}},
-        "rank": {"needs": ["systems"], "review": {"due": day(3)}},
+        "rank": {
+            "title": "Rank",
+            "needs": ["systems"],
+            "review": {"due": day(3)},
+        },
         "eigen": {"needs": ["rank"], "review": {"due": day(12)}},
     },
     "path": {"current": "rank"},
@@ -86,6 +90,7 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         ],
         "upcoming": [{"topic": "rank", "due": day(3)}],
         "current": "rank",
+        "current_title": "Rank",
         "task": {"key": "ex5", "title": "Exercise 5", "step": "Why unique?"},
         "open_tasks": 2,
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
