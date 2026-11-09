@@ -1,4 +1,4 @@
-"""Read projections of the course: resume (the session opener), show and search.
+"""Read projections of the course: resume (the session opener), show, map and search.
 
 Every projection carries whole stored items, never clipped ones; budgets decide
 which items fit. Keys with no content are omitted, so absent means "none".
@@ -22,6 +22,7 @@ EVIDENCE_BYTES = 6144
 KNOWLEDGE_BYTES = 3072
 DUE_LIMIT = progress.DUE_LIMIT
 WEAK_LIMIT = 6
+WEAK_FLAGS = ("lapsed", "stale", "choice_errors", "confident_errors")
 TASK_OBSERVATIONS = 5
 TOPIC_OBSERVATIONS = 3
 OMITTED_LIMIT = 12
@@ -241,6 +242,10 @@ def _brief(item: dict[str, Any], shown: Collection[str]) -> dict[str, Any]:
     return {name: value for name, value in item.items() if name not in TOPIC_DETAIL}
 
 
+def _is_weak(topic: dict[str, Any], standing: dict[str, Any]) -> bool:
+    return "gap" in topic or any(flag in standing for flag in WEAK_FLAGS)
+
+
 def _weak(
     record: dict[str, Any],
     levels: dict[str, dict[str, Any]],
@@ -250,13 +255,12 @@ def _weak(
     weak = []
     for key in order:
         topic, standing = record["topics"][key], levels[key]
-        flags = ("lapsed", "stale", "choice_errors", "confident_errors")
-        if not ("gap" in topic or any(flag in standing for flag in flags)):
+        if not _is_weak(topic, standing):
             continue
         item = {"topic": key, "level": standing["level"]}
         if "gap" in topic:
             item["gap"] = topic["gap"]
-        for flag in (*flags, "last"):
+        for flag in (*WEAK_FLAGS, "last"):
             if flag in standing:
                 item[flag] = standing[flag]
         weak.append(_brief(item, shown))
@@ -443,6 +447,69 @@ def show(
         "sources": _sources(record, [*items.values(), *evidence.values()]),
     }
     return compact(result)
+
+
+# --- map --------------------------------------------------------------------
+
+
+def course_map(workspace: Workspace) -> dict[str, Any]:
+    """Every topic with its edges, level, review and weak verdict, in path order.
+
+    The whole course at once and nothing capped, with no observation text: the
+    projection a map of the course draws from. ``overdue`` is present exactly
+    when the topic is due today.
+    """
+    record = records.load(workspace)
+    today = clock.today()
+    levels = progress.standings(record)
+    order = progress.path_order(record)
+    overdue = {
+        item["topic"]: item["overdue"]
+        for item in progress.due(record, today, levels=levels, order=order)
+    }
+    partners = progress.contrasts(record)
+    tasks = record["tasks"]
+    topics = []
+    for key in order:
+        topic, standing = record["topics"][key], levels[key]
+        entry = {
+            "topic": key,
+            "title": topic.get("title"),
+            "needs": topic.get("needs", []),
+            "contrasts": partners[key],
+            "level": standing["level"],
+            "introduced": topic.get("introduced"),
+            "review": topic.get("review", {}).get("due"),
+            "overdue": overdue.get(key),
+            "weak": _is_weak(topic, standing),
+            "gap": topic.get("gap"),
+            **{flag: standing[flag] for flag in WEAK_FLAGS if flag in standing},
+            "tasks": [
+                name for name, task in tasks.items() if key in task.get("topics", ())
+            ],
+        }
+        topics.append(compact(entry, keep=("needs", "contrasts", "tasks", "weak")))
+    countdown = exam(record, today)
+    return compact(
+        {
+            "today": today.isoformat(),
+            "revision": record.get("revision", 0),
+            "title": record.get("title"),
+            "exam": {"date": countdown["date"], "days_left": countdown["days_left"]}
+            if countdown and "date" in countdown
+            else None,
+            "current": record.get("path", {}).get("current"),
+            "focus": record.get("focus"),
+            "tasks": [
+                compact(
+                    {"key": key, "title": task.get("title"), "step": task.get("step")}
+                )
+                for key, task in tasks.items()
+            ],
+            "topics": topics,
+        },
+        keep=("topics",),
+    )
 
 
 # --- search -----------------------------------------------------------------

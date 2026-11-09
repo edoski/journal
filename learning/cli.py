@@ -59,6 +59,10 @@ def show(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def course_map(args: argparse.Namespace) -> dict[str, Any]:
+    return retrieval.course_map(_workspace(args))
+
+
 def search(args: argparse.Namespace) -> dict[str, Any]:
     return retrieval.search(
         _optional_workspace(args),
@@ -261,6 +265,12 @@ COMMANDS: tuple[Command, ...] = (
         "Whole items by handle, or the whole record with --all",
         show,
         _build_show,
+    ),
+    Command(
+        "map",
+        "Every topic with its edges, level, review and weak verdict",
+        course_map,
+        _build_nothing,
     ),
     Command(
         "search",
