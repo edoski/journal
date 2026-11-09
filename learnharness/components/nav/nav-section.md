@@ -8,6 +8,7 @@ A titled group of sidebar rows: the sessions of one course. `data-slot="nav-sect
 |---|---|---|
 | root | `section`, labelled by its header | rows follow the header with no extra gap |
 | header | `h2` | 28px band, 12/16, weight 500, sentence case, `muted-foreground`, left edge on the rows' label edge (padding 8) |
+| trailing | `span` in the header | optional fact at the right edge, 12/16 weight 400, tabular figures, same muted ink; the course's exam countdown ("Exam in 21 days") |
 
 Sections sit 12px apart (between rows' 0 and the sidebar blocks' 16). The header is quieter than its rows: smaller (12 against 13) and never full ink.
 

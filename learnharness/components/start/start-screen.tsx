@@ -12,8 +12,8 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
-import { CourseLines } from "@/components/start/course-lines";
-import type { CourseLine } from "@/components/start/course-facts";
+import { CourseChips } from "@/components/start/course-chips";
+import { CHIP_OPENING } from "@/components/start/course-facts";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { GraphSnapshot } from "@/src/core";
@@ -22,7 +22,7 @@ type Mode = "teach" | "practice";
 /** A practice pick as the learner saw it in the chain table. */
 type DraftPick = { id: string; name: string; statement: string };
 
-const LINE_START_FAILURE = "Couldn’t open the session. Try again.";
+const CHIP_START_FAILURE = "Couldn’t open the session. Try again.";
 
 /** The heading over the composer: Today asks about the day, the draft
  *  about the session. */
@@ -34,7 +34,7 @@ export function startHeading(today: boolean, mode: Mode): string {
 /**
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
  * anatomy: a light question, the composer centred in a 736px column, and
- * under it, on Today, one line per course with Review and Continue. Home
+ * under it, on Today, one chip per course. Home
  * (`today`) and the draft at /chat/new share it; a session is created only
  * when something is sent, through the same path the current screens use.
  */
@@ -45,7 +45,7 @@ export function StartScreen({
 }: {
 	initialConfigured: boolean;
 	initialMode?: Mode;
-	/** Home: the day's question and the course lines. */
+	/** Home: the day's question and the course chips. */
 	today?: boolean;
 }) {
 	const router = useRouter();
@@ -129,11 +129,11 @@ export function StartScreen({
 		launch(draft, mode, course, OPENING_PROMPT_FAILURE, mode === "practice" ? picks : undefined);
 	};
 
-	// Review practises the due topics (the practice brief carries their
-	// review prompts); Continue teaches from the open task or current topic.
-	const startLine = (line: CourseLine, kind: Mode, opening: string) => {
+	// A chip opens a teaching session in its course; the tutor takes the
+	// reviews due first, then the open task (CHIP_OPENING).
+	const startCourse = (workspace: string) => {
 		if (startingRef.current || !canStart()) return;
-		launch(opening, kind, line.workspace, LINE_START_FAILURE);
+		launch(CHIP_OPENING, "teach", workspace, CHIP_START_FAILURE);
 	};
 
 	const { state } = courseChoice;
@@ -215,11 +215,10 @@ export function StartScreen({
 						</div>
 					)}
 					{today && state.status === "ready" && (
-						<CourseLines
+						<CourseChips
 							courses={state.courses}
 							disabled={busy}
-							onReview={(line) => line.review && startLine(line, "practice", line.review.opening)}
-							onContinue={(line) => line.continue && startLine(line, "teach", line.continue.opening)}
+							onStart={(chip) => startCourse(chip.workspace)}
 							onNewCourse={() => setCreatingCourse(true)}
 						/>
 					)}

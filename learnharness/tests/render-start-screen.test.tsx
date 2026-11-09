@@ -1,5 +1,5 @@
 /**
- * The Proposed start surface (polish pass phase 2): Today's course lines
+ * The Proposed start surface (polish pass phase 2): Today's course chips
  * read the engine's facts and start sessions through the shared path; the
  * shared composer's proposed variant. Same tsx classic-JSX shim as the
  * other render tests.
@@ -11,8 +11,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { courseLine } from "../components/start/course-facts.ts";
-import { CourseLines } from "../components/start/course-lines.tsx";
+import { courseChip, examText } from "../components/start/course-facts.ts";
+import { CourseChips } from "../components/start/course-chips.tsx";
 import { startHeading } from "../components/start/start-screen.tsx";
 import { Composer } from "../components/composer.tsx";
 import type { CourseSummary } from "../src/core/index.ts";
@@ -34,47 +34,40 @@ function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
 }
 
-describe("Today course line", () => {
-	it("states the exam countdown, the reviews due with the most overdue topic, and the open task's step", () => {
-		const line = courseLine(LINALG);
-		assert.equal(line.exam, "Exam in 21 days");
-		assert.equal(line.reviews, "6 reviews due, most overdue: Linear independence");
-		assert.equal(line.next, "Part (c)");
+describe("Today course chips", () => {
+	it("names the course and the reviews due, and says in the tooltip what the session takes up", () => {
+		const chip = courseChip(LINALG);
+		assert.equal(chip.title, "Linear Algebra");
+		assert.equal(chip.due, "6 due");
+		assert.equal(chip.hint, "6 reviews due, then Problem sheet 4: Part (c)");
+	});
+
+	it("drops the count with nothing due and the tooltip with nothing to take up", () => {
+		const idle = courseChip(course({}));
+		assert.equal(idle.due, null);
+		assert.equal(idle.hint, null);
+		assert.equal(courseChip(course({ due: 1 })).hint, "1 review due");
+		assert.equal(courseChip(course({ task: "Sheet 2" })).hint, "Sheet 2");
 	});
 
 	it("words the exam day and the day before, and drops a past exam", () => {
-		assert.equal(courseLine(course({ exam: { date: "d", daysLeft: 0 } })).exam, "Exam today");
-		assert.equal(courseLine(course({ exam: { date: "d", daysLeft: 1 } })).exam, "Exam tomorrow");
-		assert.equal(courseLine(course({ exam: { date: "d", daysLeft: -2 } })).exam, null);
+		assert.equal(examText({ date: "d", daysLeft: 21 }), "Exam in 21 days");
+		assert.equal(examText({ date: "d", daysLeft: 0 }), "Exam today");
+		assert.equal(examText({ date: "d", daysLeft: 1 }), "Exam tomorrow");
+		assert.equal(examText({ date: "d", daysLeft: -2 }), null);
+		assert.equal(examText(null), null);
 	});
 
-	it("offers Review only when something is due and Continue only with a task or a current topic", () => {
-		const idle = courseLine(course({}));
-		assert.equal(idle.review, null);
-		assert.equal(idle.continue, null);
-		assert.equal(idle.reviews, null);
-		assert.deepEqual(courseLine(course({ current: "bayes" })).continue, { opening: "Continue where I left off", hint: "Continue Linear Algebra" });
-		assert.equal(courseLine(course({ due: 1, mostOverdue: "Span" })).reviews, "1 review due: Span");
-	});
-
-	it("opens Review as a practice of what's due and Continue at the open task", () => {
-		const line = courseLine(LINALG);
-		assert.deepEqual(line.review, { opening: "Review what's due" });
-		assert.deepEqual(line.continue, { opening: "Continue Problem sheet 4", hint: "Problem sheet 4: Part (c)" });
-	});
-
-	it("renders one entry per course with its actions, and a New course entry when there are none", () => {
+	it("renders one chip per course, and a New course chip when there are none", () => {
 		const doc = documentFor(
-			<CourseLines courses={[LINALG, course({ workspace: "/study/prob", title: "Probability" })]} disabled={false} onReview={() => {}} onContinue={() => {}} onNewCourse={() => {}} />,
+			<CourseChips courses={[LINALG, course({ workspace: "/study/prob", title: "Probability" })]} disabled={false} onStart={() => {}} onNewCourse={() => {}} />,
 		);
-		const lines = [...doc.querySelectorAll('[data-slot="course-line"]')];
-		assert.equal(lines.length, 2);
-		assert.deepEqual([...lines[0]!.querySelectorAll("button")].map((b) => b.getAttribute("aria-label")), ["Review Linear Algebra", "Continue Linear Algebra"]);
-		assert.equal(lines[1]!.querySelectorAll("button").length, 0);
-		assert.match(lines[0]!.textContent ?? "", /Exam in 21 days · 6 reviews due/);
+		const chips = [...doc.querySelectorAll('[data-slot="course-chip"]')];
+		assert.deepEqual(chips.map((c) => c.textContent), ["Linear Algebra· 6 due", "Probability"]);
+		assert.equal(chips[0]!.getAttribute("aria-label"), "Linear Algebra: 6 reviews due, then Problem sheet 4: Part (c)");
 		assert.doesNotMatch(doc.body.textContent ?? "", /%|streak|level/i);
-		const empty = documentFor(<CourseLines courses={[]} disabled={false} onReview={() => {}} onContinue={() => {}} onNewCourse={() => {}} />);
-		assert.match(empty.body.textContent ?? "", /No courses yet\..*New course/);
+		const empty = documentFor(<CourseChips courses={[]} disabled={false} onStart={() => {}} onNewCourse={() => {}} />);
+		assert.match(empty.body.textContent ?? "", /New course/);
 	});
 
 	it("asks the day's question on Today and the session's on the draft", () => {

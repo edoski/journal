@@ -44,6 +44,22 @@ export function unavailableMessage(reason: string): string {
 	return `Courses are unavailable: ${reason}`;
 }
 
+let asking: Promise<CourseListing> | null = null;
+
+/** The engine's course list. Callers that ask while a request is in flight
+ *  share it (Today's composer and the sidebar mount together, each asking
+ *  `plan --all`); the next ask after it settles reads fresh. */
+export function fetchCourses(): Promise<CourseListing> {
+	if (!asking) {
+		const request = fetch("/api/courses").then((r) => r.json() as Promise<CourseListing>);
+		asking = request;
+		void request.catch(() => {}).finally(() => {
+			asking = null;
+		});
+	}
+	return asking;
+}
+
 /** The engine's courses and the picked one. `remember` restores and stores
  *  the last pick; the link banner turns it off, because an old session's
  *  course is not the one last studied. */
@@ -53,8 +69,7 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const [notice, setNotice] = useState<string | null>(null);
 	useEffect(() => {
 		let live = true;
-		void fetch("/api/courses")
-			.then((r) => r.json() as Promise<CourseListing>)
+		void fetchCourses()
 			.then((listing) => {
 				if (!live) return;
 				if (!listing.available) {

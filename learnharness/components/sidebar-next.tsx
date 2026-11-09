@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { DumbbellIcon, NetworkIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { courseLabel, type ChatListItem } from "@/src/core";
+import { fetchCourses } from "@/components/course-picker";
+import { examText } from "@/components/start/course-facts";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { MenuShell } from "@/components/menu-shell";
@@ -159,6 +161,33 @@ function RenameRowNext({ chat, onCommit, onCancel }: { chat: ChatListItem; onCom
 }
 
 
+/** Each course's exam countdown ("Exam in 21 days"), by workspace, from
+ *  the engine's `plan`; empty until it answers or when it cannot. Asked
+ *  once per mount: the sidebar lives for the whole window. */
+function useExamCountdowns(): ReadonlyMap<string, string> {
+	const [exams, setExams] = useState<ReadonlyMap<string, string>>(new Map());
+	useEffect(() => {
+		let live = true;
+		void fetchCourses()
+			.then((listing) => {
+				if (!live || !listing.available) return;
+				const next = new Map<string, string>();
+				for (const c of listing.courses) {
+					const text = examText(c.exam);
+					if (text) next.set(c.workspace, text);
+				}
+				setExams(next);
+			})
+			.catch(() => {
+				/* no countdown is the quiet failure: the sessions still list */
+			});
+		return () => {
+			live = false;
+		};
+	}, []);
+	return exams;
+}
+
 /** The Proposed sidebar: the app mark and collapse, one New lesson action
  *  (practice beside it), Today and Knowledge, a quiet search, sessions by
  *  course, background agents only while one runs, Settings at the foot. */
@@ -168,6 +197,7 @@ export function SidebarNext() {
 	const { feed } = useActivity();
 	const running = feed.jobs.length > 0 || feed.extractions.length > 0;
 	const s = useSessionsSidebar({ open, toggle });
+	const exams = useExamCountdowns();
 
 	const groups = useMemo(() => (s.chats ? groupByCourse(filterSessions(s.chats, s.query)) : null), [s.chats, s.query]);
 	// The search walks the rows in the order they are drawn.
@@ -271,7 +301,7 @@ export function SidebarNext() {
 						</p>
 					) : (
 						groups.map((group) => (
-							<NavSection key={group.key} title={group.label}>
+							<NavSection key={group.key} title={group.label} trailing={exams.get(group.key)}>
 								{group.sessions.map((c) =>
 									s.renamingId === c.id ? (
 										<RenameRowNext
