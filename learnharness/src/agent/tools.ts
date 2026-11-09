@@ -15,7 +15,7 @@ import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
 import { planTools, type PlanToolContext } from "./tools/plan.ts";
 import { probeDoneTool, type ProbeDoneContext } from "./tools/probe.ts";
-import { practiceHandoffTool } from "./tools/handoff.ts";
+import { withPracticeHandoff } from "./tools/handoff.ts";
 import { proberGraphTools } from "./tools/graph.ts";
 import { readTool } from "./tools/read.ts";
 import { lsTool } from "./tools/ls.ts";
@@ -200,7 +200,7 @@ export function createProberTools(
 	// healToolRecord (owner, 2026-10-09 — the whitehead generalization):
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
-	return healToolRecord({
+	return withPracticeHandoff(healToolRecord({
 		...filterEnabledTools(
 			{
 				ask_user_question: askUserQuestionTool,
@@ -230,9 +230,7 @@ export function createProberTools(
 		// quizzing switch must never drop the only graded tool.
 		recall: probeExplainTool,
 		...done,
-		// The prober routes the opening: a request to practise hands off.
-		...practiceHandoffTool(ctx),
-	});
+	}), ctx); // the prober routes the opening: a request to practise hands off
 }
 
 // ─── the teacher's question tool (explain carries the position field) ────────
@@ -283,7 +281,7 @@ export function createTeacherTools(
 	enabled?: EnabledTools,
 ): Record<string, AgentTool<any>> {
 	// healToolRecord — same standard as the prober's registry (above).
-	return healToolRecord({
+	const tools = healToolRecord({
 		...filterEnabledTools(
 			{
 			ask_user_question: askUserQuestionTool,
@@ -301,6 +299,6 @@ export function createTeacherTools(
 		enabled,
 		),
 		explain: teachExplainToolFor(ctx),
-		...(ctx.deliver ? practiceHandoffTool({ chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }) : {}),
 	});
+	return ctx.deliver ? withPracticeHandoff(tools, { chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }) : tools;
 }

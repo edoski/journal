@@ -1036,6 +1036,12 @@ export function needsContinuation(messages: readonly LhMessage[]): boolean {
 		(m) => m.toolName === PRACTICE_PROBLEM_TOOL && !m.isError && m.details == null,
 	);
 	if (posedProblem) return false;
+	// A mode handoff ends its turn the same way: its wake starts the next
+	// agent's run, so a continuation here would run that agent twice.
+	const handedOff = results.some(
+		(m) => MODE_HANDOFF_TOOLS[m.toolName] !== undefined && !m.isError && (m.details as { ok?: unknown } | null)?.ok === true,
+	);
+	if (handedOff) return false;
 	const answered = new Set(results.map((m) => m.toolCallId));
 	const calls = (content as Array<{ type?: string; id?: string }>).filter(
 		(b) => b.type === "toolCall" && typeof b.id === "string",

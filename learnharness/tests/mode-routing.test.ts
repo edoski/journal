@@ -28,6 +28,7 @@ import type { PiEngine } from "../src/agent/models.ts";
 import { createPracticeAgent, createProberAgent, createTeacherAgent, type AgentKind } from "../src/agent/teacher-agent.ts";
 import { practiceHandoffTool, teachHandoffTool } from "../src/agent/tools/handoff.ts";
 import { practiceTools } from "../src/agent/tools/practice.ts";
+import { createProberTools } from "../src/agent/tools.ts";
 import { handleChatInput, handleChatRequest } from "../src/server/chat-handler.ts";
 import { deliverJobResult, setTurnRunner } from "../src/server/jobs.ts";
 import { runningTurn } from "../src/server/turn-runs.ts";
@@ -35,7 +36,7 @@ import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
 import { PATHS } from "../config.ts";
 import { MODE_HANDOFF_ACK_TEXT, MODE_HANDOFF_TEXT, type SteerMessage } from "../src/core/contracts.ts";
-import { activeProblemOf, newUserMessage, sessionModeOf, type LhMessage } from "../src/core/native-messages.ts";
+import { activeProblemOf, needsContinuation, newUserMessage, sessionModeOf, type LhMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
 
 process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
@@ -71,6 +72,13 @@ function questionCall(id: string): LhMessage[] {
 			stopReason: "toolUse",
 			timestamp: 1,
 		},
+	];
+}
+
+function callPair(name: string, id: string, details: unknown): LhMessage[] {
+	return [
+		{ ...questionCall(id)[0]!, content: [{ type: "toolCall", id, name, arguments: {} }] } as LhMessage,
+		{ id: `r_${id}`, role: "toolResult", toolCallId: id, toolName: name, content: [{ type: "text", text: "ok" }], details, isError: false, timestamp: 2 } as LhMessage,
 	];
 }
 
@@ -117,11 +125,41 @@ describe("the handoff tools", () => {
 		assert.deepEqual(queued.map((s) => s.id), ["steer_mode_call-t2"]);
 	});
 
-	it("a failed wake still records the handoff: the next learner message runs the new agent", async () => {
+	it("a failed wake still records the handoff", async () => {
 		const chatId = newChat("wake fails");
 		const { practice } = practiceHandoffTool({ chatId, chatStore, deliver: () => { throw new Error("pipeline down"); } });
 		const result = await run(practice!, "call-h3", { scope: "open", reason: "nothing named" });
 		assert.deepEqual(result.details, { ok: true, mode: "practice" });
+	});
+
+	it("a successful handoff owes no continuation: its wake starts the next run", () => {
+		const [call, result] = callPair("practice", "h-c", { ok: true, mode: "practice" });
+		assert.equal(needsContinuation([newUserMessage("give me problems"), call!, result!]), false);
+		const [other, otherResult] = callPair("read", "r-c", null);
+		assert.equal(needsContinuation([newUserMessage("read it"), other!, otherResult!]), true, "an ordinary tool result still owes one");
+	});
+
+	it("in one turn, a handoff after a question or a concluded probe is refused, and a question after a handoff", async () => {
+		const ctx = (chatId: string, queued: SteerMessage[]) => ({ chatId, chatStore, deliver: (s: SteerMessage) => queued.push(s), jobStore, spawn: () => {} });
+		const recall = { question: "What is rank?", correctAnswer: "The dimension of the column space." };
+
+		const askedFirst: SteerMessage[] = [];
+		const a = createProberTools(ctx(newChat("question then handoff"), askedFirst));
+		assert.equal((await run(a.recall!, "q1", recall)).isError, undefined);
+		assert.equal((await run(a.practice!, "h1", { scope: "rank", reason: "asked" })).isError, true);
+
+		const handedFirst: SteerMessage[] = [];
+		const b = createProberTools(ctx(newChat("handoff then question"), handedFirst));
+		assert.deepEqual((await run(b.practice!, "h2", { scope: "rank", reason: "asked" })).details, { ok: true, mode: "practice" });
+		assert.equal((await run(b.recall!, "q2", recall)).isError, true);
+		assert.equal((await run(b.probe_done!, "pd2", { strands: [{ strand: "rank", assessment: "x" }], summary: "x" })).isError, true);
+
+		const probed: SteerMessage[] = [];
+		const c = createProberTools(ctx(newChat("probe then handoff"), probed));
+		await run(c.probe_done!, "pd3", { strands: [{ strand: "rank", assessment: "x" }], summary: "x" });
+		assert.equal((await run(c.practice!, "h3", { scope: "rank", reason: "asked" })).isError, true);
+
+		assert.deepEqual([askedFirst, handedFirst, probed].map((q) => q.map((s) => s.customType)), [[], ["mode-handoff"], ["probe-handoff"]]);
 	});
 
 	it("the practice agent's registry carries teach; the turn gate closes it while the pose stands", async () => {
