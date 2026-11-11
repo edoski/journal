@@ -1,8 +1,7 @@
 /**
  * The Proposed start surface (polish pass phase 2): the screen asks without
- * naming a mode; the shared composer's proposed variant. Today's waiting
- * work has its own tests (today-waiting.test.tsx). Same tsx classic-JSX shim as the
- * other render tests.
+ * naming a mode and holds only the composer; the shared composer's proposed
+ * variant. Same tsx classic-JSX shim as the other render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -34,6 +33,15 @@ describe("the start screen (Proposed)", () => {
 			assert.equal(doc.querySelector('[role="radiogroup"]'), null);
 			assert.equal(doc.querySelector('[data-testid="practice-props-chip"]'), null);
 			assert.doesNotMatch(doc.body.textContent ?? "", /\bTeach\b|\bPractice\b/);
+		}
+	});
+
+	it("holds the heading and the composer and nothing else", () => {
+		for (const today of [true, false]) {
+			const main = screen(today).querySelector('[data-slot="start-screen"]');
+			assert.ok(main?.querySelector('[data-slot="composer"]'));
+			assert.equal(main?.querySelectorAll("h1, h2, h3").length, 1);
+			assert.doesNotMatch(main?.textContent ?? "", /Continue|Other courses|Exam in/);
 		}
 	});
 
