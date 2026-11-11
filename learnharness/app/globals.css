@@ -635,8 +635,8 @@ body {
 
 /* ============================================================
  * THE PROPOSED DESIGN (polish pass, 9 Nov 2026). The dev-only design
- * switch (components/dev/polish-switcher.js) sets data-polish-design on
- * <html>; production never does, so production stays on the tokens above.
+ * switch (the Logbook's in-app guide, through components/dev/polish-variant.js)
+ * sets data-polish-design on <html>; production never does, so production stays on the tokens above.
  * Shipping Proposed = this selector becomes the token source and the
  * Current values above go. Sources: research/agent-apps.md (T3 Code,
  * Codex, Claude desktop tokens), Apple HIG, the owner's decisions: SF Pro
