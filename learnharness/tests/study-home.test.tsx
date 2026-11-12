@@ -23,6 +23,9 @@ import {
 	todayRows,
 	waitingSessions,
 } from "../components/study-home/study-facts.ts";
+import { lessonOf, spanWords, topicSpan, trackMarks } from "../components/study-home/lesson-facts.ts";
+import { LessonButton } from "../components/study-home/lesson-button.tsx";
+import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
@@ -161,6 +164,42 @@ describe("today's lines", () => {
 	});
 });
 
+describe("lessons", () => {
+	const lesson = (course: StudyCourse) => lessonOf(todayRows([course], [], TODAY)[0]!);
+
+	it("words a course's step as a lesson: its name, what follows, its button and its topics' place in the path", () => {
+		const review = lesson(LINALG);
+		assert.equal(review.title, "Review Linear independence, Rank and more");
+		assert.equal(review.detail, "Then Problem sheet 4");
+		assert.equal(review.action, "Review");
+		assert.equal(review.exam, "Exam in 21 days");
+		assert.equal(spanWords(review.place!), "Topics 2 to 4 of 5");
+		const topic = lesson(PROB);
+		assert.deepEqual([topic.title, topic.detail, topic.action, spanWords(topic.place!)], ["Continue Bayes' rule", null, "Continue", "Topic 2 of 2"]);
+		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null } }).action, "Start");
+	});
+
+	it("leaves out a Then that only repeats a review", () => {
+		const course: StudyCourse = { ...ANALYSIS, map: { ...ANALYSIS.map, current: "seq" as TopicHandle } };
+		assert.deepEqual([lesson(course).title, lesson(course).detail], ["Review Sequences", null]);
+	});
+
+	it("places a waiting session at the course topics its transcript worked on", () => {
+		const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
+		const reply = lessonOf(todayRows([LINALG], [waiting], TODAY)[0]!);
+		assert.deepEqual([reply.kind, reply.title, reply.detail, reply.action], ["reply", "Eigen lesson", "Waiting for your reply", "Open"]);
+		assert.deepEqual(reply.open, { kind: "session", href: "/chat/q" });
+		assert.equal(spanWords(reply.place!), "Topic 5 of 5");
+		const unplaced = lessonOf(todayRows([LINALG], [{ ...waiting, topics: [] }], TODAY)[0]!);
+		assert.equal(unplaced.place, null);
+		assert.equal(topicSpan(LINALG, ["gone"] as TopicHandle[]), null);
+	});
+
+	it("marks every topic of the path as today's, started or ahead", () => {
+		assert.deepEqual(trackMarks(LINALG, lesson(LINALG).topics), ["started", "today", "today", "today", "ahead"]);
+	});
+});
+
 describe("the study read", () => {
 	it("joins the map with plan's run-up, today's review and last activity, dropping handles the map does not list", () => {
 		const plan = {
@@ -198,5 +237,27 @@ describe("Today", () => {
 		const doc = render(<Today rows={todayRows(many, [], TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
 		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
 		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
+	});
+});
+
+describe("a lesson on a study home", () => {
+	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
+	const render = (node: React.ReactNode) =>
+		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
+	const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen"] });
+	const [reply, review] = todayRows([LINALG, ANALYSIS], [waiting], TODAY).map(lessonOf) as [ReturnType<typeof lessonOf>, ReturnType<typeof lessonOf>];
+
+	it("reads as its course with the exam and its place, its name, then what follows, and counts no reviews", () => {
+		const text = render(<LessonText lesson={reply} />).body.textContent ?? "";
+		assert.match(text, /^Linear AlgebraExam in 21 daysTopic 5 of 5Eigen lessonWaiting for your reply$/);
+		assert.equal(render(<LessonText lesson={review} />).body.textContent, "Real AnalysisTopic 1 of 1Review Sequences");
+		assert.doesNotMatch(render(<LessonText lesson={reply} place={false} />).body.textContent ?? "", /Topic/);
+	});
+
+	it("opens a waiting session by link and a course's step by button", () => {
+		const link = render(<LessonButton lesson={reply} busy={false} onContinue={() => {}}>{reply.action}</LessonButton>).querySelector("a");
+		assert.deepEqual([link?.getAttribute("href"), link?.textContent], ["/chat/q", "Open"]);
+		const button = render(<LessonButton lesson={review} busy onContinue={() => {}}>{review.action}</LessonButton>).querySelector("button");
+		assert.deepEqual([button?.textContent, button?.hasAttribute("disabled")], ["Review", true]);
 	});
 });
