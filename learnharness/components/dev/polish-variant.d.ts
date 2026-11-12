@@ -1,8 +1,13 @@
-export type PolishVariant = "current" | "proposed";
+/** "current", "proposed", or one of a group's `options`. */
+export type PolishVariant = string;
 
 export interface PolishGroup {
 	id: string;
 	label?: string;
+	/** The group's candidates besides Current; without it the group offers Current and Proposed. */
+	options?: readonly string[];
+	/** Values of other groups every option of this group needs. */
+	requires?: Readonly<Record<string, string>>;
 }
 
 export function polishVariant(group: string): PolishVariant;

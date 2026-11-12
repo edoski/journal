@@ -1,6 +1,6 @@
 # StudyHome
 
-The Proposed design's study home at `/`: where studying stands across every course, separate from the composer (New lesson, `/chat/new`). `data-slot="study-home"`, `data-candidate` names the candidate shown. Explore mode: three ship-ready candidates, each its own Current/Proposed group in the Logbook guide (`home-a`, `home-b`, `home-c`; Alt+2 to Alt+4). With one on Proposed, `/` is the home in that candidate (turning one on turns the others off in development; A before B before C if storage holds several); with all on Current, `/` is the composer, the surface as it was. Production resolves to Current. Shipping one deletes the others, the `candidate` branch, their groups and `useHomeCandidate`, and `/` becomes the home.
+The Proposed design's study home at `/`: where studying stands across every course, separate from the composer (New lesson, `/chat/new`). `data-slot="study-home"`, `data-candidate` names the candidate shown. Explore mode: three ship-ready candidates, the options of one `home` group in the Logbook guide (Current, A, B, C; any candidate wears Design's Proposed). With Home on a candidate, `/` is the home in that candidate; with Home on Current, `/` is the composer, the surface as it was. Production resolves to Current. Shipping one deletes the others, the `candidate` branch, the `home` group and `useHomeCandidate`, and `/` becomes the home.
 
 | Candidate | Folder | Thesis |
 |---|---|---|
