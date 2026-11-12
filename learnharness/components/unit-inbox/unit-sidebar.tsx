@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, type ChatListItem } from "@/src/core";
@@ -13,7 +13,9 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { sessionState } from "@/components/nav/session-state";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
 import { SessionItem } from "@/components/unit-inbox/session-item";
+import { SidebarResizeHandle } from "@/components/unit-inbox/sidebar-resize-handle";
 import { onSidebarTreeKeyDown } from "@/components/unit-inbox/sidebar-tree";
+import { useSidebarWidth } from "@/components/unit-inbox/sidebar-width";
 import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
 import { UnitShelf } from "@/components/unit-inbox/unit-shelf";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
@@ -46,7 +48,8 @@ const ICON_BUTTON =
  * lesson beside it, then one list. The topics to act on come first with no
  * header, each a card that opens its page; the folded shelves sit at the
  * foot (Working, Known, Other sessions). Background agents show only while
- * one runs; Settings is the footer's icon.
+ * one runs; Settings is the footer's icon. Its right edge drags to resize,
+ * as T3 Code's does; the width lasts across reloads.
  */
 export function UnitSidebar() {
 	const { open, toggle } = useSidebar();
@@ -61,178 +64,187 @@ export function UnitSidebar() {
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";
 	const focusFirstRow = () => s.listRef.current?.querySelector<HTMLElement>("[data-sidebar-row]")?.focus();
+	const width = useSidebarWidth();
+	const sidebarRef = useRef<HTMLElement>(null);
+	const sidebarId = useId();
 
 	return (
-		<aside
-			className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-64" : "w-0")}
-			aria-hidden={!open}
-			data-testid="sidebar"
-		>
-			<div className="flex h-full w-64 flex-col border-r bg-background">
-				<div className="lh-drag lh-lights-band shrink-0" />
+		<>
+			<aside
+				ref={sidebarRef}
+				id={sidebarId}
+				style={{ "--sidebar-width": `${width}px` } as React.CSSProperties}
+				className={cn("sidebar-motion shrink-0 overflow-hidden duration-200 motion-reduce:transition-none", open ? "w-(--sidebar-width)" : "w-0")}
+				aria-hidden={!open}
+				data-testid="sidebar"
+			>
+				<div className="flex h-full w-(--sidebar-width) flex-col border-r bg-background">
+					<div className="lh-drag lh-lights-band shrink-0" />
 
-				<div className="lh-drag mb-px flex shrink-0 items-center gap-1 px-2 pt-2">
-					<Link
-						href="/"
-						data-slot="sidebar-home"
-						aria-current={s.pathname === "/" ? "page" : undefined}
-						onClick={blurAfterPointerClick}
-						className={cn(
-							"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
-							s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
-						)}
-					>
-						<HouseIcon aria-hidden className="size-4 shrink-0" />
-						Home
-					</Link>
-					<Hint label="Close sidebar" action="toggle-sidebar">
-						<button type="button" aria-label="Close sidebar" onClick={toggle} className={ICON_BUTTON}>
-							<PanelLeftCloseIcon />
-						</button>
-					</Hint>
-				</div>
-
-				<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
-					<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
-						<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
-							<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
-								<SearchIcon aria-hidden className="size-4 shrink-0" />
-								<input
-									ref={s.searchRef}
-									data-testid="session-search"
-									value={s.query}
-									onChange={(e) => s.changeQuery(e.target.value)}
-									onKeyDown={(e) => {
-										if (!query && e.key === "ArrowDown") {
-											e.preventDefault();
-											focusFirstRow();
-											return;
-										}
-										s.onSearchKeyDown(e, found?.sessions ?? null);
-									}}
-									placeholder="Search"
-									aria-label="Search topics and sessions"
-									spellCheck={false}
-									className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
-								/>
-								{s.query && (
-									<button
-										type="button"
-										aria-label="Clear search"
-										onClick={() => s.changeQuery("")}
-										className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-									>
-										<XIcon aria-hidden className="size-3.5" />
-									</button>
-								)}
-							</label>
-						</Hint>
-						{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
-					</div>
-					<Hint label="New lesson" action="new-session" side="bottom">
-						<button
-							type="button"
-							data-testid="new-session"
-							aria-label="New lesson"
-							className={ICON_BUTTON}
-							onClick={(e) => {
-								s.router.push("/chat/new");
-								blurAfterPointerClick(e);
-							}}
+					<div className="lh-drag mb-px flex shrink-0 items-center gap-1 px-2 pt-2">
+						<Link
+							href="/"
+							data-slot="sidebar-home"
+							aria-current={s.pathname === "/" ? "page" : undefined}
+							onClick={blurAfterPointerClick}
+							className={cn(
+								"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+								s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+							)}
 						>
-							<SquarePenIcon />
-						</button>
-					</Hint>
-				</div>
+							<HouseIcon aria-hidden className="size-4 shrink-0" />
+							Home
+						</Link>
+						<Hint label="Close sidebar" action="toggle-sidebar">
+							<button type="button" aria-label="Close sidebar" onClick={toggle} className={ICON_BUTTON}>
+								<PanelLeftCloseIcon />
+							</button>
+						</Hint>
+					</div>
 
-				<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
-					<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
-						{state.status === "loading" ? (
-							<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Loading…</li>
-						) : found ? (
-							found.units.length + found.sessions.length === 0 ? (
-								<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
+					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
+						<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
+							<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
+								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
+									<SearchIcon aria-hidden className="size-4 shrink-0" />
+									<input
+										ref={s.searchRef}
+										data-testid="session-search"
+										value={s.query}
+										onChange={(e) => s.changeQuery(e.target.value)}
+										onKeyDown={(e) => {
+											if (!query && e.key === "ArrowDown") {
+												e.preventDefault();
+												focusFirstRow();
+												return;
+											}
+											s.onSearchKeyDown(e, found?.sessions ?? null);
+										}}
+										placeholder="Search"
+										aria-label="Search topics and sessions"
+										spellCheck={false}
+										className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
+									/>
+									{s.query && (
+										<button
+											type="button"
+											aria-label="Clear search"
+											onClick={() => s.changeQuery("")}
+											className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+										>
+											<XIcon aria-hidden className="size-3.5" />
+										</button>
+									)}
+								</label>
+							</Hint>
+							{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
+						</div>
+						<Hint label="New lesson" action="new-session" side="bottom">
+							<button
+								type="button"
+								data-testid="new-session"
+								aria-label="New lesson"
+								className={ICON_BUTTON}
+								onClick={(e) => {
+									s.router.push("/chat/new");
+									blurAfterPointerClick(e);
+								}}
+							>
+								<SquarePenIcon />
+							</button>
+						</Hint>
+					</div>
+
+					<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
+						<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
+							{state.status === "loading" ? (
+								<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Loading…</li>
+							) : found ? (
+								found.units.length + found.sessions.length === 0 ? (
+									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
+								) : (
+									<>
+										{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
+										{found.units.map((u) =>
+											u.shelf === "known" ? (
+												<TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} />
+											) : (
+												<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
+											),
+										)}
+										{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
+										{found.sessions.map((c) => (
+											<SessionItem key={c.id} chat={c} s={s} highlighted={c.id === walked} />
+										))}
+									</>
+								)
 							) : (
 								<>
-									{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
-									{found.units.map((u) =>
-										u.shelf === "known" ? (
-											<TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} />
-										) : (
-											<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
-										),
-									)}
-									{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
-									{found.sessions.map((c) => (
-										<SessionItem key={c.id} chat={c} s={s} highlighted={c.id === walked} />
+									{state.inbox.active.map((u) => (
+										<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
 									))}
+									{state.inbox.active.length + state.inbox.working.length + state.inbox.known.length + state.inbox.other.length === 0 && (
+										<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing studied yet</li>
+									)}
+									<li aria-hidden className="mt-auto list-none" />
+									<UnitShelf
+										id="working"
+										label={SHELF_WORDS.working}
+										items={state.inbox.working}
+										folded={folded.working}
+										onFoldedChange={(next) => fold("working", next)}
+										isActive={isOpen}
+										waits={() => false}
+										renderItem={(u) => <TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:working" />}
+									/>
+									<UnitShelf
+										id="known"
+										label={SHELF_WORDS.known}
+										items={state.inbox.known}
+										folded={folded.known}
+										onFoldedChange={(next) => fold("known", next)}
+										isActive={isOpen}
+										waits={() => false}
+										renderItem={(u) => <TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:known" />}
+									/>
+									<UnitShelf
+										id="other"
+										label={SHELF_WORDS.other}
+										items={state.inbox.other}
+										folded={folded.other}
+										onFoldedChange={(next) => fold("other", next)}
+										isActive={(c) => s.pathname === `/chat/${c.id}`}
+										waits={(c) => sessionState(c) === "your-turn"}
+										renderItem={(c) => <SessionItem key={c.id} chat={c} s={s} parent="shelf:other" />}
+									/>
 								</>
-							)
-						) : (
-							<>
-								{state.inbox.active.map((u) => (
-									<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
-								))}
-								{state.inbox.active.length + state.inbox.working.length + state.inbox.known.length + state.inbox.other.length === 0 && (
-									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing studied yet</li>
-								)}
-								<li aria-hidden className="mt-auto list-none" />
-								<UnitShelf
-									id="working"
-									label={SHELF_WORDS.working}
-									items={state.inbox.working}
-									folded={folded.working}
-									onFoldedChange={(next) => fold("working", next)}
-									isActive={isOpen}
-									waits={() => false}
-									renderItem={(u) => <TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:working" />}
-								/>
-								<UnitShelf
-									id="known"
-									label={SHELF_WORDS.known}
-									items={state.inbox.known}
-									folded={folded.known}
-									onFoldedChange={(next) => fold("known", next)}
-									isActive={isOpen}
-									waits={() => false}
-									renderItem={(u) => <TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:known" />}
-								/>
-								<UnitShelf
-									id="other"
-									label={SHELF_WORDS.other}
-									items={state.inbox.other}
-									folded={folded.other}
-									onFoldedChange={(next) => fold("other", next)}
-									isActive={(c) => s.pathname === `/chat/${c.id}`}
-									waits={(c) => sessionState(c) === "your-turn"}
-									renderItem={(c) => <SessionItem key={c.id} chat={c} s={s} parent="shelf:other" />}
-								/>
-							</>
-						)}
-					</ul>
-				</ScrollArea>
+							)}
+						</ul>
+					</ScrollArea>
 
-				{running && <ActivitySection variant="proposed" />}
+					{running && <ActivitySection variant="proposed" />}
 
-				<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
-					<Hint label="Settings" action="open-settings" side="right">
-						<button
-							type="button"
-							data-testid="settings-entry"
-							aria-label="Settings"
-							className={ICON_BUTTON}
-							onClick={(e) => {
-								openSettings();
-								blurAfterPointerClick(e);
-							}}
-						>
-							<SettingsIcon />
-						</button>
-					</Hint>
+					<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
+						<Hint label="Settings" action="open-settings" side="right">
+							<button
+								type="button"
+								data-testid="settings-entry"
+								aria-label="Settings"
+								className={ICON_BUTTON}
+								onClick={(e) => {
+									openSettings();
+									blurAfterPointerClick(e);
+								}}
+							>
+								<SettingsIcon />
+							</button>
+						</Hint>
+					</div>
 				</div>
-			</div>
 
-			<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
-		</aside>
+				<DeleteSessionDialog chat={s.deleting} onClose={() => s.setDeleting(null)} onDeleted={s.onDeleted} />
+			</aside>
+			{open && <SidebarResizeHandle width={width} sidebarId={sidebarId} sidebar={sidebarRef} />}
+		</>
 	);
 }

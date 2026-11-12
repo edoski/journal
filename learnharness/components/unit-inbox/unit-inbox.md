@@ -30,6 +30,24 @@ The Proposed sidebar (`unit-sidebar.tsx`, behind the Sidebar switch) is T3 Code'
 
 States: hover lifts the row to `fill-hover`, the open row (its page, or one of its sessions) holds `fill-selected` with `aria-current="page"`, keyboard focus is a 2px inset ring with no fill change.
 
+## Width
+
+The right edge resizes the sidebar, as T3 Code's rail does (`sidebar-width.ts`, `sidebar-resize-handle.tsx`, `data-slot="sidebar-resize"`).
+
+| | Value | T3 Code's |
+|---|---|---|
+| default | 256px (16rem) | `THREAD_SIDEBAR_DEFAULT_WIDTH = 16 * 16` (`threadSidebarWidth.ts`) |
+| minimum | 208px (13rem) | `THREAD_SIDEBAR_MIN_WIDTH = 13 * 16` |
+| maximum | the window less 640px for the page, never under the minimum | `THREAD_MAIN_CONTENT_MIN_WIDTH = 40 * 16`, `resolveThreadSidebarMaximumWidth` |
+| handle | 16px wide, centred on the border, from under the 52px window band to the foot; a 2px line shows on hover, focus and drag | `SidebarRail`: `w-4`, `after:w-[2px]`, `hover:after:bg-sidebar-border` (`ui/sidebar.tsx`) |
+| cursor | `w-resize` on the handle, `col-resize` on the body while dragging, with text selection off | `SidebarRail` `cursor-w-resize`; `useResizeDrag` sets `col-resize` and `user-select: none` |
+| drag | pointer capture; the width is written straight to the sidebar each frame with its slide off, and stored once the pointer lets go; leaving the window commits where the pointer was; closing the sidebar mid-drag drops the drag | `useResizeDrag` (`requestAnimationFrame`, blur commits, unmount cancels) |
+| double-click | back to 256px, the stored width forgotten | `AppSidebarLayout` `SidebarRail onDoubleClick={resetSidebarWidth}` |
+| kept | `localStorage` `lh:sidebar-width`, narrowed to fit a smaller window | `chat_thread_sidebar_width`, `resolveInitialThreadSidebarWidth` |
+| keyboard | the handle is a focusable `separator` (vertical, with its value, minimum and maximum, controlling the sidebar): ← and → move it 16px, Home to the minimum, End to the maximum; the tooltip says "Drag to resize" | T3 Code's rail has none; WAI-ARIA's window splitter pattern |
+
+The open and close slide, the window's drag band and the Home row with its close button are as before; the handle exists only while the sidebar is open.
+
 ## Keyboard
 
 Every row is a Tab stop; `sidebar-tree.ts` moves focus without opening: ↑/↓ step through the rows, Home and End jump to the ends, → opens a folded shelf (or steps into an open one), ← folds it or goes back from a shelf row to its header. Enter opens; Space opens a topic. ↓ from an empty search goes to the first row; with a query, ↑/↓ walk the matching sessions and Enter opens one.
@@ -50,4 +68,4 @@ A session's topics come from its own transcript (`sessionTopicsOf` in `src/core/
 
 ## Sources
 
-T3 Code's sidebar at `pingdotgg/t3code@315b06c5` (`Sidebar.tsx`, `Sidebar.logic.ts`, `sidebar/SidebarThreadRow.tsx`, `ui/collapsible-section-header.tsx`, `lib/sidebarTree.ts`), in its default inbox mode, the one Edo uses: the headerless list of cards (78px there, 60px here without the third line), the folded Working, Snoozed and Settled shelves at the foot with counts, chevrons and the 10-row tail, the open row kept on a folded shelf, the status slot that gives way to one action on hover, the project filter and new-thread button beside the search, arrow keys that move focus without opening. Its thread view puts the composer at the foot of a 46rem column.
+T3 Code's sidebar at `pingdotgg/t3code@315b06c5` (`Sidebar.tsx`, `AppSidebarLayout.tsx`, `threadSidebarWidth.ts`, `hooks/useResizeDrag.ts`, `ui/sidebar.tsx`'s `SidebarRail`, `Sidebar.logic.ts`, `sidebar/SidebarThreadRow.tsx`, `ui/collapsible-section-header.tsx`, `lib/sidebarTree.ts`), in its default inbox mode, the one Edo uses: the headerless list of cards (78px there, 60px here without the third line), the folded Working, Snoozed and Settled shelves at the foot with counts, chevrons and the 10-row tail, the open row kept on a folded shelf, the status slot that gives way to one action on hover, the project filter and new-thread button beside the search, arrow keys that move focus without opening. Its thread view puts the composer at the foot of a 46rem column.
