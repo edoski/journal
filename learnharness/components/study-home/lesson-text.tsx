@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 export function LessonText({ lesson, place = true, className }: { lesson: Lesson; place?: boolean; className?: string }) {
 	return (
 		<span data-slot="lesson-text" className={cn("flex min-w-0 flex-col gap-0.5", className)}>
-			<span className="flex min-w-0 items-baseline gap-3 text-label">
-				<span className="truncate text-foreground">{lesson.courseTitle}</span>
+			<span className="flex min-w-0 flex-wrap items-baseline gap-x-3 text-label">
+				<span className="max-w-full truncate text-foreground">{lesson.courseTitle}</span>
 				{lesson.exam && <span className="shrink-0 text-muted-foreground">{lesson.exam}</span>}
 				{place && lesson.place && <span className="shrink-0 text-muted-foreground tabular-nums">{spanWords(lesson.place)}</span>}
 			</span>

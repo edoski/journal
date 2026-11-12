@@ -19,7 +19,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 
 | Line | Notes |
 |---|---|
-| course line | 12/16: the course in ink, then the exam and the place in muted ink, 12px apart; `place` off leaves the place to a home that draws it |
+| course line | 12/16: the course in ink, then the exam and the place in muted ink, 12px apart; in a narrow list the exam and the place wrap under the course before the course's name is cut; `place` off leaves the place to a home that draws it |
 | title | 14/20 at 500 in ink, up to three lines, `text-wrap: pretty` |
 | detail | 12/16 muted, one line, shown only when the lesson has one |
 
