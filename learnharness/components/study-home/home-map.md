@@ -4,7 +4,7 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 
 | Part | Notes |
 |---|---|
-| tabs | shadcn `Tabs`, the segmented track (tabs.md), one tab per course in Today's order; opens on Today's first line's course; a pick lasts the visit |
+| tabs | shadcn `Tabs`, its `line` variant (tabs.md): plain course names with the chosen one underlined, no track or pill (Edo, 12 Nov 2026: the pill track looked bolted on), one tab per course in Today's order; opens on Today's first line's course; a pick lasts the visit |
 | enlarge | quiet 32px icon button at the top right (Maximize 2, Minimize 2 while enlarged), its icon on the column's edge; tooltip "Enlarge map", "Back to Home (Esc)" |
 | frame | fills what Today leaves; the edges fade on every side, 64px across and 40px down, as a mask (a vignette); no scrollbars, the map still scrolls and drags inside |
 | camera | the current topic ("You are here") at the frame's centre, and again whenever the frame grows or shrinks |

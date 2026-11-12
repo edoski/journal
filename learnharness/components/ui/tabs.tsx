@@ -7,9 +7,10 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 /** shadcn tabs on the Proposed tokens (spec: tabs.md). `default` is the
- *  segmented track the confidence and mode switches draw; `line` is a bare
- *  list whose triggers bring their own look (the settings section list
- *  renders NavRow through `TabsTrigger asChild`). */
+ *  segmented track the confidence and mode switches draw; `line` is
+ *  shadcn v4's underline tabs: no track, the chosen tab underlined (the
+ *  settings section list renders NavRow through `TabsTrigger asChild`, which
+ *  brings its own look). */
 
 function Tabs({
   className,
@@ -36,7 +37,7 @@ const tabsListVariants = cva(
     variants: {
       variant: {
         default: "gap-0.5 rounded-full bg-fill-hover p-0.5 group-data-[orientation=horizontal]/tabs:h-8",
-        line: "gap-0.5 bg-transparent",
+        line: "gap-0.5 bg-transparent group-data-[orientation=horizontal]/tabs:h-8 group-data-[orientation=horizontal]/tabs:gap-5",
       },
     },
     defaultVariants: {
@@ -62,7 +63,9 @@ function TabsList({
 }
 
 /** A 28px pill at 13px: muted until chosen, the chosen one on the selected
- *  fill, no weight change. With `asChild` the child brings its own look. */
+ *  fill, no weight change. In a `line` list it is bare text the list's
+ *  height, the chosen one in ink over a 2px underline. With `asChild` the
+ *  child brings its own look. */
 function TabsTrigger({
   className,
   asChild,
@@ -74,6 +77,8 @@ function TabsTrigger({
       asChild={asChild}
       className={asChild ? className : cn(
         "inline-flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-row whitespace-nowrap text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-fill-selected data-[state=active]:text-foreground group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "group-data-[variant=line]/tabs-list:relative group-data-[variant=line]/tabs-list:h-full group-data-[variant=line]/tabs-list:flex-none group-data-[variant=line]/tabs-list:rounded-sm group-data-[variant=line]/tabs-list:px-0 group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
+        "group-data-[variant=line]/tabs-list:after:pointer-events-none group-data-[variant=line]/tabs-list:after:absolute group-data-[variant=line]/tabs-list:after:inset-x-0 group-data-[variant=line]/tabs-list:after:bottom-0 group-data-[variant=line]/tabs-list:after:h-0.5 group-data-[variant=line]/tabs-list:after:rounded-full group-data-[variant=line]/tabs-list:after:bg-foreground group-data-[variant=line]/tabs-list:after:opacity-0 group-data-[variant=line]/tabs-list:after:transition-opacity group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100 group-data-[variant=line]/tabs-list:motion-reduce:after:transition-none",
         className
       )}
       {...props}

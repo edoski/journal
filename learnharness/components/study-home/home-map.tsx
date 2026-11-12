@@ -59,7 +59,7 @@ export function HomeMap({
 		<section aria-label="Course map" data-slot="home-map" data-enlarged={enlarged || undefined} className="relative flex min-h-0 flex-1 flex-col gap-2">
 			<div className="flex h-8 shrink-0 items-center justify-between gap-4">
 				<Tabs value={map.workspace} onValueChange={onSelect}>
-					<TabsList aria-label="Course" data-slot="home-map-tabs">
+					<TabsList variant="line" aria-label="Course" data-slot="home-map-tabs">
 						{courses.map((c) => (
 							<TabsTrigger key={c.map.workspace} value={c.map.workspace} className="lh-no-drag">
 								{c.map.title}
