@@ -2,13 +2,12 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, type ChatListItem } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
 import { ActivitySection, useActivity } from "@/components/activity-dock";
-import { LhMark } from "@/components/lh-mark";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { sessionState } from "@/components/nav/session-state";
@@ -21,7 +20,6 @@ import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
 import { SHELF_WORDS, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Every topic and session whose title matches the query, best first. Pure. */
@@ -71,21 +69,27 @@ export function UnitSidebar() {
 			data-testid="sidebar"
 		>
 			<div className="flex h-full w-64 flex-col border-r bg-background">
-				<div className="lh-drag lh-lights-gutter flex h-13 shrink-0 items-center justify-between px-2">
-					<Link
-						href="/"
-						aria-label="Home"
-						data-brand
-						className="lh-no-drag flex h-8 items-center rounded-md px-2 outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-					>
-						<LhMark className="size-5" />
-					</Link>
+				<div className="lh-drag lh-lights-gutter flex h-13 shrink-0 items-center justify-end px-2">
 					<Hint label="Close sidebar" action="toggle-sidebar">
-						<Button variant="quiet" size="icon-row" aria-label="Close sidebar" onClick={toggle} className="lh-no-drag">
+						<button type="button" aria-label="Close sidebar" onClick={toggle} className={ICON_BUTTON}>
 							<PanelLeftCloseIcon />
-						</Button>
+						</button>
 					</Hint>
 				</div>
+
+				<Link
+					href="/"
+					data-slot="sidebar-home"
+					aria-current={s.pathname === "/" ? "page" : undefined}
+					onClick={blurAfterPointerClick}
+					className={cn(
+						"mx-2 mb-px flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+						s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+					)}
+				>
+					<HouseIcon aria-hidden className="size-4 shrink-0" />
+					Home
+				</Link>
 
 				<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 					<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
