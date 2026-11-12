@@ -1,7 +1,6 @@
 /**
  * The study home's Today: what each line says from the engine's map and
- * plan, the order across courses, where a lesson sits on its course's map,
- * and that reviews are named by topic, never counted. Same tsx classic-JSX
+ * plan, the order across courses, and that reviews are named by topic, never counted. Same tsx classic-JSX
  * shim as the other render tests.
  */
 import React from "react";
@@ -15,9 +14,6 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import {
 	byUrgency,
 	nextStepOf,
-	pathPlace,
-	placeWords,
-	stepDetail,
 	stepWords,
 	titleList,
 	todayRows,
@@ -121,7 +117,6 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 describe("study facts", () => {
 	it("words the next step in the order Continue takes it, naming reviews and never counting them", () => {
 		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank and more");
-		assert.equal(stepDetail(nextStepOf(LINALG)), "Then Problem sheet 4");
 		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
 		assert.equal(titleList(["A", "B", "C"]), "A, B and more");
 	});
@@ -135,13 +130,6 @@ describe("study facts", () => {
 
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
 		assert.deepEqual(byUrgency([ANALYSIS, LINALG, PROB]).map((c) => c.map.title), ["Probability", "Linear Algebra", "Real Analysis"]);
-	});
-
-	it("places a lesson among its map's steps", () => {
-		const layers = [["a"], ["b", "c"], ["d"], ["e"]] as TopicHandle[][];
-		assert.equal(placeWords(pathPlace(["d"] as TopicHandle[], layers)!), "Step 3 of 4");
-		assert.equal(placeWords(pathPlace(["e", "b"] as TopicHandle[], layers)!), "Steps 2–4 of 4");
-		assert.equal(pathPlace(["gone"] as TopicHandle[], layers), null);
 	});
 });
 
@@ -221,16 +209,16 @@ describe("Today", () => {
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("names each line's course and lesson, holds one primary action, and counts no reviews", () => {
+	it("names each line's course and lesson and nothing else, holds one primary action, and counts no reviews", () => {
 		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.equal(lines.length, 3);
-		assert.match(lines[0]!.textContent ?? "", /Linear Algebra.*Eigen lesson.*Your turn.*Open/);
+		assert.equal(lines[0]!.textContent, "Linear AlgebraEigen lessonOpen");
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
-		assert.match(lines[1]!.textContent ?? "", /Probability.*Exam in 11 days.*Continue Bayes' rule/);
+		assert.equal(lines[1]!.textContent, "ProbabilityContinue Bayes' rule");
 		assert.equal(doc.querySelectorAll("[data-primary]").length, 1);
 		assert.doesNotMatch(doc.body.textContent ?? "", /\d+\s+due\b/i);
-		assert.match(doc.querySelector("h2")?.textContent ?? "", /Today.*Sunday 8 November/);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /Today.*Sunday 8 November/);
 	});
 
 	it("past five lines, names the other courses on the last", () => {

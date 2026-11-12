@@ -97,25 +97,12 @@ export function byUrgency(courses: readonly StudyCourse[]): StudyCourse[] {
 		.map(({ course }) => course);
 }
 
-/** Where a step sits on its course's map: the map's steps (its layers,
- *  from 1) its topics span, of how many. */
+/** Where a lesson sits in its course: the positions it spans (from 1), of
+ *  how many. */
 export interface PathPlace {
 	from: number;
 	to: number;
 	of: number;
-}
-
-/** The place of some topics among the map's layers; null when none is on
- *  the map. Pure. */
-export function pathPlace(topics: readonly TopicHandle[], layers: readonly (readonly TopicHandle[])[]): PathPlace | null {
-	const steps = topics.map((h) => layers.findIndex((layer) => layer.includes(h))).filter((i) => i >= 0);
-	if (steps.length === 0) return null;
-	return { from: Math.min(...steps) + 1, to: Math.max(...steps) + 1, of: layers.length };
-}
-
-/** "Step 5 of 7", "Steps 2–5 of 7". Pure. */
-export function placeWords(place: PathPlace): string {
-	return place.from === place.to ? `Step ${place.from} of ${place.of}` : `Steps ${place.from}–${place.to} of ${place.of}`;
 }
 
 /** One line of Today: a session waiting on the learner, or a course's next
@@ -151,14 +138,6 @@ export function todayRows(courses: readonly StudyCourse[], waiting: readonly Cha
 /** The exam in words while the course is in its run-up, else null. Pure. */
 export function runupExam(course: StudyCourse): string | null {
 	return course.unready === null ? null : examWords(course);
-}
-
-/** A line's second line: what follows the reviews, or the open task's
- *  step; null for a session or a topic. Pure. */
-export function stepDetail(step: NextStep): string | null {
-	if (step.kind === "review") return step.then ? `Then ${step.then}` : null;
-	if (step.kind === "task") return step.step;
-	return null;
 }
 
 /** An engine date (YYYY-MM-DD) plus some days. Pure. */
