@@ -7,6 +7,10 @@ import { Today } from "@/components/study-home/today";
 import { cn } from "@/lib/utils";
 import type { StudyCourse } from "@/src/core";
 
+/** The map's share of the column while Today shows: enough to see where
+ *  the current topic sits, so Today's rows lead (Edo, 12 Nov 2026). */
+const MAP_SHARE = "basis-1/2";
+
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
  * window. The selected course's map on top, then Today, one line per
@@ -23,7 +27,9 @@ export function StudyHome({ initialConfigured }: { initialConfigured: boolean })
 		>
 			{({ rows, courses, today, busy, onStart, onContinue }) => (
 				<>
-					<MapOnHome courses={courses} enlarged={enlarged} onEnlarge={setEnlarged} busy={busy} onStart={onStart} />
+					<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "min-h-48 shrink"))}>
+						<MapOnHome courses={courses} enlarged={enlarged} onEnlarge={setEnlarged} busy={busy} onStart={onStart} />
+					</div>
 					{!enlarged && <Today rows={rows} today={today} busy={busy} onContinue={onContinue} />}
 				</>
 			)}

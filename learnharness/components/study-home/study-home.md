@@ -6,7 +6,7 @@ The Proposed design's study home at `/`: what to study now, at the start of a da
 
 | Option | Thesis | Leads with | The map | Spec |
 |---|---|---|---|---|
-| `agenda` | the map on top, then Today as four columns | the map | about two thirds of the window, vignetted | this file, today.md, home-map.md |
+| `agenda` | the map on top, then Today's rows | Today's rows | half the column, vignetted | this file, today.md, home-map.md |
 | `split` | the list is the page, and the map explains the picked lesson | today's lessons | a pane beside the list, following the pick | split/split-home.md |
 | `map` | the map stays the page's picture, bounded and tied to the lessons | the map card with its tabs | one card, 416px at most, above the lessons | map-first/map-first-home.md |
 | `path` | each lesson carries its own place in the path | today's lessons, alone | one press away, over Home | path/path-home.md |
@@ -30,7 +30,7 @@ Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an age
 | Now card | it repeated the first line; the first line holds the primary action instead |
 | "Home" title | the sidebar and the day say where he is; the row goes to the map |
 | This week | future reviews can't be done now (Things: Today holds only what you'll work on today) |
-| Exams | the countdown moves onto a course's line inside its run-up; readiness is the map's dashed topics |
+| Exams | readiness is the map's dashed topics; no line says "Exam in N days" (Edo, 12 Nov 2026) |
 | Topic strips and bands | the map draws the same, and better |
 | Gap sentence, weak marks, last studied | they don't change what he picks; weakness stays in the map's topic detail |
 | A second waiting session in a course, reviews past the plan's five | the sidebar lists every session waiting on him; the tutor brings the rest back on later days |
@@ -40,8 +40,8 @@ Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an age
 | Part | Notes |
 |---|---|
 | chrome | the 52px drag strip and the sidebar toggle, as the composer's |
-| column | 960px, 32px sides, 52px above, 24px below; the page never scrolls: the map takes what Today leaves |
-| map | `home-map` (home-map.md), at least what remains above Today |
+| column | 960px, 32px sides, 52px above, 24px below; the page never scrolls: the map takes half the column (it shrinks to 192px at least when Today needs more), Today the rest |
+| map | `home-map` (home-map.md), half the column (Edo, 12 Nov 2026: smaller, so Today's rows lead); enlarged, the whole column |
 | Today | `today` (today.md), 20px under the map |
 
 Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; the primary button is the only fill.
@@ -65,7 +65,7 @@ Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights 
 | A turn waiting | Eigenvalues and eigenvectors, Linear Algebra, Your turn, Open | the session first; its course's reviews return once it's done |
 | Exam two days away | Probability's review, Exam in 2 days | the map opens on Probability with its not-started topics dashed |
 | Nothing due | Continue Bayes' rule, Step 3 of 5 | lines never go empty while a course has a current topic |
-| Five courses | five lines, no page scroll, map about 376px tall at 1280×800 | a sixth course folds into "Also today" |
+| Five courses | five lines, no page scroll, map about 322px tall at 1280×800 | a sixth course folds into "Also today" |
 
 Not available from the engine: how long a lesson takes (no line shows time), and which topic a session is about (a waiting line shows "Your turn", not a step). The order across courses (`byUrgency`) is the app's own until the engine names the day's order.
 
