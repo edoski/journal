@@ -1,6 +1,5 @@
 /**
- * The study home's candidates (A course cards, B agenda, C one table): what
- * each says from the engine's map and plan, the cross-course order, and
+ * The study home's agenda: what it says from the engine's map and plan, the cross-course order, and
  * that reviews are named by topic, never counted. Same tsx classic-JSX shim
  * as the other render tests.
  */
@@ -25,9 +24,7 @@ import {
 	upcomingReviews,
 	waitingSessions,
 } from "../components/study-home/study-facts.ts";
-import { CourseCards } from "../components/study-home/home-a/course-cards.tsx";
-import { Agenda } from "../components/study-home/home-b/agenda.tsx";
-import { CourseTable } from "../components/study-home/home-c/course-table.tsx";
+import { Agenda } from "../components/study-home/agenda.tsx";
 import type { HomeProps } from "../components/study-home/home-props.ts";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
@@ -166,7 +163,7 @@ describe("the study read", () => {
 	});
 });
 
-describe("the study home candidates", () => {
+describe("the study home", () => {
 	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 	const props: HomeProps = {
 		courses: [ANALYSIS, LINALG, PROB],
@@ -177,38 +174,21 @@ describe("the study home candidates", () => {
 	};
 	const render = (node: React.ReactNode) =>
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
-	const candidates = { a: <CourseCards {...props} />, b: <Agenda {...props} />, c: <CourseTable {...props} /> };
 
-	for (const [name, node] of Object.entries(candidates)) {
-		it(`${name}: shows every course, its exam, the waiting session, and no due counts`, () => {
-			const doc = render(node);
-			const text = doc.body.textContent ?? "";
-			for (const title of ["Linear Algebra", "Probability", "Real Analysis"]) assert.match(text, new RegExp(title));
-			assert.match(text, /11 days/);
-			assert.ok(doc.querySelector('a[href="/chat/q"]'), "the waiting session opens");
-			assert.doesNotMatch(text, /\d+\s+due\b/i);
-			assert.equal(doc.querySelectorAll('[data-slot="topic-strip"]').length, 3);
-		});
-	}
-
-	it("a: orders the cards by urgency, each with its Continue", () => {
-		const doc = render(candidates.a);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="course-card"] h3')].map((h) => h.textContent), ["Probability", "Linear Algebra", "Real Analysis"]);
-		assert.equal(doc.querySelectorAll('[data-slot="course-card"] button').length, 3);
+	it("shows every course, its exam, the waiting session, and no due counts", () => {
+		const doc = render(<Agenda {...props} />);
+		const text = doc.body.textContent ?? "";
+		for (const title of ["Linear Algebra", "Probability", "Real Analysis"]) assert.match(text, new RegExp(title));
+		assert.match(text, /11 days/);
+		assert.ok(doc.querySelector('a[href="/chat/q"]'), "the waiting session opens");
+		assert.doesNotMatch(text, /\d+\s+due\b/i);
+		assert.equal(doc.querySelectorAll('[data-slot="topic-strip"]').length, 3);
 	});
 
-	it("b: holds one primary action, Now, and the week's reviews by day", () => {
-		const doc = render(candidates.b);
+	it("holds one primary action, Now, and the week's reviews by day", () => {
+		const doc = render(<Agenda {...props} />);
 		assert.match(doc.querySelector('[data-slot="agenda-now"]')?.textContent ?? "", /Eigen lesson/);
 		assert.equal(doc.querySelectorAll('[data-slot="agenda-day"]').length, 2);
 		assert.match(doc.querySelector('[data-slot="agenda-day"]')?.textContent ?? "", /Tomorrow.*Conditional probability/);
-	});
-
-	it("c: one row per course, marking a row that needs the learner", () => {
-		const doc = render(candidates.c);
-		const rows = [...doc.querySelectorAll('[data-slot="course-table-row"]')];
-		assert.equal(rows.length, 3);
-		assert.ok(rows[1]!.querySelector(".bg-link"), "Linear Algebra waits on you and has slipping topics");
-		assert.equal(rows[2]!.querySelector(".bg-link"), null);
 	});
 });

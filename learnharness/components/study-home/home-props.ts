@@ -1,6 +1,6 @@
 import type { ChatListItem, StudyCourse } from "@/src/core";
 
-/** What every home candidate receives. */
+/** What the home's body receives. */
 export interface HomeProps {
 	/** Every course the engine read, in its listing order. */
 	courses: readonly StudyCourse[];

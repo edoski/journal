@@ -1,6 +1,6 @@
 # TopicStrip
 
-A course's topics in path order, one segment each, so readiness reads without a number. `data-slot="topic-strip"`. Used by every home candidate.
+A course's topics in path order, one segment each, so readiness reads without a number. `data-slot="topic-strip"`. Used by the home's agenda.
 
 | Part | Notes |
 |---|---|

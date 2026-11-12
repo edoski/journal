@@ -19,7 +19,7 @@ import {
 import { courseLabel, type StudyCourse } from "@/src/core";
 
 /**
- * Candidate B, the agenda (spec: agenda.md): one ordered list from now to
+ * The agenda (spec: agenda.md): one ordered list from now to
  * the last exam, with courses as labels rather than containers. Now holds
  * the page's one primary action; Today the rest of the day's steps; the
  * week the reviews the engine scheduled, day by day; then the exams.

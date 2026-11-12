@@ -1,4 +1,4 @@
-# Agenda (home B)
+# Agenda
 
 Time-first. `data-slot="agenda"`, sections 40px apart.
 

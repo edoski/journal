@@ -15,7 +15,7 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
-import { useDesignVariant, useHomeCandidate } from "@/components/design-variant";
+import { useDesignVariant, useHomeVariant } from "@/components/design-variant";
 import { StartScreen } from "@/components/start/start-screen";
 import { StudyHome } from "@/components/study-home/study-home";
 
@@ -29,12 +29,11 @@ export function Home(props: { initialConfigured: boolean; rendering?: boolean })
 	return useDesignVariant() === "proposed" ? <HomeNext initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
 }
 
-/** The Proposed `/`: the study home in the chosen candidate, else the
- *  composer (the surface as it is). */
+/** The Proposed `/`: the study home on Home's Proposed, else the composer
+ *  (the surface as it is). */
 function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
-	const candidate = useHomeCandidate();
-	return candidate ? (
-		<StudyHome candidate={candidate} initialConfigured={initialConfigured} />
+	return useHomeVariant() === "proposed" ? (
+		<StudyHome initialConfigured={initialConfigured} />
 	) : (
 		<StartScreen initialConfigured={initialConfigured} today />
 	);

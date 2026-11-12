@@ -4,23 +4,19 @@ import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
 import { SidebarToggle } from "@/components/sidebar";
-import type { HomeCandidate } from "@/components/design-variant";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { longDay } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
-import { CourseCards } from "@/components/study-home/home-a/course-cards";
-import { Agenda } from "@/components/study-home/home-b/agenda";
-import { CourseTable } from "@/components/study-home/home-c/course-table";
+import { Agenda } from "@/components/study-home/agenda";
 import type { HomeProps } from "@/components/study-home/home-props";
 
 /**
  * The study home (spec: study-home.md): where studying stands across every
- * course. The one branch between the Explore candidates: shipping one
- * deletes the others, this switch and their registry groups. The page
- * chrome, the states and the lesson start are shared.
+ * course, as the agenda. The page chrome, the states and the lesson start
+ * live here.
  */
-export function StudyHome({ candidate, initialConfigured }: { candidate: HomeCandidate; initialConfigured: boolean }) {
+export function StudyHome({ initialConfigured }: { initialConfigured: boolean }) {
 	const { state, retry } = useStudyHome();
 	const lesson = useLessonStart(initialConfigured);
 
@@ -32,11 +28,10 @@ export function StudyHome({ candidate, initialConfigured }: { candidate: HomeCan
 					<SidebarToggle />
 				</div>
 			</header>
-			<main data-slot="study-home" data-candidate={candidate} className="min-h-0 flex-1 overflow-y-auto">
-				<div className={candidate === "c" ? "mx-auto w-full max-w-[60rem] px-8 pt-16 pb-16" : "mx-auto w-full max-w-[46rem] px-8 pt-16 pb-16"}>
+			<main data-slot="study-home" className="min-h-0 flex-1 overflow-y-auto">
+				<div className="mx-auto w-full max-w-[46rem] px-8 pt-16 pb-16">
 					<HomeBody
 						state={state}
-						candidate={candidate}
 						onRetry={retry}
 						props={{
 							busy: lesson.busy,
@@ -57,12 +52,10 @@ export function StudyHome({ candidate, initialConfigured }: { candidate: HomeCan
 
 function HomeBody({
 	state,
-	candidate,
 	onRetry,
 	props,
 }: {
 	state: StudyHomeState;
-	candidate: HomeCandidate;
 	onRetry: () => void;
 	props: Pick<HomeProps, "busy" | "onContinue">;
 }) {
@@ -89,7 +82,7 @@ function HomeBody({
 			return (
 				<>
 					<HomeHeading today={today} />
-					{candidate === "a" ? <CourseCards {...home} /> : candidate === "b" ? <Agenda {...home} /> : <CourseTable {...home} />}
+					<Agenda {...home} />
 					{state.failed.length > 0 && (
 						<p className="mt-8 text-row text-muted-foreground">
 							Couldn’t read {state.failed.length === 1 ? "one course" : "some courses"}: {state.failed.join(", ")}
