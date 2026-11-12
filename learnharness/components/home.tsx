@@ -15,8 +15,9 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
-import { useDesignVariant } from "@/components/design-variant";
+import { useDesignVariant, useHomeCandidate } from "@/components/design-variant";
 import { StartScreen } from "@/components/start/start-screen";
+import { StudyHome } from "@/components/study-home/study-home";
 
 /**
  * Home — the knowledge graph is the main view, full-bleed edge to edge
@@ -25,10 +26,17 @@ import { StartScreen } from "@/components/start/start-screen";
  * with no gradient scrims. Sessions live in the toggleable sidebar.
  */
 export function Home(props: { initialConfigured: boolean; rendering?: boolean }) {
-	return useDesignVariant() === "proposed" ? (
-		<StartScreen initialConfigured={props.initialConfigured} today />
+	return useDesignVariant() === "proposed" ? <HomeNext initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
+}
+
+/** The Proposed `/`: the study home in the chosen candidate, else the
+ *  composer (the surface as it is). */
+function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
+	const candidate = useHomeCandidate();
+	return candidate ? (
+		<StudyHome candidate={candidate} initialConfigured={initialConfigured} />
 	) : (
-		<HomeCurrent {...props} />
+		<StartScreen initialConfigured={initialConfigured} today />
 	);
 }
 

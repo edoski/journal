@@ -3,19 +3,14 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Composer } from "@/components/composer";
-import { CourseControl, CoursesUnavailable, NewCourseDialog, useCourseChoice } from "@/components/course-picker";
+import { CourseControl, CoursesUnavailable, useCourseChoice } from "@/components/course-picker";
 import { useFieldCycle } from "@/components/field-cycle";
 import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
-import { CONTINUE_OPENING } from "@/components/start/course-facts";
-import { TodayWaiting } from "@/components/start/today-waiting";
-import { useTodayVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
-
-const TODAY_START_FAILURE = "Couldn’t open the session. Try again.";
 
 /** The heading over the composer: Today asks about the day, the draft
  *  about the session. Neither names a mode: the tutor routes the request
@@ -29,17 +24,17 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
 
 /**
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
- * anatomy: a light question, the composer centred in a 736px column, and
- * under it, on Today, what is waiting (the Explore candidate). Home
- * (`today`) and the draft at /chat/new share it; a session is created only
- * when something is sent, through the same path the current screens use.
+ * anatomy: a light question and the composer centred in a 736px column,
+ * nothing else. `/` (`today`) and the draft at /chat/new share it; a
+ * session is created only when something is sent, through the same path
+ * the current screens use.
  */
 export function StartScreen({
 	initialConfigured,
 	today = false,
 }: {
 	initialConfigured: boolean;
-	/** Home: the day's question and what is waiting. */
+	/** At `/`: the day's question. */
 	today?: boolean;
 }) {
 	const router = useRouter();
@@ -49,10 +44,8 @@ export function StartScreen({
 	const starterRef = useRef(new SessionStarter());
 	const [startError, setStartError] = useState<string | null>(null);
 	const courseChoice = useCourseChoice();
-	const [creatingCourse, setCreatingCourse] = useState(false);
 	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
-	const todayVariant = useTodayVariant();
 
 	const cycleComposer = useCallback(
 		(): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="composer"] textarea')),
@@ -77,7 +70,7 @@ export function StartScreen({
 
 	// The session is created with no mode: the prober reads the opening and
 	// hands it to practice when it asks for problems.
-	const launch = (opening: string, course: string, failure: string) => {
+	const launch = (opening: string, course: string) => {
 		startingRef.current = true;
 		setBusy(true);
 		setStartError(null);
@@ -87,7 +80,7 @@ export function StartScreen({
 			.catch(() => {
 				startingRef.current = false;
 				setBusy(false);
-				setStartError(failure);
+				setStartError(OPENING_PROMPT_FAILURE);
 			});
 	};
 
@@ -96,22 +89,9 @@ export function StartScreen({
 		if (!draft || startingRef.current || !canStart()) return;
 		const course = courseChoice.requireCourse();
 		if (!course) return;
-		launch(draft, course, OPENING_PROMPT_FAILURE);
+		launch(draft, course);
 	};
 
-	// Today's Continue opens a session in its course; the tutor takes the
-	// reviews due first, then the open task (CONTINUE_OPENING).
-	const startCourse = (workspace: string) => {
-		if (startingRef.current || !canStart()) return;
-		launch(CONTINUE_OPENING, workspace, TODAY_START_FAILURE);
-	};
-
-	// A suggestion becomes the draft, in its course, for the learner to send or edit.
-	const suggest = (request: string, workspace: string) => {
-		setText(request);
-		courseChoice.choose(workspace);
-		document.querySelector<HTMLTextAreaElement>('[data-slot="composer"] textarea')?.focus();
-	};
 
 	const { state } = courseChoice;
 
@@ -162,16 +142,6 @@ export function StartScreen({
 							<CoursesUnavailable reason={state.reason} variant="proposed" />
 						</div>
 					)}
-					{today && (
-						<TodayWaiting
-							variant={todayVariant}
-							state={state}
-							busy={busy}
-							onStart={startCourse}
-							onSuggest={suggest}
-							onNewCourse={() => setCreatingCourse(true)}
-						/>
-					)}
 				</div>
 			</main>
 			<header className="pointer-events-none absolute inset-x-0 top-0 flex items-center gap-2 px-3 py-2">
@@ -179,16 +149,6 @@ export function StartScreen({
 					<SidebarToggle />
 				</div>
 			</header>
-			{creatingCourse && state.status === "ready" && (
-				<NewCourseDialog
-					roots={state.roots}
-					onClose={() => setCreatingCourse(false)}
-					onCreated={(course) => {
-						setCreatingCourse(false);
-						courseChoice.add(course);
-					}}
-				/>
-			)}
 			<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} onDone={() => setSetupOpen(false)} />
 		</div>
 	);
