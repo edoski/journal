@@ -69,9 +69,9 @@ export function UnitSidebar() {
 			data-testid="sidebar"
 		>
 			<div className="flex h-full w-64 flex-col border-r bg-background">
-				<div className="lh-drag lh-lights-gutter h-13 shrink-0" />
+				<div className="lh-drag lh-lights-band shrink-0" />
 
-				<div className="mb-px flex shrink-0 items-center gap-1 px-2">
+				<div className="lh-drag mb-px flex shrink-0 items-center gap-1 px-2 pt-2">
 					<Link
 						href="/"
 						data-slot="sidebar-home"
@@ -93,40 +93,42 @@ export function UnitSidebar() {
 				</div>
 
 				<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
-					<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
-						<label className="flex h-8 min-w-0 flex-1 cursor-text items-center gap-2 rounded-md px-2 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
-							<SearchIcon aria-hidden className="size-4 shrink-0" />
-							<input
-								ref={s.searchRef}
-								data-testid="session-search"
-								value={s.query}
-								onChange={(e) => s.changeQuery(e.target.value)}
-								onKeyDown={(e) => {
-									if (!query && e.key === "ArrowDown") {
-										e.preventDefault();
-										focusFirstRow();
-										return;
-									}
-									s.onSearchKeyDown(e, found?.sessions ?? null);
-								}}
-								placeholder="Search"
-								aria-label="Search topics and sessions"
-								spellCheck={false}
-								className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
-							/>
-							{s.query && (
-								<button
-									type="button"
-									aria-label="Clear search"
-									onClick={() => s.changeQuery("")}
-									className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<XIcon aria-hidden className="size-3.5" />
-								</button>
-							)}
-						</label>
-					</Hint>
-					{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
+					<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
+						<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
+							<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
+								<SearchIcon aria-hidden className="size-4 shrink-0" />
+								<input
+									ref={s.searchRef}
+									data-testid="session-search"
+									value={s.query}
+									onChange={(e) => s.changeQuery(e.target.value)}
+									onKeyDown={(e) => {
+										if (!query && e.key === "ArrowDown") {
+											e.preventDefault();
+											focusFirstRow();
+											return;
+										}
+										s.onSearchKeyDown(e, found?.sessions ?? null);
+									}}
+									placeholder="Search"
+									aria-label="Search topics and sessions"
+									spellCheck={false}
+									className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
+								/>
+								{s.query && (
+									<button
+										type="button"
+										aria-label="Clear search"
+										onClick={() => s.changeQuery("")}
+										className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+									>
+										<XIcon aria-hidden className="size-3.5" />
+									</button>
+								)}
+							</label>
+						</Hint>
+						{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
+					</div>
 					<Hint label="New lesson" action="new-session" side="bottom">
 						<button
 							type="button"
