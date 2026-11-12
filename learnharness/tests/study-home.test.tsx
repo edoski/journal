@@ -1,6 +1,7 @@
 /**
  * The study home's Today: what each line says from the engine's map and
- * plan, the order across courses, and that reviews are named by topic, never counted. Same tsx classic-JSX
+ * plan, the order across courses, what agenda's row candidates say, and
+ * that reviews are named by topic, never counted. Same tsx classic-JSX
  * shim as the other render tests.
  */
 import React from "react";
@@ -24,6 +25,7 @@ import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
+import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -256,5 +258,43 @@ describe("a lesson on a study home", () => {
 		assert.equal(track?.children.length, 5);
 		assert.equal(track?.getAttribute("aria-label"), "4 of 5 topics started");
 		assert.match(doc.body.textContent ?? "", /Topic 5 of 5/);
+	});
+});
+
+describe("agenda's row candidates", () => {
+	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
+	const render = (node: React.ReactNode) =>
+		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
+	const waiting = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
+	const lapsed: StudyCourse = {
+		...ANALYSIS,
+		map: { ...ANALYSIS.map, topics: [topic("seq", "Sequences", "independent", { review: due(0), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 } })] },
+	};
+	const rowOf = (course: StudyCourse) => todayRows([course], [], TODAY)[0]!;
+
+	it("says why a line is on Today from the engine's fields, in plain words", () => {
+		assert.equal(whyNow(todayRows([LINALG], [waiting], TODAY)[0]!, TODAY), "Waiting for your reply");
+		assert.equal(whyNow(todayRows([LINALG], [{ ...waiting, updatedAt: "2026-11-07T20:00:00.000Z" }], TODAY)[0]!, TODAY), "Waiting since yesterday");
+		assert.equal(whyNow(rowOf(LINALG), TODAY), "Fading for 2 weeks");
+		assert.equal(whyNow(rowOf(ANALYSIS), TODAY), "Starting to fade");
+		assert.equal(whyNow(rowOf(lapsed), TODAY), "You missed Sequences last time");
+		const task: StudyCourse = { ...LINALG, due: [] };
+		assert.equal(whyNow(rowOf(task), TODAY), "Left off at part (c)");
+		assert.equal(whyNow(rowOf(PROB), TODAY), "Next on your map");
+	});
+
+	it("says when the course was last studied, and how far along it is", () => {
+		assert.equal(lastStudied(rowOf(LINALG)), "Studied 2 days ago");
+		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 1 })), "Studied yesterday");
+		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 20 })), "Studied 2 weeks ago");
+		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: null })), "Not studied yet");
+		assert.deepEqual(courseProgress(LINALG), { started: 4, of: 5 });
+		assert.equal(courseProgress({ ...LINALG, map: { ...LINALG.map, topics: [] } }), null);
+	});
+
+	it("folds a sixth course into the last line", () => {
+		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
+		const { shown, also } = foldLines(todayRows(many, [], TODAY));
+		assert.deepEqual([shown.length, also.length], [4, 2]);
 	});
 });

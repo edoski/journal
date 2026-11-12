@@ -13,7 +13,7 @@ The home's list of what to study today: one line per course, each its one next l
 | action | the first line only: the primary button's look, "Continue" or "Open" (32px); it is part of the line, not a second control |
 | also | past five courses the fifth line reads "Also today:" and each further course as a quiet button that opens its lesson |
 
-Not on a line (Edo, 12 Nov 2026): the exam run-up ("Exam in 11 days"), what follows a review ("Then Bayes' rule"), the open task's step, and the place on the map ("Steps 2–3 of 5" with its marks). Each was a second line or a column that told him nothing when he came back after days away. The row candidates (`agenda-rows/`) try what a line should say instead.
+Not on a line (Edo, 12 Nov 2026): the exam run-up ("Exam in 11 days"), what follows a review ("Then Bayes' rule"), the open task's step, and the place on the map ("Steps 2–3 of 5" with its marks). Each was a second line or a column that told him nothing when he came back after days away. The row candidates (`agenda-rows/agenda-rows.md`, behind the Rows switch) try what a line should say instead; this page's anatomy is Rows' Current.
 
 ## Order
 
