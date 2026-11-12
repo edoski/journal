@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
-import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
+import { useDesignVariant, useHomeVariant, type DesignVariant } from "@/components/design-variant";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
@@ -49,9 +49,11 @@ export function KeyboardShortcuts() {
 	const router = useRouter();
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
-	// The graph is home in the current design and its own view in the proposed one.
+	// The graph is home in the current design, its own view in the proposed
+	// one, and on home again once Home's Proposed holds the course map.
 	const design = useDesignVariant();
-	const graphPath = design === "proposed" ? "/knowledge" : "/";
+	const home = useHomeVariant();
+	const graphPath = design === "proposed" && home !== "proposed" ? "/knowledge" : "/";
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
