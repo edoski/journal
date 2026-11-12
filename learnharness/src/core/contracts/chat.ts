@@ -293,6 +293,10 @@ export interface ChatSummary {
 	/** The course the session studies (the record's own field, carried by
 	 *  the summary spread); absent on sessions older than the course rule. */
 	course?: CourseLink;
+	/** The course topics the session worked on, from its transcript
+	 *  (sessionTopicsOf): candidates a caller checks against the course map.
+	 *  The list always sets it; a summary made elsewhere may leave it out. */
+	topics?: readonly string[];
 	/** The record's model-control settings — rides the list payload via the
 	 *  summary spread (the picker never needs it from here; the full record
 	 *  is its source). */
