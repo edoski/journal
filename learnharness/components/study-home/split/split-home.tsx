@@ -106,9 +106,9 @@ function LessonRow({
 	);
 }
 
-/** The picked lesson's course as a map, in a frame of its own: a line that
- *  says where the learner is, the control that enlarges it, and the course
- *  map with its camera on the current topic. */
+/** The picked lesson's course as a map with no frame: the course map with
+ *  its camera on the current topic, faded at its edges, and the control
+ *  that enlarges it at its top right. */
 function MapPane({
 	course,
 	onEnlarge,
@@ -123,26 +123,19 @@ function MapPane({
 	const layout = useMemo(() => (course ? layoutCourseMap(course.map.topics, course.map.edges) : null), [course]);
 	if (!course || !layout) {
 		return (
-			<section aria-label="Course map" data-slot="split-map" className="flex min-h-0 flex-col rounded-lg border border-border">
+			<section aria-label="Course map" data-slot="split-map" className="flex min-h-0 flex-col">
 				<p className="m-auto text-row text-muted-foreground">This lesson has no course, so it has no map.</p>
 			</section>
 		);
 	}
 	const { map } = course;
-	const current = map.topics.find((t) => t.handle === map.current);
 	return (
-		<section aria-label={`${map.title} map`} data-slot="split-map" className="flex min-h-0 flex-col rounded-lg border border-border">
-			<div className="flex h-11 shrink-0 items-center justify-between gap-4 pr-1.5 pl-4">
-				<p className="flex min-w-0 items-baseline gap-3 text-label">
-					<span className="shrink-0 text-foreground">{map.title}</span>
-					{current && <span className="truncate text-muted-foreground">You are at {current.title}</span>}
-				</p>
-				<Hint label="Enlarge map" side="left">
-					<Button variant="quiet" size="icon-row" data-slot="home-map-enlarge" aria-label="Enlarge map" onClick={onEnlarge} className="lh-no-drag">
-						<Maximize2Icon />
-					</Button>
-				</Hint>
-			</div>
+		<section aria-label={`${map.title} map`} data-slot="split-map" className="relative flex min-h-0 flex-col">
+			<Hint label="Enlarge map" side="left">
+				<Button variant="quiet" size="icon-row" data-slot="home-map-enlarge" aria-label="Enlarge map" onClick={onEnlarge} className="lh-no-drag absolute top-0 right-0 z-10">
+					<Maximize2Icon />
+				</Button>
+			</Hint>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={FADE}>
 				{map.topics.length > 0 ? (
 					<CourseMapGraph

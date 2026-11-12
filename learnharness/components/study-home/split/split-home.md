@@ -9,7 +9,7 @@ The `split` option of Home's switch: today's lessons on the left, the map of the
 | Title | "Today" and the study day, top left | the page's anchor; reading starts there (Apple HIG layout: the most important content top-leading) |
 | Lessons | one per course, in Today's order (lessons.md) | what he acts on leads, and holds the leading 5/12 of the width |
 | The picked lesson | the first one at rest; a selected fill and the page's only primary button | one decision at session start; another lesson is one press away |
-| Map pane | the picked lesson's course map, its camera on "You are here", with one line that says the course and where he is | the map answers "where does this lesson sit" for the lesson he is looking at (Apple HIG split views: selecting in the primary pane shows its content in the secondary) |
+| Map pane | the picked lesson's course map, its camera on "You are here", with no frame and no header line | the map answers "where does this lesson sit" for the lesson he is looking at (Apple HIG split views: selecting in the primary pane shows its content in the secondary) |
 
 ## What is cut, and why
 
@@ -28,7 +28,7 @@ The `split` option of Home's switch: today's lessons on the left, the map of the
 | list | rows 2px apart; past the pane's height the list scrolls inside itself |
 | row | radius 12, padding 12, hover `fill-hover`; `LessonText`; 96px kept free at the end for the button, picked or not, so nothing reflows when the pick moves. Pressing a row picks it |
 | picked row | `fill-selected`; the primary button (32px, "Open", "Review", "Continue" or "Start") at its end, centred |
-| map pane | 1px `border`, radius 12; a 44px line: the course 12 in ink, "You are at <topic>" 12 muted, and the quiet 32px Enlarge control; then `CourseMapGraph` as it is, edges faded 32px across and 24px down, a short drawing at the pane's middle |
+| map pane | no border and no header line (Edo, 12 Nov 2026: the outline and "You are at …" said nothing the map doesn't); `CourseMapGraph` as it is, edges faded 32px across and 24px down, a short drawing at the pane's middle; the quiet 32px Enlarge control at its top right, over the map |
 | a lesson with no course | the pane says "This lesson has no course, so it has no map." |
 | enlarged | `HomeMap` enlarged takes the page (home-map.md): tabs, List view, More, Esc back; its tabs move the pick |
 
