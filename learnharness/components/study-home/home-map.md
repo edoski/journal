@@ -1,0 +1,14 @@
+# HomeMap
+
+The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data-enlarged` while enlarged), tabs `home-map-tabs`, control `home-map-enlarge`, frame `home-map-frame`. It embeds `CourseMapGraph` as it is (course-map.md): its rendering, hover, detail popover, Study this and keyboard are the map's own.
+
+| Part | Notes |
+|---|---|
+| tabs | shadcn `Tabs`, the segmented track (tabs.md), one tab per course in Today's order; opens on Today's first line's course; a pick lasts the visit |
+| enlarge | quiet 32px icon button at the top right (Maximize 2, Minimize 2 while enlarged), its icon on the column's edge; tooltip "Enlarge map", "Back to Home (Esc)" |
+| frame | fills what Today leaves; the edges fade on every side, 64px across and 40px down, as a mask (a vignette); no scrollbars, the map still scrolls and drags inside |
+| camera | the current topic ("You are here") at the frame's centre, and again whenever the frame grows or shrinks |
+| enlarged | the tabs and the map take Home's full width and height; Today hides. Esc (unless a popover takes it) or the same control returns |
+| empty | "Topics appear as you study this course." |
+
+Not on Home: the Map page's List view, Import notes… and Statements…; they stay on `/knowledge` while Home is Current.

@@ -34,6 +34,7 @@ Every state is a word, so nothing relies on colour. Fills are opaque mixes, so e
 
 - The page opens on the remembered course (the one Today and the composer use); picking another one remembers it.
 - The map opens scrolled so the current topic sits at 40% of the view's height; Jump to current does the same, smoothly unless reduced motion is on.
+- Embedded on Home (`components/study-home/home-map.md`) the same drawing opens with the current topic at the centre (`anchor`), with no scrollbars (`className`).
 - Keyboard: the map is one tab stop (the current topic). Up goes to the nearest prerequisite, Down to the nearest dependent, Left and Right along the layer; Enter or Space opens the detail, Esc closes it. The list is the screen-reader and keyboard equivalent; the drawing is a `figure` whose caption names the course, its topic count and where the learner is.
 - Click opens the detail; double-click is Study this. Study this opens a teaching session in the course with the topic's title as the opening, through the same path and guards as Today (setup when models or keys are missing, the model picker when the model is unavailable); the tutor decides teach or practice.
 - Motion: on open, nodes fade in with a 4px rise over 180ms (`lh-card-enter`, ease cubic-bezier(.19,1,.22,1)), 15ms later per layer and at most 110ms, and the edges fade in over 180ms; off under reduced motion. No pulse.

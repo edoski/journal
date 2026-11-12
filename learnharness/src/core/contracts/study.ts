@@ -14,6 +14,9 @@ export interface StudyCourse {
 	/** Inside the exam run-up, the topics the engine counts not recently
 	 *  solid (`plan`'s `runup.unready`), in path order; null outside it. */
 	unready: readonly TopicHandle[] | null;
+	/** Today's review as the engine planned it (`plan`'s `due`, in its
+	 *  order); null when the plan could not be read. */
+	due: readonly TopicHandle[] | null;
 	/** Days since the record was last saved; null when it never was. */
 	lastActiveDaysAgo: number | null;
 }

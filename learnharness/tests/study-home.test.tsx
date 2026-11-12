@@ -1,7 +1,8 @@
 /**
- * The study home's agenda: what it says from the engine's map and plan, the cross-course order, and
- * that reviews are named by topic, never counted. Same tsx classic-JSX shim
- * as the other render tests.
+ * The study home's Today: what each line says from the engine's map and
+ * plan, the order across courses, where a lesson sits on its course's map,
+ * and that reviews are named by topic, never counted. Same tsx classic-JSX
+ * shim as the other render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -13,19 +14,16 @@ import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
 	byUrgency,
-	continueWords,
-	marksSummary,
 	nextStepOf,
-	nextUp,
-	standingWords,
+	pathPlace,
+	placeWords,
+	stepDetail,
 	stepWords,
 	titleList,
-	topicMarks,
-	upcomingReviews,
+	todayRows,
 	waitingSessions,
 } from "../components/study-home/study-facts.ts";
-import { Agenda } from "../components/study-home/agenda.tsx";
-import type { HomeProps } from "../components/study-home/home-props.ts";
+import { Today } from "../components/study-home/today.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -77,6 +75,7 @@ const LINALG: StudyCourse = {
 		],
 	}),
 	unready: ["span", "independence", "rank", "eigen"] as TopicHandle[],
+	due: null,
 	lastActiveDaysAgo: 2,
 };
 const PROB: StudyCourse = {
@@ -88,11 +87,13 @@ const PROB: StudyCourse = {
 		topics: [topic("conditional", "Conditional probability", "independent", { review: { kind: "scheduled", date: "2026-11-09" } }), topic("bayes", "Bayes' rule", "independent")],
 	}),
 	unready: [],
+	due: [],
 	lastActiveDaysAgo: 4,
 };
 const ANALYSIS: StudyCourse = {
 	map: map({ workspace: "/s/ra", title: "Real Analysis", exam: { date: "2027-01-26", daysLeft: 79 }, topics: [topic("seq", "Sequences", "independent", { review: due(1) })] }),
 	unready: null,
+	due: ["seq" as TopicHandle],
 	lastActiveDaysAgo: 11,
 };
 
@@ -114,81 +115,88 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 }
 
 describe("study facts", () => {
-	it("groups the engine's levels into three bands, in path order", () => {
-		assert.deepEqual(topicMarks(LINALG).map((m) => m.band), ["solid", "solid", "learning", "learning", "new"]);
-		assert.equal(marksSummary(topicMarks(LINALG)), "Topics: solid 2 of 5, learning 2 of 5, not started 1 of 5");
-	});
-
-	it("names the slipping topics and, in the run-up, the ones not started; never a count", () => {
-		assert.equal(standingWords(LINALG), "Linear independence and Rank are slipping. Not started: Eigenvalues.");
-		assert.equal(standingWords(ANALYSIS), "Sequences is due for review.");
-		assert.equal(standingWords(PROB), "Nothing due for review.");
+	it("words the next step in the order Continue takes it, naming reviews and never counting them", () => {
+		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank and more");
+		assert.equal(stepDetail(nextStepOf(LINALG)), "Then Problem sheet 4");
+		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
 		assert.equal(titleList(["A", "B", "C"]), "A, B and more");
 	});
 
-	it("words the next step in the order Continue takes it", () => {
-		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank and more");
-		assert.equal(continueWords(LINALG), "Reviews, then Problem sheet 4");
-		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
+	it("takes today's review from the engine's plan, in its order", () => {
+		const planned: StudyCourse = { ...LINALG, due: ["rank", "span"] as TopicHandle[] };
+		const step = nextStepOf(planned);
+		assert.equal(stepWords(step), "Review Rank and Span");
+		assert.deepEqual(step.kind === "review" && step.topics, ["rank", "span"]);
 	});
 
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
 		assert.deepEqual(byUrgency([ANALYSIS, LINALG, PROB]).map((c) => c.map.title), ["Probability", "Linear Algebra", "Real Analysis"]);
 	});
 
-	it("leads with a session waiting on the learner, else the most urgent course with a step", () => {
-		const waiting = waitingSessions([chat({ id: "idle" }), chat({ id: "q", pendingQuestion: true }), chat({ id: "w", busy: true, pendingQuestion: true })]);
+	it("places a lesson among its map's steps", () => {
+		const layers = [["a"], ["b", "c"], ["d"], ["e"]] as TopicHandle[][];
+		assert.equal(placeWords(pathPlace(["d"] as TopicHandle[], layers)!), "Step 3 of 4");
+		assert.equal(placeWords(pathPlace(["e", "b"] as TopicHandle[], layers)!), "Steps 2–4 of 4");
+		assert.equal(pathPlace(["gone"] as TopicHandle[], layers), null);
+	});
+});
+
+describe("today's lines", () => {
+	const eigen = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
+
+	it("gives a recent waiting session its course's line, first; every other course its next step, most urgent first", () => {
+		const waiting = waitingSessions([chat({ id: "idle" }), eigen, chat({ id: "w", busy: true, pendingQuestion: true })]);
 		assert.deepEqual(waiting.map((c) => c.id), ["q"]);
-		const first = nextUp([LINALG], waiting);
-		assert.equal(first.kind === "session" && first.chat.id, "q");
-		const course = nextUp([ANALYSIS, PROB], []);
-		assert.equal(course.kind === "course" && course.course.map.title, "Probability");
+		const rows = todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY);
+		assert.deepEqual(
+			rows.map((r) => (r.kind === "session" ? `session ${r.chat.id}` : r.course.map.title)),
+			["session q", "Probability", "Real Analysis"],
+		);
 	});
 
-	it("lists the reviews the engine scheduled this week by date", () => {
-		assert.deepEqual(upcomingReviews([LINALG, PROB]).map((r) => [r.date, r.topic]), [
-			["2026-11-09", "Conditional probability"],
-			["2026-11-13", "Vectors"],
-		]);
+	it("leaves a session waiting since before yesterday to the sidebar", () => {
+		const old = { ...eigen, updatedAt: "2026-11-05T09:00:00.000Z" };
+		const rows = todayRows([LINALG], [old], TODAY);
+		assert.deepEqual(rows.map((r) => r.kind), ["course"]);
 	});
 });
 
 describe("the study read", () => {
-	it("joins the map with plan's run-up and last activity, dropping handles the map does not list", () => {
-		const plan = { courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, last_activity: { days_ago: 2 } }] };
+	it("joins the map with plan's run-up, today's review and last activity, dropping handles the map does not list", () => {
+		const plan = {
+			courses: [{ runup: { days_left: 21, unready: ["span", "gone"] }, due: [{ topic: "rank" }, { topic: "gone" }, { topic: "span" }], last_activity: { days_ago: 2 } }],
+		};
 		const course = studyCourseOf(LINALG.map, plan);
 		assert.deepEqual(course.unready, ["span"]);
+		assert.deepEqual(course.due, ["rank", "span"]);
 		assert.equal(course.lastActiveDaysAgo, 2);
-		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, lastActiveDaysAgo: null });
+		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, due: [], lastActiveDaysAgo: null });
+		assert.equal(studyCourseOf(LINALG.map, null).due, null);
 	});
 });
 
-describe("the study home", () => {
+describe("Today", () => {
 	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
-	const props: HomeProps = {
-		courses: [ANALYSIS, LINALG, PROB],
-		waiting: [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })],
-		today: TODAY,
-		busy: false,
-		onContinue: () => {},
-	};
 	const render = (node: React.ReactNode) =>
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
+	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("shows every course, its exam, the waiting session, and no due counts", () => {
-		const doc = render(<Agenda {...props} />);
-		const text = doc.body.textContent ?? "";
-		for (const title of ["Linear Algebra", "Probability", "Real Analysis"]) assert.match(text, new RegExp(title));
-		assert.match(text, /11 days/);
-		assert.ok(doc.querySelector('a[href="/chat/q"]'), "the waiting session opens");
-		assert.doesNotMatch(text, /\d+\s+due\b/i);
-		assert.equal(doc.querySelectorAll('[data-slot="topic-strip"]').length, 3);
+	it("names each line's course and lesson, holds one primary action, and counts no reviews", () => {
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
+		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
+		assert.equal(lines.length, 3);
+		assert.match(lines[0]!.textContent ?? "", /Linear Algebra.*Eigen lesson.*Your turn.*Open/);
+		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
+		assert.match(lines[1]!.textContent ?? "", /Probability.*Exam in 11 days.*Continue Bayes' rule/);
+		assert.equal(doc.querySelectorAll("[data-primary]").length, 1);
+		assert.doesNotMatch(doc.body.textContent ?? "", /\d+\s+due\b/i);
+		assert.match(doc.querySelector("h2")?.textContent ?? "", /Today.*Sunday 8 November/);
 	});
 
-	it("holds one primary action, Now, and the week's reviews by day", () => {
-		const doc = render(<Agenda {...props} />);
-		assert.match(doc.querySelector('[data-slot="agenda-now"]')?.textContent ?? "", /Eigen lesson/);
-		assert.equal(doc.querySelectorAll('[data-slot="agenda-day"]').length, 2);
-		assert.match(doc.querySelector('[data-slot="agenda-day"]')?.textContent ?? "", /Tomorrow.*Conditional probability/);
+	it("past five lines, names the other courses on the last", () => {
+		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
+		const doc = render(<Today rows={todayRows(many, [], TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
+		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
+		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
 	});
 });

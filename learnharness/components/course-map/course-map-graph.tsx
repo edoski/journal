@@ -58,6 +58,8 @@ export function CourseMapGraph({
 	jumpRequest,
 	onStudy,
 	busy,
+	anchor = 0.4,
+	className,
 }: {
 	map: CourseMap;
 	layout: CourseMapLayout;
@@ -65,6 +67,10 @@ export function CourseMapGraph({
 	jumpRequest: number;
 	onStudy: (topic: CourseMapTopic) => void;
 	busy: boolean;
+	/** Where the current topic sits down the view, as a share of its height. */
+	anchor?: number;
+	/** The scroll box's own classes, for a frame that embeds the map. */
+	className?: string;
 }) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const nodeRefs = useRef(new Map<TopicHandle, HTMLButtonElement>());
@@ -94,19 +100,19 @@ export function CourseMapGraph({
 		return [PAD + p.x + NODE_WIDTH / 2, PAD + p.y + NODE_HEIGHT / 2];
 	};
 
-	/** Puts the current topic at about 40% of the view's height. */
+	/** Puts the current topic at `anchor` of the view's height (about 40% on the Map page). */
 	const jump = useCallback(
 		(behavior: ScrollBehavior) => {
 			const box = scrollRef.current;
 			const placed = map.current ? layout.topics.get(map.current) : undefined;
 			if (!box || !placed) return;
 			box.scrollTo({
-				top: (PAD + placed.y + NODE_HEIGHT / 2) * fit - box.clientHeight * 0.4,
+				top: (PAD + placed.y + NODE_HEIGHT / 2) * fit - box.clientHeight * anchor,
 				left: (PAD + placed.x + NODE_WIDTH / 2) * fit - box.clientWidth / 2,
 				behavior,
 			});
 		},
-		[layout, map.current, fit],
+		[layout, map.current, fit, anchor],
 	);
 	useEffect(() => jump("auto"), [jump]);
 	useEffect(() => {
@@ -141,7 +147,7 @@ export function CourseMapGraph({
 	const currentTitle = map.current ? titleOf(map.current) : null;
 
 	return (
-		<div ref={scrollRef} data-slot="course-map-scroll" className="min-h-0 flex-1 overflow-auto">
+		<div ref={scrollRef} data-slot="course-map-scroll" className={cn("min-h-0 flex-1 overflow-auto", className)}>
 			<div className="relative mx-auto" style={{ width: width * fit, height: height * fit }}>
 				<figure
 					data-slot="course-map-graph"

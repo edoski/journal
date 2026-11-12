@@ -14,8 +14,8 @@ function record(value: unknown): Record<string, unknown> | null {
 }
 
 /** The home's view of one course from its map and its `plan --days 1`
- *  output (`{courses: [entry]}`). Run-up handles the map does not list are
- *  dropped. Pure. */
+ *  output (`{courses: [entry]}`). Run-up and due handles the map does not
+ *  list are dropped. Pure. */
 export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 	const entries = record(plan)?.courses;
 	const entry = record(Array.isArray(entries) ? entries[0] : null);
@@ -25,7 +25,13 @@ export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 		? (Array.isArray(runup.unready) ? runup.unready : []).filter((h): h is TopicHandle => typeof h === "string" && listed.has(h))
 		: null;
 	const daysAgo = record(entry?.last_activity)?.days_ago;
-	return { map, unready, lastActiveDaysAgo: typeof daysAgo === "number" ? daysAgo : null };
+	const due = entry
+		? (Array.isArray(entry.due) ? entry.due : []).flatMap((d) => {
+				const topic = record(d)?.topic;
+				return typeof topic === "string" && listed.has(topic) ? [topic as TopicHandle] : [];
+			})
+		: null;
+	return { map, unready, due, lastActiveDaysAgo: typeof daysAgo === "number" ? daysAgo : null };
 }
 
 export async function studyStatus(): Promise<StudyListing> {
