@@ -69,27 +69,28 @@ export function UnitSidebar() {
 			data-testid="sidebar"
 		>
 			<div className="flex h-full w-64 flex-col border-r bg-background">
-				<div className="lh-drag lh-lights-gutter flex h-13 shrink-0 items-center justify-end px-2">
+				<div className="lh-drag lh-lights-gutter h-13 shrink-0" />
+
+				<div className="mb-px flex shrink-0 items-center gap-1 px-2">
+					<Link
+						href="/"
+						data-slot="sidebar-home"
+						aria-current={s.pathname === "/" ? "page" : undefined}
+						onClick={blurAfterPointerClick}
+						className={cn(
+							"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+							s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+						)}
+					>
+						<HouseIcon aria-hidden className="size-4 shrink-0" />
+						Home
+					</Link>
 					<Hint label="Close sidebar" action="toggle-sidebar">
 						<button type="button" aria-label="Close sidebar" onClick={toggle} className={ICON_BUTTON}>
 							<PanelLeftCloseIcon />
 						</button>
 					</Hint>
 				</div>
-
-				<Link
-					href="/"
-					data-slot="sidebar-home"
-					aria-current={s.pathname === "/" ? "page" : undefined}
-					onClick={blurAfterPointerClick}
-					className={cn(
-						"mx-2 mb-px flex h-8 shrink-0 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
-						s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
-					)}
-				>
-					<HouseIcon aria-hidden className="size-4 shrink-0" />
-					Home
-				</Link>
 
 				<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 					<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
