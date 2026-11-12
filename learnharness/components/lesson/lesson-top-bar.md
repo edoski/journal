@@ -7,8 +7,8 @@ The session's top bar under the Proposed design, rendered in the shared `TopBar`
 | Slot | Notes |
 |---|---|
 | sidebar toggle | `TopBar`'s own, only while the sidebar is closed |
-| title | 16/26 at 600 (`text-prose font-semibold`), truncates first; a click (or F2) renames it in place, the input in the same style |
-| course | 13/18 `muted-foreground`, baseline-aligned after the title, truncates before the title does (`shrink-[2]`) |
+| course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60% |
+| title | 14 at 500 (`text-control font-medium`), after the course as T3 Code's breadcrumb does (project › thread); truncates; a click (or F2) renames it in place, the input in the same style |
 | phase | 13/18 `muted-foreground`, sentence case ("Probing", "Planning", "Teaching", "Practice"); not interactive |
 | plan toggle | quiet button, 32px, 16px waypoints icon and "Plan" at 13/400; `data-slot="plan-toggle"`; the trigger of the plan popover (plan-map.md, popover.md), right-aligned under it |
 | details | quiet 32px icon button (ellipsis), the trigger of the details popover |

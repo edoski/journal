@@ -1334,7 +1334,7 @@ export function Chat({
 										onBlur={() => void commitRename(titleDraft)}
 										spellCheck={false}
 										aria-label="Session title"
-										className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-prose font-semibold caret-current outline-none [field-sizing:content]"
+										className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-control font-medium caret-current outline-none [field-sizing:content]"
 									/>
 								) : (
 									<Hint label="Rename session" action="rename-session" side="bottom">
@@ -1344,7 +1344,7 @@ export function Chat({
 												setTitleDraft(titleText);
 												setRenaming(true);
 											}}
-											className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left text-prose font-semibold outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+											className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left text-control font-medium outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 										>
 											{titleText}
 										</button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { EllipsisIcon, WaypointsIcon } from "lucide-react";
+import { ChevronRightIcon, EllipsisIcon, WaypointsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -10,9 +10,10 @@ import { sessionStatLabels } from "@/components/stats-bar";
 import type { SessionPricing, TurnUsage } from "@/src/core";
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside
- *  the shared TopBar at its slim size: the title (the rename button or its
- *  input, owned by the session), the course as a quiet label, then on the
- *  right the phase, the plan toggle and the details menu. */
+ *  the shared TopBar at its slim size: the course and the title as one
+ *  breadcrumb (the title is the rename button or its input, owned by the
+ *  session), then on the right the phase, the plan toggle and the details
+ *  menu. */
 export function LessonTopBar({
 	title,
 	course,
@@ -30,13 +31,16 @@ export function LessonTopBar({
 }) {
 	return (
 		<>
-			<div className="flex min-w-0 flex-1 items-baseline gap-2">
-				{title}
+			<div className="flex min-w-0 flex-1 items-center gap-1.5">
 				{course && (
-					<span data-testid="course-label" className="min-w-0 shrink-[2] truncate text-row text-muted-foreground">
-						{course}
-					</span>
+					<>
+						<span data-testid="course-label" className="min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground">
+							{course}
+						</span>
+						<ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />
+					</>
 				)}
+				{title}
 			</div>
 			<span data-testid="phase-chip" aria-hidden className="pointer-events-none shrink-0 select-none text-row text-muted-foreground">
 				{phase}
