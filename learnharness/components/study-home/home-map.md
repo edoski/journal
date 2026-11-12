@@ -11,4 +11,4 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 | enlarged | the tabs and the map take Home's full width and height; Today hides. Esc (unless a popover takes it) or the same control returns |
 | empty | "Topics appear as you study this course." |
 
-Not on Home: the Map page's List view, Import notes… and Statements…; they stay on `/knowledge` while Home is Current.
+Not on Home, enlarged or not: the Map page's List view, Import notes… and Statements… (Edo, 12 Nov 2026: he would never use them, and the engine should grow from his studying with nothing for him to manage). They stay on `/knowledge` only while Home is Current, and shipping Home deletes them with that page.

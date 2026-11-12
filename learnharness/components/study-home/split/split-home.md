@@ -30,7 +30,7 @@ The `split` option of Home's switch: today's lessons on the left, the map of the
 | picked row | `fill-selected`; the primary button (32px, "Open", "Review", "Continue" or "Start") at its end, centred |
 | map pane | no border and no header line (Edo, 12 Nov 2026: the outline and "You are at …" said nothing the map doesn't); `CourseMapGraph` as it is, edges faded 32px across and 24px down, a short drawing at the pane's middle; the quiet 32px Enlarge control at its top right, over the map |
 | a lesson with no course | the pane says "This lesson has no course, so it has no map." |
-| enlarged | `HomeMap` enlarged takes the page (home-map.md): tabs, List view, More, Esc back; its tabs move the pick |
+| enlarged | `HomeMap` enlarged takes the page (home-map.md): tabs and Esc back, nothing more; its tabs move the pick |
 
 ## Scenarios checked (seeded demo, 12 Nov 2026)
 

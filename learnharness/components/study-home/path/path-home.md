@@ -27,7 +27,7 @@ The `path` option of Home's switch: today's lessons in one calm column, each dra
 | row | radius 12, padding 12, hover `fill-hover`, 2px apart; the whole row opens the lesson; `LessonText` without the place, then the track 8px under it |
 | track | dots 6px, 4px apart (4px and 2px apart past 40 topics), in a 16px line; `role="img"` named "10 of 16 topics started"; then the place 12 muted, 12px after |
 | first row | the primary button's look at its end (32px) |
-| map open | `HomeMap` enlarged takes the page (home-map.md), opening on the first lesson's course: tabs, List view, More, Esc back |
+| map open | `HomeMap` enlarged takes the page (home-map.md), opening on the first lesson's course: tabs and Esc back, nothing more |
 
 ## Scenarios checked (seeded demo, 12 Nov 2026)
 
