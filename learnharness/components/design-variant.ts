@@ -7,7 +7,7 @@ export type DesignVariant = "current" | "proposed";
 
 /** The study homes `/` can be, one per candidate (spec:
  *  components/study-home/study-home.md). */
-export const HOME_OPTIONS = ["agenda"] as const;
+export const HOME_OPTIONS = ["agenda", "split"] as const;
 /** "current" keeps `/` the composer; an option makes it that study home. */
 export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
 
