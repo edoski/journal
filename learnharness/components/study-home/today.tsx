@@ -2,8 +2,10 @@
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useRowsVariant } from "@/components/design-variant";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
+import { ReasonRows } from "@/components/study-home/agenda-rows/reason/reason-rows";
 import { actionWord, courseTitle, foldLines, lessonTitle, lineKey, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import type { TodayRow } from "@/components/study-home/study-facts";
@@ -16,13 +18,19 @@ const LINE =
 /**
  * Today (spec: today.md): the page's title, then one line per course, each
  * its course and its one next lesson. The first line holds the page's only
- * primary action.
+ * primary action. The Rows switch draws the lines as one of agenda's row
+ * candidates (agenda-rows/agenda-rows.md).
  */
 export function Today(props: RowsProps) {
+	const variant = useRowsVariant();
 	return (
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">
 			<DayHeading id="today-heading" today={props.today} />
-			<TodayLines {...props} />
+			{variant === "reason" ? (
+				<ReasonRows {...props} />
+			) : (
+				<TodayLines {...props} />
+			)}
 		</section>
 	);
 }

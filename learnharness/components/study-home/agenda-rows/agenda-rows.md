@@ -4,6 +4,7 @@ Three candidates for how a line of agenda's Today reads, behind the Rows switch 
 
 | Option | Thesis | The signal on a row | Delineation | Spec |
 |---|---|---|---|---|
+| `reason` | every row says why it is there now | "Waiting for your reply", "You missed Chain rule last time", "Starting to fade", "Left off at part (c)…", "Next on your map" | one quiet panel, hairlines inset to the text | reason/reason.md |
 
 ## Shared
 

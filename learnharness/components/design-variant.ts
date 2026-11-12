@@ -11,14 +11,22 @@ export const HOME_OPTIONS = ["agenda", "split", "map", "path"] as const;
 /** "current" keeps `/` the composer; an option makes it that study home. */
 export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
 
+/** The agenda home's row candidates (spec:
+ *  components/study-home/agenda-rows/agenda-rows.md). */
+export const ROWS_OPTIONS = ["reason"] as const;
+/** "current" keeps agenda's rows as course and lesson only. */
+export type RowsVariant = "current" | (typeof ROWS_OPTIONS)[number];
+
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only): Design is Current or Proposed; Home is Current or one of its
  *  options, Sidebar Current or Proposed, and anything but Current wears
- *  Design's Proposed. Read only through the hooks below. */
+ *  Design's Proposed; Rows is Current or one of agenda's row candidates,
+ *  which wear Home's agenda too. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", options: HOME_OPTIONS, requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
+	{ id: "rows", label: "Rows", options: ROWS_OPTIONS, requires: { design: "proposed", home: "agenda" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -27,6 +35,8 @@ const readCurrent = (): DesignVariant => "current";
 const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" ? "proposed" : "current");
 const readHomeCurrent = (): HomeVariant => "current";
 const readHome = (): HomeVariant => HOME_OPTIONS.find((option) => option === polishVariant("home")) ?? "current";
+const readRowsCurrent = (): RowsVariant => "current";
+const readRows = (): RowsVariant => ROWS_OPTIONS.find((option) => option === polishVariant("rows")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
 
 /** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
@@ -39,6 +49,12 @@ export function useDesignVariant(): DesignVariant {
  *  Production builds get "current". */
 export function useHomeVariant(): HomeVariant {
 	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readHome : readHomeCurrent, readHomeCurrent);
+}
+
+/** Which rows agenda's Today draws, or "current" for course and lesson
+ *  only. Production builds get "current". */
+export function useRowsVariant(): RowsVariant {
+	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readRows : readRowsCurrent, readRowsCurrent);
 }
 
 /** Whether the Proposed design's sidebar lists course topics ("proposed",

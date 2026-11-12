@@ -26,6 +26,7 @@ import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
+import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -296,5 +297,19 @@ describe("agenda's row candidates", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
 		const { shown, also } = foldLines(todayRows(many, [], TODAY));
 		assert.deepEqual([shown.length, also.length], [4, 2]);
+	});
+
+	const rows = () => todayRows([ANALYSIS, LINALG, PROB], [waiting], TODAY);
+	const props = () => ({ rows: rows(), today: TODAY, busy: false, onContinue: () => {} });
+	const plain = (doc: Document) => {
+		assert.equal(doc.querySelectorAll("[data-primary]").length, 1);
+		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/);
+	};
+
+	it("reason: each line says why it is on Today, beside its lesson", () => {
+		const doc = render(<ReasonRows {...props()} />);
+		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
+		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your replyOpen", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesStarting to fade"]);
+		plain(doc);
 	});
 });
