@@ -6,17 +6,21 @@ import { ScrollArea as ScrollAreaPrimitive } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 /** shadcn scroll area on the Proposed tokens (spec: scroll-area.md): an
- *  overlay bar 10px wide with a 15% white thumb. `viewportRef` reaches the
- *  scroller for code that locks or measures it. */
+ *  overlay bar 10px wide with a 15% white thumb, or no bar at all
+ *  (`bar={false}`, T3 Code's sidebar), the area still scrolling by wheel,
+ *  trackpad and keyboard. `viewportRef` reaches the scroller for code that
+ *  locks or measures it. */
 function ScrollArea({
   className,
   children,
   viewportRef,
   viewportClassName,
+  bar = true,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   viewportRef?: React.Ref<HTMLDivElement>
   viewportClassName?: string
+  bar?: boolean
 }) {
   return (
     <ScrollAreaPrimitive.Root
@@ -34,8 +38,8 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar />
-      <ScrollAreaPrimitive.Corner />
+      {bar && <ScrollBar />}
+      {bar && <ScrollAreaPrimitive.Corner />}
     </ScrollAreaPrimitive.Root>
   )
 }

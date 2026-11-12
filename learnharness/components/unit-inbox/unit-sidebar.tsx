@@ -138,7 +138,7 @@ export function UnitSidebar() {
 					</Hint>
 				</div>
 
-				<ScrollArea viewportRef={s.listRef} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
+				<ScrollArea viewportRef={s.listRef} bar={false} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
 					<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
 						{state.status === "loading" ? (
 							<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Loading…</li>
