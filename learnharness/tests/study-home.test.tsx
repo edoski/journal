@@ -26,6 +26,7 @@ import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
+import { ProgressRows } from "../components/study-home/agenda-rows/progress/progress-rows.tsx";
 import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
 import { RecencyRows } from "../components/study-home/agenda-rows/recency/recency-rows.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
@@ -317,6 +318,12 @@ describe("agenda's row candidates", () => {
 	it("recency: each line says when its course was last studied, or that a reply waits", () => {
 		const doc = render(<RecencyRows {...props()} />);
 		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-when"]')].map((l) => l.textContent), ["Waiting for your reply", "Studied 4 days ago", "Studied 11 days ago"]);
+		plain(doc);
+	});
+
+	it("progress: each line's pie tells a screen reader how far along the course is", () => {
+		const doc = render(<ProgressRows {...props()} />);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-progress"]')].map((l) => l.getAttribute("aria-label")), ["4 of 5 topics taught", "2 of 2 topics taught", "1 of 1 topics taught"]);
 		plain(doc);
 	});
 });

@@ -6,6 +6,7 @@ Three candidates for how a line of agenda's Today reads, behind the Rows switch 
 |---|---|---|---|---|
 | `reason` | every row says why it is there now | "Waiting for your reply", "You missed Chain rule last time", "Starting to fade", "Left off at part (c)…", "Next on your map" | one quiet panel, hairlines inset to the text | reason/reason.md |
 | `recency` | a row is a thread, as in Mail and T3 Code | when he last studied the course: "Studied 2 days ago" (a waiting session says "Waiting for your reply") | two lines, hairlines between rows, no container | recency/recency.md |
+| `progress` | each course is a thing he is working through | how far along the course is, as a pie that fills (Things' project pie) | each row its own tile | progress/progress.md |
 
 ## Shared
 
