@@ -125,7 +125,7 @@ function UnitDetail({ course, topic, chats }: { course: StudyCourse; topic: Cour
 					{STUDY_WORDS}
 				</Button>
 			</div>
-			<NavSection title="Sessions" trailing={sessions.length || undefined}>
+			<NavSection title="Sessions" trailing={sessions.length || undefined} className="-mx-2">
 				{sessions.length === 0 ? (
 					<p className="px-2 text-row text-muted-foreground">No session in the app works on it yet.</p>
 				) : (
@@ -133,14 +133,14 @@ function UnitDetail({ course, topic, chats }: { course: StudyCourse; topic: Cour
 				)}
 			</NavSection>
 			{needs.length > 0 && (
-				<NavSection title="Builds on">
+				<NavSection title="Builds on" className="-mx-2">
 					{needs.map((t) => (
 						<TopicLink key={t.handle} workspace={workspace} topic={t} />
 					))}
 				</NavSection>
 			)}
 			{leads.length > 0 && (
-				<NavSection title="Leads to">
+				<NavSection title="Leads to" className="-mx-2">
 					{leads.map((t) => (
 						<TopicLink key={t.handle} workspace={workspace} topic={t} />
 					))}
