@@ -11,8 +11,9 @@ export const HOME_CANDIDATES = ["a", "b", "c"] as const;
 export type HomeCandidate = (typeof HOME_CANDIDATES)[number];
 
 /** The sidebar's Explore candidates, each a study inbox of course topics
- *  holding their sessions: Outline expands a topic in place. */
-export const SIDEBAR_CANDIDATES = ["outline"] as const;
+ *  holding their sessions: Outline expands a topic in place, Page opens
+ *  the topic's page. */
+export const SIDEBAR_CANDIDATES = ["outline", "page"] as const;
 export type SidebarCandidate = (typeof SIDEBAR_CANDIDATES)[number];
 
 /** The switch registry, which the Logbook's in-app guide switches (dev
