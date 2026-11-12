@@ -144,14 +144,6 @@ export function unitStatus(unit: Unit, today: string): UnitStatus {
 	return last ? { kind: "studied", at: last.updatedAt } : { kind: "none" };
 }
 
-/** A card's third line: where the engine says the topic slips, else its
- *  standing in words ("First lesson" while a topic not started yet is
- *  being taught). Pure. */
-export function unitMeta(unit: Unit): string {
-	if (unit.topic.weak && unit.topic.signals.gap) return unit.topic.signals.gap;
-	return unit.topic.level === "new" ? "First lesson" : LEVEL_WORDS[unit.topic.level];
-}
-
 /** A course's monogram, T3 Code's fallback for a project with no favicon:
  *  the initials of its first two words. Pure. */
 export function monogram(title: string): string {

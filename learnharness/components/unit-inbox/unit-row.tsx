@@ -10,7 +10,7 @@ import { shortTimeAgo } from "@/components/sidebar-next";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { activeSession, monogram, unitMeta, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { activeSession, monogram, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import { cn } from "@/lib/utils";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
@@ -91,10 +91,9 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
 }
 
 /**
- * A topic on the list, T3 Code's inbox card (78px): the course's mark and
- * name with the status slot, the topic's title at 14/500, then one quiet
- * line, where it slips or its standing. A click opens the topic's page;
- * a topic the tutor writes in recedes until hovered.
+ * A topic on the list, a two-line card (60px): the course's mark and name
+ * with the status slot, then the topic's title at 14/500. A click opens
+ * the topic's page; a topic the tutor writes in recedes until hovered.
  */
 export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
 	const working = unit.now === "working";
@@ -109,7 +108,7 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 				data-testid="unit-row"
 				className={cn(
 					rowSurface(active),
-					"flex h-[4.875rem] flex-col px-2.5 py-2",
+					"flex h-[3.75rem] flex-col px-2.5 py-2",
 					working && !active && "opacity-70 hover:opacity-100 focus-visible:opacity-100",
 				)}
 			>
@@ -121,9 +120,6 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 					</span>
 				</span>
 				<span className="mt-1 truncate text-control font-medium text-foreground">{unit.topic.title}</span>
-				<span data-slot="unit-meta" className="mt-0.5 truncate text-label text-muted-foreground">
-					{unitMeta(unit)}
-				</span>
 			</Link>
 			<RowAction unit={unit} className="right-2.5 top-2.5 h-5" />
 		</li>
