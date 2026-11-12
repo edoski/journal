@@ -515,6 +515,39 @@ function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 	return ids;
 }
 
+const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
+
+/** The course topics a session worked on, by its own transcript, in the
+ *  order it first touched them: the topics of each problem it posed and of
+ *  each observation it saved, the topics a save introduced, and the plan
+ *  nodes, which take a course topic's handle when they are one. Only calls
+ *  that went through count. Candidates only: a caller keeps the ones its
+ *  course map lists. Pure. */
+export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: readonly string[] = []): string[] {
+	const clean = cleanToolCallIds(messages);
+	const topics = new Set<string>();
+	for (const m of messages) {
+		if ((m as { role?: string }).role !== "assistant") continue;
+		for (const block of (m as AssistantMessage).content) {
+			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
+			const args = block.arguments as Record<string, unknown>;
+			if (block.name === PRACTICE_PROBLEM_TOOL) for (const t of strings(args.topics)) topics.add(t);
+			if (block.name !== "course_save" || typeof args.changes !== "object" || args.changes === null) continue;
+			const changes = args.changes as { observations?: unknown; topics?: unknown };
+			for (const o of Array.isArray(changes.observations) ? changes.observations : []) {
+				for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
+			}
+			if (typeof changes.topics === "object" && changes.topics !== null) {
+				for (const [t, patch] of Object.entries(changes.topics)) {
+					if ((patch as { introduced?: unknown } | null)?.introduced === true) topics.add(t);
+				}
+			}
+		}
+	}
+	for (const id of planNodeIds) topics.add(id);
+	return [...topics];
+}
+
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
  *  conclude card is the modelSolution committed at POSE time — the newest
  *  cleanly-posed problem BEFORE this conclude call. The reveal is never
