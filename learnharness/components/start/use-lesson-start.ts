@@ -12,6 +12,7 @@ const START_FAILURE = "Couldn’t open the session. Try again.";
  * (SessionStarter) and the pre-send guards every start uses: missing models
  * or keys open setup, an unavailable model opens its picker, and nothing is
  * created until they pass. The caller draws `SetupDialog` from `setupOpen`.
+ * `onCreated` hears the new session's id before the app opens it.
  */
 export function useLessonStart(initialConfigured: boolean) {
 	const router = useRouter();
@@ -21,7 +22,7 @@ export function useLessonStart(initialConfigured: boolean) {
 	const [error, setError] = useState<string | null>(null);
 	const [setupOpen, setSetupOpen] = useState(false);
 
-	const start = (opening: string, workspace: string) => {
+	const start = (opening: string, workspace: string, onCreated?: (chatId: string) => void) => {
 		if (busy) return;
 		if (!configured || zeroKeys) return setSetupOpen(true);
 		const strong = catalog?.slots.strong?.model;
@@ -30,7 +31,10 @@ export function useLessonStart(initialConfigured: boolean) {
 		setError(null);
 		void starter.current
 			.start({ title: opening, course: { workspace } }, fetch, JSON.stringify(catalog?.slots.strong))
-			.then((target) => router.push(target))
+			.then((target) => {
+				onCreated?.(target.slice("/chat/".length));
+				router.push(target);
+			})
 			.catch(() => {
 				setBusy(false);
 				setError(START_FAILURE);

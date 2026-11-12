@@ -2,19 +2,14 @@ import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 
 /**
- * The sidebar's study inbox: every unit (a course map topic) on one shelf,
- * with the sessions that worked on it. The shelves follow the engine's
- * standing and review, never the app's judgement:
- *   - Learning: taught and not yet solid, or studied right now;
- *   - Review: solid, and its spaced review is due today;
- *   - Known: solid, back on the date the engine set.
+ * The sidebar's topics. Each unit (a course map topic the learner has
+ * started) has a standing the engine sets, never the app:
+ *   - learning: taught and not yet solid, or studied right now;
+ *   - review: solid, and its spaced review is due today;
+ *   - known: solid, back on the date the engine set.
  * A topic not started is not listed: the tutor routes there.
  */
 export type Shelf = "learning" | "review" | "known";
-
-export const SHELVES: readonly Shelf[] = ["learning", "review", "known"];
-
-export const SHELF_WORDS: Record<Shelf, string> = { learning: "Learning", review: "Review", known: "Known" };
 
 export interface UnitCourse {
 	workspace: string;
@@ -36,22 +31,37 @@ export interface Unit {
 	now: UnitNow;
 }
 
+/**
+ * The sidebar's sections, T3 Code's inbox for topics: the topics to act on
+ * in one list with no header (T3's Active), then three folded shelves at
+ * the foot. Working holds topics the tutor is writing in (T3's Working),
+ * Known the solid topics on the engine's timer (T3's Snoozed: each wakes
+ * onto the list when its review falls due), and Other the sessions on no
+ * listed topic, where T3 keeps Settled.
+ */
 export interface UnitInbox {
 	/** The engine's study day. */
 	today: string;
-	learning: readonly Unit[];
-	review: readonly Unit[];
+	/** What waits on the learner first, then topics being learned, the most
+	 *  recently studied first, then due reviews, the weak first. */
+	active: readonly Unit[];
+	working: readonly Unit[];
+	/** The soonest back first. */
 	known: readonly Unit[];
 	/** Sessions tied to no listed unit: a general question, or a session
 	 *  older than the course rule. Newest first. */
 	other: readonly ChatListItem[];
 }
 
+export type FoldedShelf = "working" | "known" | "other";
+
+export const SHELF_WORDS: Record<FoldedShelf, string> = { working: "Working", known: "Known", other: "Other sessions" };
+
 const SOLID = new Set(["independent", "retained", "transferred"]);
 
 export const unitKey = (workspace: string, handle: string) => `${workspace}#${handle}`;
 
-/** Which shelf a topic sits on, or null when it is not listed. Pure. */
+/** Which standing a topic has, or null when it is not listed. Pure. */
 export function shelfOf(topic: CourseMapTopic, now: UnitNow): Shelf | null {
 	if (now !== null) return "learning";
 	if (topic.level === "new") return null;
@@ -65,19 +75,19 @@ function nowOf(sessions: readonly ChatListItem[]): UnitNow {
 	return states.includes("working") ? "working" : null;
 }
 
-const NOW_RANK: Record<"your-turn" | "working" | "none", number> = { "your-turn": 0, working: 1, none: 2 };
-const nowRank = (u: Unit) => NOW_RANK[u.now ?? "none"];
 /** When the unit was last studied in the app, else first taught. */
 const lastAt = (u: Unit) => u.sessions[0]?.updatedAt ?? u.topic.introduced ?? "";
 const overdue = (u: Unit) => (u.topic.review?.kind === "due" ? u.topic.review.overdue : 0);
 const returns = (u: Unit) => u.topic.review?.date ?? "9999-12-31";
+const byLearning = (a: Unit, b: Unit) => Number(b.now === "your-turn") - Number(a.now === "your-turn") || lastAt(b).localeCompare(lastAt(a));
+const byReview = (a: Unit, b: Unit) => Number(b.topic.weak) - Number(a.topic.weak) || overdue(b) - overdue(a);
 
 /**
- * The inbox for one course, or every course with `scope` null. Learning:
- * what waits on the learner first, then the most recently studied.
- * Review: the units the engine calls weak first, then the longest past
- * due, the nearest the app has to "most likely forgotten". Known: the
- * soonest back first. Pure.
+ * The sidebar for one course, or every course with `scope` null. Active:
+ * what waits on the learner, then the topics being learned (the latest
+ * studied first), then due reviews (the engine's weak first, then the
+ * longest past due, the nearest the app has to "most likely forgotten").
+ * Pure.
  */
 export function buildInbox(courses: readonly StudyCourse[], chats: readonly ChatListItem[], scope: string | null): UnitInbox {
 	const scoped = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
@@ -104,12 +114,12 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	}
 	const listed = new Set(units.flatMap((u) => u.sessions.map((s) => s.id)));
 	const inScope = (chat: ChatListItem) => (scope === null ? true : chat.course?.workspace === scope);
-	const on = (shelf: Shelf) => units.filter((u) => u.shelf === shelf);
+	const resting = units.filter((u) => u.now !== "working");
 	return {
 		today: scoped[0]?.map.today ?? courses[0]?.map.today ?? "",
-		learning: on("learning").sort((a, b) => nowRank(a) - nowRank(b) || lastAt(b).localeCompare(lastAt(a))),
-		review: on("review").sort((a, b) => Number(b.topic.weak) - Number(a.topic.weak) || overdue(b) - overdue(a)),
-		known: on("known").sort((a, b) => returns(a).localeCompare(returns(b))),
+		active: [...resting.filter((u) => u.shelf === "learning").sort(byLearning), ...resting.filter((u) => u.shelf === "review").sort(byReview)],
+		working: units.filter((u) => u.now === "working").sort((a, b) => lastAt(b).localeCompare(lastAt(a))),
+		known: resting.filter((u) => u.shelf === "known").sort((a, b) => returns(a).localeCompare(returns(b))),
 		other: chats.filter((c) => !listed.has(c.id) && inScope(c)),
 	};
 }
@@ -119,23 +129,37 @@ export function daysBetween(from: string, to: string): number {
 	return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
-/** The one fact a unit's trailing column shows, by priority: a session
- *  waits on the learner, the tutor writes, a known unit's return, else
- *  when it was last studied in the app. A due review shows nothing more:
- *  almost every unit still being learned is due, and Review says it for
- *  the rest. */
+/** The one fact a row's status slot shows, by priority: a session waits on
+ *  the learner, the tutor writes, a solid topic's review is due, a known
+ *  topic's return, else when it was last studied in the app. A topic being
+ *  learned never says "due": almost all of them are. */
 export type UnitStatus =
-	| { kind: "your-turn" }
-	| { kind: "working" }
-	| { kind: "returns"; days: number }
-	| { kind: "studied"; at: string }
-	| { kind: "none" };
+	{ kind: "your-turn" } | { kind: "working" } | { kind: "review" } | { kind: "returns"; days: number } | { kind: "studied"; at: string } | { kind: "none" };
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.now) return { kind: unit.now };
+	if (unit.shelf === "review") return { kind: "review" };
 	if (unit.shelf === "known" && unit.topic.review) return { kind: "returns", days: Math.max(1, daysBetween(today, unit.topic.review.date)) };
 	const last = unit.sessions[0];
-	return unit.shelf !== "review" && last ? { kind: "studied", at: last.updatedAt } : { kind: "none" };
+	return last ? { kind: "studied", at: last.updatedAt } : { kind: "none" };
+}
+
+/** A card's third line: where the engine says the topic slips, else its
+ *  standing in words ("First lesson" while a topic not started yet is
+ *  being taught). Pure. */
+export function unitMeta(unit: Unit): string {
+	if (unit.topic.weak && unit.topic.signals.gap) return unit.topic.signals.gap;
+	return unit.topic.level === "new" ? "First lesson" : LEVEL_WORDS[unit.topic.level];
+}
+
+/** A course's monogram, T3 Code's fallback for a project with no favicon:
+ *  the initials of its first two words. Pure. */
+export function monogram(title: string): string {
+	const words = title.split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w));
+	return words
+		.slice(0, 2)
+		.map((w) => w[0]!.toUpperCase())
+		.join("");
 }
 
 /** "in 5d", "in 3w", "in 2mo": a known unit's return, short enough for
@@ -158,22 +182,38 @@ export const LEVEL_WORDS: Record<CourseMapTopic["level"], string> = {
 	transferred: "Used in a new setting",
 };
 
-/** "1 session", "3 sessions". Pure. */
-export function sessionCount(n: number): string {
-	return n === 1 ? "1 session" : `${n} sessions`;
-}
-
-/** The session a unit reopens: one waiting on the learner, else one the
- *  tutor writes in, else the newest. Pure. */
-export function resumeTarget(unit: Unit): ChatListItem | undefined {
-	return unit.sessions.find((c) => sessionState(c) === "your-turn") ?? unit.sessions.find((c) => sessionState(c) === "working") ?? unit.sessions[0];
+/** The session a unit's page puts first, the one to resume: one waiting
+ *  on the learner, else one the tutor writes in, else none. Pure. */
+export function activeSession(sessions: readonly ChatListItem[]): ChatListItem | null {
+	return sessions.find((c) => sessionState(c) === "your-turn") ?? sessions.find((c) => sessionState(c) === "working") ?? null;
 }
 
 /** A topic's sessions in its course, newest first. Pure. */
 export function topicSessions(chats: readonly ChatListItem[], workspace: string, handle: string): ChatListItem[] {
-	return chats
-		.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle))
-		.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	return chats.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** Sessions started on a topic's page, by session id: the topic's handle.
+ *  The app's own link, so a new session is on its topic from its first
+ *  turn, before its transcript names the topic. */
+export type TopicStarts = Readonly<Record<string, string>>;
+
+/** The list with each started session also on the topic it was started
+ *  on. Pure. */
+export function linkStarts(chats: readonly ChatListItem[], starts: TopicStarts): ChatListItem[] {
+	return chats.map((c) => {
+		const handle = starts[c.id];
+		const topics = c.topics ?? [];
+		return handle && !topics.includes(handle) ? { ...c, topics: [...topics, handle] } : c;
+	});
+}
+
+/** A new session's first message from a topic's page: the prompt, led by
+ *  the topic's title unless the prompt names it, so the tutor works on
+ *  that topic. Pure. */
+export function openingFor(topicTitle: string, prompt: string): string {
+	const text = prompt.trim();
+	return text.toLowerCase().includes(topicTitle.toLowerCase()) ? text : `${topicTitle}: ${text}`;
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });

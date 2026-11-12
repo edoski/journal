@@ -1,32 +1,51 @@
-# Unit inbox
+# Topic sidebar and topic page
 
-The Proposed sidebar as a study inbox (`unit-sidebar.tsx`): every course topic the learner has started, on one of three shelves, holding the sessions that worked on it. The three Explore candidates (`outline/`, `page/`, `resume/`) share everything here and differ only in the unit row: how it holds its sessions and what a click does.
+The Proposed sidebar (`unit-sidebar.tsx`, behind the Sidebar switch) is T3 Code's sidebar with course topics in place of threads. A row is a topic the learner has started; one click opens its page (`unit-page.tsx`, `/unit/<course>/<topic>`). Sessions are never rows under a topic: they live on the topic's page.
 
-## Shelves
+## Sections
 
-| Shelf | A topic is on it when | Order | Row's trailing fact |
-|---|---|---|---|
-| Learning | taught and not yet solid (`introduced`, `attempted`, `assisted`), or one of its sessions waits on the learner or runs | waiting first, then the most recently studied | Your turn, the spinner, else how long ago it was studied in the app |
-| Review | solid (`independent` and up) and its spaced review is due today | weak first, then the longest past due | none: the shelf says it |
-| Known | solid and not due | the soonest back first | when it comes back (`in 5d`, `in 3w`) |
-| Other sessions | sessions tied to no listed topic: a general question, or older than the course rule | newest first | the session row's own |
+| Section             | T3 Code's | A topic is in it when                                                                                                                        | Order                                                                                                                         | Row                 |
+| ------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| the list, no header | Active    | taught and not yet solid (`introduced`, `attempted`, `assisted`), a session on it waits on the learner, or it is solid and its review is due | waits on the learner, then being learned (the latest studied first), then due reviews (weak first, then the longest past due) | card                |
+| Working             | Working   | the tutor is writing in one of its sessions                                                                                                  | the latest studied first                                                                                                      | card                |
+| Known               | Snoozed   | solid (`independent` and up) and not due: on the engine's timer, back on the list when its review falls due                                  | the soonest back first                                                                                                        | one line            |
+| Other sessions      | Settled   | sessions tied to no listed topic: a general question, or older than the course rule                                                          | newest first                                                                                                                  | one line, a session |
 
-A topic not started (`new`) is not listed: the tutor routes there. The engine owns every level and date (`units.ts` names them; it judges nothing). Learning and Review start open; Known and Other start folded, and long ones show 10 rows, then "Show all". A folded shelf keeps the open row in view and shows a 6px accent dot when a hidden row waits on the learner. Folding and the course scope persist (`lh:unit-inbox-folded`, `lh:unit-inbox-scope`).
-
-## Sessions to topics
-
-A session's topics come from its own transcript (`sessionTopicsOf` in `src/core/native-messages.ts`): the topics of each problem it posed and observation it saved, the topics a save introduced, and plan nodes named after a topic. Only topics the course map lists count. A session on two topics is under both.
+`units.ts` (`buildInbox`) is the one classifier; the engine owns every level and date. A topic not started (`new`) is not listed: the tutor routes there. The shelves sit at the foot (a spacer with `mt-auto`, so on a short list they rest at the bottom), start folded, and show 10 rows, then "Show 25 more". A folded shelf still shows the open row, and Other shows a 6px accent dot when a hidden session waits on the learner. Folding persists in `lh:topic-sidebar-folded`, the course filter in `lh:unit-inbox-scope`.
 
 ## Anatomy
 
-| Part | Notes |
-|---|---|
-| top rows | New lesson, Home, Search (the Proposed sidebar's, without Map) |
-| course scope | `course-scope.tsx`: All courses or one, as a 32px row-shaped dropdown; each course shows its exam countdown |
-| shelf header | `unit-shelf.tsx`, `data-slot="unit-section-header"`: 32px button, 12/16 at 500 muted, the count in tabular figures, a chevron that shows on hover and turns -90° folded |
-| search | topics and sessions whose titles match, under Topics and Sessions; ↑/↓ and Enter walk the sessions |
-| Study this | `start-unit.ts`: a new session in the topic's course opened on its title, as the course map's Study this |
+| Part         | Element                                           | Notes                                                                                                                                                                                                                                                                                              |
+| ------------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| top band     | brand mark (Home) and close                       | 52px, the window's drag surface                                                                                                                                                                                                                                                                    |
+| header       | `data-slot="sidebar-header"`                      | the search pill (32px, 14/500, fills on hover and focus), the course filter (`course-scope.tsx`, a 28px icon button: the filter glyph, or the chosen course's mark; the menu lists each course with its exam countdown), New lesson (28px, square pen)                                             |
+| card         | `data-slot="unit-card"`, `data-testid="unit-row"` | 78px, padding 8 × 10, radius 8: the course mark (16px monogram tile) and name (12px muted) with the status slot, then the title (14/500, full ink), then one 12px muted line: where the engine says it slips, else its standing in words. A topic the tutor writes in recedes to 70% until hovered |
+| one-line row | `data-slot="unit-slim"`                           | 36px, padding 0 10, gap 10: the course mark at 40% and greyscale until hovered, the title (14px muted, full on hover), the status slot                                                                                                                                                             |
+| status slot  | `data-slot="unit-status-slot"`                    | right-aligned, 12px tabular: Your turn (accent, question glyph), Working (spinner), Review (history glyph), a known topic's return (alarm clock, `in 5d`), else how long ago it was studied                                                                                                        |
+| row action   | `data-slot="row-action"`                          | over the status slot, which fades out on hover or when the action has keyboard focus: Resume (opens the session waiting on the learner, or running) else Study (starts a session on the topic, opened on its title)                                                                                |
+| shelf header | `data-slot="unit-section-header"`                 | 32px button, 12/500 muted, the count in tabular figures, a 12px chevron turned -90° folded                                                                                                                                                                                                         |
+| footer       | `data-slot="sidebar-footer"`                      | Settings as a 28px icon button; background agents above it only while one runs                                                                                                                                                                                                                     |
+
+States: hover lifts the row to `fill-hover`, the open row (its page, or one of its sessions) holds `fill-selected` with `aria-current="page"`, keyboard focus is a 2px inset ring with no fill change.
+
+## Keyboard
+
+Every row is a Tab stop; `sidebar-tree.ts` moves focus without opening: ↑/↓ step through the rows, Home and End jump to the ends, → opens a folded shelf (or steps into an open one), ← folds it or goes back from a shelf row to its header. Enter opens; Space opens a topic. ↓ from an empty search goes to the first row; with a query, ↑/↓ walk the matching sessions and Enter opens one.
+
+## Search
+
+Topics and sessions whose titles match, under Topics and Sessions, in the rows' own anatomy.
+
+## The topic page
+
+Laid out like a T3 Code thread: the 52px top band, then a 736px column with the course (12px muted), the title (20/600), its standing in a few words (the engine's level and review), and where it slips when the engine calls it weak. Then the session to resume, if one waits on the learner or runs (`data-testid="unit-active-session"`: a card with lesson or practice, its title, Your turn or the spinner, and Resume; the whole card opens it). Then the topic's other sessions as quiet rows, newest first, lesson or practice by their glyph. The composer (`composer.md`, Proposed) is pinned at the foot.
+
+Sending starts a new session in the topic's course through `useLessonStart` (the start screen's and the study home's path, with its setup guards). Its first message is the prompt, led by the topic's title unless the prompt names it (`openingFor`), so the tutor works on that topic. The app links the new session to the topic (`lh:topic-starts`, `linkStarts`), so its row stays selected and the page lists it before the transcript names the topic.
+
+## Sessions to topics
+
+A session's topics come from its own transcript (`sessionTopicsOf` in `src/core/native-messages.ts`): the topics of each problem it posed and observation it saved, the topics a save introduced, and plan nodes named after a topic. Only topics the course map lists count; a session on two topics is under both. Sessions started on a topic's page are on it from their first turn.
 
 ## Sources
 
-T3 Code's sidebar (`apps/web/src/components/Sidebar.tsx`, `Sidebar.logic.ts`): one classifier for every section, shelves with counts and chevrons, the open row kept in view when folded, the settled tail of 10, one status slot per row. Shelf names and rules: RemNote's Currently studying and Maintaining, Anki's Learn and Due, FSRS (a known item is on a timer, never done), Hartwig and Dunlosky 2012 (learners pick by deadline, so no overdue counts), Kornell and Bjork 2008 (the system picks). The research synthesis is in the thread's design note.
+T3 Code's sidebar at `pingdotgg/t3code@315b06c5` (`Sidebar.tsx`, `Sidebar.logic.ts`, `sidebar/SidebarThreadRow.tsx`, `ui/collapsible-section-header.tsx`, `lib/sidebarTree.ts`), in its default inbox mode, the one Edo uses: the headerless list of 78px cards, the folded Working, Snoozed and Settled shelves at the foot with counts, chevrons and the 10-row tail, the open row kept on a folded shelf, the status slot that gives way to one action on hover, the project filter and new-thread button beside the search, arrow keys that move focus without opening. Its thread view puts the composer at the foot of a 46rem column.

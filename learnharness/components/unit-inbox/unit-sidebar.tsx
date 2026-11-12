@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { HouseIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
+import { PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, type ChatListItem } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
@@ -11,41 +11,22 @@ import { ActivitySection, useActivity } from "@/components/activity-dock";
 import { LhMark } from "@/components/lh-mark";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
-import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
-import { SessionItem, type SessionsSidebar } from "@/components/unit-inbox/session-item";
-import { SHELF_TAIL, UnitShelf } from "@/components/unit-inbox/unit-shelf";
+import { SessionItem } from "@/components/unit-inbox/session-item";
+import { onSidebarTreeKeyDown } from "@/components/unit-inbox/sidebar-tree";
+import { isUnitOpen, TopicCard, TopicSlimRow } from "@/components/unit-inbox/unit-row";
+import { UnitShelf } from "@/components/unit-inbox/unit-shelf";
 import { useUnitInbox } from "@/components/unit-inbox/use-unit-inbox";
-import { SHELF_WORDS, SHELVES, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
+import { SHELF_WORDS, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-/** What a candidate draws for one unit. `scoped` is true when the inbox
- *  lists one course, so a row need not name it. */
-export interface UnitRowProps {
-	unit: Unit;
-	today: string;
-	s: SessionsSidebar;
-	scoped: boolean;
-}
-
-/** A candidate's answer to how a unit row holds its sessions: its row, and
- *  when that row is the open page (kept in view on a folded shelf). */
-export interface UnitCandidate {
-	Row: React.ComponentType<UnitRowProps>;
-	isActive: (unit: Unit, pathname: string) => boolean;
-}
-
-const waits = (u: Unit) => u.now === "your-turn";
 
 /** Every topic and session whose title matches the query, best first. Pure. */
 function searchInbox(inbox: UnitInbox, chats: readonly ChatListItem[], query: string): { units: Unit[]; sessions: ChatListItem[] } {
-	const units = [...inbox.learning, ...inbox.review, ...inbox.known]
+	const units = [...inbox.active, ...inbox.working, ...inbox.known]
 		.map((u) => ({ u, score: fuzzyScore(query.trim(), u.topic.title) }))
 		.filter((r): r is { u: Unit; score: number } => r.score !== null)
 		.sort((a, b) => b.score - a.score)
@@ -53,14 +34,23 @@ function searchInbox(inbox: UnitInbox, chats: readonly ChatListItem[], query: st
 	return { units, sessions: filterSessions([...chats], query) };
 }
 
+/** A results heading, T3 Code's quiet 12px label. */
+function ResultsLabel({ children }: { children: React.ReactNode }) {
+	return <li className="flex h-8 list-none items-center px-2 text-label font-medium text-muted-foreground">{children}</li>;
+}
+
+const ICON_BUTTON =
+	"lh-no-drag flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4";
+
 /**
- * The Proposed sidebar as a study inbox: the app mark and collapse, New
- * lesson, Home and a quiet search, the course scope, then the shelves:
- * Learning, Review and Known units, and the sessions tied to no unit.
- * Background agents show only while one runs; Settings sits at the foot.
- * The candidate draws each unit row.
+ * The Proposed sidebar (spec: unit-inbox.md), T3 Code's sidebar for topics:
+ * the mark and collapse, then the search with the course filter and New
+ * lesson beside it, then one list. The topics to act on come first with no
+ * header, each a card that opens its page; the folded shelves sit at the
+ * foot (Working, Known, Other sessions). Background agents show only while
+ * one runs; Settings is the footer's icon.
  */
-export function UnitSidebar({ candidate }: { candidate: UnitCandidate }) {
+export function UnitSidebar() {
 	const { open, toggle } = useSidebar();
 	const { open: openSettings } = useSettingsDialog();
 	const { feed } = useActivity();
@@ -68,12 +58,11 @@ export function UnitSidebar({ candidate }: { candidate: UnitCandidate }) {
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();
-	const found = useMemo(
-		() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query) : null),
-		[state, s.chats, query],
-	);
+	const found = useMemo(() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query) : null), [state, s.chats, query]);
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
-	const { Row, isActive } = candidate;
+	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
+	const today = state.status === "ready" ? state.inbox.today : "";
+	const focusFirstRow = () => s.listRef.current?.querySelector<HTMLElement>("[data-sidebar-row]")?.focus();
 
 	return (
 		<aside
@@ -98,116 +87,140 @@ export function UnitSidebar({ candidate }: { candidate: UnitCandidate }) {
 					</Hint>
 				</div>
 
-				<nav aria-label="App" className="flex shrink-0 flex-col px-2">
-					<Hint label="New lesson" action="new-session" side="right">
-						<NavRow
+				<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
+					<Hint label="Search topics and sessions" action="sessions-search" side="bottom">
+						<label className="flex h-8 min-w-0 flex-1 cursor-text items-center gap-2 rounded-md px-2 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
+							<SearchIcon aria-hidden className="size-4 shrink-0" />
+							<input
+								ref={s.searchRef}
+								data-testid="session-search"
+								value={s.query}
+								onChange={(e) => s.changeQuery(e.target.value)}
+								onKeyDown={(e) => {
+									if (!query && e.key === "ArrowDown") {
+										e.preventDefault();
+										focusFirstRow();
+										return;
+									}
+									s.onSearchKeyDown(e, found?.sessions ?? null);
+								}}
+								placeholder="Search"
+								aria-label="Search topics and sessions"
+								spellCheck={false}
+								className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
+							/>
+							{s.query && (
+								<button
+									type="button"
+									aria-label="Clear search"
+									onClick={() => s.changeQuery("")}
+									className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+								>
+									<XIcon aria-hidden className="size-3.5" />
+								</button>
+							)}
+						</label>
+					</Hint>
+					{state.status === "ready" && <CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />}
+					<Hint label="New lesson" action="new-session" side="bottom">
+						<button
+							type="button"
 							data-testid="new-session"
+							aria-label="New lesson"
+							className={ICON_BUTTON}
 							onClick={(e) => {
 								s.router.push("/chat/new");
 								blurAfterPointerClick(e);
 							}}
 						>
-							<PlusIcon />
-							<NavRowLabel>New lesson</NavRowLabel>
-						</NavRow>
+							<SquarePenIcon />
+						</button>
 					</Hint>
-					<NavRow asChild active={s.pathname === "/"}>
-						<Link href="/" onClick={blurAfterPointerClick}>
-							<HouseIcon />
-							<NavRowLabel>Home</NavRowLabel>
-						</Link>
-					</NavRow>
-					<Hint label="Search topics and sessions" action="sessions-search" side="right">
-						<div className="relative text-muted-foreground focus-within:text-foreground hover:text-foreground">
-							<SearchIcon className="pointer-events-none absolute left-2 top-2 size-4" />
-							<Input
-								ref={s.searchRef}
-								variant="quiet"
-								data-testid="session-search"
-								value={s.query}
-								onChange={(e) => s.changeQuery(e.target.value)}
-								onKeyDown={(e) => s.onSearchKeyDown(e, found?.sessions ?? null)}
-								placeholder="Search"
-								aria-label="Search topics and sessions"
-								className="pl-8"
-							/>
-						</div>
-					</Hint>
-				</nav>
+				</div>
 
-				<ScrollArea viewportRef={s.listRef} className="min-h-0 flex-1" viewportClassName="[&>div]:block! focus-visible:ring-inset">
-					<div data-testid="unit-inbox" className="flex flex-col gap-3 px-2 pb-2 pt-3">
+				<ScrollArea viewportRef={s.listRef} className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full focus-visible:ring-inset">
+					<ul data-testid="unit-inbox" onKeyDown={onSidebarTreeKeyDown} className="flex min-h-full flex-col gap-px p-2">
 						{state.status === "loading" ? (
-							<p className="px-2 text-row text-muted-foreground">Loading…</p>
+							<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Loading…</li>
 						) : found ? (
 							found.units.length + found.sessions.length === 0 ? (
-								<p className="px-2 text-row text-muted-foreground">Nothing matches.</p>
+								<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
 							) : (
 								<>
-									{found.units.length > 0 && (
-										<NavSection title="Topics">
-											{found.units.map((u) => (
-												<Row key={u.key} unit={u} today={state.inbox.today} s={s} scoped={scope !== null} />
-											))}
-										</NavSection>
+									{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
+									{found.units.map((u) =>
+										u.shelf === "known" ? (
+											<TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} />
+										) : (
+											<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
+										),
 									)}
-									{found.sessions.length > 0 && (
-										<NavSection title="Sessions">
-											{found.sessions.map((c) => (
-												<SessionItem key={c.id} chat={c} s={s} highlighted={c.id === walked} />
-											))}
-										</NavSection>
-									)}
+									{found.sessions.length > 0 && <ResultsLabel>Sessions</ResultsLabel>}
+									{found.sessions.map((c) => (
+										<SessionItem key={c.id} chat={c} s={s} highlighted={c.id === walked} />
+									))}
 								</>
 							)
 						) : (
 							<>
-								<CourseScope courses={state.courses} scope={scope} onScopeChange={setScope} />
-								{SHELVES.map((shelf) => (
-									<UnitShelf
-										key={shelf}
-										label={SHELF_WORDS[shelf]}
-										items={state.inbox[shelf]}
-										folded={folded[shelf]}
-										onFoldedChange={(next) => fold(shelf, next)}
-										isActive={(u) => isActive(u, s.pathname)}
-										waits={waits}
-										tail={shelf === "known" ? SHELF_TAIL : undefined}
-										renderItem={(u) => <Row key={u.key} unit={u} today={state.inbox.today} s={s} scoped={scope !== null} />}
-									/>
+								{state.inbox.active.map((u) => (
+									<TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} />
 								))}
+								{state.inbox.active.length + state.inbox.working.length + state.inbox.known.length + state.inbox.other.length === 0 && (
+									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing studied yet</li>
+								)}
+								<li aria-hidden className="mt-auto list-none" />
 								<UnitShelf
-									label="Other sessions"
+									id="working"
+									label={SHELF_WORDS.working}
+									items={state.inbox.working}
+									folded={folded.working}
+									onFoldedChange={(next) => fold("working", next)}
+									isActive={isOpen}
+									waits={() => false}
+									renderItem={(u) => <TopicCard key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:working" />}
+								/>
+								<UnitShelf
+									id="known"
+									label={SHELF_WORDS.known}
+									items={state.inbox.known}
+									folded={folded.known}
+									onFoldedChange={(next) => fold("known", next)}
+									isActive={isOpen}
+									waits={() => false}
+									renderItem={(u) => <TopicSlimRow key={u.key} unit={u} today={today} active={isOpen(u)} parent="shelf:known" />}
+								/>
+								<UnitShelf
+									id="other"
+									label={SHELF_WORDS.other}
 									items={state.inbox.other}
 									folded={folded.other}
 									onFoldedChange={(next) => fold("other", next)}
 									isActive={(c) => s.pathname === `/chat/${c.id}`}
 									waits={(c) => sessionState(c) === "your-turn"}
-									tail={SHELF_TAIL}
-									renderItem={(c) => <SessionItem key={c.id} chat={c} s={s} />}
+									renderItem={(c) => <SessionItem key={c.id} chat={c} s={s} parent="shelf:other" />}
 								/>
-								{SHELVES.every((shelf) => state.inbox[shelf].length === 0) && state.inbox.other.length === 0 && (
-									<p className="px-2 text-row text-muted-foreground">Nothing studied yet. Start a lesson.</p>
-								)}
 							</>
 						)}
-					</div>
+					</ul>
 				</ScrollArea>
 
 				{running && <ActivitySection variant="proposed" />}
 
-				<div className="shrink-0 px-2 pb-2 pt-1">
+				<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
 					<Hint label="Settings" action="open-settings" side="right">
-						<NavRow
+						<button
+							type="button"
 							data-testid="settings-entry"
+							aria-label="Settings"
+							className={ICON_BUTTON}
 							onClick={(e) => {
 								openSettings();
 								blurAfterPointerClick(e);
 							}}
 						>
 							<SettingsIcon />
-							<NavRowLabel>Settings</NavRowLabel>
-						</NavRow>
+						</button>
 					</Hint>
 				</div>
 			</div>

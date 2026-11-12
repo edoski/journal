@@ -4,14 +4,18 @@ import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/** How many rows a long shelf (Known, Other) shows before "Show all". */
+/** How many rows a shelf shows before "Show more", and how many each press
+ *  adds: T3 Code's settled tail. */
 export const SHELF_TAIL = 10;
+export const SHELF_PAGE = 25;
 
-/** One shelf of the inbox (spec: unit-inbox.md): a 32px header button with
- *  the name, the count and a chevron, and its rows. A folded shelf still
- *  shows the row whose page is open, and a dot when a hidden row waits on
- *  the learner. A long shelf shows its first rows and "Show all". */
+/** One folded shelf at the sidebar's foot (spec: unit-inbox.md), T3 Code's
+ *  shelf: a 32px header with the name, the count and a trailing chevron,
+ *  then its rows. A folded shelf still shows the open row, and a dot when
+ *  a hidden row waits on the learner. Open, it shows its first rows, then
+ *  "Show N more". */
 export function UnitShelf<T>({
+	id,
 	label,
 	items,
 	folded,
@@ -19,9 +23,10 @@ export function UnitShelf<T>({
 	isActive,
 	waits,
 	renderItem,
-	tail = Infinity,
 	className,
 }: {
+	/** The keyboard walk's name for the shelf (`shelf:<id>`). */
+	id: string;
 	label: string;
 	items: readonly T[];
 	folded: boolean;
@@ -31,56 +36,60 @@ export function UnitShelf<T>({
 	/** The row waits on the learner. */
 	waits: (item: T) => boolean;
 	renderItem: (item: T) => React.ReactNode;
-	/** Rows shown before "Show all"; every row when left out. */
-	tail?: number;
 	className?: string;
 }) {
-	const id = React.useId();
-	const [all, setAll] = React.useState(false);
+	const headerId = React.useId();
+	const [shownCount, setShownCount] = React.useState(SHELF_TAIL);
 	if (items.length === 0) return null;
-	const shown = folded ? items.filter(isActive) : all ? items : items.slice(0, tail);
+	const shown = folded ? items.filter(isActive) : items.slice(0, shownCount);
 	const hidden = folded ? items.filter((i) => !isActive(i)) : [];
-	const more = folded || all ? 0 : items.length - shown.length;
+	const more = folded ? 0 : Math.min(SHELF_PAGE, items.length - shown.length);
 	return (
-		<section data-slot="unit-shelf" aria-labelledby={id} className={cn("flex flex-col", className)}>
+		<li data-slot="unit-shelf" className={cn("flex list-none flex-col", className)}>
 			<h2 className="contents">
 				<button
 					type="button"
-					id={id}
+					id={headerId}
 					data-slot="unit-section-header"
+					data-sidebar-row={`shelf:${id}`}
 					aria-expanded={!folded}
 					onClick={() => onFoldedChange(!folded)}
-					className="group/shelf flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-label font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+					className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-label font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
 				>
 					<span className="min-w-0 truncate">{label}</span>
-					<span data-slot="unit-shelf-count" className="font-normal tabular-nums">
-						{items.length}
-					</span>
+					<span aria-hidden className="flex-1" />
 					{hidden.some(waits) && (
 						<span data-slot="unit-shelf-attention" className="size-1.5 rounded-full bg-link">
 							<span className="sr-only">, your turn</span>
 						</span>
 					)}
+					<span data-slot="unit-shelf-count" className="font-normal tabular-nums">
+						{items.length}
+					</span>
 					<ChevronDownIcon
 						aria-hidden
-						className={cn(
-							"ml-auto size-3.5 shrink-0 transition-[opacity,transform] duration-150 motion-reduce:transition-none",
-							folded ? "-rotate-90" : "opacity-0 group-hover/shelf:opacity-100 group-focus-visible/shelf:opacity-100",
-						)}
+						className={cn("size-3 shrink-0 transition-transform duration-150 motion-reduce:transition-none", folded && "-rotate-90")}
 					/>
 				</button>
 			</h2>
-			{shown.map(renderItem)}
-			{more > 0 && (
-				<button
-					type="button"
-					data-slot="unit-shelf-more"
-					onClick={() => setAll(true)}
-					className="flex h-8 w-full items-center rounded-md pl-8 pr-2 text-left text-label text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-				>
-					Show all {items.length}
-				</button>
-			)}
-		</section>
+			<ul aria-labelledby={headerId} className="flex flex-col gap-px">
+				{shown.map(renderItem)}
+				{more > 0 && (
+					<li className="list-none">
+						<button
+							type="button"
+							data-slot="unit-shelf-more"
+							data-sidebar-row={`more:${id}`}
+							data-sidebar-parent={`shelf:${id}`}
+							onClick={() => setShownCount((n) => n + SHELF_PAGE)}
+							className="flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-control text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
+						>
+							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
+							Show {more} more
+						</button>
+					</li>
+				)}
+			</ul>
+		</li>
 	);
 }

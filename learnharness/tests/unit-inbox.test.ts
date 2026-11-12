@@ -1,7 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../src/core/index.ts";
-import { buildInbox, resumeTarget, returnWords, shelfOf, unitStatus } from "../components/unit-inbox/units.ts";
+import {
+	activeSession,
+	buildInbox,
+	linkStarts,
+	monogram,
+	openingFor,
+	returnWords,
+	shelfOf,
+	topicSessions,
+	unitStatus,
+} from "../components/unit-inbox/units.ts";
 
 const topic = (handle: string, level: TopicLevel, review: TopicReview | null = null, weak = false): CourseMapTopic => ({
 	handle: handle as TopicHandle,
@@ -73,51 +83,103 @@ describe("buildInbox", () => {
 		chat("bayes", { course: { workspace: "pr", title: "PR" }, topics: ["bayes"] }),
 	];
 
-	it("files each unit on its shelf in its order, with its sessions newest first", () => {
+	it("lists what waits first, then topics being learned by the latest studied, then due reviews weak first; known topics apart, the soonest back first", () => {
 		const inbox = buildInbox([la, pr], chats, null);
-		assert.deepEqual(inbox.learning.map((u) => u.topic.handle), ["rank", "cramer"], "the waiting unit first, then the latest studied");
-		assert.deepEqual(inbox.learning[0]!.sessions.map((s) => s.id), ["rank-practice", "rank-take"]);
-		assert.equal(inbox.learning[0]!.now, "your-turn");
-		assert.deepEqual(inbox.review.map((u) => u.topic.handle), ["basis", "span", "bayes"], "weak first, then the longest past due");
-		assert.deepEqual(inbox.known.map((u) => u.topic.handle), ["dets", "vectors"], "the soonest back first");
+		assert.deepEqual(
+			inbox.active.map((u) => u.topic.handle),
+			["rank", "cramer", "basis", "span", "bayes"],
+		);
+		assert.deepEqual(
+			inbox.active[0]!.sessions.map((s) => s.id),
+			["rank-practice", "rank-take"],
+		);
+		assert.equal(inbox.active[0]!.now, "your-turn");
+		assert.deepEqual(
+			inbox.known.map((u) => u.topic.handle),
+			["dets", "vectors"],
+		);
+		assert.deepEqual(inbox.working, []);
+	});
+
+	it("moves a topic the tutor is writing in to Working, whatever its standing", () => {
+		const inbox = buildInbox([la], [chat("dets-now", { topics: ["dets"], busy: true })], null);
+		assert.deepEqual(
+			inbox.working.map((u) => u.topic.handle),
+			["dets"],
+		);
+		assert.ok(!inbox.known.some((u) => u.topic.handle === "dets"));
+		assert.ok(!inbox.active.some((u) => u.topic.handle === "dets"));
 	});
 
 	it("keeps sessions tied to no listed unit apart, and a scope keeps one course", () => {
-		assert.deepEqual(buildInbox([la, pr], chats, null).other.map((c) => c.id), ["question", "old"]);
+		assert.deepEqual(
+			buildInbox([la, pr], chats, null).other.map((c) => c.id),
+			["question", "old"],
+		);
 		const scoped = buildInbox([la, pr], chats, "pr");
-		assert.deepEqual(scoped.review.map((u) => u.topic.handle), ["bayes"]);
-		assert.deepEqual(scoped.learning, []);
+		assert.deepEqual(
+			scoped.active.map((u) => u.topic.handle),
+			["bayes"],
+		);
 		assert.deepEqual(scoped.other, []);
 	});
 });
 
 describe("unitStatus", () => {
 	const inbox = buildInbox(
-		[course("la", [topic("rank", "assisted", due(3)), topic("cramer", "introduced", later("2026-11-09")), topic("vectors", "retained", later("2026-11-30"))])],
+		[
+			course("la", [
+				topic("rank", "assisted", due(3)),
+				topic("cramer", "introduced", later("2026-11-09")),
+				topic("vectors", "retained", later("2026-11-30")),
+				topic("span", "retained", due(2)),
+			]),
+		],
 		[chat("r", { topics: ["rank"], busy: true }), chat("c", { topics: ["cramer"] })],
 		null,
 	);
-	const by = (h: string) => [...inbox.learning, ...inbox.known].find((u) => u.topic.handle === h)!;
+	const by = (h: string) => [...inbox.active, ...inbox.working, ...inbox.known].find((u) => u.topic.handle === h)!;
 
-	it("says what runs now, then a known unit's return, else when it was studied", () => {
+	it("says what runs now, then a due review, then a known unit's return, else when it was studied", () => {
 		assert.deepEqual(unitStatus(by("rank"), inbox.today), { kind: "working" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "studied", at: "2026-11-01T09:00:00.000Z" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", days: 22 });
 		assert.equal(returnWords(22), "in 3w");
 		assert.equal(returnWords(5), "in 5d");
 	});
+
+	it("names a course by the initials of its first two words", () => {
+		assert.equal(monogram("Linear Algebra"), "LA");
+		assert.equal(monogram("Calculus I"), "CI");
+		assert.equal(monogram("Probability"), "P");
+	});
 });
 
-describe("resumeTarget", () => {
-	it("reopens the session waiting on the learner before a newer one", () => {
-		const inbox = buildInbox(
-			[course("la", [topic("rank", "assisted", due(3))])],
-			[
-				chat("newer", { topics: ["rank"], updatedAt: "2026-11-08T09:00:00.000Z" }),
-				chat("waiting", { topics: ["rank"], pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" }),
-			],
-			null,
+describe("the topic page", () => {
+	it("puts the session waiting on the learner first, before a newer or running one, and none when nothing waits or runs", () => {
+		const waiting = chat("waiting", { pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" });
+		const running = chat("running", { busy: true, updatedAt: "2026-11-08T10:00:00.000Z" });
+		const newer = chat("newer", { updatedAt: "2026-11-08T09:00:00.000Z" });
+		assert.equal(activeSession([newer, running, waiting])?.id, "waiting");
+		assert.equal(activeSession([newer, running])?.id, "running");
+		assert.equal(activeSession([newer]), null);
+	});
+
+	it("lists a session started on the topic's page under it before its transcript names the topic", () => {
+		const chats = [chat("new", { topics: [] }), chat("rank-take", { topics: ["rank"] })];
+		const linked = linkStarts(chats, { new: "rank" });
+		assert.deepEqual(
+			topicSessions(linked, "la", "rank")
+				.map((c) => c.id)
+				.sort(),
+			["new", "rank-take"],
 		);
-		assert.equal(resumeTarget(inbox.learning[0]!)?.id, "waiting");
+		assert.deepEqual(linkStarts(chats, {}), chats);
+	});
+
+	it("leads a new session's first message with the topic unless the prompt names it", () => {
+		assert.equal(openingFor("Rank", "  give me a harder example "), "Rank: give me a harder example");
+		assert.equal(openingFor("Rank", "Why is rank the column count?"), "Why is rank the column count?");
 	});
 });
