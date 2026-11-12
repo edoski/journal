@@ -10,6 +10,11 @@ export type DesignVariant = "current" | "proposed";
 export const HOME_CANDIDATES = ["a", "b", "c"] as const;
 export type HomeCandidate = (typeof HOME_CANDIDATES)[number];
 
+/** The sidebar's Explore candidates, each a study inbox of course topics
+ *  holding their sessions: Outline expands a topic in place. */
+export const SIDEBAR_CANDIDATES = ["outline"] as const;
+export type SidebarCandidate = (typeof SIDEBAR_CANDIDATES)[number];
+
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only): Design is Current or Proposed; Home is Current or one of its
  *  candidates, and any candidate wears Design's Proposed. Read only through
@@ -17,6 +22,7 @@ export type HomeCandidate = (typeof HOME_CANDIDATES)[number];
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", options: HOME_CANDIDATES, requires: { design: "proposed" } },
+	{ id: "sidebar", label: "Sidebar", options: SIDEBAR_CANDIDATES, requires: { design: "proposed" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -36,4 +42,13 @@ export function useDesignVariant(): DesignVariant {
  *  none, and `/` stays the composer. Production builds get none. */
 export function useHomeCandidate(): HomeCandidate | null {
 	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readCandidate : readNoCandidate, readNoCandidate);
+}
+
+const readNoSidebar = (): SidebarCandidate | null => null;
+const readSidebar = (): SidebarCandidate | null => SIDEBAR_CANDIDATES.find((c) => polishVariant("sidebar") === c) ?? null;
+
+/** Which sidebar candidate the Proposed design mounts, else none and the
+ *  Proposed sidebar stays as it is. Production builds get none. */
+export function useSidebarCandidate(): SidebarCandidate | null {
+	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readSidebar : readNoSidebar, readNoSidebar);
 }
