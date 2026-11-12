@@ -146,14 +146,27 @@ function Place({ course, topics }: { course: StudyCourse; topics: readonly Topic
 	return (
 		<span data-slot="today-place" className="flex items-center gap-2">
 			<StepMarks place={place} />
-			<span className="text-label text-muted-foreground tabular-nums">{placeWords(place)}</span>
+			<span className="whitespace-nowrap text-label text-muted-foreground tabular-nums">{placeWords(place)}</span>
 		</span>
 	);
 }
 
+/** Past this many steps one mark per step outgrows the place column, so the
+ *  marks become one 48px track with the lesson's steps lit. */
+const MAX_MARKS = 10;
+
 function StepMarks({ place }: { place: PathPlace }) {
+	if (place.of > MAX_MARKS) {
+		const left = ((place.from - 1) / place.of) * 100;
+		const width = ((place.to - place.from + 1) / place.of) * 100;
+		return (
+			<span aria-hidden="true" className="relative h-1 w-12 shrink-0 rounded-full bg-foreground/15">
+				<span className="absolute inset-y-0 rounded-full bg-foreground" style={{ left: `${left}%`, width: `${width}%` }} />
+			</span>
+		);
+	}
 	return (
-		<span aria-hidden="true" className="flex items-center gap-0.5">
+		<span aria-hidden="true" className="flex shrink-0 items-center gap-0.5">
 			{Array.from({ length: place.of }, (_, i) => (
 				<span key={i} className={cn("h-3 w-1 rounded-full", i + 1 >= place.from && i + 1 <= place.to ? "bg-foreground" : "bg-foreground/15")} />
 			))}
