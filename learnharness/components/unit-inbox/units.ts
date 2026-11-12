@@ -163,6 +163,12 @@ export function sessionCount(n: number): string {
 	return n === 1 ? "1 session" : `${n} sessions`;
 }
 
+/** The session a unit reopens: one waiting on the learner, else one the
+ *  tutor writes in, else the newest. Pure. */
+export function resumeTarget(unit: Unit): ChatListItem | undefined {
+	return unit.sessions.find((c) => sessionState(c) === "your-turn") ?? unit.sessions.find((c) => sessionState(c) === "working") ?? unit.sessions[0];
+}
+
 /** A topic's sessions in its course, newest first. Pure. */
 export function topicSessions(chats: readonly ChatListItem[], workspace: string, handle: string): ChatListItem[] {
 	return chats

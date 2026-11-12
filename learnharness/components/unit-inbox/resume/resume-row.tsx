@@ -7,7 +7,7 @@ import { sessionState } from "@/components/nav/session-state";
 import { shortTimeAgo } from "@/components/sidebar-next";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { sessionCount, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { resumeTarget, sessionCount, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import type { UnitCandidate, UnitRowProps } from "@/components/unit-inbox/unit-sidebar";
 import {
 	DropdownMenu,
@@ -27,9 +27,9 @@ const opensLatest = (unit: Unit, pathname: string) => unit.sessions.some((c) => 
  *  course listed, the course leads. Null when there is no session yet.
  *  Pure. */
 export function resumeLine(unit: Unit, scoped: boolean): string | null {
-	const latest = unit.sessions[0];
-	if (!latest) return null;
-	const what = latest.title !== unit.topic.title ? latest.title : latest.kind === "practice" ? "Practice" : "Lesson";
+	const target = resumeTarget(unit);
+	if (!target) return null;
+	const what = target.title !== unit.topic.title ? target.title : target.kind === "practice" ? "Practice" : "Lesson";
 	return scoped ? what : `${unit.course.title} · ${what}`;
 }
 
@@ -67,15 +67,16 @@ function SessionsMenu({ unit, s, onStudy }: Pick<UnitRowProps, "unit" | "s"> & {
 /**
  * Resume (spec: resume.md): a unit is a way back in. On Learning and
  * Review the row has two lines, the title with its status and the session
- * a click resumes; a unit with no session starts one. The other sessions
+ * a click resumes (one waiting on the learner first, else the newest); a
+ * unit with no session starts one. The other sessions
  * and Study this sit one step away, in the count that shows on hover.
  * Known units are one line with their return.
  */
 function ResumeRow({ unit, today, s, scoped }: UnitRowProps) {
 	const { start, starting } = useStartUnit();
-	const latest = unit.sessions[0];
+	const target = resumeTarget(unit);
 	const open = (e: React.MouseEvent<HTMLButtonElement>) => {
-		if (latest) s.openChat(latest.id);
+		if (target) s.openChat(target.id);
 		else start(unit);
 		blurAfterPointerClick(e);
 	};

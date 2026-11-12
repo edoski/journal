@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../src/core/index.ts";
-import { buildInbox, returnWords, shelfOf, unitStatus } from "../components/unit-inbox/units.ts";
+import { buildInbox, resumeTarget, returnWords, shelfOf, unitStatus } from "../components/unit-inbox/units.ts";
 
 const topic = (handle: string, level: TopicLevel, review: TopicReview | null = null, weak = false): CourseMapTopic => ({
 	handle: handle as TopicHandle,
@@ -104,5 +104,19 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", days: 22 });
 		assert.equal(returnWords(22), "in 3w");
 		assert.equal(returnWords(5), "in 5d");
+	});
+});
+
+describe("resumeTarget", () => {
+	it("reopens the session waiting on the learner before a newer one", () => {
+		const inbox = buildInbox(
+			[course("la", [topic("rank", "assisted", due(3))])],
+			[
+				chat("newer", { topics: ["rank"], updatedAt: "2026-11-08T09:00:00.000Z" }),
+				chat("waiting", { topics: ["rank"], pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" }),
+			],
+			null,
+		);
+		assert.equal(resumeTarget(inbox.learning[0]!)?.id, "waiting");
 	});
 });
