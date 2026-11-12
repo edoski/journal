@@ -17,6 +17,7 @@ import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
 import { useDesignVariant, useHomeVariant } from "@/components/design-variant";
 import { StartScreen } from "@/components/start/start-screen";
+import { MapFirstHome } from "@/components/study-home/map-first/map-first-home";
 import { SplitHome } from "@/components/study-home/split/split-home";
 import { StudyHome } from "@/components/study-home/study-home";
 
@@ -38,6 +39,8 @@ function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
 			return <StudyHome initialConfigured={initialConfigured} />;
 		case "split":
 			return <SplitHome initialConfigured={initialConfigured} />;
+		case "map":
+			return <MapFirstHome initialConfigured={initialConfigured} />;
 		case "current":
 			return <StartScreen initialConfigured={initialConfigured} today />;
 	}
