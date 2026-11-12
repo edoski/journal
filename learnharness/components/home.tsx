@@ -29,14 +29,15 @@ export function Home(props: { initialConfigured: boolean; rendering?: boolean })
 	return useDesignVariant() === "proposed" ? <HomeNext initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
 }
 
-/** The Proposed `/`: the study home on Home's Proposed, else the composer
+/** The Proposed `/`: the study home Home's switch names, else the composer
  *  (the surface as it is). */
 function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
-	return useHomeVariant() === "proposed" ? (
-		<StudyHome initialConfigured={initialConfigured} />
-	) : (
-		<StartScreen initialConfigured={initialConfigured} today />
-	);
+	switch (useHomeVariant()) {
+		case "agenda":
+			return <StudyHome initialConfigured={initialConfigured} />;
+		case "current":
+			return <StartScreen initialConfigured={initialConfigured} today />;
+	}
 }
 
 function HomeCurrent({

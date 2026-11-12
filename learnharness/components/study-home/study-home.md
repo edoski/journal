@@ -1,6 +1,6 @@
 # StudyHome
 
-The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. It sits behind the `home` group in the Logbook guide (Current, Proposed; Proposed wears Design's Proposed): on Proposed `/` is the home, on Current `/` is the composer, the surface as it was. Production resolves to Current. Shipping deletes the `home` group and `useHomeVariant`, and `/` becomes the home.
+The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. It sits behind the `home` group in the Logbook guide, which offers Current and one option per study home (`HOME_OPTIONS` in `components/design-variant.ts`; any option wears Design's Proposed): this one is the option `agenda`, and on Current `/` is the composer, the surface as it was. Production resolves to Current. Shipping one option deletes the others, the `home` group and `useHomeVariant`, and `/` becomes that home.
 
 Explore mode (12 Nov 2026) built three candidates (course cards, an agenda, one table); Edo picked the agenda and asked for only what picking the next lesson needs. This spec is that pass's conclusion.
 

@@ -10,12 +10,12 @@ import { CourseMapView } from "@/components/course-map/course-map-view";
 
 /** The knowledge graph as its own view: the course's statements and chains
  *  as content, full-bleed, with the graph's own controls top right. The
- *  Proposed design shows the course map here instead, and Home's Proposed,
+ *  Proposed design shows the course map here instead, and a study home,
  *  which holds the map, sends this page to Home. */
 export function KnowledgeView({ rendering }: { rendering: boolean }) {
 	const variant = useDesignVariant();
 	const home = useHomeVariant();
-	if (variant === "proposed") return home === "proposed" ? <ToHome /> : <CourseMapView />;
+	if (variant === "proposed") return home === "current" ? <CourseMapView /> : <ToHome />;
 	return (
 		<div className="relative h-dvh">
 			{/* Window drag strip, first in the DOM so the graph's carved

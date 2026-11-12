@@ -50,10 +50,10 @@ export function KeyboardShortcuts() {
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
 	// The graph is home in the current design, its own view in the proposed
-	// one, and on home again once Home's Proposed holds the course map.
+	// one, and on home again once a study home holds the course map.
 	const design = useDesignVariant();
 	const home = useHomeVariant();
-	const graphPath = design === "proposed" && home !== "proposed" ? "/knowledge" : "/";
+	const graphPath = design === "proposed" && home === "current" ? "/knowledge" : "/";
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.

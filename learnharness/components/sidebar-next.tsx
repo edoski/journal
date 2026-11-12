@@ -256,7 +256,7 @@ function CoverageItemNext({ chatId }: { chatId: string }) {
 }
 
 /** The Proposed sidebar: the app mark and collapse, New lesson, Home and
- *  Map (Home alone on Home's Proposed, which holds the map), a quiet search, sessions under collapsible courses, background
+ *  Map (Home alone on a study home, which holds the map), a quiet search, sessions under collapsible courses, background
  *  agents only while one runs, Settings at the foot. */
 export function SidebarNext() {
 	const { open, toggle } = useSidebar();
@@ -266,7 +266,7 @@ export function SidebarNext() {
 	const s = useSessionsSidebar({ open, toggle });
 	const exams = useExamCountdowns();
 	const [collapsed, setCollapsed] = useCollapsedCourses();
-	const mapOnHome = useHomeVariant() === "proposed";
+	const mapOnHome = useHomeVariant() !== "current";
 
 	// A search shows every match, folded courses included.
 	const searching = s.query.trim() !== "";
