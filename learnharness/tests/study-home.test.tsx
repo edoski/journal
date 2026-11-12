@@ -26,6 +26,7 @@ import {
 import { lessonOf, spanWords, topicSpan, trackMarks } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { LessonText } from "../components/study-home/lesson-text.tsx";
+import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
@@ -259,5 +260,13 @@ describe("a lesson on a study home", () => {
 		assert.deepEqual([link?.getAttribute("href"), link?.textContent], ["/chat/q", "Open"]);
 		const button = render(<LessonButton lesson={review} busy onContinue={() => {}}>{review.action}</LessonButton>).querySelector("button");
 		assert.deepEqual([button?.textContent, button?.hasAttribute("disabled")], ["Review", true]);
+	});
+
+	it("draws the path as one mark per topic, with the place in words and the progress for a screen reader", () => {
+		const doc = render(<PathTrack course={LINALG} topics={reply.topics} place={reply.place} />);
+		const track = doc.querySelector('[role="img"]');
+		assert.equal(track?.children.length, 5);
+		assert.equal(track?.getAttribute("aria-label"), "4 of 5 topics started");
+		assert.match(doc.body.textContent ?? "", /Topic 5 of 5/);
 	});
 });
