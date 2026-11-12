@@ -6,6 +6,7 @@ import { useRowsVariant } from "@/components/design-variant";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ReasonRows } from "@/components/study-home/agenda-rows/reason/reason-rows";
+import { RecencyRows } from "@/components/study-home/agenda-rows/recency/recency-rows";
 import { actionWord, courseTitle, foldLines, lessonTitle, lineKey, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import type { TodayRow } from "@/components/study-home/study-facts";
@@ -28,6 +29,8 @@ export function Today(props: RowsProps) {
 			<DayHeading id="today-heading" today={props.today} />
 			{variant === "reason" ? (
 				<ReasonRows {...props} />
+			) : variant === "recency" ? (
+				<RecencyRows {...props} />
 			) : (
 				<TodayLines {...props} />
 			)}

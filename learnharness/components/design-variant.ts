@@ -13,7 +13,7 @@ export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
 
 /** The agenda home's row candidates (spec:
  *  components/study-home/agenda-rows/agenda-rows.md). */
-export const ROWS_OPTIONS = ["reason"] as const;
+export const ROWS_OPTIONS = ["reason", "recency"] as const;
 /** "current" keeps agenda's rows as course and lesson only. */
 export type RowsVariant = "current" | (typeof ROWS_OPTIONS)[number];
 

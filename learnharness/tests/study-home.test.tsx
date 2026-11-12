@@ -27,6 +27,7 @@ import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
 import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
+import { RecencyRows } from "../components/study-home/agenda-rows/recency/recency-rows.tsx";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -310,6 +311,12 @@ describe("agenda's row candidates", () => {
 		const doc = render(<ReasonRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your replyOpen", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesStarting to fade"]);
+		plain(doc);
+	});
+
+	it("recency: each line says when its course was last studied, or that a reply waits", () => {
+		const doc = render(<RecencyRows {...props()} />);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-when"]')].map((l) => l.textContent), ["Waiting for your reply", "Studied 4 days ago", "Studied 11 days ago"]);
 		plain(doc);
 	});
 });
