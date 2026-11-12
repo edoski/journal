@@ -1,25 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { EllipsisIcon, LocateFixedIcon } from "lucide-react";
-import { courseLabel, type CourseMap, type CourseMapResponse, type CourseMapTopic, type GraphSnapshot } from "@/src/core";
+import { LocateFixedIcon } from "lucide-react";
+import { courseLabel, type CourseMap, type CourseMapResponse, type CourseMapTopic } from "@/src/core";
 import { layoutCourseMap } from "./course-map-layout";
-import { useActivity } from "@/components/activity-dock";
-import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { CoursesUnavailable, useCourseChoice, type CourseState } from "@/components/course-picker";
-import { NotesImportErrors, NotesImportNotices, useNotesImport } from "@/components/notes-import.tsx";
 import { SetupDialog } from "@/components/setup-dialog";
 import { openModelPicker, selectedModelUnavailable, useModelSetup } from "@/components/setup-cta";
 import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
 import { CONTINUE_OPENING, examText } from "@/components/start/course-facts";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CourseMapGraph } from "./course-map-graph";
 import { CourseMapList } from "./course-map-list";
+import { useMapExtras } from "./map-extras";
 
 type MapFetch =
 	| { status: "loading"; workspace: string }
@@ -113,28 +110,7 @@ export function CourseMapView() {
 	const studyTopic = (topic: CourseMapTopic) => study(topic.title);
 
 	// The notes import and the statements browser, kept from the old page.
-	const fileInput = useRef<HTMLInputElement>(null);
-	const refreshActivity = useActivity().refresh;
-	const notesImport = useNotesImport({
-		onStart: () => {
-			refreshActivity();
-			setTimeout(() => refreshActivity(), 600);
-		},
-	});
-	const [statementsOpen, setStatementsOpen] = useState(false);
-	const [snapshot, setSnapshot] = useState<GraphSnapshot | null>(null);
-	const loadStatements = useCallback(() => {
-		void fetch("/api/graph")
-			.then((r) => r.json() as Promise<GraphSnapshot>)
-			.then(setSnapshot)
-			.catch(() => setSnapshot(null));
-	}, []);
-	useEffect(() => {
-		if (!statementsOpen) return;
-		loadStatements();
-		window.addEventListener("lh:graph-revision", loadStatements);
-		return () => window.removeEventListener("lh:graph-revision", loadStatements);
-	}, [statementsOpen, loadStatements]);
+	const extras = useMapExtras();
 
 	const listed = courses.status === "ready" ? courses.courses : [];
 	const exam = examText(listed.find((c) => c.workspace === workspace)?.exam ?? null);
@@ -185,43 +161,17 @@ export function CourseMapView() {
 							</ToggleGroupItem>
 						</ToggleGroup>
 					)}
-					<input
-						ref={fileInput}
-						type="file"
-						multiple
-						accept=".md,.markdown,.txt,.pdf"
-						className="hidden"
-						onChange={(e) => {
-							notesImport.onImportFiles(e.target.files);
-							e.target.value = "";
-						}}
-					/>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button variant="quiet" size="icon-row" aria-label="More" data-testid="map-more" className="lh-no-drag">
-								<EllipsisIcon />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem disabled={notesImport.importing} onSelect={() => fileInput.current?.click()}>
-								{notesImport.importing ? "Importing notes…" : "Import notes…"}
-							</DropdownMenuItem>
-							<DropdownMenuItem onSelect={() => setStatementsOpen(true)} data-testid="map-statements">
-								Statements…
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
+					{extras.menu}
 				</div>
 			</header>
-			{(messages.length > 0 || notesImport.errors.length > 0 || notesImport.notices.length > 0) && (
+			{(messages.length > 0 || extras.notices) && (
 				<div className="flex flex-col gap-1 px-5 pb-2">
 					{messages.map((m) => (
 						<p key={m} role="alert" className="text-row text-danger">
 							{m}
 						</p>
 					))}
-					<NotesImportErrors errors={notesImport.errors} variant="proposed" />
-					<NotesImportNotices notices={notesImport.notices} variant="proposed" />
+					{extras.notices}
 				</div>
 			)}
 			<main data-slot="course-map-view" className="relative flex min-h-0 flex-1 flex-col">
@@ -234,14 +184,7 @@ export function CourseMapView() {
 				) : (
 					<MapNotice body={body} busy={studying} onStart={() => study(CONTINUE_OPENING)} onRetry={retry} />
 				)}
-				<ChainTableOverlay
-					open={statementsOpen}
-					nodes={snapshot?.propositions ?? []}
-					chains={snapshot?.chains ?? []}
-					sessions={snapshot?.sessions ?? {}}
-					fileSources={snapshot?.fileSources ?? {}}
-					onClose={() => setStatementsOpen(false)}
-				/>
+				{extras.overlay}
 			</main>
 			<SetupDialog open={setupOpen} onClose={() => setSetupOpen(false)} onDone={() => setSetupOpen(false)} />
 		</div>
