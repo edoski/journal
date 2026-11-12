@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { BookIcon, CircleDashedIcon, MapIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon, SunIcon } from "lucide-react";
+import { BookIcon, CircleDashedIcon, HouseIcon, MapIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { courseLabel, type ChatListItem } from "@/src/core";
 import { fetchCourses } from "@/components/course-picker";
 import { examText } from "@/components/start/course-facts";
@@ -17,6 +17,7 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
 import { NavGroup } from "@/components/nav/nav-group";
+import { sessionState } from "@/components/nav/session-state";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -75,17 +76,7 @@ export function shortTimeAgo(iso: string, now = new Date()): string {
 	return `${Math.floor(d / 365)}y`;
 }
 
-/** What a session row says about the session: the tutor is writing, the
- *  tutor waits on the learner (a question or a posed practice problem
- *  alike, since teaching and practice are routed for the learner), or
- *  nothing is pending. Pure. */
-export type SessionState = "working" | "your-turn" | "idle";
-
-export function sessionState(chat: ChatListItem): SessionState {
-	if (chat.busy || chat.compacting) return "working";
-	if (chat.pendingQuestion || chat.pendingProblem) return "your-turn";
-	return "idle";
-}
+export { sessionState, type SessionState } from "@/components/nav/session-state";
 
 /** One session under its course: the title on the course name's edge, and
  *  one trailing item, "Your turn" in the accent, the spinner while the
@@ -263,7 +254,7 @@ function CoverageItemNext({ chatId }: { chatId: string }) {
 	);
 }
 
-/** The Proposed sidebar: the app mark and collapse, New lesson, Today and
+/** The Proposed sidebar: the app mark and collapse, New lesson, Home and
  *  Map, a quiet search, sessions under collapsible courses, background
  *  agents only while one runs, Settings at the foot. */
 export function SidebarNext() {
@@ -298,7 +289,7 @@ export function SidebarNext() {
 				<div className="lh-drag lh-lights-gutter flex h-13 shrink-0 items-center justify-between px-2">
 					<Link
 						href="/"
-						aria-label="Today"
+						aria-label="Home"
 						data-brand
 						className="lh-no-drag flex h-8 items-center rounded-md px-2 outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
 					>
@@ -326,8 +317,8 @@ export function SidebarNext() {
 					</Hint>
 					<NavRow asChild active={s.pathname === "/"}>
 						<Link href="/" onClick={blurAfterPointerClick}>
-							<SunIcon />
-							<NavRowLabel>Today</NavRowLabel>
+							<HouseIcon />
+							<NavRowLabel>Home</NavRowLabel>
 						</Link>
 					</NavRow>
 					<Hint label="Map" action="jump-graph" side="right">
