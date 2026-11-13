@@ -621,6 +621,21 @@ export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 	return [...topics];
 }
 
+/** The course saves a session made that went through, each as the changes
+ *  the engine read, in order. Pure. */
+export function sessionSavesOf(messages: readonly LhMessage[]): Record<string, unknown>[] {
+	const clean = cleanToolCallIds(messages);
+	return messages.flatMap((m) =>
+		m.role === "assistant"
+			? m.content.flatMap((block) => {
+					if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) return [];
+					const changes = saveChanges(block.arguments as Record<string, unknown>);
+					return changes ? [changes] : [];
+				})
+			: [],
+	);
+}
+
 /** The engine tasks a session holds: each task key its saves that went
  *  through last wrote as open (a task patch, or the `focus`), or that the
  *  lesson it picked up held, and never removed after (a `null` entry). Which of them the engine still has open,

@@ -14,6 +14,7 @@ import type {
 	ChatRecord,
 	ChatSettings,
 	ChatSummary,
+	DigestLedger,
 	GraphChain,
 	GraphNode,
 	JobKind,
@@ -53,6 +54,9 @@ export interface ChatStore {
 	appendTurnUsage(id: string, entry: TurnUsage): void;
 	/** Append one extraction-run usage entry — idempotent per startedAt. */
 	appendExtractionUsage(id: string, entry: ExtractionRunUsage): void;
+	/** Replace the lesson digest's ledger. Silent, like the usage logs, and
+	 *  never conversation activity: updatedAt stays put. */
+	saveDigestLedger(id: string, ledger: DigestLedger): void;
 	/** Persist the per-chat model/thinking settings (the model control).
 	 *  Replace-whole: the picker sends the complete settings object. */
 	saveSettings(id: string, settings: ChatSettings): void;
