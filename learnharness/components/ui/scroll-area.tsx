@@ -9,7 +9,8 @@ import { cn } from "@/lib/utils"
  *  overlay bar 10px wide with a 15% white thumb, or no bar at all
  *  (`bar={false}`, T3 Code's sidebar), the area still scrolling by wheel,
  *  trackpad and keyboard. `viewportRef` reaches the scroller for code that
- *  locks or measures it. */
+ *  locks or measures it. Radix lets the viewport scroll only on an axis
+ *  with a mounted scrollbar, so the bar-less area mounts a hidden one. */
 function ScrollArea({
   className,
   children,
@@ -38,7 +39,7 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      {bar && <ScrollBar />}
+      {bar ? <ScrollBar /> : <ScrollAreaPrimitive.Scrollbar orientation="vertical" className="hidden" />}
       {bar && <ScrollAreaPrimitive.Corner />}
     </ScrollAreaPrimitive.Root>
   )
