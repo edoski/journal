@@ -38,15 +38,16 @@ A typical turn after a hinted attempt on an exercise:
 }
 ```
 
-The receipt returns new observation ids, the reviews it set, level changes, the current `focus` and `path_current`, the number of due reviews, and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
+The receipt returns new observation ids, the reviews it set, level changes, the current `focus` and `path_current`, the number of due reviews, `placed` (where each new topic outside `path.order` went), and `notes` worth acting on (for example a `gap` recorded before the latest attempt).
 
 ## Topics and the knowledge path
 
-A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `contrasts` (topics whose methods are known to compete; symmetric), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`.
+A topic is one idea or method you would check separately: `title`, `needs` (prerequisite topics; no cycles), `contrasts` (topics whose methods are known to compete; symmetric), `refs`, `aliases` (other names and languages, for search), `introduced`, `gap`, `note`, `review`, `excluded`.
 
 - `introduced: true` when you first teach it; the helper stamps the day and, if nothing is scheduled, a first retrieval for the next day.
 - `gap`: the precise misconception or missing piece, phrased so a later session can test it. `null` once evidence shows it resolved, as [evidence.md](evidence.md) defines.
 - `note`: any other judgement worth carrying (fluent but slow, relies on a picture, avoids proofs).
+- `excluded`: why the course leaves the topic out ("Chapter 4 is off the exam"). It leaves due reviews, the plan and the run-up, no studied topic waits on it, and its evidence stays; `null` brings it back.
 - `review`: `{"in_days": N}` or `{"due": "YYYY-MM-DD"}` pins the next retrieval; `{"prompt": "..."}` says what to ask then and `{"points": ["...", "..."]}` lists the one to five key points an answer is marked against. The fields merge; pin only for a reason, otherwise the helper schedules.
 
 How the helper judges and schedules. Each attempt gets a grade: `solid` (correct, unaided, no `uncertain`, not a guess), `helped` (correct with help, partial, or correct but `uncertain` or a guess) or `missed` (incorrect). Each day of attempts on a topic counts at most once, as one verdict:
@@ -63,7 +64,7 @@ The `standing` of a topic (in `resume` and `show`) gives its level, attempt coun
 
 ## Path and tasks
 
-`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`. A new topic takes its place in `order` and is added to the `needs` of the topics that build on it; both lists are replaced whole, so send each with its other entries kept. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
+`path` is the course-level study order: `{"current": "rank", "order": ["systems", "rank", "eigen"], "basis": "Syllabus order, weeks 1-4 examinable"}`. Order follows `needs` first, then `order`; a topic missing from `order` goes just before the first ordered topic that builds on it, else just after its last prerequisite. A new topic is added to the `needs` of the topics that build on it, and to `order` where it belongs; both lists are replaced whole, so send each with its other entries kept. Move `current` as the learner advances; there is no `done` flag, because the levels already say what was covered and how well.
 
 A task is one unfinished activity: `title`, `topics`, `refs`, `goal` (what finishing means), `step` (the exact next step or pending question), `help` (support given so far), `note` (a temporary instruction for this task only). `focus` names the task a plain "continue" resumes: continue that task, or the only open one; with several and none in focus, name them in one line and ask which. Set `focus` to the task you continue in the first save after the choice. Keep the `goal` stable across detours; a detour changes the `step`. When the goal is met, remove the task with `null` and keep the final attempt as an observation.
 
