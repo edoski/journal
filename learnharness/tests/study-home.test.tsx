@@ -1,6 +1,6 @@
 /**
  * The study home's Today: what each line says from the engine's map and
- * plan, the order across courses, what agenda's row candidates say, and
+ * plan, the order across courses, what Today's rows say, and
  * that reviews are named by topic, never counted. Same tsx classic-JSX
  * shim as the other render tests.
  */
@@ -27,11 +27,7 @@ import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
-import { courseProgress, foldLines, lastStudied, studiedAgo, whyNow, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
-import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
-import { ProgressRows } from "../components/study-home/agenda-rows/progress/progress-rows.tsx";
-import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
-import { RecencyRows } from "../components/study-home/agenda-rows/recency/recency-rows.tsx";
+import { courseProgress, foldLines, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { studyCourseOf } from "../src/server/study.ts";
 import type { ChatListItem, CourseMap, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel } from "../src/core/index.ts";
 
@@ -233,21 +229,24 @@ describe("Today", () => {
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("names each line's course and lesson and nothing else, with no button on any line, and counts no reviews", () => {
-		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
+	it("gives each line its pie, its course ending in how long ago it was studied, and its lesson ending in an icon and a few words for why it is on Today, with no button and no review counted", () => {
+		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
-		assert.equal(lines.length, 3);
-		assert.equal(lines[0]!.textContent, "Linear AlgebraEigen lesson");
+		assert.deepEqual(
+			lines.map((l) => l.textContent),
+			["Linear Algebra2d agoEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Real Analysis11d agoReview Sequences1d overdue"],
+		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
-		assert.equal(lines[1]!.textContent, "ProbabilityContinue Bayes' rule");
+		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
-		assert.doesNotMatch(doc.body.textContent ?? "", /\d+\s+due\b/i);
+		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|tonight)\?$/);
 	});
 
 	it("past five lines, names the other courses on the last", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
-		const doc = render(<Today rows={todayRows(many, [], TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
+		const doc = render(<Today rows={todayRows(many, [], TODAY)} busy={false} onContinue={() => {}} />);
 		assert.equal(doc.querySelectorAll('[data-slot="today-line"]').length, 4);
 		assert.match(doc.querySelector('[data-slot="today-also"]')?.textContent ?? "", /Also today:Course 4Course 5/);
 	});
@@ -283,10 +282,7 @@ describe("a lesson on a study home", () => {
 	});
 });
 
-describe("agenda's row candidates", () => {
-	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
-	const render = (node: React.ReactNode) =>
-		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
+describe("what a line of Today reads", () => {
 	const waiting = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 	const lapsed: StudyCourse = {
 		...ANALYSIS,
@@ -294,20 +290,9 @@ describe("agenda's row candidates", () => {
 	};
 	const rowOf = (course: StudyCourse) => todayRows([course], [], TODAY)[0]!;
 
-	it("says why a line is on Today from the engine's fields, in plain words", () => {
-		assert.equal(whyNow(todayRows([LINALG], [waiting], TODAY)[0]!, TODAY), "Waiting for your reply");
-		assert.equal(whyNow(todayRows([LINALG], [{ ...waiting, updatedAt: "2026-11-07T20:00:00.000Z" }], TODAY)[0]!, TODAY), "Waiting since yesterday");
-		assert.equal(whyNow(rowOf(LINALG), TODAY), "Overdue by 2 weeks");
-		assert.equal(whyNow(rowOf(ANALYSIS), TODAY), "Overdue by a day");
-		assert.equal(whyNow(rowOf(lapsed), TODAY), "You missed Sequences last time");
-		const task: StudyCourse = { ...LINALG, due: [] };
-		assert.equal(whyNow(rowOf(task), TODAY), "Left off at part (c)");
-		assert.equal(whyNow(rowOf(PROB), TODAY), "Next on your map");
-	});
-
-	it("gives each reason a kind and a few words that fit beside its icon", () => {
+	it("gives each reason a kind and a few words that fit beside its icon, from the engine's fields", () => {
 		const short = (row: TodayRow) => {
-			const why = whyOf(row, TODAY);
+			const why = whyOf(row);
 			return why && [why.kind, why.short];
 		};
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
@@ -323,11 +308,7 @@ describe("agenda's row candidates", () => {
 		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "2w ago", "8w ago", "2mo ago", null]);
 	});
 
-	it("says when the course was last studied, and how much of it he can do on his own, weak topics left out", () => {
-		assert.equal(lastStudied(rowOf(LINALG)), "Studied 2 days ago");
-		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 1 })), "Studied yesterday");
-		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 20 })), "Studied 2 weeks ago");
-		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: null })), "Not studied yet");
+	it("counts how much of a course he can do on his own, weak topics left out", () => {
 		assert.deepEqual(courseProgress(LINALG), { solid: 2, of: 5 });
 		assert.deepEqual(courseProgress(PROB), { solid: 2, of: 2 });
 		assert.equal(courseProgress({ ...LINALG, map: { ...LINALG.map, topics: [] } }), null);
@@ -337,44 +318,5 @@ describe("agenda's row candidates", () => {
 		const many = Array.from({ length: 6 }, (_, i) => ({ ...PROB, map: { ...PROB.map, workspace: `/s/c${i}`, title: `Course ${i}` } }));
 		const { shown, also } = foldLines(todayRows(many, [], TODAY));
 		assert.deepEqual([shown.length, also.length], [4, 2]);
-	});
-
-	const rows = () => todayRows([ANALYSIS, LINALG, PROB], [waiting], TODAY);
-	const props = () => ({ rows: rows(), today: TODAY, busy: false, onContinue: () => {} });
-	const plain = (doc: Document) => {
-		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
-		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/);
-	};
-
-	it("reason: each line says why it is on Today, beside its lesson", () => {
-		const doc = render(<ReasonRows {...props()} />);
-		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
-		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your reply", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesOverdue by a day"]);
-		plain(doc);
-	});
-
-	it("recency: each line says when its course was last studied, or that a reply waits", () => {
-		const doc = render(<RecencyRows {...props()} />);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-when"]')].map((l) => l.textContent), ["Waiting for your reply", "Studied 4 days ago", "Studied 11 days ago"]);
-		plain(doc);
-	});
-
-	it("progress: each line's pie tells a screen reader how far along the course is", () => {
-		const doc = render(<ProgressRows {...props()} />);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-progress"]')].map((l) => l.getAttribute("aria-label")), ["2 of 5 topics you can do on your own", "2 of 2 topics you can do on your own", "1 of 1 topics you can do on your own"]);
-		plain(doc);
-	});
-
-	it("hybrid: each line has its pie, its course ending in how long ago it was studied, and its lesson ending in an icon and a few words for why it is on Today", () => {
-		const doc = render(<HybridRows {...props()} />);
-		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
-		assert.deepEqual(lines, [
-			"Linear Algebra2d agoEigen lessonYour turn",
-			"Probability4d agoContinue Bayes' ruleNext up",
-			"Real Analysis11d agoReview Sequences1d overdue",
-		]);
-		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1]]);
-		plain(doc);
 	});
 });

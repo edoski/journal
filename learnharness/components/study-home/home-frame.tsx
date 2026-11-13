@@ -19,8 +19,6 @@ export interface HomeReady {
 	lessons: readonly Lesson[];
 	/** The courses, in Today's order. */
 	courses: readonly StudyCourse[];
-	/** The engine's study day. */
-	today: string;
 	busy: boolean;
 	/** Take up a course's next step. */
 	onContinue: (workspace: string) => void;
@@ -112,7 +110,6 @@ function HomeBody({
 						rows,
 						lessons: rows.map(lessonOf),
 						courses: rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])),
-						today,
 						busy,
 						onContinue: (workspace) => onStart(CONTINUE_OPENING, workspace),
 					})}

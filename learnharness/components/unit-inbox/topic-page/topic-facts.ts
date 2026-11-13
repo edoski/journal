@@ -124,8 +124,8 @@ export function agoWords(days: number): string {
 	return `${Math.floor(days / 30)}mo ago`;
 }
 
-/** When he last studied the topic, in Home's words (`lastStudied`):
- *  "Studied today", "Studied 3 days ago", "Studied 2 weeks ago". */
+/** When he last studied the topic: "Studied today", "Studied 3 days
+ *  ago", "Studied 2 weeks ago". */
 export function studiedWords(days: number): string {
 	if (days <= 0) return "Studied today";
 	if (days === 1) return "Studied yesterday";

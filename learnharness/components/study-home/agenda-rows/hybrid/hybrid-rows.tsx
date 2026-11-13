@@ -30,7 +30,7 @@ const WHY_ICON: Record<Why["kind"], LucideIcon> = {
  * ends with when he last studied it; the lesson line ends with why it is
  * there today, as an icon and a few words.
  */
-export function HybridRows({ rows, today, busy, onContinue }: RowsProps) {
+export function HybridRows({ rows, busy, onContinue }: RowsProps) {
 	const { shown, also } = foldLines(rows);
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
@@ -43,7 +43,7 @@ export function HybridRows({ rows, today, busy, onContinue }: RowsProps) {
 							{studiedAgo(row)}
 						</span>
 						<span className="truncate text-control font-medium text-foreground">{lessonTitle(row)}</span>
-						<WhyMark why={whyOf(row, today)} />
+						<WhyMark why={whyOf(row)} />
 					</LineTarget>
 				</li>
 			))}

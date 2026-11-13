@@ -25,12 +25,12 @@ export function StudyHome({ initialConfigured }: { initialConfigured: boolean })
 			quiet={enlarged}
 			className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && "max-w-[60rem]")}
 		>
-			{({ rows, courses, today, busy, onContinue }) => (
+			{({ rows, courses, busy, onContinue }) => (
 				<>
 					<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "min-h-48 shrink"))}>
 						<MapOnHome courses={courses} enlarged={enlarged} onEnlarge={setEnlarged} />
 					</div>
-					{!enlarged && <Today rows={rows} today={today} busy={busy} onContinue={onContinue} />}
+					{!enlarged && <Today rows={rows} busy={busy} onContinue={onContinue} />}
 				</>
 			)}
 		</HomeFrame>

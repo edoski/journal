@@ -27,7 +27,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 
 ## The page frame
 
-`HomeFrame` holds what every study home shares: the 52px drag strip and the sidebar toggle, the read of the courses (`useStudyHome`) with its states, the lesson start with its guards (`useLessonStart`) and its error line. A home gives its column's classes and draws the ready state from `HomeReady` (the lines, the lessons, the courses in Today's order, the study day, `onContinue`).
+`HomeFrame` holds what every study home shares: the 52px drag strip and the sidebar toggle, the read of the courses (`useStudyHome`) with its states, the lesson start with its guards (`useLessonStart`) and its error line. A home gives its column's classes and draws the ready state from `HomeReady` (the lines, the lessons, the courses in Today's order, `onContinue`).
 
 | State | Shows |
 |---|---|

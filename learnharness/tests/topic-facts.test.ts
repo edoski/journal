@@ -11,7 +11,7 @@ import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 import type { SessionPlan, TopicAttempt, TopicRecord } from "../src/core/contracts/topic.ts";
-import { lastStudied, studiedAgo } from "../components/study-home/agenda-rows/row-facts.ts";
+import { studiedAgo } from "../components/study-home/agenda-rows/row-facts.ts";
 import type { TodayRow } from "../components/study-home/study-facts.ts";
 import {
 	agoWords,
@@ -210,10 +210,11 @@ describe("the page's words for time", () => {
 	const row = (days: number): TodayRow => ({ kind: "course", course: { ...COURSE, lastActiveDaysAgo: days }, step: { kind: "none" } });
 
 	it("are Home's, for every day from today to more than a year back", () => {
-		for (let days = 0; days <= 400; days++) {
-			assert.equal(agoWords(days), studiedAgo(row(days)), `ago ${days}`);
-			assert.equal(studiedWords(days), lastStudied(row(days)), `studied ${days}`);
-		}
+		for (let days = 0; days <= 400; days++) assert.equal(agoWords(days), studiedAgo(row(days)), `ago ${days}`);
+	});
+
+	it("say when he last studied the topic, in days, then weeks, then months", () => {
+		assert.deepEqual([0, 1, 2, 13, 14, 59, 60].map(studiedWords), ["Studied today", "Studied yesterday", "Studied 2 days ago", "Studied 13 days ago", "Studied 2 weeks ago", "Studied 8 weeks ago", "Studied 2 months ago"]);
 	});
 
 	it("name a day against the engine's: today, yesterday, else the date", () => {
