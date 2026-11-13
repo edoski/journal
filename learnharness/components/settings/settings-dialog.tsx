@@ -62,7 +62,7 @@ import { XIcon } from "lucide-react";
  *  real question users ask). */
 const SECTIONS = [
 	{ id: "keys", label: "Accounts" },
-	{ id: "agent", label: "Agent" },
+	{ id: "agent", label: "Tutor" },
 	{ id: "appearance", label: "Appearance" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
 	{ id: "general", label: "General" },
@@ -338,7 +338,7 @@ export function SettingsDialogBody({
 							)}
 							{active === "agent" && (
 								<SettingsSection
-									title="Agent"
+									title="Tutor"
 									testid="section-agent"
 								>
 									<AgentSection

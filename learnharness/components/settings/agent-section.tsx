@@ -52,12 +52,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
 
-/** One slot's display identity — the tier's roster as the row hint rides
- *  with the resolved default (owner: the hint ALWAYS names the default). */
-const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
-	strong: { label: "Strong", roster: "The main model for your sessions" },
-	cheap: { label: "Cheap", roster: "The assistants that research, build demos, and grade your work" },
-	vision: { label: "Vision", roster: "The assistants that draw and read PDFs" },
+/** One slot's display identity: what it is for, in the app's words. The
+ *  setup dialog's pickers share it. */
+export const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
+	strong: { label: "Lessons", roster: "Teaches and quizzes you" },
+	cheap: { label: "Helpers", roster: "Research, demos and grading" },
+	vision: { label: "Pictures", roster: "Draws figures and reads PDFs" },
 };
 
 /** The owner's final toggleable-tool list (confirm with the user before
@@ -67,9 +67,9 @@ export const TOGGLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
 /** The tool rows' names under the Proposed design, where the group already says "Tools". */
 const TOOL_LABEL: Record<(typeof TOGGLE_TOOLS)[number], string> = {
 	research: "Research",
-	demo: "Demos",
+	demo: "Interactive demos",
 	visual: "Figures",
-	pdf: "PDF reading",
+	pdf: "Reading PDFs",
 };
 
 const THINKING_LEVELS: readonly ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -249,11 +249,13 @@ export function AgentSection({
 						onModelsChange(composeSlotModel(models, slot, provider, modelId, level));
 						setOpenMenu(null);
 					};
-					const modelFooter = catalog && catalog.length === 0 ? "No models — sign in to Claude or ChatGPT in Settings → Accounts" : "Runs every agent of this tier";
+					const modelFooter = catalog && catalog.length === 0 ? "No models — sign in to Claude or ChatGPT in Settings → Accounts" : SLOT_META[slot].roster;
+					// The catalog's own name ("Claude Opus 5.5 · Claude · A"), not the id.
+					const modelName = modelId ? chosen?.name ?? prettyModel(modelId) : "—";
 					if (proposed) {
 						const modelTrigger = (
 							<PopoverTrigger asChild>
-								<SettingsMenuTrigger value={modelId ? prettyModel(modelId) : "—"} aria-label={`${SLOT_META[slot].label} model`} data-testid={`slot-model-${slot}`} className="w-40" />
+								<SettingsMenuTrigger value={modelName} aria-label={`${SLOT_META[slot].label} model`} data-testid={`slot-model-${slot}`} className="w-40" />
 							</PopoverTrigger>
 						);
 						return (
@@ -261,15 +263,17 @@ export function AgentSection({
 								<span className="flex items-center gap-2">
 									{slot !== "strong" && <ChatGPTBackgroundAccess provider={coord?.provider} />}
 									<Popover modal open={thisMenuOpen === "model"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "model" } : null)}>
-										{modelId ? <Hint label={`${provider}:${modelId}`}>{modelTrigger}</Hint> : modelTrigger}
+										{modelId ? <Hint label={modelName}>{modelTrigger}</Hint> : modelTrigger}
 										<PopoverContent align="end" className="w-[22rem] p-1" data-testid={`slot-model-menu-${slot}`}>
 											<ModelCommand models={slotCatalog ?? undefined} effectiveId={modelId} effectiveProvider={provider} onPick={pickModel} footer={modelFooter} />
 										</PopoverContent>
 									</Popover>
 									<DropdownMenu open={thisMenuOpen === "thinking"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "thinking" } : null)}>
-										<DropdownMenuTrigger asChild>
-											<SettingsMenuTrigger value={effectiveLevel ?? "—"} aria-label={`${SLOT_META[slot].label} thinking`} data-testid={`slot-thinking-${slot}`} className="w-24" />
-										</DropdownMenuTrigger>
+										<Hint label="How hard it thinks">
+											<DropdownMenuTrigger asChild>
+												<SettingsMenuTrigger value={effectiveLevel ?? "—"} aria-label={`${SLOT_META[slot].label} thinking`} data-testid={`slot-thinking-${slot}`} className="w-24" />
+											</DropdownMenuTrigger>
+										</Hint>
 										<DropdownMenuContent align="end" className="w-44" data-testid={`slot-thinking-menu-${slot}`}>
 											<ThinkingMenuItems levels={levels.map(String)} effectiveLevel={effectiveLevel} onPick={pickLevel} />
 										</DropdownMenuContent>
@@ -377,8 +381,8 @@ export function AgentSection({
 				    smaller line under it explaining what it is — this
 				    connects prior sessions' knowledge into new ones. */}
 				<SettingsRow
-					label="Graph tools"
-					hint="Lets the tutor consult your knowledge map between sessions"
+					label="Knowledge map"
+					hint="Lets the tutor look back at earlier lessons"
 					testid="graph-tools-row"
 				>
 					<Toggle

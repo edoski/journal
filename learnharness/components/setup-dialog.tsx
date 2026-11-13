@@ -50,6 +50,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { useDesignVariant } from "@/components/design-variant";
 import { SettingsDesignContext, useSettingsProposed } from "@/components/settings/settings-design";
 import { SettingsGroup, SettingsMenuTrigger, SettingsRow } from "@/components/settings/controls";
+import { SLOT_META } from "@/components/settings/agent-section";
 import { ModelCommand, ThinkingMenuItems } from "@/components/settings/model-pickers";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -60,16 +61,9 @@ import { cn } from "@/lib/utils";
 /** The stage's one line under the title (Proposed: the dialog's description). */
 const STAGE_LINE = {
 	keys: "Sign in to Claude or ChatGPT. You’ll pick your models next.",
-	pickers: "Pick the model for each tier. All three are required before chats can start.",
+	pickers: "Pick a model for each job. Lessons can start once all three are set.",
 } as const;
 
-/** The pickers' slot identity — same roster language as the Agent
- *  section's slot rows. */
-const SLOT_META: Record<ModelSlotName, { label: string; roster: string }> = {
-	strong: { label: "Strong", roster: "Prober, teacher" },
-	cheap: { label: "Cheap", roster: "Researcher, demo builder, extractor, auditor" },
-	vision: { label: "Vision", roster: "Visual maker + PDF reader" },
-};
 const SLOT_ORDER: readonly ModelSlotName[] = ["strong", "cheap", "vision"];
 
 /** The GET /api/models response fields the flow consumes. */

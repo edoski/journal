@@ -67,7 +67,7 @@ describe("Settings › Agent under the Proposed design", () => {
 		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
 		assert.ok(!html.includes("Tool · "), "no repeated Tool prefix");
 		const labels = TOGGLE_TOOLS.map((id) => doc.querySelector(`[data-testid="tool-row-${id}"]`)?.textContent?.trim());
-		assert.deepEqual(labels, ["Research", "Demos", "Figures", "PDF reading"]);
+		assert.deepEqual(labels, ["Research", "Interactive demos", "Figures", "Reading PDFs"]);
 		for (const id of TOGGLE_TOOLS) assert.ok(doc.querySelector(`[data-testid="toggle-tool-${id}"][role="switch"]`), `switch for ${id}`);
 	});
 });
