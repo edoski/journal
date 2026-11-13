@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { BookIcon, CircleDashedIcon, HouseIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
+import { BookIcon, CalendarDaysIcon, CircleDashedIcon, HouseIcon, PanelLeftCloseIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { courseLabel, type ChatListItem } from "@/src/core";
 import { fetchCourses } from "@/components/course-picker";
 import { examText } from "@/components/start/course-facts";
@@ -255,7 +255,7 @@ function CoverageItemNext({ chatId }: { chatId: string }) {
 }
 
 /** The Proposed sidebar: the app mark and collapse, New lesson, Home (a
- *  study home holds the map), a quiet search, sessions under collapsible courses, background
+ *  study home holds the map), Calendar, a quiet search, sessions under collapsible courses, background
  *  agents only while one runs, Settings at the foot. */
 export function SidebarNext() {
 	const { open, toggle } = useSidebar();
@@ -319,6 +319,12 @@ export function SidebarNext() {
 						<Link href="/" onClick={blurAfterPointerClick}>
 							<HouseIcon />
 							<NavRowLabel>Home</NavRowLabel>
+						</Link>
+					</NavRow>
+					<NavRow asChild active={s.pathname === "/calendar"}>
+						<Link href="/calendar" onClick={blurAfterPointerClick}>
+							<CalendarDaysIcon />
+							<NavRowLabel>Calendar</NavRowLabel>
 						</Link>
 					</NavRow>
 					<Hint label="Search sessions" action="sessions-search" side="right">
