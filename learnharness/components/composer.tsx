@@ -106,6 +106,7 @@ export function Composer({
 	onNext,
 	variant = "current",
 	toolbar,
+	head,
 }: {
 	busy: boolean;
 	value: string;
@@ -114,6 +115,9 @@ export function Composer({
 	onStop: () => void;
 	canSend: boolean;
 	autoFocus?: boolean;
+	/** Proposed only: a row docked on the composer's top edge, inside its
+	 *  surface, above the text (the topic page's resume line). */
+	head?: ReactNode;
 	/** The design (spec: composer.md). "proposed" draws the composer as its
 	 *  own rounded surface with a toolbar row under the text; its host adds
 	 *  no shell around it. */
@@ -132,11 +136,12 @@ export function Composer({
 	 *  empty-Enter share it. */
 	onNext?: () => void;
 }) {
+	const next = nextProblem ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
 	const act = () => {
-		const action = enterAction({ busy, canSend, nextProblem });
+		const action = enterAction({ busy, canSend, nextProblem: Boolean(next) });
 		if (action === "stop") onStop();
 		else if (action === "send") onSend();
-		else if (action === "next") onNext?.();
+		else if (action === "next") next?.run();
 	};
 	if (variant === "proposed") {
 		return (
@@ -148,8 +153,9 @@ export function Composer({
 				canSend={canSend}
 				autoFocus={autoFocus}
 				placeholder={placeholder}
-				nextProblem={nextProblem}
+				next={next ?? null}
 				toolbar={toolbar}
+				head={head}
 			/>
 		);
 	}
@@ -225,7 +231,9 @@ export function Composer({
 /** The Proposed composer (spec: composer.md): one rounded surface, the text
  *  on top, a toolbar row under it with muted controls on the left and one
  *  round send on the right. Enter, the stop morph and the practice pause
- *  behave as in the current composer. */
+ *  behave as in the current composer; `next` is the label the empty
+ *  composer's button wears instead of the send (Next problem, or the
+ *  host's empty action). */
 function ComposerNext({
 	busy,
 	value,
@@ -234,8 +242,9 @@ function ComposerNext({
 	canSend,
 	autoFocus,
 	placeholder,
-	nextProblem,
+	next,
 	toolbar,
+	head,
 }: {
 	busy: boolean;
 	value: string;
@@ -244,8 +253,9 @@ function ComposerNext({
 	canSend: boolean;
 	autoFocus?: boolean;
 	placeholder: string;
-	nextProblem: boolean;
+	next: { label: string; testId: string } | null;
 	toolbar?: ReactNode;
+	head?: ReactNode;
 }) {
 	const stopping = busy && !canSend;
 	return (
@@ -258,6 +268,7 @@ function ComposerNext({
 				onAct();
 			}}
 		>
+			{head}
 			<textarea
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
@@ -274,14 +285,14 @@ function ComposerNext({
 			/>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-1 p-2">
 				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{toolbar}</div>
-				{nextProblem && !busy && !canSend ? (
+				{next && !busy && !canSend ? (
 					<button
 						type="submit"
-						data-testid="next-problem-button"
-						aria-label="Next problem"
+						data-testid={next.testId}
+						aria-label={next.label}
 						className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-row font-medium text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none"
 					>
-						Next problem
+						{next.label}
 						<ArrowRightIcon className="size-4" />
 					</button>
 				) : (

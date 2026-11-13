@@ -182,6 +182,10 @@ describe("the Topic switch", () => {
 			POLISH_GROUPS.find((group) => group.id === "topic"),
 			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail", "hybrid"], requires: { design: "proposed" } },
 		);
+		assert.deepEqual(
+			POLISH_GROUPS.find((group) => group.id === "resume"),
+			{ id: "resume", label: "Resume", options: ["line"], requires: { design: "proposed", topic: "hybrid" } },
+		);
 	});
 
 	it("draws every candidate as a working page: the head, the open task to pick up (the hybrid's is in its composer foot), and every session one press away", () => {

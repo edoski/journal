@@ -17,16 +17,24 @@ export const TOPIC_OPTIONS = ["brief", "steps", "trail", "hybrid"] as const;
 /** "current" keeps the topic page as it is. */
 export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
 
+/** Where the hybrid topic page resumes a lesson, in or around its
+ *  composer (spec: components/unit-inbox/topic-page/resume/resume.md). */
+export const RESUME_OPTIONS = ["line"] as const;
+/** "current" keeps the hybrid's composer as the other candidates have it. */
+export type ResumeVariant = "current" | (typeof RESUME_OPTIONS)[number];
+
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only): Design is Current or Proposed; Home is Current or one of its
  *  options, Sidebar Current or Proposed, and anything but Current wears
  *  Design's Proposed; Topic is Current or one of the topic page's
- *  candidates. Read only through the hooks below. */
+ *  candidates; Resume is Current or one of the hybrid topic page's resume
+ *  options, and wears Topic's hybrid. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", options: HOME_OPTIONS, requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
 	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
+	{ id: "resume", label: "Resume", options: RESUME_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -37,6 +45,8 @@ const readHomeCurrent = (): HomeVariant => "current";
 const readHome = (): HomeVariant => HOME_OPTIONS.find((option) => option === polishVariant("home")) ?? "current";
 const readTopicCurrent = (): TopicVariant => "current";
 const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
+const readResumeCurrent = (): ResumeVariant => "current";
+const readResume = (): ResumeVariant => RESUME_OPTIONS.find((option) => option === polishVariant("resume")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
 
 /** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
@@ -62,4 +72,10 @@ export function useSidebarVariant(): DesignVariant {
  *  Production builds get "current". */
 export function useTopicVariant(): TopicVariant {
 	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readTopic : readTopicCurrent, readTopicCurrent);
+}
+
+/** Where the hybrid topic page resumes a lesson, or "current" for the
+ *  composer alone. Production builds get "current". */
+export function useResumeVariant(): ResumeVariant {
+	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readResume : readResumeCurrent, readResumeCurrent);
 }

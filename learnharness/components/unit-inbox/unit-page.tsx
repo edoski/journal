@@ -15,9 +15,10 @@ import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useDesignVariant, useTopicVariant } from "@/components/design-variant";
+import { useDesignVariant, useResumeVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { RESUME_FEET } from "@/components/unit-inbox/topic-page/resume/resume-options";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
@@ -210,6 +211,7 @@ function UnitBody({
 export function UnitPage({ workspace, handle, initialConfigured }: { workspace: string; handle: string; initialConfigured: boolean }) {
 	const read = useUnitRead(workspace);
 	const variant = useTopicVariant();
+	const resume = useResumeVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
@@ -221,7 +223,10 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				variant === "current" ? (
 					<UnitBody course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
 				) : (
-					<TopicPage candidate={TOPIC_CANDIDATES[variant]} course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+					<TopicPage
+						candidate={TOPIC_CANDIDATES[variant]}
+						resume={variant === "hybrid" && resume !== "current" ? RESUME_FEET[resume] : undefined}
+						course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
 				)
 			) : (
 				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">

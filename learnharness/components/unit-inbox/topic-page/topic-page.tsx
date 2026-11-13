@@ -14,7 +14,10 @@ import { BriefTopic } from "@/components/unit-inbox/topic-page/brief/brief-topic
 import { StepsTopic } from "@/components/unit-inbox/topic-page/steps/steps-topic";
 import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic";
 import { HYBRID_COLUMN, HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
+import { freshAction } from "@/components/unit-inbox/topic-page/resume/resume-facts";
+import type { ResumeOption } from "@/components/unit-inbox/topic-page/resume/resume-parts";
 import { topicFacts, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { stashLessonMessage } from "@/components/lesson-message";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /** What every candidate takes. */
@@ -40,17 +43,21 @@ export const TOPIC_CANDIDATES: Record<(typeof TOPIC_OPTIONS)[number], ComponentT
 /**
  * The topic page behind the Topic switch (spec: topic-page.md): what the
  * page as it is owns, the start and the composer, around the chosen
- * candidate's body. The page appears once the topic read has answered,
- * so nothing shifts in afterwards.
+ * candidate's body. With a `resume` option the composer foot is that
+ * option's and holds the page's action, so the head has no button. The
+ * page appears once the topic read has answered, so nothing shifts in
+ * afterwards.
  */
 export function TopicPage({
 	candidate: Candidate,
+	resume: Resume,
 	course,
 	topic,
 	chats,
 	initialConfigured,
 }: {
 	candidate: ComponentType<TopicPageProps>;
+	resume?: ResumeOption;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
@@ -82,9 +89,14 @@ export function TopicPage({
 		if ("chat" in action) router.push(`/chat/${action.chat.id}`);
 		else start(action.opening);
 	};
+	/** Opens a session; a message for it waits in its page's handover. */
+	const open = (chat: string, message?: string) => {
+		if (message && stashLessonMessage(chat, message)) setText("");
+		router.push(`/chat/${chat}`);
+	};
 	return (
 		<>
-			<Candidate facts={facts} busy={lesson.busy} onAct={act} onTask={start} />
+			<Candidate facts={facts} busy={lesson.busy} onAct={Resume ? undefined : act} onTask={start} />
 			<div className="shrink-0 bg-background pb-4">
 				<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>
 					{lesson.error && (
@@ -92,16 +104,30 @@ export function TopicPage({
 							{lesson.error}
 						</p>
 					)}
-					<Composer
-						variant="proposed"
-						busy={lesson.busy}
-						value={text}
-						onChange={setText}
-						onSend={send}
-						onStop={() => {}}
-						canSend={text.trim().length > 0 && !lesson.busy}
-						placeholder={`Ask about ${topic.title}, or start a new session on it`}
-					/>
+					{Resume ? (
+						<Resume
+							facts={facts}
+							fresh={freshAction(topic, course.map)}
+							busy={lesson.busy}
+							text={text}
+							onText={setText}
+							onAct={act}
+							onStart={start}
+							onSend={send}
+							onOpen={open}
+						/>
+					) : (
+						<Composer
+							variant="proposed"
+							busy={lesson.busy}
+							value={text}
+							onChange={setText}
+							onSend={send}
+							onStop={() => {}}
+							canSend={text.trim().length > 0 && !lesson.busy}
+							placeholder={`Ask about ${topic.title}, or start a new session on it`}
+						/>
+					)}
 				</div>
 			</div>
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />

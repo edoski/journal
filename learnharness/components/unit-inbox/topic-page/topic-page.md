@@ -13,7 +13,7 @@ Four candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic s
 
 | His question | Where it is answered |
 |---|---|
-| What is the one thing to do now? | The one button at the title's right (`topic-head.md`): Resume, Open, Review, Continue, Start, or Study in outline. On `hybrid`, the head's button too, until a Resume option moves it to the composer foot |
+| What is the one thing to do now? | The one button at the title's right (`topic-head.md`): Resume, Open, Review, Continue, Start, or Study in outline. On `hybrid` with a Resume option, the composer foot instead (`resume/resume.md`) |
 | Is there anything to review, and when? | The head line: "Review due today", "Review overdue by a week" (only for a topic he can do on his own), or "Next review Fri 13 Nov" |
 | Where do I pick this up? | The pick-up rows (`pickup-rows.md`): the session that waits or is being written, at the step it is on, and each open task that holds the topic, at its step. Else "Studied 3 days ago" in the head |
 
@@ -35,7 +35,7 @@ The app's one lever on the tutor is the session's first message; the tutor's own
 
 - `topic-facts.ts`: every fact a candidate reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's short words for time are Home's, pinned by test to `studiedAgo`.
 - `use-topic-read.ts`: `useTopicRead` over `GET /api/topic` (`src/server/topic.ts`, contract `src/core/contracts/topic.ts`, tested in `tests/topic-read.test.ts`): the engine's scored attempts on the topic and when each open task was last touched (`show`), and the plan of each of its 20 newest sessions with the step its newest tagged question is about. Nothing else of a transcript leaves the server. Read again on `turn-settled`, `chats-changed` and `record-changed`; a failed read keeps the last good one.
-- `topic-page.tsx`: `TopicPage` (the start, the composer foot as Current's with plain Tab reaching its field as on Home, the setup dialog), `TopicPageProps` (what every candidate takes: `facts`, `busy`, `onAct`, absent when the foot holds the action, `onTask`) and `TOPIC_CANDIDATES`.
+- `topic-page.tsx`: `TopicPage` (the start, the composer foot as Current's with plain Tab reaching its field as on Home, or a Resume option's foot (`resume`), the setup dialog), `TopicPageProps` (what every candidate takes: `facts`, `busy`, `onAct`, absent when the foot holds the action, `onTask`) and `TOPIC_CANDIDATES`.
 - Shared parts, used by the candidates and changed by none: `topic-head.tsx`, `pickup-rows.tsx`, `session-rows.tsx`, `why-mark.tsx` (Home's why mark restated) and `row-classes.ts` (Home's Hybrid row classes restated). When one candidate ships, Home's row and why mark and these become one shared file.
 
 Each candidate but `hybrid` (which fits the window and scrolls only inside its panes) draws inside `ScrollArea bar={false}` (no visible scrollbar), column `max-w-[46rem]`, `px-6 pt-6 pb-8`, blocks `gap-5`, root `data-testid="unit-page"` with `data-topic-candidate="<option>"`.
