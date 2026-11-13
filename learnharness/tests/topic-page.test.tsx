@@ -170,7 +170,7 @@ describe("the session rows", () => {
 });
 
 describe("the Topic switch", () => {
-	it("is Current outside development, and picking a candidate wears the Proposed design and the topic map", () => {
+	it("is Current outside development, and picking a candidate wears the Proposed design", () => {
 		let read: string | null = null;
 		function Probe() {
 			read = useTopicVariant();
@@ -180,7 +180,7 @@ describe("the Topic switch", () => {
 		assert.equal(read, "current");
 		assert.deepEqual(
 			POLISH_GROUPS.find((group) => group.id === "topic"),
-			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail"], requires: { design: "proposed", map: "proposed" } },
+			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail"], requires: { design: "proposed" } },
 		);
 	});
 

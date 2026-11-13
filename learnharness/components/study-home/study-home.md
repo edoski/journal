@@ -31,7 +31,7 @@ Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an age
 | This week | future reviews can't be done now (Things: Today holds only what you'll work on today) |
 | Exams | readiness is the map's dashed topics; no line says "Exam in N days" (Edo, 12 Nov 2026) |
 | Topic strips and bands | the map draws the same, and better |
-| Gap sentence, weak marks, last studied | they don't change what he picks; weakness stays in the map's topic detail |
+| Gap sentence, weak marks, last studied | they don't change what he picks; weakness stays on the map's nodes and the topic page |
 | A second waiting session in a course, reviews past the plan's five | the sidebar lists every session waiting on him; the tutor brings the rest back on later days |
 
 ## Anatomy

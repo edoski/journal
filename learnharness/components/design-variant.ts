@@ -27,17 +27,14 @@ export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
  *  only): Design is Current or Proposed; Home is Current or one of its
  *  options, Sidebar Current or Proposed, and anything but Current wears
  *  Design's Proposed; Rows is Current or one of agenda's row candidates,
- *  which wear Home's agenda too; Map is the course map as it was or the
- *  topic map, on whichever study home shows it; Topic is Current or one
- *  of the topic page's candidates, which wear the topic map too. Read
- *  only through the hooks below. */
+ *  which wear Home's agenda too; Topic is Current or one of the topic
+ *  page's candidates. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", options: HOME_OPTIONS, requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
 	{ id: "rows", label: "Rows", options: ROWS_OPTIONS, requires: { design: "proposed", home: "agenda" } },
-	{ id: "map", label: "Map", requires: { design: "proposed" } },
-	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed", map: "proposed" } },
+	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -51,7 +48,6 @@ const readRows = (): RowsVariant => ROWS_OPTIONS.find((option) => option === pol
 const readTopicCurrent = (): TopicVariant => "current";
 const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
-const readMap = (): DesignVariant => (polishVariant("map") === "proposed" ? "proposed" : "current");
 
 /** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
  *  Production builds always get "current" until a surface ships. */
@@ -76,14 +72,6 @@ export function useRowsVariant(): RowsVariant {
  *  ("current"). Production builds get "current". */
 export function useSidebarVariant(): DesignVariant {
 	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readSidebar : readCurrent, readCurrent);
-}
-
-/** Whether a study home draws the course as the topic map ("proposed",
- *  spec: components/course-map/topic-map/topic-map.md), with the topic
- *  page that goes with it, or as the map was ("current"). Production
- *  builds get "current". */
-export function useMapVariant(): DesignVariant {
-	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readMap : readCurrent, readCurrent);
 }
 
 /** Which topic page `/unit/...` draws, or "current" for the page as it is.

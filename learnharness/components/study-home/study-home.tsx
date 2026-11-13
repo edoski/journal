@@ -25,10 +25,10 @@ export function StudyHome({ initialConfigured }: { initialConfigured: boolean })
 			quiet={enlarged}
 			className={cn("mx-auto flex h-full w-full flex-col gap-5 px-8 pt-13 pb-6", !enlarged && "max-w-[60rem]")}
 		>
-			{({ rows, courses, today, busy, onStart, onContinue }) => (
+			{({ rows, courses, today, busy, onContinue }) => (
 				<>
 					<div className={cn("flex min-h-0 flex-col", enlarged ? "flex-1" : cn(MAP_SHARE, "min-h-48 shrink"))}>
-						<MapOnHome courses={courses} enlarged={enlarged} onEnlarge={setEnlarged} busy={busy} onStart={onStart} />
+						<MapOnHome courses={courses} enlarged={enlarged} onEnlarge={setEnlarged} />
 					</div>
 					{!enlarged && <Today rows={rows} today={today} busy={busy} onContinue={onContinue} />}
 				</>
@@ -39,29 +39,7 @@ export function StudyHome({ initialConfigured }: { initialConfigured: boolean })
 
 /** The map of one course, with the courses as tabs in Today's order; it
  *  opens on the course of Today's first line. */
-function MapOnHome({
-	courses,
-	enlarged,
-	onEnlarge,
-	busy,
-	onStart,
-}: {
-	courses: readonly StudyCourse[];
-	enlarged: boolean;
-	onEnlarge: (enlarged: boolean) => void;
-	busy: boolean;
-	onStart: (opening: string, workspace: string) => void;
-}) {
+function MapOnHome({ courses, enlarged, onEnlarge }: { courses: readonly StudyCourse[]; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
 	const [workspace, setWorkspace] = useState(() => courses[0]!.map.workspace);
-	return (
-		<HomeMap
-			courses={courses}
-			workspace={workspace}
-			onSelect={setWorkspace}
-			enlarged={enlarged}
-			onEnlarge={onEnlarge}
-			onStudy={(topic, ws) => onStart(topic.title, ws)}
-			busy={busy}
-		/>
-	);
+	return <HomeMap courses={courses} workspace={workspace} onSelect={setWorkspace} enlarged={enlarged} onEnlarge={onEnlarge} />;
 }

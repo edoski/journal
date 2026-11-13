@@ -22,8 +22,6 @@ export interface HomeReady {
 	/** The engine's study day. */
 	today: string;
 	busy: boolean;
-	/** Open a lesson in a course with an opening. */
-	onStart: (opening: string, workspace: string) => void;
 	/** Take up a course's next step. */
 	onContinue: (workspace: string) => void;
 }
@@ -116,7 +114,6 @@ function HomeBody({
 						courses: rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])),
 						today,
 						busy,
-						onStart,
 						onContinue: (workspace) => onStart(CONTINUE_OPENING, workspace),
 					})}
 					{!quiet && state.failed.length > 0 && (

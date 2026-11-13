@@ -15,7 +15,7 @@ import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useMapVariant, useTopicVariant } from "@/components/design-variant";
+import { useDesignVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
@@ -130,8 +130,8 @@ function UnitBody({
 	initialConfigured: boolean;
 }) {
 	const lesson = useLessonStart(initialConfigured);
-	// The header the topic map's node opens, while the Map switch is on Proposed.
-	const mapNext = useMapVariant() === "proposed";
+	// The Proposed design's header is the one the topic map's node opens; Current keeps the page as it was.
+	const mapNext = useDesignVariant() === "proposed";
 	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
 	const workspace = course.map.workspace;

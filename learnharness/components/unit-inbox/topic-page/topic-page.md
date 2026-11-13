@@ -1,6 +1,6 @@
 # Topic page candidates
 
-Three candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic switch (`design-variant.ts`, group `topic`, which wears Design's Proposed and the topic map). Current is the page as it is (`../unit-inbox.md`, "The topic page"). `UnitPage` in `../unit-page.tsx` branches once on the switch: Current draws `UnitBody`, an option draws `TopicPage` (`topic-page.tsx`) around that option's body. Each candidate is one folder with its spec. Edo picks one; the others are deleted with their folders, the switch and Current.
+Three candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic switch (`design-variant.ts`, group `topic`, which wears Design's Proposed). Current is the page as it is (`../unit-inbox.md`, "The topic page"). `UnitPage` in `../unit-page.tsx` branches once on the switch: Current draws `UnitBody`, an option draws `TopicPage` (`topic-page.tsx`) around that option's body. Each candidate is one folder with its spec. Edo picks one; the others are deleted with their folders, the switch and Current.
 
 | Option | Thesis | How far it resembles Home | A graph of the lesson's steps | Tied to sessions | Spec |
 |---|---|---|---|---|---|

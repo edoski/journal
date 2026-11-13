@@ -28,7 +28,7 @@ The `split` option of Home's switch: today's lessons on the left, the map of the
 | list | rows 2px apart; past the pane's height the list scrolls inside itself |
 | row | radius 12, padding 12, hover `fill-hover`; `LessonText`; 96px kept free at the end for the button, picked or not, so nothing reflows when the pick moves. Pressing a row picks it |
 | picked row | `fill-selected`; the primary button (32px, "Open", "Review", "Continue" or "Start") at its end, centred |
-| map pane | no border and no header line (Edo, 12 Nov 2026: the outline and "You are at …" said nothing the map doesn't); the course's map (`CourseMapDrawing`, home-map.md) as it is, edges faded 32px across and 24px down, a short drawing at the pane's middle; the quiet 32px Enlarge control at its top right, over the map |
+| map pane | no border and no header line (Edo, 12 Nov 2026: the outline and "You are at …" said nothing the map doesn't); the course's topic map (topic-map.md) as it is, edges faded 32px across and 24px down; the quiet 32px Enlarge control at its top right, over the map |
 | a lesson with no course | the pane says "This lesson has no course, so it has no map." |
 | enlarged | `HomeMap` enlarged takes the page (home-map.md): tabs and Esc back, nothing more; its tabs move the pick |
 

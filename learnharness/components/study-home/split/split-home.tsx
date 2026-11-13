@@ -1,20 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Maximize2Icon } from "lucide-react";
-import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
-import { layoutCourseMap } from "@/components/course-map/course-map-layout";
+import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
 import { LessonButton } from "@/components/study-home/lesson-button";
 import type { Lesson } from "@/components/study-home/lesson-facts";
 import { LessonText } from "@/components/study-home/lesson-text";
-import { MAP_BOX, mapFade } from "@/components/study-home/map-frame";
+import { mapFade } from "@/components/study-home/map-frame";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { cn } from "@/lib/utils";
-import type { CourseMapTopic, StudyCourse } from "@/src/core";
+import type { StudyCourse } from "@/src/core";
 
 const FADE = mapFade(32, 24);
 
@@ -37,10 +36,9 @@ export function SplitHome({ initialConfigured }: { initialConfigured: boolean })
 }
 
 function SplitBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { lessons, courses, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onContinue } = home;
 	const [pickedKey, setPickedKey] = useState(() => lessons[0]!.key);
 	const picked = lessons.find((l) => l.key === pickedKey) ?? lessons[0]!;
-	const onStudy = (topic: CourseMapTopic, workspace: string) => onStart(topic.title, workspace);
 
 	if (enlarged) {
 		return (
@@ -50,8 +48,6 @@ function SplitBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: b
 				onSelect={(workspace) => setPickedKey((lessons.find((l) => l.course?.map.workspace === workspace) ?? picked).key)}
 				enlarged
 				onEnlarge={onEnlarge}
-				onStudy={onStudy}
-				busy={busy}
 			/>
 		);
 	}
@@ -66,7 +62,7 @@ function SplitBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: b
 						</li>
 					))}
 				</ul>
-				<MapPane course={picked.course} onEnlarge={() => onEnlarge(true)} onStudy={onStudy} busy={busy} />
+				<MapPane course={picked.course} onEnlarge={() => onEnlarge(true)} />
 			</div>
 		</>
 	);
@@ -106,22 +102,10 @@ function LessonRow({
 	);
 }
 
-/** The picked lesson's course as a map with no frame: the course map with
- *  its camera on the current topic, faded at its edges, and the control
- *  that enlarges it at its top right. */
-function MapPane({
-	course,
-	onEnlarge,
-	onStudy,
-	busy,
-}: {
-	course: StudyCourse | null;
-	onEnlarge: () => void;
-	onStudy: (topic: CourseMapTopic, workspace: string) => void;
-	busy: boolean;
-}) {
-	const layout = useMemo(() => (course ? layoutCourseMap(course.map.topics, course.map.edges) : null), [course]);
-	if (!course || !layout) {
+/** The picked lesson's course as a map with no frame: the topic map,
+ *  faded at its edges, and the control that enlarges it at its top right. */
+function MapPane({ course, onEnlarge }: { course: StudyCourse | null; onEnlarge: () => void }) {
+	if (!course) {
 		return (
 			<section aria-label="Course map" data-slot="split-map" className="flex min-h-0 flex-col">
 				<p className="m-auto text-row text-muted-foreground">This lesson has no course, so it has no map.</p>
@@ -138,16 +122,7 @@ function MapPane({
 			</Hint>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={FADE}>
 				{map.topics.length > 0 ? (
-					<CourseMapDrawing
-						key={map.workspace}
-						map={map}
-						layout={layout}
-						jumpRequest={0}
-						onStudy={(topic) => onStudy(topic, map.workspace)}
-						busy={busy}
-						anchor={0.5}
-						className={MAP_BOX}
-					/>
+					<TopicMap key={map.workspace} map={map} />
 				) : (
 					<p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>
 				)}

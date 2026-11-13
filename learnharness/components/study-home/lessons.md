@@ -27,7 +27,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 
 ## The page frame
 
-`HomeFrame` holds what every study home shares: the 52px drag strip and the sidebar toggle, the read of the courses (`useStudyHome`) with its states, the lesson start with its guards (`useLessonStart`) and its error line. A home gives its column's classes and draws the ready state from `HomeReady` (the lines, the lessons, the courses in Today's order, the study day, `onStart`, `onContinue`).
+`HomeFrame` holds what every study home shares: the 52px drag strip and the sidebar toggle, the read of the courses (`useStudyHome`) with its states, the lesson start with its guards (`useLessonStart`) and its error line. A home gives its column's classes and draws the ready state from `HomeReady` (the lines, the lessons, the courses in Today's order, the study day, `onContinue`).
 
 | State | Shows |
 |---|---|
@@ -38,7 +38,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 | one course unreadable | the others, then "Couldn't read one course: <folder>" |
 | a start failed | "Couldn't open the session. Try again." under the home |
 
-`DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` and `MAP_BOX` frame an embedded course map: faded edges, no scrollbars, and a drawing shorter than its frame sits at the frame's middle.
+`DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` frames an embedded topic map with faded edges.
 
 ## Sources
 

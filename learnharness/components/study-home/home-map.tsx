@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
-import type { CourseMapTopic, StudyCourse } from "@/src/core";
-import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
-import { layoutCourseMap } from "@/components/course-map/course-map-layout";
+import type { StudyCourse } from "@/src/core";
+import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,8 +17,7 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
 
 /**
  * The selected course's map on Home (spec: home-map.md): course tabs over
- * the course map, embedded as it is and framed with faded edges, its camera
- * on where the learner is. The enlarge control lets the map take over Home
+ * the topic map, embedded as it is and framed with faded edges. The enlarge control lets the map take over Home
  * for a moment; it and Esc bring Home back. Enlarged or not, it is only
  * the map: no List view and no More menu (Edo, 12 Nov 2026).
  */
@@ -29,8 +27,6 @@ export function HomeMap({
 	onSelect,
 	enlarged,
 	onEnlarge,
-	onStudy,
-	busy,
 }: {
 	courses: readonly StudyCourse[];
 	/** The course whose map shows. */
@@ -38,15 +34,12 @@ export function HomeMap({
 	onSelect: (workspace: string) => void;
 	enlarged: boolean;
 	onEnlarge: (enlarged: boolean) => void;
-	onStudy: (topic: CourseMapTopic, workspace: string) => void;
-	busy: boolean;
 }) {
 	const course = courses.find((c) => c.map.workspace === workspace) ?? courses[0]!;
 	const { map } = course;
-	const layout = useMemo(() => layoutCourseMap(map.topics, map.edges), [map]);
 	useEffect(() => {
 		if (!enlarged) return;
-		// An open popover claims Esc first (Radix marks it handled).
+		// Anything open over the map claims Esc first (Radix marks it handled).
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape" && !e.defaultPrevented) onEnlarge(false);
 		};
@@ -82,19 +75,8 @@ export function HomeMap({
 			</div>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
 				{map.topics.length > 0 ? (
-					<CourseMapDrawing
-						key={map.workspace}
-						map={map}
-						layout={layout}
-						// A new request when the frame grows or shrinks brings the camera back to the current topic.
-						jumpRequest={enlarged ? 2 : 1}
-						onStudy={(topic) => onStudy(topic, map.workspace)}
-						busy={busy}
-						anchor={0.5}
-						// As much room as the fade, so a topic at the edge scrolls clear of it.
-						margin={FADE}
-						className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-					/>
+					// As much room as the fade, so a topic at the edge scrolls clear of it.
+					<TopicMap key={map.workspace} map={map} margin={FADE} />
 				) : (
 					<p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>
 				)}

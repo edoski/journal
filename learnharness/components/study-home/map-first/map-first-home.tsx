@@ -1,20 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Maximize2Icon } from "lucide-react";
-import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
-import { layoutCourseMap } from "@/components/course-map/course-map-layout";
+import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
 import { LessonButton } from "@/components/study-home/lesson-button";
 import { LessonText } from "@/components/study-home/lesson-text";
-import { MAP_BOX, mapFade } from "@/components/study-home/map-frame";
+import { mapFade } from "@/components/study-home/map-frame";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import type { CourseMapTopic, StudyCourse } from "@/src/core";
+import type { StudyCourse } from "@/src/core";
 
 const FADE = mapFade(48, 24);
 
@@ -38,17 +37,16 @@ export function MapFirstHome({ initialConfigured }: { initialConfigured: boolean
 }
 
 function MapFirstBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { lessons, courses, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onContinue } = home;
 	const [workspace, setWorkspace] = useState(() => courses[0]!.map.workspace);
-	const onStudy = (topic: CourseMapTopic, ws: string) => onStart(topic.title, ws);
 
 	if (enlarged) {
-		return <HomeMap courses={courses} workspace={workspace} onSelect={setWorkspace} enlarged onEnlarge={onEnlarge} onStudy={onStudy} busy={busy} />;
+		return <HomeMap courses={courses} workspace={workspace} onSelect={setWorkspace} enlarged onEnlarge={onEnlarge} />;
 	}
 	return (
 		<>
 			<DayHeading />
-			<MapCard courses={courses} workspace={workspace} onSelect={setWorkspace} onEnlarge={() => onEnlarge(true)} onStudy={onStudy} busy={busy} />
+			<MapCard courses={courses} workspace={workspace} onSelect={setWorkspace} onEnlarge={() => onEnlarge(true)} />
 			<ul data-slot="lesson-list" aria-label="Today’s lessons" className="-mx-3 flex min-h-0 shrink flex-col gap-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 				{lessons.map((lesson) => {
 					const picked = lesson.course?.map.workspace === workspace;
@@ -82,26 +80,21 @@ function MapFirstBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged
 }
 
 /** The course map in a card: the course tabs, a line that says where the
- *  learner is, the control that enlarges it, and the picked course's map
- *  with its camera on the current topic. */
+ *  learner is, the control that enlarges it, and the picked course's
+ *  topic map. */
 function MapCard({
 	courses,
 	workspace,
 	onSelect,
 	onEnlarge,
-	onStudy,
-	busy,
 }: {
 	courses: readonly StudyCourse[];
 	workspace: string;
 	onSelect: (workspace: string) => void;
 	onEnlarge: () => void;
-	onStudy: (topic: CourseMapTopic, workspace: string) => void;
-	busy: boolean;
 }) {
 	const course = courses.find((c) => c.map.workspace === workspace) ?? courses[0]!;
 	const { map } = course;
-	const layout = useMemo(() => layoutCourseMap(map.topics, map.edges), [map]);
 	const current = map.topics.find((t) => t.handle === map.current);
 	return (
 		<section aria-label="Course map" data-slot="home-map" className="-mx-3 flex max-h-[26rem] min-h-56 flex-1 flex-col rounded-lg border border-border">
@@ -131,16 +124,7 @@ function MapCard({
 			</div>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={FADE}>
 				{map.topics.length > 0 ? (
-					<CourseMapDrawing
-						key={map.workspace}
-						map={map}
-						layout={layout}
-						jumpRequest={0}
-						onStudy={(topic) => onStudy(topic, map.workspace)}
-						busy={busy}
-						anchor={0.5}
-						className={MAP_BOX}
-					/>
+					<TopicMap key={map.workspace} map={map} />
 				) : (
 					<p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>
 				)}

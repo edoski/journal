@@ -30,21 +30,11 @@ export function PathHome({ initialConfigured }: { initialConfigured: boolean }) 
 }
 
 function PathBody({ home, mapOpen, onMapOpen }: { home: HomeReady; mapOpen: boolean; onMapOpen: (open: boolean) => void }) {
-	const { lessons, courses, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onContinue } = home;
 	const [workspace, setWorkspace] = useState(() => courses[0]!.map.workspace);
 
 	if (mapOpen) {
-		return (
-			<HomeMap
-				courses={courses}
-				workspace={workspace}
-				onSelect={setWorkspace}
-				enlarged
-				onEnlarge={onMapOpen}
-				onStudy={(topic, ws) => onStart(topic.title, ws)}
-				busy={busy}
-			/>
-		);
+		return <HomeMap courses={courses} workspace={workspace} onSelect={setWorkspace} enlarged onEnlarge={onMapOpen} />;
 	}
 	return (
 		<>
