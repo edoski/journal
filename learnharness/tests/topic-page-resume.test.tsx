@@ -1,7 +1,7 @@
 /**
  * The hybrid topic page's resume options: every row of the action table
- * (`topicAction`) said and done from the composer foot, by the line. Same tsx
- * classic-JSX shim as the other render tests.
+ * (`topicAction`) said and done from the composer foot, by the line and
+ * the chips. Same tsx classic-JSX shim as the other render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -17,9 +17,11 @@ import type { StudyCourse } from "../src/core/contracts/study.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import {
 	freshAction,
+	resumeChips,
 	resumeLine,
 	sessionName,
 } from "../components/unit-inbox/topic-page/resume/resume-facts.ts";
+import { ResumeChipsFoot } from "../components/unit-inbox/topic-page/resume/resume-chips.tsx";
 import { ResumeLineFoot } from "../components/unit-inbox/topic-page/resume/resume-line.tsx";
 import type { ResumeProps } from "../components/unit-inbox/topic-page/resume/resume-parts.tsx";
 
@@ -97,6 +99,32 @@ describe("the resume line", () => {
 	});
 });
 
+describe("the resume chips", () => {
+	it("lead with the page's action in every row, opening a session or starting one with the action's opening", () => {
+		assert.deepEqual(
+			ROWS.map(([, facts]) => {
+				const [chip] = resumeChips(facts);
+				return [chip!.words, chip!.does];
+			}),
+			[
+				["Resume today's lesson", { kind: "open", chat: "chat_eigen" }],
+				["Open today's lesson", { kind: "open", chat: "chat_eigen" }],
+				["Start a review", { kind: "start", opening: "Review Span" }],
+				["Continue Problem sheet 4", { kind: "start", opening: "Continue Problem sheet 4" }],
+				["Start learning", { kind: "start", opening: "Invertibility" }],
+				["Keep learning", { kind: "start", opening: "Continue Determinants as volume scaling" }],
+				["Study ahead", { kind: "start", opening: "Vectors" }],
+			],
+		);
+	});
+
+	it("add each other open task that holds the topic, never the one the action continues twice", () => {
+		assert.deepEqual(resumeChips(row("continue a task")).map((chip) => chip.words), ["Continue Problem sheet 4", "Continue Problem sheet 5"]);
+		const waiting = factsOf(RANK, [chat("chat_rank", "Rank practice", "2026-11-08T07:54:30.000Z", { kind: "practice", pendingProblem: true, topics: ["rank"] })]);
+		assert.deepEqual(resumeChips(waiting).map((chip) => chip.words), ["Resume today's practice", "Continue Problem sheet 4", "Continue Problem sheet 5"]);
+	});
+});
+
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
@@ -123,5 +151,14 @@ describe("the resume options drawn", () => {
 			assert.ok(line!.textContent!.endsWith(resumeLine(facts).press), name);
 			assert.equal(document.querySelector("textarea")!.getAttribute("placeholder"), `Ask about ${facts.topic.title} to start a new lesson`, name);
 		}
+	});
+
+	it("put one chip per place to pick up in the composer's toolbar, as buttons that never submit", () => {
+		const document = render(<ResumeChipsFoot {...props(row("continue a task"))} />);
+		const chips = [...document.querySelectorAll('[data-slot="composer-toolbar"] [data-slot="composer-chip"]')];
+		assert.deepEqual(chips.map((chip) => [chip.getAttribute("data-chip"), chip.getAttribute("type"), chip.textContent]), [
+			["action", "button", "Continue Problem sheet 4"],
+			["task:sheet-5", "button", "Continue Problem sheet 5"],
+		]);
 	});
 });

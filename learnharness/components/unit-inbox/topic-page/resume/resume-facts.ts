@@ -72,3 +72,45 @@ export function resumeLine(facts: TopicFacts): ResumeLine {
 			return { kind: action.kind, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Nothing due", detail: null, press };
 	}
 }
+
+/** One chip in the composer's toolbar: the page's action, or an open task
+ *  that holds the topic. */
+export interface ResumeChip {
+	key: string;
+	icon: ResumeIcon;
+	words: string;
+	does: { kind: "open"; chat: string } | { kind: "start"; opening: string };
+}
+
+/** What the action's chip says: the press and its object, in a few words. */
+function actionChip(facts: TopicFacts): ResumeChip {
+	const { action } = facts;
+	switch (action.kind) {
+		case "resume":
+		case "open": {
+			const entry = entryOf(facts, action.chat.id);
+			const name = entry ? sessionName(entry, facts.today) : "the lesson";
+			return { key: "action", icon: action.kind === "resume" ? "reply" : "writing", words: `${ACTION_WORDS[action.kind]} ${name}`, does: { kind: "open", chat: action.chat.id } };
+		}
+		case "review":
+			return { key: "action", icon: "review", words: "Start a review", does: { kind: "start", opening: action.opening } };
+		case "continue":
+			return action.task
+				? { key: "action", icon: "task", words: `Continue ${action.task.title}`, does: { kind: "start", opening: action.opening } }
+				: { key: "action", icon: "standing", words: "Keep learning", does: { kind: "start", opening: action.opening } };
+		case "start":
+			return { key: "action", icon: "standing", words: "Start learning", does: { kind: "start", opening: action.opening } };
+		case "study":
+			return { key: "action", icon: "review", words: "Study ahead", does: { kind: "start", opening: action.opening } };
+	}
+}
+
+/** The chips: the page's action first, then each other open task that
+ *  holds the topic, the focused one first. */
+export function resumeChips(facts: TopicFacts): ResumeChip[] {
+	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
+	const tasks = facts.pickups.flatMap((pickup): ResumeChip[] =>
+		pickup.kind === "task" && pickup.task.key !== taken ? [{ key: `task:${pickup.task.key}`, icon: "task", words: `Continue ${pickup.task.title}`, does: { kind: "start", opening: pickup.opening } }] : [],
+	);
+	return [actionChip(facts), ...tasks];
+}

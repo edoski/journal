@@ -1,16 +1,17 @@
 # Resume options (hybrid topic page)
 
-The Resume switch (`design-variant.ts`, group `resume`, option `line`, each wearing Design's Proposed and Topic's `hybrid`). Current keeps the hybrid with the head's button and the plain composer. An option replaces the composer foot (`TopicPage`'s `resume` prop, `RESUME_FEET` in `resume-options.ts`) and takes the head's button away: the foot holds the page's action.
+The Resume switch (`design-variant.ts`, group `resume`, options `line`, `chips`, each wearing Design's Proposed and Topic's `hybrid`). Current keeps the hybrid with the head's button and the plain composer. An option replaces the composer foot (`TopicPage`'s `resume` prop, `RESUME_FEET` in `resume-options.ts`) and takes the head's button away: the foot holds the page's action.
 
 Every option covers the whole action table (`topicAction`, `../topic-page.md`): Resume, Open, Review, Continue a task, Start, Continue, Study. Each says whether a typed message continues a lesson or starts one.
 
 | Option | Thesis | The action | A typed message | File |
 |---|---|---|---|---|
 | `line` | GitHub's merge box over its comment field: one quiet line on the composer's top edge says what waits and does it | the line, one press | always a new lesson | `resume-line.tsx` |
+| `chips` | Suggested actions in the toolbar, as agent apps put them | one chip per place to pick up | always a new lesson | `resume-chips.tsx` |
 
 ## Shared
 
-- `resume-facts.ts`, pure, tested in `tests/topic-page-resume.test.tsx` across all seven rows: `resumeLine`, `freshAction` (`topicAction` with no session: what a new lesson does), `sessionName` ("today's lesson", "yesterday's practice").
+- `resume-facts.ts`, pure, tested in `tests/topic-page-resume.test.tsx` across all seven rows: `resumeLine`, `resumeChips`, `freshAction` (`topicAction` with no session: what a new lesson does), `sessionName` ("today's lesson", "yesterday's practice").
 - `resume-parts.tsx`: `ResumeProps` (what `TopicPage` gives every option), `TopicComposer` (the Proposed composer), `ResumeIconMark` (the reply mark in the accent, the tutor's spinner, the review clock, the task bookmark, else the topic's pie).
 - The Proposed composer gained a prop for this (`../../../composer.md`): `head`, a row docked inside its surface above the field.
 
@@ -30,6 +31,11 @@ Every option covers the whole action table (`topicAction`, `../topic-page.md`): 
 
 Field: "Ask about <topic> to start a new lesson".
 
+## `chips`
+
+In the toolbar's left: the action's chip ("Resume today's lesson", "Open today's lesson", "Start a review", "Continue <task>", "Start learning", "Keep learning", "Study ahead"), then a chip per other open task holding the topic ("Continue <task>"). Quiet 32px pills in ink, `type="button"`. Field as `line`.
+
 ## Trade-offs (see the report of 13 Nov 2026)
 
 - `line` says the most (what waits and where) in the fewest controls, and keeps the field's meaning fixed. It shows one place to pick up; other open tasks are not offered.
+- `chips` offers every place to pick up, but chips in a toolbar read as options rather than the one thing to do, and their words are shorter than the line's.
