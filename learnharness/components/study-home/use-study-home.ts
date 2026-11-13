@@ -4,13 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { waitingSessions } from "@/components/study-home/study-facts";
 
-/** The home's data: every course's map with its run-up, and the sessions
- *  waiting on the learner. */
+/** The home's data: every course's map with its run-up, the sessions
+ *  waiting on the learner, and every session (the course page sorts each
+ *  topic by them as the sidebar does). */
 export type StudyHomeState =
 	| { status: "loading" }
 	| { status: "unavailable"; reason: string }
 	| { status: "failed" }
-	| { status: "ready"; courses: StudyCourse[]; failed: string[]; waiting: ChatListItem[] };
+	| { status: "ready"; courses: StudyCourse[]; failed: string[]; waiting: ChatListItem[]; chats: ChatListItem[] };
 
 async function readHome(): Promise<StudyHomeState> {
 	const [study, chats] = await Promise.all([
@@ -22,7 +23,7 @@ async function readHome(): Promise<StudyHomeState> {
 			.catch(() => [] as ChatListItem[]),
 	]);
 	if (!study.available) return { status: "unavailable", reason: study.reason };
-	return { status: "ready", courses: study.courses, failed: study.failed, waiting: waitingSessions(chats) };
+	return { status: "ready", courses: study.courses, failed: study.failed, waiting: waitingSessions(chats), chats };
 }
 
 /** Reads the home once per visit; `retry` reads it again. */

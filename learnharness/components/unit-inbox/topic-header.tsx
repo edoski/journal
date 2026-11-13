@@ -1,11 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "@/src/core";
+import { useCourseVariant } from "@/components/design-variant";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { needOf, standingOf } from "@/components/course-map/topic-map/topic-standing";
 import { Button } from "@/components/ui/button";
 import { STUDY_WORDS } from "@/components/unit-inbox/start-unit";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { reviewWords } from "@/components/unit-inbox/units";
+import { MathText } from "@/components/ui/math-text";
 
 /** Where he stands on the topic in the map's words: the standing, then
  *  why it needs him, else when its review comes back. Pure. */
@@ -36,11 +40,27 @@ export function TopicHeader({
 }) {
 	const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const tasks = map.tasks.filter((task) => topic.tasks.includes(task.key));
+	// The course line links to the course's page while the Course switch has one.
+	const coursePage = useCourseVariant() !== "current";
 	return (
 		<header data-slot="topic-header" className="flex flex-col gap-1 px-2">
-			<p className="text-label text-muted-foreground">{map.title}</p>
+			<p className="text-label text-muted-foreground">
+				{!coursePage ? (
+					map.title
+				) : (
+					<Link
+						href={courseHref(map.workspace)}
+						data-slot="topic-course-link"
+						className="rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+					>
+						<MathText>{map.title}</MathText>
+					</Link>
+				)}
+			</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
-				<h1 className="text-xl font-semibold text-foreground">{topic.title}</h1>
+				<h1 className="text-xl font-semibold text-foreground">
+					<MathText>{topic.title}</MathText>
+				</h1>
 				{onStudy && (
 					<Button size="sm" className="shrink-0 text-row" disabled={busy} onClick={onStudy} data-testid="study-topic">
 						{STUDY_WORDS}
@@ -58,7 +78,7 @@ export function TopicHeader({
 			)}
 			{tasks.map((task) => (
 				<p key={task.key} data-slot="unit-task" className="text-row text-muted-foreground">
-					In {task.title}
+					In <MathText>{task.title}</MathText>
 					{task.step ? `, at ${task.step.charAt(0).toLowerCase()}${task.step.slice(1)}` : ""}
 				</p>
 			))}

@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { ChevronRightIcon, EllipsisIcon, WaypointsIcon } from "lucide-react";
+import { useCourseVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,26 +19,40 @@ import type { SessionPricing, TurnUsage } from "@/src/core";
 export function LessonTopBar({
 	title,
 	course,
+	courseHref,
 	phase,
 	plan,
 	details,
 }: {
 	title: ReactNode;
 	course?: string;
+	/** The course's page: the crumb links there while the Course switch has a course page. */
+	courseHref?: string;
 	/** Sentence case: "Probing", "Planning", "Teaching", "Practice". */
 	phase: string;
 	/** Present once the session has a plan: the toggle opens it as a popover. */
 	plan?: { open: boolean; onOpenChange: (open: boolean) => void; body: ReactNode };
 	details: ReactNode;
 }) {
+	const linked = useCourseVariant() !== "current" && courseHref !== undefined;
 	return (
 		<>
 			<div className="flex min-w-0 flex-1 items-center gap-1.5">
 				{course && (
 					<>
-						<span data-testid="course-label" className="min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground">
-							{course}
-						</span>
+						{linked ? (
+							<Link
+								href={courseHref}
+								data-testid="course-label"
+								className="lh-no-drag min-w-0 max-w-40 shrink-[2] truncate rounded-sm text-control text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+							>
+								{course}
+							</Link>
+						) : (
+							<span data-testid="course-label" className="min-w-0 max-w-40 shrink-[2] truncate text-control text-muted-foreground">
+								{course}
+							</span>
+						)}
 						<ChevronRightIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground/60" />
 					</>
 				)}

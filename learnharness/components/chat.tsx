@@ -91,6 +91,7 @@ import { currentUserThinkingOpen, setAllUserThinkingOpen } from "@/components/th
 import { useDesignVariant } from "@/components/design-variant";
 import { LessonDesignContext } from "@/components/lesson/lesson-design";
 import { LessonDetails, LessonTopBar } from "@/components/lesson/lesson-top-bar";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { PlanCard, PlanPanel } from "@/components/lesson/plan-map";
 import { ActivityLine } from "@/components/lesson/activity-line";
 import { TurnError } from "@/components/lesson/turn-error";
@@ -1352,6 +1353,7 @@ export function Chat({
 								)
 							}
 							course={course?.title}
+							courseHref={course ? courseHref(course.workspace) : undefined}
 							phase={mode === "practice" ? "Practice" : CHIP_LABEL[phases.at(-1) ?? "probe"]}
 							plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
 							details={

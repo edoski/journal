@@ -19,3 +19,9 @@ export function workspaceOf(segment: string): string | null {
 export function unitHref(workspace: string, handle: string): string {
 	return `/unit/${courseSegment(workspace)}/${encodeURIComponent(handle)}`;
 }
+
+/** The course page's address: `/unit/<course>`, the parent of each of its
+ *  topics' addresses. */
+export function courseHref(workspace: string): string {
+	return `/unit/${courseSegment(workspace)}`;
+}
