@@ -8,6 +8,7 @@ import {
 	CoverageMenuBody,
 	CoverageRingDetail,
 	CoverageRingGlyph,
+	coverageItem,
 	ringFill,
 	type SessionCoverage,
 } from "../components/extraction-coverage.tsx";
@@ -139,5 +140,25 @@ describe("CoverageRingDetail — the popover's exact numbers", () => {
 		);
 		assert.ok(html.includes('data-testid="coverage-ring-running"'));
 		assert.match(html, /extracting…/);
+	});
+});
+
+describe("the session menu's extraction item", () => {
+	const coverage = (over: Partial<SessionCoverage>) => ({ uncoveredTokens: 81, uncoveredCount: 2, running: false, ...over }) as SessionCoverage;
+
+	it("offers Extract notes with the backlog beside it", () => {
+		assert.deepEqual(coverageItem(coverage({}), false), {
+			label: "Extract notes",
+			detail: "81 tok · 2 messages",
+			running: false,
+			disabled: false,
+		});
+	});
+
+	it("is disabled and says so while extracting, optimistic or not, and once everything is extracted", () => {
+		assert.equal(coverageItem(coverage({ running: true }), false).label, "Extracting notes…");
+		assert.equal(coverageItem(coverage({}), true).disabled, true);
+		const done = coverageItem(coverage({ uncoveredTokens: 0, uncoveredCount: 0 }), false);
+		assert.deepEqual([done.label, done.detail, done.disabled], ["Notes fully extracted", null, true]);
 	});
 });

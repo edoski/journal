@@ -16,8 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
-import { useDesignVariant, useSidebarVariant } from "@/components/design-variant";
-import { SidebarNext } from "@/components/sidebar-next";
+import { useDesignVariant } from "@/components/design-variant";
 import { UnitSidebar } from "@/components/unit-inbox/unit-sidebar";
 import type { ChatListItem } from "@/src/core";
 import { kbdEventForAction } from "@/src/core";
@@ -670,10 +669,9 @@ function SessionsSidebar() {
 /** The app frame: sidebar inline + content. Rendered once in the root layout. */
 export function AppShell({ children }: { children: React.ReactNode }) {
 	const proposed = useDesignVariant() === "proposed";
-	const topics = useSidebarVariant() === "proposed";
 	return (
 		<SettingsDialogProvider>
-			{!proposed ? <SessionsSidebar /> : topics ? <UnitSidebar /> : <SidebarNext />}
+			{proposed ? <UnitSidebar /> : <SessionsSidebar />}
 			<main className="min-w-0 flex-1">{children}</main>
 			{/* The single document-level keydown listener (keyboard wave A) —
 			    after the content in the tree, but it's window-level so order only

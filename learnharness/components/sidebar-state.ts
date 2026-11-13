@@ -20,7 +20,7 @@ export function filterSessions(list: ChatListItem[], query: string): ChatListIte
 
 /**
  * The session sidebar's behaviour, shared by both designs (Current's
- * SessionsSidebar and Proposed's SidebarNext): the push-driven list, the
+ * SessionsSidebar and Proposed's UnitSidebar): the push-driven list, the
  * instant rename and turn-state patches, the context menu with inline
  * rename, export and delete, and the search walk. The rationale for each
  * piece lives beside it; the designs only draw.
