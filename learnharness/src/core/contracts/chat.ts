@@ -279,8 +279,8 @@ export interface PlanBlockData {
 }
 
 /** How the tutor's last turn left a session that waits on no question or
- *  problem it posed: its words asked him to go on partway through a lesson
- *  ("mid-lesson"), its turn stopped before it finished, so the next word is
+ *  problem it posed: its words asked him something, or its plan waits for
+ *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
  *  the tutor's ("cut"), or it ended the lesson, a practice round or a
  *  one-off answer ("closed"). */
 export type SessionEnd = "mid-lesson" | "cut" | "closed";
