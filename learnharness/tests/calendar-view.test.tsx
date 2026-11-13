@@ -120,18 +120,19 @@ describe("the calendar page", () => {
 		assert.equal(document.querySelectorAll("[data-slot=calendar-entry]").length, 0);
 	});
 
-	it("shows a busy week by day: the course mark, the title and the type, with Your turn on a waiting lesson", async () => {
+	it("shows a busy week by day: the title, then the course mark and the type, or Your turn on a waiting lesson", async () => {
 		const drills = { ...lesson, id: "chat_drills", title: "Span drills", kind: "practice" as const, phase: "probe" as const, pendingQuestion: false, updatedAt: "2026-11-04T18:00:00" };
 		await mount([linalg(null)], [lesson, drills]);
 		assert.equal(document.querySelector("[data-slot=calendar-quiet]"), null);
-		assert.deepEqual(text("[data-slot=calendar-entry]"), ["LASpan drillsPractice", "LAEigenvalues and eigenvectorsLessonYour turn", "LASpanOverdue"]);
-		assert.deepEqual(text("[data-slot=calendar-day-head][data-today]"), ["Sun89:00 to 12:30"]);
+		assert.deepEqual(text("[data-slot=calendar-entry]"), ["Span drillsLAPractice", "Eigenvalues and eigenvectorsLAYour turn", "SpanLAOverdue"]);
+		assert.deepEqual(text("[data-slot=calendar-day-head][data-today]"), ["Sun8Study 9:00 to 12:30"]);
+		assert.ok(document.querySelector('[data-slot=calendar-entry][data-look=lesson] svg[aria-label="Lesson"]'), "the waiting lesson's icon names its look");
 	});
 
 	it("leads an exam day with the exam and how far off it is", async () => {
 		await mount([linalg(TODAY)], []);
 		const [first] = text("[data-slot=calendar-entry]");
-		assert.equal(first, "LALinear Algebra examExam, today");
+		assert.equal(first, "Linear Algebra examLAExam, today");
 	});
 
 	it("opens an overdue review's panel, which starts the topic page's session or opens the topic", async () => {

@@ -2,7 +2,7 @@
 
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
-import { ToolContentResponse } from "@/components/ai-elements/message";
+import { MessageResponse, ToolContentResponse } from "@/components/ai-elements/message";
 import type { QuestionAnswerData } from "@/src/core";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
@@ -199,12 +199,12 @@ function AnsweredCardNext({ answer, input }: { answer: ReturnType<typeof answerF
 						{answer.other && (
 							<li data-testid="answered-other" className="flex items-start gap-3">
 								<span aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full bg-primary" />
-								<span className="lh-prose">“{answer.other}”</span>
+								<MessageResponse className="min-w-0">{`“${answer.other}”`}</MessageResponse>
 							</li>
 						)}
 					</ul>
 				)}
-				{answer.text && <p className="lh-prose mt-3 whitespace-pre-wrap">“{answer.text}”</p>}
+				{answer.text && <MessageResponse className="mt-3">{`“${answer.text}”`}</MessageResponse>}
 				{(answer.thinking ?? answer.note) && (
 					<ThinkingBlock testId="your-thinking" label="YOUR THINKING" text={answer.thinking ?? answer.note ?? ""} inCard variant="proposed" />
 				)}

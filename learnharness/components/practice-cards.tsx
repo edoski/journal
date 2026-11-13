@@ -73,6 +73,14 @@ const OUTCOME_LABEL: Record<string, string> = {
 	dismissed: "Dismissed",
 };
 
+/** How a problem ended, in the learner's words (the Proposed card). */
+const OUTCOME_WORDS: Record<string, string> = {
+	solved: "Solved on your own",
+	solvedWithHints: "Solved with a hint",
+	movedOn: "Moved on",
+	surrendered: "You gave up",
+};
+
 /* The outcome chips (owner round 3, 2026-10-05): the EXACT register of the
  * quiz cards' correct/incorrect bubbles. Colors per outcome — solved reads
  * green (the "correct" twin), solved-with-hints amber (succeeded with
@@ -111,7 +119,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 			);
 		}
 		return (
-			<LessonCard data-testid="conclude-card" label="Concluded" note={OUTCOME_LABEL[outcome]} className="my-1">
+			<LessonCard data-testid="conclude-card" label="How it went" note={OUTCOME_WORDS[outcome]} className="my-1">
 				{verdict.length > 0 && (
 					<ToolContentResponse className="text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]">{verdict}</ToolContentResponse>
 				)}
@@ -121,11 +129,6 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 						<ToolContentResponse>{reveal}</ToolContentResponse>
 					</div>
 				)}
-				<MetadataPopover
-					quiet
-					concludeInput={input}
-					problemInput={(part.problemInput ?? {}) as { mode?: unknown; topics?: unknown }}
-				/>
 			</LessonCard>
 		);
 	}
@@ -194,10 +197,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 function MetadataPopover({
 	concludeInput,
 	problemInput,
-	quiet = false,
 }: {
-	/** The Proposed card: a sentence-case "Details" trigger at 13px. */
-	quiet?: boolean;
 	concludeInput: { outcome?: string; rung?: unknown; missClass?: unknown; retest?: unknown };
 	problemInput: { mode?: unknown; topics?: unknown };
 }) {
@@ -249,9 +249,9 @@ function MetadataPopover({
 					});
 				}}
 				aria-expanded={open}
-				className={quiet ? "flex items-center gap-1 text-row text-muted-foreground transition-colors hover:text-foreground" : "flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"}
+				className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground"
 			>
-				{quiet ? "Details" : "Metadata"}
+				Metadata
 			</button>
 			{open &&
 				anchor &&

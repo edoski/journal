@@ -1,6 +1,7 @@
 import { CircleXIcon, HistoryIcon, type LucideIcon } from "lucide-react";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { Button } from "@/components/ui/button";
+import { MathText } from "@/components/ui/math-text";
 import { ACTION_WORDS, type HeadMark, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /** One icon per kind of mark, the ones the map's nodes and Today's rows use. */
@@ -25,7 +26,9 @@ export function TopicHead({ facts, busy, onAct }: { facts: TopicFacts; busy: boo
 		<header data-slot="topic-head" className="flex flex-col gap-1">
 			<p className="text-label text-muted-foreground">{facts.course.title}</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
-				<h1 className="text-heading font-medium text-foreground">{facts.topic.title}</h1>
+				<h1 className="text-heading font-medium text-foreground">
+					<MathText>{facts.topic.title}</MathText>
+				</h1>
 				{onAct && (
 					<Button
 						size="sm"
@@ -51,7 +54,7 @@ export function TopicHead({ facts, busy, onAct }: { facts: TopicFacts; busy: boo
 								<span key={mark.kind} data-slot="topic-mark" data-kind={mark.kind} className="inline-flex items-center gap-1.5">
 									{PAUSE}
 									<Icon aria-hidden className="size-3.5 shrink-0" />
-									{mark.words}
+									<MathText>{mark.words}</MathText>
 								</span>
 							);
 						})}
@@ -65,7 +68,7 @@ export function TopicHead({ facts, busy, onAct }: { facts: TopicFacts; busy: boo
 			)}
 			{mistake && (
 				<p data-slot="unit-gap" className="pl-8 text-row text-foreground/90">
-					{mistake}
+					<MathText>{mistake}</MathText>
 				</p>
 			)}
 		</header>

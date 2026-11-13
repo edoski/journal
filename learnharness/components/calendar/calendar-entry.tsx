@@ -22,6 +22,7 @@ import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
 import { distanceWords, longDayWords, lookOf, LOOKS, misfitWords, runupWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<EntryLook, LucideIcon> = {
@@ -49,9 +50,11 @@ function Mark({ entry }: { entry: CalendarEntry }) {
 	return entry.course ? <CourseMark title={entry.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />;
 }
 
-/** The entry's face: its course mark and what it is about, then, in a
- *  week, its look in an icon and a word (an exam also says how far off it
- *  is), and Your turn when a session waits. A month keeps one line: the mark, the look's icon, the title. */
+/** The entry's face. A week gives the title the column's width, on two
+ *  lines at most, over its course mark and its look in an icon and a word
+ *  (an exam also says how far off it is); a session that waits says Your
+ *  turn in the word's place, its icon naming the look. A month keeps the mark and the look's icon beside the title,
+ *  still on two lines at most, so the topic reads. */
 function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; compact: boolean }) {
 	const look = lookOf(entry);
 	const Icon = ICONS[look];
@@ -59,25 +62,31 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 	if (compact) {
 		return (
 			<>
-				<Mark entry={entry} />
-				<Icon aria-label={LOOKS[look].words} className={cn("size-3.5 shrink-0 text-muted-foreground", ICON_INK[look])} />
-				<span className="min-w-0 flex-1 truncate">{entry.title}</span>
+				<span className="flex h-4.5 shrink-0 items-center gap-1.5">
+					<Mark entry={entry} />
+					<Icon aria-label={LOOKS[look].words} className={cn("size-3.5 shrink-0 text-muted-foreground", ICON_INK[look])} />
+				</span>
+				<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 flex-1 text-foreground">
+					<MathText>{entry.title}</MathText>
+				</span>
 			</>
 		);
 	}
 	return (
 		<>
-			<span className="flex min-w-0 items-center gap-1.5">
-				<Mark entry={entry} />
-				<span className="min-w-0 flex-1 truncate text-foreground">{entry.title}</span>
+			<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 text-foreground">
+				<MathText>{entry.title}</MathText>
 			</span>
-			<span className="flex min-w-0 items-center gap-1 text-label text-muted-foreground">
-				<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />
-				<span className={cn("truncate", LOOK_INK[look], look === "exam" && "font-medium")}>
-					{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : LOOKS[look].words}
-				</span>
+			<span className="flex min-w-0 items-center gap-1.5 text-label text-muted-foreground">
+				<Mark entry={entry} />
+				<Icon aria-hidden={!waits} aria-label={waits ? LOOKS[look].words : undefined} className={cn("size-3.5 shrink-0", ICON_INK[look])} />
+				{!waits && (
+					<span className={cn("truncate", LOOK_INK[look], look === "exam" && "font-medium")}>
+						{entry.kind === "exam" ? `Exam, ${distanceWords(entry.day, today).toLowerCase()}` : LOOKS[look].words}
+					</span>
+				)}
 				{waits && (
-					<span className="ml-auto flex shrink-0 items-center gap-1 font-medium text-link">
+					<span className="flex shrink-0 items-center gap-1 font-medium text-link">
 						<MessageCircleQuestionIcon aria-hidden className="size-3.5" />
 						Your turn
 					</span>
@@ -106,7 +115,7 @@ export function CalendarEntryView({
 	busy?: boolean;
 	onStart: StartSession;
 }) {
-	const face = cn(FACE, compact ? "h-6 items-center gap-1.5" : "flex-col gap-0.5 py-1");
+	const face = cn(FACE, compact ? "items-start gap-1.5 py-0.75" : "flex-col gap-0.5 py-1");
 	const look = lookOf(entry);
 	if (entry.kind === "session") {
 		return (
@@ -120,7 +129,7 @@ export function CalendarEntryView({
 			<PopoverTrigger data-slot="calendar-entry" data-look={look} className={face}>
 				<Face entry={entry} today={today} compact={compact} />
 			</PopoverTrigger>
-			<PopoverContent data-slot="calendar-entry-detail" align="start" className="flex w-72 flex-col gap-3">
+			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className="flex w-72 flex-col gap-3">
 				<EntryDetail entry={entry} today={today} busy={busy} onStart={onStart} />
 			</PopoverContent>
 		</Popover>
@@ -153,14 +162,16 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 				<span className="truncate">{entry.course.title}</span>
 			</div>
 			<div className="flex flex-col gap-1">
-				<p className="text-row font-semibold text-foreground">{entry.title}</p>
+				<p className="text-row font-medium text-foreground">
+					<MathText>{entry.title}</MathText>
+				</p>
 				<p className={cn("flex items-center gap-1 text-label text-muted-foreground", LOOK_INK[look])}>
 					<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />
 					{LOOKS[look].words}
 				</p>
 				{lines.map((line) => (
 					<p key={line} className="text-label text-muted-foreground">
-						{line}
+						<MathText>{line}</MathText>
 					</p>
 				))}
 			</div>

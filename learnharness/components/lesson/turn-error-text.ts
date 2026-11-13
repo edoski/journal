@@ -1,9 +1,12 @@
 /** What a failed reply tells the learner (spec: turn-error.md). The
  *  subscription providers already fail in curated sentences; an API-key
  *  provider fails with the provider's raw text (`401 {"type":"error",…}`),
- *  which becomes one plain sentence with the raw text kept as details. */
+ *  which becomes one plain sentence with the raw text kept as details. The
+ *  app's own failures reach the browser as its fetch error or as the
+ *  route's JSON body (`{"error":"Unknown chat"}`), and read as what
+ *  happened. */
 
-export type TurnErrorKind = "key" | "busy" | "failed" | "written";
+export type TurnErrorKind = "key" | "busy" | "offline" | "gone" | "failed" | "written";
 
 export interface TurnErrorText {
 	kind: TurnErrorKind;
@@ -17,14 +20,35 @@ const KEY_REJECTED = /invalid[ _-]?(x-)?api[ _-]?key|incorrect api key|api key n
 const BUSY = /rate[ _-]?limit|overloaded|too many requests/i;
 const KEY_STATUSES = new Set([401, 403]);
 const BUSY_STATUSES = new Set([429, 529]);
+/** The browser's own words when the request never reached the app: Chrome, Safari, Firefox. */
+const UNREACHABLE = /^(failed to fetch|load failed|networkerror when attempting to fetch resource\.?)$/i;
+/** The chat routes' answer for a session that no longer exists. */
+const UNKNOWN_CHAT = "Unknown chat";
 
 /** Prose meant for people: no status code in front, no JSON, ends a sentence. */
 function isWritten(text: string): boolean {
 	return !STATUS.test(text) && !text.includes("{") && /[.!?]$/.test(text);
 }
 
+/** The app's route body, `{"error":"…"}`, as its text; null for anything else. */
+function routeError(text: string): string | null {
+	if (!text.startsWith("{")) return null;
+	try {
+		const body: unknown = JSON.parse(text);
+		const error = body && typeof body === "object" ? (body as { error?: unknown }).error : undefined;
+		return typeof error === "string" ? error : null;
+	} catch {
+		return null;
+	}
+}
+
 export function turnErrorText(message: string): TurnErrorText {
 	const raw = message.trim();
+	if (UNREACHABLE.test(raw)) {
+		return { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then send again.", details: null };
+	}
+	const route = routeError(raw);
+	if (route === UNKNOWN_CHAT) return { kind: "gone", sentence: "This lesson was deleted.", details: null };
 	const status = Number(STATUS.exec(raw)?.[1] ?? 0);
 	if (KEY_STATUSES.has(status) || KEY_REJECTED.test(raw)) {
 		return { kind: "key", sentence: "The provider rejected your API key.", details: raw };
@@ -32,6 +56,7 @@ export function turnErrorText(message: string): TurnErrorText {
 	if (BUSY_STATUSES.has(status) || BUSY.test(raw)) {
 		return { kind: "busy", sentence: "The provider is busy. Wait a moment, then retry.", details: raw };
 	}
-	if (isWritten(raw)) return { kind: "written", sentence: raw, details: null };
-	return { kind: "failed", sentence: "The reply failed.", details: raw === "" ? null : raw };
+	const text = route ?? raw;
+	if (isWritten(text)) return { kind: "written", sentence: text, details: null };
+	return { kind: "failed", sentence: "The reply failed.", details: text === "" ? null : text };
 }

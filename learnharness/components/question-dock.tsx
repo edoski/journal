@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
+import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
@@ -165,6 +166,27 @@ function teaserText(q: string): string {
 		.trim();
 }
 
+/** The question as one line of words and inline formulas, for MathText:
+ *  display math joins the line, a matrix or a case split (one line can't
+ *  hold its rows) folds to ⋯, a tall fraction becomes a text one, and
+ *  markdown marks drop. */
+export function teaserLine(q: string): string {
+	return repairMathForDisplay(q)
+		.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$]+?)\$/g, (_, a, b, c, d) => `$${inline(a ?? b ?? c ?? d)}$`)
+		.replace(/\*\*|__|`/g, "")
+		.replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function inline(tex: string): string {
+	return tex
+		.replace(/\\begin\{(\w+\*?)\}[\s\S]*?\\end\{\1\}/g, "\\cdots")
+		.replace(/\\dfrac/g, "\\tfrac")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
  *  (kind chip + one-liner + Answer ↓); "reveal" is the teach-check invitation —
  *  a distinct, more inviting affordance, because it asks the learner to start
@@ -204,7 +226,9 @@ export function QuestionDockBar({
 				<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
 					{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
 				</span>
-				<span className="min-w-0 flex-1 truncate text-muted-foreground">{teaserText(question)}</span>
+				<span className="min-w-0 flex-1 truncate text-muted-foreground">
+					<MathText>{teaserLine(question)}</MathText>
+				</span>
 				<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
 					{reveal ? "Open" : "Answer"}
 					{reveal ? <ChevronRightIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}

@@ -11,8 +11,8 @@ The engine owns every date; the page invents none (`calendar-facts.ts`, pure, te
 | Exam | the record's exam date | `map`'s `exam`; its panel adds `plan`'s run-up (days left for new topics, the pace) when `plan` gives it, and names the topics the plan cannot fit before the exam (`plan.does_not_fit`) |
 | Overdue, Review | today for the reviews `plan` makes today (Overdue when past their date); a later day's reviews as the engine's daily plan proposes them | `plan`'s `due`; `plan.plan.days`' `reviews` |
 | New topic | the day the daily plan proposes to start it, today included | `plan.plan.days`' `new` |
-| Open task | today, since the engine dates no task | `map`'s `tasks` |
-| Lesson, Practice, Plan, Check-in | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else the teaching session's phase (the prober's questions, the plan, the lesson) |
+| Unfinished | today, since the engine dates no task (an open task) | `map`'s `tasks` |
+| Lesson, Practice, Plan, Quiz | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else the teaching session's phase (the prober's questions, the plan, the lesson) |
 
 A week's day head adds the Journal's study windows for that day, or Day off (`plan --days 42`'s `journal.upcoming_schedule`, read by `src/server/calendar.ts`). The one clock is the engine's study day.
 
@@ -22,11 +22,11 @@ The daily plan is the engine's projection (`learning/agenda.py`): within the lea
 
 | Slot | Element | Notes |
 |---|---|---|
-| toolbar | `data-slot="calendar-toolbar"` | 52 tall, the window's drag band: the sidebar's toggle, Today, back and forward (`Button quiet`), the range (`calendar-range`, 18/600: "2 to 8 Nov 2026", "November 2026"), then at the right the course filter (`CourseScope`, the sidebar's) and Week or Month (`Tabs` `line`). The view picked lasts across visits (`lh:calendar-view`) |
-| grid | `EventCalendarViews` (`components/ui/event-calendar-views.md`) | FullCalendar's day grid, Monday first, filling the window; hairlines `border/60`; what does not fit a day folds under More |
-| day head | `data-slot="calendar-day-head"` (Week) | the weekday 12 muted, the date 14 (today's in a filled 24 circle), then the study time 12 muted with a clock, or Day off with a moon |
-| entry | `data-slot="calendar-entry"`, `data-look` | `calendar-entry.tsx`. Week: the course mark (`CourseMark`, the sidebar's monogram) and the title 13 in ink, then the look's icon and word 12 muted (an exam says how far off it is; an overdue review's icon is in danger), and Your turn in link when a session waits. Month: one 24-tall line, mark, icon, title. No fill at rest, the hover fill, the selected fill while its panel is open, radius 8 |
-| entry panel | `data-slot="calendar-entry-detail"` | `Popover`, 288 wide: the course, the title 13/600, the look, when in words, then the topic page's action (`topicAction`: Review, Continue, Start, Study, or Resume and Open for a session already running) and Open topic. An open task offers Continue. An exam has no action |
+| toolbar | `data-slot="calendar-toolbar"` | 52 tall, the window's drag band: the sidebar's toggle, Today, back and forward (`Button quiet`), the range (`calendar-range`, 20/500 as Home's and the topic page's titles: "2 to 8 Nov 2026", "November 2026"), then at the right the course filter (`CourseScope`, the sidebar's) and Week or Month (`Tabs` `line`). The view picked lasts across visits (`lh:calendar-view`) |
+| grid | `EventCalendarViews` (`components/ui/event-calendar-views.md`) | FullCalendar's day grid, Monday first, filling the window; hairlines `border/60`; what does not fit a day folds under More, whose hint is the app's Tooltip ("Show everything on this day"), never the browser's `title`; a day number that opens its week takes the focus ring |
+| day head | `data-slot="calendar-day-head"` (Week) | the weekday 12 muted, the date 14 (today's in a filled 24 circle, 500), then "Study 18:30 to 22:00" 12 muted with a clock, or Day off with a moon |
+| entry | `data-slot="calendar-entry"`, `data-look` | `calendar-entry.tsx`. Week: the title 13 in ink across the column's width, two lines at most, then the course mark (`CourseMark`, the sidebar's monogram), the look's icon and word 12 muted (an exam says how far off it is; an overdue review's icon is in danger), or Your turn in link in the word's place when a session waits. Month: the mark and the look's icon on the first line beside the title, two lines at most. Titles and every panel line go through `MathText`. No fill at rest, the hover fill, the selected fill while its panel is open, radius 8 |
+| entry panel | `data-slot="calendar-entry-detail"` | `Popover`, 288 wide, 12 clear of the window's edges (`collisionPadding`): the course, the title 13/500, the look, when in words, then the topic page's action (`topicAction`: Review, Continue, Start, Study, or Resume and Open for a session already running) and Open topic. An unfinished task offers Continue. An exam has no action |
 | quiet | `data-slot="calendar-quiet"` | "Nothing scheduled this week" (or month), centred, muted, when the range holds no entry |
 
 Order within a day: the exam, a session that waits on him, overdue reviews, new topics (the day's lesson, so a busy month day never folds it under More), reviews, open tasks, then sessions. A new topic's panel says when it is planned and offers the topic page's Start.

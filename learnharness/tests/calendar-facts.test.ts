@@ -181,7 +181,7 @@ describe("calendar entries", () => {
 
 describe("calendar words", () => {
 	it("says a day's study time from the Journal, or Day off, or nothing", () => {
-		assert.equal(studyTimeWords({ date: TODAY, off: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] }), "9:00 to 12:30, 13:30 to 18:00");
+		assert.equal(studyTimeWords({ date: TODAY, off: false, windows: [{ start: "09:00", end: "12:30" }, { start: "13:30", end: "18:00" }] }), "Study 9:00 to 12:30, 13:30 to 18:00");
 		assert.equal(studyTimeWords({ date: TODAY, off: true, windows: [] }), "Day off");
 		assert.equal(studyTimeWords({ date: TODAY, off: false, windows: [] }), null);
 		assert.equal(studyTimeWords(undefined), null);

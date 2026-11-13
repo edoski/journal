@@ -14,12 +14,13 @@ import { parseHTML } from "linkedom";
 import { PlanCard, planMapSteps } from "../components/lesson/plan-map.tsx";
 import { LessonDesignContext } from "../components/lesson/lesson-design.ts";
 import { ConfidenceChoice } from "../components/confidence-choice.tsx";
-import { QuestionDock, QuestionDockBar } from "../components/question-dock.tsx";
+import { QuestionDock, QuestionDockBar, teaserLine } from "../components/question-dock.tsx";
 import { ReadingThinkingField } from "../components/reading-thinking.tsx";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { ProblemCard, ConcludeCard, ThinkingCard } from "../components/practice-cards.tsx";
 import { ToolCallCard } from "../components/artifacts/tool-call-card.tsx";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
+import { ProbeDoneCard } from "../components/artifacts/probe-done-card.tsx";
 import { PhaseDivider } from "../components/phase-divider.tsx";
 import { CompactionCutDivider, CompactionMomentDivider } from "../components/compaction-divider.tsx";
 import { AnsweredCard } from "../components/answered-card.tsx";
@@ -35,6 +36,8 @@ function documentFor(node: React.ReactNode) {
 const proposed = (node: React.ReactNode, activeProblemCallId: string | null = null) => (
 	<LessonDesignContext.Provider value={{ variant: "proposed", activeProblemCallId }}>{node}</LessonDesignContext.Provider>
 );
+
+const AnswerFor = ({ answer }: { answer: QuestionAnswerData }) => <AnsweredCard answer={answer} variant="proposed" />;
 
 const part = (over: Record<string, unknown>) => over as unknown as ArtifactPartProps["part"];
 
@@ -73,6 +76,14 @@ describe("plan map", () => {
 		assert.doesNotMatch(card.textContent!, /Node \d/);
 		assert.equal(card.getAttribute("aria-label"), "Open the plan");
 	});
+
+	it("a step that names a formula shows it typeset", () => {
+		const nodes = [{ id: "eq", title: "The eigen-equation $Av = \\lambda v$", status: "upcoming" }];
+		const data = { kind: "full", at: "x", current: null, nodes, edges: [] } as unknown as PlanBlockData;
+		const card = documentFor(<PlanCard data={data} onOpen={() => {}} />).querySelector('[data-testid="plan-block-full"]')!;
+		assert.equal(card.querySelectorAll(".katex").length, 1);
+		assert.doesNotMatch(card.textContent!, /\$/);
+	});
 });
 
 describe("the Proposed docks", () => {
@@ -102,7 +113,12 @@ describe("the Proposed docks", () => {
 	it("a check waiting behind its reveal invites in sentence case; the reading field sits on the same dock surface", () => {
 		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" design="proposed" />);
 		const reveal = bar.querySelector('[data-testid="teach-check-reveal"]')!;
-		assert.match(reveal.textContent!, /^Check your understandingWhy is det\(A\)=0\?Open$/);
+		assert.equal(reveal.querySelectorAll(".katex").length, 1, "the formula is typeset");
+		assert.match(reveal.textContent!, /^Check your understandingWhy is /);
+		const matrix = "Let $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$. Find $\\lambda$ with **one** $$\\dfrac{a+b}{2}$$";
+		assert.equal(teaserLine(matrix), "Let $A = \\cdots$. Find $\\lambda$ with one $\\tfrac{a+b}{2}$");
+		const collapsed = documentFor(<QuestionDockBar toolName="explain" question={matrix} onExpand={() => {}} variant="reveal" design="proposed" />);
+		assert.doesNotMatch(collapsed.body.textContent!, /beginpmatrix|\*\*|\$/);
 		const field = documentFor(<ReadingThinkingField value="" revision={0} onChange={() => {}} variant="proposed" />).querySelector('[data-testid="reading-thinking-field"]')!;
 		assert.equal(field.getAttribute("data-slot"), "dock-surface");
 		assert.match(field.textContent!, /^Thinking while reading$/);
@@ -124,6 +140,14 @@ describe("agent chrome out of the Proposed lesson", () => {
 	it("a tool call leaves no row in the column", () => {
 		const document = documentFor(proposed(<ToolCallCard part={part({ type: "tool-read", state: "output-available", toolCallId: "t", input: { path: "notes.md" } })} />));
 		assert.equal(document.body.innerHTML, "");
+	});
+
+	it("the prober's hand-off to the teacher stays out: no notes about the learner in the column", () => {
+		const input = { assessment: { strands: [{ strand: "Closure", assessment: "FLOOR: one-step proofs. CEILING: he stalls on inverses (o7)." }], summary: "Adult learner. He asked to skip the warm-ups." } };
+		for (const state of ["input-streaming", "input-available", "output-available"]) {
+			const document = documentFor(proposed(<ProbeDoneCard part={{ state, input, output: { ok: true } }} />));
+			assert.equal(document.body.innerHTML, "", state);
+		}
 	});
 
 	it("a running tool is one muted activity line with no arguments", () => {
@@ -153,10 +177,18 @@ describe("Proposed lesson cards", () => {
 		assert.match(settled.querySelector('[data-slot="lesson-card"]')!.textContent!, /^ProblemFind the rank\./);
 	});
 
+	it("a given-up problem says so in plain words, with no tutor bookkeeping under Details", () => {
+		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c2", input: { outcome: "surrendered", verdict: "You read the rows by eye.", rung: "R2", missClass: "execution" }, reveal: "Eliminate." });
+		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
+		assert.match(card.textContent!, /^How it went·You gave up/);
+		assert.equal(card.querySelector('[data-testid="metadata-toggle"]'), null);
+		assert.doesNotMatch(card.textContent!, /Surrendered|Details|rung|Miss class/i);
+	});
+
 	it("a conclusion names its outcome in sentence case and shows the model solution", () => {
 		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c1", input: { outcome: "movedOn", verdict: "Pairs are not enough." }, reveal: "The third is the sum." });
 		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
-		assert.match(card.textContent!, /Concluded·Moved on/);
+		assert.match(card.textContent!, /^How it went·Moved on/);
 		assert.match(card.textContent!, /Model solution/);
 		assert.match(card.textContent!, /The third is the sum\./);
 	});
@@ -176,6 +208,16 @@ describe("Proposed lesson cards", () => {
 		assert.match(card.textContent!, /“The kernel is nonzero\.”/);
 		assert.match(card.textContent!, /The answerA nonzero kernel means not invertible\./);
 		assert.doesNotMatch(card.textContent!, /EXPLAIN|Correct|Incorrect/);
+	});
+
+	it("the learner's own math is typeset, in an answer and in his thinking", () => {
+		const answer = { kind: "explain", tool: "explain", questionText: "Why?", answers: [], text: "Because $Av = \\lambda v$ with $v \\neq 0$." } as unknown as QuestionAnswerData;
+		const card = documentFor(<AnswerFor answer={answer} />);
+		assert.equal(card.querySelectorAll(".katex").length, 2);
+		assert.doesNotMatch(card.body.textContent!, /\$/, "no delimiter left as text");
+		const thinking = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is $R_1 + R_2$" }} variant="proposed" />);
+		assert.ok(thinking.querySelector(".katex"));
+		assert.doesNotMatch(thinking.body.textContent!, /\$/);
 	});
 
 	it("the course link banner is one line with one Link action", () => {

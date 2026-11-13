@@ -1485,7 +1485,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0">
+					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						<div data-session-find-root="" className={`${proposed ? LESSON_COLUMN : COLUMN} flex flex-1 flex-col gap-4 ${proposed ? "pt-6" : "pt-4"}`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
@@ -1587,11 +1587,10 @@ export function Chat({
 									) : null}
 									{m.role === "user" && proposed ? (
 										// The learner's words: a quiet surface, full width (the
-										// transcript reads as a document), no label.
+										// transcript reads as a document), no label, set in the
+										// lesson's markdown and math like the tutor's.
 										<div data-testid="user-message" data-slot="learner-message" className="my-1 w-full rounded-xl bg-card px-4 py-3">
-											<div className="lh-prose whitespace-pre-wrap text-foreground">
-												{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-											</div>
+											<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
 										</div>
 									) : m.role === "user" ? (
 										/* THE DOCUMENT ROW (owner round, 2026-10-05): no right-aligned

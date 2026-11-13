@@ -37,6 +37,7 @@ import {
 	isTypingSurface,
 	kbdEventForAction,
 	KEYBOARD_ACTIONS,
+	type KeyAction,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 
@@ -145,6 +146,27 @@ export function KeyboardShortcuts() {
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} variant={design} />;
 }
 
+/** The Proposed sheet's words for each action whose registry label is an
+ *  engineering name. */
+const SHEET_WORDS: Partial<Record<KeyAction, string>> = {
+	"open-model-picker": "Choose the model",
+	"cycle-thinking": "Change how long the tutor thinks",
+	"toggle-sidebar": "Show or hide the sidebar",
+	"sessions-search": "Search",
+	"jump-graph": "Go Home",
+	"new-session": "New lesson",
+	"rename-session": "Rename the lesson",
+	"cheat-sheet": "Keyboard shortcuts",
+	"question-focus": "Move between your thinking and the answers",
+	"toggle-user-thinking": "Show or hide your thinking",
+	"question-next-row": "Next answer",
+	"question-prev-row": "Previous answer",
+	"question-pick-row": "Pick the answer",
+	"question-submit": "Submit the answer",
+};
+
+const SHEET_SCOPES: Record<"global" | "chat" | "graph", string> = { global: "Anywhere", chat: "In a lesson", graph: "On the map" };
+
 /** The ? overlay — the registry rendered as a table (grouped by scope).
  *  Until the settings milestone ships an editor, this is how shortcuts
  *  stay discoverable. */
@@ -159,7 +181,7 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 	};
 	if (variant === "proposed") {
 		// The dialog anatomy (dialog.md) with a two-column list: the action,
-		// then its keys as plain glyphs (kbd.md).
+		// then its keys as plain glyphs (kbd.md), in the app's own words.
 		return (
 			<Dialog open onOpenChange={(next) => !next && onClose()}>
 				<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
@@ -173,11 +195,11 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
 						if (actions.length === 0) return null;
 						return (
-							<section key={scope} aria-label={scopeLabels[scope]} className="flex flex-col">
-								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{scopeLabels[scope]}</h3>
+							<section key={scope} aria-label={SHEET_SCOPES[scope]} className="flex flex-col">
+								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{SHEET_SCOPES[scope]}</h3>
 								{actions.map((a) => (
 									<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-										<span className="truncate text-foreground">{a.label}</span>
+										<span className="truncate text-foreground">{SHEET_WORDS[a.id] ?? a.label}</span>
 										<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
 									</div>
 								))}

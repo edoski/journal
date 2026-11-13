@@ -74,7 +74,7 @@ function DayHead({ info, schedule }: { info: DayHeaderInfo; schedule: ReadonlyMa
 				<span
 					className={cn(
 						"flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-control tabular-nums",
-						info.isToday ? "bg-foreground font-semibold text-background" : "text-foreground",
+						info.isToday ? "bg-foreground font-medium text-background" : "text-foreground",
 					)}
 				>
 					{info.dayNumberText}
@@ -155,7 +155,7 @@ export function CalendarView({
 						</Button>
 					</Hint>
 				</div>
-				<h1 data-slot="calendar-range" className="min-w-0 truncate text-subheading font-semibold text-foreground">
+				<h1 data-slot="calendar-range" className="min-w-0 truncate text-heading font-medium text-foreground">
 					{view ? rangeTitle(viewId, view.currentStart, view.currentEnd) : ""}
 				</h1>
 				<div className="lh-no-drag ml-auto flex items-center gap-3">
@@ -197,11 +197,16 @@ export function CalendarView({
 					eventContent={(info) => (
 						<CalendarEntryView entry={info.event.extendedProps.entry as CalendarEntry} today={today} compact={compact} busy={busy} onStart={onStart} />
 					)}
-					moreLinkContent="More"
+					moreLinkHint={() => ""}
+					moreLinkContent={() => (
+						<Hint label="Show everything on this day">
+							<span>More</span>
+						</Hint>
+					)}
 					views={{ dayGrid: DAY_GRID }}
 					dayHeaderAlign="start"
 					dayHeaderClass="border-border/60"
-					dayHeaderInnerClass="flex w-full"
+					dayHeaderInnerClass="flex w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
 					dayHeaderContent={(info) =>
 						compact ? <span className="px-2 pb-2 pt-1 text-label text-muted-foreground">{info.weekdayText}</span> : <DayHead info={info} schedule={days} />
 					}
@@ -209,8 +214,8 @@ export function CalendarView({
 					dayCellTopClass={compact ? "flex flex-row justify-start" : "hidden"}
 					dayCellTopInnerClass={(info) =>
 						cn(
-							"m-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-row tabular-nums",
-							info.isToday ? "bg-foreground font-semibold text-background" : info.isOther ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+							"m-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-row tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
+							info.isToday ? "bg-foreground font-medium text-background" : info.isOther ? "text-muted-foreground/60" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
 						)
 					}
 					dayHeaderRowClass="border-0"

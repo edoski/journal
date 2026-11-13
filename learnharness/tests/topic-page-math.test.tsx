@@ -99,3 +99,38 @@ describe("math on the topic page", () => {
 		for (const el of [now, attempt]) assert.doesNotMatch(el.textContent!, /\$/, "no dollar is left in the words");
 	});
 });
+
+describe("math in the topic page's head and Next", () => {
+	const SHEET = { key: "sheet-4", title: "Problem sheet 4", step: "Part (c): show $\\dim\\ker A = 2$" };
+	const RANK: CourseMapTopic = {
+		...DET,
+		handle: "rank" as TopicHandle,
+		title: "Rank of $A^T A$",
+		level: "assisted",
+		weak: true,
+		signals: { ...QUIET, gap: "Reads $\\operatorname{rank} A$ as the number of rows" },
+		tasks: ["sheet-4"],
+	};
+	const map: CourseMap = { ...MAP, topics: [RANK], tasks: [SHEET] as CourseMap["tasks"] };
+	const rankFacts = topicFacts({ course: { ...COURSE, map }, topic: RANK, sessions: [{ ...LESSON, topics: ["rank"] }], read: { record: { attempts: [], tasks: [] }, plans: [] } });
+	const page = parseHTML(
+		`<html><body>${renderToStaticMarkup(
+			<AppRouterContext.Provider value={router as never}>
+				<HybridTopic facts={rankFacts} busy={false} onAct={() => {}} onTask={() => {}} pane={PICKUP_PANES.sections} />
+			</AppRouterContext.Provider>,
+		)}</body></html>`,
+	).document;
+
+	it("typesets the title and the mistake under it", () => {
+		const head = page.querySelector('[data-slot="topic-head"]')!;
+		assert.ok(head.querySelector("h1 .katex"), "the title");
+		assert.ok(head.querySelector('[data-slot="unit-gap"] .katex'), "the mistake");
+		assert.doesNotMatch(head.textContent!, /\$/);
+	});
+
+	it("typesets the step an unfinished task stopped on", () => {
+		const next = page.querySelector('[data-slot="pickup-next"][data-kind="task"]')!;
+		assert.ok(next.querySelector(".katex"));
+		assert.doesNotMatch(next.textContent!, /\$/);
+	});
+});

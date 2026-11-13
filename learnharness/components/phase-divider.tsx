@@ -27,7 +27,7 @@ import { SectionBreak } from "@/components/lesson/section-break";
 
 /** Header-chip labels: the phases as the learner thinks of them. */
 export const CHIP_LABEL: Record<Phase3, string> = {
-	probe: "Probing",
+	probe: "Quiz",
 	plan: "Planning",
 	teach: "Teaching",
 };

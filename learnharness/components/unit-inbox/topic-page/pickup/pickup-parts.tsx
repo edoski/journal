@@ -9,7 +9,7 @@ import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/to
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { ONE_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
+import { ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -123,10 +123,14 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} writing="Tutor writing" />;
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
-						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={ONE_LINE_ROW}>
-							{item.kind === "task" ? <BookmarkIcon aria-label="Open task" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
-							<span className="truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
-							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" ? item.step : null}</span>
+						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={item.kind === "task" && item.step ? TWO_LINE_ROW : ONE_LINE_ROW}>
+							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
+							<span className="col-span-2 truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
+							{item.kind === "task" && item.step && (
+								<span data-slot="pickup-next-step" className="col-span-2 col-start-2 truncate text-label text-muted-foreground">
+									<MathText>{item.step}</MathText>
+								</span>
+							)}
 						</Button>
 					</li>
 				);
@@ -174,9 +178,10 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 
 /**
  * Now as a row: its icon, what to pick up and the press on top, where it
- * stands in a few words under them, the whole row the press. Bleeds 12px as Home's row. `marked` draws the accent rule down its
- * left edge so the eye lands there first; the lesson on the map has the
- * row filled, as the history's rows do.
+ * stands in a few words under them, the whole row the press. Bleeds 12px
+ * as Home's row. A plain row like the rest of the list, no fill or box at
+ * rest: its weight is its type and, when `marked`, the accent rule down
+ * its left edge, so the eye lands there first.
  */
 export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now: NowItem; marked: boolean } & Pick<HybridPaneProps, "facts" | "busy" | "onAct" | "shown" | "onShow">) {
 	const onMap = now.chat !== null && now.chat === shown;
@@ -187,9 +192,8 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			data-shown={onMap || undefined}
 			className={cn(
 				"group/now relative -mx-3 grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-lg px-3 py-3 transition-colors hover:bg-fill-hover motion-reduce:transition-none",
-				onMap && "bg-fill-selected hover:bg-fill-selected",
-				// Link: flush to the split's hairline; ringed while the connected map's step is pointed at.
-				"in-data-[link=split]:rounded-none in-data-[lit]:data-shown:ring-1 in-data-[lit]:data-shown:ring-ring/60 in-data-[lit]:data-shown:ring-inset",
+				// Link: flush to the split's hairline.
+				"in-data-[link=split]:rounded-none",
 				marked && "before:absolute before:inset-y-3 before:left-0 before:w-0.5 before:rounded-full before:bg-link",
 			)}
 		>
