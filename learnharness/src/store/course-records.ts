@@ -78,7 +78,7 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "save":
 			return { args: ["save"], stdin: JSON.stringify(verb.changes) };
 		case "plan":
-			return { args: ["plan", "--days", "1"], stdin: "" };
+			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
 	}
 }
 

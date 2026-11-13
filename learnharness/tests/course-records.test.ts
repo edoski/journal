@@ -140,6 +140,17 @@ describe("course records adapter (fake engine)", () => {
 		]);
 	});
 
+	it("asks plan for one day unless the caller names a horizon", async () => {
+		const { engine, calls } = fakeEngine();
+		const records = createCourseRecords(engine);
+		await records.run("/w", { verb: "plan" });
+		await records.run("/w", { verb: "plan", days: 42 });
+		assert.deepEqual(calls().map((c) => c.args.slice(2)), [
+			["plan", "--days", "1"],
+			["plan", "--days", "42"],
+		]);
+	});
+
 	it("maps the engine's validation error, non-JSON output, a timeout and a missing interpreter", async () => {
 		const { engine } = fakeEngine();
 		const records = createCourseRecords({ ...engine, timeoutMs: 1_000 });

@@ -34,21 +34,32 @@ export function studyCourseOf(map: CourseMap, plan: unknown): StudyCourse {
 	return { map, unready, due, lastActiveDaysAgo: typeof daysAgo === "number" ? daysAgo : null };
 }
 
-export async function studyStatus(): Promise<StudyListing> {
+/** Every listed course's map and its `plan` over `days`, read in
+ *  parallel: the plan's JSON (null when it failed), or the workspace of a
+ *  course whose map could not be read. */
+export async function readCourses(
+	days = 1,
+): Promise<{ available: true; read: ({ map: CourseMap; plan: unknown } | string)[] } | { available: false; reason: string }> {
 	const listing = await listCourses();
 	if (!listing.available) return listing;
 	const read = await Promise.all(
 		listing.courses.map(async (course) => {
 			const [map, plan] = await Promise.all([
 				stores.courseRecords.map(course.workspace),
-				stores.courseRecords.run(course.workspace, { verb: "plan" }),
+				stores.courseRecords.run(course.workspace, { verb: "plan", days }),
 			]);
-			return map.ok ? studyCourseOf(map.map, plan.ok ? plan.json : null) : course.workspace;
+			return map.ok ? { map: map.map, plan: plan.ok ? plan.json : null } : course.workspace;
 		}),
 	);
+	return { available: true, read };
+}
+
+export async function studyStatus(): Promise<StudyListing> {
+	const listing = await readCourses();
+	if (!listing.available) return listing;
 	return {
 		available: true,
-		courses: read.filter((c): c is StudyCourse => typeof c !== "string"),
-		failed: read.filter((c): c is string => typeof c === "string"),
+		courses: listing.read.flatMap((c) => (typeof c === "string" ? [] : [studyCourseOf(c.map, c.plan)])),
+		failed: listing.read.filter((c): c is string => typeof c === "string"),
 	};
 }
