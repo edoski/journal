@@ -4,9 +4,10 @@ import { SessionRows } from "@/components/unit-inbox/topic-page/session-rows";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
 
-/** Topic page candidate "brief" (spec: brief.md). A stub until its builder
- *  draws it: the shared head, pick-up rows and sessions, so the page works
- *  on this option. */
+/** Topic page candidate "brief" (spec: brief.md): Home's Today for one
+ *  topic. The head says where he stands and the one thing to do, the
+ *  pick-up rows where it was left, the sessions are a quiet dated list,
+ *  and the page stops there. */
 export function BriefTopic({ facts, busy, onAct, onTask }: TopicPageProps) {
 	return (
 		<ScrollArea bar={false} className="min-h-0 flex-1">
