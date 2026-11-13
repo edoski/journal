@@ -155,12 +155,12 @@ describe("Proposed background agents", () => {
 		extractions: [],
 	};
 
-	it("one row per process under a quiet header: the session, elapsed time and a named stop button; cost waits in the detail", () => {
+	it("one row per process under a quiet header: what it is doing and for which session, elapsed time and a named stop button; cost waits in the detail", () => {
 		const doc = documentFor(<ActivitySection feed={feed} variant="proposed" />);
 		const section = doc.querySelector('[data-testid="activity-section"]');
 		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Background agents");
 		const row = section?.querySelector('[data-testid="activity-blob-job"] [data-slot="nav-row"]');
-		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Eigenvalues and eigenvectors");
+		assert.equal(row?.querySelector('[data-slot="nav-row-label"]')?.textContent, "Researcher · Eigenvalues and eigenvectors");
 		assert.match(row?.querySelector('[data-testid="activity-blob-elapsed"]')?.textContent ?? "", /^\d+(s|m \d\ds|h \d\dm)$/);
 		assert.equal(row?.getAttribute("aria-expanded"), "false");
 		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "End Researcher in Eigenvalues and eigenvectors");

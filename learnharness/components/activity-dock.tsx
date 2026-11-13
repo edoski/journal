@@ -417,8 +417,8 @@ function blobLabel(blob: ActivityBlob): string {
 	}
 }
 
-/** One process as a sidebar row (Proposed): kind icon, what it is, the
- *  session it works for, elapsed time, and a stop button at the right
+/** One process as a sidebar row (Proposed): kind icon, what it is doing
+ *  and the session it works for, elapsed time, and a stop button at the right
  *  edge; a click opens its detail (what it is doing, cost, context,
  *  model, steps, the session link) under the row. */
 function ActivityRowNext({
@@ -443,7 +443,7 @@ function ActivityRowNext({
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
 			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="pr-9">
 				<Icon />
-				<NavRowLabel>{blob.title}</NavRowLabel>
+				<NavRowLabel>{`${label} · ${blob.title}`}</NavRowLabel>
 				<NavRowTrailing data-testid="activity-blob-elapsed">{elapsed}</NavRowTrailing>
 			</NavRow>
 			<Hint label={abortState === "failed" ? "Abort failed — try again" : "Stop"} side="right">

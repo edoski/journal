@@ -250,4 +250,17 @@ describe("activity section render", () => {
 		// glm-5.3-flash drifted in pi-ai 0.87.1)
 		assert.match(html, /activity-total-cost[^>]*>\$0\.0040</);
 	});
+
+	it("a running digest's sidebar row says what it is doing before it is opened", () => {
+		const html = renderToStaticMarkup(
+			<ActivitySection
+				variant="proposed"
+				feed={{ jobs: [], extractions: [{ id: "cx#digest", chatId: "cx", title: "Invertible matrices", phase: "digesting", startedAt: NOW }] }}
+			/>,
+		);
+		const label = html.match(/data-slot="nav-row-label"[^>]*>([^<]*)</)?.[1] ?? "";
+		assert.match(label, /Digesting lesson/);
+		assert.match(label, /Invertible matrices/);
+		assert.doesNotMatch(html, /activity-blob-detail/, "the row is closed");
+	});
 });
