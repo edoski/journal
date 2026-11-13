@@ -1,4 +1,4 @@
-import { abortExtraction, extractionStatuses } from "../agent/subagents/extraction.ts";
+import { abortExtraction, extractionStatuses, runsEnded } from "../agent/subagents/extraction.ts";
 import { isJobLive } from "../agent/subagents/aborts.ts";
 import { coverageOf } from "../core/coverage.ts";
 import { deleteChatTraces, type ChatDeleteMode, type ChatDeletionStats } from "../core/graph-deletion.ts";
@@ -30,7 +30,6 @@ export type { ChatDeleteMode, ChatDeletionStats } from "../core/graph-deletion.t
  *  provider cancellation is normally sub-second, but a wedged provider
  *  must never wedge deletion). */
 const WIND_DOWN_TIMEOUT_MS = 10_000;
-const WIND_DOWN_POLL_MS = 50;
 
 /** What deleteChatSession did — the route maps it straight to HTTP. */
 export type ChatDeleteOutcome =
@@ -103,17 +102,13 @@ export async function deleteChatSession(chatId: string, mode: ChatDeleteMode): P
 	if (blocker) return blocker;
 	if (extractionStatuses().some((run) => run.chatId === chatId)) {
 		abortExtraction(chatId); // true cancellation — spend stops, nothing merges
-		const deadline = Date.now() + WIND_DOWN_TIMEOUT_MS;
-		while (extractionStatuses().some((run) => run.chatId === chatId)) {
-			if (Date.now() > deadline) {
-				return {
-					ok: false,
-					status: 503,
-					code: "extraction_winding_down",
-					error: "The session's extraction is still winding down — try again in a moment",
-				};
-			}
-			await new Promise((resolve) => setTimeout(resolve, WIND_DOWN_POLL_MS));
+		if (!(await runsEnded(chatId, WIND_DOWN_TIMEOUT_MS))) {
+			return {
+				ok: false,
+				status: 503,
+				code: "extraction_winding_down",
+				error: "The session's extraction is still winding down — try again in a moment",
+			};
 		}
 	}
 

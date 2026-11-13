@@ -25,7 +25,7 @@ import type {
 } from "../../core/contracts.ts";
 import { getGraph, mergeFindings, type DerivedGraph, type EmissionStats, type GraphDeps } from "../../core/graph.ts";
 import type { GraphStore } from "../../core/ports.ts";
-import { emit } from "../../core/events.ts";
+import { emit, subscribe } from "../../core/events.ts";
 import { settleGraphLayout } from "../../core/layout-settle.ts";
 import { batchRuns, coverageOf, messageViewLines } from "../../core/coverage.ts";
 import { failedOutputCallIds, type LhMessage } from "../../core/native-messages.ts";
@@ -731,6 +731,22 @@ export function abortExtraction(chatId: string): boolean {
 	}
 	return found;
 }
+/** Resolves true once the chat has no run left in the registry (every
+ *  removal announces activity-changed), or false after `limitMs`. */
+export function runsEnded(chatId: string, limitMs: number): Promise<boolean> {
+	const ended = () => !runs().running.values().some((run) => run.chatId === chatId);
+	if (ended()) return Promise.resolve(true);
+	return new Promise((resolve) => {
+		const finish = (result: boolean) => {
+			clearTimeout(limit);
+			off();
+			resolve(result);
+		};
+		const off = subscribe((event) => event.type === "activity-changed" && ended() && finish(true));
+		const limit = setTimeout(() => finish(false), limitMs);
+	});
+}
+
 /** Register a run or move it to a new phase. Every transition announces
  *  the dock (push S5, 2026-10-02): notify-after-write, the registry is the
  *  feed's truth. */
