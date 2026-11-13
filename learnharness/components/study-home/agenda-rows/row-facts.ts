@@ -38,12 +38,6 @@ export function lessonTitle(row: TodayRow): string {
 	return row.kind === "session" ? row.chat.title : stepWords(row.step);
 }
 
-/** The first line's action: open the session that waits, or continue the
- *  course. Pure. */
-export function actionWord(row: TodayRow): "Open" | "Continue" {
-	return row.kind === "session" ? "Open" : "Continue";
-}
-
 /** A review's reason from the engine's own fields: a lapse first (the
  *  topic it was), else how overdue the most overdue one is. Pure. */
 function reviewReason(due: readonly CourseMapTopic[]): string | null {

@@ -20,14 +20,14 @@ Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an age
 | Course map | the selected course's map, faded at its edges, centred on "You are here" (home-map.md) | the course's `map`, already in `/api/study` | where he is and what is not started yet, in one picture; it also carries what the Exams section said (dashed topics are what's left before the exam) |
 | Course tabs | every course, in Today's order; opens on Today's first line's course | the same | a handful of courses; one click compares paths without leaving Home |
 | Today | one line per course: its one next lesson (today.md) | `map` + `plan`'s `due` and run-up, waiting sessions | the next action, not a to-do list (GTD's next action; Things' Today holds only what you'll do today) |
-| First line's button | the page's only primary action, Continue or Open | the first line | one decision at session start (choice overload grows with harder decisions) |
 | The study day | "Today Sunday 8 November", on Today's heading | the engine's `today` | freshness without a title row |
 
 ## What is cut, and why
 
 | Cut | Why |
 |---|---|
-| Now card | it repeated the first line; the first line holds the primary action instead |
+| Now card | it repeated the first line |
+| First line's button | the blue Open looked ugly (Edo, 13 Nov 2026); every line opens its lesson |
 | "Home" title | the sidebar and the day say where he is; the row goes to the map |
 | This week | future reviews can't be done now (Things: Today holds only what you'll work on today) |
 | Exams | readiness is the map's dashed topics; no line says "Exam in N days" (Edo, 12 Nov 2026) |
@@ -44,7 +44,7 @@ Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an age
 | map | `home-map` (home-map.md), half the column (Edo, 12 Nov 2026: smaller, so Today's rows lead); enlarged, the whole column |
 | Today | `today` (today.md), 20px under the map |
 
-Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; the primary button is the only fill.
+Type: 13/18 at 400 and 500 for lines, 12/16 for meta, the tabs' 13; two weights in the body (400, 500) plus 600 on the heading and "Your turn". One accent (`link`) for "Your turn"; no fills.
 
 ## States
 

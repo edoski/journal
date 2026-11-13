@@ -214,14 +214,14 @@ describe("Today", () => {
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = [chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } })];
 
-	it("names each line's course and lesson and nothing else, holds one primary action, and counts no reviews", () => {
+	it("names each line's course and lesson and nothing else, with no button on any line, and counts no reviews", () => {
 		const doc = render(<Today rows={todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY)} today={TODAY} busy={false} onContinue={() => {}} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.equal(lines.length, 3);
-		assert.equal(lines[0]!.textContent, "Linear AlgebraEigen lessonOpen");
+		assert.equal(lines[0]!.textContent, "Linear AlgebraEigen lesson");
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(lines[1]!.textContent, "ProbabilityContinue Bayes' rule");
-		assert.equal(doc.querySelectorAll("[data-primary]").length, 1);
+		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /Today.*Sunday 8 November/);
 	});
@@ -304,14 +304,14 @@ describe("agenda's row candidates", () => {
 	const rows = () => todayRows([ANALYSIS, LINALG, PROB], [waiting], TODAY);
 	const props = () => ({ rows: rows(), today: TODAY, busy: false, onContinue: () => {} });
 	const plain = (doc: Document) => {
-		assert.equal(doc.querySelectorAll("[data-primary]").length, 1);
+		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/);
 	};
 
 	it("reason: each line says why it is on Today, beside its lesson", () => {
 		const doc = render(<ReasonRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
-		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your replyOpen", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesStarting to fade"]);
+		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your reply", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesStarting to fade"]);
 		plain(doc);
 	});
 

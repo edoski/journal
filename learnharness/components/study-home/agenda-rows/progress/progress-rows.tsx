@@ -1,13 +1,11 @@
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
-import { actionWord, courseProgress, courseTitle, foldLines, lessonTitle, lineKey, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
+import { courseProgress, courseTitle, foldLines, lessonTitle, lineKey, type RowsProps } from "@/components/study-home/agenda-rows/row-facts";
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 import type { StudyCourse } from "@/src/core";
 
-/** Ring, course, lesson, action: the same columns on every tile. */
+/** Ring, course, lesson: the same columns on every tile. */
 const TILE =
-	"grid h-14 w-full grid-cols-[1rem_9rem_minmax(0,1fr)_5.5rem] items-center justify-items-start gap-x-4 rounded-lg bg-card px-4 text-left font-normal whitespace-normal hover:bg-accent";
+	"grid h-14 w-full grid-cols-[1rem_9rem_minmax(0,1fr)] items-center justify-items-start gap-x-4 rounded-lg bg-card px-4 text-left font-normal whitespace-normal hover:bg-accent";
 
 /**
  * Agenda rows "progress" (spec: progress.md): each course its own tile,
@@ -17,19 +15,12 @@ export function ProgressRows({ rows, busy, onContinue }: RowsProps) {
 	const { shown, also } = foldLines(rows);
 	return (
 		<ul data-slot="progress-rows" className="flex flex-col gap-1.5">
-			{shown.map((row, i) => (
+			{shown.map((row) => (
 				<li key={lineKey(row)}>
-					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" data-primary={i === 0 || undefined} className={TILE}>
+					<LineTarget row={row} busy={busy} onContinue={onContinue} data-slot="today-line" className={TILE}>
 						{row.course ? <ProgressPie course={row.course} /> : <span />}
 						<span className="w-full truncate text-row text-foreground">{courseTitle(row)}</span>
 						<span className="w-full truncate text-row font-medium text-foreground">{lessonTitle(row)}</span>
-						<span className="justify-self-end">
-							{i === 0 && (
-								<span aria-hidden="true" className={cn(buttonVariants({ size: "sm" }), "font-normal")}>
-									{actionWord(row)}
-								</span>
-							)}
-						</span>
 					</LineTarget>
 				</li>
 			))}
