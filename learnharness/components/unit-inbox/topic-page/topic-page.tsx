@@ -13,6 +13,7 @@ import { linkStarts, openingFor, topicSessions } from "@/components/unit-inbox/u
 import { BriefTopic } from "@/components/unit-inbox/topic-page/brief/brief-topic";
 import { StepsTopic } from "@/components/unit-inbox/topic-page/steps/steps-topic";
 import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic";
+import { HYBRID_COLUMN, HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { topicFacts, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -21,8 +22,9 @@ export interface TopicPageProps {
 	facts: TopicFacts;
 	/** A start is in flight: the action and the task rows are disabled. */
 	busy: boolean;
-	/** Does the page's one action: opens the session, or starts one with the action's opening. */
-	onAct: () => void;
+	/** Does the page's one action: opens the session, or starts one with the
+	 *  action's opening. Absent when the composer foot holds the action. */
+	onAct?: () => void;
 	/** Starts a session on an open task (a task pick-up row). */
 	onTask: (opening: string) => void;
 }
@@ -32,6 +34,7 @@ export const TOPIC_CANDIDATES: Record<(typeof TOPIC_OPTIONS)[number], ComponentT
 	brief: BriefTopic,
 	steps: StepsTopic,
 	trail: TrailTopic,
+	hybrid: HybridTopic,
 };
 
 /**
@@ -83,7 +86,7 @@ export function TopicPage({
 		<>
 			<Candidate facts={facts} busy={lesson.busy} onAct={act} onTask={start} />
 			<div className="shrink-0 bg-background pb-4">
-				<div className="mx-auto w-full max-w-[46rem] px-4">
+				<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>
 					{lesson.error && (
 						<p role="alert" className="mb-2 px-2 text-row text-danger">
 							{lesson.error}

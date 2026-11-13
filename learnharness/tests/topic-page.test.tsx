@@ -180,11 +180,11 @@ describe("the Topic switch", () => {
 		assert.equal(read, "current");
 		assert.deepEqual(
 			POLISH_GROUPS.find((group) => group.id === "topic"),
-			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail"], requires: { design: "proposed" } },
+			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail", "hybrid"], requires: { design: "proposed" } },
 		);
 	});
 
-	it("draws every candidate as a working page: the head, the open task to pick up, and every session one press away", () => {
+	it("draws every candidate as a working page: the head, the open task to pick up (the hybrid's is in its composer foot), and every session one press away", () => {
 		const practice = chat({ kind: "practice", pendingProblem: true, topics: ["rank"] });
 		const past = chat({ title: "Rank, second pass", topics: ["rank"] });
 		for (const [option, Candidate] of Object.entries(TOPIC_CANDIDATES)) {
@@ -192,7 +192,7 @@ describe("the Topic switch", () => {
 			const root = document.querySelector('[data-testid="unit-page"]')!;
 			assert.equal(root.getAttribute("data-topic-candidate"), option);
 			assert.equal(root.querySelectorAll('[data-testid="topic-action"]').length, 1, option);
-			assert.equal(root.querySelectorAll('[data-slot="topic-pickup"][data-kind="task"]').length, 1, option);
+			assert.equal(root.querySelectorAll('[data-slot="topic-pickup"][data-kind="task"]').length, option === "hybrid" ? 0 : 1, option);
 			for (const session of [practice, past]) assert.ok(root.querySelector(`a[href="/chat/${session.id}"]`), `${option}: ${session.title}`);
 		}
 	});

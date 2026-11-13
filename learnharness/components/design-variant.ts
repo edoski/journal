@@ -13,7 +13,7 @@ export type HomeVariant = "current" | (typeof HOME_OPTIONS)[number];
 
 /** The topic page's candidates (spec:
  *  components/unit-inbox/topic-page/topic-page.md). */
-export const TOPIC_OPTIONS = ["brief", "steps", "trail"] as const;
+export const TOPIC_OPTIONS = ["brief", "steps", "trail", "hybrid"] as const;
 /** "current" keeps the topic page as it is. */
 export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
 

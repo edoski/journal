@@ -16,26 +16,29 @@ const PAUSE = <span className="sr-only">. </span>;
  * map's pie with where he stands, then why it needs him as icons and a
  * few words, when he last studied it, and what went wrong when the engine
  * can say. Study is the one action drawn in outline: the engine says
- * nothing needs him.
+ * nothing needs him. Without `onAct` the head has no button: the page's
+ * composer holds the action (the hybrid candidate).
  */
-export function TopicHead({ facts, busy, onAct }: { facts: TopicFacts; busy: boolean; onAct: () => void }) {
+export function TopicHead({ facts, busy, onAct }: { facts: TopicFacts; busy: boolean; onAct?: () => void }) {
 	const { action, standing, marks, studied, mistake } = facts;
 	return (
 		<header data-slot="topic-head" className="flex flex-col gap-1">
 			<p className="text-label text-muted-foreground">{facts.course.title}</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
 				<h1 className="text-heading font-medium text-foreground">{facts.topic.title}</h1>
-				<Button
-					size="sm"
-					variant={action.kind === "study" ? "outline" : "default"}
-					className="shrink-0 text-row"
-					disabled={busy}
-					onClick={onAct}
-					data-testid="topic-action"
-					data-action={action.kind}
-				>
-					{ACTION_WORDS[action.kind]}
-				</Button>
+				{onAct && (
+					<Button
+						size="sm"
+						variant={action.kind === "study" ? "outline" : "default"}
+						className="shrink-0 text-row"
+						disabled={busy}
+						onClick={onAct}
+						data-testid="topic-action"
+						data-action={action.kind}
+					>
+						{ACTION_WORDS[action.kind]}
+					</Button>
+				)}
 			</div>
 			{standing && (
 				<div data-slot="unit-standing" className="flex items-center gap-4 text-row text-muted-foreground">
