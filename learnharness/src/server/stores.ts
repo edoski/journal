@@ -11,6 +11,7 @@ import { graphStore } from "../store/graph.ts";
 import { jobStore } from "../store/jobs.ts";
 import { settingsStore } from "../store/settings.ts";
 import { createCourseRecords } from "../store/course-records.ts";
+import { courseMapLedgers } from "../store/course-map-ledgers.ts";
 import { LEARNING_ENGINE } from "../../config.ts";
 import { resolveSettings, type EffectiveSettings } from "../core/settings-resolution.ts";
 /** The wired adapters. Satisfies core/graph.ts's GraphDeps structurally. */
@@ -20,6 +21,7 @@ export const stores = {
 	jobStore,
 	settingsStore,
 	courseRecords: createCourseRecords(LEARNING_ENGINE),
+	courseMapLedgers,
 };
 
 export type Stores = typeof stores;

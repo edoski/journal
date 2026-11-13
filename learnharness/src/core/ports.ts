@@ -9,6 +9,7 @@
  * adapters may import core; core NEVER imports an adapter.
  */
 
+import type { CourseMapLedger } from "./course-map-build.ts";
 import type { LhMessage } from "./native-messages.ts";
 import type {
 	ChatRecord,
@@ -227,6 +228,18 @@ export interface AuthStore {
 	deleteAuthVar(name: string): void;
 }
 
+
+// ─── CourseMapLedgers — what the course map builder already read ────────────
+
+/** The course map builder's ledger, one per course workspace (app data:
+ *  the engine's record holds the map, this only what was read). */
+export interface CourseMapLedgers {
+	get(workspace: string): CourseMapLedger | undefined;
+	/** Replace one course's ledger. */
+	save(workspace: string, ledger: CourseMapLedger): void;
+	/** Every course that has a ledger. */
+	workspaces(): string[];
+}
 
 // ─── CourseRecords — the learning engine's course records ───────────────────
 

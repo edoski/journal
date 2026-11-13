@@ -400,9 +400,15 @@ export function ActivitySection({ feed: feedProp, variant = "current" }: { feed?
 	);
 }
 
+/** A run of the shared background registry in words: a course's map being
+ *  built from its material, or the graph extraction's phase. */
+function extractionLabel(phase: string | undefined): string {
+	return phase === "mapping" ? "Building the course map" : `Extraction — ${phase ?? "running"}`;
+}
+
 /** What a blob is, in words: "Researcher", "Extraction — merging". */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return `Extraction — ${blob.phase ?? "running"}`;
+	if (blob.process === "extraction") return extractionLabel(blob.phase);
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";
@@ -519,7 +525,7 @@ function ActivityBlobRow({
 	const Icon = blob.process === "extraction" ? WaypointsIcon : (blob.jobKind && KIND_ICON[blob.jobKind]) || BotIcon;
 	const label =
 		blob.process === "extraction"
-			? `Extraction — ${blob.phase ?? "running"}`
+			? extractionLabel(blob.phase)
 			: blob.jobKind === "research"
 				? "Researcher"
 				: blob.jobKind === "demo"

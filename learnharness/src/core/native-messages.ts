@@ -592,6 +592,25 @@ function saveChanges(args: Record<string, unknown>): Record<string, unknown> | n
 	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
 }
 
+/** The sources the last turn's clean course_saves registered: material
+ *  added during a lesson. Pure. */
+export function sourcesRegisteredInLastTurn(messages: readonly LhMessage[]): string[] {
+	const start = messages.findLastIndex((m) => m.role === "user") + 1;
+	const turn = messages.slice(start);
+	const clean = cleanToolCallIds(turn);
+	const added: string[] = [];
+	for (const m of turn) {
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const sources = saveChanges(block.arguments as Record<string, unknown>)?.sources;
+			if (typeof sources !== "object" || sources === null) continue;
+			for (const [handle, entry] of Object.entries(sources)) if (entry !== null && !added.includes(handle)) added.push(handle);
+		}
+	}
+	return added;
+}
+
 /** The course topics a session worked on, by its own transcript, in the
  *  order it first touched them: the topics of each problem it posed and of
  *  each observation it saved, and the topics a save introduced. Only calls

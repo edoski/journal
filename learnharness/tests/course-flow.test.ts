@@ -157,8 +157,10 @@ describe("new course", () => {
 		const directory = path.join(STUDY, "measure-theory-probability");
 		const course = (await res.json()) as { workspace: string; title: string; exam: { date: string } | null };
 		assert.deepEqual([course.workspace, course.title, course.exam?.date], [directory, "Measure Theory & Probability!", "2026-12-14"]);
-		const writes = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === directory);
+		const calls = engineCalls().filter((c) => c.args[0] === "--workspace" && c.args[1] === directory);
+		const writes = calls.filter((c) => c.args[2] !== "show");
 		assert.deepEqual(writes.map((c) => c.args.slice(2)), [["init"], ["save"], ["sources", "--add", "material/Syllabus.pdf", "material/Lectures/Week 1.md", "material/escape.txt"]]);
+		assert.ok(calls.some((c) => c.args[2] === "show" && c.args[3] === "--all"), "its map starts building from the material in the background");
 		assert.deepEqual(JSON.parse(writes[1]!.stdin), { title: "Measure Theory & Probability!", exam: { date: "2026-12-14" } });
 		assert.equal(fs.readFileSync(path.join(directory, "material", "Lectures", "Week 1.md"), "utf-8"), "week one");
 		assert.equal(fs.existsSync(path.join(directory, "material", "Lectures", ".DS_Store")), false, "hidden files stay out");

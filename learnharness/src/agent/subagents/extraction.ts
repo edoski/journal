@@ -628,11 +628,19 @@ function runAuditor(
  *  audit+merge critical section is queued behind another job's; the
  *  extractor is done but the auditor may not start until the graph is
  *  stable. */
-export type ExtractionPhase = "queued" | "extracting" | "waiting" | "auditing" | "merging";
+export type ExtractionPhase = "queued" | "extracting" | "waiting" | "auditing" | "merging" | "digesting" | "mapping";
 
 /** One in-flight pipeline run. Module-level: one process, one registry.
  *  Exported for the status payload's consumer typing (the dock). */
+/** Which front door a run came through: a session's graph extraction, a
+ *  notes import, a finished lesson's digest into the course record, or a
+ *  course's topic map built from its material. */
+export type RunKind = "chat" | "notes" | "digest" | "course-map";
+
 export interface RunningExtraction {
+	/** The registry key: the source id, "src#i" for a chunk job, or
+	 *  "chatId#digest" for a lesson digest. Unique per row. */
+	id: string;
 	/** The SOURCE id (chat id / notes src id) — the payload's identity and
 	 *  the abort key. The registry KEY adds "#i" for chunk jobs (a
 	 *  multi-chunk source owns several entries); this field stays the
@@ -645,7 +653,7 @@ export interface RunningExtraction {
 	/** Which front door the run came through — label + usage-persistence
 	 *  depend on it (chats bill their chat record; notes bill the source
 	 *  record). */
-	kind: "chat" | "notes";
+	kind: RunKind;
 	/** Display label (the file path for notes imports); the status route
 	 *  falls back to the chat store for chat runs. */
 	label?: string;
@@ -668,6 +676,9 @@ interface LhExtractionGlobal {
 		running: Map<string, RunningExtraction>;
 		/** The single-flight guard, shared by every pipeline instance. */
 		inFlight: Set<string>;
+		/** Chats asked to extract while their run was in flight: the run
+		 *  goes once more when it ends, so the request is never lost. */
+		rerun: Set<string>;
 		/** Last minted startedAt — kept monotonic so two runs starting in the
 		 *  same millisecond never collide on the usage idempotency key. */
 		lastStartedAt: number;
@@ -693,7 +704,9 @@ interface LhExtractionGlobal {
  *  single-flight guard cross route instances). */
 function runs(): NonNullable<LhExtractionGlobal["__lhExtractionRuns"]> {
 	const g = globalThis as typeof globalThis & LhExtractionGlobal;
-	return (g.__lhExtractionRuns ??= { running: new Map(), inFlight: new Set(), lastStartedAt: 0 });
+	const registry = (g.__lhExtractionRuns ??= { running: new Map(), inFlight: new Set(), rerun: new Set(), lastStartedAt: 0 });
+	registry.rerun ??= new Set();
+	return registry;
 }
 
 /** In-flight pipeline runs (oldest first) — the /api/graph/status payload. */
@@ -709,7 +722,8 @@ export function extractionStatuses(): RunningExtraction[] {
 export function abortExtraction(chatId: string): boolean {
 	// PER-CHUNK JOBS (owner, 2026-09-28): a source may own several registry
 	// entries (one per chunk/batch) — aborting the source aborts EVERY
-	// job of its fan-out.
+	// job of its fan-out. An aborted run is not run again.
+	runs().rerun.delete(chatId);
 	let found = false;
 	for (const run of runs().running.values()) {
 		if (run.chatId !== chatId) continue;
@@ -718,6 +732,43 @@ export function abortExtraction(chatId: string): boolean {
 	}
 	return found;
 }
+/** Register a run or move it to a new phase. Every transition announces
+ *  the dock (push S5, 2026-10-02): notify-after-write, the registry is the
+ *  feed's truth. */
+export function setRunPhase(
+	jobKey: string,
+	phase: ExtractionPhase,
+	kind: RunKind,
+	label?: string,
+	part?: { i: number; n: number },
+): RunningExtraction {
+	const R = runs();
+	const prev = R.running.get(jobKey);
+	if (!prev) R.lastStartedAt = Math.max(Date.now(), R.lastStartedAt + 1);
+	const run: RunningExtraction = {
+		id: jobKey,
+		chatId: prev?.chatId ?? jobKey.split("#")[0]!,
+		part: prev?.part ?? part, // phase changes never lose the part
+		kind,
+		label: prev?.label ?? label, // phase changes never lose the label
+		phase,
+		startedAt: prev?.startedAt ?? R.lastStartedAt,
+		usage: prev?.usage ?? {}, // phase changes never lose usage
+		controller: prev?.controller ?? new AbortController(),
+	};
+	R.running.set(jobKey, run);
+	emit("activity-changed", {});
+	return run;
+}
+
+/** Run over (done, failed, aborted — every exit is a finally): the row
+ *  leaves the feed. ONE seam for all delete sites so no exit path can
+ *  miss the announce (push S5, 2026-10-02). */
+export function finishRun(jobKey: string): void {
+	runs().running.delete(jobKey);
+	emit("activity-changed", {});
+}
+
 // ─── the pipeline ───────────────────────────────────────────────────────────
 
 export interface ExtractionModels {
@@ -841,39 +892,9 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 	// single-flight guard. No module-level state left in this factory.
 	const runningExtractions = runs().running;
 	const inFlight = runs().inFlight;
-
-	function setPhase(
-		jobKey: string,
-		phase: ExtractionPhase,
-		kind: "chat" | "notes",
-		label?: string,
-		part?: { i: number; n: number },
-	): void {
-		const R = runs();
-		const prev = runningExtractions.get(jobKey);
-		if (!prev) R.lastStartedAt = Math.max(Date.now(), R.lastStartedAt + 1);
-		runningExtractions.set(jobKey, {
-			chatId: prev?.chatId ?? jobKey.split("#")[0]!,
-			part: prev?.part ?? part, // phase changes never lose the part
-			kind,
-			label: prev?.label ?? label, // phase changes never lose the label
-			phase,
-			startedAt: prev?.startedAt ?? R.lastStartedAt,
-			usage: prev?.usage ?? {}, // phase changes never lose usage
-			controller: prev?.controller ?? new AbortController(),
-		});
-		// Every phase transition announces the dock (push S5, 2026-10-02):
-		// notify-after-write — the registry is the feed's truth.
-		emit("activity-changed", {});
-	}
-
-	/** Run over (done, failed, aborted — every exit is a finally): the row
-	 *  leaves the feed. ONE seam for all delete sites so no exit path can
-	 *  miss the announce (push S5, 2026-10-02). */
-	function finishExtraction(jobKey: string): void {
-		runningExtractions.delete(jobKey);
-		emit("activity-changed", {});
-	}
+	const setPhase = (jobKey: string, phase: ExtractionPhase, kind: "chat" | "notes", label?: string, part?: { i: number; n: number }): void =>
+		void setRunPhase(jobKey, phase, kind, label, part);
+	const finishExtraction = finishRun;
 
 	/** Accumulate one billed step into the run's registry entry (live). */
 	function recordStep(jobKey: string, stage: "extractor" | "auditor", usage: CallUsage, model: string): void {

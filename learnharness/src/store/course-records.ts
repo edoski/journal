@@ -80,7 +80,7 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "plan":
 			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
 		case "sources":
-			return { args: ["sources", "--add", ...verb.add], stdin: "" };
+			return { args: "scan" in verb ? ["sources", "--scan"] : ["sources", "--add", ...verb.add], stdin: "" };
 		case "forget-course":
 			return { args: ["forget", "--course"], stdin: "" };
 	}
@@ -218,6 +218,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 			repaired: e.repaired === true,
 		},
 		tasks: strings(e.tasks),
+		...(str(e.excluded) ? { excluded: str(e.excluded)! } : {}),
 		needs: strings(e.needs),
 		contrasts: strings(e.contrasts),
 	};
