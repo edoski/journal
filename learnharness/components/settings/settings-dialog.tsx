@@ -47,7 +47,7 @@ import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
-import { KeysSection } from "./keys-section.tsx";
+import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { Hint } from "@/components/ui/hint";
 import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
@@ -78,7 +78,7 @@ const DialogContext = createContext<{ open: (section?: string) => void }>({ open
 
 /** AppShell-level mount: the sidebar row and the mod+, chord call this.
  *  `open(section)` lands the dialog on a specific section (the first-run
- *  setup flow deep-links to Keys when no provider key exists yet). */
+ *  setup flow deep-links to Providers when no subscription is signed in). */
 export function SettingsDialogProvider({
 	children,
 }: {
@@ -334,7 +334,9 @@ export function SettingsDialogBody({
 							)}
 							{active === "keys" && (
 								<SettingsSection title="Providers" testid="section-keys">
-									<KeysSection />
+									<SettingsGroup label="Subscriptions" testid="group-subscriptions">
+										<SubscriptionConnections />
+									</SettingsGroup>
 								</SettingsSection>
 							)}
 							{active === "agent" && (

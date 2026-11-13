@@ -139,8 +139,7 @@ export const GRAPH_FORMAT_FILE = path.join(PATHS.graph, "format.json");
  * field) needs no migration — old records simply lack the new keys. The
  * version field is a PRIVATE schema counter for breaking shape changes
  * only (field renamed/meaning changed), unrelated to the app release
- * version. Secrets (API keys, login tokens) NEVER live here — auth.json /
- * .env.local keep that role. (The `chat` default-settings section died
+ * version. Secrets (login tokens) NEVER live here. (The `chat` default-settings section died
  * with per-session models, owner 2026-09-28 — sessions own their model
  * from birth, stamped from the strong slot.)
  */
@@ -162,19 +161,12 @@ export const SETTINGS_FILE = path.join(DATA_ROOT, "settings.json");
 export const PROMPTS_OVERRIDE_DIR = path.join(DATA_ROOT, "prompts");
 
 /**
- * THE AUTH/KEY STORE (auth-keys wave, 2026-09-19): BYOK provider keys in a
- * flat {VAR: value} JSON map — the SAME file the Electron app has always
- * hand-edited (owner decision: option A, zero migration). Desktop main.cjs
- * passes LH_AUTH_FILE pointing at userData/auth.json (mode 0600); in dev
- * (no Electron) the default is the repo-root auth.json (gitignored, same
- * pattern as .env.local — a worktree may symlink it to the master copy).
- * The SERVER reads/writes this file directly at call time (no restart to
- * change a key); it reflects the values into process.env at boot with
- * FILL-GAP precedence — real environment variables (incl. .env.local in
- * dev) always win (src/server/keys.ts). Hand-edits still work: the file is
- * re-read from disk on every API access. Secrets NEVER go in settings.json
- * — this file keeps that role, alongside .env.local.
+ * Where the web/dev server keeps the ChatGPT sign-in
+ * (chatgpt-credentials.json, owner-only): the project directory, or
+ * LH_CREDENTIALS_DIR. The packaged desktop app keeps it in Electron's
+ * userData instead, owned by the main process. No API key is stored
+ * anywhere: the app runs only on subscriptions.
  */
-export const AUTH_FILE = process.env.LH_AUTH_FILE
-	? path.resolve(process.env.LH_AUTH_FILE)
-	: path.join(TEST_SCRATCH ?? ROOT, "auth.json");
+export const CREDENTIALS_DIR = process.env.LH_CREDENTIALS_DIR
+	? path.resolve(process.env.LH_CREDENTIALS_DIR)
+	: TEST_SCRATCH ?? ROOT;

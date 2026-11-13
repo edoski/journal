@@ -6,10 +6,9 @@ import os from "node:os";
 import { createRequire } from "node:module";
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), "lh-web-sub-"));
-process.env.LH_AUTH_FILE = path.join(directory, "auth.json");
+process.env.LH_CREDENTIALS_DIR = directory;
 process.env.LH_DATA_DIR = path.join(directory, "data");
 delete process.env.LH_DESKTOP_SERVER; delete process.env.LH_DESKTOP_API_SECRET;
-await fs.writeFile(process.env.LH_AUTH_FILE, "{}", { mode: 0o600 });
 const require = createRequire(import.meta.url);
 const { SCOPES } = require("../electron/chatgpt.cjs");
 const { createWebSubscriptionOwner, webSubscriptionOwner, webSubscriptionsEnabled } = await import("../src/server/web-subscriptions.ts");

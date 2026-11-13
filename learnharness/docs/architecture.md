@@ -30,7 +30,7 @@ Hold the architecture along two orthogonal axes:
 | **Library** — world model | `data/graph/*` ledgers | extraction pipeline (sole graph writer), derivation, birth-session clusters |
 | **Practice** — problem sets | `data/practice/*.json` | partitioner→generator→grader pipeline, self-contained sets (§7) |
 | **Stage** — presentation shell | nothing server-side | components/, graph canvas, docks — pure consumer via `/api/*` |
-| **Machine room** — host | process + config | Electron main, standalone Next server, `config.ts`, data-dir seam, BYOK keys |
+| **Machine room** — host | process + config | Electron main, standalone Next server, `config.ts`, data-dir seam |
 
 **The unifying law** (generates everything else): **imports point inward, writes point to append-only evidence, and everything else is derived.** Dependency flows toward purity; data flows toward evidence; no state is stored where it can be recomputed.
 
@@ -108,7 +108,7 @@ flowchart TB
         PORTLESS["render-settings.ts (portless)"]
     end
 
-    CFG["config.ts — leaf facts: PATHS · LEDGER_FILES · engine-construction facts (no models — BYOK slots own those)"]
+    CFG["config.ts — leaf facts: PATHS · LEDGER_FILES · engine-construction facts (no models — the settings slots own those)"]
 
     COMP -->|"lint zone: @/src/core only"| CBAR
     APP -->|"lint zone: @/src/core + @/src/server"| CBAR
@@ -166,7 +166,7 @@ Storage is **per-entity semantic ports**, never one generic interface: `ChatStor
 - **`src/server/chat-handler.ts` is THE composition root for a turn**: it wires the stores, the job runner, the extraction pipeline, the practice pipeline, and the pi engine into the stream response (`setTurnRunner`/`setJobRespawn` register its seams for the wake pipeline). All logic lives behind the seams it calls.
 - The agent layer is dependency-inverted throughout: `createJobRunner({ chatStore, jobStore, deliver })`, `createExtractionPipeline({ chatStore, graphStore, extractor?, auditor?, embedder })`, `createTeacherTools({ chatId, chatStore, jobStore, spawn })`, `createProberAgent`/`createTeacherAgent(engine?, tools?, …)`. Tests inject the same ports production wires — or swap an in-memory port.
 
-The engine side is adapted too: `src/agent/models.ts` (`piEngineFor`) resolves each role's engine from the user's **model slots** (BYOK: `settings.json` `models` section — strong/cheap/vision; a chain that ends empty refuses honestly with 503 `models_not_configured`) — and the teacher/prober conversation runs the **SESSION'S OWN record**: `POST /api/chats` stamps every newborn verbatim from the strong slot (the new-session default, chosen in setup), in-session picks write the session's record (`PUT /api/chats/:id/settings`), and the strong slot never reaches an existing session again (legacy unstamped records fall back to it at resolve time) — per-session models, owner 2026-09-28. Beyond the conversation, `src/server/pi/` bridges the two SDK worlds: `record-adapter.ts` (persisted UIMessage record → stateless pi `Message[]`, dangling tool calls get synthesized INTERRUPTED results) and `ui-stream.ts` (pi agent events → AI-SDK UIMessage SSE).
+The engine side is adapted too: `src/agent/models.ts` (`piEngineFor`) resolves each role's engine from the user's **model slots** (`settings.json` `models` section — strong/cheap/vision; a chain that ends empty refuses honestly with 503 `models_not_configured`) — and the teacher/prober conversation runs the **SESSION'S OWN record**: `POST /api/chats` stamps every newborn verbatim from the strong slot (the new-session default, chosen in setup), in-session picks write the session's record (`PUT /api/chats/:id/settings`), and the strong slot never reaches an existing session again (legacy unstamped records fall back to it at resolve time) — per-session models, owner 2026-09-28. Beyond the conversation, `src/server/pi/` bridges the two SDK worlds: `record-adapter.ts` (persisted UIMessage record → stateless pi `Message[]`, dangling tool calls get synthesized INTERRUPTED results) and `ui-stream.ts` (pi agent events → AI-SDK UIMessage SSE).
 
 ```mermaid
 flowchart LR
@@ -174,7 +174,7 @@ flowchart LR
         BROWSER["Browser UI — components/: question dock (addToolOutput) · graph canvas · docks"]
         HTTP["HTTP transport — app/api/*: 28 route handlers"]
         NOTES["Notes front door — POST /api/graph/import"]
-        ELEC["Electron main — thin launcher, spawns server, LH_DATA_DIR + BYOK env"]
+        ELEC["Electron main — thin launcher, spawns server, LH_DATA_DIR"]
     end
 
     subgraph HEXCORE["THE CORE — src/core (pure domain)"]
@@ -186,7 +186,7 @@ flowchart LR
 
     subgraph DRIVEN["DRIVEN ADAPTERS — outbound"]
         FS["fs stores — src/store (data/)"]
-        LLM["LLM engines — pi-ai/OpenRouter via piEngineFor"]
+        LLM["LLM engines — Claude (claude CLI) / ChatGPT via piEngineForSpec"]
         HEAD["headless Chrome — demo verify · SVG render"]
         WEB["web tools — model-native search + Readability/Jina (researcher)"]
     end
@@ -243,7 +243,7 @@ flowchart TB
     end
 
     subgraph ROOM["MACHINE ROOM — host"]
-        HOST["Electron main → standalone Next server · config.ts · LH_DATA_DIR · BYOK"]
+        HOST["Electron main → standalone Next server · config.ts · LH_DATA_DIR"]
     end
 
     LEARNER -->|"text · answers [transport adapter]"| UI
@@ -418,7 +418,7 @@ flowchart LR
         MAIN -->|"loadURL, sandboxed renderer"| REND["Browser renderer (components/)<br/>fetch/WebSocket to own origin only"]
     end
     subgraph OUTSIDE["outside the process"]
-        OR["OpenRouter (BYOK key from auth.json, env-injected — never argv)"]
+        OR["Claude (user's own claude CLI) · ChatGPT (in-app sign-in)"]
         GCSE["page fetch / Jina (researcher tools)"]
         CHROME["system Chrome (headless: demo verify · SVG render)"]
         DISK["data/ ledgers (via LH_DATA_DIR seam)"]
@@ -438,11 +438,11 @@ The Electron main is a launcher + credential/security guard, never a host for te
 
 `electron/chatgpt.cjs` owns the verified-account ChatGPT authentication, storage and revocation. In packaged desktop mode Electron main alone owns the durable OAuth credentials and serialized refresh; the renderer gets projected status and controls over origin-pinned IPC, and the privately launched server child receives credential-free catalogs and scoped request auth, never refresh tokens. The persisted route `chatgpt` never falls back to an API route.
 
-For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes the same plain-Node controller into one lazy process-global credential owner beside configured `AUTH_FILE`. The server injects the private transport through `src/agent/subscription-runtime.ts`; the agent layer never imports the server layer. Existing scoped leases, authority revisions and foreground/background abort listeners work through that transport, without exposing an HTTP token/lease operation. `src/server/web-subscription-http.ts` exposes only same-origin status/control operations. Generic `subscriptions-changed` notifications use the existing SSE notify→fetch channel; opaque one-use browser actions redirect to provider pages without putting authorization URLs in app JSON. Browser adapters preserve the UI bridge contracts; Electron dev uses the web owner with a narrow system-browser opener. Desktop markers fail closed rather than falling back to web credentials. This is the existing shared developer-server trust model, not user authentication or DNS-rebinding protection; LAN behavior is unchanged. Only one server process may own an auth directory. See [development](development.md#subscription-connections-in-webdev) for storage, browser locality and access limitations.
+For ordinary Next web/dev, `src/server/web-subscriptions.ts` composes the same plain-Node controller into one lazy process-global credential owner in `CREDENTIALS_DIR`. The server injects the private transport through `src/agent/subscription-runtime.ts`; the agent layer never imports the server layer. Existing scoped leases, authority revisions and foreground/background abort listeners work through that transport, without exposing an HTTP token/lease operation. `src/server/web-subscription-http.ts` exposes only same-origin status/control operations. Generic `subscriptions-changed` notifications use the existing SSE notify→fetch channel; opaque one-use browser actions redirect to provider pages without putting authorization URLs in app JSON. Browser adapters preserve the UI bridge contracts; Electron dev uses the web owner with a narrow system-browser opener. Desktop markers fail closed rather than falling back to web credentials. This is the existing shared developer-server trust model, not user authentication or DNS-rebinding protection; LAN behavior is unchanged. Only one server process may own an auth directory. See [development](development.md#subscription-connections-in-webdev) for storage, browser locality and access limitations.
 
 `subscription-request-cycle.ts` is the shared admission/automatic-input recovery state machine; the old ChatGPT module is its compatibility export. Background consent is default ON, with foreground-preserving cancellation and queue ownership retained on no-dispatch. Native usage rejected before dispatch is transiently excluded from helper usage collectors, without adding persisted provenance fields. Catalogs and read-time pricing preserve the selected connection: subscription use displays compact provider labels, API dollars remain dollars, and mixed usage joins both without estimating subscription dollars or claiming detected tiers/allowances.
 
-The Claude subscription holds no app credential. `src/agent/claude-stream.ts` is a pi `StreamFunction` that runs the user's own `claude` CLI once per model call: it replays the transcript as one user message, declares the app's tools through an inline MCP server that never answers a call, and kills the CLI at the first tool_use so pi's loop still runs every tool. The child gets the user's environment minus Anthropic credential and provider variables and the app's own keys. If Claude Code reports an API key source at startup, the CLI is killed (best effort: its first request may already be in flight). Connection status comes from `claude auth status` (`src/agent/claude-connection.ts`), so its "key present" is that sign-in.
+The Claude subscription holds no app credential. `src/agent/claude-stream.ts` is a pi `StreamFunction` that runs the user's own `claude` CLI once per model call: it replays the transcript as one user message, declares the app's tools through an inline MCP server that never answers a call, and kills the CLI at the first tool_use so pi's loop still runs every tool. The child gets the user's environment minus every `ANTHROPIC_*`, `*_API_KEY` and `*_AUTH_TOKEN` variable and the Claude Code credential and provider switches. If Claude Code reports an API key source at startup, the CLI is killed (best effort: its first request may already be in flight). Connection status comes from `claude auth status` (`src/agent/claude-connection.ts`), so its "key present" is that sign-in.
 
 Each Claude account is its own provider. `src/agent/claude-accounts.ts`, the only module that reads T3 Code's files, takes the accounts from T3 Code's configuration: an account with a T3 setup token runs with that token and a private config dir, an account without one runs with its own Claude Code config dir, and the default home keeps the id `claude-subscription` (without T3 Code, that one plain signed-in account is all there is). Weekly usage comes from Claude Code's own rate-limit events, recorded on every call and probed with one tiny Haiku call only when asked (`src/agent/claude-usage.ts`); when a turn stops at an account's limit, the chat offers a one-click switch to the account with the most left, and never switches by itself.
 

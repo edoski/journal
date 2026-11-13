@@ -4,7 +4,6 @@ import {
 	getSupportedThinkingLevels,
 	type Api,
 	type Model,
-	type Models,
 	type StreamFunction,
 } from "@earendil-works/pi-ai";
 import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
@@ -28,15 +27,12 @@ export const APP_IDENTITY = Object.freeze({
 
 /**
  * The one engine factory every agent's model comes from (the pi-ai swap,
- * docs/pi-engine-swap.md). BYOK ALL THE WAY DOWN (owner, 2026-09-22):
- * there are no factory pins — every engine resolves from a RESOLVED SPEC
- * (the settings chain's output) and the one builder here wires it to
- * pi-ai's federated catalogs.
+ * docs/pi-engine-swap.md). There are no factory pins: every engine
+ * resolves from a RESOLVED SPEC (the settings chain's output) to a
+ * subscription model and its stream.
  *
  * An "engine" is the model + the stream function the agent loop runs on —
- * the two things a test fake replaces. Production engines resolve the model
- * from pi-ai's static catalogs and stream through the same Models
- * collection.
+ * the two things a test fake replaces.
  */
 
 export interface PiEngine {
@@ -51,25 +47,16 @@ export type { ThinkingLevel };
 
 let collection: ReturnType<typeof createModels> | undefined;
 
-/** The process-wide pi-ai Models collection — EVERY builtin provider's
- *  catalog (model slots wave, 2026-09-20): engines and the picker resolve
- *  against all of pi-ai's per-provider catalogs, so a settings slot can pin
- *  any native model id. Auth is resolved per request by pi-ai itself from
- *  the environment (the keys seam reflects file-saved keys into env), and
- *  a provider with no key simply fails its stream with "not configured" —
- *  honest, late, and unreachable through the picker, which gates on
- *  keyPresent. */
+/** The process-wide pi-ai Models collection, used as a CATALOG only: the
+ *  ChatGPT connection reads OpenAI's model metadata from it, and read-time
+ *  pricing reads older records' API models. Nothing streams through it,
+ *  so no environment key is ever read for a model call. */
 export function piModels() {
 	if (!collection) {
 		collection = createModels({ identity: APP_IDENTITY });
 		for (const provider of builtinProviders()) collection.setProvider(provider);
 	}
 	return collection;
-}
-
-/** OpenRouter API key (BYOK); tests never read this — they inject engines. */
-export function openRouterApiKey(): string | undefined {
-	return process.env.OPENROUTER_API_KEY || undefined;
 }
 
 /** A fully-resolved model pin — the shape every engine now comes from:
@@ -94,15 +81,13 @@ function defaultThinkingLevel(model: Model<Api>): ThinkingLevel {
 	return supported[0] ?? "off";
 }
 
-/** The production engine for a RESOLVED spec (model slots wave,
- *  2026-09-20): provider-aware catalog lookup + thinking clamp. The API
- *  key is resolved by pi-ai itself from the environment per request (the
- *  keys seam reflects file-saved keys into env), so the engine never
- *  hardcodes OpenRouter's. */
+/** The production engine for a RESOLVED spec: a subscription model
+ *  (ChatGPT, or a Claude account through the user's own `claude` CLI) plus
+ *  the thinking clamp. Any other provider throws: the app has no API-key
+ *  path, so a legacy pin to one can never bill a key. */
 export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (() => boolean) = true, lifecycle?: ChatGPTDispatchLifecycle): PiEngine {
-	const models: Models = piModels();
 	const claude = isClaudeProvider(spec.provider);
-	const model = spec.provider === "chatgpt" ? chatGPTModel(spec.id) : claude ? claudeSubscriptionModel(spec.provider, spec.id) : models.getModel(spec.provider, spec.id);
+	const model = spec.provider === "chatgpt" ? chatGPTModel(spec.id) : claude ? claudeSubscriptionModel(spec.provider, spec.id) : undefined;
 	if (!model) {
 		throw new Error(`${spec.provider} catalog has no model ${spec.id}`);
 	}
@@ -120,7 +105,7 @@ export function piEngineForSpec(spec: ResolvedModelSpec, background: boolean | (
 		// the pin honest even when config or settings drift off the map.
 		streamFn: (requestModel, context, options) => {
 			const purpose = typeof background === "function" ? background : () => background;
-			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : claude ? claudeSubscriptionStream({ account: claudeAccount(spec.provider) ?? "missing" }) : models.streamSimple.bind(models);
+			const stream = spec.provider === "chatgpt" ? chatGPTStream(purpose, lifecycle) : claudeSubscriptionStream({ account: claudeAccount(spec.provider) ?? "missing" });
 			return stream(requestModel, context, { ...options, reasoning: level === "off" ? undefined : level });
 		},
 	};

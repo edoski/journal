@@ -7,7 +7,7 @@ import { GraphView } from "@/components/graph-view";
 import { MinimalHome } from "@/components/minimal-home";
 import { SetupDialog } from "@/components/setup-dialog";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
+import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
@@ -66,7 +66,7 @@ function HomeCurrent({
 	// 33 providers. The dock shows the CTA while unconfigured; submitting
 	// a topic opens the setup dialog WITH THE DRAFT PRESERVED (Save
 	// stores slots only; the learner sends the message themselves).
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const startingRef = useRef(false);
@@ -112,7 +112,7 @@ function HomeCurrent({
 		// already created the record). Zero providers opens connection setup;
 		// an unavailable selection with another provider opens its ordinary
 		// picker. The server's admission gate remains the belt.
-		if (zeroKeys) {
+		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
@@ -217,8 +217,8 @@ function HomeCurrent({
 								onClear={() => setPracticeProps([])}
 							/>
 						)}
-						setup={zeroKeys ? (
-							<ZeroKeysPill inline onOpen={() => setSetupOpen(true)} />
+						setup={unconnected ? (
+							<SignInPill inline onOpen={() => setSetupOpen(true)} />
 						) : (
 							!configured && (
 								<button

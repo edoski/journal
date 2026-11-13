@@ -2,7 +2,7 @@
 
 The developer README (split out of the storefront README, 2026-10-10). Everything below is for people working ON LearnHarness, not using it.
 
-A standalone learning app (web + Electron desktop): a **teacher agent** (Next.js; the Vercel AI SDK's `UIMessage` protocol end-to-end, LLM engine [pi-ai](pi-engine-swap.md) via OpenRouter), probe→teach lessons with graded quiz/ask interactions, a formal **session plan tree** the teacher authors once (`plan_init`) and whose progress is derived from tagged quiz calls, and a persistent cross-session **knowledge graph** of what the learner knows — the graph is the app's home page.
+A standalone learning app (web + Electron desktop): a **teacher agent** (Next.js; the Vercel AI SDK's `UIMessage` protocol end-to-end, LLM engine [pi-ai](pi-engine-swap.md) over the learner's own Claude or ChatGPT subscription), probe→teach lessons with graded quiz/ask interactions, a formal **session plan tree** the teacher authors once (`plan_init`) and whose progress is derived from tagged quiz calls, and a persistent cross-session **knowledge graph** of what the learner knows — the graph is the app's home page.
 
 Not a chat app with a graph bolted on: sessions are probe→teach lessons, the plan tree is a structured, schema-validated object, sessions accumulate into the graph through the extraction pipeline (propositions + reasoning chains — the stored truth; the canvas renders a derived image), and the teacher reaches back into the graph through read-only prober tools on its own judgment so probing compounds across sessions.
 
@@ -37,22 +37,22 @@ For Windows/Linux packages and the three-OS CI, see [`docs/desktop-release.md`](
 
 ## Environment (`.env.local`)
 
-Secrets and machine-specific paths only. Model choice and thinking budgets are the user's, not the environment's — BYOK model slots live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level; per-role and per-chat overrides ride on top). The extraction batch threshold is a settings knob too (`graph.extractionChunkTokens`, default 4096, floor 500).
+Machine-specific paths only. The app runs only on subscriptions: Claude through the user's own signed-in `claude` CLI, ChatGPT through its in-app sign-in. No API key is read for a model call, and the `claude` child never sees an `ANTHROPIC_*`, `*_API_KEY` or `*_AUTH_TOKEN` variable (`src/agent/claude-cli.ts`). Model choice and thinking budgets live in **settings** (`models` section: strong/cheap/vision, provider + model id + optional thinking level).
 
 | Variable | Purpose |
 |---|---|
-| `OPENROUTER_API_KEY` | required — all LLM calls go through OpenRouter |
 | `CHROME_PATH` | optional system Chrome fallback for demo verification; the app's own browser helper is primary (nothing is downloaded) |
+| `LH_CREDENTIALS_DIR` | optional: where web/dev keeps the ChatGPT sign-in (default: the project directory) |
 
-The packaged desktop app takes keys from `userData/auth.json` (BYOK, mode 0600, read/written directly by the server via `LH_AUTH_FILE`). PDFs render natively with pdfjs/Skia; SVGs use resvg.
+PDFs render natively with pdfjs/Skia; SVGs use resvg.
 
 ### Subscription connections in web/dev
 
 Ordinary `npm run dev` and `npm start` support the **ChatGPT** connection in Settings → Providers. No separate launcher or change to Next's listening/LAN behavior is required. `npm run desktop:dev` uses these same dev-server connections; the packaged desktop app keeps its separate main-process credentials and private IPC transport.
 
-Web/dev saves `chatgpt-credentials.json` **beside the configured API-key `auth.json`**: the project directory by default, or the directory containing `LH_AUTH_FILE`. It is an owner-only plaintext file, not files under `data/`, desktop Application Support, or a global Pi profile. Git and standalone-build exclusions cover both the file and its atomic-write temporary files. Run only one server process per credential directory: refresh serialization is process-local, not a cross-process lock.
+Web/dev saves `chatgpt-credentials.json` in the project directory by default, or in `LH_CREDENTIALS_DIR`. It is an owner-only plaintext file, not files under `data/`, desktop Application Support, or a global Pi profile. Git and standalone-build exclusions cover both the file and its atomic-write temporary files. Run only one server process per credential directory: refresh serialization is process-local, not a cross-process lock.
 
-Sign-in opens a new tab in the browser that initiated it; permit that tab if your browser blocks popups. **ChatGPT sign-in must be completed in a browser on the server's machine**, because its callback listener remains `127.0.0.1` on that machine. In the Electron dev shell, the sign-in page open in the system browser instead. Once connected, credentials and refresh remain server-owned; other browsers using that server share its connections and background-use consent, just as they share its API keys. Disconnect, storage-failure handling, and background consent retain the existing behavior; subscription routes never fall back to API-key billing.
+Sign-in opens a new tab in the browser that initiated it; permit that tab if your browser blocks popups. **ChatGPT sign-in must be completed in a browser on the server's machine**, because its callback listener remains `127.0.0.1` on that machine. In the Electron dev shell, the sign-in page open in the system browser instead. Once connected, credentials and refresh remain server-owned; other browsers using that server share its connections and background-use consent. Disconnect, storage-failure handling, and background consent retain the existing behavior; subscription routes never fall back to API-key billing.
 
 This remains a **trusted developer/shared-server mode**, not multi-user hosting. Subscription controls require same-origin JSON/custom-header requests; browser-opening actions are short-lived, origin-bound and one-use. These checks prevent ordinary cross-origin browser controls, **not user authentication or DNS-rebinding protection**. Do not expose an unprotected dev/server instance to untrusted users or the public Internet; a public deployment needs an independent access/host gate. Remote ChatGPT callback routing, per-user accounts and credential import are not implemented.
 
@@ -86,7 +86,7 @@ flowchart TB
     end
 
     subgraph ROOM["MACHINE ROOM — host"]
-        HOST["Electron main → standalone Next server ·<br/>config.ts · LH_DATA_DIR · BYOK keys"]
+        HOST["Electron main → standalone Next server ·<br/>config.ts · LH_DATA_DIR"]
     end
 
     LEARNER -->|"text · graded answers"| UI
@@ -150,7 +150,7 @@ src/
   store/                        fs adapters implementing the ports: chats · graph
                                 ledgers · jobs (+ render-settings, default-settings)
 electron/                       desktop launcher + security guard (spawns the standalone
-                                server; 1 IPC channel; LH_DATA_DIR + BYOK env)
+                                server; 1 IPC channel; LH_DATA_DIR)
 scripts/                        build-server.mjs (packaging guards), import-notes,
                                 backfill-graph, replay-layout
 data/                           chats/ · graph/ (nodes/chains/sessions/coverage
@@ -184,7 +184,7 @@ All deterministic, no LLM, no network (engines are injected — pi-ai's faux pro
 4. **Render tests** — transcript, cards, docks, composer, sidebar, coverage via React server-side rendering.
 5. **Golden fixtures** (`tests/fixtures/golden-data/`) — a REAL data dir (real records produced by the app, never hand-edited), copied to a temp dir and read through the production paths via the `LH_DATA_DIR` seam. Pins that real data parses, flattens to a legal LLM wire, derives the graph end-to-end, covers every custom-marker kind, and that reads never write. **The fixture law:** an intentional on-disk format change updates the fixtures in the same commit — see the fixture README.
 
-Tests never touch the repo's `data/` or `auth.json`. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory, and an unset `LH_AUTH_FILE` resolves to `auth.json` beside it. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
+Tests never touch the repo's `data/` or its ChatGPT sign-in. `config.ts` treats a process as a test when `NODE_ENV=test` (set by `npm test`) or when `NODE_TEST_CONTEXT` is set (node's test runner sets it in every test file, so `npx tsx --test tests/x.test.ts` counts too). In a test process, an unset `LH_DATA_DIR` resolves to `data/` inside a fresh temporary directory, and an unset `LH_CREDENTIALS_DIR` resolves to that directory. Each test process gets its own directory and removes it on exit. A test that needs to know the path, or to seed it before the stores load, sets `LH_DATA_DIR` before its first import of `config.ts`.
 
 ## Lineage
 

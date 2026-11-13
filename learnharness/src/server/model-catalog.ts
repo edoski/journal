@@ -1,20 +1,13 @@
 /**
- * The model catalog's server surface (model-control wave, 2026-09-12;
- * federated since the model-slots wave, 2026-09-20): pi-ai's catalog for
- * every KEYED provider, projected to client-safe DTOs for the picker (GET
- * /api/models), plus the validation gate for settings writes (PUT
- * /api/settings/* — the per-chat settings PUT is retired from the UI;
- * legacy records' per-chat overrides still resolve server-side).
+ * The model catalog's server surface: the models of every CONNECTED
+ * subscription (ChatGPT, each Claude account), projected to client-safe
+ * DTOs for the picker (GET /api/models), plus the validation gate for
+ * settings writes. The app runs only on subscriptions: no API key, no
+ * environment key, no keyed provider reaches a model call.
  *
- * pi-ai owns ALL the data: the catalog (id/name/cost/context/modality/
- * thinkingLevelMap) and the per-model thinking truth
- * (getSupportedThinkingLevels / clampThinkingLevel). This module only
- * projects and validates — no second registry to drift out of sync.
- *
- * Federation: `getModels()` is called per keyed provider (federated, the
- * model-slots wave), so a provider appears in the picker exactly when its
- * key is present — piModels() in src/agent/models.ts owns the provider
- * set; nothing here changes.
+ * pi-ai owns the model data (id/name/context/modality/thinkingLevelMap)
+ * and the per-model thinking truth (getSupportedThinkingLevels /
+ * clampThinkingLevel). This module only projects and validates.
  */
 
 import { clampThinkingLevel, getSupportedThinkingLevels, type Api, type Model } from "@earendil-works/pi-ai";
@@ -38,12 +31,18 @@ function claudeProviderIds(): string[] {
 }
 function connectionModel(provider: string, id: string): Model<Api> | undefined {
 	if (isClaudeProvider(provider)) return claudeConnected(provider) ? claudeSubscriptionModel(provider, id) : undefined;
-	return provider === "chatgpt" ? chatGPTModel(id) : piModels().getModel(provider, id);
+	return provider === "chatgpt" ? chatGPTModel(id) : undefined;
 }
-function connectionProviderIds(): string[] { return [...piModels().getProviders().map((p) => p.id), "chatgpt", ...claudeProviderIds()]; }
+function connectionProviderIds(): string[] { return ["chatgpt", ...claudeProviderIds()]; }
+/** Whether a model call on this provider could run now: ChatGPT signed in,
+ *  or the Claude account's Claude Code signed in to its plan. Any other
+ *  provider (an API-key provider a legacy record still names) never runs. */
+export function providerConnected(provider: string): boolean {
+	if (isClaudeProvider(provider)) return claudeConnected(provider);
+	return provider === "chatgpt" && chatGPTConnected();
+}
 import { settingsStore } from "../store/settings.ts";
 import { effectiveSettings } from "./stores.ts";
-import { keyValue } from "./keys.ts";
 import type { ChatSettings } from "../core/contracts/chat.ts";
 import type {
 	CatalogDefaults,
@@ -54,7 +53,6 @@ import type {
 	SlotPins,
 } from "../core/contracts/models.ts";
 import type { EffectiveModelSpec, EffectiveSlot } from "../core/settings-resolution.ts";
-import { AUTH_PROVIDER_KEYS } from "../core/auth-keys.ts";
 import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS, type BackgroundModelRole, type ModelSlotName, type ModelsSettings } from "../core/settings.ts";
 
 /** The picker's client-safe model entry (contract: core/contracts/models.ts). */
@@ -137,26 +135,9 @@ export function catalogSlots(): SlotPins {
 	return pins;
 }
 
-/** The providers surface (model slots wave, 2026-09-20): one row per
- *  plain-key model provider (core/auth-keys.ts's pi-ai-derived table),
- *  with keyPresent read env-wins through the keys seam, fresh per call —
- *  saving a key immediately federates the provider into the picker. */
+/** One row per subscription provider, read fresh per call. */
 export function catalogProviders(): CatalogProvider[] {
-	return AUTH_PROVIDER_KEYS.map((p) => ({
-		id: p.id,
-		envVar: p.envVar,
-		keyPresent: keyValue(p.envVar) !== undefined,
-	})).concat([
-		{ id: "chatgpt", envVar: "", keyPresent: chatGPTConnected() },
-		...claudeProviderIds().map((id) => ({ id, envVar: "", keyPresent: claudeConnected(id) })),
-	]).sort((a, b) => a.id.localeCompare(b.id));
-}
-
-/** The providers whose key is present — the picker federates exactly
- *  these (a keyless provider's models are unreachable by design; the
- *  Keys page is the discovery surface, same discipline as search). */
-function keyedProviderIds(): Set<string> {
-	return new Set(catalogProviders().filter((p) => p.keyPresent).map((p) => p.id));
+	return connectionProviderIds().map((id) => ({ id, connected: providerConnected(id) })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
 /** Project one catalog model to the client DTO. */
@@ -179,39 +160,20 @@ export function toModelDto(model: Model<Api>): ModelDto {
 	};
 }
 
-/** The live-limits index (context-meter amendment, owner 2026-09-23):
- *  provider:id → contextWindow from pi's catalog, over the SAME keyed
- *  providers the picker federates. The one source for every context
- *  meter's denominator — the stats-bar join holds /api/models' copy,
- *  and the activity feed (observability.ts) resolves job limits
- *  server-side through this. No hardcoded fallback exists anywhere:
- *  a model missing here reads limit-null (usage-only, honest render). */
+/** The live-limits index: provider:id → contextWindow over the connected
+ *  subscriptions' models. The one source for every context meter's
+ *  denominator — the stats-bar join holds /api/models' copy, and the
+ *  activity feed (observability.ts) resolves job limits server-side
+ *  through this. A model missing here reads limit-null (usage-only). */
 export function catalogContextLimits(): Map<string, number> {
-	const keyed = keyedProviderIds();
-	const index = new Map<string, number>();
-	for (const provider of piModels().getProviders()) {
-		if (!keyed.has(provider.id)) continue;
-		for (const model of piModels().getModels(provider.id)) {
-			index.set(`${provider.id}:${model.id}`, model.contextWindow);
-		}
-	}
-	for (const model of [...chatGPTModels(), ...claudeSubscriptionModels()]) index.set(`${model.provider}:${model.id}`, model.contextWindow);
-	return index;
+	return new Map([...chatGPTModels(), ...claudeSubscriptionModels()].map((model) => [`${model.provider}:${model.id}`, model.contextWindow]));
 }
 
-/** The full picker payload: every model of every configured provider
- *  (sorted by provider then id — stable, diff-friendly) + the config
- *  defaults a settings-less chat runs + the background roles' resolved
- *  pins (the settings UI's per-role default captions). */
+/** The full picker payload: every model of every connected subscription +
+ *  the defaults a settings-less chat runs + the background roles'
+ *  resolved pins (the settings UI's per-role default captions). */
 export function modelCatalog(): ModelCatalogResponse {
-	const keyed = keyedProviderIds();
-	const models = piModels()
-		.getProviders()
-		.filter((p) => keyed.has(p.id))
-		.flatMap((p) => piModels().getModels(p.id))
-		.map(toModelDto)
-		.sort((a, b) => (a.provider === b.provider ? a.id.localeCompare(b.id) : a.provider.localeCompare(b.provider)))
-		.concat([...chatGPTModels(), ...claudeSubscriptionModels()].map(toModelDto));
+	const models = [...chatGPTModels(), ...claudeSubscriptionModels()].map(toModelDto);
 	return {
 		models,
 		defaults: catalogDefaults(),

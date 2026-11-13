@@ -6,7 +6,6 @@ import { createRoot, type Root } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { AgentSection } from "../components/settings/agent-section.tsx";
-import { providerKeyLabel, classifyKeys } from "../components/settings/keys-section.tsx";
 import { useModelCatalog } from "../components/model-catalog.ts";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { useModelSetup, savedSlotsConfigured, selectedModelUnavailable, openModelPicker } from "../components/setup-cta.tsx";
@@ -30,7 +29,7 @@ let requests: ReturnType<typeof deferred<Response>>[] = [];
 let writes: ModelsSettings[] = [];
 let snapshot: ReturnType<typeof useModelCatalog>;
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { resolve, promise }; }
-const provider = { id: "fixture", envVar: "FIXTURE_KEY", label: "Fixture" };
+const provider = { id: "fixture", label: "Fixture" };
 const a: ModelCatalogEntry = { id: "vendor/model:free", name: "Model free", provider: provider.id, input: ["text", "image"], reasoning: true, supportedLevels: ["off", "low", "high"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 };
 const b: ModelCatalogEntry = { ...a, id: "claude-opus-5-5", name: "Claude Opus 5.5", supportedLevels: ["off", "medium"] };
 function catalog(connected = true): ModelCatalogResponse {
@@ -38,7 +37,7 @@ function catalog(connected = true): ModelCatalogResponse {
 		models: connected ? [a, b] : [], defaults: null,
 		rolePins: { researcher: null, demoBuilder: null, visualMaker: null, extractor: null, auditor: null },
 		slots: { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" }, cheap: { model: { provider: a.provider, id: a.id }, thinkingLevel: "high" }, vision: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" } },
-		providers: [{ ...provider, keyPresent: connected }],
+		providers: [{ ...provider, connected: connected }],
 	};
 }
 function Reader() { snapshot = useModelCatalog(); return null; }
@@ -122,7 +121,7 @@ test("zero providers always means exclusive connection stage; reconnect with all
 	assert.equal(document.querySelector('[data-testid="setup-add-provider"]'), null);
 	assert.equal(document.querySelector('[data-testid="setup-save"]'), null);
 	await act(async () => notifySettingsSaved("keys"));
-	const other = catalog(false); other.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	const other = catalog(false); other.providers = [{ id: "other", connected: true }];
 	await answer(3, other);
 	assert.equal(closed, 1); assert.equal(completed, 0); assert.deepEqual(writes, []);
 	assert.equal(document.querySelector('[data-testid="setup-dialog"]'), null, "no intermediate picker frame after reconnect");
@@ -151,7 +150,7 @@ for (const count of [0, 1, 2]) test(`connecting with ${count} saved slots only r
 	await warm(before);
 	let closed = 0; await render(<><Reader />{setup(() => { closed++; })}</>); await answer(1, before);
 	assert.ok(element("setup-stage-keys"));
-	const connected = { ...before, models: [{ ...b, provider: "other" }], providers: [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }] };
+	const connected = { ...before, models: [{ ...b, provider: "other" }], providers: [{ id: "other", connected: true }] };
 	await act(async () => notifySettingsSaved("keys")); await answer(2, connected);
 	assert.ok(element("setup-stage-pickers")); assert.equal(document.querySelector('[data-testid="setup-stage-keys"]'), null); assert.equal(closed, 0);
 	for (const slot of ["strong", "cheap", "vision"] as const) {
@@ -201,14 +200,14 @@ test("saved completeness follows ordinary repairs and survives temporary connect
 	assert.equal(state!.configured, true);
 	await act(async () => notifySettingsSaved("keys")); assert.equal(state!.configured, true);
 	const partial = catalog(false); partial.slots.vision = null;
-	await answer(1, partial); assert.equal(state!.configured, false); assert.equal(state!.zeroKeys, true);
+	await answer(1, partial); assert.equal(state!.configured, false); assert.equal(state!.unconnected, true);
 	await act(async () => notifySettingsSaved("models")); await answer(2, catalog(false));
-	assert.equal(state!.configured, true); assert.equal(state!.zeroKeys, true, "saved is not connected");
+	assert.equal(state!.configured, true); assert.equal(state!.unconnected, true, "saved is not connected");
 });
 
 test("blocked session recovery opens its ordinary picker, never changes Strong or substitutes a model", async () => {
 	installFetch(); const available = { ...b, provider: "other" }; const body = catalog();
-	body.models = [available]; body.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	body.models = [available]; body.providers = [{ id: "other", connected: true }];
 	body.slots.strong = { model: { provider: "other", id: b.id }, thinkingLevel: "medium" };
 	const globals: ModelsSettings = { strong: body.slots.strong };
 	const session = { model: { provider: a.provider, id: a.id }, thinkingLevel: "xhigh" };
@@ -234,7 +233,7 @@ test("blocked session recovery opens its ordinary picker, never changes Strong o
 
 for (const result of ["override", "legacy", "http-failure", "network-failure"] as const) test(`known catalog never enforces provisional Strong on a pending session; session read ${result}`, async () => {
 	installFetch(); const available = { ...b, provider: "other" }; const body = catalog();
-	body.models = [available]; body.providers = [{ id: "other", envVar: "OTHER_KEY", keyPresent: true }];
+	body.models = [available]; body.providers = [{ id: "other", connected: true }];
 	// Global Strong is unavailable, but this existing session owns a valid
 	// model. Resolve global settings first while keeping its record pending.
 	const globals: ModelsSettings = { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "xhigh" } };
@@ -271,7 +270,7 @@ test("availability and setup completeness never conflate missing metadata, disco
 	assert.equal(selectedModelUnavailable(body, `${a.provider}:${a.id}`), true);
 	assert.equal(selectedModelUnavailable(undefined, `${a.provider}:${a.id}`), false);
 	assert.equal(selectedModelUnavailable(body, undefined), false);
-	body.models = [b]; body.providers = [{ ...provider, keyPresent: true }];
+	body.models = [b]; body.providers = [{ ...provider, connected: true }];
 	assert.equal(selectedModelUnavailable(body, `${b.provider}:${b.id}`), false);
 	body.slots.cheap = null; assert.equal(savedSlotsConfigured(body.slots), false);
 });
@@ -286,12 +285,4 @@ test("shared refresh fences late failure as well as late success, and Retry clea
 	assert.equal(snapshot.failed, true); assert.equal(snapshot.catalog?.models[0]?.id, b.id);
 	await act(async () => snapshot.refresh()); assert.equal(snapshot.failed, false);
 	await answer(4, fresh);
-});
-
-test("OpenCode's saved shared credential names both Pi providers without changing addable-provider semantics", () => {
-	const providers = [{ id: "opencode", envVar: "OPENCODE_API_KEY", label: "OpenCode Zen" }, { id: "opencode-go", envVar: "OPENCODE_API_KEY", label: "OpenCode Go" }];
-	assert.equal(providerKeyLabel("OPENCODE_API_KEY", providers), "OpenCode (Zen / Go)");
-	assert.equal(providerKeyLabel("OPENCODE_API_KEY", [...providers].reverse()), "OpenCode (Zen / Go)");
-	assert.equal(providerKeyLabel("FIXTURE_KEY", [provider]), "Fixture");
-	assert.equal(classifyKeys([{ id: "OPENCODE_API_KEY", present: true, masked: "…fake", source: "file", shadowedByEnv: false }], providers).addable.length, 0);
 });

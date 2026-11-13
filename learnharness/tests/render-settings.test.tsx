@@ -14,7 +14,6 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TOGGLE_TOOLS, AgentSection } from "../components/settings/agent-section.tsx";
 import { AppearanceSection, GraphSection } from "../components/settings/appearance-section.tsx";
-import { KeysSection } from "../components/settings/keys-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import type { GraphSettings } from "../src/core/index.ts";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -248,13 +247,6 @@ describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", 
 		);
 		assert.ok(tagOf(html, "input-chunk-tokens").includes('value="6000"'));
 		assert.ok(html.includes(">6000 tok</"));
-	});
-});
-
-describe("KeysSection (thin SSR)", () => {
-	it("SSR = the loading state (effects never fire)", () => {
-		const html = renderToStaticMarkup(<KeysSection />);
-		assert.ok(html.includes("Loading keys…"));
 	});
 });
 

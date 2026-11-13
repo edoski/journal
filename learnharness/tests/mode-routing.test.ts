@@ -38,8 +38,9 @@ import { PATHS } from "../config.ts";
 import { MODE_HANDOFF_ACK_TEXT, MODE_HANDOFF_TEXT, type SteerMessage } from "../src/core/contracts.ts";
 import { activeProblemOf, needsContinuation, newUserMessage, sessionModeOf, type LhMessage } from "../src/core/native-messages.ts";
 import { projectView } from "../src/core/view.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 const createdChats: string[] = [];
 after(() => {
@@ -54,7 +55,7 @@ after(() => {
 
 function newChat(title: string): string {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	createdChats.push(chat.id);
 	return chat.id;
 }

@@ -28,7 +28,6 @@
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { AUTH_PROVIDER_KEYS } from "./auth-keys.ts";
 import { isClaudeProvider } from "./contracts/claude.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
@@ -134,9 +133,9 @@ export class ModelsNotConfiguredError extends Error {
 	}
 }
 
-/** The key-presence refusal (provider-key interlude, owner, 2026-09-25):
- * a PINNED model is not enough — its provider's key must be present, or
- * the action dies mid-stream masked to a generic error. Same envelope
+/** The connection refusal: a PINNED model is not enough — its provider
+ * must be signed in, or the action dies mid-stream masked to a generic
+ * error. The code keeps its historical name (provider_key_missing). Same envelope
  * family as modelsNotConfigured: HTTP callers get 503 + this JSON;
  * in-band consumers (the job record's error field) carry the human
  * `error` line. `provider` names whose key is gone; `slots` names the
@@ -147,20 +146,19 @@ export interface ProviderKeyMissing {
 	error: string;
 	/** The machine discriminator the client switches on. */
 	code: typeof PROVIDER_KEY_MISSING_CODE;
-	/** The provider whose key is gone, e.g. "openrouter". */
+	/** The provider that is not signed in, e.g. "chatgpt". */
 	provider: string;
 	/** Which slot tiers the refused action resolves to that provider. */
 	slots: ModelSlotName[];
 }
-/** The refusal wording's invariant tail — the matcher below keys on it
- * (the label prefix varies by provider). */
-const PROVIDER_KEY_MISSING_TAIL = "key is set — add one in Settings → Keys";
-/** Claude has no app-held key: its "key" is the user's own Claude Code sign-in. */
+/** Claude's connection is the user's own Claude Code sign-in. */
 const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers";
+const CHATGPT_NOT_CONNECTED = "ChatGPT is not signed in — connect it in Settings → Providers";
+/** The tail of the refusal for a provider only an API key could run, which the app no longer uses. */
+const API_KEY_PROVIDER_TAIL = "runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent";
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {
-	const label = AUTH_PROVIDER_KEYS.find((p) => p.id === provider)?.label ?? provider;
 	return {
-		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : `No ${label} ${PROVIDER_KEY_MISSING_TAIL}`,
+		error: isClaudeProvider(provider) ? CLAUDE_NOT_CONNECTED : provider === "chatgpt" ? CHATGPT_NOT_CONNECTED : `${provider} ${API_KEY_PROVIDER_TAIL}`,
 		code: PROVIDER_KEY_MISSING_CODE,
 		provider,
 		slots,
@@ -171,7 +169,7 @@ export function providerKeyMissing(provider: string, slots: ModelSlotName[]): Pr
  * scary-error) — the envelope's home module owns the string so the
  * writer and the matcher can never drift. */
 export function isProviderKeyRefusal(error: string | undefined): boolean {
-	return !!error && (error.endsWith(PROVIDER_KEY_MISSING_TAIL) || error === CLAUDE_NOT_CONNECTED);
+	return !!error && (error === CLAUDE_NOT_CONNECTED || error === CHATGPT_NOT_CONNECTED || error.endsWith(API_KEY_PROVIDER_TAIL));
 }
 /** The typed throw for in-process seams (extraction pipeline) — the
  * ProviderKeyMissing sibling of ModelsNotConfiguredError: callers catch

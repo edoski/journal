@@ -4,7 +4,7 @@
  * What this process is and is not:
  *   IS:  a thin launcher + security guard around the app's real server —
  *        `next build`'s standalone server.js (Next 16), spawned as a child
- *        on 127.0.0.1 with the BYOK auth file and the LH_DATA_DIR seam.
+ *        on 127.0.0.1 with the LH_DATA_DIR seam.
  *   NOT: a host for any app logic. Everything — teacher turns, extraction,
  *        the graph — runs in the Next server, unchanged.
  *
@@ -16,12 +16,9 @@
  *     read-only and native .node/dylib can't dlopen from one);
  *   - all mutable state under userData (never inside the .app bundle —
  *     translocated apps are read-only);
- *   - keys ride the child's ENV, never argv; auth.json (BYOK) is a flat
- *     {VAR: value} JSON map, plaintext, mode 0600 — server-managed since
- *     the auth-keys wave (2026-09-19): the child reads/writes it DIRECTLY
- *     (LH_AUTH_FILE below) and reflects values into its own env. The old
- *     spawn-time env injection retired with that wave — a copy made here
- *     would shadow every settings-page key change until restart.
+ *   - no API key exists: model calls run only on subscriptions (ChatGPT
+ *     through this process's sign-in owner, Claude through the user's own
+ *     `claude` CLI).
  */
 
 const { app, BrowserWindow, Menu, ipcMain, session, shell } = require("electron");
@@ -49,7 +46,6 @@ const PRODUCT_NAME = "LearnHarness";
 // Must run before the LH_DEV_URL suffix below — dev becomes
 // "LearnHarness-dev".
 app.setName(PRODUCT_NAME);
-const AUTH_FILE = () => path.join(app.getPath("userData"), "auth.json");
 const DATA_DIR = () => path.join(app.getPath("userData"), "data");
 
 /** The packaged standalone server (extraResources → Resources/server).
@@ -165,13 +161,6 @@ function freePort() {
 	});
 }
 
-/** BYOK keys: auth.json in userData, flat {VAR: value} map, 0600 —
- *  SERVER-MANAGED since the auth-keys wave (2026-09-19). This shell no
- *  longer reads or injects it: the child gets LH_AUTH_FILE below and does
- *  its own read/reflect/write, so a key saved in the settings page takes
- *  effect on the next model call — no restart. Real environment variables
- *  still win over the file inside the child (its documented rule). */
-
 function log(line) {
 	const stamp = new Date().toISOString();
 	// The stdout write is guarded (EPIPE hardening, 2026-10-10): a packaged
@@ -212,10 +201,6 @@ function startServer(port) {
 					PORT: String(port),
 					HOSTNAME: "127.0.0.1", // the server defaults to 0.0.0.0 — never
 					LH_DATA_DIR: DATA_DIR(),
-					// The auth/keys store — the child reads AND writes this file itself
-					// (no env injection anymore: a spawn-time copy would shadow every
-					// settings-page key change until restart; env wins over file).
-					LH_AUTH_FILE: AUTH_FILE(),
 					LH_DESKTOP_SERVER: "1",
 					LH_DESKTOP_API_SECRET: desktopAPISecret,
 				},
@@ -500,7 +485,7 @@ async function main() {
 			},
 		});
 		log(`starting server: ${serverEntry()}`);
-		log(`data dir: ${DATA_DIR()}${fs.existsSync(AUTH_FILE()) ? " · auth.json: present" : " · auth.json: ABSENT (no BYOK keys yet)"}`);
+		log(`data dir: ${DATA_DIR()}`);
 		await startServer(new URL(url).port);
 		await waitUntilUp(url);
 		log(`server up: ${url}`);
@@ -512,7 +497,7 @@ async function main() {
 	// child is the only recipient of credential leases over inherited IPC.
 	ipcMain.handle("lh:chatgpt:control", async (event, command) => {
 		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return { error: "Untrusted desktop request." };
-		if (!chatgpt || !serverProcess?.connected) return { available: false, pending: false, activeId: null, accounts: [], error: "ChatGPT sign-in requires the desktop app's private server connection. Browser-only and externally launched development servers keep API-key connections." };
+		if (!chatgpt || !serverProcess?.connected) return { available: false, pending: false, activeId: null, accounts: [], error: "ChatGPT sign-in requires the desktop app's private server connection. Browser-only and externally launched development servers use their own web sign-in." };
 		return chatGPTControl(command, chatgpt);
 	});
 

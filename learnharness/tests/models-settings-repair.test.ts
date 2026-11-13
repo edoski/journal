@@ -12,9 +12,7 @@ import type { LoadedClaudeAccount } from "../src/agent/claude-accounts.ts";
 // Claude Code's sign-in from a fake `claude auth status`.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lh-models-repair-"));
 process.env.LH_DATA_DIR = directory;
-process.env.LH_AUTH_FILE = path.join(directory, "auth.json");
-process.env.LH_IGNORE_ENV_KEYS = "1";
-fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+process.env.LH_CREDENTIALS_DIR = directory;
 const originalSend = Object.getOwnPropertyDescriptor(process, "send");
 const originalConnected = Object.getOwnPropertyDescriptor(process, "connected");
 const marker = process.env.LH_DESKTOP_SERVER, secret = process.env.LH_DESKTOP_API_SECRET;

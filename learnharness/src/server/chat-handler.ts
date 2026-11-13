@@ -34,7 +34,7 @@ import { collectToolCallIds } from "./pi/call-ids.ts";
 import { providerEventNote } from "../agent/provider-events.ts";
 import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
-import { providerKeyPresent } from "./keys.ts";
+import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import {
 	extractionEnabled,
 	graphToolsEnabled,

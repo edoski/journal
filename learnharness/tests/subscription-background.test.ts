@@ -9,7 +9,7 @@ import { piModels } from "../src/agent/models.ts";
 import { toLlmMessages } from "../src/core/native-messages.ts";
 import { buildSubagentSteer } from "../src/core/contracts.ts";
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), "lh-subscription-background-"));
-process.env.LH_DATA_DIR = path.join(directory, "data"); process.env.LH_AUTH_FILE = path.join(directory, "auth.json"); fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+process.env.LH_DATA_DIR = path.join(directory, "data"); process.env.LH_CREDENTIALS_DIR = directory;
 const { stores } = await import("../src/server/stores.ts");
 const { beginTurn, endTurn } = await import("../src/server/turn-liveness.ts");
 const { deliverJobResult, registerLiveAgent, unregisterLiveAgent, setTurnRunner, settleSteers, steerLiveChat, automaticFollowUpAllowed } = await import("../src/server/jobs.ts");

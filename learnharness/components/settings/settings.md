@@ -22,7 +22,7 @@ The settings sheet and its control kit under the Proposed design: `settings-dial
 | switch (`Toggle`) | the shadcn `Switch` (components/ui/switch.md): 32 × 20 track, 16px disc inset 2; on: `muted-foreground` track with a `foreground` disc (owner, 2026-09-20: grey with a white disc, never a bright track), off: `input` track with a muted disc; 2px ring offset 2 on focus; its tooltip is a `Hint` |
 | disclosure | a prompt part's Show text / Hide text is a `Collapsible`; the original and your version are `Textarea`s |
 | buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect, default (the accent) for Save |
-| pickers | model and provider: a modal picker `Popover` with `ModelCommand` / `ProviderCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
+| pickers | model: a modal picker `Popover` with `ModelCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
 
 ## What Proposed leaves out of Appearance
 

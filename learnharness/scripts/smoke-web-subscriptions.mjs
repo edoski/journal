@@ -26,7 +26,6 @@ assert(model, "Installed SDK catalog required.");
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "lh-web-runtime-"));
 await fs.chmod(profile, 0o700);
 for (const name of ["home", "config", "cache", "xdg-data", "data", "pi", "claude", "codex", "tmp"]) await fs.mkdir(path.join(profile, name), { mode: 0o700 });
-await fs.writeFile(path.join(profile, "auth.json"), "{}\n", { mode: 0o600 });
 const preload = path.join(profile, "offline-fetch.mjs");
 await fs.writeFile(preload, `const original = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
@@ -40,7 +39,7 @@ const env = {
 	PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: path.join(profile, "home"),
 	XDG_CONFIG_HOME: path.join(profile, "config"), XDG_CACHE_HOME: path.join(profile, "cache"), XDG_DATA_HOME: path.join(profile, "xdg-data"),
 	PI_CODING_AGENT_DIR: path.join(profile, "pi"), PI_AGENT_DIR: path.join(profile, "pi"), CLAUDE_CONFIG_DIR: path.join(profile, "claude"), CODEX_HOME: path.join(profile, "codex"),
-	TMPDIR: path.join(profile, "tmp"), LH_AUTH_FILE: path.join(profile, "auth.json"), LH_DATA_DIR: path.join(profile, "data"),
+	TMPDIR: path.join(profile, "tmp"), LH_CREDENTIALS_DIR: profile, LH_DATA_DIR: path.join(profile, "data"),
 	NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`, NEXT_TELEMETRY_DISABLED: "1",
 };
 const saved = {
@@ -75,7 +74,7 @@ async function run(mode) {
 		});
 		// Controls have not been imported through an HTTP request yet.
 		const catalog = (await (await request("/api/models")).json()).providers;
-		assert(catalog.find((provider) => provider.id === "chatgpt")?.keyPresent, `${mode}: cold chatgpt unavailable.`);
+		assert(catalog.find((provider) => provider.id === "chatgpt")?.connected, `${mode}: cold chatgpt unavailable.`);
 		let state = await (await request("/api/subscriptions")).json();
 		assert.equal(state.chatgpt.accounts[0].email, "fixture@example.invalid");
 		for (const secret of ["fixture-chatgpt-access", "fixture-chatgpt-refresh", "fixture-id-token"]) assert(!JSON.stringify(state).includes(secret));
@@ -106,7 +105,7 @@ async function run(mode) {
 		assert.equal((await request("/api/subscriptions", { providerId: "chatgpt", op: "cancel" })).status, 200);
 		assert.equal((await fetch(origin + "/api/subscriptions", { method: "POST", headers: { origin: "https://unrelated.invalid", "content-type": "application/json", "x-learnharness-subscriptions": "1" }, body: JSON.stringify({ providerId: "chatgpt", op: "disconnect", id: "offline-account" }) })).status, 403);
 		assert.equal((await request("/api/subscriptions", { providerId: "chatgpt", op: "disconnect", id: "offline-account" })).status, 200);
-		assert.equal((await (await request("/api/models")).json()).providers.find((provider) => provider.id === "chatgpt").keyPresent, false);
+		assert.equal((await (await request("/api/models")).json()).providers.find((provider) => provider.id === "chatgpt").connected, false);
 		console.log(`[smoke-web-subscriptions] ${mode}: cold catalogs, safe status, cross-route SSE/consent/disconnect, opaque redirect/replay, CSRF${mode === "dev" ? ", owner retained across source reload" : ""} passed`);
 	} catch (error) { console.error(logs); throw error; }
 	finally {

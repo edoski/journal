@@ -7,7 +7,7 @@ import { Composer } from "@/components/composer";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { SetupDialog } from "@/components/setup-dialog";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
+import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
 import { StatsBar } from "@/components/stats-bar";
 import { ChainTableOverlay } from "@/components/chain-table.tsx";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
@@ -244,7 +244,7 @@ function NewSessionCurrent({ initialConfigured, mode = "teach" }: { initialConfi
 	// 33 providers, chats cannot start. The draft stays in the textarea;
 	// Save stores the slots and never sends (owner ruling 2026-10-09) —
 	// the learner sends the draft themselves.
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
 
 	const send = useCallback(() => {
@@ -260,7 +260,7 @@ function NewSessionCurrent({ initialConfigured, mode = "teach" }: { initialConfi
 		// sidebar. Zero providers opens connection setup; an unavailable
 		// selection with another provider opens the ordinary Strong picker.
 		// The server's admission gate remains the belt.
-		if (zeroKeys) {
+		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
@@ -285,7 +285,7 @@ function NewSessionCurrent({ initialConfigured, mode = "teach" }: { initialConfi
 				setBusy(false);
 				setStartError(true);
 			});
-	}, [text, router, configured, zeroKeys, catalog, mode, courseChoice]);
+	}, [text, router, configured, unconnected, catalog, mode, courseChoice]);
 
 	return (
 		<>
@@ -326,8 +326,8 @@ function NewSessionCurrent({ initialConfigured, mode = "teach" }: { initialConfi
 					/>
 				}
 				setupCta={
-					zeroKeys ? (
-						<ZeroKeysPill inline onOpen={() => setSetupOpen(true)} />
+					unconnected ? (
+						<SignInPill inline onOpen={() => setSetupOpen(true)} />
 					) : (
 						!configured && (
 							<button

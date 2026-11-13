@@ -10,6 +10,7 @@ import type { LhMessage } from "../src/core/native-messages.ts";
 import type { ChatInput } from "../src/core/input-events.ts";
 import type { QuestionAnswerData } from "../src/core/question-core.ts";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 assert.equal(process.env.NODE_ENV, "test");
 const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-malformed-question-")));
@@ -17,9 +18,8 @@ const COURSE = path.join(scratch, "course");
 fs.mkdirSync(COURSE);
 const engineFake = useFakeEngine(scratch, [{ workspace: COURSE, title: "Fixture course" }]);
 process.env.LH_DATA_DIR = path.join(scratch, "data");
-process.env.LH_AUTH_FILE = path.join(scratch, "auth.json");
-process.env.OPENROUTER_API_KEY = "offline-key-presence-only";
-fs.writeFileSync(process.env.LH_AUTH_FILE, "{}");
+process.env.LH_CREDENTIALS_DIR = scratch;
+await signInTestClaude();
 after(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 const { createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
@@ -51,7 +51,7 @@ function scripted(steps: FauxResponseStep[]) {
 const replacement = () => fauxAssistantMessage([fauxToolCall("explain", valid, { id: "replacement" })], { stopReason: "toolUse" });
 function configured(messages: LhMessage[] = [], course = false) {
 	const chat = chatStore.createChat("Offline malformed question", course ? { workspace: COURSE, title: "Fixture course" } : undefined);
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	chatStore.saveTree(chat.id, { nodes: [{ id: "fixture", title: "Fixture" }], edges: [], version: 1 });
 	chatStore.saveMessages(chat.id, messages);
 	return chat.id;
