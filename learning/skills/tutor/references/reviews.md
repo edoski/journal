@@ -8,7 +8,7 @@
 4. Put the next question in the same message. No recap.
 5. Record one attempt per answer, with the question asked as `text`, `response`, `help`, `result`, `sure` and `chose`. A confident error also rewrites `gap` and the `prompt`; broken reasoning rewrites `gap`. Only the first try on a due day counts; retries are relearning.
 
-When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line (how many are due, and the most overdue) and proposes a review block, today's review and as far past it as the learner wants, before new material; the learner decides.
+When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line (how many are due, and the most overdue) and proposes a review block, today's review and as far past it as the learner wants, before new material; the learner decides. The course's daily plan, when you have it, is the default for the day: its reviews, then its new topics, never more than the learner's `daily_topics`; say it in one line and let the learner change it.
 
 Ask once per course whether reviews are done with closed notes and store the answer as the course preference `review_notes`; with open notes, attempts are `uncertain`. A mock replaces the day's review for the topics it covers.
 
@@ -34,14 +34,15 @@ At the first session of a new week, offer a look at the week in one line after t
 
 ## Exam run-up
 
-Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam. Within 21 days of the exam the course's run-up figures list the path topics `not_introduced`, the `unready` ones (no `solid` verdict in two weeks) and, when the Journal has a schedule, the `study_days` until a week before the exam and the `pace` of new topics per study day. The phase follows `days_left`:
+Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam.
 
-| Days left | Phase |
+The engine paces the exam from the day its date is saved: the daily plan introduces the path's new topics from today so the last comes four days before the final review, at most three a day, and lists in `does_not_fit` those it cannot place; say which in one line and let the learner choose what to drop or where to add time. Every topic gets one final review from `final_review_days` before the exam (6 unless the course says otherwise), spread over the days to the exam by the daily budget; after it a right answer schedules nothing more, a miss comes back the next day. Nothing is planned on the exam day, and once it has passed reviews pause until a new exam date is saved: ask whether there is one. Within 21 days of the exam the course's run-up figures list the path topics `not_introduced`, the taught `unready` ones (no `solid` verdict in two weeks), the `study_days` left that take new topics and the `pace` of new topics per such day. The phase follows `days_left`:
+
+| Days left | Phase (with the final review 6 days out; shift it with `final_review_days`) |
 | --- | --- |
-| 21–8 | today's review plus two mixed sets a week; introduce the remaining path topics at `pace` per study day |
-| 7–5 | mock 1 |
-| 4–3 | targeted relearning: mock-1 failures, lapsed and `unready` topics |
-| 2 | mock 2, or an oral simulation for an oral exam |
+| 21–8 | the daily plan's reviews and new topics, plus two mixed sets a week |
+| 7 | mock 1 |
+| 6–2 | the final review as the plan spreads it: every topic once, mock-1 failures and misses relearned the next day; mock 2 on day 2, or an oral simulation for an oral exam |
 | 1 | a light mixed review only |
 
 Each mock answer is an unaided attempt on the topics it genuinely exercised; prerequisites get no implicit credit. A mock replaces the day's review for the topics it covers.
