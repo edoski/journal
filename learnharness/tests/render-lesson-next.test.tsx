@@ -20,6 +20,7 @@ import { PracticeDock } from "../components/practice-dock.tsx";
 import { ProblemCard, ConcludeCard, ThinkingCard } from "../components/practice-cards.tsx";
 import { ToolCallCard } from "../components/artifacts/tool-call-card.tsx";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
+import { ProbeDoneCard } from "../components/artifacts/probe-done-card.tsx";
 import { PhaseDivider } from "../components/phase-divider.tsx";
 import { CompactionCutDivider, CompactionMomentDivider } from "../components/compaction-divider.tsx";
 import { AnsweredCard } from "../components/answered-card.tsx";
@@ -124,6 +125,14 @@ describe("agent chrome out of the Proposed lesson", () => {
 	it("a tool call leaves no row in the column", () => {
 		const document = documentFor(proposed(<ToolCallCard part={part({ type: "tool-read", state: "output-available", toolCallId: "t", input: { path: "notes.md" } })} />));
 		assert.equal(document.body.innerHTML, "");
+	});
+
+	it("the prober's hand-off to the teacher stays out: no notes about the learner in the column", () => {
+		const input = { assessment: { strands: [{ strand: "Closure", assessment: "FLOOR: one-step proofs. CEILING: he stalls on inverses (o7)." }], summary: "Adult learner. He asked to skip the warm-ups." } };
+		for (const state of ["input-streaming", "input-available", "output-available"]) {
+			const document = documentFor(proposed(<ProbeDoneCard part={{ state, input, output: { ok: true } }} />));
+			assert.equal(document.body.innerHTML, "", state);
+		}
 	});
 
 	it("a running tool is one muted activity line with no arguments", () => {

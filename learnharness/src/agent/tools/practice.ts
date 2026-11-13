@@ -147,7 +147,7 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the outcome: solved, solvedWithHints, movedOn, or surrendered — bare words, no quotes (dismissed is synthesized, never yours)." },
 	),
 	verdict: Type.String({
-		description: "REQUIRED — the plain-language verdict: what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
+		description: "REQUIRED — the plain-language verdict, shown to the learner on the card: addressed to him as \"you\", what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],

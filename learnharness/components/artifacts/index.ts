@@ -28,8 +28,9 @@ export const artifactRenderers: Record<string, ComponentType<ArtifactPartProps>>
 	// Artifacts (W6 fills in the components):
 	demo: DemoCard,
 	visual: VisualCard,
-	// The probe conclusion: the assessment belongs to the learner as much as
-	// to the transcript (docs/probe-teach-split.md §2). Plain v1 card.
+	// The probe conclusion (docs/probe-teach-split.md §2): a plain v1 card
+	// in the Current design; the Proposed lesson keeps the prober's hand-off
+	// to the teacher out of the transcript.
 	probe_done: ProbeDoneCard,
 	// The learner-filesystem set (sources v1): one quiet expandable
 	// tool-call card each — collapsed one-liner (tool name + headline

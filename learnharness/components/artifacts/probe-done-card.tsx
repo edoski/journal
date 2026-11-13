@@ -3,15 +3,14 @@
 import { ClipboardCheckIcon } from "lucide-react";
 import { parseProbeDoneInput, type ProbeDoneResult } from "@/src/core";
 import { useLessonDesign } from "@/components/lesson/lesson-design";
-import { LessonCard } from "@/components/lesson/lesson-card";
 
 /**
  * The probe conclusion card (docs/probe-teach-split.md §2): renders the
  * prober's probe_done call. The INPUT is the learner assessment — strand by
- * strand, where his edge sits — and it belongs to the learner as much as to
- * the transcript: it streams live while the prober writes it and stays as
- * the handoff artifact. The OUTPUT is the seam's ack (ok) or the refusal
- * the prober retried on (rendered quiet and small — it is model-facing
+ * strand, where his edge sits — the prober's hand-off to the teacher. The
+ * Current design streams it live and keeps it as the handoff artifact; the
+ * Proposed lesson draws nothing, since it is written about him, not to
+ * him. The OUTPUT is the seam's ack (ok) or the refusal the prober retried on (rendered quiet and small — it is model-facing
  * bookkeeping, kept only for transcript honesty).
  *
  * The input preview is only trustworthy while the call is pending — an
@@ -25,6 +24,10 @@ import { LessonCard } from "@/components/lesson/lesson-card";
  */
 export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unknown; state?: unknown } }) {
 	const quiet = useLessonDesign().variant === "proposed";
+	// The assessment is the prober's hand-off to the teacher, written about
+	// the learner in the third person with its own shorthand: the Proposed
+	// lesson keeps it out of the transcript.
+	if (quiet) return null;
 	const output = part.output as ProbeDoneResult | undefined;
 	const state = typeof part.state === "string" ? part.state : "";
 
@@ -42,29 +45,6 @@ export function ProbeDoneCard({ part }: { part: { input?: unknown; output?: unkn
 	const assessment = input?.assessment;
 	const strands = assessment && Array.isArray(assessment.strands) ? assessment.strands : null;
 
-	if (quiet) {
-		return (
-			<LessonCard data-testid="probe-done-card" label="Where you are starting from" className="my-2">
-				{output && !output.ok ? (
-					<p className="text-row text-muted-foreground">The prober retried: {output.error}</p>
-				) : state === "output-error" ? (
-					<p className="text-row text-muted-foreground">The assessment was malformed; the prober retried with a corrected one.</p>
-				) : strands ? (
-					<div className="flex flex-col gap-3">
-						{strands.map((s, i) => (
-							<div key={i}>
-								<div className="text-prose font-semibold">{s.strand}</div>
-								<div className="text-row text-muted-foreground">{s.assessment}</div>
-							</div>
-						))}
-						{assessment?.summary && <p className="text-prose">{assessment.summary}</p>}
-					</div>
-				) : (
-					<p className="text-row text-muted-foreground">Writing the assessment…</p>
-				)}
-			</LessonCard>
-		);
-	}
 	return (
 		<div data-testid="probe-done-card" className="my-3 rounded-xl border bg-card/60 p-3">
 			<div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
