@@ -99,9 +99,13 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "plan": {
             "final_review_days": 6,
             "days": [
-                {"date": day(0), "reviews": ["systems"], "new": []},
-                {"date": day(3), "reviews": ["rank", "systems"], "new": []},
-                {"date": day(6), "reviews": ["rank"], "new": []},
+                {"date": day(0), "reviews": [], "new": ["systems"]},
+                {"date": day(1), "reviews": ["systems"], "new": ["rank"]},
+                {"date": day(2), "reviews": ["rank"], "new": ["eigen"]},
+                {"date": day(3), "reviews": ["eigen"], "new": []},
+                {"date": day(4), "reviews": ["systems"], "new": []},
+                {"date": day(5), "reviews": ["rank"], "new": []},
+                {"date": day(6), "reviews": ["eigen"], "new": []},
             ],
         },
     }

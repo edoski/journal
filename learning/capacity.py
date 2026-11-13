@@ -13,7 +13,7 @@ day spread over the week), so after ten recorded days it is a tenth of the
 estimate. Recent weeks count more toward the mean (each week half as much as the next
 every ``HALF_LIFE_DAYS``), so a change of routine shows within a week or two;
 the days of one week weigh alike, so no weekday counts more for being the most
-recent, and the evidence covers whole weeks back from yesterday. A weekday's own rates lean on his overall rates the same way, so a
+recent. The evidence starts on his first recorded day. A weekday's own rates lean on his overall rates the same way, so a
 weekday seen once does not swing the plan.
 
 Doing more than the plan proposes (more reviews from the due list, the next
@@ -165,9 +165,8 @@ def estimate(days: dict[date, Done], today: date) -> Capacity:
     new = [_Tally() for _ in range(WEEK)]
     every_seen, every_reviews, every_new = _Tally(), _Tally(), _Tally()
     first = min(past, default=today)
-    weeks = -(-(today - first).days // WEEK)
-    for offset in range(weeks * WEEK):
-        day = today - timedelta(days=weeks * WEEK - offset)
+    for offset in range((today - first).days):
+        day = first + timedelta(days=offset)
         weight, weekday = _weight(day, today), day.weekday()
         done = past.get(day)
         seen[weekday].add(weight, done is not None)

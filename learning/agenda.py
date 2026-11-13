@@ -56,13 +56,9 @@ def last_new_day(exam: progress.Exam) -> date:
 def waiting(
     record: dict[str, Any], levels: dict[str, dict[str, Any]], order: list[str]
 ) -> list[str]:
-    """Path topics still to introduce: never taught and without a review date."""
-    return [
-        key
-        for key in order
-        if levels[key]["level"] == "new"
-        and "due" not in record["topics"][key].get("review", {})
-    ]
+    """Path topics still to introduce: never taught, whatever date a tutor
+    pinned on one."""
+    return [key for key in order if levels[key]["level"] == "new"]
 
 
 def solid(standing: dict[str, Any]) -> bool:
@@ -88,6 +84,7 @@ class _Course:
     replayed: dict[str, progress.Replay]
     days: list[dict[str, Any]] = field(default_factory=list)
     introduced: set[str] = field(default_factory=set)
+    projected: set[str] = field(default_factory=set)
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -120,7 +117,11 @@ class _Course:
             limit=0,
             replayed=self.replayed,
         )
-        return [item["topic"] for item in items]
+        return [
+            item["topic"]
+            for item in items
+            if self.levels[item["topic"]]["level"] != "new"
+        ]
 
     def tier(self, topic: str, day: date) -> int:
         standing = self.levels[topic]
@@ -157,11 +158,10 @@ class _Course:
 
     def reviewed(self, topic: str, day: date) -> None:
         stored = self.record["topics"][topic].get("review", {}).get("due")
-        late = (
-            progress.late_days(day, date.fromisoformat(stored), self.exam)
-            if stored
-            else 0
-        )
+        engine = self.replayed[topic].due if topic not in self.projected else None
+        expected = engine or (date.fromisoformat(stored) if stored else None)
+        late = progress.late_days(day, expected, self.exam) if expected else 0
+        self.projected.add(topic)
         self.streaks[topic] = self.streaks.get(topic, 0) + 1
         standing = {
             name: value
@@ -177,6 +177,7 @@ class _Course:
 
     def start(self, topic: str, day: date) -> None:
         self.untaught.remove(topic)
+        self.projected.add(topic)
         self.introduced.add(topic)
         self.streaks[topic] = 0
         self.levels[topic] = {
@@ -286,9 +287,14 @@ def _new(
     for course in exams:
         if room > 0:
             room -= take(course, room)
-    for course in courses:
-        if room > 0 and course.exam is None:
-            room -= take(course, 1)
+    open_ = [course for course in courses if course.exam is None]
+    while room > 0 and open_:
+        started = []
+        for course in open_:
+            if room > 0 and take(course, 1):
+                started.append(course)
+                room -= 1
+        open_ = started
     return chosen
 
 

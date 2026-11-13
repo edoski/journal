@@ -249,10 +249,10 @@ def replay(
     for day, group in groupby(attempts, key=lambda pair: pair[1]["date"]):
         items = [item for _, item in group]
         verdict: str | None
-        assert result.expected is not None
+        assert result.due is not None
         was_due = any(key in item.get("due_topics", ()) for item in items)
         if any(item["kind"] == "exam" for item in items) or (
-            day not in learning and (day >= result.expected.isoformat() or was_due)
+            day not in learning and (day >= result.due.isoformat() or was_due)
         ):
             result.days[day], verdict = PROBE, _probe(items)
         elif day in learning:
@@ -264,7 +264,7 @@ def replay(
             continue
         result.verdicts.append((day, verdict))
         result.streak = result.streak + 1 if verdict == "solid" else 0
-        late = late_days(date.fromisoformat(day), result.expected, exam)
+        late = late_days(date.fromisoformat(day), result.due, exam)
         days_on = (
             FIRST_RETRIEVAL_DAYS
             if result.days[day] == LEARNING

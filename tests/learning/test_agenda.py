@@ -47,6 +47,14 @@ def course(
     return save(schema.empty(), patch, MONDAY)
 
 
+def taught(record: dict[str, Any], due: date) -> dict[str, Any]:
+    """Every topic taught ten days ago and due on ``due``."""
+    every = {key: {"introduced": True} for key in record["topics"]}
+    record = save(record, {"topics": every}, on(-10))
+    pins = {key: {"review": {"due": due.isoformat()}} for key in record["topics"]}
+    return save(record, {"topics": pins}, MONDAY)
+
+
 def week(reviews: float, new: float, study: frozenset[int] = WEEKDAYS) -> Capacity:
     days = tuple(
         Weekday(1.0 if day in study else 0.0, reviews, new) for day in range(7)
@@ -69,9 +77,7 @@ def started(days: list[dict[str, Any]]) -> dict[str, str]:
 
 
 def test_a_day_holds_what_he_completes_on_that_weekday_and_carries_the_rest() -> None:
-    record = course(12)
-    due = {key: {"review": {"due": on(-1).isoformat()}} for key in record["topics"]}
-    record = save(record, {"topics": due}, MONDAY)
+    record = taught(course(12), on(-1))
     days = plan({"c": record}, 7, week(2.5, 0)).days["c"]
     assert [len(day["reviews"]) for day in days[:4]] == [3, 2, 3, 2]
     assert [len(day["reviews"]) for day in days[5:]] == [0, 0]
@@ -160,11 +166,8 @@ def test_the_exam_day_holds_nothing_and_reviews_go_on_after_it() -> None:
 
 
 def test_after_the_exam_its_reviews_come_after_every_other_course() -> None:
-    passed = course(4, exam=-3)
-    current = course(4, exam=20)
-    due = {key: {"review": {"due": on(-1).isoformat()}} for key in passed["topics"]}
-    passed = save(passed, {"topics": due}, on(-5))
-    current = save(current, {"topics": due}, MONDAY)
+    passed = taught(course(4, exam=-3), on(-1))
+    current = taught(course(4, exam=20), on(-1))
     first = plan({"passed": passed, "current": current}, 1, week(5, 0)).days
     assert len(first["current"][0]["reviews"]) == 4
     assert len(first["passed"][0]["reviews"]) == 1
@@ -194,3 +197,29 @@ def test_today_holds_only_what_is_left_after_what_he_already_did() -> None:
     days = plan({"c": record}, 2, week(5, 1)).days["c"]
     assert days[0]["new"] == []
     assert days[1]["new"] == ["t01"]
+
+
+def test_courses_without_an_exam_share_his_new_topic_room() -> None:
+    together = plan(
+        {"a": course(10), "b": course(10)}, 2, week(10, 3, frozenset(range(7)))
+    )
+    assert [len(day["new"]) for day in together.days["a"]] == [2, 2]
+    assert [len(day["new"]) for day in together.days["b"]] == [1, 1]
+
+
+def test_a_pinned_date_on_an_untaught_topic_does_not_unlock_what_needs_it() -> None:
+    record = course(3, needs={"t01": ["t00"]})
+    pin = {"t00": {"review": {"due": on(2).isoformat()}}}
+    record = save(record, {"topics": pin}, MONDAY)
+    days = plan({"c": record}, 4, week(5, 1, frozenset(range(7)))).days["c"]
+    first = started(days)
+    assert first["t00"] == on(0).isoformat()
+    assert first["t01"] >= on(1).isoformat()
+    assert "t00" not in days[0]["reviews"]
+
+
+def test_the_days_before_his_first_record_are_not_days_off() -> None:
+    days = {on(offset): capacity.Done(4, 1) for offset in range(-10, 0)}
+    assert capacity.estimate(days, MONDAY).study_weekdays == frozenset(range(7))
+    yesterday = capacity.estimate({on(-1): capacity.Done(4, 1)}, MONDAY)
+    assert 6 in yesterday.study_weekdays
