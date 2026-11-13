@@ -8,7 +8,7 @@ Answer "what do you remember?" or "what am I weak at?" in plain language from `r
 
 ## Forgetting
 
-Translate an explicit request into exact handles and remove them with `forget` and those `handles` (observations, knowledge entries, tasks, sources nothing cites; a topic only together with its observations). `forget` with `course_record` deletes the whole course record; notes in `study-notes/` are ordinary files the learner deletes. There is no preview: remove exactly what was asked, and ask first only when the request is ambiguous about what it covers. A correction is not erasure: when a record is wrong rather than unwanted, append an observation that `corrects` it.
+Translate an explicit request into exact handles and remove them with `forget` and those `handles` (observations, knowledge entries, tasks, sources nothing cites; a topic only together with its observations). `forget` with `course_record` deletes the whole course record; notes in `study-notes/` are ordinary files the learner deletes. There is no preview: remove exactly what was asked, and ask first only when the request is ambiguous about what it covers. A correction is not erasure: when a record is wrong rather than unwanted, append an observation that `corrects` it (an attempt only for today's records; the learner's own `self_report` for an older one).
 
 Forgetting does not reach copies in other notes or source files, native transcripts, provider history, device backups or cloud recovery; say so when a broad request needs it.
 

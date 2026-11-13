@@ -74,7 +74,8 @@ SAVE_RULES = "\n".join(
         "correct. chose: the topic of a "
         "wrongly chosen method, on an attempt that was not correct, recorded on "
         'the topic that should have been chosen. corrects: ["oN"] supersedes '
-        "earlier ones and, without a date, takes the earliest one's day. Work you "
+        "earlier ones and, without a date, takes the earliest one's day; an attempt "
+        "may correct only observations recorded today, a self_report any. Work you "
         "did not see produced is uncertain.",
         "- preferences (this course), global_preferences (every course): "
         "{dimension: instruction}; null deletes.",

@@ -502,6 +502,29 @@ def test_corrections_name_earlier_observations() -> None:
         schema.validate_record(stored)
 
 
+def test_an_attempt_from_an_earlier_day_stands_as_recorded() -> None:
+    record = apply(
+        course(BASE),
+        {"observations": [attempt("rank", help="Pointed at the first step")]},
+    )[0]
+    tomorrow = date(2026, 10, 11)
+    regrade = attempt("rank", help="none", text="Regraded", corrects=["o1"])
+    with pytest.raises(ValueError) as caught:
+        apply(record, {"observations": [regrade]}, today=tomorrow, now=NEXT_DAY)
+    assert "o1 was recorded on 2026-10-10" in str(caught.value)
+    assert "self_report" in str(caught.value)
+    same_day = apply(record, {"observations": [regrade]}, now=LATER)[0]
+    assert same_day["observations"]["o2"]["corrects"] == ["o1"]
+    report = {"kind": "self_report", "topics": ["rank"], "text": "Had my notes open"}
+    reported = apply(
+        record,
+        {"observations": [{**report, "corrects": ["o1"]}]},
+        today=tomorrow,
+        now=NEXT_DAY,
+    )[0]
+    assert reported["observations"]["o2"]["corrects"] == ["o1"]
+
+
 @pytest.mark.parametrize(("minutes", "skipped"), [(5, True), (30, True), (31, False)])
 def test_identical_observations_within_30_minutes_are_skipped(
     minutes: int, skipped: bool

@@ -235,7 +235,7 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
     course = started(att("correct"))
     course.attempts(5, att("incorrect", text="first try"))
     course.attempts(5, att("correct", text="retry"))
-    course.attempts(6, att("correct", text="first try regraded", corrects=["o2"]))
+    course.attempts(5, att("correct", text="first try regraded", corrects=["o2"]))
     third = course.record["observations"]["o4"]
     assert third["date"] == on(5).isoformat()
     assert course.verdicts == [

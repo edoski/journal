@@ -18,7 +18,7 @@ import re
 from typing import Any, TypedDict
 import unicodedata
 
-from learning import preferences
+from learning import clock, preferences
 
 SCHEMA = 6
 HANDLE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
@@ -1256,6 +1256,14 @@ def _check_new(
             raise ValueError(
                 f"{path}.corrects: {target!r} is not a recorded observation; "
                 f"{_span(record)}"
+            )
+        recorded = clock.local_day(record["observations"][target]["recorded"])
+        if item["kind"] != "self_report" and recorded < today:
+            raise ValueError(
+                f"{path}.corrects: {target} was recorded on {recorded.isoformat()}, "
+                "and an attempt from an earlier day stands as it was recorded: never "
+                "regrade it from a transcript. When the learner says it was wrong, "
+                "record their words as a self_report that corrects it"
             )
     _check_refs(item, path, record["sources"])
 
