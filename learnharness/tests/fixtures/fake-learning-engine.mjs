@@ -6,7 +6,8 @@
 // the real registry does. FAKE_ENGINE_FAIL names a verb that fails with an
 // io error. Topic "unknown" in a save is refused like the real engine
 // refuses an unknown topic; handle "slow" hangs; handle "garbled" prints
-// non-JSON.
+// non-JSON. `sources --add` names each file; `forget --course` drops the
+// course from the plan file, as the real engine's listing does.
 import fs from "node:fs";
 
 const args = process.argv.slice(2);
@@ -73,12 +74,32 @@ switch (verb) {
 		const patch = JSON.parse(stdin);
 		const unknown = (patch.observations ?? []).flatMap((o) => o.topics ?? []).find((t) => t === "unknown");
 		if (unknown) fail('observations[0].topics[0]: unknown topic "unknown"; create it in the same patch');
-		if (planFile && typeof patch.title === "string") {
+		if (planFile && (typeof patch.title === "string" || patch.exam)) {
 			const plan = readPlan();
-			for (const c of plan.courses) if (c.workspace === workspace) c.title = patch.title;
+			for (const c of plan.courses) {
+				if (c.workspace !== workspace) continue;
+				if (typeof patch.title === "string") c.title = patch.title;
+				if (patch.exam?.date) c.exam = { date: patch.exam.date, days_left: 36 };
+			}
 			writePlan(plan);
 		}
 		process.stdout.write(JSON.stringify({ revision: 1, changed: true, observations: (patch.observations ?? []).map((_, i) => `o${i + 1}`) }));
+		break;
+	}
+	case "sources": {
+		if (operands[0] !== "--add" || operands.length < 2) fail("sources --add needs at least one file path");
+		const sources = Object.fromEntries(operands.slice(1).map((p, i) => [`s${i + 1}`, { path: p }]));
+		process.stdout.write(JSON.stringify({ sources, existing: {}, revision: 2 }));
+		break;
+	}
+	case "forget": {
+		if (operands[0] !== "--course") fail("forget needs handles or --course");
+		if (planFile) {
+			const plan = readPlan();
+			plan.courses = plan.courses.filter((c) => c.workspace !== workspace);
+			writePlan(plan);
+		}
+		process.stdout.write(JSON.stringify({ removed: ["course"], revision: 0 }));
 		break;
 	}
 	default:

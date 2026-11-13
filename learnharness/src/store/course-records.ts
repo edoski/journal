@@ -79,6 +79,10 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 			return { args: ["save"], stdin: JSON.stringify(verb.changes) };
 		case "plan":
 			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
+		case "sources":
+			return { args: ["sources", "--add", ...verb.add], stdin: "" };
+		case "forget-course":
+			return { args: ["forget", "--course"], stdin: "" };
 	}
 }
 
@@ -282,11 +286,12 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
 		},
-		async create(directory, title) {
+		async create(directory, { title, exam }) {
 			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");
 			if (!init.ok) return init;
 			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
-			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify({ title })), "save");
+			const record = exam ? { title, exam: { date: exam } } : { title };
+			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save");
 			return saved.ok ? { ok: true, workspace } : saved;
 		},
 	};

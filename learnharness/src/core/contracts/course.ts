@@ -74,7 +74,19 @@ export type CourseVerb =
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
 	| { verb: "save"; changes: unknown }
-	| { verb: "plan"; days?: number };
+	| { verb: "plan"; days?: number }
+	/** Register files as the course's material; paths are relative to the
+	 *  course folder. */
+	| { verb: "sources"; add: readonly string[] }
+	/** Delete the whole course record; the folder and its files stay. */
+	| { verb: "forget-course" };
+
+/** What a new course starts with: its title and, when known, the exam day
+ *  (YYYY-MM-DD). */
+export interface NewCourseRecord {
+	title: string;
+	exam: string | null;
+}
 
 /** Display label for a course: its title, else the directory name. */
 export function courseLabel(course: { workspace: string; title: string | null }): string {
