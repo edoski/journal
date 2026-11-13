@@ -77,6 +77,20 @@ function fauxEngine(steps: FauxResponseStep[]): PiEngine {
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
 
+/** Resolves once the chat has no run left in the registry: a request made
+ *  mid-run runs once more after the first ends. */
+function runsEnded(chatId: string): Promise<void> {
+	return new Promise((resolve) => {
+		const check = () => {
+			if (extractionStatuses().some((run) => run.chatId === chatId)) return;
+			stop();
+			resolve();
+		};
+		const stop = subscribe((event) => event.type === "activity-changed" && setImmediate(check));
+		check();
+	});
+}
+
 /** An in-memory GraphStore (core/ports.ts) — this suite never touches data/graph. */
 function memoryLedgers() {
 	const nodes: GraphNode[] = [];
@@ -962,7 +976,7 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 		assert.equal(abortExtraction(chatId), false);
 	});
 
-	it("is single-flight per chat — a concurrent second run is a no-op", async () => {
+	it("is single-flight per chat — a concurrent second run is not lost: it runs once more when the first ends", async () => {
 		const { chatId } = fixtureChat();
 		const ledgers = memoryLedgers();
 
@@ -972,13 +986,12 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 			release = resolve;
 		});
 		let calls = 0;
-		const gatedExtractor = fauxEngine([
-			async () => {
-				calls++;
-				if (calls === 1) await gate;
-				return fauxAssistantMessage("…");
-			},
-		]);
+		const step = async () => {
+			calls++;
+			if (calls === 1) await gate;
+			return fauxAssistantMessage("…");
+		};
+		const gatedExtractor = fauxEngine([step, step]);
 
 		const pipeline = createExtractionPipeline({
 			chatStore,
@@ -996,6 +1009,8 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 		// (per-chunk jobs, owner 2026-09-28): the run resolves with zeros
 		// instead of throwing.
 		assert.deepEqual(await first, { nodes: 0, chains: 0 });
+		await runsEnded(chatId);
+		assert.equal(calls, 2, "the request that arrived mid-run ran once more");
 	});
 
 	it("registers runs on the process-wide registry (route-instance safety): a second pipeline instance sees the same single-flight state", async () => {
@@ -1045,6 +1060,7 @@ describe("the extraction pipeline (extractor → auditor → merger)", () => {
 
 		release();
 		assert.deepEqual(await first, { nodes: 0, chains: 0 }, "isolated job failure — the run resolves zeros");
+		await runsEnded(chatId);
 		assert.ok(!extractionStatuses().some((run) => run.chatId === chatId), "the registry entry clears when the run ends (however it ends)");
 		assert.ok(!g.__lhExtractionRuns?.running.has(chatId), "nothing leaks into the global registry");
 	});
@@ -1148,10 +1164,16 @@ describe("message anchors (session propositions carry their passage's id)", () =
 			// own turn budget, not the auditor's).
 			auditor: fauxEngine([passThroughAuditStep(), passThroughAuditStep()]),
 		});
+		const announced: number[] = [];
+		const stop = subscribe((e) => {
+			if (e.type === "coverage-changed" && e.chatId === chatId) announced.push(ledgers.readCoverage().length);
+		});
 		assert.deepEqual(await pipeline.runExtraction(chatId), { nodes: 2, chains: 0 });
+		stop();
 		const anchors = ledgers.readNodes().map((n) => n.provenance[0]!.messageId).sort();
 		assert.deepEqual(anchors, ["a2", "a4"], "each job's node anchors INSIDE its own batch — never a5");
 		assert.equal(ledgers.readCoverage().length, 5, "both batches checkpointed");
+		assert.deepEqual(announced, [3, 5], "each batch's checkpoint is announced as it lands");
 	});
 
 	it("a LINK-APPEND carries its proposition's anchor into the existing node's provenance", async () => {

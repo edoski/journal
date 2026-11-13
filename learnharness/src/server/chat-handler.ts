@@ -13,10 +13,13 @@ import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
 import { isClaudeProvider } from "../core/contracts/claude.ts";
+import { digestModel } from "../core/lesson-digest.ts";
 import { SubscriptionRequestCycle, type SubscriptionDispatchLifecycle } from "../agent/subscription-request-cycle.ts";
 import { reconstructRequestCause } from "../core/native-messages.ts";
 import { createJobRunner } from "../agent/subagents/runner.ts";
 import { createExtractionPipeline } from "../agent/subagents/extraction.ts";
+import { createLessonDigest } from "../agent/subagents/lesson-digest.ts";
+import { onLessonEvents, resumeCutDigests } from "./lesson-finish.ts";
 import type { ModelRole } from "../../config.ts";
 import {
 	deliverJobResult,
@@ -46,7 +49,7 @@ import { modelsNotConfigured, providerKeyMissing as providerKeyMissingEnvelope, 
 import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
-import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
+import { persistTurn, startExtraction, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
 import { hasProbeDone, hasUnresolvedQuestion, resumesLesson, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
@@ -124,6 +127,47 @@ export const extraction = createExtractionPipeline({
 		providerKeyPresent(provider) ? null : providerKeyMissingEnvelope(provider, [tier]),
 });
 
+/** The lesson digest: a finished lesson's gaps, notes and task step, saved
+ *  to the course record, on the app's default model (digestModel). */
+const lessonDigest = createLessonDigest({
+	chatStore: stores.chatStore,
+	courseRecords: stores.courseRecords,
+	engineFor: (record) => {
+		const lesson = resolveConversationSpec(record.settings, effectiveSettings().models.strong);
+		try {
+			return piEngineForSpec(digestModel(lesson?.provider));
+		} catch {
+			return undefined;
+		}
+	},
+	backgroundAllowed: connectionBackgroundAllowed,
+});
+
+const lessonFinishDeps = {
+	chatStore: stores.chatStore,
+	digest: lessonDigest,
+	extractTail: (chatId: string) => {
+		if (extractionEnabled(effectiveSettings().graph)) startExtraction(extraction, chatId);
+	},
+};
+
+interface LhLessonFinishGlobal {
+	__lhLessonFinish?: () => void;
+}
+
+// One subscriber per process: Next dev compiles this module once per route
+// entry, so each load replaces the last one's subscription. Skipped under
+// tests, like the extraction trigger: scripted chats are fixtures.
+if (process.env.NODE_ENV !== "test") {
+	const g = globalThis as typeof globalThis & LhLessonFinishGlobal;
+	g.__lhLessonFinish?.();
+	g.__lhLessonFinish = onLessonEvents(lessonFinishDeps);
+}
+
+/** At app start: finish every lesson digest a quit cut short. */
+export function resumeLessonDigests(): void {
+	resumeCutDigests(lessonFinishDeps);
+}
 
 // Wake-pipeline wiring (contracts.ts "THE ASYNC PROTOCOL" §4): the pipeline
 // delivers its steers through THIS composition root (one event: the steer
@@ -397,6 +441,12 @@ export async function handleChatInput(
 	} catch (err) {
 		console.error(`[chat ${chatId}] input visibility bookkeeping failed:`, err);
 	}
+	// A wake's markers land in the record after turn-started, so a view that
+	// attached on it would miss them until settle: announce the write.
+	const announceMarkers = () => {
+		if (input.type === "steers" && appends.length > 0) emit("record-changed", { chatId });
+	};
+	if (!stagedAutomatic) announceMarkers();
 
 	// MONEY CHANNEL (wave 4): one collector per request, fed by the agent's
 	// message_end events. Every model call's usage lands in the chat record's
@@ -450,6 +500,7 @@ export async function handleChatInput(
 			stores.chatStore.saveMessages(chatId, merged);
 			persistBaseCount = merged.length;
 			noteSteersDurable(chatId, merged);
+			announceMarkers();
 		},
 		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
 	});

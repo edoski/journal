@@ -402,7 +402,7 @@ export function ActivitySection({ feed: feedProp, variant = "current" }: { feed?
 
 /** What a blob is, in words: "Researcher", "Extraction — merging". */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return `Extraction — ${blob.phase ?? "running"}`;
+	if (blob.process === "extraction") return blob.phase === "digesting" ? "Digesting lesson" : `Extraction — ${blob.phase ?? "running"}`;
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";

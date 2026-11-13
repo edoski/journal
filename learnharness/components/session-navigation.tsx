@@ -25,11 +25,11 @@ export function scrollSessionTarget(target: Range | HTMLElement, scope: HTMLElem
 
 /** React owns message markup; this controller adds no messages or content.
  * Arrival on a full load is the browser's own hash scroll; this watcher owns
- * SPA arrivals (graph links) and later hash changes. The mount path polls on
- * a short interval ON PURPOSE: the transcript scroller's ref is attached by a
+ * SPA arrivals (graph links) and later hash changes. The mount path watches
+ * DOM mutations ON PURPOSE: the transcript scroller's ref is attached by a
  * LATER SIBLING (StickToBottom.Content), hydration orderings vary, and a
  * frame-chained rAF proved cancellable mid-flight in dev (the owner's
- * every-link-lands-at-bottom report, 2026-10-13) — a synchronous tick that
+ * every-link-lands-at-bottom report, 2026-10-13) — a mutation callback that
  * retries until both elements exist has no cancellation window. */
 export function SessionMessageNavigation() {
 	const context = useStickToBottomContext();
@@ -71,24 +71,25 @@ export function SessionMessageNavigation() {
 	}, [clearFlash]);
 
 	// Arrival on mount (a graph link opened this session, or a full load
-	// carried the hash): retry on a short interval until the scroller and the
-	// anchor both exist, then stop. The ~4s watchdog covers a never-arriving
-	// anchor (a deleted message) — the session simply opens where it opens.
+	// carried the hash): jump whenever the DOM changes until the scroller and
+	// the anchor both exist. Keep watching PAST the first success: hydration
+	// / record adoption can REPLACE the node that was just jumped to
+	// (observed on cold dev loads, 2026-10-13) — jump() re-targets the fresh
+	// node and re-flashes it, while later mutations are no-ops via the
+	// lastJump guard. The observer's callback runs right after each
+	// mutation, so it has no cancellation window. The 20s limit covers a
+	// cold compile (observed 6.8s SSR flush); a deleted-message anchor gives
+	// up and the session opens as-is.
 	useEffect(() => {
 		if (!window.location.hash) return;
-		let ticks = 0;
-		const id = window.setInterval(() => {
-			// Keep watching PAST the first success: hydration / record adoption
-			// can REPLACE the node that was just jumped to (observed on cold
-			// dev loads, 2026-10-13) — jump() re-targets the fresh node and
-			// re-flashes it, while steady-state ticks are no-ops via the
-			// lastJump guard. ~20s watchdog covers a cold compile (observed
-			// 6.8s SSR flush) or slow first load; a deleted-message anchor
-			// gives up and the session opens as-is.
-			if (++ticks > 300) window.clearInterval(id);
-			else jump();
-		}, 64);
-		return () => window.clearInterval(id);
+		const observer = new MutationObserver(() => void jump());
+		observer.observe(document.body, { childList: true, subtree: true });
+		const limit = window.setTimeout(() => observer.disconnect(), 20_000);
+		jump();
+		return () => {
+			observer.disconnect();
+			window.clearTimeout(limit);
+		};
 	}, [jump]);
 
 	useEffect(() => {

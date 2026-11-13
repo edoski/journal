@@ -59,6 +59,9 @@ export interface ChatRecord {
 	 *  spend too. Same parallel-log discipline as `turns` (nothing rides
 	 *  inside messages). Keyed by startedAt; idempotent appends. */
 	extractions?: ExtractionRunUsage[];
+	/** The lesson digest's ledger: what the background digest already carried
+	 *  into the course record from this session. */
+	digest?: DigestLedger;
 	/** Per-chat model/thinking overrides for the conversation agents. */
 	settings?: ChatSettings;
 	/** SCHEMA STAMP (schema-versioning wave, owner 2026-10-10): LAZY v1 —
@@ -67,6 +70,24 @@ export interface ChatRecord {
 	 *  (the downgrade scenario) is REFUSED on read: a read-modify-write
 	 *  store must never rewrite what it doesn't understand. */
 	version?: number;
+}
+
+/** One finished digest: the session's messages through `throughMessageId`,
+ *  hashed as `fingerprint`, were read and their result saved to the engine. */
+export interface LessonDigest {
+	throughMessageId: string;
+	fingerprint: string;
+	at: string;
+	/** What the save changed, in one line, or why nothing was saved. */
+	outcome: string;
+}
+
+/** The digest ledger. `pending` is written before a digest starts and
+ *  cleared when it ends, so the app's next start finishes one a quit cut
+ *  short. */
+export interface DigestLedger {
+	done: LessonDigest[];
+	pending?: { fingerprint: string; throughMessageId: string };
 }
 
 /** The chat record format this build writes and understands. */

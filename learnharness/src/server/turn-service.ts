@@ -118,22 +118,28 @@ export function triggerExtraction(
 		if (!record) return;
 		const covered = coverageOf(record.messages, deps.graphStore.readCoverage(), chatId, record.kind);
 		if (covered.uncoveredTokens < chunkTokens) return;
-		void extraction.runExtraction(chatId).catch((err) => {
-			// BYOK (owner, 2026-09-22) + key presence (provider-key interlude,
-			// 2026-09-25): an unconfigured OR keyless write channel SKIPS (the
-			// coverage ledger keeps the messages uncovered — the next trigger
-			// retries once slots/keys are set); only real failures log.
-			if (err instanceof ModelsNotConfiguredError) {
-				console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (missing: ${err.envelope.missing.join(", ")})`);
-				return;
-			}
-			if (err instanceof ProviderKeyMissingError) {
-				console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (provider: ${err.envelope.provider})`);
-				return;
-			}
-			console.error(`[chat ${chatId}] extraction pipeline failed:`, err);
-		});
+		startExtraction(extraction, chatId);
 	} catch (err) {
 		console.error(`[chat ${chatId}] extraction trigger failed:`, err);
 	}
+}
+
+/** Run the extraction over the chat's uncovered teaching, whatever its size,
+ *  without waiting: a finished lesson's tail, or a turn over the budget. */
+export function startExtraction(extraction: ExtractionPipeline, chatId: string): void {
+	void extraction.runExtraction(chatId).catch((err) => {
+		// BYOK (owner, 2026-09-22) + key presence (provider-key interlude,
+		// 2026-09-25): an unconfigured OR keyless write channel SKIPS (the
+		// coverage ledger keeps the messages uncovered — the next trigger
+		// retries once slots/keys are set); only real failures log.
+		if (err instanceof ModelsNotConfiguredError) {
+			console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (missing: ${err.envelope.missing.join(", ")})`);
+			return;
+		}
+		if (err instanceof ProviderKeyMissingError) {
+			console.info(`[chat ${chatId}] extraction skipped — ${err.envelope.error} (provider: ${err.envelope.provider})`);
+			return;
+		}
+		console.error(`[chat ${chatId}] extraction pipeline failed:`, err);
+	});
 }

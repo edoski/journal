@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useDayChange } from "@/components/day-change";
 import { buildInbox, type FoldedShelf, type UnitInbox } from "@/components/unit-inbox/units";
 
 /** Without the engine every session is listed under Other. */
 export type InboxState = { status: "loading" } | { status: "ready"; inbox: UnitInbox; courses: readonly StudyCourse[] };
 
-/** Every course's map, read once per mount and again after a turn settles
- *  (a lesson's saves move levels and reviews). A failed read keeps the
- *  last map. */
+/** Every course's map, read once per mount and again when a course record
+ *  changes or the day turns over. A failed read keeps the last map. */
 function useStudyCourses(): StudyCourse[] | null | "unavailable" {
 	const [courses, setCourses] = useState<StudyCourse[] | null | "unavailable">(null);
 	const read = useCallback(async () => {
@@ -25,12 +25,12 @@ function useStudyCourses(): StudyCourse[] | null | "unavailable" {
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const later = () => {
 		clearTimeout(timer.current);
-		timer.current = setTimeout(() => void read(), 1000);
+		timer.current = setTimeout(() => void read(), 250);
 	};
 	useEffect(() => () => clearTimeout(timer.current), []);
-	useServerEvent("turn-settled", later);
-	useServerEvent("record-changed", later);
+	useServerEvent("course-changed", later);
 	useServerResync(() => void read());
+	useDayChange(() => void read());
 	return courses;
 }
 

@@ -87,7 +87,7 @@ export function activityFeed(): {
 		}
 	}
 	const extractions: ActivityExtraction[] = extractionStatuses().map((run) => ({
-		id: run.part ? `${run.chatId}#${run.part.i}` : run.chatId,
+		id: run.id,
 		chatId: run.chatId,
 		part: run.part,
 		// The run's own label never reaches this feed (unlike the graph

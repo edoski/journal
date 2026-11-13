@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
+import { useServerEvent } from "@/components/server-events";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { useSettingsSaved } from "@/components/settings-signal";
 import { formatTokens } from "@/components/usage-format";
@@ -106,8 +107,8 @@ async function requestExtract(chatId: string): Promise<boolean> {
  * redesign): what the extractor hasn't covered yet, plus the manual Extract
  * affordance — visually separated from Rename/Delete below (those stay the
  * two session-management actions). Fetched ON MENU OPEN (the block mounts
- * with the menu — on-demand, never eagerly), polled at 2s while a run is
- * in flight so the numbers settle live. No coverage (fetch failed, 404):
+ * with the menu — on-demand, never eagerly), and re-read as each batch of
+ * a run merges so the numbers settle live. No coverage (fetch failed, 404):
  * the whole block renders nothing — no fake zeros.
  */
 export function CoverageMenuBlock({ chatId }: { chatId: string }) {
@@ -145,24 +146,18 @@ export function useSessionCoverage(chatId: string): {
 	}, [chatId]);
 
 	// On MENU OPEN (the block mounts with the menu — on-demand, never
-	// eagerly): one read, then the 2s poll below takes over while running.
+	// eagerly): one read, then one per merged batch and per run change.
 	useEffect(() => {
 		lastUncoveredRef.current = null;
 		setExtracting(false);
 		void load();
 	}, [load]);
 
-	// While a run is in flight the block polls at 2s (the old panel's
-	// open-only cadence, bounded to the running state) — the numbers
-	// settle live and the block ends in "fully extracted".
-	// ACCEPTED BY DESIGN (owner, 2026-10-02): the ring drains per fold,
-	// and the events channel is per phase — that granularity gap is why
-	// this bounded, run-scoped poll stays.
-	useEffect(() => {
-		if (coverage?.running !== true && !extracting) return;
-		const timer = setInterval(() => void load(), 2000);
-		return () => clearInterval(timer);
-	}, [load, coverage?.running, extracting]);
+	// While a run is in flight the numbers settle live: each merged batch
+	// announces coverage-changed, and the run ending announces
+	// activity-changed.
+	useServerEvent("coverage-changed", (p) => p.chatId === chatId && void load());
+	useServerEvent("activity-changed", () => (coverage?.running === true || extracting) && void load());
 
 	const onExtract = async () => {
 		setExtracting(true);
@@ -263,8 +258,8 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
  * state signal in this app's quiet register; no new chrome).
  *
  * Refresh chains: mount + `refreshKey` (the chat view bumps it at turn
- * settle, riding the existing refetch chains) + a 2s poll while running
- * (resets as the fold drains coverage) + the settings signal (the
+ * settle, riding the existing refetch chains) + each merged batch's
+ * coverage-changed (the ring drains as the fold lands) + the settings signal (the
  * threshold/kill-switch re-read live).
  */
 export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
@@ -309,21 +304,15 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 		};
 	}, [chatId, refreshKey, nonce, runHere]);
 
-	// While a run is in flight: poll at 2s so the ring DRAINS as folds land
-	// and settles at zero when the run completes (the "resets on
-	// completion" requirement — coverage re-derives per request).
-	// ACCEPTED BY DESIGN (owner, 2026-10-02): the ring drains per fold,
-	// and the events channel is per phase — that granularity gap is why
-	// this bounded, run-scoped poll stays.
-	useEffect(() => {
-		if (coverage?.running !== true) return;
-		const timer = setInterval(() => {
-			void fetchCoverage(chatId).then((c) => {
-				if (c !== null) setCoverage(c);
-			});
-		}, 2000);
-		return () => clearInterval(timer);
-	}, [chatId, coverage?.running]);
+	// While a run is in flight the ring DRAINS batch by batch: each merged
+	// batch announces coverage-changed for its chat. The run settling at
+	// zero rides `runHere` above.
+	useServerEvent("coverage-changed", (p) => {
+		if (p.chatId !== chatId) return;
+		void fetchCoverage(chatId).then((c) => {
+			if (c !== null) setCoverage(c);
+		});
+	});
 
 	// Vanishes entirely when the graph is off, or before the first honest
 	// read (no fake zeros — the doctrine).

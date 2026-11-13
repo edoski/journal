@@ -24,7 +24,8 @@
  *     would shadow every settings-page key change until restart.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, powerMonitor, session, shell } = require("electron");
+const { waitForServer } = require("./server-ready.cjs");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
@@ -34,7 +35,6 @@ const { openWebSubscriptionBrowser } = require("./web-subscription-browser.cjs")
 const { randomBytes } = require("node:crypto");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
-const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
 
@@ -243,23 +243,6 @@ function startServer(port) {
 			subscriptions?.close();
 		});
 		resolve(child);
-	});
-}
-
-/** No "ready" event exists — poll until the server answers (docs-confirmed). */
-function waitUntilUp(url, tries = 150) {
-	return new Promise((resolve, reject) => {
-		const attempt = (n) => {
-			const req = http.get(url, (res) => {
-				res.resume();
-				resolve(res.statusCode !== undefined);
-			});
-			req.on("error", () => {
-				if (n <= 0) reject(new Error(`server never answered on ${url}`));
-				else setTimeout(() => attempt(n - 1), 200);
-			});
-		};
-		attempt(tries);
 	});
 }
 
@@ -488,6 +471,10 @@ async function main() {
 	process.on("SIGHUP", killServer);
 
 	await app.whenReady();
+	// A machine that slept through midnight: the windows check the day again.
+	powerMonitor.on("resume", () => {
+		for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:resume");
+	});
 
 	// Dev mode: point at a running `next dev` server (LH_DEV_URL) — no
 	// spawn, no packaging, full HMR. The rest of this shell still applies
@@ -521,8 +508,8 @@ async function main() {
 		await subscriptions.ready;
 		log(`starting server: ${serverEntry()}`);
 		log(`data dir: ${DATA_DIR()}${fs.existsSync(AUTH_FILE()) ? " · auth.json: present" : " · auth.json: ABSENT (no BYOK keys yet)"}`);
-		await startServer(new URL(url).port);
-		await waitUntilUp(url);
+		const server = await startServer(new URL(url).port);
+		await waitForServer(server, url);
 		log(`server up: ${url}`);
 	} else {
 		log(`dev mode: ${devUrl}`);

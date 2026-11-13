@@ -36,10 +36,17 @@ export interface ServerEvents {
 	"jobs-changed": { chatId?: string };
 	/** An extraction run changed phase (activity dock). */
 	"activity-changed": Record<string, never>;
+	/** A merged extraction batch covered more of the chat's messages: its
+	 *  coverage ring and menu block re-read, batch by batch. */
+	"coverage-changed": { chatId: string };
 	/** The session list changed (create, delete, title). */
 	"chats-changed": Record<string, never>;
 	/** The course list changed: a course was created, renamed or deleted. */
 	"courses-changed": Record<string, never>;
+	/** A course's engine record changed: a save through the app, or another
+	 *  host's (Claude Code, Claude Desktop) seen on disk. Views of that
+	 *  course's levels, reviews and tasks refetch. */
+	"course-changed": { workspace: string };
 	/** Web subscription state changed. No account or credential data on the bus. */
 	"subscriptions-changed": Record<string, never>;
 	/** A chat's record changed WITHOUT a turn (the silent dismissal write).
@@ -64,17 +71,18 @@ export const SERVER_EVENT_TYPES = [
 	"turn-settled",
 	"jobs-changed",
 	"activity-changed",
+	"coverage-changed",
 	"chats-changed",
 	"courses-changed",
+	"course-changed",
 	"subscriptions-changed",
 	"record-changed",
 	"compaction-changed",
 ] as const satisfies readonly ServerEventType[];
 
-/** One notification: the type discriminates the payload. */
-export type ServerEvent<K extends ServerEventType = ServerEventType> = {
-	type: K;
-} & ServerEvents[K];
+/** One notification: the type discriminates the payload (distributed over
+ *  the names, so checking `type` narrows it). */
+export type ServerEvent<K extends ServerEventType = ServerEventType> = K extends ServerEventType ? { type: K } & ServerEvents[K] : never;
 
 export type ServerEventListener = (event: ServerEvent) => void;
 

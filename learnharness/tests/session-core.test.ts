@@ -170,21 +170,30 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 
 	it("passes non-409 responses through untouched", async () => {
 		const calls = installFetch({ chatPOST: () => new Response("stream", { status: 200 }) });
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		const res = await m.postInputEvent({ type: "text", text: "hi" });
 		assert.equal(res.status, 200);
 		assert.equal(calls.length, 1, "no polling, single call");
 		assert.deepEqual(JSON.parse(calls[0]!.body!), { chatId: "chat_x", input: { type: "text", text: "hi" } });
 	});
 
-	it("waits out the turn, then re-POSTs the SAME event body (identity retry)", async () => {
+	it("waits for the racing turn to settle, then re-POSTs the SAME event body at once (identity retry)", async () => {
 		const event: ChatInput = { type: "text", text: "my question while the wake turn ran" };
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n === 1 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
-			jobsGET: (poll) => poll <= 1, // first poll: still running; second: done
+			jobsGET: () => true, // the racing turn is running when checked
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
-		const res = await m.postInputEvent(event);
+		let settle = () => {};
+		const m = model({
+			turnSettled: () => ({ promise: new Promise<void>((resolve) => (settle = resolve)), cancel: () => {} }),
+		});
+		const pending = m.postInputEvent(event);
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		assert.equal(calls.filter((c) => c.url === "/api/chat").length, 1, "no retry while the turn runs");
+		const settledAt = performance.now();
+		settle();
+		const res = await pending;
+		assert.ok(performance.now() - settledAt < 100, "the retry follows the settle, not a poll");
 		assert.equal(res.status, 200);
 		const posts = calls.filter((c) => c.url === "/api/chat");
 		assert.equal(posts.length, 2, "one 409, one retry");
@@ -195,7 +204,7 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n === 1 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		assert.equal((await m.postInputEvent({ type: "text", text: "q" })).status, 200);
 		assert.equal(
 			calls.filter((c) => c.url.startsWith("/api/chats/")).length,
@@ -209,7 +218,7 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 		const calls = installFetch({
 			chatPOST: (_c, n) => (n <= 2 ? new Response("busy", { status: 409 }) : new Response("stream", { status: 200 })),
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		assert.equal((await m.postInputEvent(event)).status, 200);
 		const posts = calls.filter((c) => c.url === "/api/chat");
 		assert.equal(posts.length, 3);
@@ -221,11 +230,11 @@ describe("postInputEvent (the 409 identity-retry)", { skip: process.env.NO_SLOW 
 			chatPOST: () => new Response("busy", { status: 409 }),
 			jobsGET: () => true,
 		});
-		const m = model({ pollMs: 10, waitMaxMs: 100 });
+		const m = model({ waitMaxMs: 100 });
 		const res = await m.postInputEvent({ type: "text", text: "q" });
 		assert.equal(res.status, 409);
 		const polls = calls.filter((c) => c.url.startsWith("/api/jobs")).length;
-		assert.ok(polls <= 15, `expected bounded polling (~10×10ms), got ${polls}`);
+		assert.equal(polls, 1, "one check, then a wait for the settle, never a poll");
 	});
 });
 
@@ -1003,7 +1012,7 @@ describe("answer submission recovery", () => {
 	for (const next of [{ type: "text", text: "a distinct new message" }, { type: "thinking", problemCallId: "problem1", text: "new practice thinking" }] as const) {
 		it(`preserves the existing POST/409-wait path for a new ${next.type} submission after an error`, async () => {
 			const posted: ChatInput[] = [];
-			const m = model({ pollMs: 0, fetch: async (url, init) => {
+			const m = model({ fetch: async (url, init) => {
 				if (String(url) === "/api/chat") {
 					posted.push(JSON.parse(String(init?.body)).input);
 					if (posted.length === 1) throw new TypeError("failed fetch");

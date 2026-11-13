@@ -12,6 +12,9 @@
  */
 
 import { spawn } from "node:child_process";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { emit } from "../core/events.ts";
 import { courseLabel, type CourseResult, type CourseSummary, type CourseVerb, type DueReview } from "../core/contracts/course.ts";
 import { isTopicLevel, type CourseMap, type CourseMapEdge, type CourseMapTopic, type TopicHandle } from "../core/contracts/course-map.ts";
 import type { CourseRecords } from "../core/ports.ts";
@@ -266,6 +269,26 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 	};
 }
 
+/** The verbs that write the course record. */
+const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources", "forget-course"]);
+
+/** Watch one course's record for writes from any host (Claude Code and
+ *  Claude Desktop save through the engine's MCP server, never through the
+ *  app). The engine keeps the record at `<workspace>/.study/course.json` and
+ *  replaces it whole on each save, so the folder is watched, not the file.
+ *  Returns the unwatch; a course whose folder is missing is not watched. */
+export function watchCourseRecord(workspace: string, onChange: () => void): () => void {
+	try {
+		const watcher = fs.watch(path.join(workspace, ".study"), (_event, file) => {
+			if (file === null || String(file) === "course.json") onChange();
+		});
+		watcher.on("error", () => watcher.close());
+		return () => watcher.close();
+	} catch {
+		return () => {};
+	}
+}
+
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	return {
 		async list() {
@@ -279,7 +302,10 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 		},
 		async run(workspace, verb) {
 			const { args, stdin } = argsFor(verb);
-			return toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
+			const result = toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
+			// A save that timed out may have landed too: announce it.
+			if (WRITE_VERBS.has(verb.verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
+			return result;
 		},
 		async map(workspace) {
 			const result = toResult(await exec(engine, ["--workspace", workspace, "map"], ""), "map");
@@ -293,6 +319,7 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
 			const record = exam ? { title, exam: { date: exam } } : { title };
 			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save");
+			emit("course-changed", { workspace });
 			return saved.ok ? { ok: true, workspace } : saved;
 		},
 	};

@@ -852,48 +852,6 @@ export function Chat({
 		}
 	}, [chatId, adoptRecord]);
 
-	// Turn-start window: the server inserts claimed steers right after our
-	// outgoing message, BEFORE the stream produces anything — so a bounded,
-	// self-terminating window of three record fetches (400ms/1s/2s) catches
-	// the insert and shows the marker during the turn, then stops. No
-	// standing poll — the window exists only for these seconds. (The dock
-	// nudges that lived here died at S5: dispatch writes announce jobs-changed
-	// from the store, extraction announces activity-changed at setPhase.)
-	const turnStartStatusRef = useRef(status);
-	// The window must survive the submitted→streaming flip (the stream starts
-	// in well under 400ms), so the timers are guarded by this ref — dropped at
-	// unmount, left alone otherwise: the window self-terminates after 2s.
-	const adoptionWindowOpenRef = useRef(false);
-	const turnStartTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
-	useEffect(() => {
-		const was = turnStartStatusRef.current;
-		turnStartStatusRef.current = status;
-		if (was === "submitted" || status !== "submitted") return;
-		// A turn just started (status flipped ready → submitted): open the
-		// bounded adoption window.
-		adoptionWindowOpenRef.current = true;
-		const timers = [400, 1000, 2000].map((ms) =>
-			setTimeout(() => {
-				if (adoptionWindowOpenRef.current) {
-					void adoptAppendOnly();
-				}
-			}, ms),
-		);
-		// Deliberately no cleanup here: this effect re-runs on every status
-		// flip, which would cancel the window at submitted→streaming.
-		timers.forEach((t) => {
-			turnStartTimerRefs.current.push(t);
-		});
-	}, [status, adoptAppendOnly]);
-	useEffect(() => {
-		const timers = turnStartTimerRefs;
-		return () => {
-			adoptionWindowOpenRef.current = false;
-			timers.current.forEach(clearTimeout);
-			timers.current = [];
-		};
-	}, []);
-
 	// The live plan popup (wave 4): opened by any transcript plan block, the
 	// top-bar plan chip, and the dock band's marginalia.
 	const [planOpen, setPlanOpen] = useState(false);
@@ -1205,15 +1163,15 @@ export function Chat({
 		setCompacting(p.running);
 	});
 	useServerEvent("record-changed", (p) => {
-		// The silent dismissal write (A2, 2026-10-03): no turn ever ran, so
-		// only the record moved. Other tabs and post-error windows adopt;
-		// our OWN dismissal already rendered its optimistic append — syncing
-		// here too is harmless (the adoption law swaps local ids for the
-		// server's). Busy states ignore it: a running turn owns the view,
-		// and the write is 409-guarded against exactly that anyway.
+		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
+		// turn's markers landing at its write-ahead. Idle: adopt the record
+		// (our OWN dismissal already rendered its optimistic append — the
+		// adoption law swaps local ids for the server's). During a turn the
+		// view only takes the new messages, append-only: a full sync
+		// mid-stream is forbidden.
 		if (p.chatId !== chatId) return;
-		if (localStreamRef.current || turnInFlightRef.current) return;
-		void syncFromServer();
+		if (localStreamRef.current || turnInFlightRef.current) void adoptAppendOnly();
+		else void syncFromServer();
 	});
 
 	// Registry-rendered parts read the design and the problem the dock

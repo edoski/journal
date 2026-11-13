@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { PATHS } from "../../config.ts";
 import { emit } from "../core/events.ts";
 import type { ChatStore } from "../core/ports.ts";
-import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
+import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, DigestLedger, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
 import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
@@ -28,7 +28,7 @@ function chatFile(id: string): string {
 /** THE SILENCE LAW (push S6, 2026-10-02): chats-changed announces ONLY
  *  list-SHAPE mutations — createChat, renameChat, deleteChat (below,
  *  each emits post-write). The content writers (saveMessages,
- *  appendTurnUsage, appendExtractionUsage, saveSettings, saveTree) are
+ *  appendTurnUsage, appendExtractionUsage, saveDigestLedger, saveSettings, saveTree) are
  *  DELIBERATELY SILENT: saveMessages fires per turn-persist and would
  *  spam the bus, and every list-visible change it causes (title, order,
  *  phase, busy, pendingQuestion, pendingProblem) is already announced by
@@ -86,7 +86,7 @@ function listChats(): ChatSummary[] {
 			.filter((f) => f.endsWith(".json"))
 			.map((f) => getChat(f.slice(0, -5)))
 			.filter((r): r is ChatRecord => r !== null)
-			.map(({ messages, tree, turns, extractions, ...summary }) => {
+			.map(({ messages, tree, turns, extractions, digest: _digest, ...summary }) => {
 				// Per-record isolation (Wave B): a record whose messages fail the
 				// projection (e.g. pre-Wave-B UIMessage-format scratch — the
 				// zero-back-compat wipe makes these "corrupt") must not blank the
@@ -166,6 +166,15 @@ function appendExtractionUsage(id: string, entry: ExtractionRunUsage): void {
 	writeChat(record);
 }
 
+/** Replace the lesson digest's ledger. Silent, and not conversation
+ * activity: updatedAt stays put. */
+function saveDigestLedger(id: string, ledger: DigestLedger): void {
+	const record = getChat(id);
+	if (!record) throw new Error(`Chat not found: ${id}`);
+	record.digest = ledger;
+	writeChat(record);
+}
+
 /** Persist the per-chat model/thinking settings — replace-whole (the
  * picker sends the complete object; absent = config defaults). */
 function saveSettings(id: string, settings: ChatSettings): void {
@@ -237,4 +246,5 @@ export const chatStore: ChatStore = {
 	deleteChat,
 	appendTurnUsage,
 	appendExtractionUsage,
+	saveDigestLedger,
 };

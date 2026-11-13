@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useDayChange } from "@/components/day-change";
 import { openSessions } from "@/components/study-home/study-facts";
 
 /** The home's data: every course's map with its run-up, the sessions to
@@ -28,8 +29,8 @@ async function readHome(): Promise<StudyHomeState> {
 }
 
 /** Reads the home on each visit and again whenever a turn starts or
- *  settles, a record or the session list changes, or the server comes
- *  back, so a line follows its session while the tutor writes and after;
+ *  settles, a record, a course record or the session list changes, the day
+ *  turns over, or the server comes back, so a line follows its session while the tutor writes and after;
  *  a failed reread keeps what is shown. `retry` reads it again from the
  *  start. */
 export function useStudyHome(): { state: StudyHomeState; retry: () => void } {
@@ -60,7 +61,9 @@ export function useStudyHome(): { state: StudyHomeState; retry: () => void } {
 	useServerEvent("record-changed", reread);
 	useServerEvent("chats-changed", reread);
 	useServerEvent("compaction-changed", reread);
+	useServerEvent("course-changed", reread);
 	useServerResync(reread);
+	useDayChange(reread);
 	const retry = useCallback(() => {
 		setState({ status: "loading" });
 		setAttempt((n) => n + 1);
