@@ -108,7 +108,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 }
 
 function attempt(over: Partial<TopicAttempt> = {}): TopicAttempt {
-	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", help: "none", gaveUp: false, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
+	return { id: "o1", date: "2026-11-03", recorded: null, result: "correct", unaided: true, sure: null, chose: null, text: "Counted pivots of a 3x4 matrix", ...over };
 }
 
 const EIGEN_PLAN: SessionPlan = {
@@ -356,16 +356,10 @@ describe("the topic's sessions", () => {
 
 describe("how an attempt went", () => {
 	it("says right, partly or missed, and the one thing worth saying about it", () => {
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", help: "hint" }), titleOf), { result: "missed", words: "Sure, but wrong" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", help: "hint", chose: "cramer" }), titleOf), { result: "missed", words: "Mixed up with Cramer's rule" });
-	});
-
-	it("says how he got there: on his own, with a hint, after being shown, or that he gave up", () => {
-		assert.deepEqual(attemptMark(attempt(), titleOf), { result: "right", words: "On your own" });
-		assert.deepEqual(attemptMark(attempt({ result: "partial", help: "hint" }), titleOf), { result: "partly", words: "With a hint" });
-		assert.deepEqual(attemptMark(attempt({ help: "shown" }), titleOf), { result: "right", words: "After being shown" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true }), titleOf), { result: "missed", words: "Gave up" });
-		assert.deepEqual(attemptMark(attempt({ result: "incorrect", gaveUp: true, help: "hint", sure: "confident" }), titleOf), { result: "missed", words: "Gave up" });
+		assert.deepEqual(attemptMark(attempt(), titleOf), { result: "right", words: null });
+		assert.deepEqual(attemptMark(attempt({ result: "partial", unaided: false }), titleOf), { result: "partly", words: "With a hint" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false }), titleOf), { result: "missed", words: "Sure, but wrong" });
+		assert.deepEqual(attemptMark(attempt({ result: "incorrect", sure: "confident", unaided: false, chose: "cramer" }), titleOf), { result: "missed", words: "Mixed up with Cramer's rule" });
 	});
 });
 

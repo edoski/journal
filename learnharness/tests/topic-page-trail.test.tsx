@@ -99,8 +99,7 @@ const attempt = (id: string, date: string, over: Partial<TopicAttempt> = {}): To
 	date,
 	recorded: `${date}T17:00:00.000Z`,
 	result: "correct",
-	help: "none",
-	gaveUp: false,
+	unaided: true,
 	sure: null,
 	chose: null,
 	text: `Attempt ${id}`,
@@ -183,7 +182,7 @@ describe("the trail drawn", () => {
 			attempts.map((row) => [row.getAttribute("data-result"), row.querySelector("svg")!.getAttribute("aria-label"), row.textContent]),
 			[
 				["partly", "Partly right", "Row-reduced a 3x3 matrix and counted pivots, slipping once on a signWith a hint"],
-				["missed", "Missed", "Gave rank 3 for a 3x4 matrix whose third row is the sum of the first twoOn your own"],
+				["missed", "Missed", "Gave rank 3 for a 3x4 matrix whose third row is the sum of the first two"],
 			],
 		);
 		assert.equal(attempts[0]!.tagName, "LI");

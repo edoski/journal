@@ -49,13 +49,13 @@ afterEach(() => {
 });
 
 describe("the engine's show as the topic's record", () => {
-	it("gives the scored attempts newest first, each with the help he had", () => {
+	it("gives the scored attempts newest first, each with whether it was unaided", () => {
 		const rank = topicRecordOf(SHOW_RANK, "rank", ["sheet-4"])!;
 		assert.deepEqual(
-			rank.attempts.map((a) => [a.id, a.date, a.result, a.help, a.sure]),
+			rank.attempts.map((a) => [a.id, a.date, a.result, a.unaided, a.sure]),
 			[
-				["o15", "2026-11-03", "partial", "hint", null],
-				["o12", "2026-10-30", "incorrect", "none", "neutral"],
+				["o15", "2026-11-03", "partial", false, null],
+				["o12", "2026-10-30", "incorrect", true, "neutral"],
 			],
 		);
 		assert.equal(rank.attempts[0]!.text, "Row-reduced a 3x3 matrix and counted pivots, slipping once on a sign");
@@ -103,26 +103,7 @@ describe("the engine's show as the topic's record", () => {
 			["o5", "o3"],
 			"o6 is his own statement, o4 was corrected by o5, o2 has no result, o1 is past the engine's limit",
 		);
-		assert.deepEqual([attempts[1]!.help, attempts[1]!.sure, attempts[1]!.recorded], ["none", null, null]);
-	});
-
-	it("tells help that showed the method from a hint, and a problem he gave up on", () => {
-		const show = {
-			items: { rank: { kind: "topic", observations: ["o3", "o2", "o1"] } },
-			evidence: {
-				o3: { kind: "attempt", text: "Gave up on a 4x3 rank", help: "none", result: "incorrect", gave_up: true, date: "2026-11-08" },
-				o2: { kind: "attempt", text: "Rank after a worked example", help: "Worked example just before", shown: true, result: "correct", date: "2026-11-08" },
-				o1: { kind: "attempt", text: "Rank with a nudge", help: "Pointed at the pivots", result: "correct", date: "2026-11-07" },
-			},
-		};
-		assert.deepEqual(
-			topicRecordOf(show, "rank", [])!.attempts.map((a) => [a.id, a.help, a.gaveUp]),
-			[
-				["o3", "none", true],
-				["o2", "shown", false],
-				["o1", "hint", false],
-			],
-		);
+		assert.deepEqual([attempts[1]!.unaided, attempts[1]!.sure, attempts[1]!.recorded], [true, null, null]);
 	});
 
 	it("is null for a handle that is not a topic, and for anything that is not a show answer", () => {

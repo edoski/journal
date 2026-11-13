@@ -249,17 +249,14 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
 	return [...session, ...tasks];
 }
 
-const HELP_WORDS: Record<TopicAttempt["help"], string> = { none: "On your own", hint: "With a hint", shown: "After being shown" };
-
-/** How an attempt went, and the one thing worth saying about it: that he
- *  gave up, the method he reached for in its place, that he was sure and
- *  wrong, or else the help he had. */
-export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "missed"; words: string } {
+/** How an attempt went, and the one thing worth saying about it: the
+ *  method he reached for in its place, that he was sure and wrong, or
+ *  that he had a hint. */
+export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "missed"; words: string | null } {
 	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "missed";
-	if (attempt.gaveUp) return { result, words: "Gave up" };
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
 	if (attempt.result === "incorrect" && attempt.sure === "confident") return { result, words: "Sure, but wrong" };
-	return { result, words: HELP_WORDS[attempt.help] };
+	return { result, words: attempt.unaided ? null : "With a hint" };
 }
 
 /** Everything a candidate draws, from the course, the topic, its sessions
