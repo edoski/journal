@@ -39,11 +39,11 @@ export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	overdue: { words: "Overdue", rank: 1 },
 	new: { words: "New topic", rank: 1.5 },
 	review: { words: "Review", rank: 2 },
-	task: { words: "Open task", rank: 3 },
+	task: { words: "Unfinished", rank: 3 },
 	lesson: { words: "Lesson", rank: 4 },
 	practice: { words: "Practice", rank: 4 },
 	plan: { words: "Plan", rank: 4 },
-	"check-in": { words: "Check-in", rank: 4 },
+	"check-in": { words: "Quiz", rank: 4 },
 };
 
 export function lookOf(entry: CalendarEntry): EntryLook {

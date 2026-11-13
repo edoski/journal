@@ -9,7 +9,7 @@ const ICON = "row-span-2 size-4 text-muted-foreground";
 
 /** What the row is: a lesson, a practice, or an open task. */
 function PickupIcon({ pickup }: { pickup: Pickup }) {
-	if (pickup.kind === "task") return <BookmarkIcon aria-label="Open task" className={ICON} />;
+	if (pickup.kind === "task") return <BookmarkIcon aria-label="Unfinished" className={ICON} />;
 	return pickup.chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />;
 }
 
