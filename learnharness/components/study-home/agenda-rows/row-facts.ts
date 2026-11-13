@@ -1,4 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
+import { overdueWords } from "@/components/course-map/topic-map/topic-standing";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 
 /** What every row candidate draws from: Today's lines, the engine's study
@@ -9,6 +10,31 @@ export interface RowsProps {
 	today: string;
 	busy: boolean;
 	onContinue: (workspace: string) => void;
+	/** Under the Overview switch's follow: the line Home's map follows, and
+	 *  where a line reports that he points at it (by pointer or focus) or
+	 *  stops pointing. */
+	pointed?: string | null;
+	onPoint?: (row: TodayRow, by: "pointer" | "focus") => void;
+	onPointEnd?: () => void;
+}
+
+/** The handlers and mark that let a line tell Home's map he points at it;
+ *  none when nothing follows. */
+export function pointProps(row: TodayRow, { pointed, onPoint, onPointEnd }: Pick<RowsProps, "pointed" | "onPoint" | "onPointEnd">) {
+	if (!onPoint) return {};
+	return {
+		"data-pointed": pointed === lineKey(row) || undefined,
+		onPointerEnter: () => onPoint(row, "pointer"),
+		onPointerLeave: onPointEnd,
+		onFocus: () => onPoint(row, "focus"),
+	};
+}
+
+/** The line Home's map follows: the pointed line if it has a course, else
+ *  the first line with one (Today's most urgent). Pure. */
+export function followedRow(rows: readonly TodayRow[], pointed: string | null): TodayRow | null {
+	const withCourse = rows.filter((row) => row.course !== null);
+	return withCourse.find((row) => lineKey(row) === pointed) ?? withCourse[0] ?? null;
 }
 
 /** At most this many lines; past it the last line names the other courses. */
@@ -55,10 +81,16 @@ function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 	if (lapsed) return { kind: "missed", words: `You missed ${lapsed.title} last time`, short: `Missed ${lapsed.title}` };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
-	if (overdue === 0) return { kind: "review", words: "Due today", short: "Due today" };
-	if (overdue < 7) return { kind: "review", words: overdue === 1 ? "Overdue by a day" : `Overdue by ${overdue} days`, short: `${overdue}d overdue` };
+	return { kind: "review", words: overdueSentence(overdue), short: overdueWords(overdue) };
+}
+
+/** A late review as a sentence, for a tooltip or a screen reader: "Due
+ *  today", "Overdue by 3 days", "Overdue by a week". Pure. */
+export function overdueSentence(overdue: number): string {
+	if (overdue <= 0) return "Due today";
+	if (overdue < 7) return overdue === 1 ? "Overdue by a day" : `Overdue by ${overdue} days`;
 	const weeks = Math.floor(overdue / 7);
-	return { kind: "review", words: weeks === 1 ? "Overdue by a week" : `Overdue by ${weeks} weeks`, short: `${weeks}w overdue` };
+	return weeks === 1 ? "Overdue by a week" : `Overdue by ${weeks} weeks`;
 }
 
 /**
@@ -98,8 +130,13 @@ export function whyNow(row: TodayRow, today: string): string | null {
  *  ago"; null for a course never studied or a line with no course. Pure. */
 export function studiedAgo(row: TodayRow): string | null {
 	const days = row.course?.lastActiveDaysAgo;
-	if (days === null || days === undefined) return null;
-	if (days === 0) return "Today";
+	return days === null || days === undefined ? null : agoWords(days);
+}
+
+/** Some days ago in Home's words: "Today", "Yesterday", "3d ago", "2w
+ *  ago", "3mo ago". Pure. */
+export function agoWords(days: number): string {
+	if (days <= 0) return "Today";
 	if (days === 1) return "Yesterday";
 	if (days < 14) return `${days}d ago`;
 	if (days < 60) return `${Math.floor(days / 7)}w ago`;

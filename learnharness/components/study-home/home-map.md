@@ -12,3 +12,19 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 | empty | "Topics appear as you study this course." |
 
 Not on Home, enlarged or not: the Map page's List view, Import notes… and Statements… (Edo, 12 Nov 2026: he would never use them, and the engine should grow from his studying with nothing for him to manage). They stay on `/knowledge` only while Home is Current, and shipping Home deletes them with that page.
+
+## Overview switch
+
+Edo, 13 Nov 2026: Home felt disjointed, its map showing one course behind tabs and always opening on Linear Algebra rather than giving an overview. Of three sketched answers (small multiples, course tiles, the map following Today) he chose to try the map following Today, then asked to keep the tabs, with the tab moving smoothly to the course of the line he points at. `useOverviewVariant` in `design-variant.ts`, group `overview`, requires Home's Proposed.
+
+| Option | What the map does |
+|---|---|
+| `current` | the tabs pick the course; it opens on Today's first course |
+| `follow` | the tabs follow Today: pointing at a line (hover after a 150ms rest, so crossing lines on the way to the map does not flip it; focus at once) moves the tab to that line's course and lights that line's topics, the rest dimmed (TopicMap's `highlight`). At rest it follows Today's first line with a course. A tab pressed by hand holds until he points at a line again. The followed line keeps a quiet `fill-hover`, so the tie reads both ways |
+
+Both options:
+- Every course's map stays drawn, one per course stacked in the frame, and the chosen one shows (200ms crossfade). A change of course never draws a map afresh, so its nodes do not replay their entrance (Edo saw that as a glitch).
+- The tabs' underline is one bar that slides to the chosen tab (200ms), in place of each tab's own underline fading.
+- Up and Down walk Today's lines from anywhere on Home that is not a field, the map or the sidebar (Tab is off app-wide by his ruling); from nothing focused, Down takes the first line and Up the last. Enter opens the line.
+
+`followedRow` and `pointProps` (`agenda-rows/row-facts.ts`) are the pure parts, tested in `tests/home-follow.test.ts`.

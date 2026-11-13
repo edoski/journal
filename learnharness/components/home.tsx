@@ -17,9 +17,6 @@ import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
 import { useDesignVariant, useHomeVariant } from "@/components/design-variant";
 import { StartScreen } from "@/components/start/start-screen";
-import { MapFirstHome } from "@/components/study-home/map-first/map-first-home";
-import { PathHome } from "@/components/study-home/path/path-home";
-import { SplitHome } from "@/components/study-home/split/split-home";
 import { StudyHome } from "@/components/study-home/study-home";
 
 /**
@@ -35,18 +32,7 @@ export function Home(props: { initialConfigured: boolean; rendering?: boolean })
 /** The Proposed `/`: the study home Home's switch names, else the composer
  *  (the surface as it is). */
 function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
-	switch (useHomeVariant()) {
-		case "agenda":
-			return <StudyHome initialConfigured={initialConfigured} />;
-		case "split":
-			return <SplitHome initialConfigured={initialConfigured} />;
-		case "map":
-			return <MapFirstHome initialConfigured={initialConfigured} />;
-		case "path":
-			return <PathHome initialConfigured={initialConfigured} />;
-		case "current":
-			return <StartScreen initialConfigured={initialConfigured} today />;
-	}
+	return useHomeVariant() === "proposed" ? <StudyHome initialConfigured={initialConfigured} /> : <StartScreen initialConfigured={initialConfigured} today />;
 }
 
 function HomeCurrent({

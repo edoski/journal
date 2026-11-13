@@ -1,17 +1,8 @@
 # Study home
 
-The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. It sits behind the `home` group in the Logbook guide, which offers Current and one option per study home (`HOME_OPTIONS` in `components/design-variant.ts`; any option wears Design's Proposed). On Current `/` is the composer, the surface as it was. Production resolves to Current. Shipping one option deletes the others with their folders, the `home` group and `useHomeVariant`, and `/` becomes that home.
+The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. It sits behind the `home` group in the Logbook guide: Current keeps `/` the composer, the surface as it was; Proposed is this study home (wears Design's Proposed). Production resolves to Current. Shipping deletes the group and `useHomeVariant`, and `/` becomes this home.
 
-## The options
-
-| Option | Thesis | Leads with | The map | Spec |
-|---|---|---|---|---|
-| `agenda` | the map on top, then Today's rows | Today's rows | half the column, vignetted | this file, today.md, home-map.md |
-| `split` | the list is the page, and the map explains the picked lesson | today's lessons | a pane beside the list, following the pick | split/split-home.md |
-| `map` | the map stays the page's picture, bounded and tied to the lessons | the map card with its tabs | one card, 416px at most, above the lessons | map-first/map-first-home.md |
-| `path` | each lesson carries its own place in the path | today's lessons, alone | one press away, over Home | path/path-home.md |
-
-Explore mode ran twice on 12 Nov 2026. The first pass built course cards, an agenda and one table, and Edo picked the agenda. He then found it disjointed, with the space out of balance and the data in the wrong structure, so the second pass built `split`, `map` and `path` beside it. Every home shares the page frame (`home-frame.tsx`), and the three new ones share the lesson (lessons.md). The rest of this file is the agenda home.
+Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes beside the agenda; on 13 Nov Edo kept the agenda and those three were deleted. The page frame is `home-frame.tsx` (lessons.md).
 
 ## What shows, and why
 

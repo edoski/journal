@@ -2,12 +2,12 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/s
 import { examText } from "@/components/start/course-facts";
 import { sessionState } from "@/components/nav/session-state";
 
-/** "Span", "Span and Rank", "Span, Rank and more": at most two titles,
- *  never a count. Pure. */
+/** "Span", "Span, Rank", "Span, Rank, Basis and dimension": every title,
+ *  in order, joined by commas only, since a title may hold its own "and"
+ *  ("Random variables and distributions") and "and more" hid which topics
+ *  a review takes up (13 Nov 2026). Never a count. Pure. */
 export function titleList(titles: readonly string[]): string {
-	const [first, second] = titles;
-	if (second === undefined) return first ?? "";
-	return titles.length > 2 ? `${first}, ${second} and more` : `${first} and ${second}`;
+	return titles.join(", ");
 }
 
 function overdue(t: CourseMapTopic): number {
@@ -54,7 +54,7 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	return current ? { kind: "topic", title: current.title, topics: [current.handle] } : { kind: "none" };
 }
 
-/** The step as a short instruction: "Review Linear independence and Rank",
+/** The step as a short instruction: "Review Linear independence, Rank",
  *  "Continue Problem sheet 4", "Start Rank and the column space". Pure. */
 export function stepWords(step: NextStep): string {
 	switch (step.kind) {
@@ -106,16 +106,16 @@ export interface PathPlace {
 }
 
 /** One line of Today: a session waiting on the learner, or a course's next
- *  step. Each course has one line. */
+ *  step. A course with a waiting session has no line of its own. */
 export type TodayRow =
 	| { kind: "session"; chat: ChatListItem; course: StudyCourse | null }
 	| { kind: "course"; course: StudyCourse; step: NextStep };
 
 /**
- * Today's lines: a session waiting on the learner since yesterday takes its
- * course's line (most recent first, those with no course on their own
- * line), then every other course's next step, most urgent first. An older
- * waiting session stays in the sidebar. Pure.
+ * Today's lines: every session waiting on the learner since yesterday, each
+ * its own line, most recent first (it takes its course's line, so that
+ * course gets none), then every other course's next step, most urgent
+ * first. An older waiting session stays in the sidebar. Pure.
  */
 export function todayRows(courses: readonly StudyCourse[], waiting: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
@@ -126,7 +126,6 @@ export function todayRows(courses: readonly StudyCourse[], waiting: readonly Cha
 	const taken = new Set<string>();
 	for (const chat of recent) {
 		const ws = chat.course?.workspace;
-		if (ws && taken.has(ws)) continue;
 		const course = ws ? (byWorkspace.get(ws) ?? null) : null;
 		if (course) taken.add(ws!);
 		sessions.push({ kind: "session", chat, course });

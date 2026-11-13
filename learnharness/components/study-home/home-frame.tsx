@@ -7,7 +7,8 @@ import { SidebarToggle } from "@/components/sidebar";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { needsYouNow } from "@/components/study-home/needs-you";
+import type { TodayRow } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -17,7 +18,8 @@ export interface HomeReady {
 	rows: readonly TodayRow[];
 	/** The same lines as lessons in plain words. */
 	lessons: readonly Lesson[];
-	/** The courses, in Today's order. */
+	/** The courses, in Today's order, each once (two sessions waiting in
+	 *  one course are two lines of one course). */
 	courses: readonly StudyCourse[];
 	/** The engine's study day. */
 	today: string;
@@ -107,13 +109,13 @@ function HomeBody({
 				return <Notice>No courses yet. Start a lesson from New lesson and pick a course there.</Notice>;
 			}
 			const today = state.courses[0]!.map.today;
-			const rows = todayRows(state.courses, state.waiting, today);
+			const { rows } = needsYouNow(state.courses, state.chats, today);
 			return (
 				<>
 					{children({
 						rows,
 						lessons: rows.map(lessonOf),
-						courses: rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])),
+						courses: [...new Set(rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])))],
 						today,
 						busy,
 						onStart,
