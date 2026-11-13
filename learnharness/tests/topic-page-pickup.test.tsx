@@ -184,13 +184,29 @@ describe("each option drawn", () => {
 		}
 	});
 
-	it("keeps the lesson Now opens on the map, its row filled and its map button pressed", () => {
+	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {
 		for (const option of PICKUP_OPTIONS) {
 			const document = page(option, ROWS[0]![1]);
 			const now = document.querySelector('[data-slot="pickup-now"]')!;
 			assert.equal(now.getAttribute("data-shown"), "true", option);
+			assert.doesNotMatch(now.className, /bg-fill-selected|ring-1/, `${option}: no box around Now`);
 			assert.equal(now.querySelector('[data-slot="topic-map-toggle"]')!.getAttribute("aria-pressed"), "true", option);
 			assert.ok(document.querySelector('[data-slot="topic-lesson-map"]'), option);
 		}
+	});
+});
+
+describe("Earlier", () => {
+	it("lists each attempt as its result icon, its sentence and its day, with no help words", () => {
+		const facts = factsOf(RANK, [], [], RANK_RECORD);
+		assert.ok(facts.attempts.some((attempt) => !attempt.unaided), "the record holds a helped attempt");
+		const earlier = page("sections", facts).querySelector('[data-section="earlier"]')!;
+		const rows = [...earlier.querySelectorAll('[data-slot="topic-attempt"]')];
+		assert.equal(rows.length, facts.attempts.length);
+		for (const row of rows) {
+			assert.ok(row.querySelector('svg[role="img"]'), "the result icon");
+			assert.doesNotMatch(row.textContent!, /With a hint|Sure, but wrong|Mixed up with/);
+		}
+		assert.ok(earlier.querySelector('[data-slot="topic-history-date"]'));
 	});
 });

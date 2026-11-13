@@ -62,20 +62,19 @@ const RESULT = {
 	missed: { Icon: CircleXIcon, words: "Missed" },
 } as const;
 
-/** One scored attempt: how it went, the tutor's sentence, and the one
- *  thing worth saying about it. Not a control. Given `date`, it carries the
- *  date column. */
+/** One scored attempt: how it went and the tutor's sentence. Not a
+ *  control. The icon sits on the first line, and the sentence and the
+ *  date share its baseline. Given `date`, it carries the date column. */
 export function AttemptEntry({ attempt, titleOf, ends, date }: { attempt: TopicAttempt; titleOf: (handle: string) => string; ends: Ends; date?: string | null }) {
-	const mark = attemptMark(attempt, titleOf);
-	const { Icon, words } = RESULT[mark.result];
+	const { result } = attemptMark(attempt, titleOf);
+	const { Icon, words } = RESULT[result];
 	return (
-		<li data-slot="topic-attempt" data-result={mark.result} className={cn("grid min-h-10 items-start gap-x-4 py-2.75", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
-			<Icon role="img" aria-label={words} className={cn(ICON, "mt-px")} />
-			<p className="line-clamp-2 text-row text-muted-foreground">
+		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 py-2.75", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
+			<Icon role="img" aria-label={words} className={cn(ICON, "mt-px self-start")} />
+			<p className={cn("line-clamp-2 text-row text-muted-foreground", date !== undefined && "col-span-2")}>
 				<MathText>{attempt.text}</MathText>
 			</p>
-			{mark.words ? <span className="mt-px justify-self-end text-label text-muted-foreground">{mark.words}</span> : <span />}
-			{date !== undefined && <DateCell date={date} className="mt-px" />}
+			{date !== undefined && <DateCell date={date} />}
 		</li>
 	);
 }
