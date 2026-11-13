@@ -205,19 +205,65 @@ def test_grades(observation: dict[str, Any], expected: str) -> None:
     assert progress.grade(observation) == expected
 
 
-def test_exam_pulls_reviews_in_but_never_before_the_attempt() -> None:
+def exam(day_: date, lead: int = progress.FINAL_REVIEW_DAYS) -> progress.Exam:
+    return progress.Exam(day_, day_ - timedelta(days=lead))
+
+
+def test_an_exam_caps_reviews_at_its_final_review() -> None:
     base = date(2026, 10, 10)
     assert progress.review_day(base, 16, None) == date(2026, 10, 26)
-    assert progress.review_day(base, 16, date(2026, 10, 20)) == date(2026, 10, 13)
-    assert progress.review_day(base, 2, date(2026, 10, 30)) == date(2026, 10, 12)
-    assert progress.review_day(base, 3, date(2026, 10, 12)) == date(2026, 10, 11)
-    assert progress.review_day(base, 3, date(2026, 10, 1)) == date(2026, 10, 13)
+    assert progress.review_day(base, 16, exam(date(2026, 10, 20))) == date(2026, 10, 14)
+    assert progress.review_day(base, 2, exam(date(2026, 10, 30))) == date(2026, 10, 12)
+    assert progress.review_day(base, 3, exam(date(2026, 10, 1))) == date(2026, 10, 13)
 
 
 @pytest.mark.parametrize("days", [1, 2, 3, 160])
-def test_an_exam_tomorrow_puts_the_review_on_the_exam_day(days: int) -> None:
+def test_after_the_final_review_nothing_is_due_before_the_exam(days: int) -> None:
     base = date(2026, 10, 10)
-    assert progress.review_day(base, days, date(2026, 10, 11)) == date(2026, 10, 11)
+    soon = exam(date(2026, 10, 11))
+    expected = progress.review_day(base, days, soon)
+    assert expected == base + timedelta(days=days)
+    assert progress.kept(base, expected, soon) is None
+    assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
+
+
+def test_a_miss_after_the_final_review_is_relearned_before_the_exam() -> None:
+    record = schema.apply_patch(
+        course(introduced=day(-20)),
+        {"exam": {"date": day(5)}},
+        today=TODAY,
+        now=NOW,
+    )[0]
+    record, scheduled = save(record, {"observations": [attempt("rank", "incorrect")]})
+    assert scheduled.reviews == {"rank": {"due": day(1), "by": "engine"}}
+    later = TODAY + timedelta(days=1)
+    record, scheduled = save(
+        record, {"observations": [attempt("rank", offset=1)]}, later
+    )
+    assert scheduled.reviews == {"rank": {"due": day(4), "by": "engine"}}
+    record, scheduled = save(
+        record, {"observations": [attempt("rank", offset=4)]}, TODAY + timedelta(4)
+    )
+    assert "review" not in record["topics"]["rank"]
+    assert scheduled.notes == [
+        "rank: no review before the exam; its final review is done"
+    ]
+
+
+def test_the_final_review_lead_is_a_course_preference() -> None:
+    record = course(introduced=day(-40))
+    record, _ = save(record, {"exam": {"date": day(20)}})
+    record, _ = save(record, {"observations": [attempt("rank", offset=0)]})
+    record, _ = save(
+        record,
+        {"observations": [attempt("rank", offset=3)]},
+        TODAY + timedelta(days=3),
+    )
+    assert record["topics"]["rank"]["review"]["due"] == day(10)
+    with pytest.raises(ValueError, match="belongs to one course"):
+        schema.check_patch({"global_preferences": {"final_review_days": "5"}})
+    with pytest.raises(ValueError, match="whole number from 1 to 14"):
+        schema.check_patch({"preferences": {"final_review_days": "a week"}})
 
 
 def test_new_attempts_climb_the_ladder_and_keep_the_prompt() -> None:

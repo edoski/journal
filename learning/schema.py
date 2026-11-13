@@ -1083,6 +1083,7 @@ def check_patch(patch: Any) -> dict[str, Any]:
             ]
         else:
             result[name] = preferences.validate(value, name)
+            preferences.check_engine(result[name], name)
     return result
 
 

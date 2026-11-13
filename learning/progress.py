@@ -4,6 +4,10 @@ Pure functions over a validated course record (``schema.validate_record``).
 Each counted day of a topic gets one verdict (``solid``, ``helped`` or
 ``missed``); levels, lapses and the next expected review are replayed from the
 verdicts. Nothing here is stored except the reviews ``schedule`` sets.
+
+An exam ends the course's schedule: every review before it lands no later than
+the final review, ``final_review_days`` before the exam, and a topic whose next
+review would fall on or after the exam has none until the exam passes or moves.
 """
 
 from __future__ import annotations
@@ -15,13 +19,14 @@ import heapq
 from itertools import groupby
 from typing import Any
 
+from learning import preferences
 from learning.schema import PatchResult, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
 INTERVALS = {"missed": 1, "helped": 2}
 FIRST_RETRIEVAL_DAYS = 1
 RETAINED_VERDICTS = 2
-EXAM_SHARE = 3
+FINAL_REVIEW_DAYS = 6
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
@@ -32,6 +37,26 @@ GRADES = ("missed", "helped", "solid")
 LEARNING, PROBE, PRACTICE = "learning", "probe", "practice"
 
 Attempt = tuple[str, dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class Exam:
+    """The exam day and the day its final review falls due."""
+
+    day: date
+    final: date
+
+
+def exam_plan(record: dict[str, Any]) -> Exam | None:
+    """The course's exam with its final review, from the course's own preference."""
+    value = record.get("exam", {}).get("date")
+    if not value:
+        return None
+    day = date.fromisoformat(value)
+    lead = preferences.count(
+        record["preferences"], preferences.FINAL_REVIEW_DAYS, FINAL_REVIEW_DAYS
+    )
+    return Exam(day, day - timedelta(days=lead))
 
 
 @dataclass
@@ -48,13 +73,20 @@ class Replay:
 
     ``verdicts`` holds one ``(day, grade)`` per counted day; ``days`` classifies
     every attempted day as learning, probe or practice; ``expected`` is the next
-    expected review day after the last verdict.
+    expected review day after the last verdict, and ``due`` the date the engine
+    stores for it: ``None`` when that day is on or after an exam still ahead of
+    the verdict.
     """
 
     verdicts: list[tuple[str, str]] = field(default_factory=list)
     days: dict[str, str] = field(default_factory=dict)
     expected: date | None = None
+    due: date | None = None
     streak: int = 0
+
+    def expect(self, base: date, days: int, exam: Exam | None) -> None:
+        self.expected = review_day(base, days, exam)
+        self.due = kept(base, self.expected, exam)
 
 
 @dataclass
@@ -151,19 +183,25 @@ def interval(verdict: str, streak: int) -> int:
     return INTERVALS[verdict]
 
 
-def review_day(base: date, days: int, exam: date | None) -> date:
-    """``base + days``, pulled in before a later exam; always after ``base``.
+def review_day(base: date, days: int, exam: Exam | None) -> date:
+    """``base + days``, or the final review day when that comes first.
 
-    With the exam the next day the review lands on the exam day itself.
+    From the final review day on, the ladder runs as without an exam; a review
+    it puts on or after the exam is dropped by ``Replay.expect``.
     """
-    if exam is None or exam <= base:
-        return base + timedelta(days=days)
-    days = min(days, max(1, (exam - base).days // EXAM_SHARE))
-    pulled = min(base + timedelta(days=days), exam - timedelta(days=1))
-    return max(base + timedelta(days=1), pulled)
+    natural = base + timedelta(days=days)
+    if exam is None or base >= exam.final:
+        return natural
+    return min(natural, exam.final)
 
 
-def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) -> Replay:
+def kept(base: date, expected: date, exam: Exam | None) -> date | None:
+    """The review the engine stores: none when it falls on or after an exam
+    still ahead of ``base``."""
+    return None if exam is not None and base < exam.day <= expected else expected
+
+
+def replay(topic: dict[str, Any], attempts: list[Attempt], exam: Exam | None) -> Replay:
     """Classify each attempted day and replay the verdicts in day order.
 
     A learning day (the earlier of ``introduced`` and the first attempt, and the
@@ -180,12 +218,11 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
     if not days:
         return result
     learning = {min(days), topic.get("introduced", min(days))}
-    result.expected = review_day(
-        date.fromisoformat(min(days)), FIRST_RETRIEVAL_DAYS, exam
-    )
+    result.expect(date.fromisoformat(min(days)), FIRST_RETRIEVAL_DAYS, exam)
     for day, group in groupby(attempts, key=lambda pair: pair[1]["date"]):
         items = [item for _, item in group]
         verdict: str | None
+        assert result.expected is not None
         if any(item["kind"] == "exam" for item in items) or (
             day not in learning and day >= result.expected.isoformat()
         ):
@@ -204,7 +241,7 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: date | None) ->
             if result.days[day] == LEARNING
             else interval(verdict, result.streak)
         )
-        result.expected = review_day(date.fromisoformat(day), days_on, exam)
+        result.expect(date.fromisoformat(day), days_on, exam)
     return result
 
 
@@ -249,7 +286,7 @@ def _since_solid(attempts: list[Attempt], replayed: Replay) -> list[dict[str, An
 
 
 def _standing(
-    topic: dict[str, Any], history: _History, exam: date | None
+    topic: dict[str, Any], history: _History, exam: Exam | None
 ) -> dict[str, Any]:
     attempts = history.attempts
     replayed = replay(topic, attempts, exam)
@@ -280,7 +317,7 @@ def _standing(
 def replays(record: dict[str, Any]) -> dict[str, Replay]:
     """Every topic's replayed verdicts and next expected review."""
     histories = _histories(record["observations"])
-    exam = _exam(record)
+    exam = exam_plan(record)
     return {
         key: replay(topic, histories.get(key, _History()).attempts, exam)
         for key, topic in record["topics"].items()
@@ -290,7 +327,7 @@ def replays(record: dict[str, Any]) -> dict[str, Replay]:
 def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Every topic's standing, in one pass over the observations."""
     histories = _histories(record["observations"])
-    exam = _exam(record)
+    exam = exam_plan(record)
     return {
         key: _standing(topic, histories.get(key, _History()), exam)
         for key, topic in record["topics"].items()
@@ -305,11 +342,6 @@ def standing(record: dict[str, Any], topic: str) -> dict[str, Any]:
 # --- scheduling ---------------------------------------------------------------
 
 
-def _exam(record: dict[str, Any]) -> date | None:
-    value = record.get("exam", {}).get("date")
-    return date.fromisoformat(value) if value else None
-
-
 def _with_review(
     record: dict[str, Any], topic: str, due: date, by: str
 ) -> dict[str, str]:
@@ -322,20 +354,23 @@ def _with_review(
 def _clamp_tutor_dates(
     record: dict[str, Any], changes: PatchResult, today: date, scheduled: Scheduled
 ) -> None:
-    exam = _exam(record)
+    exam = exam_plan(record)
     for key in changes.tutor_reviews:
         review = record["topics"].get(key, {}).get("review", {})
         if "due" not in review:
             continue
         due = date.fromisoformat(review["due"])
-        if exam is not None and exam > today and due >= exam:
-            moved = max(today, exam - timedelta(days=1))
+        if exam is not None and exam.day > today and due >= exam.day:
+            moved = max(today, exam.day - timedelta(days=1))
             scheduled.notes.append(
                 f"{key}: review moved from {due.isoformat()} to {moved.isoformat()}, "
                 "before the exam"
             )
             due = moved
         scheduled.reviews[key] = _with_review(record, key, due, "tutor")
+
+
+_NONE_BEFORE_EXAM = "no review before the exam; its final review is done"
 
 
 def _attempt_ids(history: _History) -> list[str]:
@@ -388,7 +423,7 @@ def _reschedule(
         {key: item for key, item in observations.items() if key not in new}
     )
     named = {topic for key in new for topic in observations[key]["topics"]}
-    exam = _exam(record)
+    exam = exam_plan(record)
     for key, topic in list(record["topics"].items()):
         now, then = histories.get(key, _History()), before.get(key, _History())
         if key in changes.tutor_reviews or _attempt_ids(now) == _attempt_ids(then):
@@ -403,12 +438,16 @@ def _reschedule(
                 scheduled.notes.append(
                     f"{key}: review date cleared, a correction left it no attempts"
                 )
+        elif (changed or _practice_moved(topic, days, after)) and after.due is None:
+            if "due" in topic.get("review", {}):
+                _clear_due(record, key)
+            scheduled.notes.append(f"{key}: {_NONE_BEFORE_EXAM}")
         elif changed or _practice_moved(topic, days, after):
-            scheduled.reviews[key] = _with_review(record, key, after.expected, "engine")
+            assert after.due is not None
+            scheduled.reviews[key] = _with_review(record, key, after.due, "engine")
             if key not in named:
                 scheduled.notes.append(
-                    f"{key}: review moved to {after.expected.isoformat()} after a "
-                    "correction"
+                    f"{key}: review moved to {after.due.isoformat()} after a correction"
                 )
 
 
@@ -418,7 +457,7 @@ def _first_retrievals(
     histories: dict[str, _History],
     scheduled: Scheduled,
 ) -> None:
-    exam = _exam(record)
+    exam = exam_plan(record)
     for key in changes.introduced:
         topic = record["topics"].get(key)
         if (
@@ -427,8 +466,10 @@ def _first_retrievals(
             or "due" in topic.get("review", {})
         ):
             continue
-        base = date.fromisoformat(topic["introduced"])
-        due = review_day(base, FIRST_RETRIEVAL_DAYS, exam)
+        due = replay(topic, [], exam).due
+        if due is None:
+            scheduled.notes.append(f"{key}: {_NONE_BEFORE_EXAM}")
+            continue
         scheduled.reviews[key] = _with_review(record, key, due, "engine")
         scheduled.notes.append(
             f"{key}: first retrieval scheduled for {due.isoformat()}, after it was "
@@ -558,8 +599,8 @@ def _due_items(
 
 def unready(record: dict[str, Any], today: date) -> set[str]:
     """Within the exam run-up, topics without a ``solid`` verdict in 14 days."""
-    exam = _exam(record)
-    if exam is None or not 0 <= (exam - today).days <= RUNUP_DAYS:
+    exam = exam_plan(record)
+    if exam is None or not 0 <= (exam.day - today).days <= RUNUP_DAYS:
         return set()
     recent = (today - timedelta(days=RECENT_SOLID_DAYS)).isoformat()
     return {
