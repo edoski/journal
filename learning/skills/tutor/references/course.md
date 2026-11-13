@@ -19,7 +19,7 @@ The exam lives in one object, merged by field:
 }}
 ```
 
-A ref cites a registered source, so the example registers the syllabus in the same save; a source `add_sources` already registered is cited by the handle it returned.
+A ref cites a registered source, so the example registers the syllabus in the same save; a source registered earlier is cited by its handle.
 
 Record requirements from primary material or the learner's explicit statement; label patterns inferred from past papers as indications. Keep each unresolved doubt in `unknowns` until evidence settles it; a learner's report can set the working convention without establishing which document is current. The `date` drives review scheduling: reviews stay within the time left and never fall after the day before. For a course with several exam sessions, keep the next one the learner is aiming for.
 

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, describe, it } from "node:test";
 import { PATHS } from "../config.ts";
-import { ENGINE_DOCTRINE, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
+import { ENGINE_DOCTRINE, courseMapDoctrine, courseRecordPrompt } from "../src/agent/prompt-segments.ts";
 
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-engine-doctrine-"));
 after(() => fs.rmSync(TMP, { recursive: true, force: true }));
@@ -102,7 +102,8 @@ describe("engine doctrine", () => {
 		for (const agent of ["prober", "teacher", "practice"] as const) {
 			const prompt = normalize(courseRecordPrompt(agent));
 			assert.ok(prompt.includes("A `gap` is resolved, and set to `null`, only by an unaided correct answer to a question that invites it, on a later day than its repair"), `${agent}: a resolved gap`);
-			assert.ok(prompt.includes("A new topic takes its place in `order` and is added to the `needs` of the topics that build on it"), `${agent}: a new topic`);
+			assert.ok(prompt.includes("A new topic is added to the `needs` of the topics that build on it, and to `order` where it belongs"), `${agent}: a new topic`);
+			assert.ok(prompt.includes("a topic missing from `order` goes just before the first ordered topic that builds on it, else just after its last prerequisite"), `${agent}: where a late topic lands`);
 		}
 		for (const agent of ["teacher", "practice"] as const) {
 			assert.ok(normalize(courseRecordPrompt(agent)).includes("Record the rung of what the hint said, not of what was asked or meant."), `${agent}: the rung given`);
@@ -152,6 +153,25 @@ describe("engine doctrine", () => {
 		const dir = path.join(TMP, "renamed-section");
 		copyReferences(dir, (file, text) => (file === "teaching.md" ? text.replace("## Hints", "## Help") : text));
 		assert.throws(() => courseRecordPrompt("practice", dir), /engine doctrine: no "## Hints" in teaching\.md/);
+	});
+
+	it("the course map builder reads the one path-building recipe: sources, true prerequisites, contrasts, exclusions, revision", () => {
+		const recipe = courseMapDoctrine();
+		assert.match(recipe, /^# Course, exam and path\n\n## Building the path\n/);
+		for (const rule of [/Cite only registered sources/, /could the learner work an exercise on B having never seen A/, /go in `contrasts`/, /give it `excluded` with the reason/, /Keep every handle/, /`\$…\$`/]) assert.match(recipe, rule);
+		assert.doesNotMatch(recipe, /## Exam facts/);
+		const dir = path.join(TMP, "renamed-recipe");
+		copyReferences(dir, (file, text) => (file === "course.md" ? text.replace("## Building the path", "## The path") : text));
+		assert.throws(() => courseMapDoctrine(dir), /engine doctrine: no "## Building the path" in course\.md/);
+	});
+
+	it("every example in course.md registers the sources it cites", () => {
+		const text = fs.readFileSync(path.join(PATHS.tutorReferences, "course.md"), "utf8");
+		for (const block of text.match(/```json\n[\s\S]*?```/g) ?? []) {
+			const patch = JSON.parse(block.slice(8, -3)) as { sources?: Record<string, unknown> };
+			const cited = [...block.matchAll(/"source": "([a-z0-9_-]+)"/g)].map((m) => m[1]!);
+			for (const source of cited) assert.ok(patch.sources && source in patch.sources, `the example cites "${source}" and registers it`);
+		}
 	});
 
 	it("reads sections from a checkout with Windows line endings", () => {
