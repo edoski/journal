@@ -43,4 +43,4 @@ Two parts:
 
 **Presenting ends your turn.** Ask him to confirm the plan before teaching begins. If he asks for changes, revise the map (`plan_init` again) and present again; once he's on board, begin the first node. Never teach in the presenting turn. Mid-lesson rewrites (`plan_init` again) carry on without re-presenting.
 
-**Closing for tonight.** When you end the session (your close, or he says he is done for tonight), call `lesson_progress` with `close: true` and any steps finished in `done`, then write your closing words. That is what tells his app the session is finished rather than waiting on him.
+**Closing for tonight.** When you end the session (your close, or he says he is done for tonight), call `lesson_progress` with `close: true` and any steps finished in `done`, then write your closing words. That is what tells his app the session is finished rather than waiting on him, and it marks the lesson's new topics introduced in his record for you.

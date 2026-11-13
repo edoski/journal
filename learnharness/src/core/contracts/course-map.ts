@@ -71,3 +71,10 @@ export interface CourseMap {
 	topics: readonly CourseMapTopic[];
 	edges: readonly CourseMapEdge[];
 }
+
+/** Of a session's candidate topics, the ones the course map lists as never
+ *  introduced: what a lesson's close marks introduced. Pure. */
+export function topicsToIntroduce(candidates: readonly string[], map: CourseMap): string[] {
+	const wanted = new Set(candidates);
+	return map.topics.filter((t) => wanted.has(t.handle) && t.introduced === null).map((t) => t.handle);
+}
