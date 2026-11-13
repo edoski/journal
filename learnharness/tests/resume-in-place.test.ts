@@ -33,7 +33,7 @@ const { createPracticeAgent, createProberAgent, createTeacherAgent } = await imp
 const { newUserMessage } = await import("../src/core/native-messages.ts");
 const { continueMove, resumableSession, sessionState } = await import("../components/nav/session-state.ts");
 const { topicAction } = await import("../components/unit-inbox/topic-page/topic-facts.ts");
-const { todayRows, waitingSessions } = await import("../components/study-home/study-facts.ts");
+const { todayRows, openSessions } = await import("../components/study-home/study-facts.ts");
 const { buildInbox, taskSessions } = await import("../components/unit-inbox/units.ts");
 const { SessionStarter } = await import("../components/start-session.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
@@ -130,7 +130,7 @@ describe("a lesson waiting on his typed answer", () => {
 		const chat = item(id);
 		assert.equal(sessionState(chat), "your-turn", "the tutor asked him something mid-lesson");
 
-		const [first] = todayRows([COURSE], waitingSessions(listed()), TODAY);
+		const [first] = todayRows([COURSE], openSessions(listed()), TODAY);
 		assert.equal(first?.kind, "session", "Home's Today line for the course is the lesson");
 		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
 

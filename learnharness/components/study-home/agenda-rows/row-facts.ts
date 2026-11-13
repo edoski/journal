@@ -1,4 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
+import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 
 /** What Today's rows draw from: Today's lines and how a line opens. */
@@ -38,7 +39,7 @@ export function lessonTitle(row: TodayRow): string {
 /** Why a line is on Today: its kind (which picks its icon) and the few
  *  words that fit beside an icon. */
 export interface Why {
-	kind: "reply" | "missed" | "review" | "task" | "next";
+	kind: "reply" | "working" | "stopped" | "missed" | "review" | "task" | "next";
 	/** "Missed Chain rule". */
 	short: string;
 }
@@ -55,14 +56,23 @@ function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 	return { kind: "review", short: `${Math.floor(overdue / 7)}w overdue` };
 }
 
+/** A session's line by where it stands; a finished session has no line. */
+const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
+	"your-turn": { kind: "reply", short: "Your turn" },
+	working: { kind: "working", short: "Tutor writing" },
+	paused: { kind: "stopped", short: "Stopped mid-reply" },
+	finished: null,
+};
+
 /**
  * Why a line is on Today, in words that need no memory of the system: a
- * session waiting on the learner, why a review is due (a lapse, or how
+ * session waiting on the learner, the tutor writing in it or stopped
+ * mid-reply in it, why a review is due (a lapse, or how
  * long it is overdue), where an open task was left, or that the topic is
  * next on the course's map. Engine fields only. Pure.
  */
 export function whyOf(row: TodayRow): Why | null {
-	if (row.kind === "session") return { kind: "reply", short: "Your turn" };
+	if (row.kind === "session") return SESSION_WHY[sessionState(row.chat)];
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {

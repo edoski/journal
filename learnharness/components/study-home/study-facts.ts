@@ -1,6 +1,8 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
-import { resumableSession, sessionState } from "@/components/nav/session-state";
+import { continueMove, sessionState, type SessionState } from "@/components/nav/session-state";
+import { taskSessions, topicSessions } from "@/components/unit-inbox/units";
+import { CONTINUE_OPENING } from "@/components/start/course-facts";
 
 /** "Span", "Span and Rank", "Span, Rank and more": at most two titles,
  *  never a count. Pure. */
@@ -35,8 +37,8 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
  *  the current topic. `topics` are the topics it works on. */
 export type NextStep =
 	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
-	| { kind: "task"; title: string; step: string | null; topics: readonly TopicHandle[] }
-	| { kind: "topic"; title: string; topics: readonly TopicHandle[] }
+	| { kind: "task"; key: string; title: string; step: string | null; topics: readonly TopicHandle[] }
+	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; started: boolean }
 	| { kind: "none" };
 
 export function nextStepOf(course: StudyCourse): NextStep {
@@ -49,13 +51,14 @@ export function nextStepOf(course: StudyCourse): NextStep {
 	}
 	if (task) {
 		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
-		return { kind: "task", title: task.title, step: task.step, topics: held.length > 0 ? held : current ? [current.handle] : [] };
+		return { kind: "task", key: task.key, title: task.title, step: task.step, topics: held.length > 0 ? held : current ? [current.handle] : [] };
 	}
-	return current ? { kind: "topic", title: current.title, topics: [current.handle] } : { kind: "none" };
+	return current ? { kind: "topic", title: current.title, topics: [current.handle], started: current.level !== "new" } : { kind: "none" };
 }
 
 /** The step as a short instruction: "Review Linear independence and Rank",
- *  "Continue Problem sheet 4", "Start Rank and the column space". Pure. */
+ *  "Continue Problem sheet 4", "Start Poisson distribution" for a topic not
+ *  started. Pure. */
 export function stepWords(step: NextStep): string {
 	switch (step.kind) {
 		case "review":
@@ -63,7 +66,7 @@ export function stepWords(step: NextStep): string {
 		case "task":
 			return `Continue ${step.title}`;
 		case "topic":
-			return `Continue ${step.title}`;
+			return `${step.started ? "Continue" : "Start"} ${step.title}`;
 		case "none":
 			return "Start a lesson";
 	}
@@ -105,33 +108,38 @@ export interface PathPlace {
 	of: number;
 }
 
-/** One line of Today: a session waiting on the learner, or a course's next
- *  step. Each course has one line. */
+/** One line of Today: a session to pick up, or a course's next step. */
 export type TodayRow =
 	| { kind: "session"; chat: ChatListItem; course: StudyCourse | null }
 	| { kind: "course"; course: StudyCourse; step: NextStep };
 
+/** Whether a session works on a course's next step: it holds the open task,
+ *  or it was started on, or worked on, every topic the step takes up. */
+function covers(chat: ChatListItem, step: NextStep): boolean {
+	if (step.kind === "none") return true;
+	if (step.kind === "task" && chat.tasks?.some((key) => key === step.key)) return true;
+	const topics = new Set(chat.topics ?? []);
+	return step.topics.every((h) => topics.has(h));
+}
+
 /**
- * Today's lines: a session waiting on the learner since yesterday takes its
- * course's line (most recent first, those with no course on their own
- * line), then every other course's next step, most urgent first. An older
- * waiting session stays in the sidebar. Pure.
+ * Today's lines: each session to pick up since yesterday (it waits on the
+ * learner, the tutor writes in it, or stopped mid-reply), most recent
+ * first, then each course's next step, most urgent first, unless a session
+ * shown already works on it. A session stays on its line while the tutor
+ * writes. An older session to pick up stays in the sidebar. Pure.
  */
-export function todayRows(courses: readonly StudyCourse[], waiting: readonly ChatListItem[], today: string): TodayRow[] {
+export function todayRows(courses: readonly StudyCourse[], open: readonly ChatListItem[], today: string): TodayRow[] {
 	const since = addDays(today, -1);
-	const recent = waiting.filter((c) => c.updatedAt.slice(0, 10) >= since);
+	const recent = open.filter((c) => c.updatedAt.slice(0, 10) >= since);
 	const ordered = byUrgency(courses);
 	const byWorkspace = new Map(ordered.map((c) => [c.map.workspace, c]));
-	const sessions: TodayRow[] = [];
-	const taken = new Set<string>();
-	for (const chat of recent) {
-		const ws = chat.course?.workspace;
-		if (ws && taken.has(ws)) continue;
-		const course = ws ? (byWorkspace.get(ws) ?? null) : null;
-		if (course) taken.add(ws!);
-		sessions.push({ kind: "session", chat, course });
-	}
-	const rest: TodayRow[] = ordered.filter((c) => !taken.has(c.map.workspace)).map((course) => ({ kind: "course", course, step: nextStepOf(course) }));
+	const sessions: TodayRow[] = recent.map((chat) => ({ kind: "session", chat, course: (chat.course && byWorkspace.get(chat.course.workspace)) ?? null }));
+	const rest = ordered.flatMap((course): TodayRow[] => {
+		const step = nextStepOf(course);
+		const taken = recent.some((chat) => chat.course?.workspace === course.map.workspace && covers(chat, step));
+		return taken ? [] : [{ kind: "course", course, step }];
+	});
 	return [...sessions, ...rest];
 }
 
@@ -155,16 +163,37 @@ export function studyQuestion(hour: number): string {
 	return `What are we studying ${when}?`;
 }
 
-/** The session a course's Continue opens instead of starting one: the one
- *  that waits on him, is being written or stopped, in the course; null
- *  when none does and Continue starts the course's next step. Pure. */
-export function courseContinue(chats: readonly ChatListItem[], workspace: string): ChatListItem | null {
-	return resumableSession(chats.filter((c) => c.course?.workspace === workspace));
+/** What a press on a course's line does: open a session, or start one
+ *  with an opening on some topics, `from` a finished lesson it picks up. */
+export type CourseMove = { kind: "open"; chat: ChatListItem } | { kind: "start"; opening: string; topics: readonly TopicHandle[]; from?: string };
+
+/**
+ * A course's line, pressed: take up its next step. A review opens a session
+ * on those topics that is still to pick up, else starts a review of them,
+ * named for them; never an older lesson. An open task or the current topic
+ * continues the lesson that holds it, as the session model says
+ * (`continueMove`), else starts one. With nothing to take up, a session
+ * starts and the tutor proposes. Pure.
+ */
+export function courseMove(course: StudyCourse, chats: readonly ChatListItem[]): CourseMove {
+	const step = nextStepOf(course);
+	const { workspace } = course.map;
+	const opening = stepWords(step);
+	if (step.kind === "none") return { kind: "start", opening: CONTINUE_OPENING, topics: [] };
+	const held = step.kind === "task" ? taskSessions(chats, workspace, step.key) : topicSessions(chats, workspace, step.topics[0] ?? "").filter((c) => covers(c, step));
+	const move = step.kind === "review" ? (pickUp(held) ? continueMove(held) : null) : continueMove(held);
+	if (move?.kind === "open") return { kind: "open", chat: move.chat };
+	return { kind: "start", opening, topics: step.topics, ...(move ? { from: move.from.id } : {}) };
 }
 
-/** Sessions whose turn is the learner's, most recent first. Pure. */
-export function waitingSessions(chats: readonly ChatListItem[]): ChatListItem[] {
+/** The states a session is picked up from: it waits on the learner, the
+ *  tutor writes in it, or the tutor stopped mid-reply. */
+const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+const pickUp = (sessions: readonly ChatListItem[]) => sessions.some((c) => PICK_UP.has(sessionState(c)));
+
+/** The sessions to pick up, most recent first. Pure. */
+export function openSessions(chats: readonly ChatListItem[]): ChatListItem[] {
 	return chats
-		.filter((c) => sessionState(c) === "your-turn")
+		.filter((c) => PICK_UP.has(sessionState(c)))
 		.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
 }
