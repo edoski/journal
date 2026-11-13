@@ -441,6 +441,12 @@ export async function handleChatInput(
 	} catch (err) {
 		console.error(`[chat ${chatId}] input visibility bookkeeping failed:`, err);
 	}
+	// A wake's markers land in the record after turn-started, so a view that
+	// attached on it would miss them until settle: announce the write.
+	const announceMarkers = () => {
+		if (input.type === "steers" && appends.length > 0) emit("record-changed", { chatId });
+	};
+	if (!stagedAutomatic) announceMarkers();
 
 	// MONEY CHANNEL (wave 4): one collector per request, fed by the agent's
 	// message_end events. Every model call's usage lands in the chat record's
@@ -494,6 +500,7 @@ export async function handleChatInput(
 			stores.chatStore.saveMessages(chatId, merged);
 			persistBaseCount = merged.length;
 			noteSteersDurable(chatId, merged);
+			announceMarkers();
 		},
 		restoreAutomatic: (automaticIds, retainedIds) => restoreUncommittedAutomatic(chatId, constructed, automaticIds, retainedIds),
 	});
