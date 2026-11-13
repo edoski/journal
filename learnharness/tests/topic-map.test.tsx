@@ -302,13 +302,14 @@ describe("topic map drawing", () => {
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
 
-	it("shows a title and its pie on every node, and a line under it only where the topic needs him, overdue in Home's words", () => {
+	it("shows a title and its pie on every node, and under it why the topic needs him, overdue in Home's words, or else where he stands", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
 			["1w overdue", "A mistake to fix", "Due today", "Missed last time", "Mixed up with Cramer's rule", "Worth another look", "Sure, but wrong"],
 		);
-		assert.equal(node("determinant").textContent, "Determinants");
+		assert.equal(node("determinant").querySelector('[data-slot="topic-need"]'), null);
+		assert.equal(node("determinant").querySelector('[data-slot="topic-standing"]')!.textContent, standingOf(MAP.topics.find((t) => t.handle === "determinant")!).words);
 		assert.equal(node("eigen").querySelector('[data-slot="topic-glyph"]')!.getAttribute("data-fill"), "0");
 	});
 

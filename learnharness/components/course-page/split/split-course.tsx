@@ -2,8 +2,7 @@
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { TopicHandle } from "@/src/core";
-import { layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
-import { useNodeSize } from "@/components/course-map/topic-map/node-size";
+import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { CourseFrame } from "@/components/course-page/course-frame";
 import { CourseHeader } from "@/components/course-page/course-header";
 import type { CourseView } from "@/components/course-page/course-model";
@@ -31,8 +30,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 	const { map } = view.course;
 	const [pointed, setPointed] = useState<Pointed | null>(null);
 	const groups = useMemo(() => shownGroups(view.groups), [view.groups]);
-	const node = useNodeSize();
-	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges, node]);
+	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE), [map.topics, map.edges]);
 	const aim = useMemo(() => aimOf(view.next.lesson.topics, groups, layout), [view.next.lesson.topics, groups, layout]);
 	const lit = useMemo(() => litOf(pointed, map.edges), [pointed, map.edges]);
 	const headerBox = useRef<HTMLDivElement>(null);

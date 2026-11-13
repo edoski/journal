@@ -7,7 +7,7 @@ Thesis: Edo liked progress, recency and reason (13 Nov 2026) and asked for one r
 | Part | Notes |
 |---|---|
 | row | 64px, radius 8 bleeding 12 past the column, hover `fill-hover`; no surface; a 1px `border` at 50% hairline above every row but the first, the column's width |
-| pie | 16, centred on both lines, muted ink: how much of the course he can do on his own; on hover a shadcn tooltip gives the count, "20 of 24 topics you can do on your own" |
+| pie | the app's one pie (`../../../ui/pie.md`), which the topic map's cards draw too; 16, centred on both lines, muted ink: how much of the course he can do on his own; on hover a shadcn tooltip gives the count, "20 of 24 topics you can do on your own" |
 | course line | 12 muted: the course; at its end, flush right, how long since he studied it, "2d ago" (`studiedAgo`: "Today", "Yesterday", "3d ago", "2w ago", "3mo ago"; nothing for a course never studied) |
 | lesson line | 13 at 500 in ink: the lesson; at its end, flush right, the reason as a 14px icon and a few words, 12 muted (`whyOf`'s `short`), up to 224 wide |
 | reason icons | `WhyMark` at size `row` (`../why-mark.md`), one per kind (`WHY_ICON`): a turn that waits, the sidebar's question bubble and "Your turn" in `link` at 500; the tutor writing, a pen and "Tutor writing"; a turn stopped mid-reply, a pause mark and "Stopped mid-reply"; a review, the sidebar's History icon and "Due today", "3d overdue" or "2w overdue"; a miss, a crossed circle and "Missed Chain rule"; an open task, a bookmark and "At part (c)" or "Unfinished"; the next topic, an arrow and "Next up" |

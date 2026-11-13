@@ -6,10 +6,9 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
-import { MIN_ZOOM, cameraAt, centreOf, chainOf, isWalkKey, layoutTopicMap, neighbourOf, openingCamera, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
+import { MIN_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, isWalkKey, layoutTopicMap, neighbourOf, openingCamera, wholeZoom, type TopicMapLayout } from "./topic-map-layout";
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
-import { useNodeSize } from "./node-size";
-import { needOf, standingOf, statusOf, topicLabel } from "./topic-standing";
+import { standingOf, statusOf, topicLabel } from "./topic-standing";
 
 const nodeTypes = { topic: TopicNode };
 const edgeTypes = { need: NeedEdge };
@@ -47,8 +46,7 @@ export function TopicMap({
 	/** Topics to light, the rest dimmed as a hover dims them; null lights none. */
 	highlight?: ReadonlySet<TopicHandle> | null;
 }) {
-	const node = useNodeSize();
-	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges, node]);
+	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<TopicFlowNode[]>(
 		() =>
@@ -75,7 +73,6 @@ export function TopicMap({
 						topic,
 						current: map.current === topic.handle,
 						standing: standingOf(topic),
-						need: needOf(topic, titleOf),
 						status: statusOf(topic, map.tasks, titleOf),
 						label: topicLabel(topic, map.current === topic.handle, titleOf),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
@@ -84,7 +81,7 @@ export function TopicMap({
 					},
 				};
 			}),
-		[map, layout, node, titleOf],
+		[map, layout, titleOf],
 	);
 	const edges = useMemo<NeedFlowEdge[]>(
 		() =>

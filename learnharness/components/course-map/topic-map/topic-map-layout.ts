@@ -17,8 +17,11 @@ export interface NodeSize {
 	height: number;
 }
 
-/** The box the map's nodes have had since the topic map (224×64). */
+/** The box a lesson's step map draws its steps in (224×64). */
 export const NODE_SIZE: NodeSize = { width: NODE_WIDTH, height: NODE_HEIGHT };
+/** The topic map's card (spec: topic-map.md, Node): the pie beside a title
+ *  and one line under it, wide enough for the longest status. */
+export const TOPIC_NODE_SIZE: NodeSize = { width: 248, height: 56 };
 /** Space between topics in a layer, and between layers. */
 export const NODE_GAP = 24;
 export const LAYER_GAP = 56;
