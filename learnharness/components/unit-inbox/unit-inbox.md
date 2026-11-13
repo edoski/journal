@@ -62,6 +62,8 @@ Laid out like a T3 Code thread: the 52px top band, then a 736px column with the 
 
 While the Map switch is on Proposed the header is `topic-header.tsx` (`data-slot="topic-header"`), the page the topic map's node opens: the course, the title with Study at its right (a primary 32px button, `data-testid="study-topic"`, which starts a lesson on the topic in one press; absent while a session waits to be resumed, since Resume is then the page's one button), then the map's 16px pie with the standing in the map's words ("Nearly on your own. A mistake to fix", "On your own. Back Fri 13 Nov"; `topic-map.md`), the mistake the engine diagnosed in its own sentence, and the open task that holds the topic ("In Problem sheet 4, at part (c)"). The old line ("Right with help. Review due") stays only on Current.
 
+Behind the Topic switch (`design-variant.ts`, group `topic`, which wears Design's Proposed and the topic map) the page's body is one of three candidates, `brief`, `steps` and `trail`, drawn by `topic-page/topic-page.tsx` around a shared head, pick-up rows and session rows; Current's body above is not touched. See `topic-page/topic-page.md`.
+
 Sending starts a new session in the topic's course through `useLessonStart` (the start screen's and the study home's path, with its setup guards). Its first message is the prompt, led by the topic's title unless the prompt names it (`openingFor`), so the tutor works on that topic. The app links the new session to the topic (`lh:topic-starts`, `linkStarts`), so its row stays selected and the page lists it before the transcript names the topic.
 
 ## Sessions to topics

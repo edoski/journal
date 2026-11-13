@@ -15,8 +15,9 @@ import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useMapVariant } from "@/components/design-variant";
+import { useMapVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
+import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
@@ -208,6 +209,7 @@ function UnitBody({
  */
 export function UnitPage({ workspace, handle, initialConfigured }: { workspace: string; handle: string; initialConfigured: boolean }) {
 	const read = useUnitRead(workspace);
+	const variant = useTopicVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
@@ -216,7 +218,11 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				<SidebarToggle />
 			</header>
 			{read.status === "ready" && topic ? (
-				<UnitBody course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				variant === "current" ? (
+					<UnitBody course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				) : (
+					<TopicPage candidate={TOPIC_CANDIDATES[variant]} course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				)
 			) : (
 				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">
 					{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}
