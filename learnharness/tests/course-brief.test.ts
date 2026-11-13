@@ -113,7 +113,9 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("the due backlog shows its total and the most overdue review past the five", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them systems \(9 days overdue\):/);
+		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait:/, "in the run-up the overdue unready review is among today's five");
+		const hidden = projectCourseBrief({ ...RESUME, due_oldest: { topic: "t4", overdue: 9 } }, "teach").text;
+		assert.match(hidden, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them t4 \(9 days overdue\):/);
 	});
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {
