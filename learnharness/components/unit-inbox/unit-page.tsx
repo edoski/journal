@@ -19,6 +19,7 @@ import { useMapVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
@@ -68,7 +69,9 @@ function ActiveSession({ chat }: { chat: ChatListItem }) {
 		>
 			<KindIcon chat={chat} />
 			<span className="flex min-w-0 flex-1 flex-col">
-				<span className="truncate text-row font-medium text-foreground">{chat.title}</span>
+				<span className="truncate text-row font-medium text-foreground">
+					<MathText>{chat.title}</MathText>
+				</span>
 				<span className="text-label text-muted-foreground">
 					{waits ? (
 						<span className="font-medium text-link">Your turn</span>
@@ -154,8 +157,12 @@ function UnitBody({
 						/>
 					) : (
 					<header className="flex flex-col gap-1 px-2">
-						<p className="text-label text-muted-foreground">{course.map.title}</p>
-						<h1 className="text-xl font-semibold text-foreground">{topic.title}</h1>
+						<p className="text-label text-muted-foreground">
+							<MathText>{course.map.title}</MathText>
+						</p>
+						<h1 className="text-xl font-semibold text-foreground">
+							<MathText>{topic.title}</MathText>
+						</h1>
 						<p data-slot="unit-standing" className="text-row text-muted-foreground">
 							{standingWords(topic)}
 						</p>
@@ -191,7 +198,7 @@ function UnitBody({
 						onSend={send}
 						onStop={() => {}}
 						canSend={text.trim().length > 0 && !lesson.busy}
-						placeholder={`Ask about ${topic.title}, or start a new session on it`}
+						placeholder={`Ask about ${mathPlain(topic.title)}, or start a new session on it`}
 					/>
 				</div>
 			</div>

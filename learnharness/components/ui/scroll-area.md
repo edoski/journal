@@ -4,7 +4,7 @@ An overlay scrollbar for a pane: the Settings content pane. `scroll-area.tsx`, s
 
 | Part | Notes |
 |---|---|
-| bar | 10px, 1px padding, over the content; `bar={false}` draws none (the Proposed sidebar, as T3 Code's) and the area still scrolls by wheel, trackpad and keyboard |
+| bar | 10px, 1px padding, over the content; `bar={false}` shows none (the Proposed sidebar, as T3 Code's) and the area still scrolls by wheel, trackpad and keyboard: the bar stays mounted, `invisible`, since Radix sets a viewport with no bar mounted to `overflow: hidden` |
 | thumb | full radius, white 15%, 25% on hover |
 
 Sources: shadcn scroll-area, macOS overlay scrollbars.

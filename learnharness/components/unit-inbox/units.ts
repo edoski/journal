@@ -1,4 +1,6 @@
-import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
+import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse } from "@/src/core";
+import { overdueWords, slipShort } from "@/components/course-map/topic-map/topic-standing";
+import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
 /**
@@ -29,6 +31,9 @@ export interface Unit {
 	/** Newest first. A session that worked on two units is in both. */
 	sessions: readonly ChatListItem[];
 	now: UnitNow;
+	/** The open task that holds the topic, the course's focused one first
+	 *  (`taskOf`), or null. */
+	task: CourseMapTask | null;
 }
 
 /**
@@ -53,9 +58,10 @@ export interface UnitInbox {
 	other: readonly ChatListItem[];
 }
 
-export type FoldedShelf = "working" | "known" | "other";
+/** The shelves that fold; Learning only under the Inbox switch. */
+export type FoldedShelf = "working" | "learning" | "known" | "other";
 
-export const SHELF_WORDS: Record<FoldedShelf, string> = { working: "Working", known: "Known", other: "Other sessions" };
+export const SHELF_WORDS: Record<FoldedShelf, string> = { working: "Working", learning: "Learning", known: "Known", other: "Other sessions" };
 
 const SOLID = new Set(["independent", "retained", "transferred"]);
 
@@ -69,7 +75,15 @@ export function shelfOf(topic: CourseMapTopic, now: UnitNow): Shelf | null {
 	return topic.review?.kind === "due" ? "review" : "known";
 }
 
-function nowOf(sessions: readonly ChatListItem[]): UnitNow {
+/** The open task that holds a topic: the course's focused task when it
+ *  does, else the first. Pure. */
+export function taskOf(map: Pick<CourseMap, "tasks" | "focus">, topic: CourseMapTopic): CourseMapTask | null {
+	const held = map.tasks.filter((task) => topic.tasks.includes(task.key));
+	return held.find((task) => task.key === map.focus) ?? held[0] ?? null;
+}
+
+/** What a topic's sessions are doing now. Pure. */
+export function nowOf(sessions: readonly ChatListItem[]): UnitNow {
 	const states = sessions.map(sessionState);
 	if (states.includes("your-turn")) return "your-turn";
 	return states.includes("working") ? "working" : null;
@@ -79,7 +93,9 @@ function nowOf(sessions: readonly ChatListItem[]): UnitNow {
 const lastAt = (u: Unit) => u.sessions[0]?.updatedAt ?? u.topic.introduced ?? "";
 const overdue = (u: Unit) => (u.topic.review?.kind === "due" ? u.topic.review.overdue : 0);
 const returns = (u: Unit) => u.topic.review?.date ?? "9999-12-31";
-const byLearning = (a: Unit, b: Unit) => Number(b.now === "your-turn") - Number(a.now === "your-turn") || lastAt(b).localeCompare(lastAt(a));
+/** Learning's order: one waiting on the learner first, then the latest
+ *  studied. */
+export const byLearning = (a: Unit, b: Unit) => Number(b.now === "your-turn") - Number(a.now === "your-turn") || lastAt(b).localeCompare(lastAt(a));
 const byReview = (a: Unit, b: Unit) => Number(b.topic.weak) - Number(a.topic.weak) || overdue(b) - overdue(a);
 
 /**
@@ -109,7 +125,7 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 			const sessions = [...(sessionsOf.get(key) ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 			const now = nowOf(sessions);
 			const shelf = shelfOf(topic, now);
-			if (shelf) units.push({ key, course, topic, shelf, sessions, now });
+			if (shelf) units.push({ key, course, topic, shelf, sessions, now, task: taskOf(map, topic) });
 		}
 	}
 	const listed = new Set(units.flatMap((u) => u.sessions.map((s) => s.id)));
@@ -129,19 +145,70 @@ export function daysBetween(from: string, to: string): number {
 	return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 }
 
-/** The one fact a row's status slot shows, by priority: a session waits on
- *  the learner, the tutor writes, a solid topic's review is due, a known
- *  topic's return, else when it was last studied in the app. A topic being
- *  learned never says "due": almost all of them are. */
+/**
+ * The one fact a topic row ends with, the fact that tells it from its
+ * neighbours, in Home's words (spec: unit-inbox.md, "Status slot"). By
+ * priority:
+ *   - a session waits on the learner ("Your turn"), or the tutor writes
+ *     in one (Working), as the session state reads them;
+ *   - the engine calls the topic weak ("Missed last time", "Mistake to
+ *     fix", "Mixed up", "Sure, but wrong");
+ *   - a solid topic's review is due ("Due today", "3d overdue");
+ *   - an open task holds it, and where he left off ("At part (c)");
+ *   - when its next review comes ("Back in 5d");
+ *   - else when he last studied it ("Today", "3d ago").
+ * A topic still being learned never says its review is due: almost all
+ * of them are.
+ */
 export type UnitStatus =
-	{ kind: "your-turn" } | { kind: "working" } | { kind: "review" } | { kind: "returns"; days: number } | { kind: "studied"; at: string } | { kind: "none" };
+	| { kind: "your-turn" }
+	| { kind: "working" }
+	| { kind: "slip" | "review" | "task" | "returns" | "studied"; words: string }
+	| { kind: "none" };
+
+/** Where an open task was left, in Home's slot words: its step up to the
+ *  first colon ("At part (c)"), else "Unfinished". Pure. */
+export function taskWords(task: CourseMapTask): string {
+	if (!task.step) return "Unfinished";
+	const step = task.step.split(":")[0]!.trimEnd();
+	return `At ${step.charAt(0).toLowerCase()}${step.slice(1)}`;
+}
+
+/** The learner's own calendar day of a session's time, or a study day as
+ *  it is. Pure. */
+const dayOf = (at: string) => {
+	if (at.length === 10) return at;
+	const d = new Date(at);
+	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** When something was last studied, in Home's words: "Today", "3d ago".
+ *  `at` is a session's time or a study day. Pure. */
+export function studiedWords(at: string, today: string): string {
+	return agoWords(Math.max(0, daysBetween(dayOf(at), today || dayOf(new Date().toISOString()))));
+}
 
 export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.now) return { kind: unit.now };
-	if (unit.shelf === "review") return { kind: "review" };
-	if (unit.shelf === "known" && unit.topic.review) return { kind: "returns", days: Math.max(1, daysBetween(today, unit.topic.review.date)) };
-	const last = unit.sessions[0];
-	return last ? { kind: "studied", at: last.updatedAt } : { kind: "none" };
+	const { topic } = unit;
+	if (topic.weak) return { kind: "slip", words: topic.signals.lapsed ? "Missed last time" : slipShort(topic) };
+	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
+	if (unit.task) return { kind: "task", words: taskWords(unit.task) };
+	if (topic.review?.kind === "scheduled") return { kind: "returns", words: returnWords(Math.max(1, daysBetween(today, topic.review.date))) };
+	const at = unit.sessions[0]?.updatedAt ?? topic.introduced;
+	return at ? { kind: "studied", words: studiedWords(at, today) } : { kind: "none" };
+}
+
+const TWIN_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+/** The sessions of a list whose title another session in it shares, each
+ *  with its own day ("6 Nov"), so two runs of "Total probability practice"
+ *  tell apart. Titles compare without case or outer space. Pure. */
+export function sessionTwins(chats: readonly ChatListItem[]): ReadonlyMap<string, string> {
+	const name = (c: ChatListItem) => c.title.trim().toLowerCase();
+	const seen = new Map<string, number>();
+	for (const c of chats) seen.set(name(c), (seen.get(name(c)) ?? 0) + 1);
+	return new Map(chats.filter((c) => seen.get(name(c))! > 1).map((c) => [c.id, TWIN_DAY.format(new Date(c.updatedAt))]));
 }
 
 /** A course's monogram, T3 Code's fallback for a project with no favicon:
@@ -154,12 +221,13 @@ export function monogram(title: string): string {
 		.join("");
 }
 
-/** "in 5d", "in 3w", "in 2mo": a known unit's return, short enough for
- *  the trailing column. Pure. */
+/** "Back in 5d", "Back in 3w", "Back in 2mo": when a known topic's review
+ *  comes, short enough for the trailing column, in the course page's
+ *  "Back" word. Pure. */
 export function returnWords(days: number): string {
-	if (days < 14) return `in ${days}d`;
-	if (days < 60) return `in ${Math.round(days / 7)}w`;
-	return `in ${Math.round(days / 30)}mo`;
+	if (days < 14) return `Back in ${days}d`;
+	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
+	return `Back in ${Math.round(days / 30)}mo`;
 }
 
 /** The standing in plain words: what the engine's level means for him.

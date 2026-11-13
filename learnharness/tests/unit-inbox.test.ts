@@ -8,6 +8,7 @@ import {
 	monogram,
 	openingFor,
 	returnWords,
+	sessionTwins,
 	shelfOf,
 	topicSessions,
 	unitStatus,
@@ -126,29 +127,66 @@ describe("buildInbox", () => {
 });
 
 describe("unitStatus", () => {
+	const slipped = { ...topic("chain", "retained", due(4), true), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 } };
+	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 } };
+	const held = { ...topic("det", "assisted", due(2)), tasks: ["sheet4"] };
+	const la = course("la", [
+		topic("rank", "assisted", due(3)),
+		topic("cramer", "introduced", later("2026-11-09")),
+		topic("vectors", "retained", later("2026-11-30")),
+		topic("span", "retained", due(2)),
+		topic("basis", "retained", due(9)),
+		topic("eigen", "attempted"),
+		topic("trace", "assisted"),
+		slipped,
+		gapped,
+		held,
+	]);
 	const inbox = buildInbox(
-		[
-			course("la", [
-				topic("rank", "assisted", due(3)),
-				topic("cramer", "introduced", later("2026-11-09")),
-				topic("vectors", "retained", later("2026-11-30")),
-				topic("span", "retained", due(2)),
-			]),
-		],
-		[chat("r", { topics: ["rank"], busy: true }), chat("c", { topics: ["cramer"] })],
+		[{ ...la, map: { ...la.map, tasks: [{ key: "sheet4", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2" }] } }],
+		[chat("r", { topics: ["rank"], busy: true }), chat("c", { topics: ["cramer"] }), chat("e", { topics: ["eigen"], pendingQuestion: true } as Partial<ChatListItem>), chat("t", { topics: ["trace"], updatedAt: "2026-11-05T12:00:00.000Z" })],
 		null,
 	);
 	const by = (h: string) => [...inbox.active, ...inbox.working, ...inbox.known].find((u) => u.topic.handle === h)!;
 
-	it("says what runs now, then a due review, then a known unit's return, else when it was studied", () => {
+	it("ends each row with the fact that is its own, in Home's words: a session first, then a slip, how overdue, where he left off, when it comes back, else how long ago", () => {
 		assert.deepEqual(unitStatus(by("rank"), inbox.today), { kind: "working" });
-		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review" });
-		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "studied", at: "2026-11-01T09:00:00.000Z" });
-		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", days: 22 });
-		assert.equal(returnWords(22), "in 3w");
-		assert.equal(returnWords(5), "in 5d");
+		assert.deepEqual(unitStatus(by("eigen"), inbox.today), { kind: "your-turn" });
+		assert.deepEqual(unitStatus(by("chain"), inbox.today), { kind: "slip", words: "Missed last time" });
+		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix" });
+		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
+		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "1w overdue" });
+		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "At part (c)" });
+		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back in 1d" });
+		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back in 3w" });
+		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
+		assert.equal(returnWords(5), "Back in 5d");
 	});
 
+	it("says Your turn only on a row whose session waits on him", () => {
+		const turns = [...inbox.active, ...inbox.working, ...inbox.known].filter((u) => unitStatus(u, inbox.today).kind === "your-turn");
+		assert.deepEqual(
+			turns.map((u) => u.topic.handle),
+			["eigen"],
+		);
+	});
+});
+
+describe("sessionTwins", () => {
+	it("dates only the sessions whose title another listed session shares", () => {
+		const twins = sessionTwins([
+			chat("a", { title: "Total probability practice", updatedAt: "2026-11-06T18:19:13.840Z" }),
+			chat("b", { title: "total probability practice ", updatedAt: "2026-10-26T18:19:17.142Z" }),
+			chat("c", { title: "Bayes' rule" }),
+		]);
+		assert.deepEqual([...twins], [
+			["a", "6 Nov"],
+			["b", "26 Oct"],
+		]);
+	});
+});
+
+describe("CourseMark", () => {
 	it("names a course by the initials of its first two words", () => {
 		assert.equal(monogram("Linear Algebra"), "LA");
 		assert.equal(monogram("Calculus I"), "CI");
