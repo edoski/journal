@@ -12,6 +12,7 @@ import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-pa
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
+import { MathText } from "@/components/ui/math-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -40,6 +41,19 @@ export interface Ends {
 	below: boolean;
 }
 
+/** The trailing date column a dated row adds (Pick up's Earlier): the
+ *  day on its first row, empty on the rest, so the days line up. */
+const DATED = "grid-cols-[1rem_minmax(0,1fr)_auto_4.5rem]";
+
+/** The day in the date column, or its room. */
+function DateCell({ date, className }: { date: string | null; className?: string }) {
+	return date ? (
+		<span data-slot="topic-history-date" className={cn("col-start-4 justify-self-end text-label text-muted-foreground tabular-nums", className)}>
+			{date}
+		</span>
+	) : null;
+}
+
 const spine = ({ above, below }: Ends) => cn("relative", (above || below) && SPINE, above ? ABOVE : "before:hidden", below ? BELOW : "after:hidden");
 
 const RESULT = {
@@ -48,28 +62,49 @@ const RESULT = {
 	missed: { Icon: CircleXIcon, words: "Missed" },
 } as const;
 
-/** One scored attempt: how it went, the tutor's sentence, and the one thing worth saying about it. Not a control. */
-function AttemptEntry({ attempt, titleOf, ends }: { attempt: TopicAttempt; titleOf: (handle: string) => string; ends: Ends }) {
+/** One scored attempt: how it went, the tutor's sentence, and the one
+ *  thing worth saying about it. Not a control. Given `date`, it carries the
+ *  date column. */
+export function AttemptEntry({ attempt, titleOf, ends, date }: { attempt: TopicAttempt; titleOf: (handle: string) => string; ends: Ends; date?: string | null }) {
 	const mark = attemptMark(attempt, titleOf);
 	const { Icon, words } = RESULT[mark.result];
 	return (
-		<li data-slot="topic-attempt" data-result={mark.result} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-4 py-2.75", spine(ends))}>
+		<li data-slot="topic-attempt" data-result={mark.result} className={cn("grid min-h-10 items-start gap-x-4 py-2.75", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={words} className={cn(ICON, "mt-px")} />
-			<p className="line-clamp-2 text-row text-muted-foreground">{attempt.text}</p>
+			<p className="line-clamp-2 text-row text-muted-foreground">
+				<MathText>{attempt.text}</MathText>
+			</p>
 			{mark.words ? <span className="mt-px justify-self-end text-label text-muted-foreground">{mark.words}</span> : <span />}
+			{date !== undefined && <DateCell date={date} className="mt-px" />}
 		</li>
 	);
 }
 
 /** One session: a link to it, its title, and whether it waits on him or
  *  the tutor is writing. A lesson that planned carries the button that
- *  puts its steps on the map; the lesson on the map has its row filled. */
-export function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntry; shown: boolean; onShow: (id: string) => void; ends: Ends }) {
+ *  puts its steps on the map; the lesson on the map has its row filled.
+ *  Given `date`, it carries the date column; `writing` is what it says
+ *  while the tutor writes. */
+export function SessionItem({
+	entry,
+	shown,
+	onShow,
+	ends,
+	date,
+	writing = "The tutor is writing",
+}: {
+	entry: SessionEntry;
+	shown: boolean;
+	onShow: (id: string) => void;
+	ends: Ends;
+	date?: string | null;
+	writing?: string;
+}) {
 	const { chat, state } = entry;
 	const planned = isPlanned(entry);
-	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words="The tutor is writing" /> : null;
+	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words={writing} /> : null;
 	return (
-		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-4", spine(ends))}>
+		<li data-slot="topic-history-session" data-shown={shown || undefined} className={cn("grid gap-x-4", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)_auto]" : DATED, spine(ends))}>
 			<Button
 				variant="quiet"
 				asChild
@@ -77,17 +112,22 @@ export function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntr
 				className={cn(
 					"col-span-full row-start-1 -mx-3 grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg px-3 text-left font-normal whitespace-normal",
 					shown && "bg-fill-selected hover:bg-fill-selected",
+					// Link: flush to the split's hairline; ringed while the connected map's step is pointed at.
+					"in-data-[link=split]:rounded-none in-data-[lit]:in-data-shown:ring-1 in-data-[lit]:in-data-shown:ring-ring/60 in-data-[lit]:in-data-shown:ring-inset",
 				)}
 			>
 				<Link href={`/chat/${chat.id}`}>
 					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
-					<span className="truncate text-row text-foreground">{chat.title}</span>
+					<span className="truncate text-row text-foreground">
+						<MathText>{chat.title}</MathText>
+					</span>
 					{(planned || why) && (
 						<span className="flex items-center gap-2 justify-self-end">
 							{why}
 							{planned && <span aria-hidden className="size-6" />}
 						</span>
 					)}
+					{date !== undefined && <DateCell date={date} />}
 				</Link>
 			</Button>
 			{planned && (

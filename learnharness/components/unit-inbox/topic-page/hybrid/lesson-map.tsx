@@ -11,6 +11,7 @@ import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/
 import { stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
+import { mathPlain } from "@/components/ui/math-text";
 
 const nodeTypes = { step: StepNode };
 const edgeTypes = { need: NeedEdge };
@@ -45,7 +46,7 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 	const drawing = useMemo(() => stepsLayout(plan), [plan]);
 	const nodes = useMemo<StepFlowNode[]>(() => {
 		const marks = hybridMarks(plan, waits);
-		const titleOf = new Map(plan.tree.nodes.map((node) => [node.id, node.title]));
+		const titleOf = new Map(plan.tree.nodes.map((node) => [node.id, mathPlain(node.title)]));
 		// A step the plan repeats is drawn once.
 		const steps = plan.tree.nodes.filter((node, index, all) => all.findIndex((other) => other.id === node.id) === index);
 		return steps.flatMap((node) => {
@@ -75,7 +76,7 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 					title: node.title,
 					status: mark.status,
 					tag: mark.tag,
-					label: [node.title, said, `Opens ${label}`].filter(Boolean).join(". "),
+					label: [mathPlain(node.title), said, `Opens ${label}`].filter(Boolean).join(". "),
 					rests: rests.length ? `Rests on ${rests.join(", ")}` : null,
 					summary: node.summary?.trim() || null,
 					href,
@@ -108,7 +109,7 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 					nodes={nodes}
 					edges={edges}
 					current={(current?.id as TopicHandle | undefined) ?? null}
-					caption={`${label}: ${nodes.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn on" : "Left off at"} ${current.title}.` : ""}`}
+					caption={`${label}: ${nodes.length} steps, each below the steps it rests on.${current ? ` ${waits ? "Your turn on" : "Left off at"} ${mathPlain(current.title)}.` : ""}`}
 				/>
 			</ReactFlowProvider>
 		</div>

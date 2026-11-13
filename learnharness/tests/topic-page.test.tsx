@@ -182,9 +182,10 @@ describe("the Topic switch", () => {
 			POLISH_GROUPS.find((group) => group.id === "topic"),
 			{ id: "topic", label: "Topic", options: ["brief", "steps", "trail", "hybrid"], requires: { design: "proposed" } },
 		);
+		assert.equal(POLISH_GROUPS.find((group) => group.id === "resume"), undefined);
 		assert.deepEqual(
-			POLISH_GROUPS.find((group) => group.id === "resume"),
-			{ id: "resume", label: "Resume", options: ["line", "target", "chips"], requires: { design: "proposed", topic: "hybrid" } },
+			POLISH_GROUPS.find((group) => group.id === "pickup"),
+			{ id: "pickup", label: "Pick up", options: ["sections"], requires: { design: "proposed", topic: "hybrid" } },
 		);
 	});
 

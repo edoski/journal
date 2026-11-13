@@ -14,11 +14,9 @@ import { BriefTopic } from "@/components/unit-inbox/topic-page/brief/brief-topic
 import { StepsTopic } from "@/components/unit-inbox/topic-page/steps/steps-topic";
 import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic";
 import { HYBRID_COLUMN, HybridTopic, type HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
-import { freshAction } from "@/components/unit-inbox/topic-page/resume/resume-facts";
-import { newLessonPlaceholder, type ResumeOption } from "@/components/unit-inbox/topic-page/resume/resume-parts";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
-import { stashLessonMessage } from "@/components/lesson-message";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
+import type { PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
 
 /** What every candidate takes. */
 export interface TopicPageProps {
@@ -26,7 +24,7 @@ export interface TopicPageProps {
 	/** A start is in flight: the action and the task rows are disabled. */
 	busy: boolean;
 	/** Does the page's one action: opens the session, or starts one with the
-	 *  action's opening. Absent when the composer foot holds the action. */
+	 *  action's opening. Absent when a Pick up pane holds the action. */
 	onAct?: () => void;
 	/** Continues an open task (a task pick-up row). */
 	onTask: (press: Press) => void;
@@ -43,25 +41,25 @@ export const TOPIC_CANDIDATES: Record<(typeof TOPIC_OPTIONS)[number], ComponentT
 /**
  * The topic page behind the Topic switch (spec: topic-page.md): what the
  * page as it is owns, the start and the composer, around the chosen
- * candidate's body. With a `resume` option the composer foot is that
- * option's and holds the page's action, so the head has no button. With a
- * `pickup` option the hybrid's history is that option's pane, which holds
- * the action, and the plain composer starts a new lesson. The page appears once the topic read has answered, so nothing shifts in
- * afterwards.
+ * candidate's body. With a `pickup` option the hybrid's history is that
+ * option's pane, which holds the action, and the page has no composer: a
+ * new lesson starts from the sidebar's New lesson. The page appears once the topic read has answered, so nothing
+ * shifts in afterwards.
  */
 export function TopicPage({
 	candidate: Candidate,
-	resume: Resume,
 	pickup,
+	link,
 	course,
 	topic,
 	chats,
 	initialConfigured,
 }: {
 	candidate: ComponentType<TopicPageProps>;
-	resume?: ResumeOption;
 	/** A Pick up option's pane, which takes the hybrid's history's place. */
 	pickup?: ComponentType<HybridPaneProps>;
+	/** A Link option's way of tying the pane to the map (with `pickup` only). */
+	link?: ComponentType<PanesProps>;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
@@ -94,38 +92,27 @@ export function TopicPage({
 		if ("chat" in action) router.push(`/chat/${action.chat.id}`);
 		else start(action.opening, "from" in action ? action.from : undefined);
 	};
-	/** Opens a session; a message for it waits in its page's handover. */
-	const open = (chat: string, message?: string) => {
-		if (message && stashLessonMessage(chat, message)) setText("");
-		router.push(`/chat/${chat}`);
-	};
 	return (
 		<>
 			{pickup ? (
-				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} pane={pickup} />
+				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} pane={pickup} panes={link} />
 			) : (
-				<Candidate facts={facts} busy={lesson.busy} onAct={Resume ? undefined : act} onTask={press} />
+				<Candidate facts={facts} busy={lesson.busy} onAct={act} onTask={press} />
 			)}
-			<div className="shrink-0 bg-background pb-4">
-				<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>
-					{lesson.error && (
-						<p role="alert" className="mb-2 px-2 text-row text-danger">
-							{lesson.error}
-						</p>
-					)}
-					{Resume ? (
-						<Resume
-							facts={facts}
-							fresh={freshAction(topic, course.map)}
-							busy={lesson.busy}
-							text={text}
-							onText={setText}
-							onAct={act}
-							onStart={start}
-							onSend={send}
-							onOpen={open}
-						/>
-					) : (
+			{pickup ? (
+				lesson.error && (
+					<p role="alert" className={`mx-auto w-full px-6 pb-4 text-row text-danger ${HYBRID_COLUMN}`}>
+						{lesson.error}
+					</p>
+				)
+			) : (
+				<div className="shrink-0 bg-background pb-4">
+					<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>
+						{lesson.error && (
+							<p role="alert" className="mb-2 px-2 text-row text-danger">
+								{lesson.error}
+							</p>
+						)}
 						<Composer
 							variant="proposed"
 							busy={lesson.busy}
@@ -134,11 +121,11 @@ export function TopicPage({
 							onSend={send}
 							onStop={() => {}}
 							canSend={text.trim().length > 0 && !lesson.busy}
-							placeholder={pickup ? newLessonPlaceholder(topic.title) : `Ask about ${topic.title}, or start a new session on it`}
+							placeholder={`Ask about ${topic.title}, or start a new session on it`}
 						/>
-					)}
+					</div>
 				</div>
-			</div>
+			)}
 			<SetupDialog open={lesson.setupOpen} onClose={lesson.closeSetup} onDone={lesson.closeSetup} />
 		</>
 	);

@@ -7,6 +7,7 @@ import type { PlanNodeStatus, TopicHandle } from "@/src/core";
 import { TopicMapContext } from "@/components/course-map/topic-map/topic-node";
 import { Hint } from "@/components/ui/hint";
 import { cn } from "@/lib/utils";
+import { MathText } from "@/components/ui/math-text";
 
 /** What the steps map hands each node: the step, its mark, and the lesson a click opens. */
 export type StepFlowNode = Node<
@@ -74,10 +75,14 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 outline-none transition-colors duration-150 motion-reduce:transition-none",
 				"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 				current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
+				// Link "connected": the step answers its row being pointed at.
+				current && "in-data-[lit]:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ring)_36%,transparent)]",
 			)}
 		>
 			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
-			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground">{title}</span>
+			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground">
+				<MathText>{title}</MathText>
+			</span>
 		</Link>
 	);
 	return (

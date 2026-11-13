@@ -25,7 +25,7 @@ export function SectionsPane({ facts, busy, onAct, onTask, shown, onShow, classN
 			)}
 			{scheduled && (
 				<Section label="Scheduled">
-					<ScheduledEntry words={scheduled} />
+					<ScheduledEntry day={scheduled} />
 				</Section>
 			)}
 			{earlier.length > 0 && (
