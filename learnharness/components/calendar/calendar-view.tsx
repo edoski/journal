@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useCalendarController, type DayHeaderInfo, type EventInput } from "@fullcalendar/react";
+import { useEffect, useMemo, useState } from "react";
+import { useCalendarController, type CalendarController, type DayHeaderInfo, type EventInput } from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/react/daygrid";
 import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, MoonIcon } from "lucide-react";
-import type { CalendarCourse, ScheduledDay } from "@/src/core";
+import { kbdEventForAction, type CalendarCourse, type KeyAction, type ScheduledDay } from "@/src/core";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ import { SidebarToggle } from "@/components/sidebar";
 import { CourseScope } from "@/components/unit-inbox/course-scope";
 import { CalendarEntryView, type StartSession } from "@/components/calendar/calendar-entry";
 import { quietBetween, studyTimeWords, type CalendarEntry } from "@/components/calendar/calendar-facts";
+import { overlayOpen } from "@/components/spatial-arrows";
 import { cn } from "@/lib/utils";
 
 /** The two views, Week first: the days of the week as columns, then the
@@ -22,6 +23,18 @@ export const CALENDAR_VIEWS = [
 	{ id: "dayGridWeek", words: "Week", quiet: "Nothing scheduled this week" },
 	{ id: "dayGridMonth", words: "Month", quiet: "Nothing scheduled this month" },
 ] as const;
+
+type CalendarViewId = (typeof CALENDAR_VIEWS)[number]["id"];
+
+/** The calendar's letters (the keyboard registry's calendar group): what
+ *  each one does here. */
+const CALENDAR_KEYS: Partial<Record<KeyAction, (controller: CalendarController, show: (view: CalendarViewId) => void) => void>> = {
+	"calendar-today": (controller) => controller.today(),
+	"calendar-week": (_, show) => show("dayGridWeek"),
+	"calendar-month": (_, show) => show("dayGridMonth"),
+	"calendar-previous": (controller) => controller.prev(),
+	"calendar-next": (controller) => controller.next(),
+};
 
 const PLUGINS = [dayGridPlugin];
 
@@ -124,6 +137,17 @@ export function CalendarView({
 			localStorage.setItem(VIEW_KEY, next);
 		} catch {}
 	};
+	useEffect(() => {
+		const offs = Object.entries(CALENDAR_KEYS).map(([action, run]) => {
+			const onKey = () => {
+				if (!overlayOpen()) run(controller, changeView);
+			};
+			const event = kbdEventForAction(action as KeyAction);
+			window.addEventListener(event, onKey);
+			return () => window.removeEventListener(event, onKey);
+		});
+		return () => offs.forEach((off) => off());
+	});
 	const view = controller.view;
 	const viewId = view?.type ?? initialView;
 	const compact = viewId === "dayGridMonth";

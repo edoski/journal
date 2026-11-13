@@ -37,6 +37,9 @@ import {
 	isTypingSurface,
 	kbdEventForAction,
 	KEYBOARD_ACTIONS,
+	type KeyActionDef,
+	type KeyGroup,
+	type KeyScope,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { useSpatialArrows } from "@/components/spatial-arrows";
@@ -131,8 +134,10 @@ export function KeyboardShortcuts() {
 					handlersRef.current.setCheatOpen(true);
 					break;
 				case "find":
-					// The mounted surface owns Find (session text / graph nodes).
-					// Claim Mod+F so Chromium's whole-window finder cannot open too.
+				case "pick-course":
+					// The mounted surface owns Find (session text / graph nodes)
+					// and the course picker. Claim the chord so Chromium's own
+					// finder or Open File cannot open too.
 					e.preventDefault();
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
 					break;
@@ -145,6 +150,23 @@ export function KeyboardShortcuts() {
 	}, [cheatOpen]);
 
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} variant={design} />;
+}
+
+/** The Proposed sheet's sections in order, in plain words: each holds the
+ *  registry's actions of its scope and group. */
+const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGroup }[] = [
+	{ label: "Global", scope: "global" },
+	{ label: "Pages", scope: "global", group: "pages" },
+	{ label: "Calendar", scope: "global", group: "calendar" },
+	{ label: "Lesson", scope: "chat" },
+	{ label: "Graph view", scope: "graph" },
+];
+
+export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }[] {
+	return SHEET_SECTIONS.map(({ label, scope, group }) => ({
+		label,
+		actions: KEYBOARD_ACTIONS.filter((a) => a.scope === scope && a.group === group),
+	})).filter((section) => section.actions.length > 0);
 }
 
 /** The ? overlay — the registry rendered as a table (grouped by scope).
@@ -171,21 +193,17 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<Hint label="Close" binding="escape" side="left">
 						<DialogClose aria-label="Close shortcuts" />
 					</Hint>
-					{scopes.map((scope) => {
-						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
-						if (actions.length === 0) return null;
-						return (
-							<section key={scope} aria-label={scopeLabels[scope]} className="flex flex-col">
-								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{scopeLabels[scope]}</h3>
-								{actions.map((a) => (
-									<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-										<span className="truncate text-foreground">{a.label}</span>
-										<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
-									</div>
-								))}
-							</section>
-						);
-					})}
+					{cheatSheetSections().map(({ label, actions }) => (
+						<section key={label} aria-label={label} className="flex flex-col">
+							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
+							{actions.map((a) => (
+								<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
+									<span className="truncate text-foreground">{a.label}</span>
+									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
+								</div>
+							))}
+						</section>
+					))}
 				</DialogContent>
 			</Dialog>
 		);
