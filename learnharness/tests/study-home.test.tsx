@@ -19,6 +19,7 @@ import {
 	titleList,
 	todayRows,
 	openSessions,
+	todayCourses,
 	courseMove,
 	studyQuestion,
 	type TodayRow,
@@ -167,6 +168,7 @@ describe("today's lines", () => {
 			["session q", "session w", "Probability", "Linear Algebra", "Real Analysis"],
 			"Linear Algebra's due review keeps its line beside the waiting lesson on another topic",
 		);
+		assert.deepEqual(todayCourses(rows).map((c) => c.map.title), ["Linear Algebra", "Probability", "Real Analysis"], "each course once for the map's tabs");
 	});
 
 	it("lets a session that works on the step stand for it", () => {

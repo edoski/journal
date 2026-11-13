@@ -7,7 +7,7 @@ import { SetupDialog } from "@/components/setup-dialog";
 import { SidebarToggle } from "@/components/sidebar";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { courseMove, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { courseMove, todayCourses, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -110,7 +110,7 @@ function HomeBody({
 					{children({
 						rows,
 						lessons: rows.map(lessonOf),
-						courses: rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])),
+						courses: todayCourses(rows),
 						busy,
 						onContinue: (workspace) => {
 							const course = state.courses.find((c) => c.map.workspace === workspace);

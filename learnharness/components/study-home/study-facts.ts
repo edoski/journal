@@ -143,6 +143,12 @@ export function todayRows(courses: readonly StudyCourse[], open: readonly ChatLi
 	return [...sessions, ...rest];
 }
 
+/** The courses of Today's lines, each once, in the lines' order: a course
+ *  with a waiting lesson and its review on two lines is one course. Pure. */
+export function todayCourses(rows: readonly TodayRow[]): StudyCourse[] {
+	return [...new Set(rows.flatMap((r) => (r.course ? [r.course] : [])))];
+}
+
 /** The exam in words while the course is in its run-up, else null. Pure. */
 export function runupExam(course: StudyCourse): string | null {
 	return course.unready === null ? null : examWords(course);
