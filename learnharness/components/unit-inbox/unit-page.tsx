@@ -15,6 +15,8 @@ import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
+import { useMapVariant } from "@/components/design-variant";
+import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
@@ -127,6 +129,8 @@ function UnitBody({
 	initialConfigured: boolean;
 }) {
 	const lesson = useLessonStart(initialConfigured);
+	// The header the topic map's node opens, while the Map switch is on Proposed.
+	const mapNext = useMapVariant() === "proposed";
 	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
 	const workspace = course.map.workspace;
@@ -141,6 +145,14 @@ function UnitBody({
 		<>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<div data-testid="unit-page" className="mx-auto flex w-full max-w-[46rem] flex-col gap-8 px-4 pb-8 pt-6">
+					{mapNext ? (
+						<TopicHeader
+							map={course.map}
+							topic={topic}
+							busy={lesson.busy}
+							onStudy={active ? undefined : () => lesson.start(topic.title, workspace, (id) => recordStart(id, topic.handle))}
+						/>
+					) : (
 					<header className="flex flex-col gap-1 px-2">
 						<p className="text-label text-muted-foreground">{course.map.title}</p>
 						<h1 className="text-xl font-semibold text-foreground">{topic.title}</h1>
@@ -153,6 +165,7 @@ function UnitBody({
 							</p>
 						)}
 					</header>
+					)}
 					{active && <ActiveSession chat={active} />}
 					<NavSection title="Sessions" trailing={others.length || undefined}>
 						{others.length === 0 ? (
