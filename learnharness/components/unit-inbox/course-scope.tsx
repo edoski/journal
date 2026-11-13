@@ -13,6 +13,7 @@ import {
 	DropdownMenuShortcut,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MathText } from "@/components/ui/math-text";
 
 const ALL = "";
 
@@ -50,7 +51,9 @@ export function CourseScope({
 					{courses.map((c) => (
 						<DropdownMenuRadioItem key={c.map.workspace} value={c.map.workspace} indicator={false}>
 							<CourseMark title={c.map.title} />
-							<span className="min-w-0 flex-1 truncate">{c.map.title}</span>
+							<span className="min-w-0 flex-1 truncate">
+								<MathText>{c.map.title}</MathText>
+							</span>
 							{examText(c.map.exam) && <DropdownMenuShortcut>{examText(c.map.exam)}</DropdownMenuShortcut>}
 						</DropdownMenuRadioItem>
 					))}

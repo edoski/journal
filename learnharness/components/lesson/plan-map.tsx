@@ -7,6 +7,7 @@ import { derivedNodeStatus, derivePlanStatuses, type PlanBlockData, type PlanNod
 import { latestTree, topoFor, type LayoutNode, type PopupMessage } from "@/components/plan-block";
 import { Button } from "@/components/ui/button";
 import { LessonCard } from "@/components/lesson/lesson-card";
+import { MathText } from "@/components/ui/math-text";
 
 export interface PlanMapStep {
 	id: string;
@@ -46,7 +47,9 @@ export function PlanMap({ steps }: { steps: readonly PlanMapStep[] }) {
 							s.status === "current" ? "bg-primary" : s.status === "visited" ? "bg-muted-foreground" : "ring-1 ring-inset ring-muted-foreground",
 						)}
 					/>
-					<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>{s.title}</span>
+					<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
+						<MathText>{s.title}</MathText>
+					</span>
 					{s.status === "current" && <span className="shrink-0 text-muted-foreground">Now</span>}
 					{s.next && <span className="shrink-0 text-muted-foreground">Next</span>}
 				</li>
