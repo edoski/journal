@@ -24,7 +24,7 @@ import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
 import { useServerEvent } from "@/components/server-events";
 import { newCourseForm, type MaterialPick } from "@/components/new-course-facts";
-import { courseLabel, type CourseListing, type CourseSummary } from "@/src/core";
+import { courseLabel, kbdEventForAction, type CourseListing, type CourseSummary } from "@/src/core";
 
 /** Where the last picked course is remembered (per device). */
 const COURSE_CHOICE_KEY = "lh:course";
@@ -46,6 +46,9 @@ export interface CourseChoice {
 	workspace: string;
 	/** Why the last send was blocked, until the learner acts on it. */
 	notice: string | null;
+	/** How many sends were blocked for want of a course; each one opens the
+	 *  Proposed picker. */
+	asked: number;
 	choose: (workspace: string) => void;
 	/** A course the New course dialog just created: listed and picked. */
 	add: (course: CourseSummary) => void;
@@ -84,6 +87,7 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const [state, setState] = useState<CourseState>({ status: "loading" });
 	const [workspace, setWorkspace] = useState("");
 	const [notice, setNotice] = useState<string | null>(null);
+	const [asked, setAsked] = useState(0);
 	const [revision, setRevision] = useState(0);
 	useEffect(() => {
 		let live = true;
@@ -132,9 +136,10 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const requireCourse = () => {
 		if (state.status === "ready" && workspace) return workspace;
 		setNotice(state.status === "unavailable" ? unavailableMessage(state.reason) : PICK_A_COURSE);
+		if (state.status === "ready") setAsked((n) => n + 1);
 		return null;
 	};
-	return { state, workspace, notice, choose, add, renamed, removed, requireCourse };
+	return { state, workspace, notice, asked, choose, add, renamed, removed, requireCourse };
 }
 
 /** The composer row's course control: the picker, or one line saying why
@@ -158,6 +163,7 @@ export function CourseControl({ choice, variant = "current" }: {
 				onChange={choice.choose}
 				onNew={() => setCreating(true)}
 				onManage={(action, course) => setManaging({ action, course })}
+				asked={choice.asked}
 				variant={variant}
 			/>
 			{choice.notice && variant === "current" && (
@@ -229,6 +235,8 @@ export function CoursePicker(props: {
 	onNew: () => void;
 	/** Proposed: Rename or Delete the picked course. */
 	onManage?: (action: "rename" | "delete", course: CourseSummary) => void;
+	/** Proposed: a change opens the menu (a send blocked for want of a course). */
+	asked?: number;
 	/** "proposed": a quiet 32px pill for the composer toolbar that opens the
 	 *  shared dropdown menu. */
 	variant?: "current" | "proposed";
@@ -270,16 +278,27 @@ export function CoursePicker(props: {
 /** The Proposed course chip: the courses as one choice, then "New course…",
  *  then Rename and Delete for the picked course. No due counts: Today says
  *  what is waiting, in words. */
-function CourseMenu({ courses, workspace, onChange, onNew, onManage }: {
+function CourseMenu({ courses, workspace, onChange, onNew, onManage, asked = 0 }: {
 	courses: readonly CourseSummary[];
 	workspace: string;
 	onChange: (workspace: string) => void;
 	onNew: () => void;
 	onManage?: (action: "rename" | "delete", course: CourseSummary) => void;
+	asked?: number;
 }) {
 	const picked = courses.find((c) => c.workspace === workspace);
+	const [open, setOpen] = useState(false);
+	useEffect(() => {
+		if (asked > 0) setOpen(true);
+	}, [asked]);
+	useEffect(() => {
+		const onPick = () => setOpen(true);
+		const name = kbdEventForAction("pick-course");
+		window.addEventListener(name, onPick);
+		return () => window.removeEventListener(name, onPick);
+	}, []);
 	return (
-		<DropdownMenu>
+		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<DropdownMenuTrigger
 				data-testid="course-picker"
 				data-slot="composer-chip"

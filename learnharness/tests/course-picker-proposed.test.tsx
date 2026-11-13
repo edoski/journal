@@ -8,6 +8,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
 import { DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
 import { pickWords } from "../components/new-course-facts.ts";
+import { kbdEventForAction } from "../src/core/keyboard.ts";
 import { Dialog } from "../components/ui/dialog.tsx";
 
 // The Proposed course chip and New course's study root, mounted on the real
@@ -251,5 +252,18 @@ describe("Proposed course menu: rename and delete", () => {
 		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => assert.fail("not deleted")} />);
 		await press(element('[data-testid="delete-course-confirm"]'), "click");
 		assert.equal(element('[data-testid="delete-course-dialog"] [role="alert"]').textContent, "That course is no longer in your list.");
+	});
+});
+
+describe("Proposed course chip by keyboard", () => {
+	it("Command O opens the course menu, and a send blocked for want of a course opens it too", async () => {
+		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={0} />);
+		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
+		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent(kbdEventForAction("pick-course"))); });
+		assert.ok(document.querySelector('[data-testid="course-menu"]'), "the shortcut's event opens the menu");
+		await escapeReachesWindow();
+		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
+		await act(async () => { root!.render(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={1} />); });
+		assert.ok(document.querySelector('[data-testid="course-menu"]'), "a blocked send opens the menu");
 	});
 });
