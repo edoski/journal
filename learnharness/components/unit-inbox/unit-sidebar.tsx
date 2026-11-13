@@ -245,7 +245,7 @@ export function UnitSidebar() {
 						</ul>
 					</ScrollArea>
 
-					{running && <ActivitySection variant="proposed" />}
+					{running && <ActivitySection />}
 
 					<div data-slot="sidebar-footer" className="flex shrink-0 items-center gap-1 px-2 pb-2 pt-1">
 						<Hint label="Settings" action="open-settings" side="right">

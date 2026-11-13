@@ -18,10 +18,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { QuestionDock } from "../components/question-dock.tsx";
-import { ProbeDoneCard } from "../components/artifacts/probe-done-card.tsx";
 import { DispatchCard } from "../components/artifacts/dispatch-card.tsx";
 import { JobsContext } from "../components/jobs-context.ts";
-import { LessonDesignContext } from "../components/lesson/lesson-design.ts";
 import { ChatActionsContext } from "../components/chat.tsx";
 import type { JobRecord } from "../src/core/contracts.ts";
 import { AnsweredCard } from "../components/answered-card.tsx";
@@ -90,7 +88,8 @@ describe("question submission draft restoration", () => {
 	it("restores a free-response answer and its confidence state when its form remounts", () => {
 		const html = renderToStaticMarkup(<QuestionDock toolName="explain" toolCallId="e1" input={explainInput} expanded onExpand={() => {}} onSubmit={() => {}} initialDraft={draft} />);
 		assert.ok(html.includes("preserved free-text answer"));
-		assert.match(html, /aria-checked="true"[^>]*data-state="confident"/);
+		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
+		assert.equal(doc.querySelector('[data-testid="confidence-choice"] [data-confidence="confident"]')?.getAttribute("aria-checked"), "true");
 	});
 
 	it("restores an ask's custom answer and a free-text answer", () => {
@@ -147,15 +146,15 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		assert.ok(!html.includes("failed"));
 	});
 
-	it("a real failure keeps the honest red failure", () => {
+	it("a real failure reads as its plain failure line, not a setup prompt", () => {
 		const html = renderToStaticMarkup(inJobs([job({ error: "FAILED: headless crashed" })]));
 		assert.ok(html.includes('data-testid="dispatch-settled"'));
-		assert.ok(html.includes("failed"));
-		assert.ok(html.includes("text-red-500"));
+		assert.ok(html.includes("The sources couldn&#x27;t be checked"));
 		assert.ok(!html.includes("dispatch-refused"));
+		assert.ok(!html.includes("dispatch-setup-link"));
 	});
 
-	it("the Proposed lesson reads a failed helper as one plain line per kind", () => {
+	it("the lesson reads a failed helper as one plain line per kind", () => {
 		const lines: Record<JobRecord["kind"], string> = {
 			research: "The sources couldn't be checked",
 			demo: "The demo couldn't be built",
@@ -164,20 +163,22 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		};
 		for (const [kind, line] of Object.entries(lines) as [JobRecord["kind"], string][]) {
 			const html = renderToStaticMarkup(
-				<LessonDesignContext.Provider value={{ variant: "proposed", activeProblemCallId: null }}>
-					<JobsContext.Provider value={[job({ kind, error: "took longer than 8 minutes" })]}>
-						<DispatchCard toolCallId="t1" kind={kind} />
-					</JobsContext.Provider>
-				</LessonDesignContext.Provider>,
+				<JobsContext.Provider value={[job({ kind, error: "took longer than 8 minutes" })]}>
+					<DispatchCard toolCallId="t1" kind={kind} />
+				</JobsContext.Provider>,
 			);
 			assert.ok(html.includes(line.replace("'", "&#x27;")), `${kind}: ${line}`);
 			assert.ok(!/agent|failed|uppercase/i.test(html), `${kind}: no agent label, no uppercase failure`);
 		}
 	});
 
-	it("a finished worker reads finished, independently of delivery", () => {
-		const html = renderToStaticMarkup(inJobs([job({ status: "done", error: undefined })]));
-		assert.ok(html.includes("finished"));
+	it("a working helper is one activity line; a finished one draws nothing, its result arrives in the steer card", () => {
+		for (const jobs of [[], [job({ status: "running", error: undefined })]]) {
+			const html = renderToStaticMarkup(inJobs(jobs));
+			assert.ok(html.includes('data-testid="dispatch-card"') && html.includes('role="status"'), "one status line while it works");
+			assert.match(html, /Checking sources…/);
+		}
+		assert.equal(renderToStaticMarkup(inJobs([job({ status: "done", error: undefined })])), "");
 	});
 });
 
@@ -187,17 +188,15 @@ describe("render smoke tests", () => {
 		assert.match(html, /Which planet is closest to the sun/);
 		assert.ok(html.includes('data-testid="answer-field"'), "free response is the answer field");
 		assert.match(html, /Your answer/);
-		assert.match(html, /Submit answer/, "send becomes Submit answer");
-		assert.match(html, /↵ submits · ⇧↵ newline/, "the standard chord is discoverable (owner round 5)");
+		assert.match(html, />Submit</, "send becomes Submit");
 		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
 		const group = doc.querySelector('[data-testid="confidence-choice"]');
 		assert.ok(group, "the confidence control renders under the answer box");
 		assert.equal(group.getAttribute("role"), "radiogroup");
-		assert.ok(group.closest('[data-testid="answer-field"]'), "it lives in the answer box's submit row");
+		assert.ok(group.closest("form")?.querySelector('[data-testid="answer-field"]'), "it lives in the answer box's submit row");
 		const choices = [...group.querySelectorAll('[role="radio"]')];
 		assert.deepEqual(choices.map((c) => c.textContent), ["Guessing", "Neutral", "Confident"]);
 		assert.deepEqual(choices.map((c) => c.getAttribute("aria-checked")), ["false", "true", "false"], "neutral is preselected");
-		assert.deepEqual(choices.map((c) => c.getAttribute("tabindex")), ["-1", "0", "-1"], "Tab reaches the chosen state");
 		assert.ok(!html.includes('type="range"'), "no slider");
 		assert.ok(!/\d+%/.test(html), "no percentage");
 		assert.ok(!html.includes("I don&#x27;t know"), "no multiple-choice 'I don't know' row");
@@ -228,7 +227,7 @@ describe("render smoke tests", () => {
 		assert.ok(html.includes('role="radio"'), "Other row keeps the option role");
 		assert.match(html, /aria-checked="false"/, "circle starts unfilled");
 		assert.ok(html.includes('data-testid="thinking-field"'), "thinking field coexists with Other");
-		assert.match(html, /YOUR THINKING/, "ask select-mode also gets the learner's voice");
+		assert.match(html, /aria-label="Your thinking"/, "ask select-mode also gets the learner's voice");
 	});
 
 	it("multi-select ask renders checkbox rows and the select-all hint", () => {
@@ -241,7 +240,7 @@ describe("render smoke tests", () => {
 				options: [{ label: "Physics" }, { label: "Philosophy" }],
 			} as never,
 		});
-		assert.match(html, /select all that apply/);
+		assert.match(html, /Select all that apply/);
 		assert.ok(html.includes('role="group"'), "checkbox group");
 		assert.ok((html.match(/role="checkbox"/g) ?? []).length >= 3, "options AND the Other row are checkboxes");
 		assert.ok(html.includes('data-testid="other-option"'), "Other is still an option row in multi-select");
@@ -283,10 +282,11 @@ describe("render smoke tests", () => {
 				onSubmit={() => {}}
 			/>,
 		);
-		assert.ok(teach.includes("min-h-[4.5rem]"), "teach: a generous dump area");
+		const field = (html: string) => parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="thinking-field"]')!.classList;
+		assert.ok(field(teach).contains("min-h-20"), "teach: a generous dump area");
 		const probe = renderDock({ toolName: "ask_user_question", toolCallId: "q1", input: selectAsk as never });
-		assert.ok(!probe.includes("min-h-[4.5rem]"), "probe (default): stays compact");
-		assert.ok(probe.includes("min-h-10"), "probe: one quiet row");
+		assert.ok(!field(probe).contains("min-h-20"), "probe (default): stays compact");
+		assert.ok(field(probe).contains("min-h-12"), "probe: one quiet row");
 	});
 
 	it("text-mode asks keep Enter-to-submit and the answer label", () => {
@@ -345,12 +345,14 @@ describe("render smoke tests", () => {
 		const answer = buildAnswer(askQD(), { other: "Fairly confident — but shaky on applications" });
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
 		assert.ok(html.includes('data-testid="answered-other"'), "the Other answer is an option row");
-		assert.match(html, /border-primary bg-accent/, "styled like its selected siblings");
 		assert.match(html, /shaky on applications/, "the typed words render");
-		// Inside the options container — same list, not a loose quote outside it.
+		// Inside the options list — same list, not a loose quote outside it.
+		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
+		const list = doc.querySelector('[data-testid="answered-other"]')!.parentElement!;
+		assert.match(list.textContent!, /Very/, "the Other row sits with the listed options");
 		assert.ok(
 			html.indexOf("Very") < html.indexOf("answered-other"),
-			"the Other row sits with the listed options",
+			"after them",
 		);
 	});
 
@@ -361,20 +363,12 @@ describe("render smoke tests", () => {
 		});
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
 		assert.ok(html.includes('data-testid="your-thinking"'), "the thinking row exists");
-		assert.match(html, /YOUR THINKING/, "labeled as the learner's voice (all caps, owner round 3)");
+		assert.match(html, />Your thinking</, "labeled as the learner's voice");
+		assert.ok(html.includes('data-slot="learner-note"'), "the learner's own surface");
 		// COLLAPSED ARRIVAL (owner round 2, 2026-10-05): the SSR output is the
 		// trigger row only — the thinking text is one click away, never loud.
 		assert.ok(html.includes('data-testid="your-thinking-trigger"'), "the trigger row");
 		assert.ok(html.includes('aria-expanded="false"'), "arrives collapsed");
-		// ONE GEOMETRY, NO BAND IN CARDS (owner round five, 2026-10-07): the
-		// accent lift read too light — rail only, heights match everywhere.
-		const yourRow = html.slice(html.indexOf('data-testid="your-thinking"'));
-		assert.ok(!yourRow.slice(0, 400).includes("bg-card") && !yourRow.slice(0, 400).includes("bg-accent"), "no band inside the card");
-		// THE RAIL GROUPS (owner correction): the label sits INSIDE the rail —
-		// ownership readable from the rail alone, collapsed or expanded.
-		const railAt = html.indexOf("border-l-[calc(3ch-14px)]");
-		const trigAt = html.indexOf("your-thinking-trigger");
-		assert.ok(railAt !== -1 && railAt < trigAt, "the rail opens before the label (same quote)");
 		assert.ok(!html.includes("brightness isn&#x27;t distance"), "the text is hidden until expanded");
 		assert.ok(!html.includes("Note:"), "no longer a muted 'Note:' footnote");
 	});
@@ -397,7 +391,7 @@ describe("render smoke tests", () => {
 	it("AnsweredCard renders dismissal as skipped", () => {
 		const answer = { ...buildAnswer(askQD(), {}), dismissed: true };
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.match(html, /skipped/);
+		assert.match(html, /Skipped: How confident are you\?/);
 	});
 });
 
@@ -487,75 +481,11 @@ describe("teach-check reveal (W5 phase separation)", () => {
 		// path renders the identical form; this is also the regression pin for it.
 		const html = renderDock({ toolName: "explain", toolCallId: "t1", input: explainInput as never });
 		assert.ok(html.includes('data-testid="question-dock"'), "the form is the dock's content once expanded");
-		assert.match(html, /Submit answer/);
+		assert.match(html, />Submit</);
 	});
 });
 
 // ─── probe-done card (the malformed-assessment crash) ─────────────────────
-// The live bug: the model stringified `assessment` (a rejected input), and
-// the card's input-preview fallback trusted the shape — strands died. The
-// preview now reads only pending inputs; an errored part renders the quiet
-// retry note.
-describe("probe-done card", () => {
-	const validAssessment = {
-		strands: [
-			{ strand: "modal logic basics", assessment: "Floor: solid intuition; ceiling: notation." },
-			{ strand: "indexical 'actual'", assessment: "Genuine floor — prior exposure likely." },
-		],
-		summary: "Bracketed: teach the symbols on the intuition he has.",
-	};
-
-	it("renders the strand-by-strand assessment — the CALL is its home (context diet 2026-10-09)", () => {
-		const html = renderToStaticMarkup(
-			<ProbeDoneCard
-				part={{ state: "output-available", input: { assessment: validAssessment }, output: { ok: true } } as never}
-			/>,
-		);
-		assert.ok(html.includes('data-testid="probe-done-card"'));
-		assert.match(html, /modal logic basics/);
-		assert.match(html, /indexical &#x27;actual&#x27;|indexical 'actual'/);
-		assert.match(html, /Bracketed/);
-		// An ok output alone (the pre-diet echo shape) renders the quiet
-		// fallback, never strands: the assessment no longer rides the result.
-		const echoless = renderToStaticMarkup(
-			<ProbeDoneCard part={{ state: "output-available", output: { ok: true } } as never} />,
-		);
-		assert.match(echoless, /Writing the assessment…/);
-		assert.ok(!echoless.includes("modal logic basics"), "no assessment echo in the result");
-	});
-
-	it("previews the assessment from a PENDING (validated) input", () => {
-		const html = renderToStaticMarkup(
-			<ProbeDoneCard part={{ state: "input-available", input: { assessment: validAssessment } } as never} />,
-		);
-		assert.match(html, /modal logic basics/);
-	});
-
-	it("a REJECTED assessment (the stringified live shape) renders the retry note, never the garbage", () => {
-		// The exact live crash: assessment arrived as a string, zod rejected
-		// the call, the model retried — this dead part must not explode.
-		const html = renderToStaticMarkup(
-			<ProbeDoneCard
-				part={{
-					state: "output-error",
-					errorText: "Validation failed",
-					input: { assessment: "strands: [{\"strand\": ...stringified garbage" },
-				} as never}
-			/>,
-		);
-		assert.match(html, /malformed/);
-		assert.match(html, /retried/);
-		assert.ok(!html.includes("strands:"), "the rejected input never renders");
-	});
-
-	it("a mid-stream partial without strands renders the writing note, not a crash", () => {
-		const html = renderToStaticMarkup(
-			<ProbeDoneCard part={{ state: "input-streaming", input: { assessment: { summary: "…" } } } as never} />,
-		);
-		assert.match(html, /Writing the assessment/);
-	});
-});
-
 // ─── the explain reveal (free-recall, owner 2026-09-27) ────────────────────
 
 describe("AnsweredCard: the explain variant", () => {
@@ -572,7 +502,7 @@ describe("AnsweredCard: the explain variant", () => {
 	it("reveals the single committed answer (reasoning inside it) with NO verdict chips", () => {
 		const html = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(explainQD(), { text: "Something about relativity?" })} />);
 		assert.match(html, /Explain/, "labeled as the explain kind");
-		assert.match(html, /The answer:/);
+		assert.match(html, />The answer</);
 		assert.match(html, /luminiferous aether/);
 		assert.match(html, /fringe shift/);
 		assert.ok(!html.includes("Why:"), "no separate explanation field — one committed answer (owner 2026-09-27)");
@@ -591,9 +521,13 @@ describe("AnsweredCard: the explain variant", () => {
 
 describe("probe-phase naming: Recall labels", () => {
 
-	it("the dock labels a recall question as Recall", () => {
-		const html = renderDock({ toolName: "recall", toolCallId: "r1", input: { question: "Explain the chain rule.", correctAnswer: "Outer function times the derivative of the inner." } as never });
-		assert.match(html, /Recall/);
+	it("the collapsed dock labels a recall question as Recall", () => {
+		const html = renderToStaticMarkup(
+			<QuestionDock toolName="recall" toolCallId="r1" input={{ question: "Explain the chain rule.", correctAnswer: "Outer function times the derivative of the inner." } as never}
+				expanded={false} onExpand={() => {}} onSubmit={() => {}} />,
+		);
+		const bar = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="question-dock-bar"]')!;
+		assert.equal(bar.firstElementChild!.textContent, "Recall");
 		assert.ok(!html.includes(">Explain<"), "not the teach label");
 	});
 
@@ -645,9 +579,13 @@ describe("predict vs check rendering", () => {
 		assert.ok(html.includes("Prediction"), `chip missing: ${html.slice(0, 200)}`);
 	});
 
-	it("an expanded explain reads the 'Explain' eyebrow", () => {
-		const html = renderDock({ toolName: "explain", toolCallId: "call-c1", input: explainInput as never });
-		assert.ok(html.includes("Explain"));
+	it("a collapsed check reads 'Explain'", () => {
+		const html = renderToStaticMarkup(
+			<QuestionDock toolName="explain" toolCallId="call-c1" input={explainInput as never}
+				expanded={false} onExpand={() => {}} onSubmit={() => {}} />,
+		);
+		const bar = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="question-dock-bar"]')!;
+		assert.equal(bar.firstElementChild!.textContent, "Explain");
 	});
 
 	it("the reading-thinking channel is LIFTED above the card as its own user-side block", () => {
@@ -659,12 +597,12 @@ describe("predict vs check rendering", () => {
 		const html = renderToStaticMarkup(<AnsweredCard answer={withReading} />);
 		// The unified ThinkingBlock (owner round, 2026-10-05; round two
 		// 2026-10-07): the reading thoughts render BEFORE the card as the
-		// banded user-thinking row, arriving EXPANDED (clearly sent).
+		// learner's own row, arriving EXPANDED (clearly sent).
 		const blockAt = html.indexOf("reading-thinking-block");
 		const cardAt = html.indexOf("answered-card");
 		assert.ok(blockAt !== -1, "the lifted block renders");
 		assert.ok(blockAt < cardAt, "it sits ABOVE the answered card");
-		assert.ok(html.includes("YOUR THINKING"), "the plain label");
+		assert.ok(html.includes(">Your thinking<"), "the plain label");
 		assert.ok(!html.includes("Your thinking while reading"), "the old verbose label is gone");
 		assert.ok(!html.includes("your-reading-thinking"), "the in-card inset is gone");
 		// EXPANDED ARRIVAL (owner round two, 2026-10-07): transcript rows

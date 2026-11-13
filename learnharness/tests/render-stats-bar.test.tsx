@@ -44,9 +44,9 @@ describe("stats bar", () => {
 		assert.match(html, /data-testid="stats-model"[^>]*>\s*<span[^>]*>—<\/span>/);
 		assert.match(html, /data-testid="stats-thinking"[^>]*>\s*<span[^>]*>—<\/span>/);
 		assert.ok(!html.includes("aria-hidden>·"), "no dot between the controls");
-		// the control reads as a button: pill border + dropdown chevron
-		assert.match(html, /data-testid="stats-model"[^>]*rounded-full[^>]*>/);
-		assert.match(html, /▾/);
+		// each control reads as a closed menu trigger with a chevron
+		assert.match(html, /data-testid="stats-model"[^>]*aria-haspopup="dialog"[^>]*aria-expanded="false"[^>]*>\s*<span[^>]*>—<\/span>\s*<svg[^>]*lucide-chevron-down/);
+		assert.match(html, /data-testid="stats-thinking"[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*>\s*<span[^>]*>—<\/span>\s*<svg[^>]*lucide-chevron-down/);
 	});
 
 	it("folds context + cost from the turns log (core/prices, no local math)", () => {

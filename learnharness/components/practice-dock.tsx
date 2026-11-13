@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownIcon, BookOpenIcon, ChevronRightIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
+import { ArrowDownIcon, BookOpenIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ConfidenceChoice } from "@/components/confidence-choice";
 import { Hint } from "@/components/ui/hint";
-import { cn } from "@/lib/utils";
 import { DEFAULT_CONFIDENCE, kbdEventForAction, type Confidence, type KeyAction, type PracticeRequest } from "@/src/core";
 
 /** The three requests, in the order the row shows them. */
@@ -21,15 +20,17 @@ const REQUESTS: readonly { request: PracticeRequest; label: string; hint: string
  * The practice dock (practice sessions, owner design 2026-10-04): an
  * ACTIVE problem replaces the chat composer — the persistent bottom blob
  * morphs into the problem. The agent's statement above; the learner's
- * half below — "Your thinking", a labeled field with ONE Send button
- * (owner round 2, 2026-10-05): Enter sends, Shift+Enter makes a newline.
+ * half below — "Your thinking", one field with one Submit button beside
+ * the three requests (owner round 2, 2026-10-05): Enter sends,
+ * Shift+Enter makes a newline.
  * There are no lanes — whether a submission claims an answer is apparent
  * from the thinking itself; the agent reads it. One problem may carry
  * many submissions; each starts a turn and carries one of three
  * confidence states, neutral unless the learner taps another.
  *
  * Collapse (scroll-up → slim bar) is owned by the DockOverlay; this
- * component is content only, and the expanded form stays MOUNTED while
+ * component is content only, for the dock surface (lesson/dock-surface.md),
+ * and the expanded form stays MOUNTED while
  * collapsed (hidden) so a half-written trace survives scrolling.
  *
  * The commitment (modelSolution, decisionPoints, …) rides the tool call's
@@ -57,12 +58,9 @@ export interface PracticeDockProps {
 	 *  and say so in the hint row. The server registry is the real gate;
 	 *  this is the affordance. */
 	compactionRunning?: boolean;
-	/** The design (spec: lesson/dock-surface.md): "proposed" is content for
-	 *  the Proposed dock surface, the question dock's anatomy. */
-	variant?: "current" | "proposed";
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, variant = "current" }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
 
@@ -116,156 +114,68 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 	 * while the dock is — collapsed bar included (the trace survives). */
 	useEnterSubmits(submit);
 
-	if (variant === "proposed") {
-		if (!expanded) {
-			return (
-				<button
-					type="button"
-					data-testid="practice-dock-bar"
-					onClick={onExpand}
-					className="flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
-				>
-					<span className="shrink-0 text-muted-foreground">Problem</span>
-					<span className="min-w-0 flex-1 truncate text-muted-foreground">{input.statement}</span>
-					<span className="flex shrink-0 items-center gap-1 text-foreground">
-						Answer
-						<ArrowDownIcon className="size-4" />
-					</span>
-				</button>
-			);
-		}
-		return (
-			<div data-testid="practice-dock" data-problem={problemCallId}>
-				<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-4">
-					<ToolContentResponse>{input.statement}</ToolContentResponse>
-				</div>
-				<div className="mx-4 mt-3 border-t" />
-				<textarea
-					data-testid="practice-thinking-field"
-					aria-label="Your thinking"
-					value={thinking}
-					onChange={(e) => setThinking(e.target.value)}
-					onKeyDown={(e) => {
-						// The field claims Esc so the window chain doesn't open
-						// the problem's dismiss confirm under the cursor.
-						if (e.key === "Escape") {
-							e.preventDefault();
-							e.stopPropagation();
-							return;
-						}
-						// Enter sends; Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
-						if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-							e.preventDefault();
-							submit();
-						}
-					}}
-					placeholder="Work here, think out loud."
-					rows={3}
-					className="field-sizing-content block max-h-64 min-h-20 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground"
-				/>
-				<div className="flex items-center gap-3 p-2 pl-3">
-					<ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />
-					{compactionRunning ? (
-						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">Compacting the conversation…</span>
-					) : (
-						<div data-testid="practice-requests" className="flex min-w-0 items-center gap-0.5">{requestButtons()}</div>
-					)}
-					<Button
-						type="button"
-						data-testid="practice-send"
-						disabled={thinking.trim().length === 0 || compactionRunning}
-						onClick={() => submit()}
-						className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-					>
-						Submit
-					</Button>
-				</div>
-			</div>
-		);
-	}
-
-	/* ── the collapsed bar ── */
 	if (!expanded) {
 		return (
 			<button
 				type="button"
 				data-testid="practice-dock-bar"
 				onClick={onExpand}
-				className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+				className="flex h-12 w-full items-center gap-3 px-4 text-left text-row outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none"
 			>
-				<ChevronRightIcon className="size-4 shrink-0 rotate-90" />
-				<span className="font-medium">Problem</span>
-				<span className="min-w-0 flex-1 truncate">{input.statement}</span>
+				<span className="shrink-0 text-muted-foreground">Problem</span>
+				<span className="min-w-0 flex-1 truncate text-muted-foreground">{input.statement}</span>
+				<span className="flex shrink-0 items-center gap-1 text-foreground">
+					Answer
+					<ArrowDownIcon className="size-4" />
+				</span>
 			</button>
 		);
 	}
-
-	/* ── the expanded form ── */
 	return (
 		<div data-testid="practice-dock" data-problem={problemCallId}>
-			{/* The agent's half: the 'Problem' eyebrow (mirroring the quiz
-			    cards' label row — owner round, 2026-10-05) + the statement,
-			    markdown + LaTeX rendered, capped by the measured column
-			    (--dock-max-h; the old fixed 40vh cut long problems short). */}
-			<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-3 pb-2">
-				<div className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Problem</div>
-				<div className="lh-prose text-[15px]">
-					<ToolContentResponse>{input.statement}</ToolContentResponse>
-				</div>
+			<div data-dock-scroll-area="" className="max-h-[var(--dock-max-h,40vh)] overflow-y-auto px-4 pt-4">
+				<ToolContentResponse>{input.statement}</ToolContentResponse>
 			</div>
-
-			{/* The learner's half: Enter SENDS (owner round 2, 2026-10-05);
-			    Shift+Enter makes a newline — less to decide about. */}
-			<div
+			<div className="mx-4 mt-3 border-t" />
+			<textarea
 				data-testid="practice-thinking-field"
-				className="m-1.5 rounded-[10px] border border-border/70 bg-background/60 transition-colors focus-within:border-primary/50"
-			>
-				<div className="px-2.5 pt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					YOUR THINKING
-				</div>
-				<textarea
-					value={thinking}
-					onChange={(e) => setThinking(e.target.value)}
-					onKeyDown={(e) => {
-						// The field claims Esc so the window chain doesn't open
-						// the problem's dismiss confirm under the cursor.
-						if (e.key === "Escape") {
-							e.preventDefault();
-							e.stopPropagation();
-							return;
-						}
-						// Enter SENDS — the single lane (owner round 2, 2026-10-05);
-						// Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
-						if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
-							e.preventDefault();
-							submit();
-						}
-					}}
-					placeholder="Work here, think out loud."
-					rows={4}
-					className={cn(
-						"field-sizing-content lh-input max-h-64 min-h-16 w-full resize-none bg-transparent px-2.5 pb-2 outline-none placeholder:text-muted-foreground",
-					)}
-				/>
-				{/* The submit row (owner round 4, 2026-10-05): IDENTICAL to the
-				    question dock's — hint left, the SAME Button (h-9, px-3.5),
-				    one p-1 row. Corner radii concentric: shell 16 − m-1.5 (6) =
-				    field 10 − p-1 (4) = button 6. */}
-				<div className="flex items-center justify-between gap-2 p-1">
-					<ConfidenceChoice value={confidence} onChange={setConfidence} />
-					<span aria-hidden className="min-w-0 truncate pl-1.5 text-xs text-muted-foreground">
-						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
-					</span>
-					<Button
-						type="button"
-						data-testid="practice-send"
-						disabled={thinking.trim().length === 0 || compactionRunning}
-						onClick={() => submit()}
-						className="ml-auto h-9 rounded-[6px] px-3.5 text-sm font-medium"
-					>
-						Submit thinking
-					</Button>
-				</div>
+				aria-label="Your thinking"
+				value={thinking}
+				onChange={(e) => setThinking(e.target.value)}
+				onKeyDown={(e) => {
+					// The field claims Esc so the window chain doesn't open
+					// the problem's dismiss confirm under the cursor.
+					if (e.key === "Escape") {
+						e.preventDefault();
+						e.stopPropagation();
+						return;
+					}
+					// Enter sends; Shift+Enter is the newline, ⌘/Ctrl+Enter the chord too.
+					if (e.key === "Enter" && (!e.shiftKey || e.metaKey || e.ctrlKey)) {
+						e.preventDefault();
+						submit();
+					}
+				}}
+				placeholder="Work here, think out loud."
+				rows={3}
+				className="field-sizing-content block max-h-64 min-h-20 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-control text-foreground outline-none placeholder:text-muted-foreground"
+			/>
+			<div className="flex items-center gap-3 p-2 pl-3">
+				<ConfidenceChoice value={confidence} onChange={setConfidence} />
+				{compactionRunning ? (
+					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">Compacting the conversation…</span>
+				) : (
+					<div data-testid="practice-requests" className="flex min-w-0 items-center gap-0.5">{requestButtons()}</div>
+				)}
+				<Button
+					type="button"
+					data-testid="practice-send"
+					disabled={thinking.trim().length === 0 || compactionRunning}
+					onClick={() => submit()}
+					className="ml-auto h-8 rounded-full px-3.5 text-row font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+				>
+					Submit
+				</Button>
 			</div>
 		</div>
 	);

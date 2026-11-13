@@ -1,13 +1,18 @@
+import React, { act } from "react";
+(globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedExtraction } from "../components/activity-dock.tsx";
 import { formatTokens, formatUsd } from "../components/usage-format.ts";
 import { jobCost } from "../src/server/pricing.ts";
 
-// The section's pure layer: folds, formatting, and blob order — then the SSR
-// render (blobs, "—" doctrine, the abort affordance, the always-present
-// header — the sidebar's background-agents strip).
+// The section's pure layer: folds, formatting, and blob order — then the
+// render (one row per process, the abort affordance, the always-present
+// header, the "—" doctrine in the opened detail — the sidebar's
+// background-agents strip).
 
 const NOW = Date.parse("2026-09-09T12:00:00Z");
 
@@ -187,6 +192,30 @@ describe("activity dock pure layer", () => {
 	});
 });
 
+/** Mounts the section, opens the detail of the row whose title is
+ *  `title`, and hands back that detail's text and cost. */
+async function openDetail(feed: ActivityFeed, title: string) {
+	const host = dom.document.createElement("div");
+	dom.document.body.appendChild(host);
+	const root = createRoot(host);
+	try {
+		await act(async () => root.render(<ActivitySection feed={feed} />));
+		const row = [...host.querySelectorAll('[data-slot="nav-row"]')].find((r) => r.textContent?.includes(title));
+		assert.ok(row, `a row for ${title}`);
+		await act(async () => row.dispatchEvent(new dom.window.Event("click", { bubbles: true })));
+		const detail = host.querySelector('[data-testid="activity-blob-detail"]');
+		return {
+			expanded: row.getAttribute("aria-expanded"),
+			text: detail?.textContent ?? "",
+			cost: detail?.querySelector('[data-testid="activity-blob-cost"]')?.textContent,
+			totalCost: host.querySelector('[data-testid="activity-total-cost"]'),
+		};
+	} finally {
+		await act(async () => root.unmount());
+		host.remove();
+	}
+}
+
 describe("activity section render", () => {
 	it("renders the ALWAYS-PRESENT header when idle — empty means empty, nothing hides", () => {
 		const html = renderToStaticMarkup(<ActivitySection feed={{ jobs: [], extractions: [] }} />);
@@ -196,36 +225,33 @@ describe("activity section render", () => {
 		assert.doesNotMatch(html, /activity-total-cost/, "the cost span is population, not decoration");
 	});
 
-	it("renders one blob per running process with cost, elapsed, and the abort affordance", () => {
-		const html = renderToStaticMarkup(
-			<ActivitySection
-				feed={{
-					jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
-					extractions: [{ id: "cx", chatId: "cx", title: "Old lesson", phase: "merging", startedAt: NOW - 60_000 }],
-				}}
-			/>,
-		);
+	it("renders one row per running process with elapsed time and the abort affordance; the detail carries activity and cost", async () => {
+		const feed: ActivityFeed = {
+			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
+			extractions: [{ id: "cx", chatId: "cx", title: "Old lesson", phase: "merging", startedAt: NOW - 60_000 }],
+		};
+		const html = renderToStaticMarkup(<ActivitySection feed={feed} />);
 		assert.match(html, /data-testid="activity-section"/);
 		assert.match(html, /data-testid="activity-blob-job"/);
 		assert.match(html, /data-testid="activity-blob-extraction"/);
 		assert.match(html, /Chain-rule demo/);
-		assert.match(html, /building sandbox…/);
-		assert.match(html, /Extraction — merging/);
-		// Unpriced job → "—", never $0.0000 (doctrine); both blobs show it.
-		assert.match(html, /activity-blob-cost[^>]*>—</);
-		assert.match(html, /data-testid="activity-abort"/, "END on the blob face, popover-independent");
-		assert.match(html, /\bEnd\b/, "the explicit END button");
+		assert.match(html, /Old lesson/);
+		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
+		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
+		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
+		assert.match(html, /aria-label="End Extraction — merging in Old lesson"/);
 		assert.match(html, /Background agents/);
-		// Total cost: nothing priced → "—" in the header.
-		assert.match(html, /activity-total-cost[^>]*>—</);
-		// Truncation-reveals KEEP native title (tooltip wave mechanism rule):
-		// the truncated activity + title spans carry title= — a styled
-		// tooltip adds nothing over an ellipsis reveal.
-		assert.match(html, /title="building sandbox…"/);
+		assert.doesNotMatch(html, /building sandbox…/, "what it is doing waits in the detail");
+
+		const detail = await openDetail(feed, "Chain-rule demo");
+		assert.equal(detail.expanded, "true");
+		assert.match(detail.text, /Demo builder/);
+		assert.match(detail.text, /building sandbox…/);
+		// Unpriced job → "—", never $0.0000 (doctrine).
+		assert.equal(detail.cost, "—");
 	});
 
-
-	it("shows total running cost when jobs are priced", () => {
+	it("shows a priced job's cost in its detail, with no running total", async () => {
 		const usage = {
 			model: "openrouter:z-ai/glm-5.3-flash",
 			inputTokens: 10_000,
@@ -235,19 +261,18 @@ describe("activity section render", () => {
 			reasoningTokens: 0,
 			steps: 1,
 		};
-		const html = renderToStaticMarkup(
-			<ActivitySection
-				feed={{
-					jobs: [
-						job({ id: "a", usage }),
-						job({ id: "b", usage, createdAt: new Date(NOW - 20_000).toISOString() }),
-					],
-					extractions: [],
-				}}
-			/>,
+		const detail = await openDetail(
+			{
+				jobs: [
+					job({ id: "a", usage, title: "Limits lesson" }),
+					job({ id: "b", usage, title: "Series lesson", createdAt: new Date(NOW - 20_000).toISOString() }),
+				],
+				extractions: [],
+			},
+			"Limits lesson",
 		);
-		// two identical priced jobs → 2 × $0.002 = $0.0040 total (pi prices,
-		// glm-5.3-flash drifted in pi-ai 0.87.1)
-		assert.match(html, /activity-total-cost[^>]*>\$0\.0040</);
+		// glm-5.3-flash at pi's prices (drifted in pi-ai 0.87.1): $0.002 a job
+		assert.equal(detail.cost, "$0.0020");
+		assert.equal(detail.totalCost, null, "no running total in the header");
 	});
 });

@@ -1,7 +1,6 @@
 /**
- * Composer render tests — the chat input row (content only; the persistent
- * rounded shell lives in the chat view's overlay so it can morph into the
- * question dock without remounting).
+ * Composer render tests — the message field, its send/stop button and the
+ * practice pause's Next problem morph.
  *
  * Same tsx classic-JSX shim as render-cards.test.tsx.
  */
@@ -51,22 +50,15 @@ describe("Composer", () => {
 		assert.ok(idleStop.includes('aria-label="Stop"'), "empty composer: stop replaces send while streaming");
 	});
 
-	it("send button radius is 10px = 25% of the 40px button (concentric with the shell)", () => {
-		const html = render();
-		assert.ok(html.includes("rounded-[10px]"), "send radius = shell radius − row padding");
-		assert.ok(html.includes("size-10"), "40px send button (10px = 25%)");
-	});
-
 	it("disabled when nothing to send", () => {
 		const html = render({ canSend: false });
 		assert.ok(/aria-label="Send"[^>]*disabled|disabled[^>]*aria-label="Send"/.test(html), "send disabled");
 	});
 
-	it("THE NEXT MORPH (owner round 16 refinement): empty composer in the pause → wide green Next problem", () => {
+	it("THE NEXT MORPH (owner round 16 refinement): empty composer in the pause → Next problem", () => {
 		const html = render({ canSend: false, nextProblem: true });
 		assert.ok(html.includes('data-testid="next-problem-button"'), "the morphed button");
 		assert.match(html, /Next problem/, "the label");
-		assert.ok(html.includes("bg-green-600"), "green — the correct-answer register");
 		assert.ok(!html.includes('aria-label="Send"'), "the square send is gone in the pause");
 	});
 

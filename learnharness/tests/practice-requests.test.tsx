@@ -107,9 +107,9 @@ describe("concluding after Explain instead", () => {
 });
 
 describe("the problem box and the transcript", () => {
-	it("the Proposed problem box offers Hint, Show me and Explain instead beside Submit", () => {
+	it("the problem box offers Hint, Show me and Explain instead beside Submit", () => {
 		const html = renderToStaticMarkup(
-			<PracticeDock problemCallId="call_p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} variant="proposed" />,
+			<PracticeDock problemCallId="call_p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} />,
 		);
 		for (const [id, label] of [["hint", "Hint"], ["show", "Show me"], ["explain", "Explain instead"]]) {
 			assert.match(html, new RegExp(`data-testid="practice-request-${id}"[^>]*>(?:<svg.*?</svg>)?${label}<`));
@@ -118,7 +118,7 @@ describe("the problem box and the transcript", () => {
 	});
 
 	it("a request reads in the transcript as what he asked for, with his work", () => {
-		const html = renderToStaticMarkup(<RequestCard data={{ problemCallId: "call_p1", request: "hint", text: "rows 1 and 3" }} variant="proposed" />);
+		const html = renderToStaticMarkup(<RequestCard data={{ problemCallId: "call_p1", request: "hint", text: "rows 1 and 3" }} />);
 		assert.match(html, /You asked for a hint/);
 		assert.match(html, /rows 1 and 3/);
 	});

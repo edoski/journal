@@ -68,11 +68,9 @@ export function sessionFindHasForegroundLayer(doc: Document): boolean {
 /** Mounted for the lifetime of ONE Chat (which is keyed by chatId). Closing
  * keeps the query/reading position; changing sessions resets all local state.
  * The bar lives outside scopeRef, so it never finds its own query or count. */
-export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }: {
+export function SessionFind({ scopeRef, scrollContextRef }: {
 	scopeRef: RefObject<HTMLDivElement | null>;
 	scrollContextRef: RefObject<SessionScrollContext | null>;
-	/** "proposed": the slim Proposed bar (13/14px, quiet 32px buttons). */
-	variant?: "current" | "proposed";
 }) {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
@@ -167,14 +165,12 @@ export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }:
 	};
 
 	if (!open) return null;
-	const proposed = variant === "proposed";
-	const buttonClass = "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40";
 	return (
 		<div
 			role="search"
 			aria-label="Session Find"
 			data-testid="session-find"
-			className={proposed ? "lh-no-drag flex h-11 shrink-0 items-center gap-1 border-b border-border px-4 text-control" : "lh-no-drag flex h-10 shrink-0 items-center gap-2 border-b border-border px-6 font-ui text-sm"}
+			className="lh-no-drag flex h-11 shrink-0 items-center gap-1 border-b border-border px-4 text-control"
 			onKeyDown={(event) => {
 				if (event.key === "Enter") {
 					event.stopPropagation(); // NEVER reach question/global Enter submits.
@@ -196,42 +192,26 @@ export function SessionFind({ scopeRef, scrollContextRef, variant = "current" }:
 				value={query}
 				onChange={(event) => setQuery(event.target.value)}
 				spellCheck={false}
-				className={proposed ? "ml-1 min-w-0 flex-1 bg-transparent text-control text-foreground outline-none placeholder:text-muted-foreground" : "lh-input min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"}
+				className="ml-1 min-w-0 flex-1 bg-transparent text-control text-foreground outline-none placeholder:text-muted-foreground"
 			/>
-			<output aria-live="polite" data-testid="session-find-count" className={proposed ? "mr-1 shrink-0 text-label tabular-nums text-muted-foreground" : "shrink-0 text-xs tabular-nums text-muted-foreground"}>
+			<output aria-live="polite" data-testid="session-find-count" className="mr-1 shrink-0 text-label tabular-nums text-muted-foreground">
 				{query ? `${result.index + 1}/${result.count}` : ""}
 			</output>
-			{proposed ? (
-				<>
-					<Hint label="Previous match" binding="shift+enter" side="bottom">
-						<Button variant="quiet" size="icon-row" aria-label="Previous match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
-							<ChevronUpIcon aria-hidden />
-						</Button>
-					</Hint>
-					<Hint label="Next match" binding="enter" side="bottom">
-						<Button variant="quiet" size="icon-row" aria-label="Next match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(1)}>
-							<ChevronDownIcon aria-hidden />
-						</Button>
-					</Hint>
-					<Hint label="Close Find" binding="escape" side="bottom">
-						<Button variant="quiet" size="icon-row" aria-label="Close Find" onClick={close}>
-							<XIcon aria-hidden />
-						</Button>
-					</Hint>
-				</>
-			) : (<>
-			<button type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" className={buttonClass}
-				disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
-				<ChevronUpIcon className="size-4" aria-hidden />
-			</button>
-			<button type="button" aria-label="Next match" title="Next match (Enter)" className={buttonClass}
-				disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(1)}>
-				<ChevronDownIcon className="size-4" aria-hidden />
-			</button>
-			<button type="button" aria-label="Close Find" title="Close Find (Esc)" className={buttonClass} onClick={close}>
-				<XIcon className="size-4" aria-hidden />
-			</button>
-			</>)}
+			<Hint label="Previous match" binding="shift+enter" side="bottom">
+				<Button variant="quiet" size="icon-row" aria-label="Previous match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(-1)}>
+					<ChevronUpIcon aria-hidden />
+				</Button>
+			</Hint>
+			<Hint label="Next match" binding="enter" side="bottom">
+				<Button variant="quiet" size="icon-row" aria-label="Next match" disabled={!result.count} onMouseDown={(event) => event.preventDefault()} onClick={() => step(1)}>
+					<ChevronDownIcon aria-hidden />
+				</Button>
+			</Hint>
+			<Hint label="Close Find" binding="escape" side="bottom">
+				<Button variant="quiet" size="icon-row" aria-label="Close Find" onClick={close}>
+					<XIcon aria-hidden />
+				</Button>
+			</Hint>
 		</div>
 	);
 }

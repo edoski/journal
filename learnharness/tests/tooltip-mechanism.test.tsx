@@ -1,8 +1,8 @@
 /**
  * Tooltip-wave mechanism pins (owner, 2026-09-25): the composition rule —
  * icon/pill controls ride the styled Radix tooltip via Hint, the shortcut
- * appended as an em-dash suffix off the LIVE registry (a rebind changes
- * the suffix); truncation-reveals keep native title=; the copy carries no
+ * shown as key glyphs off the LIVE registry (a rebind changes them);
+ * truncation-reveals keep native title=; the copy carries no
  * internal vocabulary. Node 26 exposes the host platform through navigator,
  * so expectations cover Mac glyphs AND Ctrl+/Shift+ elsewhere. Composition
  * is the pin; running on a Mac must not be a test prerequisite.
@@ -15,25 +15,24 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { Hint, hintText } from "../components/ui/hint.tsx";
+import { Hint, hintBinding } from "../components/ui/hint.tsx";
 import { TOOLTIP_DELAY_MS } from "../components/ui/tooltip.tsx";
 import { IS_MAC } from "../src/core/keyboard.ts";
 
-describe("hintText — the parenthesized composition", () => {
-	it("a registry action appends the LIVE binding (override-aware source)", () => {
-		assert.equal(hintText("Model selector", "open-model-picker"), IS_MAC ? "Model selector (⌘K)" : "Model selector (Ctrl+K)");
-		assert.equal(hintText("Settings", "open-settings"), IS_MAC ? "Settings (⌘,)" : "Settings (Ctrl+,)");
-		assert.equal(hintText("Search sessions", "sessions-search"), IS_MAC ? "Search sessions (⌘⇧F)" : "Search sessions (Ctrl+Shift+F)");
+describe("hintBinding — the shortcut glyphs beside the label", () => {
+	it("a registry action shows the LIVE binding (override-aware source)", () => {
+		assert.equal(hintBinding("open-model-picker"), IS_MAC ? "⌘K" : "Ctrl+K");
+		assert.equal(hintBinding("open-settings"), IS_MAC ? "⌘," : "Ctrl+,");
+		assert.equal(hintBinding("sessions-search"), IS_MAC ? "⌘⇧F" : "Ctrl+Shift+F");
 	});
 
 	it("surface-owned keys ride the binding prop (no registry entry)", () => {
-		assert.equal(hintText("Close", undefined, "escape"), "Close (Esc)");
-		assert.equal(hintText("Send", undefined, "enter"), "Send (↵)");
+		assert.equal(hintBinding(undefined, "escape"), "Esc");
+		assert.equal(hintBinding(undefined, "enter"), "↵");
 	});
 
-	it("no shortcut = the label alone, no dangling dash", () => {
-		assert.equal(hintText("Home"), "Home");
-		assert.equal(hintText("Close (Esc)"), "Close (Esc)");
+	it("no shortcut = no glyphs", () => {
+		assert.equal(hintBinding(), "");
 	});
 });
 

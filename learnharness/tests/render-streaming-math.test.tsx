@@ -6,13 +6,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { MessageResponse, ToolContentResponse } from "../components/ai-elements/message.tsx";
-import { Reasoning, ReasoningContent } from "../components/ai-elements/reasoning.tsx";
 import { transformMathDelimiters } from "../src/core/math-delims.ts";
 
 const surfaces = {
 	message: (source: string) => <MessageResponse>{source}</MessageResponse>,
 	tool: (source: string) => <ToolContentResponse>{source}</ToolContentResponse>,
-	reasoning: (source: string) => <Reasoning open><ReasoningContent>{source}</ReasoningContent></Reasoning>,
 };
 const documentFor = (element: React.ReactElement) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(element)}</body></html>`).document;
@@ -105,8 +103,8 @@ it("preserves native TeX source in both streaming and static modes", () => {
 // mistaking independent server renders for incremental streaming coverage.
 it("retains less-than prefixes through mounted streaming updates on every entry point", async () => {
 	const dom = parseHTML("<html><body></body></html>");
-	// linkedom has no layout/animation engine; Radix's open reasoning panel
-	// only needs these inert browser hooks. This test checks text, not layout.
+	// linkedom has no layout/animation engine; the renderers only need these
+	// inert browser hooks. This test checks text, not layout.
 	const globals = { window: dom.window, document: dom.document, Element: dom.window.Element,
 		HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true,
 		getComputedStyle: () => ({ display: "block", animationName: "none" }),

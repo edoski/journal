@@ -15,7 +15,7 @@ Steps run in teaching order: each after the steps it rests on (`topoFor` in `pla
 
 ## Where it shows
 
-- **In the transcript** (`PlanBlock` variant proposed): a `LessonCard` labelled "Plan" with the step count, the map of the snapshot statuses; the card opens the panel.
+- **In the transcript** (`PlanCard`): a `LessonCard` labelled "Plan" with the step count, the map of the snapshot statuses; the card opens the panel.
 - **The panel** (`PlanPanel`, the body of the top bar's plan popover, lesson-top-bar.md): 320px, padding 8, right-aligned under the plan toggle, live statuses. The toggle and the transcript's plan card open it; Esc, a click outside or the close button dismisses it.
 
 Sources: research/learning-first.md ("Plan: coarse map in a collapsible side panel: where you are, what's next; no Node N labels"); findings 16.

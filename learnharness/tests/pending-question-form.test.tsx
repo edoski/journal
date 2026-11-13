@@ -22,8 +22,8 @@ function question(id: string, callId: string, text: string): LhMessage {
 	} }], stopReason: "toolUse", timestamp: 1 } as unknown as LhMessage;
 }
 
-const answerField = (host: HTMLElement) => host.querySelector<HTMLTextAreaElement>('[data-testid="answer-field"] textarea')!;
-const confident = (host: HTMLElement) => host.querySelector<HTMLButtonElement>('[data-testid="confidence-choice"] [data-state="confident"]')!;
+const answerField = (host: HTMLElement) => host.querySelector<HTMLTextAreaElement>('textarea[data-testid="answer-field"]')!;
+const confident = (host: HTMLElement) => host.querySelector<HTMLButtonElement>('[data-testid="confidence-choice"] [data-confidence="confident"]')!;
 
 // The same keyed-content boundary as Chat's DockOverlay. This exercises the
 // actual form state under synthetic DOM, not CSS layout or a live provider.

@@ -35,20 +35,20 @@ describe("a Hint press on a check", () => {
 
 	it("never reveals the proof in the transcript, while a real answer still does", () => {
 		const input = { question: check.question, correctAnswer: PROOF };
-		const hinted = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "stuck", hint: true }, "recall")} input={input} variant="proposed" />);
+		const hinted = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "stuck", hint: true }, "recall")} input={input} />);
 		assert.doesNotMatch(hinted, /The answer/);
 		assert.match(hinted, /You asked for a hint/);
-		const answered = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "e = ee' = e'" }, "recall")} input={input} variant="proposed" />);
+		const answered = renderToStaticMarkup(<AnsweredCard answer={buildAnswer(check, { text: "e = ee' = e'" }, "recall")} input={input} />);
 		assert.match(answered, /The answer/);
 	});
 
 	it("the check box offers Hint beside Submit, and a plain question does not", () => {
 		const explain = renderToStaticMarkup(
-			<QuestionDock toolName="explain" toolCallId="q1" input={{ question: "Why?", correctAnswer: "Because.", nodeId: "a", type: "check" } as never} expanded onExpand={() => {}} onSubmit={() => {}} variant="proposed" />,
+			<QuestionDock toolName="explain" toolCallId="q1" input={{ question: "Why?", correctAnswer: "Because.", nodeId: "a", type: "check" } as never} expanded onExpand={() => {}} onSubmit={() => {}} />,
 		);
 		assert.match(explain, /data-testid="question-hint"/);
 		const ask = renderToStaticMarkup(
-			<QuestionDock toolName="ask_user_question" toolCallId="q2" input={{ question: "Which?" }} expanded onExpand={() => {}} onSubmit={() => {}} variant="proposed" />,
+			<QuestionDock toolName="ask_user_question" toolCallId="q2" input={{ question: "Which?" }} expanded onExpand={() => {}} onSubmit={() => {}} />,
 		);
 		assert.doesNotMatch(ask, /data-testid="question-hint"/);
 	});

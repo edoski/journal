@@ -95,7 +95,6 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 				</div>
 				<div className="mx-auto w-full max-w-[46rem]">
 					<Composer
-						variant="proposed"
 						busy={busy}
 						value={text}
 						onChange={setText}

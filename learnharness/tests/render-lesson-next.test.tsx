@@ -1,5 +1,5 @@
 /**
- * The Proposed lesson (polish pass phase 3): agent chrome stays out of the
+ * The lesson (polish pass phase 3): agent chrome stays out of the
  * column, the plan reads as a calm map, the docks share one anatomy, and
  * the problem reads once. Same tsx classic-JSX shim as the other render
  * tests.
@@ -11,18 +11,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { PlanCard, planMapSteps } from "../components/lesson/plan-map.tsx";
-import { LessonDesignContext } from "../components/lesson/lesson-design.ts";
+import { PlanCard, PlanPanel, planMapSteps } from "../components/lesson/plan-map.tsx";
+import { ActiveProblemContext } from "../components/lesson/active-problem.ts";
 import { ConfidenceChoice } from "../components/confidence-choice.tsx";
 import { QuestionDock, QuestionDockBar, teaserLine } from "../components/question-dock.tsx";
 import { ReadingThinkingField } from "../components/reading-thinking.tsx";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { ProblemCard, ConcludeCard, ThinkingCard } from "../components/practice-cards.tsx";
-import { ToolCallCard } from "../components/artifacts/tool-call-card.tsx";
 import { LiveToolCard } from "../components/artifacts/live-tool-card.tsx";
-import { ProbeDoneCard } from "../components/artifacts/probe-done-card.tsx";
+import { artifactRenderers } from "../components/artifacts/index.ts";
 import { PhaseDivider } from "../components/phase-divider.tsx";
-import { CompactionCutDivider, CompactionMomentDivider } from "../components/compaction-divider.tsx";
+import { CompactionCutDivider } from "../components/compaction-divider.tsx";
 import { AnsweredCard } from "../components/answered-card.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
 import { sessionStatLabels } from "../components/usage-format.ts";
@@ -33,11 +32,9 @@ function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
 }
 
-const proposed = (node: React.ReactNode, activeProblemCallId: string | null = null) => (
-	<LessonDesignContext.Provider value={{ variant: "proposed", activeProblemCallId }}>{node}</LessonDesignContext.Provider>
+const withActiveProblem = (node: React.ReactNode, activeProblemCallId: string | null) => (
+	<ActiveProblemContext.Provider value={activeProblemCallId}>{node}</ActiveProblemContext.Provider>
 );
-
-const AnswerFor = ({ answer }: { answer: QuestionAnswerData }) => <AnsweredCard answer={answer} variant="proposed" />;
 
 const part = (over: Record<string, unknown>) => over as unknown as ArtifactPartProps["part"];
 
@@ -84,11 +81,26 @@ describe("plan map", () => {
 		assert.equal(card.querySelectorAll(".katex").length, 1);
 		assert.doesNotMatch(card.textContent!, /\$/);
 	});
+
+	it("the plan panel derives statuses live: the latest tagged check is current, earlier ones visited", () => {
+		const tree = { nodes: NODES, edges: EDGES, version: 1 };
+		const messages = [
+			{ parts: [{ type: "tool-plan_init", state: "output-available", output: { ok: true, tree } }] },
+			{ parts: [{ type: "tool-quiz", state: "output-available", input: { nodeId: "maps" }, output: { correct: true } }] },
+			{ parts: [{ type: "tool-quiz", state: "input-available", input: { nodeId: "equation" } }] },
+		];
+		const document = documentFor(<PlanPanel messages={messages} onClose={() => {}} />);
+		const status = (id: string) => document.querySelector(`[data-testid="plan-step-${id}"]`)!.getAttribute("data-status");
+		assert.equal(status("maps"), "visited");
+		assert.equal(status("equation"), "current");
+		assert.equal(status("compute"), "upcoming");
+		assert.equal(documentFor(<PlanPanel messages={[]} onClose={() => {}} />).querySelectorAll('[data-testid^="plan-step-"]').length, 0, "no plan, no steps");
+	});
 });
 
-describe("the Proposed docks", () => {
+describe("the docks", () => {
 	it("confidence is the segmented group in sentence case, Neutral on, no numbers", () => {
-		const document = documentFor(<ConfidenceChoice value="neutral" onChange={() => {}} variant="proposed" />);
+		const document = documentFor(<ConfidenceChoice value="neutral" onChange={() => {}} />);
 		const group = document.querySelector('[data-testid="confidence-choice"]')!;
 		assert.equal(group.getAttribute("data-slot"), "toggle-group");
 		const items = [...group.querySelectorAll('[data-slot="toggle-group-item"]')];
@@ -99,7 +111,7 @@ describe("the Proposed docks", () => {
 	it("the question dock shows the question in prose with no uppercase labels, the answer field and Submit", () => {
 		const document = documentFor(
 			<QuestionDock toolName="explain" toolCallId="q1" input={{ question: "Why is det zero?", correctAnswer: "kernel", details: "Two sentences." } as never}
-				expanded onExpand={() => {}} onSubmit={() => {}} variant="proposed" />,
+				expanded onExpand={() => {}} onSubmit={() => {}} />,
 		);
 		const dock = document.querySelector('[data-testid="question-dock"]')!;
 		assert.match(dock.textContent!, /Why is det zero\?/);
@@ -111,22 +123,22 @@ describe("the Proposed docks", () => {
 	});
 
 	it("a check waiting behind its reveal invites in sentence case; the reading field sits on the same dock surface", () => {
-		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" design="proposed" />);
+		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" />);
 		const reveal = bar.querySelector('[data-testid="teach-check-reveal"]')!;
 		assert.equal(reveal.querySelectorAll(".katex").length, 1, "the formula is typeset");
 		assert.match(reveal.textContent!, /^Check your understandingWhy is /);
 		const matrix = "Let $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$. Find $\\lambda$ with **one** $$\\dfrac{a+b}{2}$$";
 		assert.equal(teaserLine(matrix), "Let $A = \\cdots$. Find $\\lambda$ with one $\\tfrac{a+b}{2}$");
-		const collapsed = documentFor(<QuestionDockBar toolName="explain" question={matrix} onExpand={() => {}} variant="reveal" design="proposed" />);
+		const collapsed = documentFor(<QuestionDockBar toolName="explain" question={matrix} onExpand={() => {}} variant="reveal" />);
 		assert.doesNotMatch(collapsed.body.textContent!, /beginpmatrix|\*\*|\$/);
-		const field = documentFor(<ReadingThinkingField value="" revision={0} onChange={() => {}} variant="proposed" />).querySelector('[data-testid="reading-thinking-field"]')!;
+		const field = documentFor(<ReadingThinkingField value="" revision={0} onChange={() => {}} />).querySelector('[data-testid="reading-thinking-field"]')!;
 		assert.equal(field.getAttribute("data-slot"), "dock-surface");
 		assert.match(field.textContent!, /^Thinking while reading$/);
 	});
 
 	it("the practice dock has the same anatomy: the problem once, the thinking field, confidence and Submit", () => {
 		const document = documentFor(
-			<PracticeDock problemCallId="p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} variant="proposed" />,
+			<PracticeDock problemCallId="p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} />,
 		);
 		const dock = document.querySelector('[data-testid="practice-dock"]')!;
 		assert.match(dock.textContent!, /Find the rank\./);
@@ -136,50 +148,45 @@ describe("the Proposed docks", () => {
 	});
 });
 
-describe("agent chrome out of the Proposed lesson", () => {
-	it("a tool call leaves no row in the column", () => {
-		const document = documentFor(proposed(<ToolCallCard part={part({ type: "tool-read", state: "output-available", toolCallId: "t", input: { path: "notes.md" } })} />));
-		assert.equal(document.body.innerHTML, "");
-	});
-
-	it("the prober's hand-off to the teacher stays out: no notes about the learner in the column", () => {
-		const input = { assessment: { strands: [{ strand: "Closure", assessment: "FLOOR: one-step proofs. CEILING: he stalls on inverses (o7)." }], summary: "Adult learner. He asked to skip the warm-ups." } };
-		for (const state of ["input-streaming", "input-available", "output-available"]) {
-			const document = documentFor(proposed(<ProbeDoneCard part={{ state, input, output: { ok: true } }} />));
-			assert.equal(document.body.innerHTML, "", state);
+describe("agent chrome out of the lesson", () => {
+	it("a settled tool call leaves no row in the column: no renderer draws the agent's own tools", () => {
+		for (const tool of ["read", "ls", "find", "grep", "list_sessions", "list_propositions", "course_resume", "course_show", "course_search", "course_save"]) {
+			assert.equal(artifactRenderers[tool], undefined, tool);
 		}
 	});
 
+	it("the prober's hand-off to the teacher stays out: no notes about the learner in the column", () => {
+		assert.equal(artifactRenderers.probe_done, undefined);
+	});
+
 	it("a running tool is one muted activity line with no arguments", () => {
-		const document = documentFor(<LiveToolCard part={part({ type: "tool-read", state: "input-streaming", toolCallId: "t", input: { path: "secret/notes.md" } })} variant="proposed" />);
+		const document = documentFor(<LiveToolCard part={part({ type: "tool-read", state: "input-streaming", toolCallId: "t", input: { path: "secret/notes.md" } })} />);
 		const line = document.querySelector('[data-slot="activity-line"]')!;
 		assert.equal(line.textContent, "Reading a file…");
 		assert.doesNotMatch(document.body.textContent!, /secret\/notes\.md/);
 	});
 
 	it("phase changes are quiet section breaks; compaction leaves only a hairline, no token count", () => {
-		const teach = documentFor(<PhaseDivider phase="teach" variant="proposed" />).querySelector('[data-slot="section-break"]')!;
+		const teach = documentFor(<PhaseDivider phase="teach" />).querySelector('[data-slot="section-break"]')!;
 		assert.equal(teach.getAttribute("aria-label"), "Teaching");
 		assert.equal(teach.textContent, "Teaching");
-		const data = { content: "summary", details: { tokensBefore: 21000 } } as never;
-		const cut = documentFor(<CompactionCutDivider data={data} variant="proposed" />);
+		const cut = documentFor(<CompactionCutDivider />);
 		assert.equal(cut.body.textContent, "");
 		assert.ok(cut.querySelector('[data-slot="section-break"]'));
-		assert.equal(documentFor(<CompactionMomentDivider data={data} variant="proposed" />).body.innerHTML, "");
 	});
 });
 
-describe("Proposed lesson cards", () => {
+describe("lesson cards", () => {
 	it("the active problem reads once: its transcript card stays out while the dock shows it", () => {
 		const problem = part({ type: "tool-problem", state: "output-available", toolCallId: "p1", input: { statement: "Find the rank." } });
-		assert.equal(documentFor(proposed(<ProblemCard part={problem} />, "p1")).body.innerHTML, "");
-		const settled = documentFor(proposed(<ProblemCard part={problem} />, null));
+		assert.equal(documentFor(withActiveProblem(<ProblemCard part={problem} />, "p1")).body.innerHTML, "");
+		const settled = documentFor(withActiveProblem(<ProblemCard part={problem} />, null));
 		assert.match(settled.querySelector('[data-slot="lesson-card"]')!.textContent!, /^ProblemFind the rank\./);
 	});
 
 	it("a given-up problem says so in plain words, with no tutor bookkeeping under Details", () => {
 		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c2", input: { outcome: "surrendered", verdict: "You read the rows by eye.", rung: "R2", missClass: "execution" }, reveal: "Eliminate." });
-		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
+		const card = documentFor(<ConcludeCard part={conclude} />).querySelector('[data-testid="conclude-card"]')!;
 		assert.match(card.textContent!, /^How it went·You gave up/);
 		assert.equal(card.querySelector('[data-testid="metadata-toggle"]'), null);
 		assert.doesNotMatch(card.textContent!, /Surrendered|Details|rung|Miss class/i);
@@ -187,14 +194,14 @@ describe("Proposed lesson cards", () => {
 
 	it("a conclusion names its outcome in sentence case and shows the model solution", () => {
 		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c1", input: { outcome: "movedOn", verdict: "Pairs are not enough." }, reveal: "The third is the sum." });
-		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
+		const card = documentFor(<ConcludeCard part={conclude} />).querySelector('[data-testid="conclude-card"]')!;
 		assert.match(card.textContent!, /^How it went·Moved on/);
 		assert.match(card.textContent!, /Model solution/);
 		assert.match(card.textContent!, /The third is the sum\./);
 	});
 
 	it("the learner's thinking is labelled in sentence case", () => {
-		const document = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is row 1 + row 2?" }} variant="proposed" />);
+		const document = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is row 1 + row 2?" }} />);
 		assert.match(document.querySelector('[data-testid="thinking-card"]')!.textContent!, /^Your thinkingRow 3 is row 1 \+ row 2\?/);
 	});
 
@@ -203,7 +210,7 @@ describe("Proposed lesson cards", () => {
 			kind: "explain", tool: "explain", questionText: "Why is det zero?", answers: [], text: "The kernel is nonzero.",
 			confidence: "confident", committed: "A nonzero kernel means not invertible.",
 		} as unknown as QuestionAnswerData;
-		const card = documentFor(<AnsweredCard answer={answer} variant="proposed" />).querySelector('[data-testid="answered-card"]')!;
+		const card = documentFor(<AnsweredCard answer={answer} />).querySelector('[data-testid="answered-card"]')!;
 		assert.match(card.textContent!, /^Explain·Confident/);
 		assert.match(card.textContent!, /“The kernel is nonzero\.”/);
 		assert.match(card.textContent!, /The answerA nonzero kernel means not invertible\./);
@@ -212,10 +219,10 @@ describe("Proposed lesson cards", () => {
 
 	it("the learner's own math is typeset, in an answer and in his thinking", () => {
 		const answer = { kind: "explain", tool: "explain", questionText: "Why?", answers: [], text: "Because $Av = \\lambda v$ with $v \\neq 0$." } as unknown as QuestionAnswerData;
-		const card = documentFor(<AnswerFor answer={answer} />);
+		const card = documentFor(<AnsweredCard answer={answer} />);
 		assert.equal(card.querySelectorAll(".katex").length, 2);
 		assert.doesNotMatch(card.body.textContent!, /\$/, "no delimiter left as text");
-		const thinking = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is $R_1 + R_2$" }} variant="proposed" />);
+		const thinking = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is $R_1 + R_2$" }} />);
 		assert.ok(thinking.querySelector(".katex"));
 		assert.doesNotMatch(thinking.body.textContent!, /\$/);
 	});
@@ -225,7 +232,7 @@ describe("Proposed lesson cards", () => {
 			state: { status: "ready", courses: [{ workspace: "/s", title: "SMM", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }], roots: [] },
 			workspace: "/s", notice: null, choose: () => {}, add: () => {}, requireCourse: () => "/s",
 		} as unknown as CourseChoice;
-		const banner = documentFor(<CourseLinkBody choice={choice} busy={false} error={null} onLink={() => {}} variant="proposed" />).querySelector('[data-testid="course-link-banner"]')!;
+		const banner = documentFor(<CourseLinkBody choice={choice} busy={false} error={null} onLink={() => {}} />).querySelector('[data-testid="course-link-banner"]')!;
 		assert.match(banner.textContent!, /Link this session to a course to continue\./);
 		assert.deepEqual(
 			[...banner.querySelectorAll("button")].filter((b) => b.getAttribute("data-testid") !== "course-picker").map((b) => b.textContent),

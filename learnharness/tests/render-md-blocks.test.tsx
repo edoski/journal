@@ -17,7 +17,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MessageResponse } from "../components/ai-elements/message.tsx";
 import { ThinkingBlock, setAllUserThinkingOpen } from "@/components/thinking-block";
 import { MermaidOverlay, SessionMermaidContext, chartSize } from "../components/session-overlay.tsx";
-import { PlanPopup } from "../components/plan-block.tsx";
 import { MarkdownCode, codeSource } from "../components/md-blocks.tsx";
 
 function render(md: string): string {
@@ -134,25 +133,10 @@ describe("session-scoped overlays (chrome-melt wave, 2026-09-19)", () => {
 		assert.match(html, /role="dialog"/, "dialog semantics for Esc/aria");
 	});
 
-	it("the plan popup is session-scoped the same way, and its chart is hidden until the first fit (no top-left flash)", () => {
-		const html = renderToStaticMarkup(<PlanPopup messages={[]} onClose={() => {}} />);
-		assert.match(html, /data-testid="plan-popup"/);
-		assert.match(html, /class="absolute inset-0[^"]*z-40/, "absolute inset-0 z-40 — scoped, not fullscreen");
-		assert.ok(html.includes("bg-background/80"), "80% background");
-		assert.ok(html.includes("backdrop-blur"), "blur surface");
-		assert.ok(!html.includes("fixed inset-0"), "never fixed — the drag bar stays uncovered");
-	});
-
 	it("the diagram wrapper is hidden until the first fit applies (no top-left flash — owner report, 2026-09-19)", () => {
-		// Covered in render-plan-block.test.tsx, which has a real tree
-		// fixture (an empty-messages popup renders no diagram to gate) — and
-		// the same gate is asserted on the mermaid overlay's wrapper here:
-		// settled=false at static render → opacity 0.
+		// The chart itself hasn't rendered at static render (async effect),
+		// so only the overlay shell is pinned here.
 		const html = renderToStaticMarkup(<MermaidOverlay chart="graph TD\nA --> B" onClose={() => {}} />);
-		// The chart itself hasn't rendered at static render (async effect) —
-		// the opacity gate is pinned on the plan popup's diagram wrapper in
-		// render-plan-block.test.tsx, which has a real tree fixture (the two
-		// overlays share the settled-gating pattern).
 		assert.ok(html.includes('data-testid="mermaid-overlay-close"'), "overlay shell renders");
 	});
 
@@ -255,22 +239,20 @@ describe("md-blocks — the restored plain blockquote (owner round, 2026-10-07)"
 	});
 });
 
-describe("ThinkingBlock — the document band + ⌘T sync (owner rounds, 2026-10-07)", () => {
-	it("the row is the document band — round four geometry (owner, 2026-10-07)", () => {
+describe("ThinkingBlock — the learner's surface + ⌘T sync", () => {
+	it("the row is the learner's quiet surface, full width, open on arrival", () => {
 		const html = renderToStaticMarkup(<ThinkingBlock text="banded" defaultOpen />);
-		assert.ok(html.includes("bg-card"), "the card-color band");
-		assert.ok(html.includes("border-l-[calc(3ch-14px)]"), "narrow rail — 14px gap inside the 3ch inset");
-		assert.ok(html.includes("py-1") && html.includes("pl-[14px]"), "4px band padding");
-		assert.ok(html.includes("pr-4"), "the text wraps early — air at the band's right edge");
+		assert.ok(html.includes('data-slot="learner-note"'));
+		assert.ok(html.includes("rounded-xl bg-card"), "the card-fill surface");
 		assert.ok(html.includes("w-full"), "full width — no chat side");
+		assert.ok(!html.includes("border-l-"), "no rail");
 		assert.match(html, /aria-expanded="true"/);
 		assert.ok(html.includes("banded"), "text visible on arrival");
 	});
 
-	it("in-card rows take no band — the accent step read too light (owner round five)", () => {
+	it("in-card rows take no surface of their own", () => {
 		const html = renderToStaticMarkup(<ThinkingBlock text="in card" inCard />);
 		assert.ok(!html.includes("bg-accent") && !html.includes("bg-card"), "transparent on the card");
-		assert.ok(html.includes("border-l-[calc(3ch-14px)]"), "rail only, same geometry");
 	});
 
 	it("⌘T sets every row — explicit sets stomp individual state, late mounts honor the last set", () => {

@@ -2,13 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
-import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { timeAgo } from "@/components/time-ago";
 import { EXTRACTION_CHUNK_TOKENS } from "@/src/core";
-import { cn } from "@/lib/utils";
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
@@ -226,7 +224,7 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
 }
 
 /**
- * The ring meter (owner-locked: "a donut next to the PhaseChip"): how
+ * The ring meter (owner-locked: "a donut next to the phase label"): how
  * close this session is to its next extraction run. Click → the exact
  * numbers (covered/uncovered tokens, messages, the threshold, the last
  * fold). Vanishes entirely while the graph is disabled or before the
@@ -239,17 +237,11 @@ export function ringFill(uncoveredTokens: number, chunkTokens: number): number {
  * (resets as the fold drains coverage) + the settings signal (the
  * threshold/kill-switch re-read live).
  */
-export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
+export function CoverageRing({ chatId, refreshKey = 0 }: {
 	chatId: string;
 	refreshKey?: number;
-	/** "proposed": the numbers open in the shared popover (popover.md). */
-	variant?: "current" | "proposed";
 }) {
-	const proposed = variant === "proposed";
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
-	const [open, setOpen] = useState(false);
-	const rootRef = useRef<HTMLDivElement>(null);
-	usePopoverDismiss(rootRef, open && !proposed, () => setOpen(false));
 
 	// The activity/refresh chain (the dispatch's seam): runs can fire from
 	// OTHER surfaces (the sidebar menu's Extract, the turn pipeline, another
@@ -287,54 +279,23 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 	if (coverage === null) return null;
 
 	const fill = ringFill(coverage.uncoveredTokens, EXTRACTION_CHUNK_TOKENS);
-	if (proposed) {
-		return (
-			<Popover open={open} onOpenChange={setOpen}>
-				<Hint label="How much of this session isn't mapped yet" side="bottom">
-					<PopoverTrigger asChild>
-						<button
-							type="button"
-							data-testid="coverage-ring"
-							className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<CoverageRingGlyph fill={fill} running={coverage.running} />
-						</button>
-					</PopoverTrigger>
-				</Hint>
-				<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
-					<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} variant="proposed" />
-				</PopoverContent>
-			</Popover>
-		);
-	}
 	return (
-		<div ref={rootRef} className="lh-no-drag relative shrink-0">
-			<Hint
-				// Trimmed (owner, subtlety round 2026-09-25).
-				label="How much of this session isn't mapped yet"
-				side="bottom"
-			>
-				<button
-					type="button"
-					data-testid="coverage-ring"
-					onClick={() => setOpen((o) => !o)}
-					aria-expanded={open}
-					className="relative flex size-5 cursor-pointer items-center justify-center transition-opacity hover:opacity-80"
-				>
-					{/* The donut: track + fill. The whole ring pulses while a run
-					    is in flight (motion = the working-state signal). */}
-					<CoverageRingGlyph fill={fill} running={coverage.running} />
-				</button>
+		<Popover>
+			<Hint label="How much of this session isn't mapped yet" side="bottom">
+				<PopoverTrigger asChild>
+					<button
+						type="button"
+						data-testid="coverage-ring"
+						className="relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+					>
+						<CoverageRingGlyph fill={fill} running={coverage.running} />
+					</button>
+				</PopoverTrigger>
 			</Hint>
-			{open && (
-				<div
-					data-testid="coverage-ring-popover"
-					className="absolute top-full right-0 z-40 mt-1.5 w-64 rounded-xl border bg-card p-3 text-xs shadow-xl"
-				>
-					<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} />
-				</div>
-			)}
-		</div>
+			<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
+				<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} />
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -368,22 +329,14 @@ export function CoverageRingGlyph({ fill, running }: { fill: number; running: bo
 /** The popover body (exported for static-render tests): the exact numbers —
  *  covered/uncovered tokens, message coverage, the threshold, the last
  *  fold's age. */
-export function CoverageRingDetail({ coverage, chunkTokens, variant = "current" }: {
+export function CoverageRingDetail({ coverage, chunkTokens }: {
 	coverage: SessionCoverage;
 	chunkTokens: number;
-	/** "proposed": the popover's sentence-case title over 13px rows. */
-	variant?: "current" | "proposed";
 }) {
 	return (
 		<>
-			{variant === "proposed" ? (
-				<PopoverTitle className="mb-2">Extraction coverage</PopoverTitle>
-			) : (
-				<div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-					Extraction coverage
-				</div>
-			)}
-			<div className={cn("flex flex-col gap-1 text-muted-foreground", variant === "proposed" && "text-row")}>
+			<PopoverTitle className="mb-2">Extraction coverage</PopoverTitle>
+			<div className="flex flex-col gap-1 text-row text-muted-foreground">
 				<div className="flex justify-between gap-2">
 					<span>Uncovered</span>
 					<span className="tabular-nums text-card-foreground">

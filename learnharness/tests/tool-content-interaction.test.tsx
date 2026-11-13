@@ -13,7 +13,7 @@ Object.assign(globalThis, { window: dom.window, document: dom.document, Element:
 	HTMLElement: dom.window.HTMLElement, IS_REACT_ACT_ENVIRONMENT: true });
 
 const submitForm = async (host: HTMLElement) => {
-	const submit = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.includes("Submit answer"))!;
+	const submit = [...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent?.trim() === "Submit")!;
 	assert.equal(submit.disabled, false);
 	// linkedom does not implement the browser's default button→form
 	// action; dispatch its native submit event through React instead.
@@ -65,16 +65,16 @@ test("one tap on a confidence state rides the free-response answer; neutral is t
 			onExpand={() => {}} onSubmit={a => { answers.push(a); }} />));
 		await submitForm(host);
 		assert.equal(answers[0]?.confidence, "neutral");
-		const guessing = host.querySelector<HTMLButtonElement>('[data-testid="confidence-choice"] [data-state="guessing"]')!;
+		const guessing = host.querySelector<HTMLButtonElement>('[data-testid="confidence-choice"] [data-confidence="guessing"]')!;
 		await act(async () => guessing.click());
 		assert.equal(guessing.getAttribute("aria-checked"), "true");
-		assert.equal(host.querySelector('[data-state="neutral"]')!.getAttribute("aria-checked"), "false");
+		assert.equal(host.querySelector('[data-confidence="neutral"]')!.getAttribute("aria-checked"), "false");
 		await submitForm(host);
 		assert.equal(answers[1]?.confidence, "guessing");
 	} finally { await act(async () => root.unmount()); host.remove(); }
 });
 
-test("committed-answer reveals keep the first paragraph inline without flattening later paragraphs", async () => {
+test("the committed-answer reveal keeps its paragraphs apart", async () => {
 	const committed = String.raw`First paragraph.\n\nSecond paragraph with $\\nabla f$ and $\nu$.`;
 	const answer: QuestionAnswerData = { kind: "explain", questionText: "Explain the gradient.", answers: [], text: "Synthetic answer", committed, answeredAt: "2026-10-26T00:00:00.000Z" };
 	const input = { question: answer.questionText, correctAnswer: committed };
@@ -83,10 +83,12 @@ test("committed-answer reveals keep the first paragraph inline without flattenin
 	const root = createRoot(host);
 	try {
 		await act(async () => root.render(<AnsweredCard answer={answer} input={input} />));
-		const paragraphs = host.querySelectorAll("p");
-		assert.equal(paragraphs.length, 3, "question plus two committed-answer paragraphs");
-		assert.ok(paragraphs[1]!.parentElement!.classList.contains("[&>p:first-child]:inline"));
-		assert.ok(!paragraphs[1]!.parentElement!.classList.contains("[&_p]:inline"));
+		const heading = [...host.querySelectorAll("div")].find(div => div.textContent === "The answer")!;
+		assert.ok(heading, "the reveal is labelled");
+		const paragraphs = [...heading.nextElementSibling!.querySelectorAll("p")].map(p => p.textContent);
+		assert.equal(paragraphs.length, 2, "both committed-answer paragraphs stay paragraphs");
+		assert.equal(paragraphs[0], "First paragraph.");
+		assert.match(paragraphs[1]!, /^Second paragraph with/);
 		assert.equal(host.querySelectorAll(".katex-error").length, 0);
 		assert.deepEqual(answer, before);
 	} finally { await act(async () => root.unmount()); host.remove(); }

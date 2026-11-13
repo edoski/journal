@@ -7,7 +7,6 @@ import { isSubagentFailure } from "@/src/core";
 import { DemoOutputCard } from "@/components/artifacts/demo-card";
 import { PdfBriefCard, ResearchBriefCard } from "@/components/artifacts/job-card";
 import { VisualOutputCard } from "@/components/artifacts/visual-card";
-import { useLessonDesign } from "@/components/lesson/lesson-design";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 /**
@@ -19,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
  * NEVER a learner bubble, never wrapped in a message container:
  *
  *   research — a quiet "Research complete" one-liner that expands on demand
- *     (native <details>) to the full persisted brief + sources: the brief is
+ *     to the full persisted brief + sources: the brief is
  *     too long to inline by default and the teacher's wake turn weaves it
  *     into the lesson anyway. Failures keep the failure card (the brief
  *     explains what went wrong).
@@ -68,11 +67,10 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
  * teacher's wake turn acknowledges the abort in the lesson itself,
  * this just marks what happened. */
 function AbortedBadge({ kind }: { kind: string }) {
-	const quiet = useLessonDesign().variant === "proposed";
 	return (
-		<div data-testid="job-aborted-badge" className={quiet ? "flex items-center gap-2 text-row text-muted-foreground" : "flex items-center gap-2 text-xs text-muted-foreground"}>
-			<CircleX className={quiet ? "size-4" : "size-3.5"} />
-			<span className={quiet ? "first-letter:uppercase" : "font-medium uppercase tracking-wide"}>{kind}</span>
+		<div data-testid="job-aborted-badge" className="flex items-center gap-2 text-row text-muted-foreground">
+			<CircleX className="size-4" />
+			<span className="first-letter:uppercase">{kind}</span>
 			<span>aborted by the learner</span>
 		</div>
 	);
@@ -80,73 +78,33 @@ function AbortedBadge({ kind }: { kind: string }) {
 
 /** Quiet one-liner, the research-badge idiom ported to PDF: the brief is
  * too long to inline by default and the teacher's wake turn weaves it in;
- * the badge marks delivery, the collapsed details carries the full text
+ * the badge marks delivery, the collapsed brief carries the full text
  * + consulted pages. */
 function PdfCompleteBadge({ result }: { result: PdfResult }) {
-	const quiet = useLessonDesign().variant === "proposed";
 	// The honest count is READ pages (extract/render — sources v1 split);
 	// the ?? is runtime tolerance for pre-split persisted steers.
 	const readPages = result.pagesRead ?? result.pagesConsulted;
-	if (quiet) {
-		return (
-			<BriefDisclosure testid="pdf-complete-badge" summary={`PDF reading complete${readPages.length > 0 ? ` · read ${readPages.length} page${readPages.length === 1 ? "" : "s"}` : ""}`}>
-				<PdfBriefCard output={result} />
-			</BriefDisclosure>
-		);
-	}
 	return (
-		<details data-testid="pdf-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
-			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className={quiet ? "size-4" : "size-3.5"} />
-				<span className={quiet ? "" : "font-medium uppercase tracking-wide"}>PDF</span>
-				<span>reading complete</span>
-				{readPages.length > 0 && (
-					<span>
-						· read {readPages.length} page{readPages.length === 1 ? "" : "s"}
-					</span>
-				)}
-				<span className={quiet ? "ml-1 group-open:hidden" : "ml-1 text-xs text-muted-foreground/70 group-open:hidden"}>{quiet ? "· View brief" : "view brief"}</span>
-				<span className={quiet ? "ml-1 hidden group-open:inline" : "ml-1 hidden text-xs text-muted-foreground/70 group-open:inline"}>{quiet ? "· Hide brief" : "hide brief"}</span>
-			</summary>
-			<div className="mt-2">
-				<PdfBriefCard output={result} />
-			</div>
-		</details>
+		<BriefDisclosure testid="pdf-complete-badge" summary={`PDF reading complete${readPages.length > 0 ? ` · read ${readPages.length} page${readPages.length === 1 ? "" : "s"}` : ""}`}>
+			<PdfBriefCard output={result} />
+		</BriefDisclosure>
 	);
 }
 
 /** Quiet one-liner, the dispatch-settled idiom — the lesson lives in the
  * teacher's wake turn; the badge just marks delivery. The persisted brief
- * rides along in a collapsed <details> (the wave-1 "view full research"
- * affordance): full markdown + sources, one click away, no extra fetch —
- * the artifact part in the record is the single source of truth. */
+ * rides along collapsed (the wave-1 "view full research" affordance): full
+ * markdown + sources, one click away, no extra fetch — the artifact part
+ * in the record is the single source of truth. */
 function ResearchCompleteBadge({ result }: { result: ResearchResult }) {
-	const quiet = useLessonDesign().variant === "proposed";
-	if (quiet) {
-		return (
-			<BriefDisclosure testid="research-complete-badge" summary={`Research complete${result.sources.length > 0 ? ` · ${result.sources.length} sources` : ""}`}>
-				<ResearchBriefCard output={result} />
-			</BriefDisclosure>
-		);
-	}
 	return (
-		<details data-testid="research-complete-badge" className={quiet ? "group w-full text-row text-muted-foreground" : "group w-full text-xs text-muted-foreground"}>
-			<summary className="flex cursor-pointer select-none list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-				<CheckIcon className={quiet ? "size-4" : "size-3.5"} />
-				<span className={quiet ? "" : "font-medium uppercase tracking-wide"}>Research</span>
-				<span>complete</span>
-				{result.sources.length > 0 && <span>· {result.sources.length} sources</span>}
-				<span className={quiet ? "ml-1 group-open:hidden" : "ml-1 text-xs text-muted-foreground/70 group-open:hidden"}>{quiet ? "· View brief" : "view brief"}</span>
-				<span className={quiet ? "ml-1 hidden group-open:inline" : "ml-1 hidden text-xs text-muted-foreground/70 group-open:inline"}>{quiet ? "· Hide brief" : "hide brief"}</span>
-			</summary>
-			<div className="mt-2">
-				<ResearchBriefCard output={result} />
-			</div>
-		</details>
+		<BriefDisclosure testid="research-complete-badge" summary={`Research complete${result.sources.length > 0 ? ` · ${result.sources.length} sources` : ""}`}>
+			<ResearchBriefCard output={result} />
+		</BriefDisclosure>
 	);
 }
 
-/** The Proposed complete badge: a quiet line that discloses the brief. */
+/** The complete badge: a quiet line that discloses the brief. */
 function BriefDisclosure({ testid, summary, children }: { testid: string; summary: string; children: React.ReactNode }) {
 	return (
 		<Collapsible data-testid={testid} className="group w-full text-row text-muted-foreground">

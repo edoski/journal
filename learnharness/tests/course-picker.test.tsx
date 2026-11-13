@@ -1,9 +1,11 @@
-import React from "react";
+import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import { dom } from "./helpers/radix-dom.ts";
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { ComposerActions } from "../components/composer-actions.tsx";
 import { CourseControl, CoursePicker, NewCourseBody, PICK_A_COURSE, type CourseChoice, type CourseState } from "../components/course-picker.tsx";
@@ -81,12 +83,27 @@ describe("new course dialog", () => {
 });
 
 describe("course link banner", () => {
-	it("asks for the session's course with the picker and a Link button", () => {
-		const document = documentFor(<CourseLinkBody choice={choice()} busy={false} error={null} onLink={() => {}} />);
-		const banner = document.querySelector('[data-testid="course-link-banner"]')!;
-		assert.match(banner.textContent!, /This session has no course yet\. Pick the course it belongs to, to continue\./);
-		assert.ok(banner.querySelector('[data-testid="course-picker"] option[value="new"]'), "New course is offered");
-		assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
+	it("asks for the session's course with the picker and a Link button", async () => {
+		const host = dom.document.createElement("div");
+		dom.document.body.appendChild(host);
+		const root = createRoot(host);
+		try {
+			await act(async () => root.render(<CourseLinkBody choice={choice()} busy={false} error={null} onLink={() => {}} />));
+			const banner = host.querySelector('[data-testid="course-link-banner"]')!;
+			assert.match(banner.textContent!, /^Link this session to a course to continue\./);
+			assert.equal(banner.querySelector('[data-testid="course-link"]')!.textContent, "Link");
+			const chip = banner.querySelector('[data-testid="course-picker"]')!;
+			assert.equal(chip.textContent, "Pick a course");
+			await act(async () => {
+				const event = new dom.window.Event("pointerdown", { bubbles: true, cancelable: true });
+				Object.assign(event, { pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, ctrlKey: false });
+				chip.dispatchEvent(event);
+			});
+			assert.ok(dom.document.querySelector('[data-testid="course-new"]'), "New course is offered");
+		} finally {
+			await act(async () => root.unmount());
+			host.remove();
+		}
 	});
 
 	it("with the engine unavailable it shows the reason and no Link button", () => {

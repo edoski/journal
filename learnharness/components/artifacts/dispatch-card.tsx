@@ -1,12 +1,10 @@
 "use client";
 
 import { useContext } from "react";
-import { CheckIcon, CircleSlashIcon, SettingsIcon, XIcon } from "lucide-react";
+import { CircleSlashIcon, SettingsIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
-import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
-import { BrailleSpinner } from "@/components/braille-spinner";
-import { useLessonDesign } from "@/components/lesson/lesson-design";
+import { isModelsRefusal, isProviderKeyRefusal, type JobKind } from "@/src/core";
 import { ActivityLine } from "@/components/lesson/activity-line";
 
 /**
@@ -15,13 +13,13 @@ import { ActivityLine } from "@/components/lesson/activity-line";
  * FORGET ACK (a string) — never the result. Live status comes from the
  * chat-view jobs feed via JobsContext, matched by toolCallId:
  *
- *   job unknown → "dispatched" pulse (the jobs feed hasn't seen it yet)
- *   running     → live activity card (activity line + elapsed)
- *   done/error  → quiet one-liner ("finished" / "failed") — the artifact
- *                 itself arrives in the steer message right below, so the
- *                 box must not duplicate it.
+ *   unknown or running → one muted activity line
+ *   refused            → the setup deep-link (models or a sign-in)
+ *   done               → nothing: the artifact itself arrives in the steer
+ *                        message right below, so the box must not duplicate it
+ *   error              → one plain failure line
  */
-/** The Proposed lesson's one muted line while a helper works. */
+/** The one muted line while a helper works. */
 const KIND_ACTIVITY: Record<JobKind, string> = {
 	research: "Checking sources…",
 	demo: "Building a demo…",
@@ -29,7 +27,7 @@ const KIND_ACTIVITY: Record<JobKind, string> = {
 	pdf: "Reading the PDF…",
 };
 
-/** The Proposed lesson's one plain line when a helper failed. */
+/** The one plain line when a helper failed. */
 const KIND_FAILED: Record<JobKind, string> = {
 	research: "The sources couldn't be checked",
 	demo: "The demo couldn't be built",
@@ -48,12 +46,8 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	const jobs = useContext(JobsContext);
 	const job = jobs.find((j) => j.toolCallId === toolCallId) ?? null;
 	const label = KIND_LABEL[kind];
-	const quiet = useLessonDesign().variant === "proposed";
 
-	if (quiet && (!job || job.status === "running")) return <ActivityLine testId="dispatch-card" label={KIND_ACTIVITY[kind]} />;
-	if (!job || job.status === "running") {
-		return <DispatchActivityCard job={job} label={label} />;
-	}
+	if (!job || job.status === "running") return <ActivityLine testId="dispatch-card" label={KIND_ACTIVITY[kind]} />;
 	// BYOK (owner, 2026-09-22): a job refused for missing models is INFO,
 	// not scary-error — gray glyph + "needs model setup" + the deep-link
 	// into the SetupDialog (the same flow the send interception uses).
@@ -66,26 +60,13 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	if (isProviderKeyRefusal(job.error)) {
 		return <DispatchRefusedCard label={label} line="needs a sign-in" button="Sign in" />;
 	}
-	const failed = job.status === "error";
 	// Delivered: the result arrives in the steer card right below; the
-	// Proposed lesson marks only a failure.
-	if (quiet && !failed) return null;
-	if (quiet) {
-		return (
-			<div className="flex items-center gap-2 text-row text-muted-foreground" data-testid="dispatch-settled">
-				<CircleSlashIcon className="size-3.5" />
-				<span>{KIND_FAILED[kind]}</span>
-			</div>
-		);
-	}
+	// lesson marks only a failure.
+	if (job.status !== "error") return null;
 	return (
-		<div
-			className="flex items-center gap-2 text-xs text-muted-foreground"
-			data-testid="dispatch-settled"
-		>
-			{failed ? <XIcon className="size-3.5 text-red-500" /> : <CheckIcon className="size-3.5" />}
-			<span className="font-medium uppercase tracking-wide">{label}</span>
-			<span>{failed ? "failed" : "finished"}</span>
+		<div className="flex items-center gap-2 text-row text-muted-foreground" data-testid="dispatch-settled">
+			<CircleSlashIcon className="size-3.5" />
+			<span>{KIND_FAILED[kind]}</span>
 		</div>
 	);
 }
@@ -110,39 +91,6 @@ function DispatchRefusedCard({ label, line, button }: { label: string; line: str
 				>
 					{button}
 				</button>
-			)}
-		</div>
-	);
-}
-
-function DispatchActivityCard({ job, label }: { job: JobRecord | null; label: string }) {
-	// Elapsed from createdAt — jobs appear here only via the jobs feed (post-mount),
-	// so no SSR/hydration mismatch.
-	const elapsed =
-		job && job.createdAt ? Math.max(0, Math.round((Date.now() - Date.parse(job.createdAt)) / 1000)) : null;
-	return (
-		<div
-			className="rounded-xl border bg-card p-4 text-card-foreground"
-			data-testid="dispatch-card"
-		>
-			<div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-				{/* The working-state grammar (owner, streaming round 2026-10-01):
-				    the Braille spinner replaces the pulsing dot — one indicator
-				    everywhere. This is the ONLY dispatch-card change; the card's
-				    shape is untouched. */}
-				<BrailleSpinner label={`${label} running`} />
-				{label}
-				{elapsed !== null && <span className="font-normal">· {elapsed}s</span>}
-			</div>
-			{job?.activity && (
-				<div className="mt-1 truncate text-sm text-muted-foreground" data-testid="dispatch-activity-line">
-					{job.activity}
-				</div>
-			)}
-			{!job && (
-				<div className="mt-1 text-sm text-muted-foreground" data-testid="dispatch-pending">
-					Dispatched…
-				</div>
 			)}
 		</div>
 	);

@@ -96,7 +96,7 @@ function Toggle({ initial }: { initial: Confidence }) {
 	return (
 		<>
 			<textarea data-testid="answer" />
-			<ConfidenceChoice value={value} onChange={setValue} variant="proposed" />
+			<ConfidenceChoice value={value} onChange={setValue} />
 		</>
 	);
 }

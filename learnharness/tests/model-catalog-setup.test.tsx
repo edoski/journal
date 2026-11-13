@@ -1,9 +1,9 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+import "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
-import { parseHTML } from "linkedom";
 import { SetupDialog } from "../components/setup-dialog.tsx";
 import { AgentSection } from "../components/settings/agent-section.tsx";
 import { useModelCatalog } from "../components/model-catalog.ts";
@@ -12,16 +12,6 @@ import { useModelSetup, savedSlotsConfigured, selectedModelUnavailable, openMode
 import { StatsBar } from "../components/stats-bar.tsx";
 import type { ModelCatalogEntry, ModelCatalogResponse, ModelsSettings } from "../src/core/index.ts";
 
-const dom = parseHTML("<html><body></body></html>");
-Object.assign(globalThis, {
-	window: dom.window, document: dom.document, Element: dom.window.Element,
-	HTMLElement: dom.window.HTMLElement, HTMLInputElement: dom.window.HTMLInputElement,
-	CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true,
-	requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 0),
-	cancelAnimationFrame: (id: number) => clearTimeout(id),
-});
-Object.assign(dom.window, { innerWidth: 1280, innerHeight: 800 });
-dom.window.HTMLElement.prototype.scrollIntoView = () => {};
 const originalFetch = globalThis.fetch;
 let root: Root | undefined;
 let host: HTMLDivElement | undefined;
@@ -248,7 +238,7 @@ for (const result of ["override", "legacy", "http-failure", "network-failure"] a
 	await warm(body); const identities: Array<string | undefined> = [];
 	await render(<><Reader /><StatsBar turns={[]} chatId="fixture" onModelChange={(id) => { identities.push(id); }} /></>);
 	assert.ok(snapshot.catalog, "catalog is already known, not the deferred unknown-catalog case");
-	assert.equal(element("stats-model").textContent, "—▾");
+	assert.equal(element("stats-model").textContent, "—");
 	assert.equal(identities.at(-1), undefined);
 	assert.equal(selectedModelUnavailable(snapshot.catalog, identities.at(-1)), false, "pending session cannot block Send using global Strong");
 	await act(async () => {

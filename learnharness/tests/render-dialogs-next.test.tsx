@@ -21,7 +21,7 @@ import { ThinkingMenuList } from "../components/settings/model-menu.tsx";
 import { priceLabel } from "../components/settings/model-pickers.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
-import { hintBinding, hintText } from "../components/ui/hint.tsx";
+import { hintBinding } from "../components/ui/hint.tsx";
 import { bindingForAction, formatBinding, KEYBOARD_ACTIONS } from "../src/core/index.ts";
 import type { GraphChain, GraphNode } from "../src/core/contracts.ts";
 
@@ -123,11 +123,10 @@ describe("the Proposed model menu's prices", () => {
 	});
 });
 
-describe("Proposed tooltips", () => {
-	it("carry the shortcut as glyphs of their own, the same keys the Current text shows in parentheses", () => {
+describe("tooltips", () => {
+	it("carry the shortcut as glyphs of their own", () => {
 		const glyphs = hintBinding("open-settings");
 		assert.ok(glyphs.length > 0);
-		assert.equal(hintText("Settings", "open-settings"), `Settings (${glyphs})`);
 		assert.equal(hintBinding(undefined, "escape"), "Esc");
 		assert.equal(hintBinding(), "");
 	});
@@ -135,7 +134,7 @@ describe("Proposed tooltips", () => {
 
 const NOW = Date.parse("2026-11-08T10:00:00");
 
-describe("Proposed background agents", () => {
+describe("background agents", () => {
 	const feed: ActivityFeed = {
 		jobs: [
 			{
@@ -156,7 +155,7 @@ describe("Proposed background agents", () => {
 	};
 
 	it("one row per process under a quiet header: the session, elapsed time and a named stop button; cost waits in the detail", () => {
-		const doc = documentFor(<ActivitySection feed={feed} variant="proposed" />);
+		const doc = documentFor(<ActivitySection feed={feed} />);
 		const section = doc.querySelector('[data-testid="activity-section"]');
 		assert.equal(section?.querySelector('[data-slot="nav-section-header"]')?.textContent, "Background agents");
 		const row = section?.querySelector('[data-testid="activity-blob-job"] [data-slot="nav-row"]');
