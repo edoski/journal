@@ -320,7 +320,7 @@ export function ModelControl({
 							error={error}
 							footer={
 								catalog && catalog.models.length === 0
-									? "No models — sign in to Claude or ChatGPT in Providers"
+									? "No models — sign in to Claude or ChatGPT in Settings → Accounts"
 									: chatId
 										? "This session's model"
 										: "Strong tier — the default for new sessions"
@@ -427,7 +427,7 @@ export function ModelControl({
 						onPick={pickModel}
 						footer={
 							catalog && catalog.models.length === 0
-								? "No models — sign in to Claude or ChatGPT in Providers"
+								? "No models — sign in to Claude or ChatGPT in Settings → Accounts"
 								: chatId
 									? "This session's model"
 									: "Strong tier — the default for new sessions"

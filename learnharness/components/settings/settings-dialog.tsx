@@ -61,7 +61,7 @@ import { XIcon } from "lucide-react";
  *  prose is out; only the keyboard note stays (storage location is a
  *  real question users ask). */
 const SECTIONS = [
-	{ id: "keys", label: "Providers" },
+	{ id: "keys", label: "Accounts" },
 	{ id: "agent", label: "Agent" },
 	{ id: "appearance", label: "Appearance" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
@@ -330,7 +330,7 @@ export function SettingsDialogBody({
 								</SettingsSection>
 							)}
 							{active === "keys" && (
-								<SettingsSection title="Providers" testid="section-keys">
+								<SettingsSection title="Accounts" testid="section-keys">
 									<SettingsGroup label="Subscriptions" testid="group-subscriptions">
 										<SubscriptionConnections />
 									</SettingsGroup>

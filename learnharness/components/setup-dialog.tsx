@@ -340,7 +340,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 																		setLevels((prev) => ({ ...prev, [slot]: populateLevel(prev[slot], m.supportedLevels) }));
 																		setOpenMenu(null);
 																	}}
-																	footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Sign in to Claude or ChatGPT in Providers." : undefined}
+																	footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Sign in to Claude or ChatGPT in Settings → Accounts." : undefined}
 																/>
 															</PopoverContent>
 														</Popover>
@@ -503,7 +503,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 															}));
 															setOpenMenu(null);
 														}}
-														footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Sign in to Claude or ChatGPT in Providers." : undefined}
+														footer={slotCatalog && slotCatalog.length === 0 && slot === "vision" ? "No image-capable models. Sign in to Claude or ChatGPT in Settings → Accounts." : undefined}
 													/>
 												</MenuShell>
 											)}

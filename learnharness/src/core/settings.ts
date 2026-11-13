@@ -152,8 +152,8 @@ export interface ProviderKeyMissing {
 	slots: ModelSlotName[];
 }
 /** Claude's connection is the user's own Claude Code sign-in. */
-const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Providers";
-const CHATGPT_NOT_CONNECTED = "ChatGPT is not signed in — connect it in Settings → Providers";
+const CLAUDE_NOT_CONNECTED = "Claude Code is not signed in to your Claude plan — run `claude` in a terminal, sign in with your Claude account, then press Refresh in Settings → Accounts";
+const CHATGPT_NOT_CONNECTED = "ChatGPT is not signed in — connect it in Settings → Accounts";
 /** The tail of the refusal for a provider only an API key could run, which the app no longer uses. */
 const API_KEY_PROVIDER_TAIL = "runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent";
 export function providerKeyMissing(provider: string, slots: ModelSlotName[]): ProviderKeyMissing {

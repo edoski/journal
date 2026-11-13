@@ -122,7 +122,7 @@ describe("providerKeyMissing — the envelope factory (provider-key interlude, 2
 	});
 
 	it("a signed-out subscription asks for its sign-in", () => {
-		assert.equal(providerKeyMissing("chatgpt", ["cheap"]).error, "ChatGPT is not signed in — connect it in Settings → Providers");
+		assert.equal(providerKeyMissing("chatgpt", ["cheap"]).error, "ChatGPT is not signed in — connect it in Settings → Accounts");
 		assert.match(providerKeyMissing("claude-subscription", ["cheap"]).error, /^Claude Code is not signed in/);
 	});
 });

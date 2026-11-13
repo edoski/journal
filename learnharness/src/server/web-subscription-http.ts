@@ -48,7 +48,7 @@ export async function subscriptionControlsResponse(request: Request): Promise<Re
 		if (typeof fields.op !== "string" || !["login", "cancel", "select", "disconnect", "logout", "consent"].includes(fields.op)) return error("Unsupported control.", 400);
 		return Response.json(await webSubscriptionOwner().control(fields, subscriptionRequestOrigin(request)!), { headers: HEADERS });
 	} catch {
-		return error("The subscription connection could not be changed. Retry or reconnect in Providers.", 400);
+		return error("The subscription connection could not be changed. Retry or reconnect in Settings → Accounts.", 400);
 	}
 }
 /** One-use same-origin navigation. Full provider authorization URLs go only to

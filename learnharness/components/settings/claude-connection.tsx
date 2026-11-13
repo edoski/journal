@@ -8,8 +8,8 @@ import { useModelCatalog } from "@/components/model-catalog";
 import { ConnectionRow, connectionBlockClass, connectionNoteClass } from "./connection-controls";
 import { useSettingsProposed } from "./settings-design";
 
-export const CLAUDE_LABEL = "Claude (your subscription)";
-export const CLAUDE_NOTICE = "Prompts and session context go to Anthropic through Claude Code and count toward your Claude plan's usage limits.";
+export const CLAUDE_LABEL = "Claude";
+export const CLAUDE_NOTICE = "Your lessons run on your Claude plan through Claude Code and count toward its limits.";
 const PATH = "/api/subscriptions/claude";
 
 const METHOD_LABELS: Record<string, string> = {
@@ -86,7 +86,7 @@ function UseForAllRoles({ providerId, busy, onUse }: { providerId: string; busy:
 	const { catalog } = useModelCatalog();
 	const proposed = useSettingsProposed();
 	if (!catalog || holdsAllRoles(catalog.slots, providerId)) return null;
-	return <Button type="button" size={proposed ? "sm" : "xs"} variant="outline" className={proposed ? "h-7 cursor-pointer px-3 disabled:cursor-not-allowed" : "cursor-pointer disabled:cursor-not-allowed"} data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for all roles</Button>;
+	return <Button type="button" size={proposed ? "sm" : "xs"} variant="outline" className={proposed ? "h-7 cursor-pointer px-3 disabled:cursor-not-allowed" : "cursor-pointer disabled:cursor-not-allowed"} data-testid="claude-use-all" disabled={busy} onClick={onUse}>Use for everything</Button>;
 }
 
 function AccountRow({ status, busy, labelClassName, onUse }: { status: ClaudeAccountStatus; busy: boolean; labelClassName?: string; onUse: () => void }) {

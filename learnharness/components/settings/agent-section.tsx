@@ -249,7 +249,7 @@ export function AgentSection({
 						onModelsChange(composeSlotModel(models, slot, provider, modelId, level));
 						setOpenMenu(null);
 					};
-					const modelFooter = catalog && catalog.length === 0 ? "No models — sign in to Claude or ChatGPT in Providers" : "Runs every agent of this tier";
+					const modelFooter = catalog && catalog.length === 0 ? "No models — sign in to Claude or ChatGPT in Settings → Accounts" : "Runs every agent of this tier";
 					if (proposed) {
 						const modelTrigger = (
 							<PopoverTrigger asChild>
@@ -336,7 +336,7 @@ export function AgentSection({
 											}}
 											footer={
 												catalog && catalog.length === 0
-													? "No models — sign in to Claude or ChatGPT in Providers"
+													? "No models — sign in to Claude or ChatGPT in Settings → Accounts"
 													: "Runs every agent of this tier"
 											}
 										/>
