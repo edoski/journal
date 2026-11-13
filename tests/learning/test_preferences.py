@@ -103,3 +103,10 @@ def test_effective_preferences_let_the_course_win_per_dimension() -> None:
         "format": "Short",
         "pace": "Course",
     }
+
+
+@pytest.mark.parametrize("dimension", ["daily_topics", "new_topics_on_weekends"])
+def test_the_daily_load_is_learned_never_set(dimension: str) -> None:
+    with pytest.raises(ValueError, match="learned from the record"):
+        preferences.check_engine({dimension: "8"}, "preferences")
+    preferences.check_engine({dimension: None}, "preferences")
