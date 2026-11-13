@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* FullCalendar's structural styles (components/ui/event-calendar-views.tsx),
+   in the base layer so its utilities win over them. */
+@import "@fullcalendar/react/skeleton.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
 
