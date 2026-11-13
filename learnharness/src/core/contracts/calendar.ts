@@ -31,6 +31,9 @@ export interface CalendarCourse extends StudyCourse {
 	planned: readonly PlannedDay[];
 	/** Path topics the plan cannot introduce before the exam. */
 	doesNotFit: readonly TopicHandle[];
+	/** The day the final review before the exam starts, as the plan's
+	 *  `final_review_days` places it; null without an exam. */
+	finalReview: string | null;
 }
 
 /** One study window, "HH:MM" local. */

@@ -1,4 +1,4 @@
-import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, ScheduledDay, TopicHandle } from "@/src/core";
+import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, topicSessions } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -22,11 +22,42 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null; doesNotFit: readonly string[] }
+	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null; doesNotFit: readonly string[]; road: readonly RoadWeek[]; finalReview: string | null }
 	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; action: TopicAction }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
 	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
+
+/** One week of the road to an exam: the days in it that start new topics
+ *  in the engine's daily plan, and those topics' titles in plan order. */
+export interface RoadWeek {
+	from: string;
+	to: string;
+	titles: readonly string[];
+}
+
+/** The Monday of a day's week, YYYY-MM-DD. */
+function weekOf(day: string): string {
+	const date = new Date(`${day}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() - ((date.getUTCDay() + 6) % 7));
+	return date.toISOString().slice(0, 10);
+}
+
+/** The road to an exam: the daily plan's new topics before it, a line per
+ *  week. Pure. */
+export function roadOf(planned: readonly PlannedDay[], exam: string, titleOf: (handle: TopicHandle) => string): RoadWeek[] {
+	const weeks: { key: string; from: string; to: string; titles: string[] }[] = [];
+	for (const day of planned) {
+		if (day.new.length === 0 || day.date >= exam) continue;
+		const key = weekOf(day.date);
+		const last = weeks.at(-1);
+		if (last?.key === key) {
+			last.to = day.date;
+			last.titles.push(...day.new.map(titleOf));
+		} else weeks.push({ key, from: day.date, to: day.date, titles: day.new.map(titleOf) });
+	}
+	return weeks.map(({ from, to, titles }) => ({ from, to, titles }));
+}
 
 /** How an entry reads: its words, one per look, and where it sits in its
  *  day: exams first, then what is due (a new topic, the day's lesson,
@@ -106,10 +137,13 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
-	for (const { map, due, runup, planned, doesNotFit } of shown) {
+	for (const { map, due, runup, planned, doesNotFit, finalReview } of shown) {
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
-		if (map.exam) entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf) });
+		if (map.exam) {
+			const road = roadOf(planned, map.exam.date, titleOf);
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf), road, finalReview });
+		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, topicSessions(chats, map.workspace, topic)) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, ...facts(topic) });
@@ -189,6 +223,21 @@ export function distanceWords(day: string, today: string): string {
 	const span = Math.abs(days);
 	const words = span < 14 ? `${span} days` : `${Math.round(span / 7)} weeks`;
 	return days > 0 ? `In ${words}` : `${words} ago`;
+}
+
+const SHORT = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const short = (day: string) => SHORT.format(new Date(`${day}T00:00:00Z`));
+
+/** A road week's days: "9 to 13 Nov", "30 Nov to 4 Dec", "9 Nov". Pure. */
+export function spanWords({ from, to }: Pick<RoadWeek, "from" | "to">): string {
+	if (from === to) return short(from);
+	const [a, b] = [short(from), short(to)];
+	return a.split(" ")[1] === b.split(" ")[1] ? `${a.split(" ")[0]} to ${b}` : `${a} to ${b}`;
+}
+
+/** When the final review starts: "Final review from 27 Nov". Pure. */
+export function finalReviewWords(day: string): string {
+	return `Final review from ${short(day)}`;
 }
 
 /** The exam run-up in words, as `plan` counts it. */
