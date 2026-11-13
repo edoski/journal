@@ -27,7 +27,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 ## History (`history.tsx`)
 
 - Trail's line restated: day headings (`dayWords`), sessions then attempts per day, the 1px spine in the map's edge ink, attempts as plain entries (`attemptMark`). No "Earlier" fold: the pane scrolls instead.
-- Bounded: `ScrollArea bar={false}` (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
+- Bounded: `ScrollArea bar={false}` (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip, and the titles stay on the head's edge. An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
 - A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `WhyMark` ("Your turn", or the spinner), then for a lesson that planned the map button (`data-slot="topic-map-toggle"`, `WaypointsIcon`, the lesson page's Plan icon, `size="icon-inline"`, `aria-pressed`, hint "Show its steps on the map"). The lesson on the map has its row filled `bg-fill-selected` and its button in ink (`data-shown`).
 
 ## Lesson map (`lesson-map.tsx`)

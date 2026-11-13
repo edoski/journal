@@ -160,8 +160,8 @@ export function History({ days, shown, onShow, titleOf, className }: { days: rea
 	}, [measure]);
 	if (days.length === 0) return null;
 	return (
-		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
-			<ol aria-label="History" className="flex flex-col">
+		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("-mx-3 flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
+			<ol aria-label="History" className="flex flex-col px-3">
 				{days.map((day, i) => (
 					<DayItem key={day.day} day={day} shown={shown} onShow={onShow} titleOf={titleOf} first={i === 0} last={i === days.length - 1} />
 				))}
