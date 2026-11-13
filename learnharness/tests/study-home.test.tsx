@@ -20,13 +20,14 @@ import {
 	todayRows,
 	waitingSessions,
 	studyQuestion,
+	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, spanWords, topicSpan, trackMarks } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
-import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
+import { courseProgress, foldLines, lastStudied, studiedAgo, whyNow, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { ProgressRows } from "../components/study-home/agenda-rows/progress/progress-rows.tsx";
 import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
@@ -304,6 +305,24 @@ describe("agenda's row candidates", () => {
 		assert.equal(whyNow(rowOf(PROB), TODAY), "Next on your map");
 	});
 
+	it("gives each reason a kind and a few words that fit beside its icon", () => {
+		const short = (row: TodayRow) => {
+			const why = whyOf(row, TODAY);
+			return why && [why.kind, why.short];
+		};
+		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
+		assert.deepEqual(short(rowOf(LINALG)), ["review", "2w overdue"]);
+		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "1d overdue"]);
+		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Missed Sequences"]);
+		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "At part (c)"]);
+		assert.deepEqual(short(rowOf(PROB)), ["next", "Next up"]);
+	});
+
+	it("says how long ago a course was studied in a few characters", () => {
+		const ago = (days: number | null) => studiedAgo(rowOf({ ...LINALG, lastActiveDaysAgo: days }));
+		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "2w ago", "8w ago", "2mo ago", null]);
+	});
+
 	it("says when the course was last studied, and how much of it he can do on his own, weak topics left out", () => {
 		assert.equal(lastStudied(rowOf(LINALG)), "Studied 2 days ago");
 		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 1 })), "Studied yesterday");
@@ -346,15 +365,16 @@ describe("agenda's row candidates", () => {
 		plain(doc);
 	});
 
-	it("hybrid: each line has its pie, its course ending in when it was last studied, and its lesson ending in why it is on Today", () => {
+	it("hybrid: each line has its pie, its course ending in how long ago it was studied, and its lesson ending in an icon and a few words for why it is on Today", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear AlgebraStudied 2 days agoEigen lessonWaiting for your reply",
-			"ProbabilityStudied 4 days agoContinue Bayes' ruleNext on your map",
-			"Real AnalysisStudied 11 days agoReview SequencesOverdue by a day",
+			"Linear Algebra2d agoEigen lessonYour turn",
+			"Probability4d agoContinue Bayes' ruleNext up",
+			"Real Analysis11d agoReview Sequences1d overdue",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1]]);
 		plain(doc);
 	});
 });
