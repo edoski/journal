@@ -83,6 +83,25 @@ export function derivedNodeStatus(statuses: DerivedPlanStatuses, nodeId: string)
  *  session for tonight. Its calls feed the same fold as the question tags. */
 export const LESSON_PROGRESS_TOOL = "lesson_progress";
 
+export const lessonProgressInput = Type.Object({
+	done: Type.Array(Type.String({ minLength: 1 }), {
+		description:
+			"REQUIRED — the plan node ids this turn finished teaching (taught, and he showed he has it), or [] when none. They show as done on his map.",
+	}),
+	close: Type.Optional(
+		Type.Boolean({
+			description: "true when this turn ends the session for tonight (your close). Omit otherwise.",
+		}),
+	),
+});
+export type LessonProgressInput = Static<typeof lessonProgressInput>;
+
+/** A recorded lesson_progress call's arguments, read the way the tool
+ *  boundary accepted them (a `done` sent as a JSON string included). */
+export function lessonProgressOf(input: unknown): LessonProgressInput | undefined {
+	return boundaryParse<LessonProgressInput>(lessonProgressInput, input);
+}
+
 /** One tool call, as the fold reads it. */
 interface PlanCall {
 	name: string;
@@ -105,9 +124,8 @@ function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanSt
 			if (current !== null && current !== nodeId) visited.add(current);
 			current = nodeId;
 		} else if (call.name === LESSON_PROGRESS_TOOL) {
-			const done = (call.input as { done?: unknown } | undefined)?.done;
-			for (const id of Array.isArray(done) ? done : []) {
-				if (typeof id !== "string" || !ids.has(id)) continue;
+			for (const id of lessonProgressOf(call.input)?.done ?? []) {
+				if (!ids.has(id)) continue;
 				visited.add(id);
 				if (current === id) current = null;
 			}
@@ -149,6 +167,8 @@ export interface PlanToolResult {
 
 import type { LhMessage } from "../native-messages.ts";
 import { POSITION_QUESTION_TOOLS } from "../question-core.ts";
+import { Type, type Static } from "typebox";
+import { boundaryParse } from "../tool-parts.ts";
 
 /** The same derivation over the NATIVE record: tagged question CALLS only (any state —
  *  a dangling call still moves position; results feed nothing). */

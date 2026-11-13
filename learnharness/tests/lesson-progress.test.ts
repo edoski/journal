@@ -63,6 +63,11 @@ describe("steps the tutor's turn marks done", () => {
 		assert.equal(marked.current, "spectrum-2x2");
 	});
 
+	it("reads a done list the tutor sent as a JSON string, as the tool accepted it", () => {
+		const marked = derivePlanStatusesLh(TREE, [...evening(), ...progress("p1", { done: JSON.stringify(["map", "eigen-def"]) as never })]);
+		assert.ok(marked.visited.has("map") && marked.visited.has("eigen-def"));
+	});
+
 	it("a finished current step stops being current", () => {
 		const marked = derivePlanStatusesLh(TREE, [...evening(), ...progress("p1", { done: ["spectrum-2x2"] })]);
 		assert.equal(marked.current, null);

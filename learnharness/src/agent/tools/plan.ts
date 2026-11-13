@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import { LESSON_PROGRESS_TOOL, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressInput, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import { createTree, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
@@ -57,18 +57,6 @@ const planInitInput = Type.Object({
 			"The only strict rule: ids are permanent lowercase slugs (a-z, 0-9, hyphens/underscores) — checks reference them via nodeId. " +
 			"Titles are free single-line text; `-->` means 'from = prerequisite' (chains fine); no subgraphs, styles, or classes.",
 	}),
-});
-
-const lessonProgressInput = Type.Object({
-	done: Type.Array(Type.String({ minLength: 1 }), {
-		description:
-			"REQUIRED — the plan node ids this turn finished teaching (taught, and he showed he has it), or [] when none. They show as done on his map.",
-	}),
-	close: Type.Optional(
-		Type.Boolean({
-			description: "true when this turn ends the session for tonight (your close). Omit otherwise.",
-		}),
-	),
 });
 
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
