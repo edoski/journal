@@ -34,6 +34,17 @@ describe("turnErrorText", () => {
 		assert.equal(turnErrorText(claude).kind, "written");
 	});
 
+	it("says the app could not be reached when the browser's request never left, with no raw text", () => {
+		for (const raw of ["Failed to fetch", "Load failed", "NetworkError when attempting to fetch resource."]) {
+			assert.deepEqual(turnErrorText(raw), { kind: "offline", sentence: "Couldn't reach the app. Check it's running, then send again.", details: null }, raw);
+		}
+	});
+
+	it("says a lesson deleted elsewhere was deleted, and reads other route errors as their text", () => {
+		assert.deepEqual(turnErrorText('{"error":"Unknown chat"}'), { kind: "gone", sentence: "This lesson was deleted.", details: null });
+		assert.deepEqual(turnErrorText('{"error":"Invalid JSON body"}'), { kind: "failed", sentence: "The reply failed.", details: "Invalid JSON body" });
+	});
+
 	it("falls back to a plain failure for anything else, keeping the raw text", () => {
 		assert.deepEqual(turnErrorText("fetch failed"), { kind: "failed", sentence: "The reply failed.", details: "fetch failed" });
 		assert.equal(turnErrorText('500 {"error":"internal"}').sentence, "The reply failed.");
@@ -52,6 +63,12 @@ describe("TurnError", () => {
 		const buttons = [...doc.querySelectorAll("button")].map((b) => b.textContent);
 		assert.deepEqual(buttons, ["Retry", "Open Settings", "Details"]);
 		assert.equal(doc.querySelector('[data-testid="turn-error-details-toggle"]')?.getAttribute("aria-expanded"), "false");
+	});
+
+	it("offers Home instead of Retry for a deleted lesson", () => {
+		const doc = render('{"error":"Unknown chat"}', () => {});
+		assert.equal(doc.querySelector('[data-testid="turn-error-sentence"]')?.textContent, "This lesson was deleted.");
+		assert.deepEqual([...doc.querySelectorAll("a, button")].map((b) => b.textContent), ["Go to Home"]);
 	});
 
 	it("offers neither Settings nor Details when the message is already plain, and no Retry when it cannot run", () => {

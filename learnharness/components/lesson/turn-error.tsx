@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,8 @@ const ACTION = "h-8 px-2 text-row";
 
 /** A failed reply under the Proposed design (spec: turn-error.md): one plain
  *  sentence in the danger colour, then Retry, Open Settings for a rejected
- *  key, and Details for the provider's own text. */
+ *  key, Home for a lesson deleted elsewhere, and Details for the provider's
+ *  own text. */
 export function TurnError({ message, onRetry, onOpenSettings, children }: {
 	message: string;
 	/** Present while the failed turn can be retried. */
@@ -25,7 +27,7 @@ export function TurnError({ message, onRetry, onOpenSettings, children }: {
 		<div role="alert" data-testid="turn-error" data-kind={text.kind} className="flex flex-wrap items-center gap-1 text-row">
 			<span data-testid="turn-error-sentence" className="mr-2 min-w-0 text-danger">{text.sentence}</span>
 			{children}
-			{onRetry && (
+			{onRetry && text.kind !== "gone" && (
 				<Button variant="quiet" size="sm" data-testid="retry-failed-turn" onClick={onRetry} className={cn(ACTION, "font-medium text-foreground")}>
 					Retry
 				</Button>
@@ -33,6 +35,11 @@ export function TurnError({ message, onRetry, onOpenSettings, children }: {
 			{text.kind === "key" && (
 				<Button variant="quiet" size="sm" data-testid="turn-error-settings" onClick={onOpenSettings} className={cn(ACTION, "text-muted-foreground")}>
 					Open Settings
+				</Button>
+			)}
+			{text.kind === "gone" && (
+				<Button asChild variant="quiet" size="sm" data-testid="turn-error-home" className={cn(ACTION, "font-medium text-foreground")}>
+					<Link href="/">Go to Home</Link>
 				</Button>
 			)}
 			{text.details !== null && (
