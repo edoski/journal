@@ -250,6 +250,32 @@ def test_a_miss_after_the_final_review_is_relearned_before_the_exam() -> None:
     ]
 
 
+def test_setting_an_exam_pulls_every_engine_date_before_it() -> None:
+    record = course(introduced=day(-27))
+    for offset in (-26, -23, -16, 0):
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=offset)]},
+            TODAY + timedelta(days=offset),
+        )
+    assert record["topics"]["rank"]["review"]["due"] == day(35)
+    moved, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert moved["topics"]["rank"]["review"] == {"due": day(14), "by": "engine"}
+    assert scheduled.notes == [f"rank: review moved to {day(14)}, after the exam moved"]
+    back, _ = save(moved, {"exam": None})
+    assert back["topics"]["rank"]["review"] == record["topics"]["rank"]["review"]
+    again, scheduled = save(moved, {"exam": {"date": day(20)}})
+    assert again == moved and scheduled.reviews == {}
+
+
+def test_a_tutor_date_after_a_moved_exam_goes_to_the_engine() -> None:
+    record = course(introduced=day(-3), review={"due": day(30)})
+    record, _ = save(record, {"exam": {"date": day(40)}})
+    assert record["topics"]["rank"]["review"]["by"] == "tutor"
+    record, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert record["topics"]["rank"]["review"] == {"due": day(-2), "by": "engine"}
+
+
 def test_the_final_review_lead_is_a_course_preference() -> None:
     record = course(introduced=day(-40))
     record, _ = save(record, {"exam": {"date": day(20)}})
@@ -260,6 +286,9 @@ def test_the_final_review_lead_is_a_course_preference() -> None:
         TODAY + timedelta(days=3),
     )
     assert record["topics"]["rank"]["review"]["due"] == day(10)
+    record, scheduled = save(record, {"preferences": {"final_review_days": "14"}})
+    assert record["topics"]["rank"]["review"]["due"] == day(6)
+    assert scheduled.notes == [f"rank: review moved to {day(6)}, after the exam moved"]
     with pytest.raises(ValueError, match="belongs to one course"):
         schema.check_patch({"global_preferences": {"final_review_days": "5"}})
     with pytest.raises(ValueError, match="whole number from 1 to 14"):

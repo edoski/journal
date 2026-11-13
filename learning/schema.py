@@ -312,6 +312,7 @@ class PatchResult:
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
+    exam_moved: bool = False
 
 
 # --- messages ---------------------------------------------------------------
@@ -1303,6 +1304,14 @@ def _append_observations(
     record["next_observation"] = sequence
 
 
+def _exam_plan(record: dict[str, Any]) -> tuple[Any, Any]:
+    """What review dates hang on: the exam day and the course's final-review lead."""
+    return (
+        record.get("exam", {}).get("date"),
+        record.get("preferences", {}).get(preferences.FINAL_REVIEW_DAYS),
+    )
+
+
 def apply_patch(
     record: dict[str, Any], patch: dict[str, Any], *, today: date, now: str
 ) -> tuple[dict[str, Any], PatchResult]:
@@ -1370,4 +1379,5 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
+    outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
     return validate_record(result), outcome

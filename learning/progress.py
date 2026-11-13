@@ -373,6 +373,37 @@ def _clamp_tutor_dates(
 _NONE_BEFORE_EXAM = "no review before the exam; its final review is done"
 
 
+def _resync(
+    record: dict[str, Any],
+    histories: dict[str, _History],
+    today: date,
+    scheduled: Scheduled,
+) -> None:
+    """Re-derive every engine date after the exam or its final review moved.
+
+    Each engine date becomes the replayed one, so moving the exam and moving
+    it back restores the dates. A tutor date on or after an exam still ahead is
+    handed to the engine.
+    """
+    exam = exam_plan(record)
+    for key, topic in list(record["topics"].items()):
+        review = topic.get("review", {})
+        stored = review.get("due")
+        if review.get("by") == "tutor" and not (
+            exam is not None and exam.day > today and stored >= exam.day.isoformat()
+        ):
+            continue
+        target = replay(topic, histories.get(key, _History()).attempts, exam).due
+        if target is not None and target.isoformat() != stored:
+            scheduled.reviews[key] = _with_review(record, key, target, "engine")
+            scheduled.notes.append(
+                f"{key}: review moved to {target.isoformat()}, after the exam moved"
+            )
+        elif target is None and stored is not None:
+            _clear_due(record, key)
+            scheduled.notes.append(f"{key}: {_NONE_BEFORE_EXAM}")
+
+
 def _attempt_ids(history: _History) -> list[str]:
     return [key for key, _ in history.attempts]
 
@@ -507,6 +538,7 @@ def schedule(
 ) -> tuple[dict[str, Any], Scheduled]:
     """Apply a save's engine consequences; returns the new record and what moved.
 
+    A save that moves the exam or its final review re-derives every engine date.
     Tutor-set dates on or after the exam move to the day before it. A topic whose
     verdicts this save created or changed is due on its next expected review day,
     unless the same patch dated its review; a practice day leaves the date alone
@@ -518,6 +550,8 @@ def schedule(
     result = {**record, "topics": dict(record["topics"])}
     scheduled = Scheduled()
     histories = _histories(result["observations"])
+    if changes.exam_moved:
+        _resync(result, histories, today, scheduled)
     _clamp_tutor_dates(result, changes, today, scheduled)
     _reschedule(result, changes, histories, scheduled)
     _first_retrievals(result, changes, histories, scheduled)
