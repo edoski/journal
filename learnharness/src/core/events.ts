@@ -36,6 +36,9 @@ export interface ServerEvents {
 	"jobs-changed": { chatId?: string };
 	/** An extraction run changed phase (activity dock). */
 	"activity-changed": Record<string, never>;
+	/** A merged extraction batch covered more of the chat's messages: its
+	 *  coverage ring and menu block re-read, batch by batch. */
+	"coverage-changed": { chatId: string };
 	/** The session list changed (create, delete, title). */
 	"chats-changed": Record<string, never>;
 	/** The course list changed: a course was created, renamed or deleted. */
@@ -68,6 +71,7 @@ export const SERVER_EVENT_TYPES = [
 	"turn-settled",
 	"jobs-changed",
 	"activity-changed",
+	"coverage-changed",
 	"chats-changed",
 	"courses-changed",
 	"course-changed",

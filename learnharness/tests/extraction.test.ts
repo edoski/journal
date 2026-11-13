@@ -1164,10 +1164,16 @@ describe("message anchors (session propositions carry their passage's id)", () =
 			// own turn budget, not the auditor's).
 			auditor: fauxEngine([passThroughAuditStep(), passThroughAuditStep()]),
 		});
+		const announced: number[] = [];
+		const stop = subscribe((e) => {
+			if (e.type === "coverage-changed" && e.chatId === chatId) announced.push(ledgers.readCoverage().length);
+		});
 		assert.deepEqual(await pipeline.runExtraction(chatId), { nodes: 2, chains: 0 });
+		stop();
 		const anchors = ledgers.readNodes().map((n) => n.provenance[0]!.messageId).sort();
 		assert.deepEqual(anchors, ["a2", "a4"], "each job's node anchors INSIDE its own batch — never a5");
 		assert.equal(ledgers.readCoverage().length, 5, "both batches checkpointed");
+		assert.deepEqual(announced, [3, 5], "each batch's checkpoint is announced as it lands");
 	});
 
 	it("a LINK-APPEND carries its proposition's anchor into the existing node's provenance", async () => {

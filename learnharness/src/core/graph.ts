@@ -68,6 +68,7 @@ import { MIN_CLUSTER_SIZE } from "./clusters.ts";
 import { formatChainLine } from "./chains.ts";
 import { attachImpToCommunities, birthSessionOf, birthSessionPartition } from "./session-clusters.ts";
 import type { ChatStore, GraphStore } from "./ports.ts";
+import { emit } from "./events.ts";
 
 /** The storage ports every graph operation needs, passed explicitly. */
 export interface GraphDeps {
@@ -282,6 +283,7 @@ export function mergeFindings(
 	//    checkpoint (a file is one shot).
 	if (source.coverage !== undefined) {
 		for (const entry of source.coverage) ledgers.appendCoverage(entry);
+		emit("coverage-changed", { chatId });
 	} else {
 		ledgers.appendCheckpoint({ chatId, foldedAt: source.foldedAt });
 	}
