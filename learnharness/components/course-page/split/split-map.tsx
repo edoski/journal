@@ -5,7 +5,8 @@ import type { CourseMap, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import type { TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { mapFade } from "@/components/study-home/map-frame";
-import { boxesOf, fadeAcross, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
+import { besideRow, boxesOf, fadeAcross, scrollOn, surfaceOf, topicAt, type Scroll, type Size } from "@/components/course-page/split/split-tie";
+import { useTieAnchor } from "@/components/linked-columns/linked-columns";
 
 /** What the page asks of the map: focus a topic's node. */
 export interface SplitMapHandle {
@@ -69,11 +70,12 @@ export function SplitMap({
 }) {
 	const root = useRef<HTMLElement>(null);
 	const scroller = useRef<HTMLDivElement>(null);
+	const tieAnchor = useTieAnchor();
 	const pointed = useRef<TopicHandle | null>(null);
 	const glide = useRef(0);
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
-	const surface = surfaceOf(layout, pane, FADE, TAG_ROOM);
+	const surface = surfaceOf(layout, pane, FADE, TAG_ROOM, tieAnchor !== null);
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
@@ -83,13 +85,16 @@ export function SplitMap({
 		onPoint(handle);
 	};
 
-	/** Scrolls the pane to show a topic: at once for the opening view, else over 200ms (at once under reduced motion). */
+	/** Scrolls the pane to show a topic: at once for the opening view, else over 200ms (at once under reduced motion).
+	 *  A topic a row points at also comes beside that row when the tie's line would otherwise have no clear route. */
 	const show = useCallback(
 		(handle: TopicHandle, settle: "near" | "centre") => {
 			const el = scroller.current;
 			if (!el || el.clientWidth === 0) return;
 			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
-			const to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade, settle);
+			let to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade, settle);
+			const anchor = settle === "near" ? tieAnchor?.() : null;
+			if (anchor) to = besideRow(boxes, handle, anchor, to ?? view, { ...view, maxTop: el.scrollHeight - el.clientHeight }, fade, map.current) ?? to;
 			cancelAnimationFrame(glide.current);
 			if (!to) return;
 			if (settle === "centre" || reducedMotion()) return el.scrollTo(to);
@@ -103,7 +108,7 @@ export function SplitMap({
 			};
 			glide.current = requestAnimationFrame(step);
 		},
-		[boxes, fade],
+		[boxes, fade, tieAnchor, map.current],
 	);
 
 	// The pane's size sets the surface's width and where it opens.
@@ -186,7 +191,7 @@ export function SplitMap({
 			ref={root}
 			aria-label={`${map.title} map`}
 			data-slot="course-split-map"
-			className="relative min-h-0"
+			className="relative min-h-0 flex-1"
 			style={mapFade(fade.x, fade.y)}
 			onPointerOver={(e) => point(topicAt(e.target))}
 			onPointerLeave={() => point(null)}

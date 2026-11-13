@@ -83,6 +83,7 @@ export function CourseTopicRow({
 				onClick={blurAfterPointerClick}
 				data-slot="course-topic-row"
 				data-group={row.group}
+				data-topic={row.topic.handle}
 				data-highlighted={highlighted || undefined}
 				aria-current={row.current ? "location" : undefined}
 				className={cn(

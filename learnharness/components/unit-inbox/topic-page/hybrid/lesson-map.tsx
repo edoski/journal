@@ -4,13 +4,15 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
 import type { TopicHandle } from "@/src/core";
 import { NeedEdge, type NeedFlowEdge } from "@/components/course-map/topic-map/need-edge";
-import { MIN_ZOOM, NODE_HEIGHT, NODE_WIDTH, cameraAt, centreOf, chainOf, isWalkKey, neighbourOf, openingCamera, wholeZoom } from "@/components/course-map/topic-map/topic-map-layout";
+import { MIN_ZOOM, NODE_HEIGHT, NODE_WIDTH, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbourOf, openingCamera, wholeZoom } from "@/components/course-map/topic-map/topic-map-layout";
 import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
 import { mapFade } from "@/components/study-home/map-frame";
 import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
 import { stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
+import { useTieAnchor } from "@/components/linked-columns/linked-columns";
+import { clearShift, tieShifts, type Box } from "@/components/linked-columns/tie-route";
 import { mathPlain } from "@/components/ui/math-text";
 
 const nodeTypes = { step: StepNode };
@@ -37,7 +39,10 @@ function reducedMotion(): boolean {
  * pans inside it by wheel, trackpad or drag, with no bar. It opens on the
  * whole plan when that fits at three quarters size or more, else at full
  * size on the step the lesson stopped on. That step is ringed, the steps
- * right after it say Next, and every step opens the lesson.
+ * right after it say Next, and every step opens the lesson. In the linked
+ * columns, while a line ties the lesson's row to that step, the plan opens
+ * moved up or down so the step sits beside its row whenever the line
+ * would otherwise have no clear route (`clearShift`).
  */
 export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string }) {
 	const { plan } = entry;
@@ -116,7 +121,19 @@ export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string
 	);
 }
 
-function Flow({ drawing, nodes, edges, current, caption }: { drawing: StepsDrawing; nodes: StepFlowNode[]; edges: NeedFlowEdge[]; current: TopicHandle | null; caption: string }) {
+function Flow({
+	drawing,
+	nodes,
+	edges,
+	current,
+	caption,
+}: {
+	drawing: StepsDrawing;
+	nodes: StepFlowNode[];
+	edges: NeedFlowEdge[];
+	current: TopicHandle | null;
+	caption: string;
+}) {
 	const { layout, needs } = drawing;
 	const captionId = useId();
 	const flow = useReactFlow<StepFlowNode, NeedFlowEdge>();
@@ -128,22 +145,50 @@ function Flow({ drawing, nodes, edges, current, caption }: { drawing: StepsDrawi
 	const links = useRef(new Map<TopicHandle, HTMLAnchorElement>());
 	const lit = useMemo(() => (active ? chainOf(active, needs) : null), [active, needs]);
 
-	const extent = useMemo<CoordinateExtent>(
-		() => [
-			[-MARGIN.x, -MARGIN.y],
-			[layout.width + MARGIN.x, layout.height + MARGIN.y],
-		],
-		[layout],
-	);
+	const tieAnchor = useTieAnchor();
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	const minZoom = frame ? Math.max(MIN_ZOOM, Math.min(1, wholeZoom(layout, frame, MARGIN))) : 1;
 
 	// The camera returns to its opening view whenever the frame grows or shrinks.
-	const [placed, setPlaced] = useState(false);
+	const [opening, setOpening] = useState<Camera | null>(null);
 	useEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
-		void flow.setViewport(openingCamera(layout, current, { width: frameWidth, height: frameHeight }, MARGIN)).then(() => setPlaced(true));
-	}, [flow, layout, current, frameWidth, frameHeight]);
+		const camera = openingCamera(layout, current, { width: frameWidth, height: frameHeight }, MARGIN);
+		const at = current ? layout.topics.get(current) : undefined;
+		const anchor = tieAnchor?.();
+		if (anchor && at) {
+			// The step its row is tied to moves beside the row when that gives the line a clear route, staying clear of the fade.
+			const onScreen = (x: number, y: number, width: number, height: number): Box => ({ left: x * camera.zoom + camera.x, top: y * camera.zoom + camera.y, right: (x + width) * camera.zoom + camera.x, bottom: (y + height) * camera.zoom + camera.y });
+			const to = onScreen(at.x, at.y, NODE_WIDTH, NODE_HEIGHT);
+			const obstacles = nodes.flatMap((node) => {
+				const box = node.id === current ? [] : [onScreen(node.position.x, node.position.y, NODE_WIDTH, NODE_HEIGHT)];
+				return node.data.tag || node.data.status === "current" ? [...box, onScreen(node.position.x, node.position.y - TAG_ROOM, NODE_WIDTH / 2, 14)] : box;
+			});
+			const keepsInView = (dy: number) => to.top + dy >= FADE.y + TAG_ROOM && to.bottom + dy <= frameHeight - FADE.y;
+			const dy = clearShift({ ...anchor, to, obstacles }, tieShifts(anchor.from, to).filter(keepsInView));
+			if (dy) camera.y += dy;
+		}
+		setOpening(camera);
+	}, [layout, current, frameWidth, frameHeight, tieAnchor, nodes]);
+
+	// The plan and its room, and whatever more the opening view shows when it moved the plan beside its row.
+	const extent = useMemo<CoordinateExtent>(() => {
+		const base: CoordinateExtent = [
+			[-MARGIN.x, -MARGIN.y],
+			[layout.width + MARGIN.x, layout.height + MARGIN.y],
+		];
+		if (!opening || frameHeight <= 0) return base;
+		return [
+			[base[0][0], Math.min(base[0][1], -opening.y / opening.zoom)],
+			[base[1][0], Math.max(base[1][1], (frameHeight - opening.y) / opening.zoom)],
+		];
+	}, [layout, opening, frameHeight]);
+
+	// Set once the extent above holds the view, so the camera is not pulled back inside the plan's own room.
+	const [placed, setPlaced] = useState(false);
+	useEffect(() => {
+		if (opening) void flow.setViewport(opening).then(() => setPlaced(true));
+	}, [flow, opening]);
 
 	/** Brings a step the keyboard reached into view, when part of it is out of the frame. */
 	const follow = useCallback(

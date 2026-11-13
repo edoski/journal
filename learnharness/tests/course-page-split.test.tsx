@@ -16,7 +16,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { aimOf, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOn, scrollToShow, shownGroups, slackOf, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { aimOf, besideRow, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOn, scrollToShow, shownGroups, slackOf, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -215,6 +215,27 @@ describe("the map pane's surface and where it scrolls", () => {
 		assert.ok(surface.zoom > 0.8 && surface.zoom < 0.84, String(surface.zoom));
 		assert.equal(surface.height, Math.floor((304 + 104) * surface.zoom));
 		assert.equal(surfaceOf({ ...layout, width: 2000 }, { width: 696, height: 692 }, room, 20).zoom, 1, "below 75% it stays at 100% and scrolls");
+	});
+
+	it("keeps the pane's height of room above and below while the tie is drawn, so any topic can scroll beside its row", () => {
+		const layout = { ...LAYOUT, width: 744, height: 304 };
+		const plain = surfaceOf(layout, { width: 696, height: 692 }, room, 20);
+		assert.equal(surfaceOf(layout, { width: 696, height: 692 }, room, 20, true).height, plain.height + 692 * 2);
+	});
+
+	it("scrolls a pointed topic beside its row only when the line would have no clear route, by the least it can", () => {
+		// Two topics side by side on one layer; the row points at the right one from level with them, so the left one blocks the left edge.
+		const boxes = new Map<TopicHandle, Box>([
+			[h("left"), { x: 100, y: 600, width: 248, height: 56 }],
+			[h("right"), { x: 372, y: 600, width: 248, height: 56 }],
+		]);
+		const view = { left: 0, top: 400, width: 700, height: 700, maxTop: 2000 };
+		const anchor = { from: { x: -12, y: 228 }, gutter: { left: -24, right: 0 } };
+		const to = besideRow(boxes, h("right"), anchor, view, view, { x: 48, y: 32 }, null)!;
+		assert.ok(to, "it moves");
+		const top = boxes.get(h("right"))!.y - to.top;
+		assert.ok(Math.abs(top - (228 + 38)) < 1 || Math.abs(top + 56 - (228 - 18)) < 1, `the row in the channel just above or below the topic, at ${top}`);
+		assert.equal(besideRow(new Map([[h("right"), boxes.get(h("right"))!]]), h("right"), anchor, view, view, { x: 48, y: 32 }, null), null, "already clear: it stays");
 	});
 
 	it("places each topic where the map draws it: the course in the surface's middle", () => {

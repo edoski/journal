@@ -18,7 +18,7 @@ Column `max-w-[60rem]` (`HYBRID_COLUMN`, which the error line under it shares), 
 | Block | Shown when | Size |
 |---|---|---|
 | `TopicHead` (shared), no button: Now holds the action | always | its own height |
-| `data-slot="topic-panes"`: two columns the full height under the head, the history on the left up to 24rem, the map filling the rest on the right, 24px apart (`grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
+| `data-slot="topic-panes"`: the app's linked columns (`../../../linked-columns/linked-columns.md`, which the course page shares), the full height under the head, the history on the left up to 24rem, the map filling the rest on the right, 24px apart, nothing around them, and a line in the map's edge ink from the lesson on the map's row to the step it stopped on (the Link switch, Connected unless he picks Current). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
 | The history alone, the column's width | no session planned | fills |
 
 Measured at 1440x900 and 1280x720 with the sidebar open: the document is the window's height, and only the two panes scroll.
@@ -32,7 +32,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 ## Lesson map (`lesson-map.tsx`)
 
 - Home's course map frame: the pane keeps its size, `mapFade(64, 40)` on every edge, room around the drawing as much as the fade (plus 20 for a tag), wheel and trackpad pan inside (`panOnScroll`), drag pans, pinch zooms between `MIN_ZOOM` and full size, no bars, no controls.
-- Opens on the whole plan when it fits at 75% or more, else full size on the step the lesson stopped on (`openingCamera`). Fades in once placed (180ms); a new lesson mounts a new map with the same fade.
+- Opens on the whole plan when it fits at 75% or more, else full size on the step the lesson stopped on (`openingCamera`). While the line ties its row to that step, it opens moved up or down by the least that gives the line a clear route, beside the row (`clearShift`), so on the eigen lesson the step it stopped on sits level with Now and the steps before it sit above, a pan away. Fades in once placed (180ms); a new lesson mounts a new map with the same fade.
 - Steps are `StepNode` (`../steps/step-node.tsx`) on `stepsLayout`, marked by `hybridMarks`: the steps tab's marks, plus "Next" over each step that rests on the one it stopped on and no question was about yet. "Left off here" over the step a lesson that waits on nobody stopped on. Keyboard, hover chain and caption as the steps map.
 
 ## Math

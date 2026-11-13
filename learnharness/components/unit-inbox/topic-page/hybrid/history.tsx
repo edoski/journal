@@ -109,8 +109,8 @@ export function SessionItem({
 				className={cn(
 					"col-span-full row-start-1 -mx-3 grid h-10 grid-cols-subgrid items-center gap-x-4 rounded-lg px-3 text-left font-normal whitespace-normal",
 					shown && "bg-fill-selected hover:bg-fill-selected",
-					// Link: flush to the split's hairline; ringed while the connected map's step is pointed at.
-					"in-data-[link=split]:rounded-none in-data-[lit]:in-data-shown:ring-1 in-data-[lit]:in-data-shown:ring-ring/60 in-data-[lit]:in-data-shown:ring-inset",
+					// Linked columns: ringed while the tie's step on the map is pointed at.
+					"in-data-[lit]:in-data-shown:ring-1 in-data-[lit]:in-data-shown:ring-ring/60 in-data-[lit]:in-data-shown:ring-inset",
 				)}
 			>
 				<Link href={`/chat/${chat.id}`}>

@@ -1,6 +1,5 @@
 "use client";
 
-import type { ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -9,7 +8,6 @@ import { topicSessions } from "@/components/unit-inbox/units";
 import { HYBRID_COLUMN, HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
-import type { PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
 
 /** What the page's body takes. */
 export interface TopicPageProps {
@@ -30,14 +28,14 @@ export interface TopicPageProps {
  * topic read has answered, so nothing shifts in afterwards.
  */
 export function TopicPage({
-	link,
+	connected,
 	course,
 	topic,
 	chats,
 	initialConfigured,
 }: {
-	/** A Link option's way of tying the history pane to the map. */
-	link?: ComponentType<PanesProps>;
+	/** The Link switch: whether a line ties the lesson's row to its step. */
+	connected?: boolean;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
@@ -64,7 +62,7 @@ export function TopicPage({
 	};
 	return (
 		<>
-			<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} panes={link} />
+			<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} connected={connected} />
 			{lesson.error && (
 				<p role="alert" className={`mx-auto w-full px-6 pb-4 text-row text-danger ${HYBRID_COLUMN}`}>
 					{lesson.error}

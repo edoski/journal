@@ -113,7 +113,8 @@ describe("the hybrid page drawn", () => {
 		assert.equal(document.querySelector('[data-testid="unit-page"]')!.getAttribute("data-topic-candidate"), "hybrid");
 		assert.equal(document.querySelector('[data-testid="topic-action"]'), null);
 		const panes = document.querySelector('[data-slot="topic-panes"]')!;
-		assert.deepEqual([...panes.children].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
+		assert.deepEqual([...panes.querySelectorAll(":scope > div > [data-slot]")].map((pane) => pane.getAttribute("data-slot")), ["topic-history", "topic-lesson-map"]);
+		assert.ok(panes.querySelector('[data-slot="linked-tie"]'), "the lesson's row tied to its step (Link: Connected, the default)");
 		const steps = [...document.querySelectorAll('[data-slot="topic-step"]')];
 		assert.equal(steps.length, 7);
 		assert.ok(steps.every((step) => step.getAttribute("href") === "/chat/chat_demo_eigen"));

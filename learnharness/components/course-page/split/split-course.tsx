@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { LinkedColumns, type Tie } from "@/components/linked-columns/linked-columns";
+import { useLinkVariant } from "@/components/design-variant";
 import type { TopicHandle } from "@/src/core";
 import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { CourseFrame } from "@/components/course-page/course-frame";
@@ -8,7 +10,7 @@ import { CourseHeader } from "@/components/course-page/course-header";
 import type { CourseView } from "@/components/course-page/course-model";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
-import { aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/components/course-page/split/split-tie";
+import { aimOf, litOf, markedOf, revealOf, shownGroups, tieOf, type Pointed } from "@/components/course-page/split/split-tie";
 
 /**
  * The course page candidate "split" (spec: split-course.md): the shared
@@ -33,6 +35,9 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, TOPIC_NODE_SIZE), [map.topics, map.edges]);
 	const aim = useMemo(() => aimOf(view.next.lesson.topics, groups, layout), [view.next.lesson.topics, groups, layout]);
 	const lit = useMemo(() => litOf(pointed, map.edges), [pointed, map.edges]);
+	const handle = pointed?.handle ?? null;
+	const tie = useMemo<Tie | null>(() => (handle ? tieOf(handle) : null), [handle]);
+	const connected = useLinkVariant() === "connected";
 	const headerBox = useRef<HTMLDivElement>(null);
 	const list = useRef<SplitListHandle>(null);
 	const drawing = useRef<SplitMapHandle>(null);
@@ -64,26 +69,33 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 					Topics appear as you study this course.
 				</p>
 			) : (
-				<div data-slot="course-split" className="grid min-h-0 flex-1 grid-cols-[clamp(20rem,36%,25rem)_minmax(0,1fr)] gap-6">
-					<SplitList
-						ref={list}
-						groups={groups}
-						marked={markedOf(pointed)}
-						onPoint={pointFrom("list")}
-						onEnterMap={(handle) => drawing.current?.focus(handle)}
-						onExitTop={() => action()?.focus()}
-					/>
-					<SplitMap
-						ref={drawing}
-						map={map}
-						layout={layout}
-						lit={lit}
-						aim={aim}
-						reveal={revealOf(pointed)}
-						onPoint={pointFrom("map")}
-						onLeave={(handle) => list.current?.focus(handle)}
-					/>
-				</div>
+				<LinkedColumns
+					data-slot="course-split"
+					connected={connected}
+					tie={tie}
+					list={
+						<SplitList
+							ref={list}
+							groups={groups}
+							marked={markedOf(pointed)}
+							onPoint={pointFrom("list")}
+							onEnterMap={(to) => drawing.current?.focus(to)}
+							onExitTop={() => action()?.focus()}
+						/>
+					}
+					map={
+						<SplitMap
+							ref={drawing}
+							map={map}
+							layout={layout}
+							lit={lit}
+							aim={aim}
+							reveal={revealOf(pointed)}
+							onPoint={pointFrom("map")}
+							onLeave={(to) => list.current?.focus(to)}
+						/>
+					}
+				/>
 			)}
 		</>
 	);

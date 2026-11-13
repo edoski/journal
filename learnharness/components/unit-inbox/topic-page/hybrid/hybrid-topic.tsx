@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
@@ -8,12 +8,15 @@ import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-pa
 import type { Press, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
-import { PlainPanes, type PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
+import { LinkedColumns, type Tie } from "@/components/linked-columns/linked-columns";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
 
 /** The hybrid page's column, which its error line shares: wide enough
  *  for the history beside a map two steps wide plus the frame's fade. */
 export const HYBRID_COLUMN = "max-w-[60rem]";
+
+/** The step the lesson on the map stopped on, which its row is tied to. */
+const TIED_STEP = '[data-slot="topic-step"][aria-current="step"]';
 
 /** What the history pane is given (`../pickup/pickup.md`). */
 export interface HybridPaneProps {
@@ -36,21 +39,29 @@ export interface HybridPaneProps {
  * full height under it: the topic's history sorted into Pick up's sections
  * on the left, which holds the page's action, and the steps of the lesson
  * picked in it as a map on the right, since a lesson's steps run down with
- * little branching. With no lesson that planned, the history takes the
- * width. `panes` (a Link option) is how the two are tied; plain side by
- * side by default.
+ * little branching, in the app's linked columns. With no lesson that
+ * planned, the history takes the width. `connected` (the Link switch)
+ * draws the line from the lesson's row to the step it stopped on.
  */
-export function HybridTopic({ facts, busy, onAct, onTask, panes: Panes = PlainPanes }: TopicPageProps & { panes?: ComponentType<PanesProps> }) {
+export function HybridTopic({ facts, busy, onAct, onTask, connected = true }: TopicPageProps & { connected?: boolean }) {
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
 	const shown = planned.find((entry) => entry.chat.id === chosen) ?? planned.find((entry) => entry.chat.id === mapLessonAtFirst(facts.sessions, facts.action)) ?? null;
+	const shownId = shown?.chat.id ?? null;
+	const tie = useMemo<Tie | null>(() => (shownId ? { key: shownId, row: "[data-shown]", node: TIED_STEP } : null), [shownId]);
 	const side = (className?: string) => <SectionsPane facts={facts} busy={busy} onAct={onAct} onTask={onTask} shown={shown?.chat.id ?? null} onShow={setChosen} className={className} />;
 	return (
 		<div data-testid="unit-page" data-topic-candidate="hybrid" className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pb-6 pt-6", HYBRID_COLUMN)}>
 			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
 			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }} />
 			{shown ? (
-				<Panes side={side()} map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />} />
+				<LinkedColumns
+					data-slot="topic-panes"
+					connected={connected}
+					tie={tie}
+					list={side("flex-1")}
+					map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />}
+				/>
 			) : (
 				side("flex-1")
 			)}

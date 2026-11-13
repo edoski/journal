@@ -142,7 +142,7 @@ export function SplitList({
 	};
 
 	return (
-		<section aria-label="Topics" data-slot="course-split-list" className="flex min-h-0 flex-col">
+		<section aria-label="Topics" data-slot="course-split-list" className="flex min-h-0 flex-1 flex-col">
 			{/* The rows' hover fill and focus ring reach 12px past the column; the pane makes room for them. */}
 			<div
 				ref={viewport}

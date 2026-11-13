@@ -6,7 +6,6 @@ import { useServerEvent } from "@/components/server-events";
 import { SidebarToggle } from "@/components/sidebar";
 import { useLinkVariant } from "@/components/design-variant";
 import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
-import { LINK_PANES } from "@/components/unit-inbox/topic-page/link/link-options";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
@@ -52,9 +51,7 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				<SidebarToggle />
 			</header>
 			{read.status === "ready" && topic ? (
-				<TopicPage
-					link={link !== "current" ? LINK_PANES[link] : undefined}
-					course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				<TopicPage connected={link === "connected"} course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
 			) : (
 				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">
 					{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}
