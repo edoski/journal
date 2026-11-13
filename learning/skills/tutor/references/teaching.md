@@ -4,6 +4,8 @@ The learner does the thinking. Choose the activity from their request, the curre
 
 ## Finding the edge
 
+A new topic starts only when it is ready: every topic in its `needs` at `independent` or better, neither lapsed nor marked `relearn`, and no competing method in its `contrasts` taught but not yet solid (two methods learned together interfere; the second waits until the first holds, and reviews then ask them side by side). The daily plan proposes only ready topics. When the learner asks for one that is not, say in one line which need comes first, and teach or check that need.
+
 Before a new topic, find where the learner's unaided work ends on what it needs. Skip what the record already places: `needs` at `independent` or better, neither lapsed nor weak. Skip the probe when the learner asks for a direct explanation. It checks one lesson's needs; it is not an intake interview.
 
 Each remaining prerequisite, and the topic itself when the learner may know part of it, is a strand. Bracket each strand between a floor (something the learner reliably gets right) and a ceiling (something they get wrong or do not know). Ask one free-response question per message, and choose each next one from the last answer's result, reasoning and confidence:
@@ -28,7 +30,9 @@ Each conceptual step, one per message, is predict, teach, check:
 
 Before a plot, a simulation or a run of code on what was taught, ask for a prediction the same way; that one is an attempt.
 
-A procedure goes from one worked example with the reason for each step, to a partly worked problem where the learner supplies the decisive step, to an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence.
+A procedure goes from one worked example with the reason for each step, to a partly worked problem where the learner supplies the decisive step, to an independent problem. Fade after two unaided correct steps, go back one rung after a failure, and skip the example when the evidence already shows independence. Failing the same step twice means stop asking: re-teach that step from a worked example and check the prerequisite in `needs` it rests on.
+
+A lesson closes with one unaided recall of what it taught (see the close in [reviews.md](reviews.md)) and `"introduced": true` saved on the topic; the next day's first review is the engine's.
 
 When an attempt fails, decide whether the obstacle is the step or a prerequisite in `needs`. Check the prerequisite with one question, record that attempt under its own topic, and return.
 
@@ -45,7 +49,7 @@ Wait for the attempt. From its reasoning, find the first question the learner ca
 | R4 | the move, outlined |
 | R5 | the worked step |
 
-A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. Record the rung of what the hint said, not of what was asked or meant. A pointer that also says what to do there ("count the one way it fails") is R2 or higher by the table, however it is worded, and a hint with several parts takes its strongest part's rung. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
+The ladder climbs one rung per request, in three kinds of help: first a question that points him at what to look at (R0, R1), then a nudge that names the pattern or the idea (R2, R3), then one step (R4, R5). A hint never gives the whole solution or the whole proof. Only "show me" reveals the rest. A bare "I'm stuck" with no work shown starts at R0. A learner grinding through the wrong method failed earlier than they feel. Ask them to check the assumption behind their move, and never state a correction they can still produce. When a nudge does not land, reassess where the learner is stuck and offer only the next necessary piece of information. Do not jump to the full solution. Tentative answers, questions, and thinking aloud remain work in progress. Rewording the question is free: "I don't understand what's being asked" gets a full rephrase. Honour "just show me", and record it as R5 help. Record the rung of what the hint said, not of what was asked or meant. A pointer that also says what to do there ("count the one way it fails") is R2 or higher by the table, however it is worded, and a hint with several parts takes its strongest part's rung. The rung a problem needed reads its difficulty: R0 or R1 means about right, R3 or more means past the edge.
 
 ## Practice problems
 

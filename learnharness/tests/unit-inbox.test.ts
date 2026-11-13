@@ -1,10 +1,10 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../src/core/index.ts";
+import { resumableSession } from "../components/nav/session-state.ts";
 import {
-	activeSession,
 	buildInbox,
-	linkStarts,
+	taskSessions,
 	monogram,
 	openingFor,
 	returnWords,
@@ -21,7 +21,7 @@ const topic = (handle: string, level: TopicLevel, review: TopicReview | null = n
 	introduced: level === "new" ? null : "2026-10-20",
 	review,
 	weak,
-	signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 },
+	signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false },
 	tasks: [],
 });
 const due = (overdue: number): TopicReview => ({ kind: "due", date: "2026-11-01", overdue });
@@ -31,7 +31,7 @@ const course = (workspace: string, topics: CourseMapTopic[]): StudyCourse => ({
 	map: { workspace, title: workspace.toUpperCase(), today: "2026-11-08", revision: 1, exam: null, current: null, focus: null, tasks: [], topics, edges: [] },
 	unready: null,
 	due: null,
-	lastActiveDaysAgo: 0,
+	newToday: [], lastActiveDaysAgo: 0,
 });
 
 const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
@@ -127,8 +127,8 @@ describe("buildInbox", () => {
 });
 
 describe("unitStatus", () => {
-	const slipped = { ...topic("chain", "retained", due(4), true), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 } };
-	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 } };
+	const slipped = { ...topic("chain", "retained", due(4), true), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
+	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
 	const held = { ...topic("det", "assisted", due(2)), tasks: ["sheet4"] };
 	const la = course("la", [
 		topic("rank", "assisted", due(3)),
@@ -195,25 +195,22 @@ describe("CourseMark", () => {
 });
 
 describe("the topic page", () => {
-	it("puts the session waiting on the learner first, before a newer or running one, and none when nothing waits or runs", () => {
+	it("puts the session waiting on the learner first, then a running one, then one stopped mid-turn, and none when all finished", () => {
 		const waiting = chat("waiting", { pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" });
 		const running = chat("running", { busy: true, updatedAt: "2026-11-08T10:00:00.000Z" });
+		const stopped = chat("stopped", { ended: "cut", updatedAt: "2026-11-08T11:00:00.000Z" });
 		const newer = chat("newer", { updatedAt: "2026-11-08T09:00:00.000Z" });
-		assert.equal(activeSession([newer, running, waiting])?.id, "waiting");
-		assert.equal(activeSession([newer, running])?.id, "running");
-		assert.equal(activeSession([newer]), null);
+		assert.equal(resumableSession([stopped, newer, running, waiting])?.id, "waiting");
+		assert.equal(resumableSession([stopped, newer, running])?.id, "running");
+		assert.equal(resumableSession([newer, stopped])?.id, "stopped");
+		assert.equal(resumableSession([newer]), null);
 	});
 
-	it("lists a session started on the topic's page under it before its transcript names the topic", () => {
-		const chats = [chat("new", { topics: [] }), chat("rank-take", { topics: ["rank"] })];
-		const linked = linkStarts(chats, { new: "rank" });
-		assert.deepEqual(
-			topicSessions(linked, "la", "rank")
-				.map((c) => c.id)
-				.sort(),
-			["new", "rank-take"],
-		);
-		assert.deepEqual(linkStarts(chats, {}), chats);
+	it("lists only the sessions the engine's records tie to the topic, never one that only holds a task covering it", () => {
+		const sheet = chat("sheet", { topics: ["rank"], tasks: ["sheet-4"], pendingQuestion: true });
+		const kernelTake = chat("kernel-take", { topics: ["kernel"] });
+		assert.deepEqual(topicSessions([sheet, kernelTake], "la", "kernel").map((c) => c.id), ["kernel-take"]);
+		assert.deepEqual(taskSessions([sheet, kernelTake], "la", "sheet-4").map((c) => c.id), ["sheet"], "the task reaches its lesson");
 	});
 
 	it("leads a new session's first message with the topic unless the prompt names it", () => {

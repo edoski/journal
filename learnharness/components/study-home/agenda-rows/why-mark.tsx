@@ -1,4 +1,4 @@
-import { ArrowRightIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MessageCircleQuestionIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MessageCircleQuestionIcon, PauseIcon, PenLineIcon, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
 import { MathText } from "@/components/ui/math-text";
@@ -7,6 +7,8 @@ import { MathText } from "@/components/ui/math-text";
  *  the course page's header and the sidebar's status slot. */
 export const WHY_ICON: Record<Why["kind"], LucideIcon> = {
 	reply: MessageCircleQuestionIcon,
+	working: PenLineIcon,
+	stopped: PauseIcon,
 	missed: CircleXIcon,
 	review: HistoryIcon,
 	task: BookmarkIcon,

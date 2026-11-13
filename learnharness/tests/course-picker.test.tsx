@@ -20,7 +20,7 @@ function documentFor(node: React.ReactNode) {
 }
 
 function choice(over: Partial<CourseChoice> = {}): CourseChoice {
-	return { state: READY, workspace: "", notice: null, choose: () => {}, add: () => {}, requireCourse: () => null, ...over };
+	return { state: READY, workspace: "", notice: null, asked: 0, choose: () => {}, add: () => {}, renamed: () => {}, removed: () => {}, requireCourse: () => null, ...over };
 }
 
 describe("course picker", () => {

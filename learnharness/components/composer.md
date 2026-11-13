@@ -11,6 +11,8 @@
 | toolbar | `div` | padding 8; left: the host's controls (`toolbar`), each a 32px pill (`data-slot="composer-chip"`), 4px apart; right: send |
 | send | `button` | 32px circle, `primary` fill, 16px arrow; disabled at 40% while empty; a 16px square on `fill-selected` while a turn runs and the field is empty (Stop) |
 | next problem | `button` | replaces send in the practice pause: 32px pill, `primary`, "Next problem" 13/500 and a 16px arrow |
+| head | the host's (`head`) | a row docked inside the surface above the field (the hybrid topic page's resume line) |
+| empty action | `button` (`data-testid="composer-action"`) | the host's `emptyAction`: as next problem, labelled with its `label`, while the field is empty; Enter on the empty field runs it |
 
 ## States
 

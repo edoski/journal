@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
-import type { CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
-import { layoutCourseMap } from "@/components/course-map/course-map-layout";
+import type { StudyCourse, TopicHandle } from "@/src/core";
+import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { MathText } from "@/components/ui/math-text";
@@ -20,10 +19,9 @@ const VIGNETTE = mapFade(FADE.x, FADE.y);
 
 /**
  * The selected course's map on Home (spec: home-map.md): course tabs over
- * the course map, embedded as it is and framed with faded edges, its camera
- * on where the learner is. Every course's map stays drawn and the chosen
- * one shows, so a change of course crossfades instead of drawing a map
- * afresh; the tabs' underline slides to the chosen course. The enlarge
+ * the topic map, embedded as it is and framed with faded edges. Every
+ * course's map stays drawn and the chosen one shows, so a change of course
+ * crossfades instead of drawing a map afresh; the tabs' underline slides to the chosen course. The enlarge
  * control lets the map take over Home for a moment; it and Esc bring Home
  * back. Enlarged or not, it is only the map: no List view and no More menu
  * (Edo, 12 Nov 2026).
@@ -35,8 +33,6 @@ export function HomeMap({
 	highlight = null,
 	enlarged,
 	onEnlarge,
-	onStudy,
-	busy,
 }: {
 	courses: readonly StudyCourse[];
 	/** The course whose map shows. */
@@ -46,13 +42,11 @@ export function HomeMap({
 	highlight?: ReadonlySet<TopicHandle> | null;
 	enlarged: boolean;
 	onEnlarge: (enlarged: boolean) => void;
-	onStudy: (topic: CourseMapTopic, workspace: string) => void;
-	busy: boolean;
 }) {
 	const chosen = courses.some((c) => c.map.workspace === workspace) ? workspace : courses[0]!.map.workspace;
 	useEffect(() => {
 		if (!enlarged) return;
-		// An open popover claims Esc first (Radix marks it handled).
+		// Anything open over the map claims Esc first (Radix marks it handled).
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape" && !e.defaultPrevented) onEnlarge(false);
 		};
@@ -93,7 +87,7 @@ export function HomeMap({
 								shown ? "opacity-100" : "pointer-events-none opacity-0",
 							)}
 						>
-							<CourseDrawing course={course} highlight={shown ? highlight : null} enlarged={enlarged} onStudy={onStudy} busy={busy} />
+							<CourseDrawing course={course} highlight={shown ? highlight : null} />
 						</div>
 					);
 				})}
@@ -143,36 +137,10 @@ function CourseTabs({ courses, workspace, onSelect }: { courses: readonly StudyC
 	);
 }
 
-/** One course's map, laid out once and kept. */
-function CourseDrawing({
-	course,
-	highlight,
-	enlarged,
-	onStudy,
-	busy,
-}: {
-	course: StudyCourse;
-	highlight: ReadonlySet<TopicHandle> | null;
-	enlarged: boolean;
-	onStudy: (topic: CourseMapTopic, workspace: string) => void;
-	busy: boolean;
-}) {
+/** One course's map, drawn once and kept. */
+function CourseDrawing({ course, highlight }: { course: StudyCourse; highlight: ReadonlySet<TopicHandle> | null }) {
 	const { map } = course;
-	const layout = useMemo(() => layoutCourseMap(map.topics, map.edges), [map]);
 	if (map.topics.length === 0) return <p className="m-auto text-row text-muted-foreground">Topics appear as you study this course.</p>;
-	return (
-		<CourseMapDrawing
-			map={map}
-			layout={layout}
-			// A new request when the frame grows or shrinks brings the camera back to the current topic.
-			jumpRequest={enlarged ? 2 : 1}
-			onStudy={(topic) => onStudy(topic, map.workspace)}
-			busy={busy}
-			anchor={0.5}
-			// As much room as the fade, so a topic at the edge scrolls clear of it.
-			margin={FADE}
-			highlight={highlight}
-			className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-		/>
-	);
+	// As much room as the fade, so a topic at the edge scrolls clear of it.
+	return <TopicMap map={map} margin={FADE} highlight={highlight} />;
 }

@@ -1,5 +1,5 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
-import { overdueSentence, type Why } from "@/components/study-home/agenda-rows/row-facts";
+import type { Why } from "@/components/study-home/agenda-rows/row-facts";
 import type { NeedsYou, NowLine } from "@/components/study-home/needs-you";
 import { overdueWords, statusOf } from "@/components/course-map/topic-map/topic-standing";
 import { sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
@@ -12,9 +12,10 @@ import { unitKey, type Unit, type UnitInbox, type UnitNow } from "@/components/u
  * own reason. The pure part.
  */
 
-/** A companion's own reason: Home's `Why` (its kind picks the row's icon,
- *  its `words` the tooltip), or the tutor writing in one of its sessions. */
-export type TopicWords = Why | { kind: "working" };
+/** A companion's own reason: Home's `Why` (its kind picks the row's icon)
+ *  with its full `words` for the tooltip, or the tutor writing in one of its
+ *  sessions. */
+export type TopicWords = (Why & { words: string }) | { kind: "working" };
 
 /** What a companion's reason says, in its tooltip and to a screen reader:
  *  the reason's full words ("Missed last time", "Overdue by 3 days"), or
@@ -45,8 +46,18 @@ export type NowItem =
 /** At most this many companions under a card before the tail. */
 export const COMPANIONS_SHOWN = 2;
 
-/** Home's review reason for one topic, as `whyOf` gives it. Pure. */
-const overdueWhy = (overdue: number): Why => ({ kind: "review", words: overdueSentence(overdue), short: overdueWords(overdue) });
+/** A late review as a sentence, for the tooltip: "Due today", "Overdue by
+ *  3 days", "Overdue by a week". Pure. */
+function overdueSentence(overdue: number): string {
+	if (overdue <= 0) return "Due today";
+	if (overdue < 7) return overdue === 1 ? "Overdue by a day" : `Overdue by ${overdue} days`;
+	const weeks = Math.floor(overdue / 7);
+	return weeks === 1 ? "Overdue by a week" : `Overdue by ${weeks} weeks`;
+}
+
+/** Home's review reason for one topic, as `whyOf` gives it, with its
+ *  sentence. Pure. */
+const overdueWhy = (overdue: number): TopicWords => ({ kind: "review", words: overdueSentence(overdue), short: overdueWords(overdue) });
 
 /**
  * A topic's own reason, by priority: a session on it waits on the learner

@@ -1,14 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
 import { SidebarToggle } from "@/components/sidebar";
-import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import { needsYouNow } from "@/components/study-home/needs-you";
-import type { TodayRow } from "@/components/study-home/study-facts";
+import { courseMove, todayCourses, type TodayRow } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -21,12 +21,8 @@ export interface HomeReady {
 	/** The courses, in Today's order, each once (two sessions waiting in
 	 *  one course are two lines of one course). */
 	courses: readonly StudyCourse[];
-	/** The engine's study day. */
-	today: string;
 	busy: boolean;
-	/** Open a lesson in a course with an opening. */
-	onStart: (opening: string, workspace: string) => void;
-	/** Take up a course's next step. */
+	/** Take up a course's next step (`courseMove`). */
 	onContinue: (workspace: string) => void;
 }
 
@@ -87,9 +83,10 @@ function HomeBody({
 	onRetry: () => void;
 	quiet: boolean;
 	busy: boolean;
-	onStart: (opening: string, workspace: string) => void;
+	onStart: (opening: string, workspace: string, options: { topics: readonly string[]; from?: string }) => void;
 	children: (home: HomeReady) => React.ReactNode;
 }) {
+	const router = useRouter();
 	switch (state.status) {
 		case "loading":
 			return <Notice>Reading your courses…</Notice>;
@@ -115,11 +112,15 @@ function HomeBody({
 					{children({
 						rows,
 						lessons: rows.map(lessonOf),
-						courses: [...new Set(rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])))],
-						today,
+						courses: todayCourses(rows),
 						busy,
-						onStart,
-						onContinue: (workspace) => onStart(CONTINUE_OPENING, workspace),
+						onContinue: (workspace) => {
+							const course = state.courses.find((c) => c.map.workspace === workspace);
+							if (!course) return;
+							const move = courseMove(course, state.chats);
+							if (move.kind === "open") router.push(`/chat/${move.chat.id}`);
+							else onStart(move.opening, workspace, { topics: move.topics, from: move.from });
+						},
 					})}
 					{!quiet && state.failed.length > 0 && (
 						<p className="shrink-0 text-row text-muted-foreground">

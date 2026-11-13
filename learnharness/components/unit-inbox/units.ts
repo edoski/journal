@@ -107,25 +107,14 @@ const byReview = (a: Unit, b: Unit) => Number(b.topic.weak) - Number(a.topic.wea
  */
 export function buildInbox(courses: readonly StudyCourse[], chats: readonly ChatListItem[], scope: string | null): UnitInbox {
 	const scoped = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
-	const sessionsOf = new Map<string, ChatListItem[]>();
-	for (const chat of chats) {
-		if (!chat.course) continue;
-		for (const handle of chat.topics ?? []) {
-			const key = unitKey(chat.course.workspace, handle);
-			const list = sessionsOf.get(key) ?? [];
-			list.push(chat);
-			sessionsOf.set(key, list);
-		}
-	}
 	const units: Unit[] = [];
 	for (const { map } of scoped) {
 		const course = { workspace: map.workspace, title: map.title };
 		for (const topic of map.topics) {
-			const key = unitKey(map.workspace, topic.handle);
-			const sessions = [...(sessionsOf.get(key) ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+			const sessions = topicSessions(chats, map.workspace, topic.handle);
 			const now = nowOf(sessions);
 			const shelf = shelfOf(topic, now);
-			if (shelf) units.push({ key, course, topic, shelf, sessions, now, task: taskOf(map, topic) });
+			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic) });
 		}
 	}
 	const listed = new Set(units.flatMap((u) => u.sessions.map((s) => s.id)));
@@ -242,31 +231,21 @@ export const LEVEL_WORDS: Record<CourseMapTopic["level"], string> = {
 	transferred: "Used in a new setting",
 };
 
-/** The session a unit's page puts first, the one to resume: one waiting
- *  on the learner, else one the tutor writes in, else none. Pure. */
-export function activeSession(sessions: readonly ChatListItem[]): ChatListItem | null {
-	return sessions.find((c) => sessionState(c) === "your-turn") ?? sessions.find((c) => sessionState(c) === "working") ?? null;
-}
-
-/** A topic's sessions in its course, newest first. Pure. */
+/** A topic's sessions in its course, newest first: those the engine's
+ *  records tie to it (a problem posed on it, an attempt saved on it, its
+ *  introduction) and those started on it. Never a session that only holds
+ *  a task covering the topic, nor one whose plan has a step named like it.
+ *  Pure. */
 export function topicSessions(chats: readonly ChatListItem[], workspace: string, handle: string): ChatListItem[] {
-	return chats.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+	return chats.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle)).sort(newestFirst);
 }
 
-/** Sessions started on a topic's page, by session id: the topic's handle.
- *  The app's own link, so a new session is on its topic from its first
- *  turn, before its transcript names the topic. */
-export type TopicStarts = Readonly<Record<string, string>>;
-
-/** The list with each started session also on the topic it was started
- *  on. Pure. */
-export function linkStarts(chats: readonly ChatListItem[], starts: TopicStarts): ChatListItem[] {
-	return chats.map((c) => {
-		const handle = starts[c.id];
-		const topics = c.topics ?? [];
-		return handle && !topics.includes(handle) ? { ...c, topics: [...topics, handle] } : c;
-	});
+/** The sessions in a course that hold an open task, newest first. Pure. */
+export function taskSessions(chats: readonly ChatListItem[], workspace: string, task: string): ChatListItem[] {
+	return chats.filter((c) => c.course?.workspace === workspace && (c.tasks ?? []).includes(task)).sort(newestFirst);
 }
+
+const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeCompare(a.updatedAt);
 
 /** A new session's first message from a topic's page: the prompt, led by
  *  the topic's title unless the prompt names it, so the tutor works on

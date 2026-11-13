@@ -22,7 +22,7 @@ import { isNoteFact } from "../components/course-page/map/topic-note.tsx";
 import { CourseLegend } from "../components/course-page/map/course-legend.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 const later = (date: string) => ({ kind: "scheduled" as const, date });
 
@@ -37,6 +37,7 @@ function course(topics: CourseMapTopic[], edges: CourseMapEdge[], current: strin
 		unready: null,
 		due: [],
 		lastActiveDaysAgo: 2,
+		newToday: [],
 	};
 }
 

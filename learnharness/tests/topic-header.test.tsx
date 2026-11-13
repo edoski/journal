@@ -14,7 +14,7 @@ import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contrac
 import { TopicHeader, standingLine } from "../components/unit-inbox/topic-header.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {

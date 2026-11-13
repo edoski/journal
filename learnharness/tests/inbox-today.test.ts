@@ -30,7 +30,7 @@ function topOf(courses: readonly StudyCourse[], chats = CHATS, scope: string | n
  *  started yet. */
 const QUIET_LA: StudyCourse = { ...LINALG, due: [], map: { ...LINALG.map, current: "diag" as TopicHandle } };
 /** A course with nothing to take up: no review, no task, no current topic. */
-const EMPTY: StudyCourse = { map: map({ workspace: "/s/empty", title: "Empty", topics: [topic("a", "A", "assisted")] }), unready: null, due: [], lastActiveDaysAgo: null };
+const EMPTY: StudyCourse = { map: map({ workspace: "/s/empty", title: "Empty", topics: [topic("a", "A", "assisted")] }), unready: null, due: [], lastActiveDaysAgo: null, newToday: [] };
 
 describe("todayTop", () => {
 	it("is Today's lines in order, each with a lead topic or a waiting session", () => {
@@ -41,7 +41,7 @@ describe("todayTop", () => {
 		);
 		assert.deepEqual(
 			top.map((i) => (i.kind === "topic" ? i.unit.topic.title : i.chat.title)),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Convergent sequences", "Chain rule"],
+			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
 		);
 		assert.ok(top.length <= 5);
 	});
@@ -82,7 +82,7 @@ describe("todayTop", () => {
 	it("keeps only the chosen course's lines under the course filter", () => {
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/linalg").top.map((i) => itemKey(i)),
-			["/s/linalg#eigen", "/s/linalg#rank"],
+			["/s/linalg#eigen", "/s/linalg#rank", "/s/linalg#independence"],
 		);
 		assert.deepEqual(
 			topOf(COURSES, CHATS, "/s/calc").top.map((i) => itemKey(i)),
@@ -93,10 +93,13 @@ describe("todayTop", () => {
 	it("lists a topic two lines lead with once, at the first", () => {
 		const twice = [chat("a", { course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank"], pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" }), chat("b", { course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank"], pendingProblem: true, updatedAt: "2026-11-08T08:00:00.000Z" })];
 		const { needs, top } = topOf([LINALG], twice);
-		assert.equal(needs.lines.length, 2);
+		assert.equal(needs.lines.length, 3);
 		assert.deepEqual(
 			top.map((i) => [i.line.key, itemKey(i)]),
-			[["a", "/s/linalg#rank"]],
+			[
+				["a", "/s/linalg#rank"],
+				["/s/linalg", "/s/linalg#independence"],
+			],
 		);
 	});
 
@@ -161,13 +164,11 @@ describe("steadyTop", () => {
 		assert.deepEqual(keysOf(turn(COURSES, [], rankFirst)).slice(0, 2), ["/s/linalg#rank", "/s/linalg#eigen"]);
 	});
 
-	it("lets a kept session take its course's line, as a waiting one does on Today", () => {
+	it("keeps a course's due review on its own line beside a kept session on another topic, as Today does", () => {
 		const alone = CHATS.filter((c) => c.id !== "chat_rank");
 		const { top } = topOf(COURSES, alone);
 		assert.equal(itemKey(top[0]!), "/s/linalg#eigen");
-		assert.ok(!top.some((i) => i.line.row.kind === "course" && i.line.row.course.map.workspace === "/s/linalg"));
-		const { top: bare } = topOf(COURSES, writing(alone, "chat_eigen"));
-		assert.ok(bare.some((i) => i.line.key === "/s/linalg"), "without the hold, Linear Algebra's own line comes back");
+		assert.ok(top.some((i) => i.line.key === "/s/linalg"), "the eigen lesson does not hide Linear Algebra's review");
 		const during = turn(COURSES, top, writing(alone, "chat_eigen"));
 		assert.deepEqual(keysOf(during), keysOf(top));
 	});
@@ -213,16 +214,16 @@ function renderList(over: Partial<NowListProps> = {}, courses: readonly StudyCou
 }
 
 describe("TodayList", () => {
-	it("draws the demo's five cards with Home's reasons in order, then the folded shelves", () => {
+	it("draws the demo's four cards with Home's reasons in order, then the folded shelves", () => {
 		const doc = renderList();
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Convergent sequences", "Chain rule"],
+			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "3d overdue", "1w overdue", "Missed last time"],
+			["Your turn", "Your turn", "3d overdue", "4d overdue"],
 		);
 		assert.deepEqual(
 			[...doc.querySelectorAll('[data-slot="unit-section-header"]')].map((h) => h.textContent),

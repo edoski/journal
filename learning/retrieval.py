@@ -22,7 +22,7 @@ EVIDENCE_BYTES = 6144
 KNOWLEDGE_BYTES = 3072
 DUE_LIMIT = progress.DUE_LIMIT
 WEAK_LIMIT = 6
-WEAK_FLAGS = ("lapsed", "stale", "choice_errors", "confident_errors")
+WEAK_FLAGS = ("relearn", "lapsed", "stale", "choice_errors", "confident_errors")
 TASK_OBSERVATIONS = 5
 TOPIC_OBSERVATIONS = 3
 OMITTED_LIMIT = 12
@@ -260,7 +260,7 @@ def _weak(
         item = {"topic": key, "level": standing["level"]}
         if "gap" in topic:
             item["gap"] = topic["gap"]
-        for flag in (*WEAK_FLAGS, "last"):
+        for flag in (*WEAK_FLAGS, "repaired", "last"):
             if flag in standing:
                 item[flag] = standing[flag]
         weak.append(_brief(item, shown))
@@ -483,7 +483,11 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "overdue": overdue.get(key),
             "weak": _is_weak(topic, standing),
             "gap": topic.get("gap"),
-            **{flag: standing[flag] for flag in WEAK_FLAGS if flag in standing},
+            **{
+                flag: standing[flag]
+                for flag in (*WEAK_FLAGS, "repaired")
+                if flag in standing
+            },
             "tasks": [
                 name for name, task in tasks.items() if key in task.get("topics", ())
             ],

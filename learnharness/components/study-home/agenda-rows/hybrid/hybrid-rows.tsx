@@ -20,7 +20,7 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  * ends with when he last studied it; the lesson line ends with why it is
  * there today, as an icon and a few words.
  */
-export function HybridRows({ rows, today, busy, onContinue, ...point }: RowsProps) {
+export function HybridRows({ rows, busy, onContinue, ...point }: RowsProps) {
 	const { shown, also } = foldLines(rows);
 	return (
 		<ul data-slot="hybrid-rows" className="flex flex-col">
@@ -33,7 +33,7 @@ export function HybridRows({ rows, today, busy, onContinue, ...point }: RowsProp
 							{studiedAgo(row)}
 						</span>
 						<span className="truncate text-control font-medium text-foreground"><MathText>{lessonTitle(row)}</MathText></span>
-						<WhyMark why={whyOf(row, today)} />
+						<WhyMark why={whyOf(row)} />
 					</LineTarget>
 				</li>
 			))}

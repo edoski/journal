@@ -197,9 +197,9 @@ describe("plan_init — the author-once mermaid tool (execute against the real s
 		assert.equal(res.tree, undefined, "no tree echo on failure (context diet, 2026-10-09)");
 	});
 
-	it("only plan_init exists — the seven mutation/tracking tools are gone by design", () => {
+	it("plan_init writes the map and lesson_progress marks steps done; the seven mutation tools stay gone", () => {
 		const tools = planTools({ chatId: "chat_x", chatStore });
-		assert.deepEqual(Object.keys(tools), ["plan_init"]);
+		assert.deepEqual(Object.keys(tools).sort(), ["lesson_progress", "plan_init"]);
 	});
 
 	it("unknown chat returns ok:false with the empty tree", async () => {

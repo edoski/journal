@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownIcon, CheckIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
+import { ArrowDownIcon, CheckIcon, ChevronRightIcon, LightbulbIcon, PlayIcon } from "lucide-react";
+import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
+import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
+	kbdEventForAction,
 	repairMathForDisplay,
 	normalizeQuestionType,
 	DEFAULT_CONFIDENCE,
@@ -165,6 +168,27 @@ function teaserText(q: string): string {
 		.trim();
 }
 
+/** The question as one line of words and inline formulas, for MathText:
+ *  display math joins the line, a matrix or a case split (one line can't
+ *  hold its rows) folds to ⋯, a tall fraction becomes a text one, and
+ *  markdown marks drop. */
+export function teaserLine(q: string): string {
+	return repairMathForDisplay(q)
+		.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$]+?)\$/g, (_, a, b, c, d) => `$${inline(a ?? b ?? c ?? d)}$`)
+		.replace(/\*\*|__|`/g, "")
+		.replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function inline(tex: string): string {
+	return tex
+		.replace(/\\begin\{(\w+\*?)\}[\s\S]*?\\end\{\1\}/g, "\\cdots")
+		.replace(/\\dfrac/g, "\\tfrac")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
  *  (kind chip + one-liner + Answer ↓); "reveal" is the teach-check invitation —
  *  a distinct, more inviting affordance, because it asks the learner to start
@@ -204,7 +228,9 @@ export function QuestionDockBar({
 				<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
 					{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
 				</span>
-				<span className="min-w-0 flex-1 truncate text-muted-foreground">{teaserText(question)}</span>
+				<span className="min-w-0 flex-1 truncate text-muted-foreground">
+					<MathText>{teaserLine(question)}</MathText>
+				</span>
 				<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
 					{reveal ? "Open" : "Answer"}
 					{reveal ? <ChevronRightIcon className="size-4" /> : <ArrowDownIcon className="size-4" />}
@@ -331,6 +357,38 @@ function QuestionDockForm({
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): the same
 	 * law as the practice dock. */
 	useEnterSubmits(submit);
+
+	// Hint (checks only): a request, never an answer, so the committed
+	// answer stays hidden and the tutor gives the next rung.
+	const askHint = () => {
+		if (kind !== "explain" || compactionRunning) return;
+		onSubmit(buildAnswer(qd, { text: qd.mode === "text" ? text : undefined, thinking: qd.mode !== "text" ? thinking.trim() || undefined : undefined, hint: true }, toolName));
+	};
+	const askHintRef = useRef(askHint);
+	askHintRef.current = askHint;
+	useEffect(() => {
+		if (kind !== "explain") return;
+		const listener = () => askHintRef.current();
+		window.addEventListener(kbdEventForAction("practice-hint"), listener);
+		return () => window.removeEventListener(kbdEventForAction("practice-hint"), listener);
+	}, [kind]);
+	const hintButton = () =>
+		kind === "explain" ? (
+			<Hint label="Get a nudge, not the answer" action="practice-hint">
+				<Button
+					type="button"
+					variant="quiet"
+					size="sm"
+					data-testid="question-hint"
+					disabled={compactionRunning}
+					onClick={askHint}
+					className="h-8 rounded-full px-3 text-row"
+				>
+					<LightbulbIcon />
+					Hint
+				</Button>
+			</Hint>
+		) : null;
 
 	// Selecting Other never clears the thinking field — two channels, the
 	// answer and the reasoning behind it, side by side.
@@ -594,8 +652,9 @@ function QuestionDockForm({
 					)}
 					<div className="flex items-center gap-3 p-2 pl-3">
 						{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />}
+						{hintButton()}
 						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
-							{compactionRunning ? "Compacting the conversation…" : "↵ to submit · ⇧↵ for a new line"}
+							{compactionRunning ? "Compacting the conversation…" : kind === "explain" ? "" : "↵ to submit · ⇧↵ for a new line"}
 						</span>
 						<Button
 							type="submit"

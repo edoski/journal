@@ -37,15 +37,15 @@ describe("NowCard", () => {
 		const cards = [...doc.querySelectorAll('[data-slot="unit-card"]')];
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-testid="unit-row"] > span:last-child')?.textContent),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Convergent sequences", "Chain rule"],
+			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="why-mark"]')?.textContent?.replace(", ", "")),
-			["Your turn", "Your turn", "3d overdue", "1w overdue", "Missed last time"],
+			["Your turn", "Your turn", "3d overdue", "4d overdue"],
 		);
 		assert.deepEqual(
 			cards.map((c) => c.querySelector('[data-slot="row-action"]')?.getAttribute("aria-label")),
-			["Resume: Eigenvalues and eigenvectors", "Resume: Rank and the column space", "Review: Random variables and distributions", "Review: Convergent sequences", "Review: Chain rule"],
+			["Resume: Eigenvalues and eigenvectors", "Resume: Rank and the column space", "Review: Random variables and distributions", "Review: Linear independence"],
 		);
 		assert.equal(cards[0]!.querySelector('[data-slot="row-action"]')?.getAttribute("href"), "/chat/chat_eigen");
 		assert.equal(cards[2]!.querySelector('[data-testid="unit-row"]')?.getAttribute("href")?.startsWith("/unit/"), true);

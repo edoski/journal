@@ -27,7 +27,7 @@ import type {
 	NotesSource,
 } from "./contracts.ts";
 import type { UserSettings } from "./settings.ts";
-import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb } from "./contracts/course.ts";
+import type { CourseLink, CourseListing, CourseResult, CourseSummary, CourseVerb, NewCourseRecord } from "./contracts/course.ts";
 import type { CourseMap } from "./contracts/course-map.ts";
 
 // ─── ChatStore — the session record's home (data/chats) ─────────────────────
@@ -36,7 +36,7 @@ export interface ChatStore {
 	/** Create a session record; `course` links the session to one
 	 *  registered course for its whole life. A session's mode lives in its
 	 *  transcript (a session-mode marker, then the agents' handoffs). */
-	createChat(title: string, course?: CourseLink): ChatRecord;
+	createChat(title: string, course?: CourseLink, topics?: readonly string[]): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */
@@ -243,8 +243,8 @@ export interface CourseRecords {
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
 	/** The course map: the engine's read-only `map` verb, parsed. */
 	map(workspace: string): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
-	/** Make an existing empty directory a titled, registered course: the
-	 *  engine's `init` there, then a save of the title. `workspace` is the
-	 *  directory as the engine registered it. */
-	create(directory: string, title: string): Promise<{ ok: true; workspace: string } | Extract<CourseResult, { ok: false }>>;
+	/** Make an existing directory a titled, registered course: the engine's
+	 *  `init` there, then one save of the title and the exam day. `workspace`
+	 *  is the directory as the engine registered it. */
+	create(directory: string, course: NewCourseRecord): Promise<{ ok: true; workspace: string } | Extract<CourseResult, { ok: false }>>;
 }

@@ -42,36 +42,12 @@ export function StudyHome({ initialConfigured }: { initialConfigured: boolean })
 /** What picks the map's course: a Today line he points at, or a tab he chose. */
 type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
-/** Up and Down walk Today's lines from anywhere on Home that is not a
- *  field, the map or the sidebar: from nothing focused, Down takes the
- *  first line and Up the last. Tab is off app-wide (Edo's ruling), so this
- *  is how the keyboard reaches them. */
-function useLineKeys(enabled: boolean) {
-	useEffect(() => {
-		if (!enabled) return;
-		const onKey = (event: KeyboardEvent) => {
-			if ((event.key !== "ArrowDown" && event.key !== "ArrowUp") || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
-			const lines = [...document.querySelectorAll<HTMLElement>('[data-slot="today"] [data-slot="today-line"]')];
-			if (lines.length === 0) return;
-			const active = document.activeElement as HTMLElement | null;
-			const at = active ? lines.indexOf(active) : -1;
-			if (at < 0 && active && active !== document.body) return;
-			event.preventDefault();
-			const next = at < 0 ? (event.key === "ArrowDown" ? 0 : lines.length - 1) : Math.min(lines.length - 1, Math.max(0, at + (event.key === "ArrowDown" ? 1 : -1)));
-			lines[next]!.focus();
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [enabled]);
-}
-
 function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { rows, courses, today, busy, onStart, onContinue } = ready;
+	const { rows, courses, busy, onContinue } = ready;
 	const follow = useOverviewVariant() === "follow";
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	const dwell = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => () => clearTimeout(dwell.current), []);
-	useLineKeys(!enlarged);
 
 	const followed = follow && chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
@@ -97,14 +73,11 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					highlight={highlight}
 					enlarged={enlarged}
 					onEnlarge={onEnlarge}
-					onStudy={(topic, ws) => onStart(topic.title, ws)}
-					busy={busy}
 				/>
 			</div>
 			{!enlarged && (
 				<Today
 					rows={rows}
-					today={today}
 					busy={busy}
 					onContinue={onContinue}
 					{...(follow && { pointed: followed ? lineKey(followed) : null, onPoint, onPointEnd: () => clearTimeout(dwell.current) })}

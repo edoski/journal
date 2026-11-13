@@ -1,10 +1,12 @@
 # Agenda rows
 
-How a line of Today reads, behind the Rows switch (`design-variant.ts`, group `rows`, which wears Home's Proposed). Current is the line after Edo's cuts of 12 Nov 2026: course and lesson only (today.md). Proposed is the hybrid row: progress, recency and reason, each beside what it is about (hybrid/hybrid.md). On 13 Nov 2026 Edo picked hybrid; the reason, recency and progress rows were deleted.
+How a line of agenda's Today reads: the hybrid rows (`hybrid/hybrid.md`), the pie by the course, "2d ago" at the end of the course line, the reason as an icon and a few words at the end of the lesson line, both flush right. `today.tsx` draws them with no switch.
+
+Four candidates ran behind a Rows switch: `reason` (every row says why it is there now, as a sentence), `recency` (a row is a thread, "Studied 2 days ago"), `progress` (each course a tile with a pie that fills) and `hybrid`, against the course-and-lesson line of 12 Nov 2026. Edo picked hybrid on 13 Nov 2026, and the other three, the old line and the switch were deleted.
 
 ## Shared
 
-`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` and its sentence `whyNow` (a session's age from its `updatedAt`; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `lastStudied` and the short `studiedAgo` (`lastActiveDaysAgo`), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
+`row-facts.ts` holds what the rows read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyOf` (a session waiting on him; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `studiedAgo` (`lastActiveDaysAgo`) and its sentence `lastStudied` (the course page's), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `progress-pie.tsx` draws `courseProgress` as the course's pie. `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
 
 ## The signal test
 

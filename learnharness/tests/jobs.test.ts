@@ -34,6 +34,7 @@ import {
 	buildAbortSteer,
 	buildSubagentSteer,
 	isSubagentFailure,
+	JOB_TIME_LIMIT_MS,
 	steerDelivered,
 	type DemoResult,
 	type JobUsage,
@@ -69,7 +70,8 @@ import { beginTurn, endTurn, isTurnRunning } from "../src/server/turn-liveness.t
 import { persistTurn } from "../src/server/turn-service.ts";
 import { chatStore } from "../src/store/chats.ts";
 import { jobStore } from "../src/store/jobs.ts";
-import { createJobRunner, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
+import { createJobRunner, demoModelOverride, pdfModelOverride, researchModelOverride } from "../src/agent/subagents/runner.ts";
+import { headlessOverride, type HeadlessApi } from "../src/agent/subagents/headless.ts";
 import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts";
 import type { PiEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
@@ -1822,6 +1824,132 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		);
 		const result = done.result as ResearchResult;
 		assert.equal(result.sources.length, 0, "the failure result matches the research convention");
+	});
+});
+
+// ─── time limits: a hung helper fails with a plain reason ───────────────────
+
+describe("job time limit", () => {
+	const DEMO_INPUT = { title: "Eigenvectors", brief: "Drag a vector; show when Av stays on its line." };
+	const SHORT_LIMITS = { ...JOB_TIME_LIMIT_MS, demo: 300 };
+
+	function demoJob(label: string, toolCallId: string): string {
+		const chat = chatStore.createChat(`Test: ${label}`);
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, nativeToolMessages("show me", "demo", toolCallId, DEMO_INPUT));
+		const job = jobStore.createJob({ kind: "demo", chatId: chat.id, toolCallId, input: DEMO_INPUT });
+		trackJob(job.id);
+		return job.id;
+	}
+
+	/** A browser that is always there and never used: the hung model call
+	 *  is the whole run. */
+	function withHeadless<T>(body: () => Promise<T>): Promise<T> {
+		headlessOverride.current = { unavailableReason: () => null } as unknown as HeadlessApi;
+		demoModelOverride.current = fauxEngine([abortableFactory()]);
+		return body().finally(() => {
+			headlessOverride.current = undefined;
+			demoModelOverride.current = undefined;
+		});
+	}
+
+	it("a demo whose model never answers fails after its limit, and the tutor is told once to carry on without it", () =>
+		withHeadless(async () => {
+			const jobId = demoJob("hung demo", "call-limit1");
+			const delivery = fakeDeliver();
+			const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver, timeLimitMs: SHORT_LIMITS });
+			await runner.runJob(jobId, DEMO_INPUT);
+			await new Promise((r) => setTimeout(r, 100));
+
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.status, "error");
+			assert.match(done.error ?? "", /^took longer than /);
+			assert.equal(delivery.steers.length, 1, "exactly one steer");
+			const text = delivery.steers[0]!.content;
+			assert.match(text, /could not be built/);
+			assert.match(text, /carry on teaching in prose without it/);
+			assert.ok(!text.includes("FAILED:"), "the tutor reads a plain reason");
+		}));
+
+	it("an orphan past its limit, re-spawned by recovery, fails at once without running", async () => {
+		const jobId = demoJob("expired orphan", "call-limit2");
+		jobStore.updateJob(jobId, { createdAt: new Date(Date.now() - JOB_TIME_LIMIT_MS.demo - 1000).toISOString() } as never);
+		let modelCalls = 0;
+		demoModelOverride.current = fauxEngine([
+			() => {
+				modelCalls++;
+				return fauxAssistantMessage("never");
+			},
+		] as unknown as FauxResponseStep[]);
+		const delivery = fakeDeliver();
+		const runner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
+		setJobRespawn((id) => {
+			if (id === jobId) void runner.runJob(id);
+		});
+		try {
+			(globalThis as { __lhWakePipeline?: { lastSweepAt: number } }).__lhWakePipeline!.lastSweepAt = 0;
+			recoverStaleJobs();
+			await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "orphan settled");
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.status, "error");
+			assert.equal(done.error, `took longer than ${JOB_TIME_LIMIT_MS.demo / 60_000} minutes`);
+			assert.equal(modelCalls, 0, "the expired job never reached its model");
+			assert.equal(delivery.steers.length, 1);
+			assert.match(delivery.steers[0]!.content, /could not be built/);
+		} finally {
+			demoModelOverride.current = undefined;
+		}
+	});
+
+	it("a learner abort still produces only the abort steer, and the limit stays quiet afterwards", () =>
+		withHeadless(async () => {
+			const jobId = demoJob("aborted demo", "call-limit3");
+			const fired: SteerMessage[] = [];
+			setTurnRunner(async (_cid, input) => {
+				fired.push(...((input as SteerInput).steers as SteerMessage[]));
+				return 200;
+			});
+			const runner = createJobRunner({
+				chatStore,
+				jobStore,
+				deliver: async () => {
+					throw new Error("an aborted job must never deliver a result steer");
+				},
+				timeLimitMs: SHORT_LIMITS,
+			});
+			const settled = runner.runJob(jobId, DEMO_INPUT);
+			await waitFor(() => isJobLive(jobId), 8000, "loop started");
+			assert.ok(abortJob(jobId).ok);
+			await settled;
+			await new Promise((r) => setTimeout(r, SHORT_LIMITS.demo + 100));
+
+			const done = jobStore.getJob(jobId)!;
+			assert.equal(done.error, "Aborted by learner");
+			assert.equal(done.result, undefined);
+			await waitFor(() => fired.length > 0, 8000, "abort wake fired");
+			assert.deepEqual(fired.map((m) => m.customType), ["subagent-abort"]);
+		}));
+
+	it("a model the settings name but the catalog lacks fails the job instead of leaving it running", async () => {
+		const chat = chatStore.createChat("Test: unknown model");
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-limit4", RESEARCH_INPUT));
+		const job = jobStore.createJob({ kind: "research", chatId: chat.id, toolCallId: "call-limit4" });
+		trackJob(job.id);
+		const delivery = fakeDeliver();
+		const runner = createJobRunner({
+			chatStore,
+			jobStore,
+			deliver: delivery.deliver,
+			engineFor: () => {
+				throw new Error("catalog has no model claude-haiku-5-5");
+			},
+		});
+		await runner.runJob(job.id);
+		const done = jobStore.getJob(job.id)!;
+		assert.equal(done.status, "error");
+		assert.equal(done.error, "catalog has no model claude-haiku-5-5");
+		assert.equal(delivery.steers.length, 1, "the tutor learns the outcome");
 	});
 });
 

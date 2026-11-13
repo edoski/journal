@@ -78,7 +78,11 @@ function argsFor(verb: CourseVerb): { args: string[]; stdin: string } {
 		case "save":
 			return { args: ["save"], stdin: JSON.stringify(verb.changes) };
 		case "plan":
-			return { args: ["plan", "--days", "1"], stdin: "" };
+			return { args: ["plan", "--days", String(verb.days ?? 1)], stdin: "" };
+		case "sources":
+			return { args: ["sources", "--add", ...verb.add], stdin: "" };
+		case "forget-course":
+			return { args: ["forget", "--course"], stdin: "" };
 	}
 }
 
@@ -211,6 +215,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 			stale: e.stale === true,
 			choiceErrors,
 			confidentErrors: count(e.confident_errors),
+			repaired: e.repaired === true,
 		},
 		tasks: strings(e.tasks),
 		needs: strings(e.needs),
@@ -282,11 +287,12 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			const map = courseMapOf(workspace, result.json);
 			return map ? { ok: true, map } : { ok: false, kind: "io", message: "map printed an unexpected shape" };
 		},
-		async create(directory, title) {
+		async create(directory, { title, exam }) {
 			const init = toResult(await exec(engine, ["--workspace", directory, "init"], ""), "init");
 			if (!init.ok) return init;
 			const workspace = str((init.json as { workspace?: unknown } | null)?.workspace) ?? directory;
-			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify({ title })), "save");
+			const record = exam ? { title, exam: { date: exam } } : { title };
+			const saved = toResult(await exec(engine, ["--workspace", workspace, "save"], JSON.stringify(record)), "save");
 			return saved.ok ? { ok: true, workspace } : saved;
 		},
 	};

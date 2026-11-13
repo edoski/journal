@@ -18,7 +18,7 @@ export function topic(handle: string, title: string, level: TopicLevel, over: Pa
 		introduced: level === "new" ? null : "2026-10-20",
 		review: null,
 		weak: false,
-		signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 },
+		signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false },
 		tasks: [],
 		...over,
 	};
@@ -26,7 +26,7 @@ export function topic(handle: string, title: string, level: TopicLevel, over: Pa
 
 export const due = (overdue: number): TopicReview => ({ kind: "due", date: "2026-11-01", overdue });
 export const back = (date: string): TopicReview => ({ kind: "scheduled", date });
-const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 
 export function map(over: Partial<CourseMap>): CourseMap {
 	return { workspace: "/s/x", title: "X", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [], ...over };
@@ -52,6 +52,7 @@ export const LINALG: StudyCourse = {
 	unready: h("independence", "rank", "det", "eigen", "diag"),
 	due: h("independence"),
 	lastActiveDaysAgo: 2,
+	newToday: [],
 };
 
 export const PROB: StudyCourse = {
@@ -70,6 +71,7 @@ export const PROB: StudyCourse = {
 	unready: [],
 	due: h("rv", "total", "bayes"),
 	lastActiveDaysAgo: 2,
+	newToday: [],
 };
 
 export const ANALYSIS: StudyCourse = {
@@ -82,6 +84,7 @@ export const ANALYSIS: StudyCourse = {
 	unready: null,
 	due: h("conv", "cauchy"),
 	lastActiveDaysAgo: 11,
+	newToday: [],
 };
 
 export const CALCULUS: StudyCourse = {
@@ -99,6 +102,7 @@ export const CALCULUS: StudyCourse = {
 	unready: null,
 	due: h("chain", "riemann", "improper"),
 	lastActiveDaysAgo: 1,
+	newToday: [],
 };
 
 export const COURSES: readonly StudyCourse[] = [LINALG, PROB, ANALYSIS, CALCULUS];
@@ -128,7 +132,7 @@ const la = { workspace: "/s/linalg", title: "Linear Algebra" };
 export const CHATS: readonly ChatListItem[] = [
 	chat("chat_rank", { title: "Rank practice", course: la, topics: ["rank", "not-on-map"], pendingProblem: true, updatedAt: "2026-11-08T08:50:00.000Z" }),
 	chat("chat_eigen", { title: "Eigenvalues lesson", course: la, topics: ["eigen"], pendingQuestion: true, updatedAt: "2026-11-08T09:20:00.000Z" }),
-	chat("chat_old", { title: "Span, second pass", course: la, topics: ["independence"], pendingQuestion: true, updatedAt: "2026-11-05T09:00:00.000Z" }),
+	chat("chat_old", { title: "Determinants, second pass", course: la, topics: ["det"], pendingQuestion: true, updatedAt: "2026-11-05T09:00:00.000Z" }),
 	chat("chat_det", { title: "Determinants as volume", course: la, topics: ["det"], updatedAt: "2026-11-07T18:00:00.000Z" }),
 	chat("chat_general", { title: "Why are vectors columns?", updatedAt: "2026-11-07T09:00:00.000Z" }),
 ];

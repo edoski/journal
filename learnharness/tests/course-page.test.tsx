@@ -26,7 +26,7 @@ import { buildInbox } from "../components/unit-inbox/units.ts";
 import { searchInbox } from "../components/unit-inbox/unit-sidebar.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 const later = (date: string) => ({ kind: "scheduled" as const, date });
 
@@ -70,6 +70,7 @@ function course(over: Partial<StudyCourse["map"]> = {}, rest: Partial<Omit<Study
 		unready: null,
 		due: [h("span")],
 		lastActiveDaysAgo: 2,
+		newToday: [],
 		...rest,
 	};
 }
@@ -100,10 +101,10 @@ describe("the course page's address", () => {
 		assert.equal(workspaceOf(href.slice("/unit/".length)), WS);
 	});
 
-	it("is behind a Course switch of four candidates that wears the Proposed design, sidebar and map", () => {
+	it("is behind a Course switch of four candidates that wears the Proposed design and sidebar", () => {
 		assert.deepEqual([...COURSE_OPTIONS], ["list", "map", "brief", "split"]);
 		const group = POLISH_GROUPS.find((g) => g.id === "course");
-		assert.deepEqual(group?.requires, { design: "proposed", sidebar: "proposed", map: "proposed" });
+		assert.deepEqual(group?.requires, { design: "proposed", sidebar: "proposed" });
 	});
 });
 
@@ -208,7 +209,7 @@ describe("the header's facts and next lesson", () => {
 });
 
 describe("the course page's read", () => {
-	const ready = { status: "ready" as const, courses: [course()], failed: ["/study/broken"], waiting: [], chats: [] };
+	const ready = { status: "ready" as const, courses: [course()], failed: ["/study/broken"], open: [], chats: [] };
 
 	it("says why a course cannot show: still reading, the engine not answering, the read failing, a record it could not read, a course not his", () => {
 		assert.equal(courseRead({ status: "loading" }, WS).status, "loading");
@@ -218,9 +219,9 @@ describe("the course page's read", () => {
 		assert.equal(courseRead(ready, "/study/elsewhere").status, "missing");
 	});
 
-	it("links a session started on a topic's page to that topic, as the sidebar does", () => {
-		const started = chat("c9", { pendingQuestion: true, topics: [] });
-		const read = courseRead({ ...ready, chats: [started] }, WS, { c9: "eigen" });
+	it("ties a session to a topic by the engine's records, as the sidebar does", () => {
+		const started = chat("c9", { pendingQuestion: true, topics: ["eigen"] });
+		const read = courseRead({ ...ready, chats: [started] }, WS);
 		assert.equal(read.status, "ready");
 		if (read.status !== "ready") return;
 		const eigen = read.view.groups.flatMap((g) => g.topics).find((t) => t.topic.handle === "eigen")!;
@@ -234,7 +235,7 @@ const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 
 function viewOf(c: StudyCourse) {
-	const read = courseRead({ status: "ready", courses: [c], failed: [], waiting: [], chats: [] }, c.map.workspace);
+	const read = courseRead({ status: "ready", courses: [c], failed: [], open: [], chats: [] }, c.map.workspace);
 	assert.equal(read.status, "ready");
 	return (read as Extract<typeof read, { status: "ready" }>).view;
 }

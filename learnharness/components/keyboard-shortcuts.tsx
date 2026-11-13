@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
-import { useDesignVariant, useHomeVariant, type DesignVariant } from "@/components/design-variant";
+import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
@@ -37,8 +37,13 @@ import {
 	isTypingSurface,
 	kbdEventForAction,
 	KEYBOARD_ACTIONS,
+	type KeyAction,
+	type KeyActionDef,
+	type KeyGroup,
+	type KeyScope,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { useSpatialArrows } from "@/components/spatial-arrows";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
 // the dispatcher composes event names through the ONE helper — a second
@@ -49,11 +54,8 @@ export function KeyboardShortcuts() {
 	const router = useRouter();
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
-	// The graph is home in the current design, its own view in the proposed
-	// one, and on home again once a study home holds the course map.
 	const design = useDesignVariant();
-	const home = useHomeVariant();
-	const graphPath = design === "proposed" && home === "current" ? "/knowledge" : "/";
+	useSpatialArrows(design === "proposed");
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
@@ -61,9 +63,8 @@ export function KeyboardShortcuts() {
 		router: ReturnType<typeof useRouter>;
 		setCheatOpen: (v: boolean) => void;
 		openSettings: () => void;
-		graphPath: string;
-	}>({ router, setCheatOpen, openSettings, graphPath });
-	handlersRef.current = { router, setCheatOpen, openSettings, graphPath };
+	}>({ router, setCheatOpen, openSettings });
+	handlersRef.current = { router, setCheatOpen, openSettings };
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -126,14 +127,25 @@ export function KeyboardShortcuts() {
 					handlersRef.current.openSettings();
 					break;
 				case "jump-graph":
-					handlersRef.current.router.push(handlersRef.current.graphPath);
+					// The graph is home in the current design, and a study home holds the
+					// course map in the proposed one.
+					handlersRef.current.router.push("/");
 					break;
 				case "cheat-sheet":
 					handlersRef.current.setCheatOpen(true);
 					break;
+				case "practice-hint":
+				case "practice-show":
+				case "practice-explain":
+					// The problem box owns these; claim the chord from the browser.
+					e.preventDefault();
+					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
+					break;
 				case "find":
-					// The mounted surface owns Find (session text / graph nodes).
-					// Claim Mod+F so Chromium's whole-window finder cannot open too.
+				case "pick-course":
+					// The mounted surface owns Find (session text / graph nodes)
+					// and the course picker. Claim the chord so Chromium's own
+					// finder or Open File cannot open too.
 					e.preventDefault();
 					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
 					break;
@@ -146,6 +158,42 @@ export function KeyboardShortcuts() {
 	}, [cheatOpen]);
 
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} variant={design} />;
+}
+
+/** The Proposed sheet's words for each action whose registry label is an
+ *  engineering name. */
+const SHEET_WORDS: Partial<Record<KeyAction, string>> = {
+	"open-model-picker": "Choose the model",
+	"cycle-thinking": "Change how long the tutor thinks",
+	"toggle-sidebar": "Show or hide the sidebar",
+	"sessions-search": "Search",
+	"jump-graph": "Go Home",
+	"new-session": "New lesson",
+	"rename-session": "Rename the lesson",
+	"cheat-sheet": "Keyboard shortcuts",
+	"question-focus": "Move between your thinking and the answers",
+	"toggle-user-thinking": "Show or hide your thinking",
+	"question-next-row": "Next answer",
+	"question-prev-row": "Previous answer",
+	"question-pick-row": "Pick the answer",
+	"question-submit": "Submit the answer",
+};
+
+/** The Proposed sheet's sections in order, in plain words: each holds the
+ *  registry's actions of its scope and group. */
+const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGroup }[] = [
+	{ label: "Anywhere", scope: "global" },
+	{ label: "Pages", scope: "global", group: "pages" },
+	{ label: "Calendar", scope: "global", group: "calendar" },
+	{ label: "In a lesson", scope: "chat" },
+	{ label: "On the map", scope: "graph" },
+];
+
+export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }[] {
+	return SHEET_SECTIONS.map(({ label, scope, group }) => ({
+		label,
+		actions: KEYBOARD_ACTIONS.filter((a) => a.scope === scope && a.group === group),
+	})).filter((section) => section.actions.length > 0);
 }
 
 /** The ? overlay — the registry rendered as a table (grouped by scope).
@@ -162,7 +210,7 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 	};
 	if (variant === "proposed") {
 		// The dialog anatomy (dialog.md) with a two-column list: the action,
-		// then its keys as plain glyphs (kbd.md).
+		// then its keys as plain glyphs (kbd.md), in the app's own words.
 		return (
 			<Dialog open onOpenChange={(next) => !next && onClose()}>
 				<DialogContent aria-describedby={undefined} data-testid="cheat-sheet" className="max-h-[80vh] max-w-xl overflow-y-auto">
@@ -172,21 +220,17 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<Hint label="Close" binding="escape" side="left">
 						<DialogClose aria-label="Close shortcuts" />
 					</Hint>
-					{scopes.map((scope) => {
-						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
-						if (actions.length === 0) return null;
-						return (
-							<section key={scope} aria-label={scopeLabels[scope]} className="flex flex-col">
-								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{scopeLabels[scope]}</h3>
-								{actions.map((a) => (
-									<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-										<span className="truncate text-foreground">{a.label}</span>
-										<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
-									</div>
-								))}
-							</section>
-						);
-					})}
+					{cheatSheetSections().map(({ label, actions }) => (
+						<section key={label} aria-label={label} className="flex flex-col">
+							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
+							{actions.map((a) => (
+								<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
+									<span className="truncate text-foreground">{SHEET_WORDS[a.id] ?? a.label}</span>
+									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
+								</div>
+							))}
+						</section>
+					))}
 				</DialogContent>
 			</Dialog>
 		);

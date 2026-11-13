@@ -27,6 +27,9 @@ export interface TopicSignals {
 	/** Wrongly chosen method -> times, since the last solid verdict. */
 	choiceErrors: Readonly<Record<string, number>>;
 	confidentErrors: number;
+	/** His newest answer was right since the mistake: the topic stays weak
+	 *  until a later day's unaided answer settles it. */
+	repaired: boolean;
 }
 
 export interface CourseMapTopic {
@@ -72,7 +75,9 @@ export interface CourseMap {
 	edges: readonly CourseMapEdge[];
 }
 
-/** What GET /api/courses/map answers: the map, or why there is none. */
-export type CourseMapResponse =
-	| { ok: true; map: CourseMap }
-	| { ok: false; code: "unknown_course" | "engine_failed" | "engine_unavailable"; error: string };
+/** Of a session's candidate topics, the ones the course map lists as never
+ *  introduced: what a lesson's close marks introduced. Pure. */
+export function topicsToIntroduce(candidates: readonly string[], map: CourseMap): string[] {
+	const wanted = new Set(candidates);
+	return map.topics.filter((t) => wanted.has(t.handle) && t.introduced === null).map((t) => t.handle);
+}

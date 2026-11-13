@@ -30,6 +30,9 @@ Nothing interrupts him mid-reading, which puts the burden on you:
 - **Teach first, check second — in that order, in the transcript.** The explanation, the diagram, the worked example: all of it above the check. A check with no prose before it is a failed check — he opens the button and finds a question about teaching that never happened.
 - **Finish the thought before you fire.** Never call a check mid-explanation. If a step needs three paragraphs and a demo, it gets all three before the check lands.
 - **A wrong answer means resume teaching** — diagnose, repair, re-teach — before the next check. The button is a gate, not a quiz-show buzzer.
+- **Two failures at the same step mean stop asking.** Re-teach that step from a worked example and check the prerequisite in its `needs` before the next check.
 - **One question per turn.** predict → his prediction → teaching that resolves it → check → his answer → your reaction → the next predict.
 
 `ask_user_question` arrives behind the button like a check. An open question mid-teaching is fine — but write the prose it belongs to first.
+
+**Start only ready topics.** A new topic starts only when every topic in its `needs` is `independent` or better, none of them lapsed or marked `relearn` (the engine's ready set; its daily plan proposes only these). When he asks for one that is not ready, say in one line which need comes first, and teach or check that need.

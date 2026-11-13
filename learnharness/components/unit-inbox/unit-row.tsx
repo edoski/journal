@@ -4,11 +4,11 @@ import Link from "next/link";
 import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState } from "@/components/nav/session-state";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { activeSession, monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { monogram, studiedWords, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import { CARD_ACTION_PLACE, ROW_ACTION, RowCard, rowSurface, STATUS_SLOT, TRAILING_SLOT } from "@/components/unit-inbox/row-card";
 import { cn } from "@/lib/utils";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -42,7 +42,7 @@ export function CourseMark({ title, className }: { title: string; className?: st
  *  topic. Shown on hover and on keyboard focus. */
 function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	const { start, starting } = useStartUnit();
-	const resume = activeSession(unit.sessions);
+	const resume = resumableSession(unit.sessions);
 	const label = resume ? "Resume" : STUDY_WORDS;
 	const Icon = resume ? PlayIcon : SquarePenIcon;
 	const props = {
@@ -223,7 +223,7 @@ export function SessionSlimRow({
 			</span>
 			<span data-testid={state === "your-turn" ? "session-waiting" : undefined} className={cn(TRAILING_SLOT, "h-6")}>
 				<UnitStatusText
-					status={state === "idle" ? { kind: "studied", words: studiedWords(chat.updatedAt, today) } : { kind: state }}
+					status={state === "working" || state === "your-turn" ? { kind: state } : { kind: "studied", words: studiedWords(chat.updatedAt, today) }}
 				/>
 			</span>
 		</button>

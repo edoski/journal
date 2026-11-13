@@ -15,7 +15,8 @@ import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
-import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { sessionEndOf } from "../core/session-end.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -34,7 +35,7 @@ function chatFile(id: string): string {
  *  turn-started / turn-settled, or for a turn-less write (a dismissal,
  *  compaction) by record-changed, which the sidebar refetches on. Silence
  *  here is law, not oversight. */
-function createChat(title: string, course?: CourseLink): ChatRecord {
+function createChat(title: string, course?: CourseLink, topics: readonly string[] = []): ChatRecord {
 	const now = new Date().toISOString();
 	const record: ChatRecord = {
 		id: `chat_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
@@ -43,6 +44,7 @@ function createChat(title: string, course?: CourseLink): ChatRecord {
 		updatedAt: now,
 		messages: [],
 		...(course ? { course: { workspace: course.workspace, title: course.title } } : {}),
+		...(topics.length > 0 ? { topics: [...topics] } : {}),
 	};
 	fs.mkdirSync(PATHS.chats, { recursive: true });
 	writeChat(record);
@@ -112,7 +114,9 @@ function listChats(): ChatSummary[] {
 						// waiting"); only practice poses, and a handoff to teaching
 						// is refused while one is active.
 						pendingProblem: activeProblemOf(messages) !== null,
-						topics: sessionTopicsOf(messages, tree?.nodes.map((n) => n.id)),
+						topics: [...new Set([...(summary.topics ?? []), ...sessionTopicsOf(messages)])],
+						ended: sessionEndOf(messages, tree, summary.kind),
+						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);

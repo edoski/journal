@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SessionStarter } from "@/components/start-session";
-import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import type { Unit } from "@/components/unit-inbox/units";
 
 /** The row action that starts a session on a unit, worded as the course map's. */
@@ -17,22 +16,18 @@ export const STUDY_WORDS = "Study";
 export function useStartUnit(): { start: (unit: Unit) => void; starting: string | null } {
 	const router = useRouter();
 	const starter = useRef(new SessionStarter());
-	const [, recordStart] = useTopicStarts();
 	const [starting, setStarting] = useState<string | null>(null);
 	const start = useCallback(
 		(unit: Unit) => {
 			if (starting) return;
 			setStarting(unit.key);
 			starter.current
-				.start({ title: unit.topic.title, course: { workspace: unit.course.workspace } }, fetch)
-				.then((href) => {
-					recordStart(href.slice("/chat/".length), unit.topic.handle);
-					router.push(href);
-				})
+				.start({ title: unit.topic.title, course: { workspace: unit.course.workspace }, topics: [unit.topic.handle] }, fetch)
+				.then((href) => router.push(href))
 				.catch(() => router.push("/chat/new"))
 				.finally(() => setStarting(null));
 		},
-		[router, starting, recordStart],
+		[router, starting],
 	);
 	return { start, starting };
 }

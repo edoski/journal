@@ -12,13 +12,15 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
-import { sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useMapVariant } from "@/components/design-variant";
+import { useDesignVariant, useLinkVariant, usePickupVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
-import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
-import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
+import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
+import { PICKUP_PANES } from "@/components/unit-inbox/topic-page/pickup/pickup-options";
+import { LINK_PANES } from "@/components/unit-inbox/topic-page/link/link-options";
+import { LEVEL_WORDS, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
@@ -132,17 +134,16 @@ function UnitBody({
 	initialConfigured: boolean;
 }) {
 	const lesson = useLessonStart(initialConfigured);
-	// The header the topic map's node opens, while the Map switch is on Proposed.
-	const mapNext = useMapVariant() === "proposed";
-	const [starts, recordStart] = useTopicStarts();
+	// The Proposed design's header is the one the topic map's node opens; Current keeps the page as it was.
+	const mapNext = useDesignVariant() === "proposed";
 	const [text, setText] = useState("");
 	const workspace = course.map.workspace;
-	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic.handle);
-	const active = activeSession(sessions);
+	const sessions = topicSessions(chats, workspace, topic.handle);
+	const active = resumableSession(sessions);
 	const others = sessions.filter((c) => c !== active);
 	const send = () => {
 		if (!text.trim()) return;
-		lesson.start(openingFor(topic.title, text), workspace, (id) => recordStart(id, topic.handle));
+		lesson.start(openingFor(topic.title, text), workspace, { topics: [topic.handle] });
 	};
 	return (
 		<>
@@ -153,7 +154,7 @@ function UnitBody({
 							map={course.map}
 							topic={topic}
 							busy={lesson.busy}
-							onStudy={active ? undefined : () => lesson.start(topic.title, workspace, (id) => recordStart(id, topic.handle))}
+							onStudy={active ? undefined : () => lesson.start(topic.title, workspace, { topics: [topic.handle] })}
 						/>
 					) : (
 					<header className="flex flex-col gap-1 px-2">
@@ -215,6 +216,9 @@ function UnitBody({
  */
 export function UnitPage({ workspace, handle, initialConfigured }: { workspace: string; handle: string; initialConfigured: boolean }) {
 	const read = useUnitRead(workspace);
+	const variant = useTopicVariant();
+	const pickup = usePickupVariant();
+	const link = useLinkVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
@@ -223,7 +227,15 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				<SidebarToggle />
 			</header>
 			{read.status === "ready" && topic ? (
-				<UnitBody course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				variant === "current" ? (
+					<UnitBody course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				) : (
+					<TopicPage
+						candidate={TOPIC_CANDIDATES[variant]}
+						pickup={variant === "hybrid" && pickup !== "current" ? PICKUP_PANES[pickup] : undefined}
+						link={variant === "hybrid" && pickup !== "current" && link !== "current" ? LINK_PANES[link] : undefined}
+						course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
+				)
 			) : (
 				<p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">
 					{read.status === "loading" ? "Loading…" : "This topic is not in the course record."}

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { SetupDialog } from "@/components/setup-dialog";
-import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { useLessonStart } from "@/components/start/use-lesson-start";
+import { courseMove } from "@/components/study-home/study-facts";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CourseChrome } from "@/components/course-page/course-chrome";
@@ -16,7 +17,7 @@ import { useCourse } from "@/components/course-page/use-course";
 export interface CourseReady {
 	view: CourseView;
 	busy: boolean;
-	/** Take up the course's next step (Home's Continue). */
+	/** Take up the course's next step as Home's line does (`courseMove`). */
 	onContinue: (workspace: string) => void;
 }
 
@@ -39,15 +40,21 @@ export function CourseFrame({
 	className: string;
 	children: (ready: CourseReady) => React.ReactNode;
 }) {
-	const { read, retry } = useCourse(workspace);
+	const { read, chats, retry } = useCourse(workspace);
 	const lesson = useLessonStart(initialConfigured);
+	const router = useRouter();
+	const onContinue = (view: CourseView) => (ws: string) => {
+		const move = courseMove(view.course, chats);
+		if (move.kind === "open") router.push(`/chat/${move.chat.id}`);
+		else lesson.start(move.opening, ws, { topics: move.topics, from: move.from });
+	};
 	return (
 		<CourseChrome>
 			<ScrollArea bar={false} data-slot="course-page" className="min-h-0 flex-1" viewportClassName="[&>div]:block! [&>div]:h-full">
 				<div className={className}>
 					<CourseLessonError value={lesson.error}>
 						<CourseBody read={read} onRetry={retry}>
-							{(view) => children({ view, busy: lesson.busy, onContinue: (ws) => lesson.start(CONTINUE_OPENING, ws) })}
+							{(view) => children({ view, busy: lesson.busy, onContinue: onContinue(view) })}
 						</CourseBody>
 					</CourseLessonError>
 				</div>

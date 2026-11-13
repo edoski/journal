@@ -126,6 +126,16 @@ function attemptResult(description: string) {
 	return Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], { description });
 }
 
+function brokeAtField() {
+	return Type.Optional(
+		Type.String({
+			minLength: 1,
+			description:
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
+		}),
+	);
+}
+
 function byTopicField() {
 	return Type.Optional(
 		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
@@ -147,11 +157,11 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the outcome: solved, solvedWithHints, movedOn, or surrendered — bare words, no quotes (dismissed is synthesized, never yours)." },
 	),
 	verdict: Type.String({
-		description: "REQUIRED — the plain-language verdict: what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
+		description: "REQUIRED — the plain-language verdict, shown to the learner on the card: addressed to him as \"you\", what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given before he answered or gave up, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes). The solution revealed after he gives up is not a hint." },
 	),
 	missClass: Type.Union(
 		[
@@ -165,9 +175,10 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
-	result: attemptResult(
-		"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
-	),
+	result: Type.Union([attemptResult("correct, partial or incorrect"), Type.Null()], {
+		description:
+			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
+	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
 	chose: Type.Optional(
 		Type.String({
@@ -177,6 +188,7 @@ export const concludeInputObject = Type.Object({
 		}),
 	),
 	byTopic: byTopicField(),
+	brokeAt: brokeAtField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
@@ -190,6 +202,7 @@ export const concludeInputObject = Type.Object({
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
 				byTopic: byTopicField(),
+				brokeAt: brokeAtField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
@@ -216,6 +229,17 @@ function lastSubmissionConfidence(messages: readonly LhMessage[], problemCallId:
 	return states[states.length - 1];
 }
 
+/** True when he pressed Explain instead on this problem before submitting
+ *  any work on it: he asked to be taught, so nothing was attempted. */
+function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: string): boolean {
+	const onProblem = messages
+		.filter((m): m is LhMessage & LhMarkerMessage => m.role === "custom")
+		.filter((m) => (m.details as { problemCallId?: unknown } | null)?.problemCallId === problemCallId);
+	const explained = onProblem.some((m) => m.customType === "practice-request" && (m.details as { request?: unknown }).request === "explain");
+	const worked = onProblem.some((m) => m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof (m.details as { text?: unknown }).text === "string"));
+	return explained && !worked;
+}
+
 /** Save a concluded problem's attempts; a refusal names what to fix. */
 async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
 	if (input.outcome === "dismissed") return { text: "" };
@@ -227,6 +251,9 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	if (!record || !active || !pose) {
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
 	}
+	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
+		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
+	}
 	const topics = pose.topics;
 	const conclusion: PracticeConclusion = {
 		outcome: input.outcome,
@@ -235,10 +262,12 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		response: input.response,
 		...(input.chose ? { chose: input.chose } : {}),
 		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
+	if (conclusion.result === null) return { text: "No attempt recorded: he claimed no answer." };
 	const observations = practiceObservations(
 		{ statement: pose.statement, topics },
 		conclusion,

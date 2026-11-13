@@ -18,7 +18,7 @@ import re
 from typing import Any, TypedDict
 import unicodedata
 
-from learning import preferences
+from learning import clock, preferences
 
 SCHEMA = 6
 HANDLE = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
@@ -84,6 +84,7 @@ HELPER_FIELDS = frozenset(
         "updated_at",
         "next_observation",
         "recorded",
+        "due_topics",
         "judged",
         "updated",
         "created",
@@ -147,6 +148,8 @@ FIELDS: dict[str, dict[str, str]] = {
         "sure": _SURE,
         "chose": _HANDLE,
         "transfer": _FLAG,
+        "shown": _FLAG,
+        "gave_up": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -176,7 +179,7 @@ FIELDS: dict[str, dict[str, str]] = {
 HELPERS: dict[str, dict[str, str]] = {
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
-    "observation": {"recorded": _STAMP},
+    "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
     "knowledge": {"updated": _DAY},
     "task": {"created": _DAY, "updated": _DAY},
 }
@@ -243,12 +246,15 @@ class Observation(TypedDict, total=False):
     sure: str
     chose: str
     transfer: bool
+    shown: bool
+    gave_up: bool
     date: str
     task: str
     refs: list[Reference]
     corrects: list[str]
     uncertain: str
     recorded: str
+    due_topics: list[str]
 
 
 class Knowledge(TypedDict, total=False):
@@ -312,6 +318,7 @@ class PatchResult:
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
+    exam_moved: bool = False
 
 
 # --- messages ---------------------------------------------------------------
@@ -655,7 +662,15 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
     else:
         given = [
             name
-            for name in ("result", "help", "sure", "transfer", "chose")
+            for name in (
+                "result",
+                "help",
+                "sure",
+                "transfer",
+                "chose",
+                "shown",
+                "gave_up",
+            )
             if name in observation
         ]
         if given:
@@ -665,6 +680,13 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
             )
     if observation.get("transfer") and observation.get("result") != "correct":
         raise ValueError(f'{path}.transfer is allowed only with result "correct"')
+    if observation.get("shown") and unaided(observation):
+        raise ValueError(
+            f"{path}.shown marks help that showed the method or the answer before "
+            'the attempt, so it needs that help named, not help "none"'
+        )
+    if observation.get("gave_up") and observation.get("result") != "incorrect":
+        raise ValueError(f'{path}.gave_up is allowed only with result "incorrect"')
     if "chose" in observation:
         if observation.get("result") == "correct":
             raise ValueError(
@@ -1083,6 +1105,7 @@ def check_patch(patch: Any) -> dict[str, Any]:
             ]
         else:
             result[name] = preferences.validate(value, name)
+            preferences.check_engine(result[name], name)
     return result
 
 
@@ -1253,6 +1276,14 @@ def _check_new(
                 f"{path}.corrects: {target!r} is not a recorded observation; "
                 f"{_span(record)}"
             )
+        recorded = clock.local_day(record["observations"][target]["recorded"])
+        if item["kind"] != "self_report" and recorded < today:
+            raise ValueError(
+                f"{path}.corrects: {target} was recorded on {recorded.isoformat()}, "
+                "and an attempt from an earlier day stands as it was recorded: never "
+                "regrade it from a transcript. When the learner says it was wrong, "
+                "record their words as a self_report that corrects it"
+            )
     _check_refs(item, path, record["sources"])
 
 
@@ -1264,7 +1295,11 @@ def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> s
 
 
 def _content(observation: dict[str, Any]) -> dict[str, Any]:
-    return {name: value for name, value in observation.items() if name != "recorded"}
+    return {
+        name: value
+        for name, value in observation.items()
+        if name not in ("recorded", "due_topics")
+    }
 
 
 def _append_observations(
@@ -1300,6 +1335,14 @@ def _append_observations(
         record["observations"][key] = {**item, "recorded": now}
         outcome.observations.append(key)
     record["next_observation"] = sequence
+
+
+def _exam_plan(record: dict[str, Any]) -> tuple[Any, Any]:
+    """What review dates hang on: the exam day and the course's final-review lead."""
+    return (
+        record.get("exam", {}).get("date"),
+        record.get("preferences", {}).get(preferences.FINAL_REVIEW_DAYS),
+    )
 
 
 def apply_patch(
@@ -1369,4 +1412,5 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
+    outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
     return validate_record(result), outcome

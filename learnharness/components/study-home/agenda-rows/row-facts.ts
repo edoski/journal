@@ -1,13 +1,11 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
 import { overdueWords } from "@/components/course-map/topic-map/topic-standing";
+import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 
-/** What every row candidate draws from: Today's lines, the engine's study
- *  day, and how a line opens. */
+/** What Today's rows draw from: Today's lines and how a line opens. */
 export interface RowsProps {
 	rows: readonly TodayRow[];
-	/** The engine's study day. */
-	today: string;
 	busy: boolean;
 	onContinue: (workspace: string) => void;
 	/** Under the Overview switch's follow: the line Home's map follows, and
@@ -64,12 +62,10 @@ export function lessonTitle(row: TodayRow): string {
 	return row.kind === "session" ? row.chat.title : stepWords(row.step);
 }
 
-/** Why a line is on Today: its kind (which picks its icon), the full
- *  sentence, and the few words that fit beside an icon. */
+/** Why a line is on Today: its kind (which picks its icon) and the few
+ *  words that fit beside an icon. */
 export interface Why {
-	kind: "reply" | "missed" | "review" | "task" | "next";
-	/** "You missed Chain rule last time". */
-	words: string;
+	kind: "reply" | "working" | "stopped" | "missed" | "review" | "task" | "next";
 	/** "Missed Chain rule". */
 	short: string;
 }
@@ -78,31 +74,29 @@ export interface Why {
  *  topic it was), else how overdue the most overdue one is. Pure. */
 function reviewReason(due: readonly CourseMapTopic[]): Why | null {
 	const lapsed = due.find((t) => t.signals.lapsed);
-	if (lapsed) return { kind: "missed", words: `You missed ${lapsed.title} last time`, short: `Missed ${lapsed.title}` };
+	if (lapsed) return { kind: "missed", short: `Missed ${lapsed.title}` };
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
-	return { kind: "review", words: overdueSentence(overdue), short: overdueWords(overdue) };
+	return { kind: "review", short: overdueWords(overdue) };
 }
 
-/** A late review as a sentence, for a tooltip or a screen reader: "Due
- *  today", "Overdue by 3 days", "Overdue by a week". Pure. */
-export function overdueSentence(overdue: number): string {
-	if (overdue <= 0) return "Due today";
-	if (overdue < 7) return overdue === 1 ? "Overdue by a day" : `Overdue by ${overdue} days`;
-	const weeks = Math.floor(overdue / 7);
-	return weeks === 1 ? "Overdue by a week" : `Overdue by ${weeks} weeks`;
-}
+/** A session's line by where it stands; a finished session has no line. */
+const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
+	"your-turn": { kind: "reply", short: "Your turn" },
+	working: { kind: "working", short: "Tutor writing" },
+	paused: { kind: "stopped", short: "Stopped mid-reply" },
+	finished: null,
+};
 
 /**
  * Why a line is on Today, in words that need no memory of the system: a
- * session waiting on the learner and since when, why a review is due (a
- * lapse, or how long it is overdue), where an open task was left, or
- * that the topic is next on the course's map. Engine fields only. Pure.
+ * session waiting on the learner, the tutor writing in it or stopped
+ * mid-reply in it, why a review is due (a lapse, or how
+ * long it is overdue), where an open task was left, or that the topic is
+ * next on the course's map. Engine fields only. Pure.
  */
-export function whyOf(row: TodayRow, today: string): Why | null {
-	if (row.kind === "session") {
-		return { kind: "reply", words: row.chat.updatedAt.slice(0, 10) < today ? "Waiting since yesterday" : "Waiting for your reply", short: "Your turn" };
-	}
+export function whyOf(row: TodayRow): Why | null {
+	if (row.kind === "session") return SESSION_WHY[sessionState(row.chat)];
 	const { course, step } = row;
 	switch (step.kind) {
 		case "review": {
@@ -110,19 +104,12 @@ export function whyOf(row: TodayRow, today: string): Why | null {
 			return reviewReason(course.map.topics.filter((t) => handles.has(t.handle)));
 		}
 		case "task":
-			return step.step
-				? { kind: "task", words: `Left off at ${step.step.charAt(0).toLowerCase()}${step.step.slice(1)}`, short: `At ${step.step.charAt(0).toLowerCase()}${step.step.slice(1)}` }
-				: { kind: "task", words: "Started, not finished", short: "Unfinished" };
+			return step.step ? { kind: "task", short: `At ${step.step.charAt(0).toLowerCase()}${step.step.slice(1)}` } : { kind: "task", short: "Unfinished" };
 		case "topic":
-			return { kind: "next", words: "Next on your map", short: "Next up" };
+			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
 		case "none":
 			return null;
 	}
-}
-
-/** `whyOf` as its full sentence. Pure. */
-export function whyNow(row: TodayRow, today: string): string | null {
-	return whyOf(row, today)?.words ?? null;
 }
 
 /** How long since the learner last studied a line's course, short enough

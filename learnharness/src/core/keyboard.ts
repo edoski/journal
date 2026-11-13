@@ -35,11 +35,28 @@ export type KeyAction =
 	| "question-pick-row"
 	| "question-submit"
 	| "open-settings"
-	| "toggle-user-thinking";
+	| "toggle-user-thinking"
+	| "page-move"
+	| "page-open"
+	| "calendar-today"
+	| "calendar-week"
+	| "calendar-month"
+	| "calendar-previous"
+	| "calendar-next"
+	| "confidence-up"
+	| "confidence-down"
+	| "pick-course"
+	| "practice-hint"
+	| "practice-show"
+	| "practice-explain";
 
 /** Where the cheat sheet groups an action (display only — dispatch is
  *  global; a seam that isn't mounted simply no-ops). */
 export type KeyScope = "global" | "chat" | "graph";
+
+/** A finer heading the Proposed cheat sheet files an action under, inside
+ *  its scope's place. Settings lists by scope alone. */
+export type KeyGroup = "pages" | "calendar";
 
 export interface KeyActionDef {
 	id: KeyAction;
@@ -51,6 +68,7 @@ export interface KeyActionDef {
 	 *  question dock's row machine); never dispatched from the registry,
 	 *  so they can't leak to pages where the surface isn't mounted. */
 	displayOnly?: boolean;
+	group?: KeyGroup;
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
@@ -67,6 +85,10 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "new-session", label: "New session", scope: "global", binding: "mod+n" },
 	{ id: "rename-session", label: "Rename session", scope: "chat", binding: "f2" },
 	{ id: "toggle-user-thinking", label: "Toggle all your thinking", scope: "chat", binding: "mod+t" },
+	// The practice problem's requests: the mounted problem box answers them.
+	{ id: "practice-hint", label: "Problem or check · hint", scope: "chat", binding: "mod+shift+h" },
+	{ id: "practice-show", label: "Problem · show me", scope: "chat", binding: "mod+shift+s" },
+	{ id: "practice-explain", label: "Problem · explain instead", scope: "chat", binding: "mod+shift+e" },
 	// Mod+F is surface-scoped: graph node search and session text Find share
 	// one action/binding. Only the currently mounted surface listens.
 	{ id: "find", label: "Find", scope: "global", binding: "mod+f" },
@@ -83,6 +105,20 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "question-prev-row", label: "Question · previous row", scope: "chat", binding: "arrowup", displayOnly: true },
 	{ id: "question-pick-row", label: "Question · pick row", scope: "chat", binding: "space", displayOnly: true },
 	{ id: "question-submit", label: "Question · submit", scope: "chat", binding: "enter", displayOnly: true },
+	// Keyboard reach (13 Nov 2026): the page's own arrows (spatial-arrows.ts)
+	// walk its rows and links, and Enter opens them natively.
+	{ id: "page-move", label: "Move between rows and links", scope: "global", binding: "arrows", displayOnly: true, group: "pages" },
+	{ id: "page-open", label: "Open the row or link", scope: "global", binding: "enter", displayOnly: true, group: "pages" },
+	// The calendar's letters, Google Calendar's; only the mounted calendar listens.
+	{ id: "calendar-today", label: "Go to today", scope: "global", binding: "t", group: "calendar" },
+	{ id: "calendar-week", label: "Show the week", scope: "global", binding: "w", group: "calendar" },
+	{ id: "calendar-month", label: "Show the month", scope: "global", binding: "m", group: "calendar" },
+	{ id: "calendar-previous", label: "Previous week or month", scope: "global", binding: "p", group: "calendar" },
+	{ id: "calendar-next", label: "Next week or month", scope: "global", binding: "n", group: "calendar" },
+	// The confidence toggle owns these while it is mounted (confidence-choice.tsx).
+	{ id: "confidence-up", label: "More sure", scope: "chat", binding: "alt+arrowup", displayOnly: true },
+	{ id: "confidence-down", label: "Less sure", scope: "chat", binding: "alt+arrowdown", displayOnly: true },
+	{ id: "pick-course", label: "Pick a course", scope: "chat", binding: "mod+o" },
 ];
 
 const STORAGE_KEY = "lh:keymap";
@@ -200,6 +236,8 @@ const KEY_GLYPH: Record<string, string> = {
 	tab: "⇥",
 	escape: "Esc",
 	space: "Space",
+	// Display-only: the four arrows as one cheat-sheet row (page-move).
+	arrows: "↑ ↓ ← →",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */

@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils"
 /** shadcn scroll area on the Proposed tokens (spec: scroll-area.md): an
  *  overlay bar 10px wide with a 15% white thumb, or no bar in view
  *  (`bar={false}`, T3 Code's sidebar), the area still scrolling by wheel,
- *  trackpad and keyboard: Radix lets only a viewport with a bar mounted
- *  scroll, so that bar stays mounted, invisible. `viewportRef` reaches the
- *  scroller for code that locks or measures it. */
+ *  trackpad and keyboard. `viewportRef` reaches the scroller for code that
+ *  locks or measures it. Radix lets the viewport scroll only on an axis
+ *  with a mounted scrollbar, so the bar-less area mounts a hidden one. */
 function ScrollArea({
   className,
   children,
@@ -39,7 +39,7 @@ function ScrollArea({
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
-      <ScrollBar aria-hidden={!bar || undefined} className={cn(!bar && "invisible")} />
+      {bar ? <ScrollBar /> : <ScrollAreaPrimitive.Scrollbar orientation="vertical" className="hidden" />}
       {bar && <ScrollAreaPrimitive.Corner />}
     </ScrollAreaPrimitive.Root>
   )

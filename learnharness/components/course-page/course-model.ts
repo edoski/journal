@@ -5,7 +5,7 @@ import { examWords, todayRows, type TodayRow } from "@/components/study-home/stu
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { buildInbox, linkStarts, reviewWords, type TopicStarts, type Unit, type UnitNow } from "@/components/unit-inbox/units";
+import { buildInbox, reviewWords, type Unit, type UnitNow } from "@/components/unit-inbox/units";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
@@ -178,13 +178,13 @@ export interface CourseNext {
 }
 
 /** What the course's button takes up, exactly as Home's line for it would:
- *  a session in this course waiting on him since yesterday, else the
- *  course's next step. `waiting` are the sessions waiting on him. Pure. */
-export function courseNext(course: StudyCourse, waiting: readonly ChatListItem[]): CourseNext {
-	const mine = waiting.filter((c) => c.course?.workspace === course.map.workspace);
+ *  a session in this course to pick up since yesterday, else the course's
+ *  next step. `open` are the sessions to pick up (`openSessions`). Pure. */
+export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): CourseNext {
+	const mine = open.filter((c) => c.course?.workspace === course.map.workspace);
 	const row = todayRows([course], mine, course.map.today)[0]!;
 	const lesson = lessonOf(row);
-	return { row, lesson, why: whyOf(row, course.map.today), action: lesson.action === "Open" ? "Resume" : lesson.action };
+	return { row, lesson, why: whyOf(row), action: lesson.action === "Open" ? "Resume" : lesson.action };
 }
 
 /** The header's facts, each a few words; null where the course has none. */
@@ -227,10 +227,8 @@ export type CourseRead =
 	| { status: "missing" }
 	| { status: "ready"; view: CourseView };
 
-/** One course's page from the study home's read (`useStudyHome`), with the
- *  sessions started on a topic's page linked to it as the sidebar links
- *  them. Pure. */
-export function courseRead(state: StudyHomeState, workspace: string, starts: TopicStarts = {}): CourseRead {
+/** One course's page from the study home's read (`useStudyHome`). Pure. */
+export function courseRead(state: StudyHomeState, workspace: string): CourseRead {
 	switch (state.status) {
 		case "loading":
 			return { status: "loading" };
@@ -243,7 +241,7 @@ export function courseRead(state: StudyHomeState, workspace: string, starts: Top
 			if (!course) return { status: state.failed.includes(workspace) ? "unreadable" : "missing" };
 			return {
 				status: "ready",
-				view: { course, groups: courseGroups(course, linkStarts(state.chats, starts)), facts: courseFacts(course), next: courseNext(course, state.waiting) },
+				view: { course, groups: courseGroups(course, state.chats), facts: courseFacts(course), next: courseNext(course, state.open) },
 			};
 		}
 	}

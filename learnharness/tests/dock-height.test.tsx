@@ -109,7 +109,7 @@ function Fixture({ expanded = true, practice = false, enabled = true, inspected,
 	return <><div ref={scrollRef} data-part="column" /><div ref={blockRef} data-part="block" data-inset={inset}>
 		<div ref={viewportRef} data-part="viewport"><div ref={bodyRef} data-part="body">
 			<div ref={shellRef} data-part="shell"><div ref={contentRef} data-part="content" key={practice ? "practice" : "question"}>
-				{practice ? <PracticeDock problemCallId="p1" input={{ statement: "Long practice problem" }} expanded={expanded} onExpand={() => {}} onSubmit={() => {}} />
+				{practice ? <PracticeDock problemCallId="p1" input={{ statement: "Long practice problem" }} expanded={expanded} onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} />
 					: <QuestionDock toolName="recall" toolCallId="q1" input={{ question: "Long teaching question", correctAnswer: "A, because it is correct." }} expanded={expanded} onExpand={() => {}} onSubmit={() => {}} />}
 			</div></div>
 		</div></div><div data-testid="toolbar" />

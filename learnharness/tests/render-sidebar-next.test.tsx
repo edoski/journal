@@ -84,8 +84,11 @@ describe("sessionState", () => {
 		assert.equal(sessionState(item({ compacting: true })), "working");
 	});
 
-	it("nothing pending is idle", () => {
-		assert.equal(sessionState(item({})), "idle");
+	it("a lesson waiting on his words mid-lesson is his turn; a cut turn is paused; else finished", () => {
+		assert.equal(sessionState(item({ ended: "mid-lesson" })), "your-turn");
+		assert.equal(sessionState(item({ ended: "cut" })), "paused");
+		assert.equal(sessionState(item({ ended: "closed" })), "finished");
+		assert.equal(sessionState(item({})), "finished", "a summary without the fold reads as closed");
 	});
 });
 

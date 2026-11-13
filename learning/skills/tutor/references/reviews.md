@@ -8,7 +8,7 @@
 4. Put the next question in the same message. No recap.
 5. Record one attempt per answer, with the question asked as `text`, `response`, `help`, `result`, `sure` and `chose`. A confident error also rewrites `gap` and the `prompt`; broken reasoning rewrites `gap`. Only the first try on a due day counts; retries are relearning.
 
-When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line (how many are due, and the most overdue) and proposes a review block, today's review and as far past it as the learner wants, before new material; the learner decides.
+When more than five topics are due, or the exam is 21 days away or less and any topic is due, an open-ended start says so in one line (how many are due, and the most overdue) and proposes a review block, today's review and as far past it as the learner wants, before new material; the learner decides. The course's daily plan, when you have it, is the default for the day: its reviews, then its new topics. It holds what the learner actually completes on that weekday, learned from the record across every course, and nothing on a weekday he does not study; say it in one line and let the learner change it. When it is done and the learner wants more, offer the next due review or the next topic: what he does beyond the plan moves the pace the plan assumes.
 
 Ask once per course whether reviews are done with closed notes and store the answer as the course preference `review_notes`; with open notes, attempts are `uncertain`. A mock replaces the day's review for the topics it covers.
 
@@ -18,11 +18,11 @@ Write them when a session that taught a new topic closes, from the course source
 
 ## Missed reviews and lapses
 
-A missed review is a planning fact, not evidence of forgetting: the topic stays due until it is answered. A topic that lapses again is re-taught in the session, not quizzed again.
+A missed review is a planning fact, not evidence of forgetting: the topic stays due until it is answered, and with no exam ahead a right answer after a long gap earns a longer interval. A topic marked `relearn` (missed on its last two counted days) or that lapses again is re-taught in the session, starting with a check of its `needs`, not quizzed again.
 
 ## The close
 
-In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message is that step itself, not an administrative recap. Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete, and set `focus` to the one to continue.
+In a session that taught a new topic, unless the learner is leaving, write its `review.prompt` and `review.points`, then ask for a brain dump without notes, mark it against those points and record it as an attempt, with `"introduced": true` on the topic in the same save; its first review is the next day. Every session ends with a next step, the task's `step` or `path.current` moved on, and the last message is that step itself, not an administrative recap. Leave every open task true: rewrite the `step` of each one the session moved, remove one whose goal was met or that the session made obsolete, and set `focus` to the one to continue.
 
 ## The week
 
@@ -34,14 +34,15 @@ At the first session of a new week, offer a look at the week in one line after t
 
 ## Exam run-up
 
-Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam. Within 21 days of the exam the course's run-up figures list the path topics `not_introduced`, the `unready` ones (no `solid` verdict in two weeks) and, when the Journal has a schedule, the `study_days` until a week before the exam and the `pace` of new topics per study day. The phase follows `days_left`:
+Use the recorded `exam` (format, coverage, criteria, constraints) from [course.md](course.md). Establish only missing information that changes the exercise. If requirements are unverified, describe the practice as provisional; never invent a marking scheme or predict the exam.
 
-| Days left | Phase |
+The engine paces the exam from the day its date is saved, planning every course together: on the days the learner studies, at the pace he keeps, the daily plan introduces the path's ready topics so the last comes four days before the final review (its first retrieval and one solid review fit before it), the nearest exam first, and with room to spare starts what is left even in the final week, since a topic started late beats one never started. `does_not_fit` names the topics it cannot place, per course and, across courses, in the plan's top-level `does_not_fit`; say which in one line and let the learner choose what to drop, or study more than planned, which raises the pace the plan assumes. Every topic gets one final review from `final_review_days` before the exam (6 unless the course says otherwise), spread over his study days to the exam by what each holds; after it a right answer sends the topic's next review after the exam, and a miss comes back the next day. Nothing is planned on the exam day. Once it has passed, the course's reviews go on at their spaced dates, after every other course's; ask whether there is a next exam date. Within 21 days of the exam the course's run-up figures list the path topics `not_introduced`, the taught `unready` ones (no `solid` verdict in two weeks) and the `study_days` he studies before the exam. The phase follows `days_left`:
+
+| Days left | Phase (with the final review 6 days out; shift it with `final_review_days`) |
 | --- | --- |
-| 21–8 | today's review plus two mixed sets a week; introduce the remaining path topics at `pace` per study day |
-| 7–5 | mock 1 |
-| 4–3 | targeted relearning: mock-1 failures, lapsed and `unready` topics |
-| 2 | mock 2, or an oral simulation for an oral exam |
+| 21–8 | the daily plan's reviews and new topics, plus two mixed sets a week |
+| 7 | mock 1 |
+| 6–2 | the final review as the plan spreads it: every topic once, mock-1 failures and misses relearned the next day; mock 2 on day 2, or an oral simulation for an oral exam |
 | 1 | a light mixed review only |
 
 Each mock answer is an unaided attempt on the topics it genuinely exercised; prerequisites get no implicit credit. A mock replaces the day's review for the topics it covers.

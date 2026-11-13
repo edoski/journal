@@ -123,7 +123,7 @@ export function listWhere({ course, next }: Pick<CourseView, "course" | "next">)
 	const current = map.topics.find((t) => t.handle === map.current) ?? null;
 	// The course's open task, the one its Continue takes up (`nextStepOf`).
 	const open = map.tasks.find((t) => t.key === map.focus) ?? map.tasks[0];
-	const words = open && whyOf({ kind: "course", course, step: { kind: "task", title: open.title, step: open.step, topics: [] } }, map.today)?.short;
+	const words = open && whyOf({ kind: "course", course, step: { kind: "task", key: open.key, title: open.title, step: open.step, topics: [] } })?.short;
 	return {
 		here: step === "topic" ? null : current,
 		task: open && words && step !== "task" ? { title: open.title, step: words } : null,

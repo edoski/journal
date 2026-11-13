@@ -45,7 +45,7 @@ Levels are computed from attempts: `new`, `introduced` (taught), `attempted` (no
 
 ## Teaching, evidence and reviews
 
-Read [reviews.md](references/reviews.md) before running today's review, writing review prompts, looking at the week or preparing an exam; in the run-up `plan` adds the untaught and unready topics and the pace. Read [teaching.md](references/teaching.md) before teaching a new topic and [evidence.md](references/evidence.md) before recording a first attempt.
+Read [reviews.md](references/reviews.md) before running today's review, writing review prompts, looking at the week or preparing an exam; `plan` gives each course's daily plan (which reviews and which new topics each day, as much as the learner completes on that weekday across every course, paced to the exam) and, in the run-up, the untaught and unready topics and the pace. Read [teaching.md](references/teaching.md) before teaching a new topic and [evidence.md](references/evidence.md) before recording a first attempt.
 
 ## Judgement
 

@@ -34,8 +34,9 @@ export function planMapSteps(
 
 /** The calm plan map (spec: plan-map.md): one line per step, a small
  *  marker for visited, current and upcoming, "Now" and "Next" as quiet
- *  words. No diagram, no node numbers. */
-export function PlanMap({ steps }: { steps: readonly PlanMapStep[] }) {
+ *  words; a lesson nobody is in names its current step by `currentWord`.
+ *  No diagram, no node numbers. */
+export function PlanMap({ steps, currentWord = "Now" }: { steps: readonly PlanMapStep[]; currentWord?: string }) {
 	return (
 		<ol data-slot="plan-map" className="flex flex-col">
 			{steps.map((s) => (
@@ -47,10 +48,8 @@ export function PlanMap({ steps }: { steps: readonly PlanMapStep[] }) {
 							s.status === "current" ? "bg-primary" : s.status === "visited" ? "bg-muted-foreground" : "ring-1 ring-inset ring-muted-foreground",
 						)}
 					/>
-					<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
-						<MathText>{s.title}</MathText>
-					</span>
-					{s.status === "current" && <span className="shrink-0 text-muted-foreground">Now</span>}
+					<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}><MathText>{s.title}</MathText></span>
+					{s.status === "current" && <span className="shrink-0 text-muted-foreground">{currentWord}</span>}
 					{s.next && <span className="shrink-0 text-muted-foreground">Next</span>}
 				</li>
 			))}

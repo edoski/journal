@@ -73,7 +73,7 @@ describe("restShelves", () => {
 	it("keeps Learning's waiting topic first and reports it for the folded shelf's dot", () => {
 		const { inbox, top } = topOf(COURSES);
 		const learning = restShelves(inbox, new Set(top.map((u) => u.key))).learning;
-		assert.equal(learning[0]?.topic.handle, "independence");
+		assert.equal(learning[0]?.topic.handle, "det");
 		assert.ok(waitsOnYou(learning[0]!), "a session from before yesterday waits on it");
 		assert.ok(!learning.slice(1).some(waitsOnYou));
 	});
@@ -126,7 +126,7 @@ describe("unitFor and topicUnit", () => {
 describe("nowFor", () => {
 	it("keeps every course's lines with no filter, and only the chosen course's under it", () => {
 		assert.deepEqual(nowFor(COURSES, CHATS, null, TODAY), needsYouNow(COURSES, CHATS, TODAY));
-		assert.deepEqual(nowFor(COURSES, CHATS, "/s/linalg", TODAY).lines.map((l) => l.key), ["chat_eigen", "chat_rank"]);
+		assert.deepEqual(nowFor(COURSES, CHATS, "/s/linalg", TODAY).lines.map((l) => l.key), ["chat_eigen", "chat_rank", "/s/linalg"]);
 		assert.deepEqual(nowFor(COURSES, CHATS, "/s/prob", TODAY).lines.map((l) => l.key), ["/s/prob"]);
 	});
 

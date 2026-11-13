@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* FullCalendar's structural styles (components/ui/event-calendar-views.tsx),
+   in the base layer so its utilities win over them. */
+@import "@fullcalendar/react/skeleton.css" layer(base);
 
 @custom-variant dark (&:is(.dark *));
 
@@ -21,10 +24,24 @@
    DID (:focus-visible re-evaluates on key input — a clicked sidebar
    session lit up when the quiz's ←/→ were pressed). Surfaces carry their
    own hover/active/selected affordances; the dock's keyboard walk uses
-   its own ring utilities, unaffected by an outline reset. */
-*:focus,
-*:focus-visible {
-	outline: none;
+   its own ring utilities, unaffected by an outline reset.
+   In the base layer (keyboard reach, 13 Nov 2026), so it silences only the
+   browser's own outline: unlayered, it also beat every focus-visible:outline
+   utility, and the calendar's day numbers and the maps' nodes showed no
+   ring when the arrows reached them. */
+@layer base {
+	*:focus,
+	*:focus-visible {
+		outline: none;
+	}
+}
+
+/* Tailwind's outline-none sets the outline style to none for every later
+   outline utility too, so a target that pairs it with a focus-visible:outline
+   ring (the maps' nodes) drew nothing when the arrows reached it. On the
+   page, a keyboard focus gives such a ring its solid style back. */
+main [class*="focus-visible:outline-"]:not([class*="focus-visible:outline-none"]):not([class*="focus-visible:outline-hidden"]):focus-visible {
+	outline-style: solid;
 }
 
 /* Palette (owner's hexes): main #141414, raised #1C1C1C, edges #434343.

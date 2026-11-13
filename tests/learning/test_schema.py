@@ -502,6 +502,53 @@ def test_corrections_name_earlier_observations() -> None:
         schema.validate_record(stored)
 
 
+def test_an_attempt_records_how_it_was_helped_and_whether_he_gave_up() -> None:
+    record, outcome = apply(
+        course(BASE),
+        {
+            "observations": [
+                attempt("rank", help="Worked example of the same method", shown=True),
+                attempt("rank", text="Stuck", result="incorrect", gave_up=True),
+            ]
+        },
+    )
+    assert outcome.observations == ["o1", "o2"]
+    assert record["observations"]["o1"]["shown"] is True
+    assert record["observations"]["o2"]["gave_up"] is True
+    for observation, fragment in [
+        (attempt("rank", shown=True), "shown marks help"),
+        (attempt("rank", gave_up=True), "gave_up is allowed only with result"),
+        (
+            {"kind": "self_report", "topics": ["rank"], "text": "x", "gave_up": True},
+            "takes no gave_up",
+        ),
+    ]:
+        fails(course(BASE), {"observations": [observation]}, fragment)
+
+
+def test_an_attempt_from_an_earlier_day_stands_as_recorded() -> None:
+    record = apply(
+        course(BASE),
+        {"observations": [attempt("rank", help="Pointed at the first step")]},
+    )[0]
+    tomorrow = date(2026, 10, 11)
+    regrade = attempt("rank", help="none", text="Regraded", corrects=["o1"])
+    with pytest.raises(ValueError) as caught:
+        apply(record, {"observations": [regrade]}, today=tomorrow, now=NEXT_DAY)
+    assert "o1 was recorded on 2026-10-10" in str(caught.value)
+    assert "self_report" in str(caught.value)
+    same_day = apply(record, {"observations": [regrade]}, now=LATER)[0]
+    assert same_day["observations"]["o2"]["corrects"] == ["o1"]
+    report = {"kind": "self_report", "topics": ["rank"], "text": "Had my notes open"}
+    reported = apply(
+        record,
+        {"observations": [{**report, "corrects": ["o1"]}]},
+        today=tomorrow,
+        now=NEXT_DAY,
+    )[0]
+    assert reported["observations"]["o2"]["corrects"] == ["o1"]
+
+
 @pytest.mark.parametrize(("minutes", "skipped"), [(5, True), (30, True), (31, False)])
 def test_identical_observations_within_30_minutes_are_skipped(
     minutes: int, skipped: bool

@@ -22,7 +22,7 @@ import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 	return { handle: h(handle), title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over };
@@ -51,7 +51,7 @@ const MAP: StudyCourse["map"] = {
 		{ kind: "needs", prerequisite: h("independence"), topic: h("basis") },
 	],
 };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: [], lastActiveDaysAgo: 2 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: [], lastActiveDaysAgo: 2, newToday: [] };
 
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>

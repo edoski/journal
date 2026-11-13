@@ -67,13 +67,26 @@ export type CourseResult =
 	| { ok: false; kind: "validation" | "io" | "unavailable"; message: string };
 
 /** The engine's read and write verbs a lesson uses. `plan` is read for
- *  the exam run-up's figures. */
+ *  the exam run-up's figures; `days` is its horizon (one day unless set),
+ *  how far ahead it lists reviews and the Journal's study windows. */
 export type CourseVerb =
 	| { verb: "resume"; task?: string }
 	| { verb: "show"; handles: string[] | "all" }
 	| { verb: "search"; query: string }
 	| { verb: "save"; changes: unknown }
-	| { verb: "plan" };
+	| { verb: "plan"; days?: number }
+	/** Register files as the course's material; paths are relative to the
+	 *  course folder. */
+	| { verb: "sources"; add: readonly string[] }
+	/** Delete the whole course record; the folder and its files stay. */
+	| { verb: "forget-course" };
+
+/** What a new course starts with: its title and, when known, the exam day
+ *  (YYYY-MM-DD). */
+export interface NewCourseRecord {
+	title: string;
+	exam: string | null;
+}
 
 /** Display label for a course: its title, else the directory name. */
 export function courseLabel(course: { workspace: string; title: string | null }): string {

@@ -140,6 +140,17 @@ describe("course records adapter (fake engine)", () => {
 		]);
 	});
 
+	it("asks plan for one day unless the caller names a horizon", async () => {
+		const { engine, calls } = fakeEngine();
+		const records = createCourseRecords(engine);
+		await records.run("/w", { verb: "plan" });
+		await records.run("/w", { verb: "plan", days: 42 });
+		assert.deepEqual(calls().map((c) => c.args.slice(2)), [
+			["plan", "--days", "1"],
+			["plan", "--days", "42"],
+		]);
+	});
+
 	it("maps the engine's validation error, non-JSON output, a timeout and a missing interpreter", async () => {
 		const { engine } = fakeEngine();
 		const records = createCourseRecords({ ...engine, timeoutMs: 1_000 });
@@ -173,7 +184,7 @@ describe("course records adapter (fake engine)", () => {
 			topics: [
 				{ topic: "vectors", title: "Vectors", needs: [], contrasts: [], level: "transferred", introduced: "2026-10-16", review: "2026-11-23", weak: false, tasks: [] },
 				{ topic: "elimination", title: "Gaussian elimination", needs: ["vectors"], contrasts: ["cramer"], level: "assisted", review: "2026-11-06", overdue: 2, weak: true, choice_errors: { cramer: 1 }, tasks: [] },
-				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, tasks: ["sheet-4"] },
+				{ topic: "rank", title: "Rank", needs: ["elimination", "gone"], contrasts: [], level: "assisted", review: "2026-11-05", overdue: 3, weak: true, gap: "Counts nonzero entries", stale: true, repaired: true, tasks: ["sheet-4"] },
 				{ topic: "cramer", needs: ["vectors"], contrasts: ["elimination"], level: "introduced", weak: false, tasks: [] },
 				{ topic: "odd", level: "mastered", needs: [], contrasts: [], weak: false, tasks: [] },
 			],
@@ -195,7 +206,8 @@ describe("course records adapter (fake engine)", () => {
 		const [vectors, elimination, rank, cramer] = map.topics;
 		assert.deepEqual(vectors!.review, { kind: "scheduled", date: "2026-11-23" });
 		assert.deepEqual(rank!.review, { kind: "due", date: "2026-11-05", overdue: 3 });
-		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0 });
+		assert.deepEqual(rank!.signals, { gap: "Counts nonzero entries", lapsed: false, stale: true, choiceErrors: {}, confidentErrors: 0, repaired: true });
+		assert.equal(elimination!.signals.repaired, false);
 		assert.deepEqual(elimination!.signals.choiceErrors, { cramer: 1 });
 		assert.equal(cramer!.title, "cramer", "a topic without a title shows its handle");
 		assert.deepEqual(map.edges, [
@@ -218,19 +230,19 @@ describe("course records adapter (fake engine)", () => {
 });
 
 describe("course records adapter: create (fake engine)", () => {
-	it("runs init in the directory, then saves the title to the workspace init reports", async () => {
+	it("runs init in the directory, then saves the title and exam day to the workspace init reports", async () => {
 		const { engine, calls } = fakeEngine();
-		const created = await createCourseRecords(engine).create("/s/new", "New Course");
+		const created = await createCourseRecords(engine).create("/s/new", { title: "New Course", exam: "2026-12-14" });
 		assert.deepEqual(created, { ok: true, workspace: "/s/new" });
 		assert.deepEqual(calls().map((c) => [c.args, c.stdin]), [
 			[["--workspace", "/s/new", "init"], ""],
-			[["--workspace", "/s/new", "save"], JSON.stringify({ title: "New Course" })],
+			[["--workspace", "/s/new", "save"], JSON.stringify({ title: "New Course", exam: { date: "2026-12-14" } })],
 		]);
 	});
 
 	it("a failed init stops before the save and returns the engine's message", async () => {
 		const { engine, calls } = fakeEngine();
-		const created = await createCourseRecords({ ...engine, env: { ...engine.env, FAKE_ENGINE_FAIL: "init" } }).create("/s/new", "New Course");
+		const created = await createCourseRecords({ ...engine, env: { ...engine.env, FAKE_ENGINE_FAIL: "init" } }).create("/s/new", { title: "New Course", exam: null });
 		assert.deepEqual(created, { ok: false, kind: "io", message: "init could not write the record" });
 		assert.deepEqual(calls().map((c) => c.args[2]), ["init"]);
 	});
@@ -373,17 +385,35 @@ describe("course records adapter (the real engine, throwaway course)", { skip: !
 		);
 	});
 
-	it("create makes a new folder a titled course that the listing shows at once", async () => {
+	it("create makes a new folder a course with its exam day and material; rename and delete go through the engine", async () => {
 		const home = fs.mkdtempSync(path.join(TMP, "home-"));
 		const directory = path.join(fs.mkdtempSync(path.join(TMP, "root-")), "measure-theory");
-		fs.mkdirSync(directory);
+		fs.mkdirSync(path.join(directory, "material"), { recursive: true });
+		fs.writeFileSync(path.join(directory, "material", "Syllabus.md"), "# Syllabus");
 		const env = { ...process.env, HOME: home, LEARNING_TODAY: "2026-11-07" };
 		const records = createCourseRecords({ python: ENGINE_PYTHON, root: ENGINE_ROOT, env });
-		const created = await records.create(directory, "Measure Theory");
+		const created = await records.create(directory, { title: "Measure Theory", exam: "2026-12-14" });
 		assert.ok(created.ok, !created.ok ? created.message : "");
+		assert.equal(fs.realpathSync(created.workspace), fs.realpathSync(directory));
+		const added = await records.run(created.workspace, { verb: "sources", add: ["material/Syllabus.md"] });
+		assert.ok(added.ok, !added.ok ? added.message : "");
+		const shown = await records.run(created.workspace, { verb: "show", handles: "all" });
+		assert.ok(shown.ok);
+		assert.match(JSON.stringify(shown.json), /material\/Syllabus\.md/);
+
 		const listing = await records.list();
 		assert.ok(listing.available);
-		assert.deepEqual(listing.courses.map((c) => [c.workspace, c.title]), [[created.workspace, "Measure Theory"]]);
-		assert.equal(fs.realpathSync(created.workspace), fs.realpathSync(directory));
+		assert.deepEqual(listing.courses.map((c) => [c.workspace, c.title, c.exam?.date]), [[created.workspace, "Measure Theory", "2026-12-14"]]);
+
+		const renamed = await records.run(created.workspace, { verb: "save", changes: { title: "Measure and Integration" } });
+		assert.ok(renamed.ok);
+		const after = await records.list();
+		assert.deepEqual(after.available && after.courses.map((c) => c.title), ["Measure and Integration"]);
+
+		const forgotten = await records.run(created.workspace, { verb: "forget-course" });
+		assert.ok(forgotten.ok, !forgotten.ok ? forgotten.message : "");
+		const gone = await records.list();
+		assert.deepEqual(gone.available && gone.courses, [], "a deleted course leaves the listing");
+		assert.ok(fs.existsSync(path.join(directory, "material", "Syllabus.md")), "its files stay");
 	});
 });

@@ -41,7 +41,10 @@ import {
 	HANDOFF_TEXT,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
+	PRACTICE_REQUEST_TEXT,
+	hintRungText,
 	THINKING_LABEL,
+	type PracticeRequest,
 	type SessionMode,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
@@ -80,8 +83,10 @@ export interface LhMarkerMessage {
 		| "plan-block"
 		| "practice-thinking"
 		| "practice-next"
+		| "practice-request"
 		| "problem-dismissed"
-		| "compaction";
+		| "compaction"
+		| "session-resume";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -295,6 +300,28 @@ export function sessionModeOf(messages: readonly LhMessage[], initial: SessionMo
 	return foldModes(messages, initial).now;
 }
 
+/** The opening of a fresh session that picks up a finished lesson
+ *  (`from`): model-facing (sessionResumeText), and it stands for the
+ *  concluded probe and the plan, which the record's tree carries over. It
+ *  also carries the open tasks the lesson held, so the new session holds
+ *  them from its first message. */
+export function newSessionResumeMessage(from: { id: string; title: string }, text: string, tasks: readonly string[]): LhMarkerMessage {
+	return {
+		id: `resume_${from.id}_${newMessageId()}`,
+		role: "custom",
+		customType: "session-resume",
+		content: text,
+		display: true,
+		details: { from: from.id, title: from.title, tasks: [...tasks] },
+		timestamp: Date.now(),
+	};
+}
+
+/** Does the session pick up an earlier lesson (a session-resume opening)? */
+export function resumesLesson(messages: readonly LhMessage[]): boolean {
+	return messages.some((m) => m.role === "custom" && m.customType === "session-resume");
+}
+
 /** The plan presentation block: pure UI history (a frozen snapshot), no
  *  model face — toLlmMessages filters it. `planCallId` keys idempotent
  *  emission (one block per successful plan_init call). */
@@ -392,6 +419,15 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
 	};
 }
 
+/** How many Hint requests this problem has had so far. */
+export function hintsAsked(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && d.request === "hint";
+	}).length;
+}
+
 /** The learner's thinking submission (ONE send lane, owner round
  *  2026-10-05): the register is no longer declared by a button — the
  *  model READS the text to tell working traces from claimed answers. The
@@ -407,6 +443,30 @@ export function newThinkingMessage(problemCallId: string, text: string, confiden
 		content: `${THINKING_LABEL}:\n${text}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
 		display: true,
 		details: { problemCallId, text, ...(confidence ? { confidence } : {}) },
+		timestamp: Date.now(),
+	};
+}
+
+/** A practice request (the dock's Hint, Show me and Explain instead):
+ *  never an answer. `details.request` names it for the record and the
+ *  transcript; `text` is any work he had written when he pressed it. */
+export interface PracticeRequestDetails {
+	problemCallId: string;
+	request: PracticeRequest;
+	text?: string;
+}
+
+/** `nth`: which hint on this problem a Hint request is (1 for the first). */
+export function newPracticeRequestMessage(problemCallId: string, request: PracticeRequest, text?: string, nth = 1): LhMarkerMessage {
+	const work = text?.trim();
+	const head = request === "hint" ? `${PRACTICE_REQUEST_TEXT.hint} ${hintRungText(nth)}` : PRACTICE_REQUEST_TEXT[request];
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-request",
+		content: work ? `${head}\n\nHis work so far:\n${work}` : head,
+		display: true,
+		details: { problemCallId, request, ...(work ? { text: work } : {}) } satisfies PracticeRequestDetails,
 		timestamp: Date.now(),
 	};
 }
@@ -517,13 +577,27 @@ function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
 
+/** A course_save's changes as the engine read them: the tool takes an
+ *  object, and also its JSON text, which the tutor often sends. Null when
+ *  neither. Pure. */
+function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
+	let changes = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return null;
+		}
+	}
+	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
+}
+
 /** The course topics a session worked on, by its own transcript, in the
  *  order it first touched them: the topics of each problem it posed and of
- *  each observation it saved, the topics a save introduced, and the plan
- *  nodes, which take a course topic's handle when they are one. Only calls
- *  that went through count. Candidates only: a caller keeps the ones its
- *  course map lists. Pure. */
-export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: readonly string[] = []): string[] {
+ *  each observation it saved, and the topics a save introduced. Only calls
+ *  that went through count; a plan step never does, whatever its name.
+ *  Candidates only: a caller keeps the ones its course map lists. Pure. */
+export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
 	const topics = new Set<string>();
 	for (const m of messages) {
@@ -532,8 +606,8 @@ export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: rea
 			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
 			const args = block.arguments as Record<string, unknown>;
 			if (block.name === PRACTICE_PROBLEM_TOOL) for (const t of strings(args.topics)) topics.add(t);
-			if (block.name !== "course_save" || typeof args.changes !== "object" || args.changes === null) continue;
-			const changes = args.changes as { observations?: unknown; topics?: unknown };
+			const changes = block.name === "course_save" ? saveChanges(args) : null;
+			if (!changes) continue;
 			for (const o of Array.isArray(changes.observations) ? changes.observations : []) {
 				for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
 			}
@@ -544,8 +618,32 @@ export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: rea
 			}
 		}
 	}
-	for (const id of planNodeIds) topics.add(id);
 	return [...topics];
+}
+
+/** The engine tasks a session holds: each task key its saves that went
+ *  through last wrote as open (a task patch, or the `focus`), or that the
+ *  lesson it picked up held, and never removed after (a `null` entry). Which of them the engine still has open,
+ *  and at which step, is the engine's to say. Pure. */
+export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	const held = new Map<string, boolean>();
+	for (const m of messages) {
+		if (m.role === "custom" && m.customType === "session-resume") {
+			for (const key of strings((m.details as { tasks?: unknown } | null)?.tasks)) held.set(key, true);
+		}
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			if (!changes) continue;
+			if (typeof changes.tasks === "object" && changes.tasks !== null) {
+				for (const [key, patch] of Object.entries(changes.tasks)) held.set(key, patch !== null);
+			}
+			if (typeof changes.focus === "string") held.set(changes.focus, true);
+		}
+	}
+	return [...held].filter(([, open]) => open).map(([key]) => key);
 }
 
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
@@ -960,7 +1058,7 @@ export type RequestCause = "foreground" | "background";
 export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
-const NEUTRAL_MARKERS = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction"];
+export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume"];
 
 /** Whether a message is an input that starts a new agent turn: exactly
  *  the messages `nativeInputCause` does not call neutral, decided without
@@ -979,7 +1077,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

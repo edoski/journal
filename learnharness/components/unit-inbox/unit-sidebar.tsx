@@ -2,7 +2,7 @@
 
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
-import { HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
+import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, type ChatListItem, type StudyCourse } from "@/src/core";
 import { useCourseVariant, useInboxVariant } from "@/components/design-variant";
 import { useSidebar } from "@/components/sidebar";
@@ -57,6 +57,14 @@ export function searchInbox(
 function ResultsLabel({ children }: { children: React.ReactNode }) {
 	return <li className="flex h-8 list-none items-center px-2 text-label font-medium text-muted-foreground">{children}</li>;
 }
+
+/** A top row that opens a page, Home or Calendar: the selected fill on
+ *  its own page. */
+const navLinkClass = (here: boolean) =>
+	cn(
+		"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+		here ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
+	);
 
 const ICON_BUTTON =
 	"lh-no-drag flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-fill-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none [&>svg]:size-4";
@@ -133,10 +141,7 @@ export function UnitSidebar() {
 							data-slot="sidebar-home"
 							aria-current={s.pathname === "/" ? "page" : undefined}
 							onClick={blurAfterPointerClick}
-							className={cn(
-								"flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 text-control font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
-								s.pathname === "/" ? "bg-fill-selected text-foreground" : "text-muted-foreground hover:bg-fill-hover hover:text-foreground",
-							)}
+							className={navLinkClass(s.pathname === "/")}
 						>
 							<HouseIcon aria-hidden className="size-4 shrink-0" />
 							Home
@@ -146,6 +151,21 @@ export function UnitSidebar() {
 								<PanelLeftCloseIcon />
 							</button>
 						</Hint>
+					</div>
+
+					<div className="mb-px flex shrink-0 gap-1 px-2">
+						<Link
+							href="/calendar"
+							data-slot="sidebar-calendar"
+							aria-current={s.pathname === "/calendar" ? "page" : undefined}
+							onClick={blurAfterPointerClick}
+							className={navLinkClass(s.pathname === "/calendar")}
+						>
+							<CalendarDaysIcon aria-hidden className="size-4 shrink-0" />
+							Calendar
+						</Link>
+						{/* Ends where Home's and Search's fills end, before their buttons. */}
+						<span aria-hidden className="size-7 shrink-0" />
 					</div>
 
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">

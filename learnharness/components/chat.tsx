@@ -28,6 +28,7 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
+import { takeLessonMessage } from "@/components/lesson-message";
 import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
 import { useFieldCycle } from "@/components/field-cycle";
@@ -56,11 +57,11 @@ import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
-import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
+import { RequestCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
-import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
+import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
 import { CHIP_LABEL, ModeDivider, PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
@@ -532,6 +533,17 @@ export function Chat({
 			const problem = activeProblemRef.current;
 			if (!problem) return;
 			void send({ type: "thinking", problemCallId: problem.toolCallId, text, confidence });
+		},
+		[send],
+	);
+
+	// The dock's Hint, Show me and Explain instead: a request on the active
+	// problem, never an answer; the field's work rides along.
+	const sendPracticeRequest = useCallback(
+		(request: PracticeRequest, text: string) => {
+			const problem = activeProblemRef.current;
+			if (!problem) return;
+			void send({ type: "request", problemCallId: problem.toolCallId, request, ...(text ? { text } : {}) });
 		},
 		[send],
 	);
@@ -1265,6 +1277,19 @@ export function Chat({
 		doSend();
 	};
 
+	/* A message the topic page handed this lesson (lesson-message.ts): taken
+	 * once on mount and sent as the composer sends it, a steer while the
+	 * tutor writes; a lesson that cannot take it now (a question waits)
+	 * keeps it as the draft. */
+	const steerOrSendRef = useRef(doSteerOrSend);
+	steerOrSendRef.current = doSteerOrSend;
+	useEffect(() => {
+		const message = takeLessonMessage(chatId);
+		if (!message) return;
+		applyText(message);
+		steerOrSendRef.current();
+	}, [chatId, applyText]);
+
 	return (
 		<ChatActionsContext.Provider
 			value={{
@@ -1473,7 +1498,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0">
+					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						<div data-session-find-root="" className={`${proposed ? LESSON_COLUMN : COLUMN} flex flex-1 flex-col gap-4 ${proposed ? "pt-6" : "pt-4"}`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
@@ -1490,6 +1515,10 @@ export function Chat({
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
 									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} />
+								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
+								// A session that picks up an earlier lesson opens teaching:
+								// the plan carried over, so no probe or planning came first.
+								<PhaseDivider key={m.id || `m-${mi}`} phase="teach" variant={design} />
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-probe-handoff") ? (
 								// The probe→teach handoff wake (custom-message scheme): the
 								// PLANNING DIVIDER IS the seam (owner ruling 2026-09-26 — it
@@ -1523,6 +1552,8 @@ export function Chat({
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} variant={design} />;
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} variant={design} />;
+											case "data-practice-request":
+												return <RequestCard key={pi} data={part.data as PracticeRequestDetails} variant={design} />;
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
 												// centered mono-caps line — chrome, the dismissal register.
@@ -1571,11 +1602,10 @@ export function Chat({
 									) : null}
 									{m.role === "user" && proposed ? (
 										// The learner's words: a quiet surface, full width (the
-										// transcript reads as a document), no label.
+										// transcript reads as a document), no label, set in the
+										// lesson's markdown and math like the tutor's.
 										<div data-testid="user-message" data-slot="learner-message" className="my-1 w-full rounded-xl bg-card px-4 py-3">
-											<div className="lh-prose whitespace-pre-wrap text-foreground">
-												{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-											</div>
+											<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
 										</div>
 									) : m.role === "user" ? (
 										/* THE DOCUMENT ROW (owner round, 2026-10-05): no right-aligned
@@ -1802,6 +1832,7 @@ export function Chat({
 					practice={activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
+					onPracticeRequest={sendPracticeRequest}
 					chatId={chatId}
 					onModelChange={setSelectedModel}
 					plan={hasPlan && !proposed ? <PlanMarginalia messages={messages} /> : undefined}
@@ -2037,6 +2068,7 @@ function DockOverlay({
 	practice,
 	compactionRunning,
 	onSubmitThinking,
+	onPracticeRequest,
 	requiresReveal,
 	readingThinking,
 	readingThinkingRevision,
@@ -2070,6 +2102,7 @@ function DockOverlay({
 	practice: { toolCallId: string; input: unknown } | null;
 	/** (commit, text) — the practice dock's two submit lanes. */
 	onSubmitThinking: (text: string, confidence: Confidence) => void;
+	onPracticeRequest: (request: PracticeRequest, text: string) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
 	/** The reading-thinking draft (owner 2026-10-03), read from ChatView's
@@ -2512,6 +2545,7 @@ function DockOverlay({
 										void suppressFoldDuringReveal();
 									}}
 									onSubmit={onSubmitThinking}
+									onRequest={onPracticeRequest}
 									compactionRunning={compactionRunning}
 									variant={variant}
 								/>

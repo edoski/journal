@@ -25,7 +25,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../
 import { ANALYSIS, CALCULUS, CHATS, chat, due, LINALG, map, PROB, TODAY, topic } from "./fixtures/now-demo.ts";
 
 const h = (...handles: string[]) => handles as TopicHandle[];
-const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const lapsed = { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 
 /** The demo's Probability: Law of total probability weak on a diagnosed
  *  mistake, as the seeded world has it. */
@@ -63,6 +63,7 @@ const FIVE: StudyCourse = {
 	unready: null,
 	due: h("a", "b", "c", "d", "e"),
 	lastActiveDaysAgo: 1,
+	newToday: [],
 };
 
 function topOf(courses: readonly StudyCourse[], chats: readonly ChatListItem[] = CHATS) {
@@ -116,7 +117,7 @@ describe("topicsTop", () => {
 		const both = chat("both", { title: "Rank and det", course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["rank", "det"], pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" });
 		const { needs, items } = topOf([LINALG], [both]);
 		assert.equal(needs.lines[0]!.topics.length, 2, "the session takes up two topics");
-		assert.deepEqual(items.map(said), ["card Rank and the column space: Your turn"]);
+		assert.deepEqual(items.map(said), ["card Rank and the column space: Your turn", "card Linear independence: 4d overdue"]);
 	});
 
 	it("lists each topic once, the first occurrence winning", () => {
@@ -157,6 +158,7 @@ describe("topicsTop", () => {
 			unready: null,
 			due: [],
 			lastActiveDaysAgo: 1,
+			newToday: [],
 		};
 		const { items } = topOf([course], []);
 		assert.deepEqual(items.map(said), ["card Kernel: At part (c)", "  Rank: At part (c)"]);
@@ -181,7 +183,7 @@ describe("topicWords", () => {
 
 	it("says each slip in the map's words", () => {
 		const says = (signals: Partial<CourseMapTopic["signals"]>) => {
-			const w = topicWords(t({ weak: true, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, ...signals } }), null, titleOf);
+			const w = topicWords(t({ weak: true, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, ...signals } }), null, titleOf);
 			return w === null ? null : companionSays(w);
 		};
 		assert.equal(says({ lapsed: true }), "Missed last time");
@@ -192,7 +194,7 @@ describe("topicWords", () => {
 	});
 
 	it("keeps the map's few words as the short form", () => {
-		const slip = (signals: Partial<CourseMapTopic["signals"]>) => short(topicWords(t({ weak: true, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, ...signals } }), null, titleOf));
+		const slip = (signals: Partial<CourseMapTopic["signals"]>) => short(topicWords(t({ weak: true, signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false, ...signals } }), null, titleOf));
 		assert.equal(slip({ lapsed: true }), "missed Missed");
 		assert.equal(slip({ gap: "Counts entries" }), "missed Mistake to fix");
 		assert.equal(slip({ choiceErrors: { cramer: 1 } }), "missed Mixed up");
@@ -203,8 +205,8 @@ describe("topicWords", () => {
 		for (const overdue of [0, 1, 3, 7, 15]) {
 			for (const level of ["assisted", "independent"] as const) {
 				const x = topic("x", "X", level, { review: due(overdue) });
-				const course: StudyCourse = { map: map({ topics: [x] }), unready: null, due: h("x"), lastActiveDaysAgo: 1 };
-				const home = whyOf({ kind: "course", course, step: { kind: "review", titles: ["X"], topics: h("x"), then: null } }, TODAY);
+				const course: StudyCourse = { map: map({ topics: [x] }), unready: null, due: h("x"), lastActiveDaysAgo: 1, newToday: [] };
+				const home = whyOf({ kind: "course", course, step: { kind: "review", titles: ["X"], topics: h("x"), then: null } });
 				const words = topicWords(x, null, titleOf);
 				assert.ok(words && words.kind === "review");
 				assert.equal(words.short, home?.short);
@@ -233,7 +235,7 @@ function renderList(courses: readonly StudyCourse[], chats: readonly ChatListIte
 }
 
 describe("TopicsList", () => {
-	it("draws the demo's five cards and six companions with their titles and reasons, in order", () => {
+	it("draws the demo's four cards and two companions with their titles and reasons, in order", () => {
 		const doc = renderList(DEMO);
 		const rows = [...doc.querySelectorAll('[data-slot="unit-card"], [data-slot="companion"]')].map((row) => {
 			if (row.getAttribute("data-slot") === "unit-card") {
@@ -249,12 +251,7 @@ describe("TopicsList", () => {
 			"card Random variables and distributions: 3d overdue",
 			"  Law of total probability (missed): A mistake to fix",
 			"  Bayes' rule (review): Overdue by a day",
-			"card Convergent sequences: 1w overdue",
-			"  Cauchy sequences (review): Overdue by a week",
-			"card Chain rule: Missed last time",
-			"  Riemann sums (missed): Missed last time",
-			"  Improper integrals (review): Overdue by 3 days",
-			"  Area between curves (review): Overdue by a day",
+			"card Linear independence: 4d overdue",
 		]);
 	});
 
@@ -280,7 +277,7 @@ describe("TopicsList", () => {
 	});
 
 	it("says when nothing needs him, when there are no courses, and when they could not be read", () => {
-		const quiet: StudyCourse = { map: map({ workspace: "/s/q", title: "Quiet", topics: [topic("a", "A", "independent")] }), unready: null, due: [], lastActiveDaysAgo: 1 };
+		const quiet: StudyCourse = { map: map({ workspace: "/s/q", title: "Quiet", topics: [topic("a", "A", "independent")] }), unready: null, due: [], lastActiveDaysAgo: 1, newToday: [] };
 		assert.equal(renderList([quiet], []).querySelector('[data-slot="sidebar-note"]')?.textContent, "Nothing needs you today");
 		assert.equal(renderList([], []).querySelector('[data-slot="sidebar-note"]')?.textContent, "No courses yet");
 		const down = renderList([], CHATS, true);

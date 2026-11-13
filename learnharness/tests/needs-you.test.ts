@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { foldLines, lineKey, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { lineTopics, needsYouNow, slotWords } from "../components/study-home/needs-you.ts";
-import { todayRows, waitingSessions, type TodayRow } from "../components/study-home/study-facts.ts";
+import { openSessions, todayRows, type TodayRow } from "../components/study-home/study-facts.ts";
 import type { StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { ANALYSIS, CALCULUS, CHATS, chat, COURSES, LINALG, PROB, TODAY, due, map, topic } from "./fixtures/now-demo.ts";
 
@@ -16,19 +16,19 @@ const label = (r: TodayRow) => (r.kind === "session" ? `session ${r.chat.id}` : 
 describe("needsYouNow", () => {
 	it("is Home's Today: the same lines in the same order, each with Home's reason", () => {
 		const needs = needsYouNow(COURSES, CHATS, TODAY);
-		const home = foldLines(todayRows(COURSES, waitingSessions(CHATS), TODAY));
+		const home = foldLines(todayRows(COURSES, openSessions(CHATS), TODAY));
 		assert.deepEqual(
 			needs.lines.map((l) => l.key),
 			home.shown.map(lineKey),
 		);
-		assert.deepEqual(needs.rows, todayRows(COURSES, waitingSessions(CHATS), TODAY));
-		for (const line of needs.lines) assert.deepEqual(line.why, whyOf(line.row, TODAY));
+		assert.deepEqual(needs.rows, todayRows(COURSES, openSessions(CHATS), TODAY));
+		for (const line of needs.lines) assert.deepEqual(line.why, whyOf(line.row));
 	});
 
-	it("gives every session waiting since yesterday its own line, the newest first, before every course; its course gets none", () => {
-		const { lines } = needsYouNow(COURSES, CHATS, TODAY);
-		assert.deepEqual(lines.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank", "Probability", "Real Analysis", "Calculus I"]);
-		assert.ok(!lines.some((l) => l.row.kind === "course" && l.row.course === LINALG));
+	it("gives every session to pick up since yesterday its own line, the newest first, before every course; a course keeps its line when no session shown works on its step", () => {
+		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
+		assert.deepEqual(lines.map((l) => label(l.row)), ["session chat_eigen", "session chat_rank", "Probability", "Linear Algebra"]);
+		assert.deepEqual(also.map((l) => label(l.row)), ["Real Analysis", "Calculus I"]);
 		assert.ok(!lines.some((l) => l.key === "chat_old"), "a session waiting from before yesterday gets no line");
 	});
 
@@ -38,10 +38,10 @@ describe("needsYouNow", () => {
 	});
 
 	it("draws each line as the topic it leads with; a course with nothing to take up leads with none", () => {
-		const { lines } = needsYouNow(COURSES, CHATS, TODAY);
+		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
-			lines.map((l) => l.lead?.title),
-			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Convergent sequences", "Chain rule"],
+			[...lines, ...also].map((l) => l.lead?.title),
+			["Eigenvalues and eigenvectors", "Rank and the column space", "Random variables and distributions", "Linear independence", "Convergent sequences", "Chain rule"],
 		);
 		const empty: StudyCourse = { ...PROB, due: [], map: { ...PROB.map, current: null, topics: [] } };
 		const [line] = needsYouNow([empty], [], TODAY).lines;
@@ -49,10 +49,10 @@ describe("needsYouNow", () => {
 	});
 
 	it("words the status slot as Today does, a lapse on the lead itself as Missed last time and a task up to its colon", () => {
-		const { lines } = needsYouNow(COURSES, CHATS, TODAY);
+		const { lines, also } = needsYouNow(COURSES, CHATS, TODAY);
 		assert.deepEqual(
-			lines.map((l) => l.slot),
-			["Your turn", "Your turn", "3d overdue", "1w overdue", "Missed last time"],
+			[...lines, ...also].map((l) => l.slot),
+			["Your turn", "Your turn", "3d overdue", "4d overdue", "1w overdue", "Missed last time"],
 		);
 		const task: StudyCourse = {
 			...LINALG,

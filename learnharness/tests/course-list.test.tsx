@@ -22,7 +22,7 @@ import { ListWhere } from "../components/course-page/list/list-where.tsx";
 import { todaysReview } from "../components/study-home/study-facts.ts";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const WS = "/study/linalg";
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {
@@ -37,6 +37,7 @@ function course(topics: CourseMapTopic[], current: string | null = null, over: P
 		unready: null,
 		due: [],
 		lastActiveDaysAgo: 2,
+		newToday: [],
 		...over,
 	};
 }

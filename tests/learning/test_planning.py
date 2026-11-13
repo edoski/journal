@@ -96,7 +96,20 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
+        "plan": {
+            "final_review_days": 6,
+            "days": [
+                {"date": day(0), "reviews": [], "new": ["systems"]},
+                {"date": day(1), "reviews": ["systems"], "new": ["rank"]},
+                {"date": day(2), "reviews": ["rank"], "new": ["eigen"]},
+                {"date": day(3), "reviews": ["eigen"], "new": []},
+                {"date": day(4), "reviews": ["systems"], "new": []},
+                {"date": day(5), "reviews": ["rank"], "new": []},
+                {"date": day(6), "reviews": ["eigen"], "new": []},
+            ],
+        },
     }
+    assert result["capacity"]["evidence_days"] == 0
     assert "daily" not in result["journal"]
     assert result["journal"]["by_activity"]["Other"]["study_minutes"] == 30
     wider = plan(workspace, vault, everywhere=False, days=14)
@@ -211,3 +224,57 @@ def test_journal_rejects_invalid_window_lengths(tmp_path: Path) -> None:
         journal_summary(tmp_path, horizon=0)
     with pytest.raises(ValueError, match="days"):
         journal_summary(tmp_path, days=0)
+
+
+def test_plan_names_what_no_longer_fits_across_courses_and_goes_on_after_the_exam(
+    tmp_path: Path,
+) -> None:
+    topics = {f"t{index:02d}": {} for index in range(30)}
+    workspace = course(
+        tmp_path / "late",
+        {"title": "Late", "exam": {"date": day(14)}, "topics": topics},
+    )
+    entry = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    late = entry["courses"][0]["plan"]
+    assert late["does_not_fit"] and late["does_not_fit"][-1] == "t29"
+    assert set(late["does_not_fit"]).isdisjoint(
+        topic for day_ in late["days"] for topic in day_["new"]
+    )
+    assert entry["does_not_fit"] == [
+        {
+            "workspace": str(workspace.directory),
+            "title": "Late",
+            "topics": late["does_not_fit"],
+        }
+    ]
+    records.save(
+        workspace,
+        {
+            "topics": {"t00": {"introduced": True, "review": {"due": day(-1)}}},
+            "exam": {"date": day(-1)},
+        },
+    )
+    over = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    assert over["courses"][0]["plan"]["days"][0] == {
+        "date": day(0),
+        "reviews": ["t00"],
+        "new": [],
+    }
+    assert "does_not_fit" not in over
+
+
+def test_one_course_is_planned_with_every_other(tmp_path: Path) -> None:
+    near = course(
+        tmp_path / "near",
+        {"title": "Near", "exam": {"date": day(10)}, "topics": {"a": {}, "b": {}}},
+    )
+    far = course(
+        tmp_path / "far",
+        {"title": "Far", "exam": {"date": day(30)}, "topics": {"c": {}, "d": {}}},
+    )
+    alone = plan(far, tmp_path / "vault", everywhere=False, days=3)
+    every = plan(None, tmp_path / "vault", everywhere=True, days=3)
+    by_title = {entry["title"]: entry for entry in every["courses"]}
+    assert alone["courses"][0]["plan"] == by_title["Far"]["plan"]
+    assert by_title["Near"]["plan"]["days"][0]["new"] == ["a"]
+    assert near is not None

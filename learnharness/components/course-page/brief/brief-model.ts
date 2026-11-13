@@ -107,7 +107,7 @@ export function taskLine(task: { title: string; step: string | null }): string {
  *  a review of this one topic, so the page has one vocabulary. Pure. */
 export function overdueWords(course: StudyCourse, topic: CourseMapTopic): string {
 	const alone = { ...course, map: { ...course.map, topics: [topic] } };
-	const why = whyOf({ kind: "course", course: alone, step: { kind: "review", titles: [topic.title], topics: [topic.handle], then: null } }, course.map.today);
+	const why = whyOf({ kind: "course", course: alone, step: { kind: "review", titles: [topic.title], topics: [topic.handle], then: null } });
 	return why?.kind === "review" ? why.short : "Review due";
 }
 

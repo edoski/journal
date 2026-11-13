@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { foldLines, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
-import { todayRows, waitingSessions, type TodayRow } from "@/components/study-home/study-facts";
+import { openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
  *  topics it takes up (resolved on its course's map) and the one it leads
@@ -9,7 +9,7 @@ export interface NowLine {
 	/** `lineKey(row)`. */
 	key: string;
 	row: TodayRow;
-	/** Home's reason, `whyOf(row, today)`. */
+	/** Home's reason, `whyOf(row)`. */
 	why: Why | null;
 	/** `lineTopics(row)`, resolved on the line's course map, the lead
 	 *  first. */
@@ -77,10 +77,10 @@ export function leadOf(row: TodayRow, topics: readonly CourseMapTopic[], why: Wh
 	return topics[0] ?? null;
 }
 
-function nowLine(row: TodayRow, today: string): NowLine {
+function nowLine(row: TodayRow): NowLine {
 	const byHandle = new Map((row.course?.map.topics ?? []).map((t) => [t.handle, t]));
 	const taken = lineTopics(row).flatMap((h) => byHandle.get(h) ?? []);
-	const why = whyOf(row, today);
+	const why = whyOf(row);
 	const lead = leadOf(row, taken, why);
 	const topics = lead ? [lead, ...taken.filter((t) => t !== lead)] : taken;
 	return { key: lineKey(row), row, why, topics, lead, slot: slotWords(why, lead) };
@@ -93,7 +93,7 @@ function nowLine(row: TodayRow, today: string): NowLine {
  * Inbox switch draws `lines`, each as the topic it leads with. Pure.
  */
 export function needsYouNow(courses: readonly StudyCourse[], chats: readonly ChatListItem[], today: string): NeedsYou {
-	const rows = todayRows(courses, waitingSessions(chats), today);
+	const rows = todayRows(courses, openSessions(chats), today);
 	const { shown, also } = foldLines(rows);
-	return { rows, lines: shown.map((r) => nowLine(r, today)), also: also.map((r) => nowLine(r, today)) };
+	return { rows, lines: shown.map(nowLine), also: also.map(nowLine) };
 }

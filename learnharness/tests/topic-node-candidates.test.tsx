@@ -17,7 +17,7 @@ import { NodeBody } from "../components/course-map/topic-map/topic-node.tsx";
 import { needOf, standingOf, statusOf } from "../components/course-map/topic-map/topic-standing.ts";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET: TopicSignals = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET: TopicSignals = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 const titleOf = (handle: TopicHandle) => ({ cramer: "Cramer's rule" })[handle as string] ?? handle;
 const TASKS: CourseMapTask[] = [{ key: "sheet-4", title: "Problem sheet 4", step: "Part (c)" }];

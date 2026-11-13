@@ -18,7 +18,7 @@ import { teachStepIndex } from "../src/core/phases.ts";
 describe("PhaseChip (header)", () => {
 	it("renders the learner-facing label — no colored dot (phase color retired)", () => {
 		for (const [phase, label] of [
-			["probe", "Probing"],
+			["probe", "Quiz"],
 			["plan", "Planning"],
 			["teach", "Teaching"],
 		] as const) {

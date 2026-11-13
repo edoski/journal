@@ -22,7 +22,7 @@ import { BriefAnswer } from "../components/course-page/brief/brief-answer.tsx";
 import { BriefMistake } from "../components/course-page/brief/brief-mistake.tsx";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 const later = (date: string) => ({ kind: "scheduled" as const, date });
 
@@ -70,6 +70,7 @@ function course(over: Partial<StudyCourse["map"]> = {}, due: TopicHandle[] = [h(
 		unready: null,
 		due,
 		lastActiveDaysAgo: 2,
+		newToday: [],
 	};
 }
 
@@ -90,7 +91,7 @@ const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({
 });
 
 function viewOf(c: StudyCourse, chats: ChatListItem[] = [], waiting: ChatListItem[] = []) {
-	const read = courseRead({ status: "ready", courses: [c], failed: [], waiting, chats }, c.map.workspace);
+	const read = courseRead({ status: "ready", courses: [c], failed: [], open: waiting, chats }, c.map.workspace);
 	assert.equal(read.status, "ready");
 	return (read as Extract<typeof read, { status: "ready" }>).view;
 }

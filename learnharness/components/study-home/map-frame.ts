@@ -8,7 +8,3 @@ export function mapFade(x: number, y: number): React.CSSProperties {
 		WebkitMaskComposite: "source-in",
 	};
 }
-
-/** The course map's scroll box inside a frame on Home: no scrollbars, and a
- *  drawing shorter than the frame sits at its middle. */
-export const MAP_BOX = "grid [align-content:safe_center] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";

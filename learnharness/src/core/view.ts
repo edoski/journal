@@ -442,6 +442,14 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "session-resume": {
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-session-resume", id: `sr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "probe-handoff": {
 			out.push({
 				id: marker.id,
@@ -499,6 +507,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 				id: marker.id,
 				role: "user",
 				parts: [{ type: "data-practice-thinking", id: `pt_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
+		case "practice-request": {
+			// The dock's Hint, Show me or Explain instead: a learner row naming
+			// the request (and the work he had written), never an answer card.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-request", id: `pr_${marker.id}`, data: marker.details }],
 			});
 			return;
 		}
