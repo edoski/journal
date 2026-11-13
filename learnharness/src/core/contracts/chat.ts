@@ -214,7 +214,7 @@ export function sessionResumeText(title: string, steps: readonly { id: string; t
  *  scope to practise, or the topic to teach. */
 export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
 	practice:
-		"[PRACTICE] — the session moves to practice, on the scope the handoff above names. Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
+		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
 	teach:
 		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
 };

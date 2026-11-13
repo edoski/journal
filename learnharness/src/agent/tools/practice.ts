@@ -126,6 +126,16 @@ function attemptResult(description: string) {
 	return Type.Union([Type.Literal("correct"), Type.Literal("partial"), Type.Literal("incorrect")], { description });
 }
 
+function brokeAtField() {
+	return Type.Optional(
+		Type.String({
+			minLength: 1,
+			description:
+				"When an answer to a problem with several topics was incorrect or partial: the handle of the topic where it first broke. The miss is charged to that topic alone; give the topics answered right before the break their result in byTopic.",
+		}),
+	);
+}
+
 function byTopicField() {
 	return Type.Optional(
 		Type.Record(Type.String(), attemptResult("correct, partial or incorrect"), {
@@ -177,6 +187,7 @@ export const concludeInputObject = Type.Object({
 		}),
 	),
 	byTopic: byTopicField(),
+	brokeAt: brokeAtField(),
 	firstTry: Type.Optional(
 		Type.Object(
 			{
@@ -190,6 +201,7 @@ export const concludeInputObject = Type.Object({
 					Type.String({ minLength: 1, description: "When the first answer used a wrongly chosen method: that method's course topic handle." }),
 				),
 				byTopic: byTopicField(),
+				brokeAt: brokeAtField(),
 			},
 			{ description: "When the problem took more than one answer: his first unaided answer, its result and his confidence in it." },
 		),
@@ -249,6 +261,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 		response: input.response,
 		...(input.chose ? { chose: input.chose } : {}),
 		...(input.byTopic ? { byTopic: input.byTopic } : {}),
+		...(input.brokeAt ? { brokeAt: input.brokeAt } : {}),
 		...(input.firstTry ? { firstTry: input.firstTry } : {}),
 	};
 	const problem = conclusionProblem(conclusion, topics);
