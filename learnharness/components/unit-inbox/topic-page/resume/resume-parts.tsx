@@ -51,10 +51,11 @@ export function ResumeIconMark({ icon, facts, className = "size-4" }: { icon: Re
 
 /** The topic page's composer as every resume option draws it: the
  *  Proposed composer, which a typed message leaves through `onSend`. */
-export function TopicComposer({ busy, text, onText, onSend, placeholder, head, toolbar }: Pick<ResumeProps, "busy" | "text" | "onText" | "onSend"> & {
+export function TopicComposer({ busy, text, onText, onSend, placeholder, head, toolbar, emptyAction }: Pick<ResumeProps, "busy" | "text" | "onText" | "onSend"> & {
 	placeholder: string;
 	head?: React.ReactNode;
 	toolbar?: React.ReactNode;
+	emptyAction?: { label: string; run: () => void };
 }) {
 	return (
 		<Composer
@@ -68,6 +69,7 @@ export function TopicComposer({ busy, text, onText, onSend, placeholder, head, t
 			placeholder={placeholder}
 			head={head}
 			toolbar={toolbar}
+			emptyAction={emptyAction}
 		/>
 	);
 }

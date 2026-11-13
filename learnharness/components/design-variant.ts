@@ -19,7 +19,7 @@ export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
 
 /** Where the hybrid topic page resumes a lesson, in or around its
  *  composer (spec: components/unit-inbox/topic-page/resume/resume.md). */
-export const RESUME_OPTIONS = ["line", "chips"] as const;
+export const RESUME_OPTIONS = ["line", "target", "chips"] as const;
 /** "current" keeps the hybrid's composer as the other candidates have it. */
 export type ResumeVariant = "current" | (typeof RESUME_OPTIONS)[number];
 

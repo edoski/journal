@@ -107,6 +107,7 @@ export function Composer({
 	variant = "current",
 	toolbar,
 	head,
+	emptyAction,
 }: {
 	busy: boolean;
 	value: string;
@@ -118,6 +119,10 @@ export function Composer({
 	/** Proposed only: a row docked on the composer's top edge, inside its
 	 *  surface, above the text (the topic page's resume line). */
 	head?: ReactNode;
+	/** Proposed only: what the empty composer's button does instead of
+	 *  sending, as the practice pause's Next problem does: its label on
+	 *  the button, and Enter on the empty field runs it. */
+	emptyAction?: { label: string; run: () => void };
 	/** The design (spec: composer.md). "proposed" draws the composer as its
 	 *  own rounded surface with a toolbar row under the text; its host adds
 	 *  no shell around it. */
@@ -136,7 +141,11 @@ export function Composer({
 	 *  empty-Enter share it. */
 	onNext?: () => void;
 }) {
-	const next = nextProblem ? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" } : undefined;
+	const next = nextProblem
+		? { label: "Next problem", run: () => onNext?.(), testId: "next-problem-button" }
+		: variant === "proposed" && emptyAction
+			? { ...emptyAction, testId: "composer-action" }
+			: undefined;
 	const act = () => {
 		const action = enterAction({ busy, canSend, nextProblem: Boolean(next) });
 		if (action === "stop") onStop();

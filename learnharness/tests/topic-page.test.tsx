@@ -184,7 +184,7 @@ describe("the Topic switch", () => {
 		);
 		assert.deepEqual(
 			POLISH_GROUPS.find((group) => group.id === "resume"),
-			{ id: "resume", label: "Resume", options: ["line", "chips"], requires: { design: "proposed", topic: "hybrid" } },
+			{ id: "resume", label: "Resume", options: ["line", "target", "chips"], requires: { design: "proposed", topic: "hybrid" } },
 		);
 	});
 

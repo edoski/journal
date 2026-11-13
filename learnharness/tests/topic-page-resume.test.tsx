@@ -1,7 +1,8 @@
 /**
  * The hybrid topic page's resume options: every row of the action table
- * (`topicAction`) said and done from the composer foot, by the line and
- * the chips. Same tsx classic-JSX shim as the other render tests.
+ * (`topicAction`) said and done from the composer foot, by the line, the
+ * chips and the target menu. Same tsx classic-JSX shim as the other
+ * render tests.
  */
 import React from "react";
 (globalThis as Record<string, unknown>).React = React;
@@ -16,14 +17,20 @@ import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contrac
 import type { StudyCourse } from "../src/core/contracts/study.ts";
 import { topicFacts, type TopicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import {
+	emptyPress,
 	freshAction,
 	resumeChips,
 	resumeLine,
+	resumeTargets,
 	sessionName,
+	targetAtFirst,
+	targetPlaceholder,
+	TARGET_SESSIONS,
 } from "../components/unit-inbox/topic-page/resume/resume-facts.ts";
 import { ResumeChipsFoot } from "../components/unit-inbox/topic-page/resume/resume-chips.tsx";
 import { ResumeLineFoot } from "../components/unit-inbox/topic-page/resume/resume-line.tsx";
 import type { ResumeProps } from "../components/unit-inbox/topic-page/resume/resume-parts.tsx";
+import { ResumeTargetFoot } from "../components/unit-inbox/topic-page/resume/resume-target.tsx";
 
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
@@ -125,6 +132,46 @@ describe("the resume chips", () => {
 	});
 });
 
+describe("the resume target", () => {
+	it("starts on the session the page's action opens, else a new lesson", () => {
+		assert.deepEqual(
+			ROWS.map(([, facts]) => targetAtFirst(facts.action)),
+			["chat_eigen", "chat_eigen", "new", "new", "new", "new", "new"],
+		);
+	});
+
+	it("offers a new lesson, then the topic's newest sessions by their day, two on one day adding their titles", () => {
+		const sessions = Array.from({ length: TARGET_SESSIONS + 2 }, (_, i) => chat(`chat_${i}`, `Lesson ${i}`, `2026-11-0${8 - i}T10:00:00.000Z`, { topics: ["rank"] }));
+		sessions[1] = { ...sessions[1]!, updatedAt: sessions[0]!.updatedAt };
+		const targets = resumeTargets(factsOf(RANK, sessions));
+		assert.equal(targets.length, TARGET_SESSIONS + 1);
+		assert.deepEqual(targets.slice(0, 4).map((t) => t.label), ["New lesson", "Today's lesson, Lesson 0", "Today's lesson, Lesson 1", "Lesson of Fri 6 Nov"]);
+	});
+
+	it("presses Resume on a session, Open while the tutor writes, and the new lesson's own action otherwise", () => {
+		const press = (facts: TopicFacts, id: string, topicOf: CourseMapTopic) => emptyPress(resumeTargets(facts).find((t) => t.id === id)!, freshAction(topicOf, MAP));
+		assert.equal(press(row("resume"), "chat_eigen", EIGEN), "Resume");
+		assert.equal(press(row("open"), "chat_eigen", EIGEN), "Open");
+		assert.equal(press(row("resume"), "new", EIGEN), "Start");
+		assert.equal(press(row("review"), "new", SPAN), "Review");
+		assert.equal(press(row("continue a task"), "chat_rank", RANK), "Resume");
+		assert.equal(press(row("continue a task"), "new", RANK), "Continue");
+		assert.equal(press(row("study"), "new", VECTORS), "Study");
+	});
+
+	it("says in the field where a message goes, and that a waiting question holds it", () => {
+		const [fresh, eigen] = resumeTargets(row("resume"));
+		assert.equal(targetPlaceholder(fresh!, "Eigenvalues"), "Ask about Eigenvalues to start a new lesson");
+		assert.equal(targetPlaceholder(eigen!, "Eigenvalues"), "Message today's lesson; it waits until you answer its question");
+		assert.equal(targetPlaceholder(resumeTargets(row("open"))[1]!, "Eigenvalues"), "Message today's lesson");
+	});
+
+	it("takes the new lesson's action from the table with no session, for every topic", () => {
+		assert.deepEqual(freshAction(EIGEN, MAP), { kind: "start", opening: "Eigenvalues and eigenvectors" });
+		assert.equal(freshAction(SPAN, MAP).kind, "review");
+	});
+});
+
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
@@ -160,5 +207,17 @@ describe("the resume options drawn", () => {
 			["action", "button", "Continue Problem sheet 4"],
 			["task:sheet-5", "button", "Continue Problem sheet 5"],
 		]);
+	});
+
+	it("show the target on its chip and, with the field empty, the press in place of the send", () => {
+		const resume = render(<ResumeTargetFoot {...props(row("resume"))} />);
+		assert.equal(resume.querySelector('[data-slot="composer-chip"]')!.textContent, "Today's lesson");
+		assert.equal(resume.querySelector('[data-testid="composer-action"]')!.textContent, "Resume");
+		const review = render(<ResumeTargetFoot {...props(row("review"))} />);
+		assert.equal(review.querySelector('[data-slot="composer-chip"]')!.textContent, "New lesson");
+		assert.equal(review.querySelector('[data-testid="composer-action"]')!.textContent, "Review");
+		const typed = render(<ResumeTargetFoot {...props(row("review"), "Why does span matter?")} />);
+		assert.equal(typed.querySelector('[data-testid="composer-action"]'), null);
+		assert.equal(typed.querySelector('[data-slot="composer-send"]')!.getAttribute("aria-label"), "Send");
 	});
 });

@@ -114,3 +114,52 @@ export function resumeChips(facts: TopicFacts): ResumeChip[] {
 	);
 	return [actionChip(facts), ...tasks];
 }
+
+/** Where a typed message goes: a new lesson, or one of the topic's sessions. */
+export interface ResumeTarget {
+	/** "new", or the session's id. */
+	id: string;
+	/** "New lesson", "Today's lesson", "Lesson of Tue 3 Nov". */
+	label: string;
+	/** The session's title; null for a new lesson. */
+	title: string | null;
+	entry: SessionEntry | null;
+}
+
+/** The most sessions the menu offers: the topic's newest. */
+export const TARGET_SESSIONS = 5;
+
+/** The menu's choices: a new lesson, then the topic's newest sessions;
+ *  two on one label gain the session's title. */
+export function resumeTargets(facts: TopicFacts): ResumeTarget[] {
+	const entries = facts.sessions.slice(0, TARGET_SESSIONS);
+	const labels = entries.map((entry) => lessonWords(entry.day, facts.today, entry.chat.kind === "practice" ? "practice" : "lesson"));
+	return [
+		{ id: "new", label: "New lesson", title: null, entry: null },
+		...entries.map((entry, index) => {
+			const label = labels[index]!;
+			return { id: entry.chat.id, label: labels.filter((other) => other === label).length > 1 ? `${label}, ${entry.chat.title}` : label, title: entry.chat.title, entry };
+		}),
+	];
+}
+
+/** The target the menu starts on: the session the page's action opens,
+ *  else a new lesson. */
+export function targetAtFirst(action: TopicAction): string {
+	return "chat" in action ? action.chat.id : "new";
+}
+
+/** What the empty composer's button says for a target: a session's
+ *  Resume (Open while the tutor writes), else the new lesson's action. */
+export function emptyPress(target: ResumeTarget, fresh: FreshAction): string {
+	if (!target.entry) return ACTION_WORDS[fresh.kind];
+	return target.entry.state === "working" ? ACTION_WORDS.open : ACTION_WORDS.resume;
+}
+
+/** The field's placeholder for a target: a message to a session, which a
+ *  question waiting in it holds until he answers, or a new lesson. */
+export function targetPlaceholder(target: ResumeTarget, topicTitle: string): string {
+	if (!target.entry) return `Ask about ${topicTitle} to start a new lesson`;
+	const name = target.label.charAt(0).toLowerCase() + target.label.slice(1);
+	return target.entry.state === "your-turn" ? `Message ${name}; it waits until you answer its question` : `Message ${name}`;
+}
