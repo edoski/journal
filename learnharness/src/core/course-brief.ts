@@ -126,6 +126,26 @@ function runupLine(plan: unknown, workspace: string): string | null {
 	return `Exam run-up: ${parts.join("; ")}`;
 }
 
+const handles = (v: unknown): string[] => list(v).filter((h): h is string => typeof h === "string");
+
+/** What the engine's `path_health` lists, in the brief's words: the gaps a
+ *  half-built path still has. Null when the path has none. */
+const HEALTH_WORDS: ReadonlyArray<[string, string]> = [
+	["untitled", "no title"],
+	["unplaced", "not in the order"],
+	["unlinked", "linked to no other topic"],
+	["unreferenced", "no reference to its material"],
+];
+
+function pathHealthLine(health: unknown): string | null {
+	const h = obj(health);
+	const parts = HEALTH_WORDS.flatMap(([field, words]) => {
+		const keys = handles(h[field]);
+		return keys.length > 0 ? [`${words}: ${keys.join(", ")}`] : [];
+	});
+	return parts.length > 0 ? `Path gaps (fix them in a save when you next touch these topics): ${parts.join("; ")}` : null;
+}
+
 /** The brief for one role, and the key that decides when it is re-sent.
  *  Practice also reads the run-up from the engine's `plan` for the course
  *  at `workspace`; its figures move with the day (in the key) and with
@@ -149,6 +169,10 @@ export function projectCourseBrief(
 		.map((t) => (Array.isArray(t) ? `${String(t[0])} (${String(t[1])})` : undefined))
 		.filter(Boolean);
 	if (topics.length > 0) lines.push(`Path${str(path.current) ? `, current ${path.current}` : ""}: ${topics.join(", ")}`);
+	const excluded = handles(path.excluded);
+	if (excluded.length > 0) lines.push(`Left out of the course: ${excluded.join(", ")}`);
+	const health = pathHealthLine(r.path_health);
+	if (health) lines.push(health);
 	const runupText = role === "practice" && runup ? runupLine(runup.plan, runup.workspace) : null;
 	if (runupText) lines.push(runupText);
 	const detail = obj(r.topics);
@@ -176,6 +200,8 @@ export function projectCourseBrief(
 			.map((t) => [str(obj(t).key) ?? "", task ? null : (obj(t).step ?? null)])
 			.sort(([a], [b]) => String(a).localeCompare(String(b))),
 		path.current ?? null,
+		handles(path.excluded),
+		r.path_health ?? null,
 		role,
 	]);
 	return { key, text: lines.join("\n") };
