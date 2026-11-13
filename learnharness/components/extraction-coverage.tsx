@@ -6,7 +6,7 @@ import { usePopoverDismiss } from "@/components/popover-dismiss";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
-import { timeAgo } from "@/components/sidebar";
+import { timeAgo } from "@/components/time-ago";
 import { EXTRACTION_CHUNK_TOKENS } from "@/src/core";
 import { cn } from "@/lib/utils";
 

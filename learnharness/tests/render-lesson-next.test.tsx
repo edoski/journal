@@ -25,7 +25,7 @@ import { PhaseDivider } from "../components/phase-divider.tsx";
 import { CompactionCutDivider, CompactionMomentDivider } from "../components/compaction-divider.tsx";
 import { AnsweredCard } from "../components/answered-card.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
-import { sessionStatLabels } from "../components/stats-bar.tsx";
+import { sessionStatLabels } from "../components/usage-format.ts";
 import type { CourseChoice } from "../components/course-picker.tsx";
 import type { ArtifactPartProps, PlanBlockData, QuestionAnswerData } from "../src/core/index.ts";
 

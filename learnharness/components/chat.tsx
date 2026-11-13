@@ -47,7 +47,8 @@ import {
 	type LhMessage,
 	type ModelSlotName,
 } from "@/src/core";
-import { PlanBlock, PlanPopup, latestTree } from "@/components/plan-block";
+import { PlanBlock, PlanPopup } from "@/components/plan-block";
+import { latestTree } from "@/components/lesson/plan-facts";
 import { PlanMarginalia, planExists } from "@/components/plan-window";
 import { MermaidOverlay, SessionMermaidContext } from "@/components/session-overlay";
 import { AbortTurnDialog, type AbortMode } from "@/components/abort-turn-dialog";

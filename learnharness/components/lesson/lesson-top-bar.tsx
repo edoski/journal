@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
-import { sessionStatLabels } from "@/components/stats-bar";
+import { sessionStatLabels } from "@/components/usage-format";
 import type { SessionPricing, TurnUsage } from "@/src/core";
 
 /** The lesson's top bar contents (spec: lesson-top-bar.md), rendered inside

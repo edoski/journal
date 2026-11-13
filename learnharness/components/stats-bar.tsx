@@ -1,33 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL, sessionCacheHitRate, subscriptionLabels, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
-import { formatTokens, formatUsd, planCostLabel, prettyModel } from "@/components/usage-format";
+import { CLAUDE_SUBSCRIPTION, CLAUDE_USAGE_URL, sessionCacheHitRate, subscriptionLabel, type SessionPricing, type TurnUsage } from "@/src/core";
+import { formatUsd, prettyModel, sessionStatLabels } from "@/components/usage-format";
 import { ModelControl, catalogLimits, useModelCatalog } from "@/components/model-picker";
-
-export function formatContextMeasurement(tokens: number | null, limit: number | null): string {
-	const numerator = tokens === null ? "?" : formatTokens(tokens);
-	return limit === null ? numerator : `${numerator} / ${formatTokens(limit)}`;
-}
-
-/** The session's two footprint labels, shared by the stats bar and the
- *  lesson's details menu: context as "used / limit" (catalog denominator
- *  only) and cost, honest "—" until at least one turn priced. */
-export function sessionStatLabels({ turns, contextTokens, pricing, limit }: {
-	turns: TurnUsage[];
-	contextTokens: number | null;
-	pricing?: SessionPricing;
-	limit: number | null;
-}): { contextLabel: string; costLabel: string; providers: string[] } {
-	const { cost = 0, unpriced = turns.length, subscription = 0 } = pricing ?? {};
-	const pricedCount = turns.length - unpriced - subscription;
-	const providers = pricing?.subscriptionProviders ?? subscriptionLabels(turns.map((turn) => turn.model));
-	return {
-		contextLabel: formatContextMeasurement(contextTokens, limit),
-		costLabel: planCostLabel(pricedCount > 0 ? cost : null, providers),
-		providers,
-	};
-}
 
 /**
  * The below-composer stats bar (wave 4 observability): the session's

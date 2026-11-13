@@ -17,7 +17,8 @@ import { AppearanceSection } from "../components/settings/appearance-section.tsx
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
-import { priceLabel, ThinkingMenuList } from "../components/settings/model-menu.tsx";
+import { ThinkingMenuList } from "../components/settings/model-menu.tsx";
+import { priceLabel } from "../components/settings/model-pickers.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
 import { hintBinding, hintText } from "../components/ui/hint.tsx";

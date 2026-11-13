@@ -13,9 +13,10 @@ import { layout as dagreLayout } from "dagre-d3-es/src/dagre/index.js";
 // d3's curveBasis (the exact recipe dagre-d3's own renderer uses).
 import { curveBasis, line } from "d3-shape";
 import { fitGraphView, fitZoomFor, zoomedGraphView, type Viewport } from "@/components/pan-zoom";
-import type { PlanBlockData, PlanNodeStatus, PlanTree } from "@/src/core";
+import type { PlanBlockData, PlanNodeStatus } from "@/src/core";
 import { derivedNodeStatus, derivePlanStatuses } from "@/src/core";
 import { Hint } from "@/components/ui/hint";
+import { latestTree, type LayoutNode, type PopupMessage } from "@/components/lesson/plan-facts";
 
 /**
  * PLAN BLOCKS — the plan lives in the chat (wave 4): persisted
@@ -88,53 +89,6 @@ export function estimateLineWidth(line: string): number {
 export const LINE_H = 13;
 export const GAP_X = 24;
 export const GAP_Y = 48;
-
-/** A node for layout purposes — the payload's shape and the tree's shape agree. */
-export interface LayoutNode {
-	id: string;
-	title: string;
-}
-
-/** Topological order + longest-path depth (Kahn, authoring tie-break) —
- *  order + depth semantics kept for tests; placement itself runs on dagre
- *  now (owner, round 8). */
-export function topoFor(nodes: readonly LayoutNode[], edges: ReadonlyArray<{ from: string; to: string }>) {
-	const index = new Map(nodes.map((n, i) => [n.id, i] as const));
-	const indegree = new Map<string, number>(nodes.map((n) => [n.id, 0] as const));
-	const dependents = new Map<string, string[]>();
-	for (const e of edges) {
-		if (!index.has(e.from) || !index.has(e.to)) continue; // defensive: dangling ids
-		indegree.set(e.to, (indegree.get(e.to) ?? 0) + 1);
-		const list = dependents.get(e.from);
-		if (list) list.push(e.to);
-		else dependents.set(e.from, [e.to]);
-	}
-	const ready = nodes.filter((n) => (indegree.get(n.id) ?? 0) === 0).map((n) => n.id);
-	const order: LayoutNode[] = [];
-	const depth = new Map<string, number>();
-	const byId = new Map(nodes.map((n) => [n.id, n] as const));
-	while (ready.length > 0) {
-		ready.sort((a, b) => (index.get(a) ?? 0) - (index.get(b) ?? 0));
-		const id = ready.shift()!;
-		const node = byId.get(id);
-		if (node) order.push(node);
-		const d = depth.get(id) ?? 0;
-		depth.set(id, d);
-		for (const t of dependents.get(id) ?? []) {
-			if ((depth.get(t) ?? -1) < d + 1) depth.set(t, d + 1);
-			const left = (indegree.get(t) ?? 0) - 1;
-			indegree.set(t, left);
-			if (left === 0) ready.push(t);
-		}
-	}
-	for (const n of nodes) {
-		if (!depth.has(n.id)) {
-			order.push(n);
-			depth.set(n.id, 0);
-		}
-	}
-	return { order, depth };
-}
 
 /** Placement — dagre (mermaid's engine, owner round 8): Sugiyama-style
  *  layered layout, TB, with our geometry (text-first sized boxes,
@@ -706,26 +660,6 @@ export function PlanBlock({ data, onOpen }: { data: PlanBlockData; onOpen: () =>
 }
 
 // ─── The live plan popup ──────────────────────────────────────────────────────
-
-/** Minimal structural message slice (same trick as phases.ts). */
-export interface PopupMessage {
-	parts: ReadonlyArray<{ type: string; state?: string; input?: unknown; output?: unknown }>;
-}
-
-/** The latest plan tree in the transcript (latest tool-plan_ output). */
-export function latestTree(messages: readonly PopupMessage[]): PlanTree | null {
-	for (let m = messages.length - 1; m >= 0; m--) {
-		const parts = messages[m]?.parts;
-		if (!parts) continue;
-		for (let p = parts.length - 1; p >= 0; p--) {
-			const part = parts[p]!;
-			if (!part.type.startsWith("tool-plan_") || part.state !== "output-available") continue;
-			const output = part.output as { tree?: PlanTree } | undefined;
-			if (output?.tree && Array.isArray(output.tree.nodes)) return output.tree;
-		}
-	}
-	return null;
-}
 
 /** The popup shows the glow, so its frame pads by the glow's reach —
  *  the in-chat block (monochrome, no glow) stays tight at GRAPH_PAD. */

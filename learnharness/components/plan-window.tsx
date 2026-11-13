@@ -5,10 +5,9 @@ import { derivedNodeStatus, derivePlanStatuses } from "@/src/core";
 import {
 	PlanDiagram,
 	GRAPH_PAD,
-	latestTree,
 	TEXT_CAP_SCALE,
-	type PopupMessage,
 } from "@/components/plan-block";
+import { latestTree, type PopupMessage } from "@/components/lesson/plan-facts";
 
 /**
  * THE PLAN MARGINALIA: the plan's ambient presence in the session view —

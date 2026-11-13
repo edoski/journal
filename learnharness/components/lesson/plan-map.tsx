@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { derivedNodeStatus, derivePlanStatuses, type PlanBlockData, type PlanNodeStatus } from "@/src/core";
-import { latestTree, topoFor, type LayoutNode, type PopupMessage } from "@/components/plan-block";
+import { latestTree, topoFor, type LayoutNode, type PopupMessage } from "@/components/lesson/plan-facts";
 import { Button } from "@/components/ui/button";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { MathText } from "@/components/ui/math-text";

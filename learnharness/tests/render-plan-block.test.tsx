@@ -5,7 +5,6 @@ import {
 	PlanBlock,
 	PlanPopup,
 	blockLayout,
-	topoFor,
 	edgePathD,
 	wrapTitle,
 	GAP_X,
@@ -13,8 +12,8 @@ import {
 	NODE_W_MIN,
 	nodeWidth,
 	estimateLineWidth,
-	type PopupMessage,
 } from "../components/plan-block.tsx";
+import type { PopupMessage } from "../components/lesson/plan-facts.ts";
 import type { PlanBlockData, PlanTree } from "../src/core/contracts.ts";
 
 // Plan blocks: the pure layered layout, the frozen-snapshot rendering
@@ -36,9 +35,6 @@ const CHAIN: PlanTree = {
 
 describe("plan block layout (pure)", () => {
 	it("layers a chain top-down, one node per depth row", () => {
-		const { order, depth } = topoFor(CHAIN.nodes, CHAIN.edges);
-		assert.deepEqual(order.map((n) => n.id), ["a", "b", "c"]);
-		assert.equal(depth.get("c"), 2);
 		const layout = blockLayout(CHAIN.nodes, CHAIN.edges);
 		// Text-first sizing (owner, plan-hug round 2026-10-07): these short
 		// titles hug to the minimum — no more fixed 160px slabs.

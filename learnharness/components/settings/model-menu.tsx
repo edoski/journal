@@ -24,18 +24,12 @@ import type { ModelCatalogEntry } from "@/src/core";
 import { fuzzyScore, subscriptionLabel } from "@/src/core";
 import { formatTokens } from "@/components/usage-format";
 import { SearchMenuList } from "./search-menu-list";
+import { priceLabel } from "./model-pickers";
 import { CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MENU_DETAIL, MENU_ITEM, MENU_ITEM_SELECTED, MENU_ITEM_WALKED, MENU_NOTE, MENU_SEARCH, MENU_SEPARATOR } from "@/components/ui/menu";
 
 type MenuVariant = "current" | "proposed";
-
-/** USD per 1M tokens in/out. Proposed keeps two decimals on every price
- *  (one format in a column of figures); Current trims a trailing zero under $1. */
-export function priceLabel(cost: ModelCatalogEntry["cost"], variant: MenuVariant = "current"): string {
-	const fmt = (n: number) => `$${variant === "proposed" || n >= 1 ? n.toFixed(2) : n.toFixed(2).replace(/0$/, "")}`;
-	return `${fmt(cost.input)}/${fmt(cost.output)}`;
-}
 
 /** The model dropdown body — fuzzy search + ranked list. `models ===
  *  undefined` is the catalog-loading state; an empty result list gets

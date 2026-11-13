@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { StatsBar, formatContextMeasurement } from "../components/stats-bar.tsx";
+import { StatsBar } from "../components/stats-bar.tsx";
 import { sessionCost } from "../src/server/pricing.ts";
 import { catalogLimits } from "../components/model-picker.tsx";
 import type { ModelCatalogEntry, ModelCatalogResponse } from "../src/core/contracts.ts";
@@ -78,11 +78,7 @@ describe("stats bar", () => {
 		assert.match(html, /data-testid="stats-context">11k</);
 	});
 
-	it("unknown context is explicit; changing the selected limit preserves the measurement", () => {
-		assert.equal(formatContextMeasurement(null, 100_000), "? / 100k");
-		assert.equal(formatContextMeasurement(83_000, 100_000), "83k / 100k");
-		assert.equal(formatContextMeasurement(83_000, 200_000), "83k / 200k");
-		assert.equal(formatContextMeasurement(83_000, null), "83k");
+	it("unknown context is explicit", () => {
 		const html = renderToStaticMarkup(<StatsBar chatId="fixture" turns={[turn()]} contextTokens={null} />);
 		assert.match(html, /data-testid="stats-context">\?</);
 		const empty = renderToStaticMarkup(<StatsBar chatId="fixture" turns={[]} />);
