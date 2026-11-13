@@ -7,11 +7,23 @@
  */
 
 import type { CalendarListing, CalendarRunup, PlannedDay, ScheduledDay, StudyWindow } from "../core/contracts/calendar.ts";
+import type { CourseSummary } from "../core/contracts/course.ts";
 import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
 import { readCourses, studyCourseOf } from "./study.ts";
 
-/** How many days ahead `plan` looks: the six weeks a month view can show. */
+/** How many days ahead `plan` looks at least: the six weeks a month view
+ *  can show. A course whose exam is further off is read up to its exam, so
+ *  its whole road shows. */
 export const CALENDAR_DAYS = 42;
+
+/** The engine refuses a longer plan (`learning/planning.py`, MAX_DAYS). */
+const ENGINE_MAX_DAYS = 366;
+
+/** The days to ask `plan` for one course: up to its exam, at least the
+ *  month view's six weeks. Pure. */
+export function planDays(course: Pick<CourseSummary, "exam">): number {
+	return Math.min(ENGINE_MAX_DAYS, Math.max(CALENDAR_DAYS, course.exam?.daysLeft ?? 0));
+}
 
 function record(value: unknown): Record<string, unknown> | null {
 	return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -55,6 +67,14 @@ export function doesNotFitOf(plan: unknown, map: Pick<CourseMap, "topics">): Top
 	return handles(record(courseEntry(plan)?.plan)?.does_not_fit, new Set(map.topics.map((t) => t.handle)));
 }
 
+/** The final review's first day: the exam day less `plan`'s
+ *  `final_review_days`; null without both. Pure. */
+export function finalReviewOf(plan: unknown, exam: CourseMap["exam"]): string | null {
+	const days = record(courseEntry(plan)?.plan)?.final_review_days;
+	if (!exam || typeof days !== "number" || !DAY.test(exam.date)) return null;
+	return new Date(Date.parse(`${exam.date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+}
+
 const TIME = /^\d{2}:\d{2}$/;
 
 function windowOf(value: unknown): StudyWindow | null {
@@ -76,7 +96,7 @@ export function scheduleOf(plan: unknown): ScheduledDay[] {
 }
 
 export async function calendarRead(): Promise<CalendarListing> {
-	const listing = await readCourses(CALENDAR_DAYS);
+	const listing = await readCourses(planDays);
 	if (!listing.available) return listing;
 	const read = listing.read.flatMap((c) => (typeof c === "string" ? [] : [c]));
 	return {
@@ -86,6 +106,7 @@ export async function calendarRead(): Promise<CalendarListing> {
 			runup: runupOf(plan),
 			planned: plannedOf(plan, map),
 			doesNotFit: doesNotFitOf(plan, map),
+			finalReview: finalReviewOf(plan, map.exam),
 		})),
 		failed: listing.read.filter((c): c is string => typeof c === "string"),
 		schedule: read.map(({ plan }) => scheduleOf(plan)).find((days) => days.length > 0) ?? [],

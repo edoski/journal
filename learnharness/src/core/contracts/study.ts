@@ -19,6 +19,9 @@ export interface StudyCourse {
 	due: readonly TopicHandle[] | null;
 	/** Days since the record was last saved; null when it never was. */
 	lastActiveDaysAgo: number | null;
+	/** The new topics the engine's daily plan starts today, in its order;
+	 *  empty when today starts none or the plan could not be read. */
+	newToday: readonly TopicHandle[];
 }
 
 /** What GET /api/study answers. A course whose read failed is left out and

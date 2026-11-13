@@ -10,8 +10,8 @@ import { describe, it } from "node:test";
 import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import { doesNotFitOf, plannedOf, runupOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, lookOf, misfitWords, quietBetween, runupWords, sessionType, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { doesNotFitOf, finalReviewOf, planDays, plannedOf, runupOf, scheduleOf } from "../src/server/calendar.ts";
+import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, roadOf, runupWords, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -29,7 +29,7 @@ const topic = (handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTop
 
 function course(workspace: string, title: string, over: Partial<CourseMap> = {}, rest: Partial<CalendarCourse> = {}): CalendarCourse {
 	const map: CourseMap = { workspace, title, today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [], ...over };
-	return { map, unready: null, due: [], lastActiveDaysAgo: 0, runup: null, planned: [], doesNotFit: [], ...rest };
+	return { map, unready: null, due: [], newToday: [], lastActiveDaysAgo: 0, runup: null, planned: [], doesNotFit: [], finalReview: null, ...rest };
 }
 
 const LINALG = course(
@@ -246,5 +246,40 @@ describe("the calendar's read of plan", () => {
 			{ date: "2026-11-10", off: false, windows: [] },
 		]);
 		assert.deepEqual(scheduleOf({ journal: { error: "no vault" } }), []);
+	});
+});
+
+describe("the road to an exam", () => {
+	const titles: Record<string, string> = { a: "Groups", b: "Subgroups", c: "Cosets", d: "Lagrange", e: "Late" };
+	const titleOf = (h: TopicHandle) => titles[h] ?? h;
+	const day = (date: string, ...fresh: string[]) => ({ date, reviews: [] as TopicHandle[], new: fresh as TopicHandle[] });
+
+	it("puts the plan's new topics before the exam into weeks, in plan order, and leaves days with none out", () => {
+		const road = roadOf([day("2026-11-09", "a"), day("2026-11-10"), day("2026-11-13", "b"), day("2026-11-16", "c", "d"), day("2026-12-14", "e")], "2026-12-14", titleOf);
+		assert.deepEqual(road, [
+			{ from: "2026-11-09", to: "2026-11-13", titles: ["Groups", "Subgroups"] },
+			{ from: "2026-11-16", to: "2026-11-16", titles: ["Cosets", "Lagrange"] },
+		]);
+		assert.deepEqual(road.map(spanWords), ["9 to 13 Nov", "16 Nov"]);
+		assert.equal(spanWords({ from: "2026-11-30", to: "2026-12-04" }), "30 Nov to 4 Dec");
+		assert.equal(finalReviewWords("2026-12-08"), "Final review from 8 Dec");
+	});
+
+	it("gives the exam entry its road and its final review", () => {
+		const topics = [topic("a", { title: "Groups", level: "new" }), topic("b", { title: "Subgroups", level: "new" })];
+		const gt = course("/study/gt", "Group Theory", { exam: { date: "2026-12-14", daysLeft: 36 }, topics }, { planned: [day("2026-11-09", "a"), day("2026-11-10", "b")], finalReview: "2026-12-08" });
+		const exam = calendarEntries({ courses: [gt], chats: [], scope: null }).find((e) => e.kind === "exam");
+		assert.ok(exam?.kind === "exam");
+		assert.deepEqual([exam.road, exam.finalReview], [[{ from: "2026-11-09", to: "2026-11-10", titles: ["Groups", "Subgroups"] }], "2026-12-08"]);
+	});
+
+	it("reads the final review's first day from the plan, and asks the plan up to the exam, at least six weeks", () => {
+		const plan = { courses: [{ plan: { final_review_days: 6 } }] };
+		assert.equal(finalReviewOf(plan, { date: "2026-12-03", daysLeft: 25 }), "2026-11-27");
+		assert.equal(finalReviewOf(plan, null), null);
+		assert.equal(finalReviewOf({ courses: [{}] }, { date: "2026-12-03", daysLeft: 25 }), null);
+		assert.equal(planDays({ exam: null }), 42);
+		assert.equal(planDays({ exam: { date: "2027-02-01", daysLeft: 85 } }), 85);
+		assert.equal(planDays({ exam: { date: "2028-02-01", daysLeft: 450 } }), 366, "never past the engine's limit");
 	});
 });

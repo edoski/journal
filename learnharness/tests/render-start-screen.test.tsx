@@ -13,6 +13,7 @@ import { parseHTML } from "linkedom";
 import { StartScreen } from "../components/start/start-screen.tsx";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { Composer } from "../components/composer.tsx";
+import { ServerEventsProvider } from "../components/server-events.tsx";
 function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
 }
@@ -21,9 +22,11 @@ describe("the start screen (Proposed)", () => {
 	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 	const screen = (today: boolean) =>
 		documentFor(
-			<AppRouterContext.Provider value={router as never}>
-				<StartScreen initialConfigured today={today} />
-			</AppRouterContext.Provider>,
+			<ServerEventsProvider>
+				<AppRouterContext.Provider value={router as never}>
+					<StartScreen initialConfigured today={today} />
+				</AppRouterContext.Provider>
+			</ServerEventsProvider>,
 		);
 
 	it("offers no Teach/Practice switch and no proposition picker: the tutor routes the request", () => {

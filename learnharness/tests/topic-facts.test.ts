@@ -83,7 +83,7 @@ const MAP: CourseMap = {
 	topics: Object.values(TOPICS),
 	edges: [],
 };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 const titleOf = (handle: string) => MAP.topics.find((t) => t.handle === handle)?.title ?? handle;
 
 let ids = 0;

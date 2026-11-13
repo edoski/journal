@@ -46,7 +46,7 @@ const EIGEN = topic("eigen", { title: "Eigenvalues and eigenvectors" });
 const DET = topic("determinant", { title: "Determinants", level: "assisted", introduced: "2026-11-07", review: { kind: "due", date: "2026-11-08", overdue: 0 } });
 const RANK = topic("rank", { title: "Rank and the column space", level: "assisted", introduced: "2026-10-30" });
 const MAP: CourseMap = { workspace: WORKSPACE, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [EIGEN, DET, RANK], edges: [] };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 function chat(id: string, over: Partial<ChatListItem> = {}): ChatListItem {
 	return {

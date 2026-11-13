@@ -30,7 +30,7 @@ const course = (workspace: string, topics: CourseMapTopic[]): StudyCourse => ({
 	map: { workspace, title: workspace.toUpperCase(), today: "2026-11-08", revision: 1, exam: null, current: null, focus: null, tasks: [], topics, edges: [] },
 	unready: null,
 	due: null,
-	lastActiveDaysAgo: 0,
+	newToday: [], lastActiveDaysAgo: 0,
 });
 
 const chat = (id: string, over: Partial<ChatListItem> = {}): ChatListItem => ({

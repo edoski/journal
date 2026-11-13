@@ -62,7 +62,7 @@ const MAP: CourseMap = {
 	topics: [RANK, SPAN, EIGEN, INVERTIBILITY, CRAMER],
 	edges: [],
 };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 function chat(id: string, title: string, updatedAt: string, over: Partial<ChatListItem> = {}): ChatListItem {
 	return {

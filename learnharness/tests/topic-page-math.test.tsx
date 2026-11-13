@@ -34,7 +34,7 @@ const WORKSPACE = "/study/linalg";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const DET: CourseMapTopic = { handle: "determinant" as TopicHandle, title: "Determinants as volume scaling", level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [] };
 const MAP: CourseMap = { workspace: WORKSPACE, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [DET], edges: [] };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 const PRODUCT = "$\\det(AB) = \\det A \\cdot \\det B$";
 const TEX: Record<string, string> = { "det(AB) = det A · det B": PRODUCT, "det is the area scale factor": "$\\det$ is the area scale factor" };

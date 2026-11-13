@@ -52,7 +52,7 @@ const MAP: CourseMap = {
 	topics: [RANK, SPAN, VECTORS, EIGEN, DETERMINANT],
 	edges: [],
 };
-const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
+const COURSE: StudyCourse = { map: MAP, unready: null, due: null, newToday: [], lastActiveDaysAgo: 0 };
 
 let ids = 0;
 function chat(over: Partial<ChatListItem> = {}): ChatListItem {

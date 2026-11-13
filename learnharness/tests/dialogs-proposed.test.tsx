@@ -47,7 +47,7 @@ async function escapeReachesWindow(): Promise<boolean> {
 }
 
 describe("Proposed dialogs keep their actions", () => {
-	it("New course: a dialog with a title field, a study root select, Cancel, and Create disabled until there is a title", async () => {
+	it("New course: a dialog with a title field, the exam day and material, Cancel, and Create disabled until there is a title", async () => {
 		const closes: boolean[] = [];
 		await mount(
 			<Dialog open onOpenChange={(open) => closes.push(open)}>
@@ -58,7 +58,8 @@ describe("Proposed dialogs keep their actions", () => {
 		assert.equal(dialog?.getAttribute("role"), "dialog");
 		assert.equal(dialog?.querySelector('[data-slot="dialog-title"]')?.textContent, "New course");
 		assert.ok($('[data-testid="new-course-title"]'));
-		assert.equal($('[data-testid="new-course-root"]')?.getAttribute("role"), "combobox");
+		assert.ok($('[data-testid="new-course-exam"]'));
+		assert.ok($('[data-testid="new-course-material"]'));
 		assert.equal($('[data-testid="new-course-create"]')?.hasAttribute("disabled"), true);
 		assert.ok([...document.querySelectorAll("button")].some((b) => b.textContent === "Cancel"));
 		assert.equal(await escapeReachesWindow(), false, "Esc closes the dialog and stops there");

@@ -100,7 +100,7 @@ describe("where he stands on a topic", () => {
 
 	it("draws a full pie for exactly the topics the course's progress pie counts", () => {
 		const full = TOPICS.filter((t) => standingOf(t).fill === 1).length;
-		assert.equal(full, courseProgress({ map: MAP, unready: null, due: [], lastActiveDaysAgo: 0 })!.solid);
+		assert.equal(full, courseProgress({ map: MAP, unready: null, due: [], newToday: [], lastActiveDaysAgo: 0 })!.solid);
 		assert.equal(full, 3);
 	});
 

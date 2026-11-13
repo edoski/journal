@@ -21,7 +21,7 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, longDayWords, lookOf, LOOKS, misfitWords, runupWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, runupWords, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
@@ -129,7 +129,7 @@ export function CalendarEntryView({
 			<PopoverTrigger data-slot="calendar-entry" data-look={look} className={face}>
 				<Face entry={entry} today={today} compact={compact} />
 			</PopoverTrigger>
-			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className="flex w-72 flex-col gap-3">
+			<PopoverContent data-slot="calendar-entry-detail" align="start" collisionPadding={12} className={cn("flex flex-col gap-3", entry.kind === "exam" ? "w-80" : "w-72")}>
 				<EntryDetail entry={entry} today={today} busy={busy} onStart={onStart} />
 			</PopoverContent>
 		</Popover>
@@ -175,8 +175,36 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 					</p>
 				))}
 			</div>
+			{entry.kind === "exam" && <Road entry={entry} />}
 			<EntryActions entry={entry} busy={busy} onStart={onStart} />
 		</>
+	);
+}
+
+/** The road to the exam as the engine planned it: each week's new topics,
+ *  then the final review. Nothing when the plan starts no new topic. */
+function Road({ entry }: { entry: Extract<CalendarEntry, { kind: "exam" }> }) {
+	if (entry.road.length === 0 && !entry.finalReview) return null;
+	return (
+		<div data-slot="exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
+			<p className="text-label font-medium text-muted-foreground">The road to it</p>
+			<ol className="flex flex-col gap-1.5">
+				{entry.road.map((week) => (
+					<li key={week.from} className="flex gap-2 text-label">
+						<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+						<span className="min-w-0">
+							<span className="text-muted-foreground">{spanWords(week)}</span> <span className="text-foreground">{week.titles.join(", ")}</span>
+						</span>
+					</li>
+				))}
+				{entry.finalReview && (
+					<li className="flex gap-2 text-label text-muted-foreground">
+						<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+						{finalReviewWords(entry.finalReview)}
+					</li>
+				)}
+			</ol>
+		</div>
 	);
 }
 

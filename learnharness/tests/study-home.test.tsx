@@ -80,7 +80,7 @@ const LINALG: StudyCourse = {
 	}),
 	unready: ["span", "independence", "rank", "eigen"] as TopicHandle[],
 	due: null,
-	lastActiveDaysAgo: 2,
+	newToday: [], lastActiveDaysAgo: 2,
 };
 const PROB: StudyCourse = {
 	map: map({
@@ -92,13 +92,13 @@ const PROB: StudyCourse = {
 	}),
 	unready: [],
 	due: [],
-	lastActiveDaysAgo: 4,
+	newToday: [], lastActiveDaysAgo: 4,
 };
 const ANALYSIS: StudyCourse = {
 	map: map({ workspace: "/s/ra", title: "Real Analysis", exam: { date: "2027-01-26", daysLeft: 79 }, topics: [topic("seq", "Sequences", "independent", { review: due(1) })] }),
 	unready: null,
 	due: ["seq" as TopicHandle],
-	lastActiveDaysAgo: 11,
+	newToday: [], lastActiveDaysAgo: 11,
 };
 
 function chat(over: Partial<ChatListItem>): ChatListItem {
@@ -146,6 +146,15 @@ describe("study facts", () => {
 		const step = nextStepOf(planned);
 		assert.equal(stepWords(step), "Review Rank and Span");
 		assert.deepEqual(step.kind === "review" && step.topics, ["rank", "span"]);
+	});
+
+	it("starts the new topics today's plan names, once reviews and the open task are done", () => {
+		const fresh: StudyCourse = { ...PROB, newToday: ["bayes"] as TopicHandle[] };
+		const step = nextStepOf(fresh);
+		assert.equal(stepWords(step), "Start Bayes' rule");
+		assert.deepEqual(step.kind === "topic" && [step.topics, step.planned], [["bayes"], true]);
+		assert.equal(whyOf({ kind: "course", course: fresh, step })?.short, "Planned today");
+		assert.equal(stepWords(nextStepOf({ ...LINALG, newToday: ["span"] as TopicHandle[] })), "Review Linear independence, Rank and more", "reviews still come first");
 	});
 
 	it("puts a course in its exam run-up first, the nearest exam first", () => {
@@ -218,8 +227,14 @@ describe("the study read", () => {
 		assert.deepEqual(course.unready, ["span"]);
 		assert.deepEqual(course.due, ["rank", "span"]);
 		assert.equal(course.lastActiveDaysAgo, 2);
-		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, due: [], lastActiveDaysAgo: null });
+		assert.deepEqual(studyCourseOf(LINALG.map, { courses: [{}] }), { map: LINALG.map, unready: null, due: [], lastActiveDaysAgo: null, newToday: [] });
 		assert.equal(studyCourseOf(LINALG.map, null).due, null);
+	});
+
+	it("reads the new topics today's plan starts, only when its first day is today", () => {
+		const day = (date: string) => ({ today: "2026-11-08", courses: [{ plan: { days: [{ date, reviews: [], new: ["span", "gone"] }] } }] });
+		assert.deepEqual(studyCourseOf(LINALG.map, day("2026-11-08")).newToday, ["span"]);
+		assert.deepEqual(studyCourseOf(LINALG.map, day("2026-11-09")).newToday, [], "a later day is not today's");
 	});
 });
 

@@ -72,7 +72,7 @@ export function whyOf(row: TodayRow): Why | null {
 		case "task":
 			return step.step ? { kind: "task", short: `At ${step.step.charAt(0).toLowerCase()}${step.step.slice(1)}` } : { kind: "task", short: "Unfinished" };
 		case "topic":
-			return { kind: "next", short: "Next up" };
+			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
 		case "none":
 			return null;
 	}
