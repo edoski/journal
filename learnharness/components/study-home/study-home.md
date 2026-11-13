@@ -1,6 +1,6 @@
 # Study home
 
-The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. It sits behind the `home` group in the Logbook guide: Current keeps `/` the composer, the surface as it was; Proposed is this study home (wears Design's Proposed). Production resolves to Current. Shipping deletes the group and `useHomeVariant`, and `/` becomes this home.
+The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. Edo picked it over the composer at `/` on 13 Nov 2026; the Home switch is gone, and the composer is the draft at `/chat/new`.
 
 Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes beside the agenda; on 13 Nov Edo kept the agenda and those three were deleted. The page frame is `home-frame.tsx` (lessons.md).
 

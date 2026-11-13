@@ -12,12 +12,9 @@ import { SidebarToggle } from "@/components/sidebar";
 import { SessionStarter } from "@/components/start-session";
 import { Button } from "@/components/ui/button";
 
-/** The heading over the composer: Today asks about the day, the draft
- *  about the session. Neither names a mode: the tutor routes the request
- *  to teaching or practice itself. */
-function startHeading(today: boolean): string {
-	return today ? "What are we learning today?" : "What do you want to work on?";
-}
+/** The heading over the composer. It names no mode: the tutor routes the
+ *  request to teaching or practice itself. */
+const START_HEADING = "What do you want to work on?";
 
 /** The composer's prompt, for a lesson and for practice alike. */
 const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
@@ -25,18 +22,10 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
 /**
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
  * anatomy: a light question and the composer centred in a 736px column,
- * nothing else. `/` (`today`) and the draft at /chat/new share it; a
- * session is created only when something is sent, through the same path
- * the current screens use.
+ * nothing else. It is the draft at /chat/new; a session is created only
+ * when something is sent, through the same path the current screens use.
  */
-export function StartScreen({
-	initialConfigured,
-	today = false,
-}: {
-	initialConfigured: boolean;
-	/** At `/`: the day's question. */
-	today?: boolean;
-}) {
+export function StartScreen({ initialConfigured }: { initialConfigured: boolean }) {
 	const router = useRouter();
 	const [text, setText] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -102,7 +91,7 @@ export function StartScreen({
 			<div className="lh-drag absolute inset-x-0 top-0 h-13" aria-hidden="true" />
 			<main data-slot="start-screen" className="relative flex min-h-0 flex-1 flex-col px-5">
 				<div className="flex min-h-0 flex-1 flex-col justify-end pb-8">
-					<h1 className="text-center text-display font-normal tracking-[-0.025em] text-foreground">{startHeading(today)}</h1>
+					<h1 className="text-center text-display font-normal tracking-[-0.025em] text-foreground">{START_HEADING}</h1>
 				</div>
 				<div className="mx-auto w-full max-w-[46rem]">
 					<Composer

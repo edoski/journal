@@ -14,8 +14,7 @@ import { OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
 import { SessionStarter } from "@/components/start-session";
 import { CourseControl, useCourseChoice } from "@/components/course-picker";
 import type { TurnUsage } from "@/src/core";
-import { useDesignVariant, useHomeVariant } from "@/components/design-variant";
-import { StartScreen } from "@/components/start/start-screen";
+import { useDesignVariant } from "@/components/design-variant";
 import { StudyHome } from "@/components/study-home/study-home";
 
 /**
@@ -25,13 +24,7 @@ import { StudyHome } from "@/components/study-home/study-home";
  * with no gradient scrims. Sessions live in the toggleable sidebar.
  */
 export function Home(props: { initialConfigured: boolean }) {
-	return useDesignVariant() === "proposed" ? <HomeNext initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
-}
-
-/** The Proposed `/`: the study home Home's switch names, else the composer
- *  (the surface as it is). */
-function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
-	return useHomeVariant() === "proposed" ? <StudyHome initialConfigured={initialConfigured} /> : <StartScreen initialConfigured={initialConfigured} today />;
+	return useDesignVariant() === "proposed" ? <StudyHome initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
 }
 
 function HomeCurrent({ initialConfigured }: { initialConfigured: boolean }) {

@@ -19,14 +19,12 @@ export const LINK_OPTIONS = ["split", "connected"] as const;
 export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
 
 /** The switch registry, which the Logbook's in-app guide switches (dev
- *  only): Design is Current or Proposed; Home is the composer or the study
- *  home, Sidebar Current or Proposed, and anything but Current wears
+ *  only): Design is Current or Proposed; Sidebar Current or Proposed, and anything but Current wears
  *  Design's Proposed; Node is the topic map's node as it was or
  *  one of its candidates, wherever the topic map draws; Link is the topic page's
  *  panes as they are or one of its options. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
-	{ id: "home", label: "Home", requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
 	{ id: "node", label: "Node", options: NODE_OPTIONS, requires: { design: "proposed" } },
 	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed" } },
@@ -47,7 +45,6 @@ function subscribeSwitch(onChange: () => void): () => void {
 }
 const readCurrent = (): DesignVariant => "current";
 const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" ? "proposed" : "current");
-const readHome = (): DesignVariant => (polishVariant("home") === "proposed" ? "proposed" : "current");
 const readLinkCurrent = (): LinkVariant => "current";
 const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
@@ -58,13 +55,6 @@ const readNode = (): NodeVariant => NODE_OPTIONS.find((option) => option === pol
  *  Production builds always get "current" until a surface ships. */
 export function useDesignVariant(): DesignVariant {
 	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readSwitch : readCurrent, readCurrent);
-}
-
-/** Whether `/` is the study home ("proposed", spec:
- *  components/study-home/study-home.md) or the composer ("current").
- *  Production builds get "current". */
-export function useHomeVariant(): DesignVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readHome : readCurrent, readCurrent);
 }
 
 /** Whether the Proposed design's sidebar lists course topics ("proposed",

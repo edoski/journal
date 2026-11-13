@@ -20,37 +20,32 @@ function documentFor(node: React.ReactNode) {
 
 describe("the start screen (Proposed)", () => {
 	const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
-	const screen = (today: boolean) =>
+	const screen = () =>
 		documentFor(
 			<ServerEventsProvider>
 				<AppRouterContext.Provider value={router as never}>
-					<StartScreen initialConfigured today={today} />
+					<StartScreen initialConfigured />
 				</AppRouterContext.Provider>
 			</ServerEventsProvider>,
 		);
 
 	it("offers no Teach/Practice switch and no proposition picker: the tutor routes the request", () => {
-		for (const today of [true, false]) {
-			const doc = screen(today);
-			assert.equal(doc.querySelector('[data-testid="home-mode-switch"]'), null);
-			assert.equal(doc.querySelector('[role="radiogroup"]'), null);
-			assert.equal(doc.querySelector('[data-testid="practice-props-chip"]'), null);
-			assert.doesNotMatch(doc.body.textContent ?? "", /\bTeach\b|\bPractice\b/);
-		}
+		const doc = screen();
+		assert.equal(doc.querySelector('[data-testid="home-mode-switch"]'), null);
+		assert.equal(doc.querySelector('[role="radiogroup"]'), null);
+		assert.equal(doc.querySelector('[data-testid="practice-props-chip"]'), null);
+		assert.doesNotMatch(doc.body.textContent ?? "", /\bTeach\b|\bPractice\b/);
 	});
 
 	it("holds the heading and the composer and nothing else", () => {
-		for (const today of [true, false]) {
-			const main = screen(today).querySelector('[data-slot="start-screen"]');
-			assert.ok(main?.querySelector('[data-slot="composer"]'));
-			assert.equal(main?.querySelectorAll("h1, h2, h3").length, 1);
-			assert.doesNotMatch(main?.textContent ?? "", /Continue|Other courses|Exam in/);
-		}
+		const main = screen().querySelector('[data-slot="start-screen"]');
+		assert.ok(main?.querySelector('[data-slot="composer"]'));
+		assert.equal(main?.querySelectorAll("h1, h2, h3").length, 1);
+		assert.doesNotMatch(main?.textContent ?? "", /Continue|Other courses|Exam in/);
 	});
 
-	it("asks one neutral question and prompt, whichever entry opened the draft", () => {
-		assert.equal(screen(true).querySelector("h1")?.textContent, "What are we learning today?");
-		const draft = screen(false);
+	it("asks one neutral question and prompt", () => {
+		const draft = screen();
 		assert.equal(draft.querySelector("h1")?.textContent, "What do you want to work on?");
 		assert.equal(draft.querySelector("textarea")?.getAttribute("placeholder"), "Name a topic, ask a question or paste a problem");
 	});
