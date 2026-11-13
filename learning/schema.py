@@ -148,6 +148,8 @@ FIELDS: dict[str, dict[str, str]] = {
         "sure": _SURE,
         "chose": _HANDLE,
         "transfer": _FLAG,
+        "shown": _FLAG,
+        "gave_up": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -244,6 +246,8 @@ class Observation(TypedDict, total=False):
     sure: str
     chose: str
     transfer: bool
+    shown: bool
+    gave_up: bool
     date: str
     task: str
     refs: list[Reference]
@@ -658,7 +662,15 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
     else:
         given = [
             name
-            for name in ("result", "help", "sure", "transfer", "chose")
+            for name in (
+                "result",
+                "help",
+                "sure",
+                "transfer",
+                "chose",
+                "shown",
+                "gave_up",
+            )
             if name in observation
         ]
         if given:
@@ -668,6 +680,13 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
             )
     if observation.get("transfer") and observation.get("result") != "correct":
         raise ValueError(f'{path}.transfer is allowed only with result "correct"')
+    if observation.get("shown") and unaided(observation):
+        raise ValueError(
+            f"{path}.shown marks help that showed the method or the answer before "
+            'the attempt, so it needs that help named, not help "none"'
+        )
+    if observation.get("gave_up") and observation.get("result") != "incorrect":
+        raise ValueError(f'{path}.gave_up is allowed only with result "incorrect"')
     if "chose" in observation:
         if observation.get("result") == "correct":
             raise ValueError(

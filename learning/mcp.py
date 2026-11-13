@@ -64,14 +64,17 @@ SAVE_RULES = "\n".join(
         "uncertain, pinned}; task {title, topics, goal, step, help, note, refs}; "
         "source {path, title}",
         "- Lists replace whole; refs are [{source, locator}].",
-        "- observations: new entries, appended: {topics, text, kind, help, result, "
-        "sure, response, chose, transfer, date, task, refs, corrects, uncertain}. "
+        "- observations: new entries, appended: {topics, text, kind, help, shown, "
+        "result, gave_up, sure, response, chose, transfer, date, task, refs, "
+        "corrects, uncertain}. "
         'kind attempt (default) needs help ("none" if unaided) and result correct|'
         "partial|incorrect; exam needs result; self_report (the learner's own "
         "statement) takes neither. sure: guess|neutral|confident, only when the "
         "learner marked the answer; a guess is never solid, and a "
         "confident incorrect answer is a confident error. transfer: true only when "
-        "correct. chose: the topic of a "
+        "correct. shown: true when the help showed the method or the answer "
+        "before the attempt, not a hint during it. gave_up: true when the learner "
+        "abandoned it without an answer (result incorrect). chose: the topic of a "
         "wrongly chosen method, on an attempt that was not correct, recorded on "
         'the topic that should have been chosen. corrects: ["oN"] supersedes '
         "earlier ones and, without a date, takes the earliest one's day; an attempt "

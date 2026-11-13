@@ -10,7 +10,7 @@ Evidence is what the learner did, kept apart from knowledge about the course and
 
 ## Observations
 
-One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `result`, `sure`, `chose`, `transfer`, `date` (the event day when not today), `task`, `refs`, `corrects`, `uncertain`.
+One entry per actual attempt, external result or explicit self-report. Fields: `topics` and `text` (required), `kind`, `response` (the learner's actual answer, short), `help`, `shown`, `result`, `gave_up`, `sure`, `chose`, `transfer`, `date` (the event day when not today), `task`, `refs`, `corrects`, `uncertain`.
 
 | `kind` | When | Required |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ One entry per actual attempt, external result or explicit self-report. Fields: `
 | `exam` | graded work from outside the session | `result`, no `help`; counts as unaided |
 | `self_report` | the learner's statement about their own understanding | no `result`, `help`, `sure` or `transfer` |
 
-`help` is the strongest support given before or during the attempt, in words: a hint rung, a worked example, a reminder of the method. A solution reproduced right after your explanation, or the same problem re-solved after an example, is assisted. `transfer: true` marks an unaided success on a meaningfully different problem, representation or context than the one taught. `chose` names the topic of a wrongly chosen method; record the attempt on the topic that should have been chosen, with a result that is not `correct`. `uncertain` marks doubtful evidence: possibly read from notes, an illegible symbol, work you did not watch (earlier homework, a pasted solution). An `uncertain` attempt is never `solid`.
+`help` is the strongest support given before or during the attempt, in words: a hint rung, a worked example, a reminder of the method. A solution reproduced right after your explanation, or the same problem re-solved after an example, is assisted. `shown: true` marks help that showed the method or the answer before the attempt (a worked example, the step worked for them, the method taught earlier in the session), as against a hint during it. The solution revealed after the learner gives up is not help: `gave_up: true` marks an attempt they abandoned without an answer, with `result` `incorrect`. A request to be taught instead, before any answer, is not an attempt: record nothing. `transfer: true` marks an unaided success on a meaningfully different problem, representation or context than the one taught. `chose` names the topic of a wrongly chosen method; record the attempt on the topic that should have been chosen, with a result that is not `correct`. `uncertain` marks doubtful evidence: possibly read from notes, an illegible symbol, work you did not watch (earlier homework, a pasted solution). An `uncertain` attempt is never `solid`.
 
 A misrecorded observation is superseded by a new one, describing what really happened, with `corrects: ["o7"]`: the original stays visible but stops counting, and without a `date` the correction takes the earliest corrected observation's day and its place in that day's order. Only an observation recorded today can be superseded by an attempt: an earlier session's attempts stand as recorded, so never regrade them from a transcript you resume. When the learner says an older one was wrong, their statement is a `self_report` that corrects it. Later improvement is simply a new observation.
 
