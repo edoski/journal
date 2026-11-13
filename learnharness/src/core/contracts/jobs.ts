@@ -15,6 +15,19 @@ import { newHandoffMessage, newModeHandoffMessage } from "../native-messages.ts"
 export type JobKind = "research" | "demo" | "visual" | "pdf";
 export type JobStatus = "running" | "done" | "error";
 
+/** How long a job may run, counted from createdAt, before the runner fails
+ * it. Only a hung model or network call should ever reach these: each is a
+ * ceiling well above a normal run. A figure took 74 s in the golden fixtures;
+ * a demo build there made 5 model calls of about 3k output tokens each, and
+ * the builder may take up to 24; research stops at 12 turns; a PDF reader may
+ * render and read many pages of a long book. */
+export const JOB_TIME_LIMIT_MS: Record<JobKind, number> = {
+	research: 6 * 60_000,
+	demo: 8 * 60_000,
+	visual: 4 * 60_000,
+	pdf: 10 * 60_000,
+};
+
 export interface JobRecord {
 	id: string;
 	kind: JobKind;
@@ -334,18 +347,20 @@ export function isSubagentFailure(
 	return typeof r.svg !== "string" || r.svg.length === 0;
 }
 
+function failureReason(notes: string | undefined): string {
+	return notes?.replace(/^FAILED:\s*/i, "").trim() || "unknown reason";
+}
+
 /** The model-facing text of a steer: what the result IS, what to do with it. */
 function steerText(kind: JobKind, result: ResearchResult | DemoResult | VisualResult | PdfResult): string {
 	if (isSubagentFailure(kind, result)) {
 		if (kind === "research")
 			return `${(result as ResearchResult).brief}\n\nContinue with what you can establish and flag the uncertainty to the learner.`;
 		if (kind === "demo")
-			return `The demo "${(result as DemoResult).title}" could not be built: ${
-				(result as DemoResult).notes ?? "unknown reason"
-			}. Fall back to explaining in prose; if the brief was the problem, re-call demo with a tighter one.`;
+			return `The demo "${(result as DemoResult).title}" could not be built (${failureReason((result as DemoResult).notes)}). Tell the learner so in one line, then carry on teaching in prose without it.`;
 		if (kind === "pdf")
 			return `${(result as PdfResult).brief}\n\nContinue with what you can establish from the session and flag the gap to the learner.`;
-		return `The figure could not be made: ${(result as VisualResult).notes ?? "unknown reason"}. Fall back to prose or mermaid, or re-call visual with a tighter brief.`;
+		return `The figure could not be made (${failureReason((result as VisualResult).notes)}). Tell the learner so in one line, then carry on teaching in prose without it.`;
 	}
 	if (kind === "research")
 		return `Research complete — the researcher's full brief follows. Weave it into the lesson and cite its sources when you use its findings:\n\n${(result as ResearchResult).brief}`;
