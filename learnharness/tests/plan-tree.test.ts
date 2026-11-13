@@ -110,6 +110,17 @@ function newChat(title: string): string {
 	return chat.id;
 }
 
+describe("plan titles that hold math", () => {
+	it("keeps a $…$ formula in a title whole, brackets included in the quoted form", () => {
+		const { problems, plan } = parseMermaidPlan('graph TD\n  det-product[$\\det(AB) = \\det A \\det B$]\n  closed-interval("Continuity on $[a, b]$")\n  det-product --> closed-interval');
+		assert.deepEqual(problems, []);
+		assert.deepEqual(
+			plan!.nodes.map((n) => n.title),
+			["$\\det(AB) = \\det A \\det B$", "Continuity on $[a, b]$"],
+		);
+	});
+});
+
 describe("plan_init — the author-once mermaid tool (execute against the real store)", () => {
 	it("parses a mermaid block, builds the tree, persists, returns the full tree", async () => {
 		const chatId = newChat("Plan: init");
