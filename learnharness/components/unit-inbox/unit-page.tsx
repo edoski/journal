@@ -20,8 +20,7 @@ import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 import { PICKUP_PANES } from "@/components/unit-inbox/topic-page/pickup/pickup-options";
 import { LINK_PANES } from "@/components/unit-inbox/topic-page/link/link-options";
-import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
-import { LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
+import { LEVEL_WORDS, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
@@ -134,15 +133,14 @@ function UnitBody({
 	const lesson = useLessonStart(initialConfigured);
 	// The Proposed design's header is the one the topic map's node opens; Current keeps the page as it was.
 	const mapNext = useDesignVariant() === "proposed";
-	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
 	const workspace = course.map.workspace;
-	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic);
+	const sessions = topicSessions(chats, workspace, topic.handle);
 	const active = resumableSession(sessions);
 	const others = sessions.filter((c) => c !== active);
 	const send = () => {
 		if (!text.trim()) return;
-		lesson.start(openingFor(topic.title, text), workspace, (id) => recordStart(id, topic.handle));
+		lesson.start(openingFor(topic.title, text), workspace, { topics: [topic.handle] });
 	};
 	return (
 		<>
@@ -153,7 +151,7 @@ function UnitBody({
 							map={course.map}
 							topic={topic}
 							busy={lesson.busy}
-							onStudy={active ? undefined : () => lesson.start(topic.title, workspace, (id) => recordStart(id, topic.handle))}
+							onStudy={active ? undefined : () => lesson.start(topic.title, workspace, { topics: [topic.handle] })}
 						/>
 					) : (
 					<header className="flex flex-col gap-1 px-2">

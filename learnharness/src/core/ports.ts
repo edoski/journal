@@ -36,7 +36,7 @@ export interface ChatStore {
 	/** Create a session record; `course` links the session to one
 	 *  registered course for its whole life. A session's mode lives in its
 	 *  transcript (a session-mode marker, then the agents' handoffs). */
-	createChat(title: string, course?: CourseLink): ChatRecord;
+	createChat(title: string, course?: CourseLink, topics?: readonly string[]): ChatRecord;
 	/** The full record, or null if unknown id / corrupt file. */
 	getChat(id: string): ChatRecord | null;
 	/** All sessions, newest activity first (the sidebar's list view). */

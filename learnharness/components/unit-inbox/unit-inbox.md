@@ -65,11 +65,11 @@ In the Proposed design the header is `topic-header.tsx` (`data-slot="topic-heade
 
 Behind the Topic switch (`design-variant.ts`, group `topic`, which wears Design's Proposed) the page's body is one of three candidates, `brief`, `steps` and `trail`, drawn by `topic-page/topic-page.tsx` around a shared head, pick-up rows and session rows; Current's body above is not touched. See `topic-page/topic-page.md`.
 
-Sending starts a new session in the topic's course through `useLessonStart` (the start screen's and the study home's path, with its setup guards). Its first message is the prompt, led by the topic's title unless the prompt names it (`openingFor`), so the tutor works on that topic. The app links the new session to the topic (`lh:topic-starts`, `linkStarts`), so its row stays selected and the page lists it before the transcript names the topic.
+Sending starts a new session in the topic's course through `useLessonStart` (the start screen's and the study home's path, with its setup guards). Its first message is the prompt, led by the topic's title unless the prompt names it (`openingFor`), so the tutor works on that topic. The session is created on the topic (`topics` on its record, `POST /api/chats`), so its row stays selected and the page lists it before the transcript names the topic.
 
 ## Sessions to topics
 
-A session's topics come from its own transcript (`sessionTopicsOf` in `src/core/native-messages.ts`): the topics of each problem it posed and observation it saved, the topics a save introduced, and plan nodes named after a topic. Only topics the course map lists count; a session on two topics is under both. Sessions started on a topic's page are on it from their first turn.
+A session's topics come from its own transcript (`sessionTopicsOf` in `src/core/native-messages.ts`): the topics of each problem it posed and observation it saved, the topics a save introduced (a save sent as JSON text read as the engine reads it), and the topics it was started on. A plan step never counts, whatever its name, and an open task links its sessions to the task, not to each topic it covers. Only topics the course map lists count; a session on two topics is under both. Sessions started on a topic's page are on it from their first turn.
 
 ## Sources
 

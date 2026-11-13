@@ -1,6 +1,6 @@
 # Today
 
-The home's list of what to study today: one line per course, each its one next lesson. `today.tsx`, `data-slot` `today`, title `day-heading`, lines `today-line`, overflow `today-also`. Facts in `study-facts.ts` (`todayRows`, `nextStepOf`). The lines are the hybrid rows (`agenda-rows/hybrid/hybrid.md`), Edo's pick of 13 Nov 2026: their anatomy, words and marks are specified there.
+The home's list of what to study today: each session to pick up, then each course's one next lesson. `today.tsx`, `data-slot` `today`, title `day-heading`, lines `today-line`, overflow `today-also`. Facts in `study-facts.ts` (`todayRows`, `nextStepOf`). The lines are the hybrid rows (`agenda-rows/hybrid/hybrid.md`), Edo's pick of 13 Nov 2026: their anatomy, words and marks are specified there.
 
 ## Anatomy
 
@@ -15,7 +15,9 @@ No line has a button: the first row's blue Open looked ugly and every line alrea
 
 ## Order
 
-A session waiting on the learner since yesterday takes its course's line, most recent first (one with no course gets its own line). Then every other course, most urgent first (`byUrgency`: in the exam run-up, nearest exam, most recent activity). An older waiting session stays in the sidebar.
+Each session to pick up since yesterday (it waits on the learner, the tutor writes in it, or it stopped mid-reply) has its own line, most recent first, and keeps it while the tutor writes, its reason saying so. Then each course's next step, most urgent first (`byUrgency`: in the exam run-up, nearest exam, most recent activity), unless a session shown works on that step (it holds the task, or was started on or worked on every topic of the step); a lesson waiting on another topic never hides a due review. A finished session, a sign-off included, has no line. An older session to pick up stays in the sidebar. Home reads again whenever a turn starts or settles, a record or the session list changes.
+
+A course's line, pressed (`courseMove`): a review opens a session on those topics that is still to pick up, else starts a review of them, titled and opened "Review A and B" and created on those topics; never an older lesson. An open task or the current topic continues the lesson that holds it (`continueMove`), else starts one; a topic not started reads "Start <title>".
 
 ## Words
 

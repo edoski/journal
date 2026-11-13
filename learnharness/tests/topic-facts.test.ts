@@ -120,30 +120,44 @@ const EIGEN_PLAN: SessionPlan = {
 
 describe("the page's one action", () => {
 	it("resumes the session that waits on him, else opens the one the tutor is writing in", () => {
-		const waiting = chat({ pendingQuestion: true });
-		const writing = chat({ busy: true, updatedAt: "2026-11-08T09:00:00.000Z" });
+		const waiting = chat({ topics: ["rank"], pendingQuestion: true });
+		const writing = chat({ topics: ["rank"], busy: true, updatedAt: "2026-11-08T09:00:00.000Z" });
 		assert.deepEqual(topicAction(TOPICS.rank, MAP, [writing, waiting]), { kind: "resume", chat: waiting }, "a waiting session beats one being written");
 		assert.deepEqual(topicAction(TOPICS.rank, MAP, [writing]), { kind: "open", chat: writing });
-		assert.deepEqual(topicAction(TOPICS.eigen, MAP, [chat({ compacting: true })]).kind, "open");
+		assert.deepEqual(topicAction(TOPICS.eigen, MAP, [chat({ topics: ["eigen"], compacting: true })]).kind, "open");
 	});
 
-	it("reviews a topic he can do on his own whose review is due, ahead of an open task", () => {
+	it("never resumes a session the engine's records do not tie to the topic", () => {
+		const elsewhere = chat({ topics: ["span"], pendingQuestion: true });
+		assert.equal(topicAction(TOPICS.determinant, MAP, [elsewhere]).kind, "review", "a lesson on another topic waits, not this one");
+		const sheet = chat({ tasks: ["sheet-4"], pendingQuestion: true });
+		assert.deepEqual(topicAction(TOPICS.basis, MAP, [sheet]), { kind: "review", opening: "Review Basis and dimension" }, "a waiting sheet that covers it does not make it the topic's turn");
+		const finished = chat({ topics: ["rank"], updatedAt: "2026-11-08T09:00:00.000Z" });
+		assert.deepEqual(topicAction(TOPICS.rank, MAP, [finished]), { kind: "review", opening: "Review Rank and the column space" }, "a finished lesson is not reopened for a due review");
+	});
+
+	it("reviews a topic whose review is due, at any level, ahead of an open task", () => {
 		assert.deepEqual(topicAction(TOPICS.span, MAP, []), { kind: "review", opening: "Review Span" });
 		assert.deepEqual(topicAction(TOPICS.basis, MAP, []), { kind: "review", opening: "Review Basis and dimension" });
 		assert.deepEqual(topicAction(TOPICS.matmul, MAP, []), { kind: "review", opening: "Review Matrix multiplication as composition" });
+		assert.deepEqual(topicAction(TOPICS.kernel, MAP, []), { kind: "review", opening: "Review Kernel and rank-nullity" }, "still being learned");
 	});
 
 	it("continues the open task that holds the topic, ahead of starting it", () => {
-		assert.deepEqual(topicAction(TOPICS.kernel, MAP, []), { kind: "continue", opening: "Continue Problem sheet 4: rank and nullity", task: SHEET });
+		const kernelLater = { ...TOPICS.kernel, review: null };
+		assert.deepEqual(topicAction(kernelLater, MAP, []), { kind: "continue", opening: "Continue Problem sheet 4: rank and nullity", task: SHEET });
+		const sheet = chat({ tasks: ["sheet-4"] });
+		assert.deepEqual(topicAction(kernelLater, MAP, [sheet]), { kind: "continue", chat: sheet, task: SHEET }, "Continue reopens the lesson that holds the task");
 		assert.deepEqual(topicAction({ ...TOPICS.eigen, tasks: ["sheet-4"] }, MAP, []).kind, "continue");
 	});
 
 	it("starts a topic not started, and continues one still being learned", () => {
 		assert.deepEqual(topicAction(TOPICS.eigen, MAP, []), { kind: "start", opening: "Eigenvalues and eigenvectors" });
-		assert.deepEqual(topicAction(TOPICS.cramer, MAP, []), { kind: "continue", opening: "Continue Cramer's rule", task: null });
-		const finished = chat();
-		assert.deepEqual(topicAction(TOPICS.determinant, MAP, [finished]), { kind: "continue", chat: finished, task: null }, "Continue reopens the finished lesson");
-		assert.deepEqual(topicAction(TOPICS.determinant, MAP, [chat({ kind: "practice" })]), { kind: "continue", opening: "Continue Determinants as volume scaling", task: null }, "a finished practice round is not reopened");
+		const learning = { ...TOPICS.determinant, review: null };
+		assert.deepEqual(topicAction({ ...TOPICS.cramer, review: null }, MAP, []), { kind: "continue", opening: "Continue Cramer's rule", task: null });
+		const finished = chat({ topics: ["determinant"] });
+		assert.deepEqual(topicAction(learning, MAP, [finished]), { kind: "continue", chat: finished, task: null }, "Continue reopens the finished lesson");
+		assert.deepEqual(topicAction(learning, MAP, [chat({ topics: ["determinant"], kind: "practice" })]), { kind: "continue", opening: "Continue Determinants as volume scaling", task: null }, "a finished practice round is not reopened");
 	});
 
 	it("only offers Study when the engine has dated the next review", () => {
@@ -172,20 +186,20 @@ describe("the open tasks that hold a topic", () => {
 describe("where he stands, in the map's words", () => {
 	it("says every seeded head line word for word", () => {
 		const lines: [CourseMapTopic, string][] = [
-			[TOPICS.rank, "Nearly on your own. A mistake to fix"],
+			[TOPICS.rank, "Nearly on your own. A mistake to fix. Review overdue by 3 days"],
 			[TOPICS.matmul, "On your own. Missed last time. Review overdue by 2 days"],
 			[TOPICS.span, "On your own. Review overdue by a week"],
 			[TOPICS.vectors, "On your own. Next review Fri 13 Nov"],
-			[TOPICS.cramer, "Just started"],
+			[TOPICS.cramer, "Just started. Review overdue by 2 days"],
 			[TOPICS.riemann, "On your own. Missed last time. Review due today"],
-			[TOPICS.elimination, "Nearly on your own. Mixed up with Cramer's rule"],
-			[TOPICS.kernel, "Learning. Sure, but wrong"],
+			[TOPICS.elimination, "Nearly on your own. Mixed up with Cramer's rule. Review overdue by 2 days"],
+			[TOPICS.kernel, "Learning. Sure, but wrong. Review overdue by a day"],
 			[TOPICS.basis, "On your own. Review overdue by a week"],
-			[TOPICS.independence, "Nearly on your own. A mistake to fix"],
+			[TOPICS.independence, "Nearly on your own. A mistake to fix. Review overdue by 2 weeks"],
 			[TOPICS.chain, "On your own. Missed last time. Review overdue by 4 weeks"],
 			[TOPICS.eigen, "Not started"],
 		];
-		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, sessions: [], read: null }).standing!.words, ...headMarks(t, titleOf).map((mark) => mark.words)].join(". ");
+		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf).map((mark) => mark.words)].join(". ");
 		for (const [t, words] of lines) assert.equal(said(t), words, t.handle);
 	});
 
@@ -194,16 +208,17 @@ describe("where he stands, in the map's words", () => {
 			{ kind: "slip", words: "Missed last time" },
 			{ kind: "review", words: "Review overdue by 2 days" },
 		]);
-		assert.deepEqual(headMarks(TOPICS.cramer, titleOf), []);
+		assert.deepEqual(headMarks({ ...TOPICS.cramer, review: null }, titleOf), []);
 	});
 
 	it("is silent for a topic not started that already has a session", () => {
-		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, sessions: [chat({ pendingQuestion: true })], read: null });
+		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [chat({ topics: ["eigen"], pendingQuestion: true })], read: null });
 		assert.deepEqual([facts.standing, facts.marks], [null, []]);
 	});
 
-	it("says nothing about review for a topic still being learned until the engine dates it", () => {
-		assert.deepEqual(headMarks(TOPICS.determinant, titleOf), []);
+	it("says a topic still being learned is due, as its action does, and dates a later review", () => {
+		assert.deepEqual(headMarks(TOPICS.determinant, titleOf), [{ kind: "review", words: "Review overdue by 4 days" }]);
+		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: null }, titleOf), []);
 		assert.deepEqual(headMarks({ ...TOPICS.determinant, review: { kind: "scheduled", date: "2026-11-09" } }, titleOf), [{ kind: "review", words: "Next review Mon 9 Nov" }]);
 	});
 });
@@ -245,9 +260,9 @@ describe("when he last studied the topic", () => {
 	});
 
 	it("reads a session dated after the engine's day as today", () => {
-		const sessions = [chat({ topics: ["cramer"], updatedAt: "2026-11-10T08:00:00.000Z" })];
-		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, sessions, read: null }).studied, "Studied today");
-		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, sessions: [], read: null }).studied, "Studied 3 days ago");
+		const chats = [chat({ topics: ["cramer"], updatedAt: "2026-11-10T08:00:00.000Z" })];
+		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats, read: null }).studied, "Studied today");
+		assert.equal(topicFacts({ course: COURSE, topic: TOPICS.cramer, chats: [], read: null }).studied, "Studied 3 days ago");
 	});
 
 	it("dates a session by its local day, never after the engine's", () => {
@@ -281,7 +296,7 @@ describe("what went wrong", () => {
 
 describe("where to pick the topic back up", () => {
 	const record: TopicRecord = { attempts: [], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] };
-	const pickups = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = []) => pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY), record, TODAY);
+	const pickups = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = []) => pickupsOf(t, MAP, sessionEntries(sessions, plans, TODAY), sessions, record, TODAY);
 
 	it("puts a lesson waiting on a step at that step", () => {
 		const lesson = chat({ id: "chat_eigen", title: "Eigenvalues and eigenvectors", pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" });
@@ -320,7 +335,7 @@ describe("where to pick the topic back up", () => {
 
 	it("calls a task with no step unfinished, and gives nothing when there is no place", () => {
 		const map = { ...MAP, tasks: [{ ...SHEET, step: null }] };
-		const [row] = pickupsOf(TOPICS.kernel, map, [], null, TODAY);
+		const [row] = pickupsOf(TOPICS.kernel, map, [], [], null, TODAY);
 		assert.deepEqual([row!.where, row!.when], ["Unfinished", null]);
 		assert.deepEqual(pickups(TOPICS.determinant, [chat()]), []);
 	});
@@ -331,7 +346,8 @@ describe("the topic's sessions", () => {
 		const newest = chat({ topics: ["determinant"], pendingQuestion: true, updatedAt: "2026-11-08T09:00:00.000Z" });
 		const second = chat({ topics: ["determinant"], pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" });
 		const old = chat({ topics: ["determinant"], updatedAt: "2026-10-20T09:00:00.000Z" });
-		const facts = topicFacts({ course: COURSE, topic: TOPICS.determinant, sessions: [newest, second, old], read: { record: null, plans: [] } });
+		const elsewhere = chat({ topics: ["span"], pendingQuestion: true, updatedAt: "2026-11-08T10:00:00.000Z" });
+		const facts = topicFacts({ course: COURSE, topic: TOPICS.determinant, chats: [elsewhere, old, second, newest], read: { record: null, plans: [] } });
 		assert.deepEqual(
 			facts.sessions.map((e) => [e.chat.id, e.state, e.when]),
 			[
@@ -365,14 +381,14 @@ describe("how an attempt went", () => {
 
 describe("the facts a candidate draws", () => {
 	it("are silent where the engine is, and fold the topic read in", () => {
-		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, sessions: [], read: null });
+		const facts = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [], read: null });
 		assert.deepEqual([facts.standing?.words, facts.marks, facts.studied, facts.mistake, facts.standing?.fill], ["Not started", [], null, null, 0]);
-		const waiting = topicFacts({ course: COURSE, topic: TOPICS.eigen, sessions: [chat({ pendingQuestion: true })], read: null });
+		const waiting = topicFacts({ course: COURSE, topic: TOPICS.eigen, chats: [chat({ topics: ["eigen"], pendingQuestion: true })], read: null });
 		assert.deepEqual([waiting.standing, waiting.marks, waiting.studied], [null, [], null]);
 		const rank = topicFacts({
 			course: COURSE,
 			topic: TOPICS.rank,
-			sessions: [],
+			chats: [],
 			read: { record: { attempts: [attempt({ date: "2026-11-03" })], tasks: [{ key: "sheet-4", updated: "2026-11-06" }] }, plans: [] },
 		});
 		assert.deepEqual([rank.studied, rank.attempts.length, rank.pickups.map((p) => p.when)], ["Studied 5 days ago", 1, ["2d ago"]]);

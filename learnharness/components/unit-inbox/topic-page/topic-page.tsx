@@ -8,8 +8,7 @@ import { useFieldCycle } from "@/components/field-cycle";
 import { SetupDialog } from "@/components/setup-dialog";
 import type { TOPIC_OPTIONS } from "@/components/design-variant";
 import { useLessonStart } from "@/components/start/use-lesson-start";
-import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
-import { linkStarts, openingFor, topicSessions } from "@/components/unit-inbox/units";
+import { openingFor, topicSessions } from "@/components/unit-inbox/units";
 import { BriefTopic } from "@/components/unit-inbox/topic-page/brief/brief-topic";
 import { StepsTopic } from "@/components/unit-inbox/topic-page/steps/steps-topic";
 import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic";
@@ -67,26 +66,25 @@ export function TopicPage({
 }) {
 	const router = useRouter();
 	const lesson = useLessonStart(initialConfigured);
-	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
 	const cycleComposer = useCallback((): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="composer"] textarea')), []);
 	useFieldCycle(cycleComposer);
 	const workspace = course.map.workspace;
-	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic);
+	const sessions = topicSessions(chats, workspace, topic.handle);
 	const topicRead = useTopicRead(
 		workspace,
 		topic.handle,
 		topic.tasks,
 		sessions.map((chat) => chat.id),
 	);
-	const start = (opening: string, from?: string) => lesson.start(opening, workspace, (id) => recordStart(id, topic.handle), from);
+	const start = (opening: string, from?: string) => lesson.start(opening, workspace, { topics: [topic.handle], from });
 	const press = (does: Press) => ("open" in does ? router.push(`/chat/${does.open.id}`) : start(does.opening, does.from));
 	const send = () => {
 		if (!text.trim()) return;
 		start(openingFor(topic.title, text));
 	};
 	if (topicRead.status === "loading") return <p className="mx-auto w-full max-w-[46rem] px-6 pt-6 text-row text-muted-foreground">Loading…</p>;
-	const facts = topicFacts({ course, topic, sessions, read: topicRead.read });
+	const facts = topicFacts({ course, topic, chats, read: topicRead.read });
 	const act = () => {
 		const { action } = facts;
 		if ("chat" in action) router.push(`/chat/${action.chat.id}`);

@@ -78,7 +78,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 
 function page(t: CourseMapTopic, sessions: ChatListItem[] = [], { plans = [] as SessionPlan[], busy = false } = {}) {
-	const facts = topicFacts({ course: COURSE, topic: t, sessions, read: { record: null, plans } });
+	const facts = topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: { record: null, plans } });
 	const html = renderToStaticMarkup(
 		<AppRouterContext.Provider value={router as never}>
 			<BriefTopic facts={facts} busy={busy} onAct={() => {}} onTask={() => {}} />

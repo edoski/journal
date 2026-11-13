@@ -540,13 +540,27 @@ function cleanToolCallIds(messages: readonly LhMessage[]): Set<string> {
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : []);
 
+/** A course_save's changes as the engine read them: the tool takes an
+ *  object, and also its JSON text, which the tutor often sends. Null when
+ *  neither. Pure. */
+function saveChanges(args: Record<string, unknown>): Record<string, unknown> | null {
+	let changes = args.changes;
+	if (typeof changes === "string") {
+		try {
+			changes = JSON.parse(changes);
+		} catch {
+			return null;
+		}
+	}
+	return typeof changes === "object" && changes !== null && !Array.isArray(changes) ? (changes as Record<string, unknown>) : null;
+}
+
 /** The course topics a session worked on, by its own transcript, in the
  *  order it first touched them: the topics of each problem it posed and of
- *  each observation it saved, the topics a save introduced, and the plan
- *  nodes, which take a course topic's handle when they are one. Only calls
- *  that went through count. Candidates only: a caller keeps the ones its
- *  course map lists. Pure. */
-export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: readonly string[] = []): string[] {
+ *  each observation it saved, and the topics a save introduced. Only calls
+ *  that went through count; a plan step never does, whatever its name.
+ *  Candidates only: a caller keeps the ones its course map lists. Pure. */
+export function sessionTopicsOf(messages: readonly LhMessage[]): string[] {
 	const clean = cleanToolCallIds(messages);
 	const topics = new Set<string>();
 	for (const m of messages) {
@@ -555,8 +569,8 @@ export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: rea
 			if (block.type !== "toolCall" || !clean.has(block.id)) continue;
 			const args = block.arguments as Record<string, unknown>;
 			if (block.name === PRACTICE_PROBLEM_TOOL) for (const t of strings(args.topics)) topics.add(t);
-			if (block.name !== "course_save" || typeof args.changes !== "object" || args.changes === null) continue;
-			const changes = args.changes as { observations?: unknown; topics?: unknown };
+			const changes = block.name === "course_save" ? saveChanges(args) : null;
+			if (!changes) continue;
 			for (const o of Array.isArray(changes.observations) ? changes.observations : []) {
 				for (const t of strings((o as { topics?: unknown } | null)?.topics)) topics.add(t);
 			}
@@ -567,7 +581,6 @@ export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: rea
 			}
 		}
 	}
-	for (const id of planNodeIds) topics.add(id);
 	return [...topics];
 }
 
@@ -585,8 +598,8 @@ export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
 		if (m.role !== "assistant") continue;
 		for (const block of m.content) {
 			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
-			const changes = (block.arguments as { changes?: unknown }).changes as { tasks?: unknown; focus?: unknown } | null | undefined;
-			if (typeof changes !== "object" || changes === null) continue;
+			const changes = saveChanges(block.arguments as Record<string, unknown>);
+			if (!changes) continue;
 			if (typeof changes.tasks === "object" && changes.tasks !== null) {
 				for (const [key, patch] of Object.entries(changes.tasks)) held.set(key, patch !== null);
 			}

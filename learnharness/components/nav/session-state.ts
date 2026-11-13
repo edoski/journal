@@ -1,16 +1,16 @@
 import type { ChatListItem } from "@/src/core";
 
 /**
- * Where a session stands, the one model Home, the topic page and the
- * sidebar read. Pure.
+ * Where a session stands, the one model Home, the topic page, the calendar
+ * and the sidebar read (spec: session-state.md). Pure.
  *   - working: the tutor is writing (a turn or a compaction runs);
  *   - your-turn: the tutor waits on the learner: a question or a practice
- *     problem it posed, or its words asking him to go on partway through a
- *     lesson;
+ *     problem it posed, its plan waiting for his go-ahead, or its last
+ *     words asking him something partway through a lesson;
  *   - paused: the tutor's turn stopped before it finished, so the tutor
  *     owes the next word and picks the turn back up when it is opened;
- *   - finished: the tutor ended the lesson, the practice round or the
- *     answer.
+ *   - finished: the tutor ended the lesson (a sign-off such as "Good place
+ *     to stop" included), the practice round or the answer.
  */
 export type SessionState = "working" | "your-turn" | "paused" | "finished";
 

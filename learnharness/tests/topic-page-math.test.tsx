@@ -61,7 +61,7 @@ const LESSON: ChatListItem = {
 const EARLIER: ChatListItem = { ...LESSON, id: "chat_cofactors", title: "$\\det$ by cofactors", updatedAt: "2026-11-06T08:00:00.000Z", pendingQuestion: false };
 const ATTEMPT = { id: "o1", date: "2026-11-07", recorded: null, result: "partial" as const, unaided: false, sure: null, chose: null, text: "Read $\\det = -2$ as an area doubled and flipped" };
 
-const facts = topicFacts({ course: COURSE, topic: DET, sessions: [LESSON, EARLIER], read: { record: { attempts: [ATTEMPT], tasks: [] }, plans: [PLAN] } });
+const facts = topicFacts({ course: COURSE, topic: DET, chats: [LESSON, EARLIER].map((c) => ({ ...c, topics: [DET.handle] })), read: { record: { attempts: [ATTEMPT], tasks: [] }, plans: [PLAN] } });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const document = parseHTML(
 	`<html><body>${renderToStaticMarkup(
@@ -112,7 +112,7 @@ describe("math in the topic page's head and Next", () => {
 		tasks: ["sheet-4"],
 	};
 	const map: CourseMap = { ...MAP, topics: [RANK], tasks: [SHEET] as CourseMap["tasks"] };
-	const rankFacts = topicFacts({ course: { ...COURSE, map }, topic: RANK, sessions: [{ ...LESSON, topics: ["rank"] }], read: { record: { attempts: [], tasks: [] }, plans: [] } });
+	const rankFacts = topicFacts({ course: { ...COURSE, map }, topic: RANK, chats: [{ ...LESSON, topics: ["rank"] }], read: { record: { attempts: [], tasks: [] }, plans: [] } });
 	const page = parseHTML(
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>

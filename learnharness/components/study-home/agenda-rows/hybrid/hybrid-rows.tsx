@@ -1,4 +1,4 @@
-import { ArrowRightIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MessageCircleQuestionIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MessageCircleQuestionIcon, PauseIcon, PenLineIcon, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
 import { ProgressPie } from "@/components/study-home/agenda-rows/progress-pie";
@@ -18,6 +18,8 @@ const HAIRLINE = "relative not-first:before:absolute not-first:before:inset-x-0 
  *  and for a review. */
 const WHY_ICON: Record<Why["kind"], LucideIcon> = {
 	reply: MessageCircleQuestionIcon,
+	working: PenLineIcon,
+	stopped: PauseIcon,
 	missed: CircleXIcon,
 	review: HistoryIcon,
 	task: BookmarkIcon,

@@ -69,7 +69,7 @@ const RANK_SESSIONS = [
 const RANK_RECORD = topicRecordOf(fixture("show.rank+task.json"), "rank", ["sheet-4"]);
 
 const factsOf = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[] = [], record = null as TopicFacts["attempts"] extends never ? never : Parameters<typeof topicFacts>[0]["read"] extends infer R ? (R extends { record: infer Rec } ? Rec : never) : never): TopicFacts =>
-	topicFacts({ course: COURSE, topic: t, sessions, read: { record, plans } });
+	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: { record, plans } });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;

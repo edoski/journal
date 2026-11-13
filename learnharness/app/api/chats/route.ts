@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown; resume?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown; resume?: unknown; topics?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
@@ -41,7 +41,10 @@ export async function POST(req: Request) {
 	if (typeof from === "string" && resumed?.course?.workspace !== workspace) {
 		return Response.json({ error: "Unknown lesson", code: "unknown_lesson" }, { status: 400 });
 	}
-	const chat = createChat(titleFromPrompt(title || "Untitled session"), course);
+	// The course topics it is started on, by handle: a topic's page, Home's
+	// review of those topics. The lists keep only handles the map has.
+	const topics = Array.isArray(body.topics) ? body.topics.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 32) : [];
+	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics);
 	// PER-SESSION MODELS (owner, 2026-09-28): a session owns its model +
 	// thinking level from birth — stamped verbatim from the STRONG slot,
 	// the new-session default. From here the strong slot never reaches

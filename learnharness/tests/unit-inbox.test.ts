@@ -4,7 +4,7 @@ import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel
 import { resumableSession } from "../components/nav/session-state.ts";
 import {
 	buildInbox,
-	linkStarts,
+	taskSessions,
 	monogram,
 	openingFor,
 	returnWords,
@@ -168,22 +168,11 @@ describe("the topic page", () => {
 		assert.equal(resumableSession([newer]), null);
 	});
 
-	it("lists a session holding an open task of the topic under it, though its transcript names another", () => {
-		const sheet = chat("sheet", { topics: ["rank"], tasks: ["sheet-4"] });
-		assert.deepEqual(topicSessions([sheet], "la", { handle: "kernel" as TopicHandle, tasks: ["sheet-4"] }).map((c) => c.id), ["sheet"]);
-		assert.deepEqual(topicSessions([sheet], "la", { handle: "kernel" as TopicHandle, tasks: [] }), [], "a task the engine closed links nothing");
-	});
-
-	it("lists a session started on the topic's page under it before its transcript names the topic", () => {
-		const chats = [chat("new", { topics: [] }), chat("rank-take", { topics: ["rank"] })];
-		const linked = linkStarts(chats, { new: "rank" });
-		assert.deepEqual(
-			topicSessions(linked, "la", { handle: "rank" as TopicHandle, tasks: [] })
-				.map((c) => c.id)
-				.sort(),
-			["new", "rank-take"],
-		);
-		assert.deepEqual(linkStarts(chats, {}), chats);
+	it("lists only the sessions the engine's records tie to the topic, never one that only holds a task covering it", () => {
+		const sheet = chat("sheet", { topics: ["rank"], tasks: ["sheet-4"], pendingQuestion: true });
+		const kernelTake = chat("kernel-take", { topics: ["kernel"] });
+		assert.deepEqual(topicSessions([sheet, kernelTake], "la", "kernel").map((c) => c.id), ["kernel-take"]);
+		assert.deepEqual(taskSessions([sheet, kernelTake], "la", "sheet-4").map((c) => c.id), ["sheet"], "the task reaches its lesson");
 	});
 
 	it("leads a new session's first message with the topic unless the prompt names it", () => {

@@ -1,4 +1,3 @@
-import { shelfOf } from "@/components/unit-inbox/units";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
@@ -104,7 +103,7 @@ export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
 	const sessions = facts.sessions.filter((entry) => entry.chat.id !== now.chat && entry.state !== "finished");
 	const waiting = [...sessions.filter((entry) => entry.state === "your-turn"), ...sessions.filter((entry) => entry.state === "working")];
 	const review =
-		facts.action.kind !== "review" && shelfOf(facts.topic, null) === "review"
+		facts.action.kind !== "review" && facts.topic.review?.kind === "due"
 			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due", press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;

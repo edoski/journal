@@ -40,6 +40,10 @@ export interface ChatRecord {
 	 *  Absent only on sessions older than that rule: they stay readable and
 	 *  take no learner turn until the learner links a course. */
 	course?: CourseLink;
+	/** The course topics the session was started on (a topic's page, Home's
+	 *  review of those topics), set at creation: the session's own topics,
+	 *  on it from its first turn. */
+	topics?: readonly string[];
 	/** The session's plan tree (vision §2) — written by plan tools via saveTree. */
 	tree?: PlanTree;
 	/** Append-only usage log (observability, 2026-09): one entry per model
@@ -279,8 +283,8 @@ export interface PlanBlockData {
 }
 
 /** How the tutor's last turn left a session that waits on no question or
- *  problem it posed: its words asked him to go on partway through a lesson
- *  ("mid-lesson"), its turn stopped before it finished, so the next word is
+ *  problem it posed: its words asked him something, or its plan waits for
+ *  his go-ahead, partway through a lesson ("mid-lesson"), its turn stopped before it finished, so the next word is
  *  the tutor's ("cut"), or it ended the lesson, a practice round or a
  *  one-off answer ("closed"). */
 export type SessionEnd = "mid-lesson" | "cut" | "closed";
@@ -313,8 +317,9 @@ export interface ChatSummary {
 	/** The course the session studies (the record's own field, carried by
 	 *  the summary spread); absent on sessions older than the course rule. */
 	course?: CourseLink;
-	/** The course topics the session worked on, from its transcript
-	 *  (sessionTopicsOf): candidates a caller checks against the course map.
+	/** The course topics the session was started on, then those its
+	 *  transcript worked on (sessionTopicsOf): candidates a caller checks
+	 *  against the course map.
 	 *  The list always sets it; a summary made elsewhere may leave it out. */
 	topics?: readonly string[];
 	/** How the tutor's last turn left the session (sessionEndOf); a summary

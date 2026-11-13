@@ -18,7 +18,9 @@ import {
 	stepWords,
 	titleList,
 	todayRows,
-	waitingSessions,
+	openSessions,
+	todayCourses,
+	courseMove,
 	studyQuestion,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
@@ -165,14 +167,25 @@ describe("study facts", () => {
 describe("today's lines", () => {
 	const eigen = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 
-	it("gives a recent waiting session its course's line, first; every other course its next step, most urgent first", () => {
-		const waiting = waitingSessions([chat({ id: "idle" }), eigen, chat({ id: "w", busy: true, pendingQuestion: true })]);
-		assert.deepEqual(waiting.map((c) => c.id), ["q"]);
-		const rows = todayRows([ANALYSIS, LINALG, PROB], waiting, TODAY);
+	it("gives each recent session to pick up a line first, and keeps every course's next step that no such session works on", () => {
+		const writing = chat({ id: "w", busy: true, course: { workspace: "/s/prob", title: "Probability" }, updatedAt: "2026-11-08T08:00:00.000Z" });
+		const open = openSessions([chat({ id: "idle" }), writing, eigen]);
+		assert.deepEqual(open.map((c) => c.id), ["q", "w"], "a session waiting on him and one the tutor writes in, never a finished one");
+		const rows = todayRows([ANALYSIS, LINALG, PROB], open, TODAY);
 		assert.deepEqual(
 			rows.map((r) => (r.kind === "session" ? `session ${r.chat.id}` : r.course.map.title)),
-			["session q", "Probability", "Real Analysis"],
+			["session q", "session w", "Probability", "Linear Algebra", "Real Analysis"],
+			"Linear Algebra's due review keeps its line beside the waiting lesson on another topic",
 		);
+		assert.deepEqual(todayCourses(rows).map((c) => c.map.title), ["Linear Algebra", "Probability", "Real Analysis"], "each course once for the map's tabs");
+	});
+
+	it("lets a session that works on the step stand for it", () => {
+		const review = chat({ id: "r", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["independence", "rank", "span"] });
+		const rows = todayRows([LINALG], [review], TODAY);
+		assert.deepEqual(rows.map((r) => r.kind), ["session"]);
+		const sheet = chat({ id: "s", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, tasks: ["sheet-4"] });
+		assert.deepEqual(todayRows([{ ...LINALG, due: [] }], [sheet], TODAY).map((r) => r.kind), ["session"], "the open task's lesson");
 	});
 
 	it("leaves a session waiting since before yesterday to the sidebar", () => {
@@ -249,11 +262,11 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear Algebra2d agoEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Real Analysis11d agoReview Sequences1d overdue"],
+			["Linear Algebra2d agoEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank and more2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
-		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1]]);
+		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-why"]')].map((w) => [w.getAttribute("data-kind"), w.querySelectorAll("svg").length]), [["reply", 1], ["next", 1], ["review", 1], ["review", 1]]);
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /Exam|Then |Step|\d+\s+due\b/i);
 		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|tonight)\?$/);
@@ -272,7 +285,7 @@ describe("a lesson on a study home", () => {
 	const render = (node: React.ReactNode) =>
 		parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 	const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen"] });
-	const [reply, review] = todayRows([LINALG, ANALYSIS], [waiting], TODAY).map(lessonOf) as [ReturnType<typeof lessonOf>, ReturnType<typeof lessonOf>];
+	const [reply, , review] = todayRows([LINALG, ANALYSIS], [waiting], TODAY).map(lessonOf) as [ReturnType<typeof lessonOf>, ReturnType<typeof lessonOf>, ReturnType<typeof lessonOf>];
 
 	it("reads as its course with the exam and its place, its name, then what follows, and counts no reviews", () => {
 		const text = render(<LessonText lesson={reply} />).body.textContent ?? "";

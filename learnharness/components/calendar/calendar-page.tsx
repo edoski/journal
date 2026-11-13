@@ -6,8 +6,6 @@ import { CoursesUnavailable } from "@/components/course-picker";
 import { useDesignVariant } from "@/components/design-variant";
 import { SetupDialog } from "@/components/setup-dialog";
 import { useLessonStart } from "@/components/start/use-lesson-start";
-import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
-import { linkStarts } from "@/components/unit-inbox/units";
 import { calendarEntries } from "@/components/calendar/calendar-facts";
 import { CalendarView } from "@/components/calendar/calendar-view";
 import { useCalendarRead } from "@/components/calendar/use-calendar";
@@ -30,12 +28,11 @@ export function CalendarPage({ initialConfigured }: { initialConfigured: boolean
 function CalendarRoute({ initialConfigured }: { initialConfigured: boolean }) {
 	const read = useCalendarRead();
 	const lesson = useLessonStart(initialConfigured);
-	const [starts, recordStart] = useTopicStarts();
 	const [scope, setScope] = useState<string | null>(null);
 	const ready = read.status === "ready" ? read : null;
 	const entries = useMemo(
-		() => (ready ? calendarEntries({ courses: ready.listing.courses, chats: linkStarts(ready.chats, starts), scope }) : []),
-		[ready, starts, scope],
+		() => (ready ? calendarEntries({ courses: ready.listing.courses, chats: ready.chats, scope }) : []),
+		[ready, scope],
 	);
 
 	if (read.status !== "ready") {
@@ -56,7 +53,7 @@ function CalendarRoute({ initialConfigured }: { initialConfigured: boolean }) {
 				scope={courses.some((c) => c.map.workspace === scope) ? scope : null}
 				onScopeChange={setScope}
 				busy={lesson.busy}
-				onStart={(opening, workspace, handle) => lesson.start(opening, workspace, handle ? (id) => recordStart(id, handle) : undefined)}
+				onStart={(opening, workspace, handle) => lesson.start(opening, workspace, { topics: handle ? [handle] : [] })}
 			/>
 			{lesson.error && (
 				<p role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 text-row text-danger">

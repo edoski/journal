@@ -107,7 +107,7 @@ const attempt = (id: string, date: string, over: Partial<TopicAttempt> = {}): To
 });
 
 const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = [], read: Parameters<typeof topicFacts>[0]["read"] = null): TopicFacts =>
-	topicFacts({ course: COURSE, topic: t, sessions, read });
+	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;

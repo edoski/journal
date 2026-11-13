@@ -14,7 +14,7 @@ Four candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic s
 | His question | Where it is answered |
 |---|---|
 | What is the one thing to do now? | The one button at the title's right (`topic-head.md`): Resume, Open, Review, Continue, Start, or Study in outline. On `hybrid` with Pick up, Now in the history pane (`pickup/pickup.md`) |
-| Is there anything to review, and when? | The head line: "Review due today", "Review overdue by a week" (only for a topic he can do on his own), or "Next review Fri 13 Nov" |
+| Is there anything to review, and when? | The head line: "Review due today", "Review overdue by a week" (at any level, as the action), or "Next review Fri 13 Nov" |
 | Where do I pick this up? | The pick-up rows (`pickup-rows.md`): the session that waits or is being written, at the step it is on, and each open task that holds the topic, at its step. Else "Studied 3 days ago" in the head |
 
 ## The one action, first match wins (`topicAction`)
@@ -23,13 +23,13 @@ Four candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic s
 |---|---|---|---|
 | 1 | a session of the topic waits on him or the tutor stopped in it mid-reply (`sessionState`: your turn, paused) | Resume | opens `/chat/<id>` |
 | 2 | else the tutor is writing in one (`busy`, `compacting`) | Open | opens `/chat/<id>` |
-| 3 | else a topic he can do on his own whose review is due (`shelfOf` is `review`) | Review | starts a session whose first message is "Review <title>" |
+| 3 | else its review is due, whatever its level (as Home and the calendar say) | Review | starts a review session on the topic whose first message is "Review <title>"; never an older lesson |
 | 4 | else an open task holds it (the focused one first) | Continue | `continueMove` over the sessions holding the task: reopens the finished lesson that holds it (or, with `FINISHED_LESSON` on `fresh`, starts a session from it that skips the probe and keeps its plan); with none, first message "Continue <task title>" |
 | 5 | else not started | Start | first message "<title>" |
-| 6 | else still being learned, its review due or not set | Continue | as row 4 over the topic's sessions; with none, first message "Continue <title>" |
+| 6 | else still being learned, no review set | Continue | as row 4 over the topic's sessions; with none, first message "Continue <title>" |
 | 7 | else (the next review is dated) | Study, outline | first message "<title>" |
 
-A session's state is one model (`components/nav/session-state.ts`): working, your turn (a question, a problem, or the tutor's words partway through a lesson's plan), paused (its turn stopped before it finished) or finished. A session belongs to a topic when its transcript names it or it holds an open task the engine says holds the topic.
+A session's state is one model (`components/nav/session-state.ts`): working, your turn (a question or a problem it posed, its plan waiting for his go-ahead, or its last words asking him something partway through a lesson), paused (its turn stopped before it finished) or finished (a sign-off such as "Good place to stop" included). A session belongs to a topic when the engine's records tie it there (a problem posed on it, an attempt saved on it, its introduction) or it was started on it (`topics` on the record, set at creation); never by a plan step's name, and never because it holds a task covering the topic: that task is continued through its own row.
 
 The app's one lever on the tutor is the session's first message; the tutor's own rule takes an unaided first try on any due topic it touches.
 
