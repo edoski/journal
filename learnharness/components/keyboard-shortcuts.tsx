@@ -39,6 +39,7 @@ import {
 	KEYBOARD_ACTIONS,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
+import { useSpatialArrows } from "@/components/spatial-arrows";
 
 // Re-exported for the contract pin (tests/keyboard-toggle-sidebar.test.ts):
 // the dispatcher composes event names through the ONE helper — a second
@@ -50,6 +51,7 @@ export function KeyboardShortcuts() {
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
 	const design = useDesignVariant();
+	useSpatialArrows(design === "proposed");
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
