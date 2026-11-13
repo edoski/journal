@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BookmarkIcon, DumbbellIcon, MessageSquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HAIRLINE, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
-import type { Pickup } from "@/components/unit-inbox/topic-page/topic-facts";
+import { WRITING, type Pickup } from "@/components/unit-inbox/topic-page/topic-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
 
 const ICON = "row-span-2 size-4 text-muted-foreground";
@@ -31,14 +31,14 @@ export function PickupRows({ pickups, busy, onTask }: { pickups: readonly Pickup
 						<span className="truncate text-label text-muted-foreground">{pickup.title}</span>
 						<span className="justify-self-end text-label text-muted-foreground tabular-nums">{pickup.when}</span>
 						<span className="truncate text-control font-medium text-foreground">{pickup.where}</span>
-						{pickup.kind === "session" ? <WhyMark kind={pickup.waits ? "reply" : "writing"} words={pickup.waits ? "Your turn" : "The tutor is writing"} /> : <span />}
+						{pickup.kind === "session" ? pickup.waits ? <WhyMark kind="reply" words="Your turn" /> : <WhyMark kind="writing" words={pickup.where === WRITING ? undefined : WRITING} /> : <span />}
 					</>
 				);
 				return (
 					<li key={pickup.kind === "session" ? pickup.chat.id : pickup.task.key} className={HAIRLINE}>
 						{pickup.kind === "session" ? (
 							<Button variant="quiet" asChild data-slot="topic-pickup" data-kind="session" className={TWO_LINE_ROW}>
-								<Link href={`/chat/${pickup.chat.id}`} aria-disabled={busy || undefined}>
+								<Link href={`/chat/${pickup.chat.id}`} aria-disabled={busy || undefined} onClick={busy ? (event) => event.preventDefault() : undefined}>
 									{lines}
 								</Link>
 							</Button>

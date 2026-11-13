@@ -32,9 +32,9 @@ The app's one lever on the tutor is the session's first message; the tutor's own
 
 ## Shared
 
-- `topic-facts.ts`: every fact a candidate reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`); tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's words for time are Home's, pinned by test to `studiedAgo` and `lastStudied`.
+- `topic-facts.ts`: every fact a candidate reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's words for time are Home's, pinned by test to `studiedAgo` and `lastStudied`.
 - `use-topic-read.ts`: `useTopicRead` over `GET /api/topic` (`src/server/topic.ts`, contract `src/core/contracts/topic.ts`, tested in `tests/topic-read.test.ts`): the engine's scored attempts on the topic and when each open task was last touched (`show`), and the plan of each of its 20 newest sessions with the step its newest tagged question is about. Nothing else of a transcript leaves the server. Read again on `turn-settled`, `chats-changed` and `record-changed`; a failed read keeps the last good one.
-- `topic-page.tsx`: `TopicPage` (the start, the composer foot as Current's, the setup dialog), `TopicPageProps` (what every candidate takes: `facts`, `busy`, `onAct`, `onTask`) and `TOPIC_CANDIDATES`.
+- `topic-page.tsx`: `TopicPage` (the start, the composer foot as Current's with plain Tab reaching its field as on Home, the setup dialog), `TopicPageProps` (what every candidate takes: `facts`, `busy`, `onAct`, `onTask`) and `TOPIC_CANDIDATES`.
 - Shared parts, used by the candidates and changed by none: `topic-head.tsx`, `pickup-rows.tsx`, `session-rows.tsx`, `why-mark.tsx` (Home's why mark restated) and `row-classes.ts` (Home's Hybrid row classes restated). When one candidate ships, Home's row and why mark and these become one shared file.
 
 Each candidate draws inside `ScrollArea bar={false}` (no visible scrollbar), column `max-w-[46rem]`, `px-6 pt-6 pb-8`, blocks `gap-5`, root `data-testid="unit-page"` with `data-topic-candidate="<option>"`.

@@ -9,6 +9,6 @@ One 64px row per pick-up (`data-slot="topic-pickup"`, `data-kind`), Home's Hybri
 | Icon, both lines | `MessageSquareIcon` lesson, `DumbbellIcon` practice, 16px muted | `BookmarkIcon` |
 | Line 1 | the session's title, `text-label` muted | the task's title |
 | Line 1, right | "Today", "3d ago" (`agoWords`), `tabular-nums` | when the task was last touched, or nothing |
-| Line 2 | the step its newest tagged question is about, else "Problem waiting", else "Question waiting"; "The tutor is writing" while it writes. `text-control font-medium` ink | the task's step, else "Unfinished" |
-| Line 2, right | `WhyMark`: "Your turn" or the spinner and "The tutor is writing" | nothing |
-| Press | opens `/chat/<id>` (a link) | `onTask(opening)`: starts a session whose first message is "Continue <task>"; disabled while `busy` |
+| Line 2 | the step its newest tagged question is about, else, while the tutor writes, "The tutor is writing", else "Problem waiting", else "Question waiting". `text-control font-medium` ink | the task's step, else "Unfinished" |
+| Line 2, right | `WhyMark`: "Your turn", or the spinner and "The tutor is writing" (the spinner alone when line 2 already says it) | nothing |
+| Press | opens `/chat/<id>` (a link); does nothing while `busy` | `onTask(opening)`: starts a session whose first message is "Continue <task>"; disabled while `busy` |

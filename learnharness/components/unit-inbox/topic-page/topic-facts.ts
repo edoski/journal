@@ -36,16 +36,25 @@ export interface SessionEntry {
 	plan: SessionPlan | null;
 }
 
+/** One thing the head says beside the pie, as an icon and a few words in
+ *  the map's: why the engine calls the topic weak, or its review, due or
+ *  dated. */
+export interface HeadMark {
+	kind: "slip" | "review";
+	words: string;
+}
+
 export interface TopicFacts {
 	course: { workspace: string; title: string };
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
-	/** The pie; null when the head line is silent. */
+	/** The pie and its words; null when the head line is silent: a topic
+	 *  not started that has a session, where "Not started" would contradict
+	 *  the lesson. */
 	standing: Standing | null;
-	/** "Nearly on your own. A mistake to fix"; null for a topic not started
-	 *  that has a session, where "Not started" would contradict the lesson. */
-	line: string | null;
+	/** What the head says beside the pie; empty when the line is silent. */
+	marks: readonly HeadMark[];
 	/** "Studied 3 days ago"; null when nothing dates it or the line is silent. */
 	studied: string | null;
 	/** The engine's diagnosed mistake, else the last attempt of a topic it
@@ -126,13 +135,12 @@ export function studiedWords(days: number): string {
 }
 
 /**
- * Where he stands, in the map's words joined by full stops: the standing,
- * why the engine calls it weak, then its review, due (only for a topic he
- * can do on his own: nearly every topic being learned is due) or dated.
- * Null for a topic not started that has a session.
+ * What the head says beside the pie, in the map's words, each drawn as an
+ * icon and a few words: why the engine calls the topic weak, then its
+ * review, due (only for a topic he can do on his own: nearly every topic
+ * being learned is due) or dated.
  */
-export function topicLine(topic: CourseMapTopic, titleOf: (handle: string) => string, hasSession: boolean): string | null {
-	if (topic.level === "new" && hasSession) return null;
+export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string): HeadMark[] {
 	const slip = topic.weak ? needOf(topic, titleOf)?.words : null;
 	const review =
 		shelfOf(topic, null) === "review"
@@ -140,7 +148,7 @@ export function topicLine(topic: CourseMapTopic, titleOf: (handle: string) => st
 			: topic.review?.kind === "scheduled"
 				? nextReviewWords(topic.review.date)
 				: null;
-	return [standingOf(topic).words, slip, review].filter(Boolean).join(". ");
+	return [...(slip ? [{ kind: "slip" as const, words: slip }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
 
 /** The latest day anything says he studied the topic: its newest attempt,
@@ -159,22 +167,34 @@ export function mistakeOf(topic: CourseMapTopic, attempts: readonly TopicAttempt
 	return topic.weak && last && last.result !== "correct" ? last.text : null;
 }
 
+/** The local day of a moment, YYYY-MM-DD: the engine's study day is the
+ *  local date, so a session's day is too. */
+export function localDay(iso: string): string {
+	const at = new Date(iso);
+	return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+}
+
 /** The topic's sessions as the page lists them, in the order given
- *  (newest first), each with its plan when the read holds one. */
+ *  (newest first), each with its plan when the read holds one. A session
+ *  dated after the engine's day counts as that day. */
 export function sessionEntries(sessions: readonly ChatListItem[], plans: readonly SessionPlan[], today: string): SessionEntry[] {
 	return sessions.map((chat) => {
-		const day = chat.updatedAt.slice(0, 10);
+		const local = localDay(chat.updatedAt);
+		const day = local > today ? today : local;
 		return { chat, state: sessionState(chat), day, when: agoWords(daysBetween(day, today)), plan: plans.find((plan) => plan.id === chat.id) ?? null };
 	});
 }
 
-/** Where a session stands: the tutor is writing; else the step its newest
- *  tagged question is about; else a practice problem waits; else a
- *  question waits. */
+/** What the pick-up row says while the tutor writes and no step is known. */
+export const WRITING = "The tutor is writing";
+
+/** Where a session stands: the step its newest tagged question is about;
+ *  else, while the tutor writes, that it writes; else a practice problem
+ *  waits; else a question waits. */
 function whereOf(entry: SessionEntry): string {
-	if (entry.state !== "your-turn") return "The tutor is writing";
 	const step = entry.plan?.tree.nodes.find((node) => node.id === entry.plan?.current);
 	if (step) return step.title;
+	if (entry.state !== "your-turn") return WRITING;
 	return entry.chat.pendingProblem ? "Problem waiting" : "Question waiting";
 }
 
@@ -213,15 +233,15 @@ export function topicFacts({ course, topic, sessions, read }: { course: StudyCou
 	const entries = sessionEntries(sessions, read?.plans ?? [], map.today);
 	const pickups = pickupsOf(topic, map, entries, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
-	const line = topicLine(topic, titleOf, sessions.length > 0);
+	const silent = topic.level === "new" && sessions.length > 0;
 	const studied = lastStudiedDay(topic, entries, attempts);
 	return {
 		course: { workspace: map.workspace, title: map.title },
 		topic,
 		today: map.today,
-		standing: line === null ? null : standingOf(topic),
-		line,
-		studied: line !== null && studied ? studiedWords(daysBetween(studied, map.today)) : null,
+		standing: silent ? null : standingOf(topic),
+		marks: silent ? [] : headMarks(topic, titleOf),
+		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
 		action: topicAction(topic, map, sessions),
 		pickups,

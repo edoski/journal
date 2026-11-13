@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useCallback, useState, type ComponentType } from "react";
 import { useRouter } from "next/navigation";
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { Composer } from "@/components/composer";
+import { useFieldCycle } from "@/components/field-cycle";
 import { SetupDialog } from "@/components/setup-dialog";
 import type { TOPIC_OPTIONS } from "@/components/design-variant";
 import { useLessonStart } from "@/components/start/use-lesson-start";
@@ -56,6 +57,8 @@ export function TopicPage({
 	const lesson = useLessonStart(initialConfigured);
 	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
+	const cycleComposer = useCallback((): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="composer"] textarea')), []);
+	useFieldCycle(cycleComposer);
 	const workspace = course.map.workspace;
 	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic.handle);
 	const topicRead = useTopicRead(

@@ -104,6 +104,8 @@ describe("the topic head", () => {
 		const document = head(factsOf(RANK));
 		assert.equal(document.querySelector("h1")!.textContent, "Rank and the column space");
 		assert.equal(document.querySelector('[data-slot="unit-standing"]')!.textContent, "Nearly on your own. A mistake to fixStudied 9 days ago");
+		const marks = Array.from(document.querySelectorAll('[data-slot="topic-mark"]'));
+		assert.deepEqual(marks.map((mark) => [mark.getAttribute("data-kind"), mark.textContent, mark.querySelectorAll("svg").length]), [["slip", ". A mistake to fix", 1]]);
 		assert.equal(document.querySelector('[data-slot="topic-studied"]')!.textContent, "Studied 9 days ago");
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");
 	});
@@ -182,7 +184,7 @@ describe("the Topic switch", () => {
 		);
 	});
 
-	it("draws every candidate as a working page: the head, the pick-up rows and the sessions", () => {
+	it("draws every candidate as a working page: the head, the open task to pick up, and every session one press away", () => {
 		const practice = chat({ kind: "practice", pendingProblem: true, topics: ["rank"] });
 		const past = chat({ title: "Rank, second pass", topics: ["rank"] });
 		for (const [option, Candidate] of Object.entries(TOPIC_CANDIDATES)) {
@@ -190,8 +192,8 @@ describe("the Topic switch", () => {
 			const root = document.querySelector('[data-testid="unit-page"]')!;
 			assert.equal(root.getAttribute("data-topic-candidate"), option);
 			assert.equal(root.querySelectorAll('[data-testid="topic-action"]').length, 1, option);
-			assert.equal(root.querySelectorAll('[data-slot="topic-pickups"] > li').length, 2, option);
-			assert.equal(root.querySelectorAll('[data-testid="unit-page-session"]').length, 1, option);
+			assert.equal(root.querySelectorAll('[data-slot="topic-pickup"][data-kind="task"]').length, 1, option);
+			for (const session of [practice, past]) assert.ok(root.querySelector(`a[href="/chat/${session.id}"]`), `${option}: ${session.title}`);
 		}
 	});
 });
