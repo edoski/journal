@@ -10,8 +10,8 @@ import { UnitStatusText } from "@/components/unit-inbox/unit-status";
 import { sessionTwins, type Unit } from "@/components/unit-inbox/units";
 
 /**
- * The shelves at the sidebar's foot under the Inbox switch (spec:
- * unit-inbox.md, "Inbox switch"), after a spacer that rests them at the
+ * The shelves at the sidebar's foot (spec: unit-inbox.md, "Today on
+ * top"), after a spacer that rests them at the
  * bottom of a short list: Working (cards, only while the tutor writes),
  * Learning, On your own and Other sessions, each folded until opened.
  * Every shelf row says when it comes back (Review in today's plan, "in

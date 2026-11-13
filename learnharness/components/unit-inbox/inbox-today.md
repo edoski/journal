@@ -1,6 +1,6 @@
 # Inbox: Today
 
-The Inbox switch's candidate "today" (`unit-inbox.md`, "Inbox switch"; pin it with `?polish-inbox=today`). `today/today-top.ts` (`todayTop`, `steadyTop`, `itemKey`, `NowItem`; `tests/inbox-today.test.ts`) and `today/today-list.tsx` (`TodayList`).
+The sidebar's list (`unit-inbox.md`, "Today on top"), which Edo picked over Topics on 13 Nov 2026. `today/today-top.ts` (`todayTop`, `steadyTop`, `itemKey`, `NowItem`; `tests/inbox-today.test.ts`) and `today/today-list.tsx` (`TodayList`).
 
 Thesis: the sidebar's top is exactly Home's Today. One card per line, in the same order with the same reason, each drawn as the topic its line leads with; everything else folds onto the shelves at the foot. The system picks; he never sorts.
 

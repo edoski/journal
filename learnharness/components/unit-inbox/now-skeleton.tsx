@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** The Inbox candidates' list while the courses are read: three 60px cards'
+/** The sidebar's list while the courses are read: three 60px cards'
  *  places, so nothing moves when the cards arrive. */
 export function NowSkeleton() {
 	return (

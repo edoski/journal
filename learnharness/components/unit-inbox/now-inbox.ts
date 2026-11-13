@@ -5,12 +5,12 @@ import { overdueWords } from "@/components/course-map/topic-map/topic-standing";
 import { byLearning, nowOf, shelfOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
 
 /**
- * The Proposed sidebar under the Inbox switch (spec: unit-inbox.md, "Inbox
- * switch"): the top is Home's Today (`needsYouNow`), and everything else
- * folds onto the shelves at the foot. The pure part both candidates share.
+ * The sidebar's list (spec: unit-inbox.md, "Today on top"): the top is
+ * Home's Today (`needsYouNow`), and everything else folds onto the shelves
+ * at the foot. Its pure part.
  */
 
-/** The shelves under the Inbox switch, in the order they sit. */
+/** The shelves under Today, in the order they sit. */
 export type NowShelf = "working" | "learning" | "known" | "other";
 
 /** The shelves' names. "On your own" is the course page's group and Home's

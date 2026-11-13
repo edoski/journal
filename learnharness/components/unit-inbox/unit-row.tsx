@@ -107,7 +107,7 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
  * course's mark, greyed until hovered, the title, and when it comes back.
  * A click opens the topic's page; the action starts a review now.
  * `status` and `action` replace the slot's fact and the action (the
- * shelves under the Inbox switch, and topics' companion rows).
+ * shelves under Today).
  */
 export function TopicSlimRow({
 	unit,

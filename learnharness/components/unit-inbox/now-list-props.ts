@@ -4,8 +4,8 @@ import type { SessionsSidebar } from "@/components/unit-inbox/session-item";
 import type { Folded } from "@/components/unit-inbox/use-unit-inbox";
 import type { FoldedShelf, UnitInbox } from "@/components/unit-inbox/units";
 
-/** What the Proposed sidebar hands an Inbox candidate (spec: unit-inbox.md,
- *  "Inbox switch"): Today's lines under the course filter, the inbox they
+/** What the sidebar hands its Today list (spec: unit-inbox.md, "Today on
+ *  top"): Today's lines under the course filter, the inbox they
  *  sit over, and the sidebar's own state. */
 export interface NowListProps {
 	/** Today's lines for the sidebar (`nowFor`), under the course filter. */

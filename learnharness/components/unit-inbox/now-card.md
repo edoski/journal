@@ -1,6 +1,6 @@
 # Now card
 
-One of Today's lines as a sidebar card, under the Inbox switch (`unit-inbox.md`, "Inbox switch"). `now-card.tsx` (`NowCard`, `NowAction`, `nowActionOf`), drawn on `RowCard` (`row-card.tsx`, the card shell `TopicCard` shares), `data-slot="unit-card"`.
+One of Today's lines as a sidebar card (`unit-inbox.md`, "Today on top"). `now-card.tsx` (`NowCard`, `NowAction`, `nowActionOf`), drawn on `RowCard` (`row-card.tsx`, the card shell `TopicCard` shares), `data-slot="unit-card"`.
 
 ## Anatomy
 
@@ -14,7 +14,7 @@ One of Today's lines as a sidebar card, under the Inbox switch (`unit-inbox.md`,
 
 ## The session card
 
-A waiting session whose transcript holds no topic of its course's map, or that has no course: line 1 is its course's mark and name, or a dashed circle and "No course"; line 2 its title; the slot says Your turn, or the spinner and Working at 70% while the tutor writes in it (a card a candidate keeps in place through a turn). A click opens the session; it has no action. `data-sidebar-row` is `chat:<id>`.
+A waiting session whose transcript holds no topic of its course's map, or that has no course: line 1 is its course's mark and name, or a dashed circle and "No course"; line 2 its title; the slot says Your turn, or the spinner and Working at 70% while the tutor writes in it (a card the list keeps in place through a turn). A click opens the session; it has no action. `data-sidebar-row` is `chat:<id>`.
 
 ## States
 

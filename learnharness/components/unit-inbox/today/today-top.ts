@@ -5,7 +5,7 @@ import { sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
 import type { Unit, UnitInbox } from "@/components/unit-inbox/units";
 
 /**
- * One card on the sidebar's top under the Inbox candidate "today" (spec:
+ * One card on the sidebar's top (spec:
  * ../inbox-today.md): a Today line drawn as the topic it leads with, or a
  * waiting session whose transcript holds no topic of its course's map (or
  * that has no course) drawn as itself.

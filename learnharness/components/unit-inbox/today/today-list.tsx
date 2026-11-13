@@ -18,7 +18,7 @@ function noteOf({ unavailable, courses }: Pick<NowListProps, "unavailable" | "co
 }
 
 /**
- * The Inbox candidate "today" (spec: ../inbox-today.md): the sidebar's top
+ * The sidebar's list (spec: ../inbox-today.md): its top
  * is exactly Home's Today, one card per line in Today's order with Today's
  * reason, each drawn as the topic its line leads with (a waiting session on
  * no topic as itself); everything else folds onto the shelves at the foot.

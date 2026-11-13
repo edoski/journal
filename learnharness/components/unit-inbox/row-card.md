@@ -1,6 +1,6 @@
 # Row card
 
-The sidebar's two-line card shell, `row-card.tsx` (`RowCard`), with the row parts every sidebar row shares: `rowSurface`, `STATUS_SLOT`, `ROW_ACTION` and `CARD_ACTION_PLACE`. `TopicCard` (`unit-row.tsx`, the Proposed sidebar as it is) and `NowCard` (`now-card.tsx`, the Inbox switch's top) are this shell with their own slots, so the two never drift.
+The sidebar's two-line card shell, `row-card.tsx` (`RowCard`), with the row parts every sidebar row shares: `rowSurface`, `STATUS_SLOT`, `ROW_ACTION` and `CARD_ACTION_PLACE`. `TopicCard` (`unit-row.tsx`, search's topic rows) and `NowCard` (`now-card.tsx`, Today's cards) are this shell with their own slots, so the two never drift.
 
 ## Anatomy
 

@@ -1,6 +1,6 @@
 # Now shelves
 
-The shelves at the sidebar's foot under the Inbox switch (`unit-inbox.md`, "Inbox switch"). `now-shelves.tsx` (`NowShelves`) draws `restShelves` (`now-inbox.ts`) on `UnitShelf`; `now-skeleton.tsx` (`NowSkeleton`) holds the top's place while the courses are read; `sidebar-note.tsx` (`SidebarNote`) is the list's quiet one-line note.
+The shelves at the sidebar's foot, under Today (`unit-inbox.md`, "Today on top"). `now-shelves.tsx` (`NowShelves`) draws `restShelves` (`now-inbox.ts`) on `UnitShelf`; `now-skeleton.tsx` (`NowSkeleton`) holds the top's place while the courses are read; `sidebar-note.tsx` (`SidebarNote`) is the list's quiet one-line note.
 
 ## Shelves
 
@@ -13,7 +13,7 @@ In this order, after a spacer (`mt-auto`) that rests them at the bottom of a sho
 | On your own | solid and not weak, the topics Home's pie counts (`courseProgress`): the due ones not on top, then the rest | due first (the longest overdue first) with how overdue; then the soonest back, "Back in 5d" | one line | the row's own fact (`shelfStatus`, unit-inbox.md's status slot): "3d overdue" (history), "Back in 5d" (calendar-clock) |
 | Other sessions | sessions on no listed topic and not on top as their own card | newest first | one line, a session | Your turn, the spinner or how long ago in Home's words; a repeated title carries its day; the dot as on Learning |
 
-"On your own" is the course page's group and Home's "N of M on your own", and holds the same topics (`tests/now-inbox.test.ts`); Current's shelf keeps "Known" (`NOW_SHELF_WORDS`).
+"On your own" is the course page's group and Home's "N of M on your own", and holds the same topics (`tests/now-inbox.test.ts`; the words are `NOW_SHELF_WORDS`).
 
 ## States
 
@@ -26,4 +26,4 @@ In this order, after a spacer (`mt-auto`) that rests them at the bottom of a sho
 
 `SidebarNote`: `data-slot="sidebar-note"`, 12px muted, centred, 24px above and below.
 
-Sources: T3 Code's sidebar (Working, Snoozed, Settled shelves at the foot, folded; its 12px header); the research for the Inbox switch (fold with a plan: every shelf row says when it comes back, else when it was studied).
+Sources: T3 Code's sidebar (Working, Snoozed, Settled shelves at the foot, folded; its 12px header); the research for the sidebar's Today (fold with a plan: every shelf row says when it comes back, else when it was studied).

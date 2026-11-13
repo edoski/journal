@@ -58,10 +58,8 @@ export interface UnitInbox {
 	other: readonly ChatListItem[];
 }
 
-/** The shelves that fold; Learning only under the Inbox switch. */
+/** The shelves that fold under Today. */
 export type FoldedShelf = "working" | "learning" | "known" | "other";
-
-export const SHELF_WORDS: Record<FoldedShelf, string> = { working: "Working", learning: "Learning", known: "Known", other: "Other sessions" };
 
 const SOLID = new Set(["independent", "retained", "transferred"]);
 
