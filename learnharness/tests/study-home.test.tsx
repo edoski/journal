@@ -19,6 +19,7 @@ import {
 	titleList,
 	todayRows,
 	waitingSessions,
+	studyQuestion,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, spanWords, topicSpan, trackMarks } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
@@ -121,6 +122,22 @@ function chat(over: Partial<ChatListItem>): ChatListItem {
 }
 
 describe("study facts", () => {
+	it("asks the home's question for the hour, never naming the date", () => {
+		assert.deepEqual(
+			[4, 5, 11, 12, 17, 18, 21, 22].map(studyQuestion),
+			[
+				"What are we studying tonight?",
+				"What are we studying this morning?",
+				"What are we studying this morning?",
+				"What are we studying this afternoon?",
+				"What are we studying this afternoon?",
+				"What are we studying this evening?",
+				"What are we studying this evening?",
+				"What are we studying tonight?",
+			],
+		);
+	});
+
 	it("words the next step in the order Continue takes it, naming reviews and never counting them", () => {
 		assert.equal(stepWords(nextStepOf(LINALG)), "Review Linear independence, Rank and more");
 		assert.equal(stepWords(nextStepOf(PROB)), "Continue Bayes' rule");
@@ -224,7 +241,7 @@ describe("Today", () => {
 		assert.equal(lines[1]!.textContent, "ProbabilityContinue Bayes' rule");
 		assert.equal(doc.querySelectorAll(".bg-primary").length, 0);
 		assert.doesNotMatch(doc.body.textContent ?? "", /\d+\s+due\b/i);
-		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /Today.*Sunday 8 November/);
+		assert.match(doc.querySelector("#today-heading")?.textContent ?? "", /^What are we studying (this morning|this afternoon|this evening|tonight)\?$/);
 	});
 
 	it("past five lines, names the other courses on the last", () => {
@@ -279,8 +296,8 @@ describe("agenda's row candidates", () => {
 	it("says why a line is on Today from the engine's fields, in plain words", () => {
 		assert.equal(whyNow(todayRows([LINALG], [waiting], TODAY)[0]!, TODAY), "Waiting for your reply");
 		assert.equal(whyNow(todayRows([LINALG], [{ ...waiting, updatedAt: "2026-11-07T20:00:00.000Z" }], TODAY)[0]!, TODAY), "Waiting since yesterday");
-		assert.equal(whyNow(rowOf(LINALG), TODAY), "Fading for 2 weeks");
-		assert.equal(whyNow(rowOf(ANALYSIS), TODAY), "Starting to fade");
+		assert.equal(whyNow(rowOf(LINALG), TODAY), "Overdue by 2 weeks");
+		assert.equal(whyNow(rowOf(ANALYSIS), TODAY), "Overdue by a day");
 		assert.equal(whyNow(rowOf(lapsed), TODAY), "You missed Sequences last time");
 		const task: StudyCourse = { ...LINALG, due: [] };
 		assert.equal(whyNow(rowOf(task), TODAY), "Left off at part (c)");
@@ -313,7 +330,7 @@ describe("agenda's row candidates", () => {
 	it("reason: each line says why it is on Today, beside its lesson", () => {
 		const doc = render(<ReasonRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
-		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your reply", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesStarting to fade"]);
+		assert.deepEqual(lines, ["Linear AlgebraEigen lessonWaiting for your reply", "ProbabilityContinue Bayes' ruleNext on your map", "Real AnalysisReview SequencesOverdue by a day"]);
 		plain(doc);
 	});
 
@@ -329,13 +346,13 @@ describe("agenda's row candidates", () => {
 		plain(doc);
 	});
 
-	it("hybrid: each line has its pie, its course with when it was last studied, and its lesson with why it is on Today", () => {
+	it("hybrid: each line has its pie, its course ending in when it was last studied, and its lesson ending in why it is on Today", () => {
 		const doc = render(<HybridRows {...props()} />);
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
 		assert.deepEqual(lines, [
-			"Linear Algebra · Studied 2 days agoEigen lessonWaiting for your reply",
-			"Probability · Studied 4 days agoContinue Bayes' ruleNext on your map",
-			"Real Analysis · Studied 11 days agoReview SequencesStarting to fade",
+			"Linear AlgebraStudied 2 days agoEigen lessonWaiting for your reply",
+			"ProbabilityStudied 4 days agoContinue Bayes' ruleNext on your map",
+			"Real AnalysisStudied 11 days agoReview SequencesOverdue by a day",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
 		plain(doc);

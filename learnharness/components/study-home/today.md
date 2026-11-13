@@ -6,7 +6,7 @@ The home's list of what to study today: one line per course, each its one next l
 
 | Part | Notes |
 |---|---|
-| heading | `DayHeading`, the page's title: "Today" 20 at 500, then the study day 13 muted ("Sunday 8 November"). It stays above the rows it names, under the map (Edo, 12 Nov 2026: "where it's at, but bigger"); above the map it would sit beside the course tabs and away from its list |
+| heading | `DayHeading`, the page's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). It stays above the rows it names, under the map (Edo, 12 Nov 2026: "where it's at, but bigger"); above the map it would sit beside the course tabs and away from its list |
 | line | 52px, radius 8, hover `fill-hover`; two columns, the same on every line: course 144px, lesson (fills); 24px between. The whole line opens the lesson |
 | course | the course 13 in ink, one line |
 | lesson | 13 at 500, one line: "Review A, B and more" (today's review), "Continue <task or topic>", the waiting session's title, or "Start a lesson" |

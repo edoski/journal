@@ -30,7 +30,7 @@ export function PathHome({ initialConfigured }: { initialConfigured: boolean }) 
 }
 
 function PathBody({ home, mapOpen, onMapOpen }: { home: HomeReady; mapOpen: boolean; onMapOpen: (open: boolean) => void }) {
-	const { lessons, courses, today, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onStart, onContinue } = home;
 	const [workspace, setWorkspace] = useState(() => courses[0]!.map.workspace);
 
 	if (mapOpen) {
@@ -49,7 +49,7 @@ function PathBody({ home, mapOpen, onMapOpen }: { home: HomeReady; mapOpen: bool
 	return (
 		<>
 			<div className="flex h-8 shrink-0 items-center justify-between gap-4">
-				<DayHeading today={today} />
+				<DayHeading />
 				<Button variant="quiet" size="sm" data-slot="home-map-open" onClick={() => onMapOpen(true)} className="lh-no-drag -mr-3 font-normal">
 					<NetworkIcon />
 					Course map

@@ -38,7 +38,7 @@ A waiting session sits at the course topics its transcript worked on (`ChatListI
 | one course unreadable | the others, then "Couldn't read one course: <folder>" |
 | a start failed | "Couldn't open the session. Try again." under the home |
 
-`DayHeading` is a home's title: "Today" 20/26 at 500, then the study day 13 muted. `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` and `MAP_BOX` frame an embedded course map: faded edges, no scrollbars, and a drawing shorter than its frame sits at the frame's middle.
+`DayHeading` is a home's title: one question in 20 at 500, "What are we studying this morning?" ("this afternoon", "this evening", "tonight" by the learner's clock, `studyQuestion`); never the date (Edo, 13 Nov 2026: one line, dynamic, not about the date). `LessonButton` opens a lesson: a link to the session that waits, or a button that takes up the course's next step; it takes the shadcn button's props for its look. `mapFade` and `MAP_BOX` frame an embedded course map: faded edges, no scrollbars, and a drawing shorter than its frame sits at the frame's middle.
 
 ## Sources
 

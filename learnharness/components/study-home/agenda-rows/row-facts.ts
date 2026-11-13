@@ -45,16 +45,16 @@ function reviewReason(due: readonly CourseMapTopic[]): string | null {
 	if (lapsed) return `You missed ${lapsed.title} last time`;
 	const overdue = Math.max(-1, ...due.map((t) => (t.review?.kind === "due" ? t.review.overdue : -1)));
 	if (overdue < 0) return null;
-	if (overdue === 0) return "Scheduled for today";
-	if (overdue < 7) return "Starting to fade";
+	if (overdue === 0) return "Due today";
+	if (overdue < 7) return overdue === 1 ? "Overdue by a day" : `Overdue by ${overdue} days`;
 	const weeks = Math.floor(overdue / 7);
-	return weeks === 1 ? "Fading for a week" : `Fading for ${weeks} weeks`;
+	return weeks === 1 ? "Overdue by a week" : `Overdue by ${weeks} weeks`;
 }
 
 /**
  * Why a line is on Today, in words that need no memory of the system: a
  * session waiting on the learner and since when, why a review is due (a
- * lapse, or how long it has been fading), where an open task was left, or
+ * lapse, or how long it is overdue), where an open task was left, or
  * that the topic is next on the course's map. Engine fields only. Pure.
  */
 export function whyNow(row: TodayRow, today: string): string | null {

@@ -38,7 +38,7 @@ export function MapFirstHome({ initialConfigured }: { initialConfigured: boolean
 }
 
 function MapFirstBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { lessons, courses, today, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onStart, onContinue } = home;
 	const [workspace, setWorkspace] = useState(() => courses[0]!.map.workspace);
 	const onStudy = (topic: CourseMapTopic, ws: string) => onStart(topic.title, ws);
 
@@ -47,7 +47,7 @@ function MapFirstBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged
 	}
 	return (
 		<>
-			<DayHeading today={today} />
+			<DayHeading />
 			<MapCard courses={courses} workspace={workspace} onSelect={setWorkspace} onEnlarge={() => onEnlarge(true)} onStudy={onStudy} busy={busy} />
 			<ul data-slot="lesson-list" aria-label="Today’s lessons" className="-mx-3 flex min-h-0 shrink flex-col gap-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 				{lessons.map((lesson) => {

@@ -147,11 +147,12 @@ export function addDays(date: string, days: number): string {
 	return d.toISOString().slice(0, 10);
 }
 
-const LONG_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
-
-/** "Sunday 8 November" for an engine date. Pure. */
-export function longDay(date: string): string {
-	return LONG_DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
+/** The study home's question for the hour of the learner's day: "What
+ *  are we studying this morning?", "…this afternoon?", "…this evening?",
+ *  "…tonight?". Pure. */
+export function studyQuestion(hour: number): string {
+	const when = hour >= 5 && hour < 12 ? "this morning" : hour >= 12 && hour < 18 ? "this afternoon" : hour >= 18 && hour < 22 ? "this evening" : "tonight";
+	return `What are we studying ${when}?`;
 }
 
 /** Sessions whose turn is the learner's, most recent first. Pure. */

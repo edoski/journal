@@ -26,7 +26,7 @@ export function Today(props: RowsProps) {
 	const variant = useRowsVariant();
 	return (
 		<section aria-labelledby="today-heading" data-slot="today" className="flex shrink-0 flex-col gap-2">
-			<DayHeading id="today-heading" today={props.today} />
+			<DayHeading id="today-heading" />
 			{variant === "reason" ? (
 				<ReasonRows {...props} />
 			) : variant === "recency" ? (

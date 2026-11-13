@@ -37,7 +37,7 @@ export function SplitHome({ initialConfigured }: { initialConfigured: boolean })
 }
 
 function SplitBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
-	const { lessons, courses, today, busy, onStart, onContinue } = home;
+	const { lessons, courses, busy, onStart, onContinue } = home;
 	const [pickedKey, setPickedKey] = useState(() => lessons[0]!.key);
 	const picked = lessons.find((l) => l.key === pickedKey) ?? lessons[0]!;
 	const onStudy = (topic: CourseMapTopic, workspace: string) => onStart(topic.title, workspace);
@@ -57,7 +57,7 @@ function SplitBody({ home, enlarged, onEnlarge }: { home: HomeReady; enlarged: b
 	}
 	return (
 		<>
-			<DayHeading today={today} />
+			<DayHeading />
 			<div className="grid max-h-[42rem] min-h-0 flex-1 grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-8">
 				<ul data-slot="lesson-list" aria-label="Today’s lessons" className="-mx-3 flex min-h-0 flex-col gap-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 					{lessons.map((lesson) => (

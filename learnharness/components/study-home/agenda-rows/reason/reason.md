@@ -13,7 +13,7 @@ Thesis: the one thing a row lacked was why it is there today. Each row now says 
 | lesson | 13 at 500 in ink |
 | reason | 13 muted; a waiting session in `link` (the app's colour for "your turn") |
 
-What the reason says (`whyNow`): "Waiting for your reply" or "Waiting since yesterday"; for a review, "You missed <topic> last time" when the engine marks a lapse, else "Scheduled for today", "Starting to fade" (1 to 6 days overdue) or "Fading for a week" / "for N weeks"; "Left off at <the open task's step>"; "Next on your map".
+What the reason says (`whyNow`): "Waiting for your reply" or "Waiting since yesterday"; for a review, "You missed <topic> last time" when the engine marks a lapse, else "Due today", "Overdue by N days" (1 to 6) or "Overdue by a week" / "by N weeks" ("Fading for a week" meant nothing to Edo, 13 Nov 2026); "Left off at <the open task's step>"; "Next on your map".
 
 Trade-offs: the strongest single signal, but the reason column takes width from the lesson, so long reviews truncate sooner; the panel adds a second surface under the map.
 

@@ -4,10 +4,10 @@ Four candidates for how a line of agenda's Today reads, behind the Rows switch (
 
 | Option | Thesis | The signal on a row | Delineation | Spec |
 |---|---|---|---|---|
-| `reason` | every row says why it is there now | "Waiting for your reply", "You missed Chain rule last time", "Starting to fade", "Left off at part (c)…", "Next on your map" | one quiet panel, hairlines inset to the text | reason/reason.md |
+| `reason` | every row says why it is there now | "Waiting for your reply", "You missed Chain rule last time", "Overdue by a week", "Left off at part (c)…", "Next on your map" | one quiet panel, hairlines inset to the text | reason/reason.md |
 | `recency` | a row is a thread, as in Mail and T3 Code | when he last studied the course: "Studied 2 days ago" (a waiting session says "Waiting for your reply") | two lines, hairlines between rows, no container | recency/recency.md |
 | `progress` | each course is a thing he is working through | how far along the course is, as a pie that fills (Things' project pie) | each row its own tile | progress/progress.md |
-| `hybrid` | progress, recency and reason, each beside what it is about | the pie by the course, "Studied 2 days ago" on the course line, the reason at the end of the lesson line | two lines, hairlines between rows, no surface | hybrid/hybrid.md |
+| `hybrid` | progress, recency and reason, each beside what it is about | the pie by the course, "Studied 2 days ago" at the end of the course line, the reason at the end of the lesson line, both flush right | two lines, hairlines between rows, no surface | hybrid/hybrid.md |
 
 ## Shared
 
