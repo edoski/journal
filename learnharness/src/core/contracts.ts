@@ -19,3 +19,4 @@ export * from "./contracts/models.ts";
 export * from "./contracts/course.ts";
 export * from "./contracts/course-map.ts";
 export * from "./contracts/study.ts";
+export * from "./contracts/topic.ts";

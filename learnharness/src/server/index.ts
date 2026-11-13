@@ -9,6 +9,7 @@ export * from "./events-stream.ts";
 export * from "./chats.ts";
 export * from "./courses.ts";
 export * from "./study.ts";
+export * from "./topic.ts";
 export * from "./graph.ts";
 export { NotesImportError } from "../agent/subagents/extraction.ts";
 export { convertPdf } from "../agent/subagents/pdf-ops.ts";
