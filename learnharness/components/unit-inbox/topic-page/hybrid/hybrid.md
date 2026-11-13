@@ -19,7 +19,7 @@ Column `max-w-[60rem]` (`HYBRID_COLUMN`, which the composer foot shares), `px-6 
 | Block | Shown when | Size |
 |---|---|---|
 | `TopicHead` (shared), no button: the composer foot holds the action | always | its own height |
-| `data-slot="topic-panes"`: a column, the history (or the Pick up pane) on top, as tall as it needs up to 40% of the room (`max-h-[40%] shrink-0`), then the map filling the rest, 16px apart. Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
+| `data-slot="topic-panes"`: two columns the full height under the head, the history (or the Pick up pane) on the left up to 24rem, the map filling the rest on the right, 24px apart (`grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
 | `History` alone, the column's width | no session planned | fills |
 
 Measured at 1440x900 and 1280x720 with the sidebar open: the document is the window's height, and only the two panes scroll.
@@ -54,9 +54,9 @@ It reads, and changes none of: `TopicHead` (whose button is absent without `onAc
 
 | Layout | 1440x900 | 1280x720 | Kept |
 |---|---|---|---|
-| History on top (40% at most), map below | map about 330px tall | map about 190px tall: the step after the current one falls under the fade | yes, from 13 Nov: Edo fits the page to his 14-inch MacBook Pro (1512×982) only, where the map keeps its current step, parents and Next, and the page reads top to bottom: what to pick up, where the lesson stands, the composer |
+| History on top (40% at most), map below | map about 330px tall | map about 190px tall: the step after the current one falls under the fade | from 13 Nov until Edo went back to side by side the same day |
 | Map on top, history below | as above, reversed | as above | no |
-| Side by side | both panes the full height under the head | both about 400px tall: current step, its parents and Next in view | first pick, replaced on 13 Nov |
+| Side by side | both panes the full height under the head | both about 400px tall: current step, its parents and Next in view | yes: Edo's favourite (13 Nov), since a single lesson's steps run down with little branching, so a tall narrow map fits beside the list. At 1512×982 the eigen lesson's whole plan fits |
 
 ## Signal test
 
