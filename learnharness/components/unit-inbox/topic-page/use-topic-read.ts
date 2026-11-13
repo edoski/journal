@@ -17,7 +17,7 @@ const SESSIONS = 20;
 /**
  * The topic read (spec: topic-page.md): the engine's attempts and task
  * days for one topic and the plans of its newest sessions. Read again
- * when a turn settles, the list or a record changes, and when the tasks
+ * when a turn settles, the list, a record or the course record changes, and when the tasks
  * or sessions asked for change. A failed read is `read: null` the first
  * time and keeps the last good one after.
  */
@@ -32,6 +32,7 @@ export function useTopicRead(
 	useServerEvent("turn-settled", () => setAttempt((n) => n + 1));
 	useServerEvent("chats-changed", () => setAttempt((n) => n + 1));
 	useServerEvent("record-changed", () => setAttempt((n) => n + 1));
+	useServerEvent("course-changed", (p) => p.workspace === workspace && setAttempt((n) => n + 1));
 	const query = new URLSearchParams([
 		["workspace", workspace],
 		["topic", handle],

@@ -63,4 +63,10 @@ contextBridge.exposeInMainWorld("lh", {
 		return () => ipcRenderer.removeListener("lh:zoom", listener);
 	},
 	getZoom: () => ipcRenderer.invoke("lh:zoom:get"),
+	/** The machine woke from sleep; returns unsubscribe. */
+	onResume: (cb) => {
+		const listener = () => cb();
+		ipcRenderer.on("lh:resume", listener);
+		return () => ipcRenderer.removeListener("lh:resume", listener);
+	},
 });

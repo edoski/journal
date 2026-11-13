@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CalendarListing, ChatListItem } from "@/src/core";
 import { useServerEvent, useServerResync } from "@/components/server-events";
+import { useDayChange } from "@/components/day-change";
 
 export type CalendarRead =
 	| { status: "loading" }
@@ -10,8 +11,9 @@ export type CalendarRead =
 	| { status: "ready"; listing: Extract<CalendarListing, { available: true }>; chats: ChatListItem[] };
 
 /** The courses with their run-ups, the Journal's study windows and every
- *  session, read once per mount and again after a turn settles, a record
- *  changes or the session list changes. A failed read keeps the last. */
+ *  session, read once per mount and again when a course record, a session
+ *  or the session list changes, or the day turns over. A failed read keeps
+ *  the last. */
 export function useCalendarRead(): CalendarRead {
 	const [read, setRead] = useState<CalendarRead>({ status: "loading" });
 	const load = useCallback(async () => {
@@ -29,12 +31,14 @@ export function useCalendarRead(): CalendarRead {
 	const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const later = () => {
 		clearTimeout(timer.current);
-		timer.current = setTimeout(() => void load(), 1000);
+		timer.current = setTimeout(() => void load(), 250);
 	};
 	useEffect(() => () => clearTimeout(timer.current), []);
+	useServerEvent("course-changed", later);
 	useServerEvent("turn-settled", later);
 	useServerEvent("record-changed", later);
 	useServerEvent("chats-changed", later);
 	useServerResync(() => void load());
+	useDayChange(() => void load());
 	return read;
 }

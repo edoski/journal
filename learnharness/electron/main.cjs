@@ -24,7 +24,7 @@
  *     would shadow every settings-page key change until restart.
  */
 
-const { app, BrowserWindow, Menu, ipcMain, session, shell } = require("electron");
+const { app, BrowserWindow, Menu, ipcMain, powerMonitor, session, shell } = require("electron");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
 const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
@@ -488,6 +488,10 @@ async function main() {
 	process.on("SIGHUP", killServer);
 
 	await app.whenReady();
+	// A machine that slept through midnight: the windows check the day again.
+	powerMonitor.on("resume", () => {
+		for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:resume");
+	});
 
 	// Dev mode: point at a running `next dev` server (LH_DEV_URL) — no
 	// spawn, no packaging, full HMR. The rest of this shell still applies

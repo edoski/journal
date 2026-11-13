@@ -11,7 +11,7 @@
  */
 
 import type { ChatStore } from "../core/ports.ts";
-import { subscribe, type ServerEvent } from "../core/events.ts";
+import { subscribe } from "../core/events.ts";
 import { digestWindow, lessonFinished, lessonLeftMidway } from "../core/lesson-digest.ts";
 import type { LessonDigest } from "../agent/subagents/lesson-digest.ts";
 
@@ -40,12 +40,12 @@ function previousLessonLeftMidway(deps: LessonFinishDeps, chatId: string, worksp
 export function onLessonEvents(deps: LessonFinishDeps): () => void {
 	return subscribe((event) => {
 		if (event.type === "turn-settled") {
-			const record = deps.chatStore.getChat((event as ServerEvent<"turn-settled">).chatId);
+			const record = deps.chatStore.getChat(event.chatId);
 			if (!record || !lessonFinished(record)) return;
 			startDigest(deps, record.id);
 			deps.extractTail(record.id);
 		} else if (event.type === "turn-started") {
-			const record = deps.chatStore.getChat((event as ServerEvent<"turn-started">).chatId);
+			const record = deps.chatStore.getChat(event.chatId);
 			if (!record?.course || record.messages.some((m) => m.role === "assistant")) return;
 			const previous = previousLessonLeftMidway(deps, record.id, record.course.workspace);
 			if (previous) startDigest(deps, previous);
