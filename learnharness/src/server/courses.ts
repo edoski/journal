@@ -9,7 +9,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { CourseLink, CourseListing, CourseSummary } from "../core/contracts/course.ts";
-import type { CourseMapResponse } from "../core/contracts/course-map.ts";
 import { courseLabel } from "../core/contracts/course.ts";
 import { stores } from "./stores.ts";
 
@@ -29,24 +28,6 @@ export async function courseLinkFor(workspace: string): Promise<CourseLink | nul
 	if (!listing.available) return null;
 	const course = listing.courses.find((c) => c.workspace === workspace);
 	return course ? { workspace: course.workspace, title: courseLabel(course) } : null;
-}
-
-/** The course map for a listed course. Only a workspace the engine lists
- *  is read, as for a link. */
-export async function courseMapFor(workspace: string): Promise<{ status: 200 | 404 | 502 | 503; body: CourseMapResponse }> {
-	const listing = await listCourses();
-	if (!listing.available) {
-		return { status: 503, body: { ok: false, code: "engine_unavailable", error: listing.reason } };
-	}
-	if (!listing.courses.some((c) => c.workspace === workspace)) {
-		return { status: 404, body: { ok: false, code: "unknown_course", error: "No registered course has this folder" } };
-	}
-	const result = await stores.courseRecords.map(workspace);
-	if (!result.ok) {
-		const code = result.kind === "unavailable" ? "engine_unavailable" : "engine_failed";
-		return { status: code === "engine_unavailable" ? 503 : 502, body: { ok: false, code, error: result.message } };
-	}
-	return { status: 200, body: { ok: true, map: result.map } };
 }
 
 /** A course title as a folder name: lowercase, every run of other

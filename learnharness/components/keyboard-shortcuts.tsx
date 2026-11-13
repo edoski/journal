@@ -25,7 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useRouter } from "next/navigation";
-import { useDesignVariant, useHomeVariant, type DesignVariant } from "@/components/design-variant";
+import { useDesignVariant, type DesignVariant } from "@/components/design-variant";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
 import { Kbd } from "@/components/ui/kbd";
@@ -49,11 +49,7 @@ export function KeyboardShortcuts() {
 	const router = useRouter();
 	const [cheatOpen, setCheatOpen] = useState(false);
 	const { open: openSettings } = useSettingsDialog();
-	// The graph is home in the current design, its own view in the proposed
-	// one, and on home again once a study home holds the course map.
 	const design = useDesignVariant();
-	const home = useHomeVariant();
-	const graphPath = design === "proposed" && home === "current" ? "/knowledge" : "/";
 
 	// Router + cheat + settings state inside a ref so the keydown listener
 	// (attached once) never goes stale.
@@ -61,9 +57,8 @@ export function KeyboardShortcuts() {
 		router: ReturnType<typeof useRouter>;
 		setCheatOpen: (v: boolean) => void;
 		openSettings: () => void;
-		graphPath: string;
-	}>({ router, setCheatOpen, openSettings, graphPath });
-	handlersRef.current = { router, setCheatOpen, openSettings, graphPath };
+	}>({ router, setCheatOpen, openSettings });
+	handlersRef.current = { router, setCheatOpen, openSettings };
 
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
@@ -126,7 +121,9 @@ export function KeyboardShortcuts() {
 					handlersRef.current.openSettings();
 					break;
 				case "jump-graph":
-					handlersRef.current.router.push(handlersRef.current.graphPath);
+					// The graph is home in the current design, and a study home holds the
+					// course map in the proposed one.
+					handlersRef.current.router.push("/");
 					break;
 				case "cheat-sheet":
 					handlersRef.current.setCheatOpen(true);

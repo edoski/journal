@@ -1,6 +1,6 @@
 # NavRow
 
-The sidebar's one row: navigation (New lesson, Home, Map, Settings), sessions under their course (`NavGroup`, nav-group.md) and, while one runs, background agents alike; the Settings sheet's section list uses it too. `data-slot="nav-row"`, set after the caller's props so a wrapping trigger (the session's context menu) cannot replace it.
+The sidebar's one row: navigation (New lesson, Home, Settings), sessions under their course (`NavGroup`, nav-group.md) and, while one runs, background agents alike; the Settings sheet's section list uses it too. `data-slot="nav-row"`, set after the caller's props so a wrapping trigger (the session's context menu) cannot replace it.
 
 ## Anatomy
 

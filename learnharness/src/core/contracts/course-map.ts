@@ -71,8 +71,3 @@ export interface CourseMap {
 	topics: readonly CourseMapTopic[];
 	edges: readonly CourseMapEdge[];
 }
-
-/** What GET /api/courses/map answers: the map, or why there is none. */
-export type CourseMapResponse =
-	| { ok: true; map: CourseMap }
-	| { ok: false; code: "unknown_course" | "engine_failed" | "engine_unavailable"; error: string };
