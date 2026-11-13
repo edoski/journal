@@ -237,7 +237,11 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 				toolDescription: "Submit the course's topic map.",
 				parameters: mapSchema,
 				fill: (input: Static<typeof mapSchema>) => ({ ...input, topics: input.topics ?? [], order: input.order ?? [] }),
-				validate: (answer) => answerProblems(answer, view),
+				validate: (answer) => {
+					const problems = answerProblems(answer, view);
+					if (problems) console.info(`[course-map ${workspace}] answer refused: ${problems.replace(/\n/g, " | ")}`);
+					return problems;
+				},
 				systemPrompt: COURSE_MAP_INSTRUCTIONS + courseMapDoctrine(),
 				prompt: mapPrompt(title, view, files, examDate, record),
 				engine,

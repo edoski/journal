@@ -32,7 +32,7 @@ import {
 } from "../src/core/course-map-build.ts";
 
 const view = (over: Partial<MapCourseView> = {}): MapCourseView => ({ topics: {}, order: [], current: null, basis: null, exam: {}, sources: ["notes", "sheet"], taken: [], ...over });
-const topic = (title: string, over: Partial<MapCourseView["topics"][string]> = {}) => ({ title, needs: [], contrasts: [], refs: [], aliases: [], studied: false, ...over });
+const topic = (title: string, over: Partial<MapCourseView["topics"][string]> = {}) => ({ title, needs: [], contrasts: [], refs: [], aliases: [], ...over });
 
 describe("course map merge", () => {
 	const answer: MapSubmit = {
@@ -75,11 +75,11 @@ describe("course map merge", () => {
 		assert.equal(mapChanges(answer, built), null);
 	});
 
-	it("extends in place: keeps handles, titles, the order and what was decided; lists grow whole", () => {
+	it("extends in place: keeps handles, titles and the order; lists grow whole; a studied topic the material drops is excluded, its answers kept", () => {
 		const before = view({
 			topics: {
 				ols: topic("OLS, as you named it", { refs: [{ source: "notes", locator: "§1" }] }),
-				ridge: topic("Ridge", { needs: ["ols"], studied: true }),
+				ridge: topic("Ridge", { needs: ["ols"] }),
 			},
 			order: ["ols", "ridge"],
 			current: "ridge",
@@ -99,7 +99,7 @@ describe("course map merge", () => {
 		);
 		assert.ok(merged);
 		assert.deepEqual(merged.changes.topics, {
-			ridge: { needs: ["ols", "cv"], refs: [{ source: "sheet", locator: "Ex. 2" }] },
+			ridge: { needs: ["ols", "cv"], refs: [{ source: "sheet", locator: "Ex. 2" }], excluded: "not examined" },
 			cv: { title: "Cross-validation", refs: [{ source: "sheet", locator: "Ex. 1" }] },
 		});
 		assert.deepEqual(merged.changes.path, { order: ["cv", "ols", "ridge"] }, "a new topic with nothing placed before it goes first; current and basis stay");

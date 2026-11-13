@@ -80,8 +80,6 @@ export interface ViewTopic {
 	refs: MapRef[];
 	aliases: string[];
 	excluded?: string;
-	/** Taught, or holds answers: a build never excludes it. */
-	studied: boolean;
 }
 
 /** What the course record holds that a build's patch is merged into. */
@@ -113,7 +111,6 @@ function refsOf(v: unknown): MapRef[] {
 /** The view, from the engine's `show --all` (the whole record). Pure. */
 export function courseView(record: unknown): MapCourseView {
 	const r = obj(record);
-	const observed = new Set(Object.values(obj(r.observations)).flatMap((o) => strs(obj(o).topics)));
 	const topics: Record<string, ViewTopic> = {};
 	for (const [handle, value] of Object.entries(obj(r.topics))) {
 		const t = obj(value);
@@ -126,7 +123,6 @@ export function courseView(record: unknown): MapCourseView {
 			refs: refsOf(t.refs),
 			aliases: strs(t.aliases),
 			...(excluded ? { excluded } : {}),
-			studied: t.introduced !== undefined || observed.has(handle),
 		};
 	}
 	const path = obj(r.path);
@@ -309,9 +305,9 @@ export interface MapCounts {
  *  - `needs`, `contrasts`, `refs` and `aliases` only grow, and each list is
  *    sent whole, its other entries kept. A prerequisite that would close a
  *    loop is left out.
- *  - `excluded` is set on a topic only when it was never taught or
- *    answered, and never cleared: what the learner or the tutor decided
- *    stands.
+ *  - `excluded` is set when the material leaves a topic out, taught or
+ *    not (the engine keeps its answers), and never cleared: an exclusion
+ *    the learner or the tutor lifted is theirs to set again.
  *  - New topics join `path.order` after the topic the answer's own order
  *    puts before them; `current` and `basis` are set only where none is. */
 export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: Json; counts: MapCounts; summary: string } | null {
@@ -328,7 +324,7 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 		if (rename.has(t.handle) || t.handle in view.topics) continue;
 		const twin = duplicateOf(t, kept);
 		if (twin) rename.set(t.handle, twin);
-		else kept[t.handle] = { title: t.title, needs: [], contrasts: [], refs: [], aliases: t.aliases ?? [], studied: false };
+		else kept[t.handle] = { title: t.title, needs: [], contrasts: [], refs: [], aliases: t.aliases ?? [] };
 	}
 	const h = (handle: string) => rename.get(handle) ?? handle;
 	const byHandle = new Map<string, MapTopic>();
@@ -397,7 +393,7 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 		const aliases = [...(old?.aliases ?? [])];
 		for (const a of t.aliases ?? []) if (a.trim() && !aliases.includes(a.trim())) aliases.push(a.trim());
 		if (aliases.length !== (old?.aliases.length ?? 0)) patch.aliases = aliases;
-		if (t.excluded?.trim() && !old?.excluded && !old?.studied) {
+		if (t.excluded?.trim() && !old?.excluded) {
 			patch.excluded = t.excluded.trim();
 			counts.excluded++;
 		}
