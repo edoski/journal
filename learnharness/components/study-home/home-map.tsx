@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Maximize2Icon, Minimize2Icon } from "lucide-react";
+import Link from "next/link";
+import { ArrowRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
 import type { StudyCourse, TopicHandle } from "@/src/core";
 import { TopicMap } from "@/components/course-map/topic-map/topic-map";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
-import { MathText } from "@/components/ui/math-text";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { mapFade } from "@/components/study-home/map-frame";
+import { courseHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 
 /** How far the fade reaches in from the sides and from the top and bottom. */
@@ -44,6 +46,7 @@ export function HomeMap({
 	onEnlarge: (enlarged: boolean) => void;
 }) {
 	const chosen = courses.some((c) => c.map.workspace === workspace) ? workspace : courses[0]!.map.workspace;
+	const chosenTitle = mathPlain(courses.find((c) => c.map.workspace === chosen)!.map.title);
 	useEffect(() => {
 		if (!enlarged) return;
 		// Anything open over the map claims Esc first (Radix marks it handled).
@@ -58,19 +61,29 @@ export function HomeMap({
 		<section aria-label="Course map" data-slot="home-map" data-enlarged={enlarged || undefined} className="relative flex min-h-0 flex-1 flex-col gap-2">
 			<div className="flex h-8 shrink-0 items-center justify-between gap-4">
 				<CourseTabs courses={courses} workspace={chosen} onSelect={onSelect} />
-				<Hint label={enlarged ? "Back to Home" : "Enlarge map"} binding={enlarged ? "escape" : undefined} side="left">
-					<Button
-						variant="quiet"
-						size="icon-row"
-						data-slot="home-map-enlarge"
-						aria-label={enlarged ? "Back to Home" : "Enlarge map"}
-						aria-pressed={enlarged}
-						onClick={() => onEnlarge(!enlarged)}
-						className="lh-no-drag -mr-2"
-					>
-						{enlarged ? <Minimize2Icon /> : <Maximize2Icon />}
-					</Button>
-				</Hint>
+				<div className="flex shrink-0 items-center gap-1">
+					<Hint label={`${chosenTitle}'s course page`} side="bottom">
+						<Button variant="quiet" size="sm" asChild data-slot="home-map-course-page" className="lh-no-drag text-label font-normal">
+							<Link href={courseHref(chosen)}>
+								Course page
+								<ArrowRightIcon aria-hidden className="size-3.5" />
+							</Link>
+						</Button>
+					</Hint>
+					<Hint label={enlarged ? "Back to Home" : "Enlarge map"} binding={enlarged ? "escape" : undefined} side="left">
+						<Button
+							variant="quiet"
+							size="icon-row"
+							data-slot="home-map-enlarge"
+							aria-label={enlarged ? "Back to Home" : "Enlarge map"}
+							aria-pressed={enlarged}
+							onClick={() => onEnlarge(!enlarged)}
+							className="lh-no-drag -mr-2"
+						>
+							{enlarged ? <Minimize2Icon /> : <Maximize2Icon />}
+						</Button>
+					</Hint>
+				</div>
 			</div>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
 				{courses.map((course) => {

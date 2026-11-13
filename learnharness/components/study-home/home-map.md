@@ -1,10 +1,11 @@
 # HomeMap
 
-The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data-enlarged` while enlarged), tabs `home-map-tabs`, control `home-map-enlarge`, frame `home-map-frame`. It embeds the course's topic map (`components/course-map/topic-map/topic-map.md`) as it is, with room around it as deep as the fade (`margin`), so a topic at the edge scrolls clear of it; Edo picked the topic map over the old drawing and its popover on 13 Nov 2026. Rendering, hover, what a click opens and the keyboard are the map's own.
+The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data-enlarged` while enlarged), tabs `home-map-tabs`, course page `home-map-course-page`, control `home-map-enlarge`, frame `home-map-frame`. It embeds the course's topic map (`components/course-map/topic-map/topic-map.md`) as it is, with room around it as deep as the fade (`margin`), so a topic at the edge scrolls clear of it; Edo picked the topic map over the old drawing and its popover on 13 Nov 2026. Rendering, hover, what a click opens and the keyboard are the map's own.
 
 | Part | Notes |
 |---|---|
 | tabs | shadcn `Tabs`, its `line` variant (tabs.md): plain course names with the chosen one underlined, no track or pill (Edo, 12 Nov 2026: the pill track looked bolted on), one tab per course in Today's order; opens on Today's first line's course; a pick lasts the visit |
+| course page | a quiet `sm` link between the tabs and the enlarge control: "Course page" in `text-label` with a 14px arrow after it, opening the chosen tab's course page (`courseHref`, course-page.md); its tooltip names the course ("Linear Algebra's course page"). Home's one way into a course page (Edo, 13 Nov 2026: "I can't just select a course and open its page"). The tabs keep selecting and following |
 | enlarge | quiet 32px icon button at the top right (Maximize 2, Minimize 2 while enlarged), its icon on the column's edge; tooltip "Enlarge map", "Back to Home (Esc)" |
 | frame | fills what Today leaves; the edges fade on every side, 64px across and 40px down, as a mask (a vignette); no scrollbars, the map still scrolls and drags inside |
 | camera | the current topic ("You are here") at the frame's centre, and again whenever the frame grows or shrinks; the topic map shows the whole course instead when it fits the frame (topic-map.md) |
