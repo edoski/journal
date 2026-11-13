@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownIcon, CheckIcon, ChevronRightIcon, PlayIcon } from "lucide-react";
+import { ArrowDownIcon, CheckIcon, ChevronRightIcon, LightbulbIcon, PlayIcon } from "lucide-react";
+import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
@@ -9,6 +10,7 @@ import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
 import {
 	buildAnswer,
+	kbdEventForAction,
 	repairMathForDisplay,
 	normalizeQuestionType,
 	DEFAULT_CONFIDENCE,
@@ -332,6 +334,38 @@ function QuestionDockForm({
 	 * law as the practice dock. */
 	useEnterSubmits(submit);
 
+	// Hint (checks only): a request, never an answer, so the committed
+	// answer stays hidden and the tutor gives the next rung.
+	const askHint = () => {
+		if (kind !== "explain" || compactionRunning) return;
+		onSubmit(buildAnswer(qd, { text: qd.mode === "text" ? text : undefined, thinking: qd.mode !== "text" ? thinking.trim() || undefined : undefined, hint: true }, toolName));
+	};
+	const askHintRef = useRef(askHint);
+	askHintRef.current = askHint;
+	useEffect(() => {
+		if (kind !== "explain") return;
+		const listener = () => askHintRef.current();
+		window.addEventListener(kbdEventForAction("practice-hint"), listener);
+		return () => window.removeEventListener(kbdEventForAction("practice-hint"), listener);
+	}, [kind]);
+	const hintButton = () =>
+		kind === "explain" ? (
+			<Hint label="Get a nudge, not the answer" action="practice-hint">
+				<Button
+					type="button"
+					variant="quiet"
+					size="sm"
+					data-testid="question-hint"
+					disabled={compactionRunning}
+					onClick={askHint}
+					className="h-8 rounded-full px-3 text-row"
+				>
+					<LightbulbIcon />
+					Hint
+				</Button>
+			</Hint>
+		) : null;
+
 	// Selecting Other never clears the thinking field — two channels, the
 	// answer and the reasoning behind it, side by side.
 	const selectOther = () => setSel(toggleOther(selectMode, sel));
@@ -594,8 +628,9 @@ function QuestionDockForm({
 					)}
 					<div className="flex items-center gap-3 p-2 pl-3">
 						{kind === "explain" && <ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />}
+						{hintButton()}
 						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
-							{compactionRunning ? "Compacting the conversation…" : "↵ to submit · ⇧↵ for a new line"}
+							{compactionRunning ? "Compacting the conversation…" : kind === "explain" ? "" : "↵ to submit · ⇧↵ for a new line"}
 						</span>
 						<Button
 							type="submit"

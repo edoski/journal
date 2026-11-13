@@ -71,7 +71,7 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "rename-session", label: "Rename session", scope: "chat", binding: "f2" },
 	{ id: "toggle-user-thinking", label: "Toggle all your thinking", scope: "chat", binding: "mod+t" },
 	// The practice problem's requests: the mounted problem box answers them.
-	{ id: "practice-hint", label: "Problem · hint", scope: "chat", binding: "mod+shift+h" },
+	{ id: "practice-hint", label: "Problem or check · hint", scope: "chat", binding: "mod+shift+h" },
 	{ id: "practice-show", label: "Problem · show me", scope: "chat", binding: "mod+shift+s" },
 	{ id: "practice-explain", label: "Problem · explain instead", scope: "chat", binding: "mod+shift+e" },
 	// Mod+F is surface-scoped: graph node search and session text Find share

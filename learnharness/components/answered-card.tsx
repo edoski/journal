@@ -178,7 +178,7 @@ function AnsweredCardNext({ answer, input }: { answer: ReturnType<typeof answerF
 			<LessonCard
 				data-testid="answered-card"
 				label={answer.tool === "recall" ? "Recall" : isExplain ? "Explain" : "Question"}
-				note={confidenceLabel && <span data-testid="answered-confidence">{confidenceLabel}</span>}
+				note={answer.hintRequested ? <span data-testid="answered-hint">You asked for a hint</span> : confidenceLabel && <span data-testid="answered-confidence">{confidenceLabel}</span>}
 			>
 				<ToolContentResponse>{answer.questionText}</ToolContentResponse>
 				{askInput?.details && <ToolContentResponse className={cn("mt-1", small)}>{askInput.details}</ToolContentResponse>}

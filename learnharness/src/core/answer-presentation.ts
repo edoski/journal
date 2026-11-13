@@ -11,7 +11,7 @@ export function answerForPresentation(answer: QuestionAnswerData, input: unknown
 	const source = explain ?? (answer.kind === "ask" ? parseAskInput(input) : undefined);
 	if (!source) return answer;
 	const projected = { ...answer, questionText: source.question };
-	if (explain) projected.committed = explain.correctAnswer;
+	if (explain && !answer.hintRequested) projected.committed = explain.correctAnswer;
 	if (!answer.options?.length || !("options" in source) || !source.options?.length) return projected;
 
 	const original = normalizeOptions(source.options);
