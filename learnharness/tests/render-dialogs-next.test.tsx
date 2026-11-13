@@ -43,6 +43,8 @@ describe("Settings › Appearance under the Proposed design", () => {
 		for (const gone of ["row-mode", "row-background", "row-font", "font-trigger", "row-session-serif", "row-heading-weight"])
 			assert.ok(!ids.includes(gone), `leaves out ${gone}`);
 		assert.equal(doc.querySelector('[data-testid="row-prose-size"]')?.textContent?.includes("Text size"), true);
+		const text = doc.body.textContent ?? "";
+		assert.ok(!/px|Empty =/.test(text), "no pixel counts or equals-sign notes");
 	});
 
 	it("the Current design keeps every appearance row", () => {

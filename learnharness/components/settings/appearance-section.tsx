@@ -198,7 +198,7 @@ export function AppearanceSection({
 	if (proposed) {
 		return (
 			<SettingsGroup label="Reading" testid="group-reading">
-				<SettingsRow label="Text size" hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
+				<SettingsRow label="Text size" testid="row-prose-size">
 					<CommitInput
 						type="number"
 						value={String(appearance?.proseFontSize ?? "")}
@@ -208,7 +208,7 @@ export function AppearanceSection({
 						onCommit={commitProseSize}
 					/>
 				</SettingsRow>
-				<SettingsRow label="Bold color" hint="Empty = same as text" testid="row-bold-color">
+				<SettingsRow label="Bold color" testid="row-bold-color">
 					<CommitInput
 						value={md?.boldColor ?? ""}
 						placeholder="same as text"
@@ -217,7 +217,7 @@ export function AppearanceSection({
 						onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
 					/>
 				</SettingsRow>
-				<SettingsRow label="Italic color" hint="Empty = same as text" testid="row-italic-color">
+				<SettingsRow label="Italic color" testid="row-italic-color">
 					<CommitInput
 						value={md?.italicColor ?? ""}
 						placeholder="same as text"
