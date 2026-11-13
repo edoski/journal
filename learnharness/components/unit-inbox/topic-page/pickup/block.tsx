@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HistoryPane } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
@@ -20,7 +21,7 @@ function StepPath({ now }: { now: NowItem }) {
 				</li>
 				{now.then && (
 					<li data-slot="pickup-then" className="grid h-7 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
-						<span aria-hidden className="size-2 justify-self-center rounded-full border-[1.5px] border-muted-foreground" />
+						<CircleIcon aria-hidden strokeWidth={3} className="size-2.5 justify-self-center text-muted-foreground" />
 						<span className="truncate text-row text-muted-foreground">{now.then}</span>
 						<span className="text-label text-muted-foreground">Next</span>
 					</li>
