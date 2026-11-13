@@ -21,9 +21,12 @@ completes on each, so a lighter evening takes less of it and a day off none.
 New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
 (``contrasts``) would interfere with. A course with an exam ahead first gets
-its pace, the topics it has left over the study days it has left, nearest exam
-first; spare new-topic capacity then goes to the nearest exam, then to courses
-with no exam. A topic a course cannot start before its exam does not fit.
+its pace, the topics it has left over the study days it has left before its
+new topics should end, nearest exam first; spare new-topic capacity then goes
+to the nearest exam with topics left, even within its final review, since a
+topic started late is better known at the exam than one never started; then to
+courses with no exam. A topic a course cannot start before its exam does not
+fit.
 """
 
 from __future__ import annotations
@@ -82,6 +85,7 @@ class _Course:
     order: list[str]
     untaught: list[str]
     partners: dict[str, list[str]]
+    replayed: dict[str, progress.Replay]
     days: list[dict[str, Any]] = field(default_factory=list)
     introduced: set[str] = field(default_factory=set)
 
@@ -89,15 +93,17 @@ class _Course:
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
         levels = progress.standings(record)
         order = progress.path_order(record)
+        replayed = progress.replays(record)
         return cls(
             name,
             {**record, "topics": dict(record["topics"])},
             dict(levels),
-            {key: item.streak for key, item in progress.replays(record).items()},
+            {key: item.streak for key, item in replayed.items()},
             progress.exam_plan(record),
             order,
             waiting(record, levels, order),
             progress.contrasts(record),
+            replayed,
         )
 
     def ahead(self, day: date) -> bool:
@@ -112,6 +118,7 @@ class _Course:
             levels=self.levels,
             order=self.order,
             limit=0,
+            replayed=self.replayed,
         )
         return [item["topic"] for item in items]
 
@@ -150,7 +157,11 @@ class _Course:
 
     def reviewed(self, topic: str, day: date) -> None:
         stored = self.record["topics"][topic].get("review", {}).get("due")
-        late = (day - date.fromisoformat(stored)).days if stored else 0
+        late = (
+            progress.late_days(day, date.fromisoformat(stored), self.exam)
+            if stored
+            else 0
+        )
         self.streaks[topic] = self.streaks.get(topic, 0) + 1
         standing = {
             name: value
@@ -273,8 +284,7 @@ def _new(
         if room > 0 and left > 0 and course.untaught:
             room -= take(course, min(room, math.ceil(len(course.untaught) / left)))
     for course in exams:
-        end = course.new_end(day)
-        if room > 0 and end is not None and day <= end:
+        if room > 0:
             room -= take(course, room)
     for course in courses:
         if room > 0 and course.exam is None:
@@ -293,9 +303,10 @@ def plan(
     ``week`` defaults to the capacity learned from these records. Today's
     allowance is what is left after what the record shows done today.
     """
-    week = week or capacity.of(records.values(), today)
+    history = capacity.activity(records.values())
+    week = week or capacity.estimate(history, today)
     courses = [_Course.of(name, record) for name, record in records.items()]
-    done = capacity.activity(records.values()).get(today, capacity.Done())
+    done = history.get(today, capacity.Done())
     allowance = _Allowance()
     for offset in range(days):
         day = today + timedelta(days=offset)

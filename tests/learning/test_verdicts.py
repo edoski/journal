@@ -375,3 +375,11 @@ def test_two_misses_in_a_row_ask_for_reteaching_first() -> None:
     assert item["topic"] == "a"
     course.attempts(3, att("correct", text="after reteaching"))
     assert "relearn" not in course.standing
+
+
+def test_with_an_exam_ahead_a_late_review_earns_no_longer_gap() -> None:
+    course = Course({**TOPICS, "exam": {"date": on(60).isoformat()}})
+    course.attempts(0, att("correct"))
+    course.attempts(1, att("correct", text="on time"))
+    course.attempts(9, att("correct", text="five days late"))
+    assert course.due == on(16).isoformat()

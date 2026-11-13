@@ -183,6 +183,14 @@ def _learned(items: list[dict[str, Any]]) -> str:
     return "helped" if best == "solid" else best
 
 
+def late_days(answered: date, expected: date, exam: Exam | None) -> int:
+    """Days a review was answered after its expected day, credited only with
+    no exam ahead: before an exam the time left to it sets the gaps."""
+    if exam is not None and answered < exam.day:
+        return 0
+    return max((answered - expected).days, 0)
+
+
 def interval(verdict: str, streak: int, late: int = 0) -> int:
     """Days from a verdict to the next expected review; ``solid`` climbs the
     ladder, plus the days the review was answered late: recall after a longer
@@ -227,8 +235,8 @@ def replay(
     a day the engine had the topic due when its answer was saved (``due_topics``,
     so moving the exam never uncounts a review), or any day with an ``exam``, is a
     probe: the first try counts, lowered only by a later unaided incorrect. Any other day is practice: only an unaided
-    incorrect counts. A ``solid`` probe answered after its expected day adds the
-    days it was late to the next interval.
+    incorrect counts. With no exam ahead, a ``solid`` probe answered after its
+    expected day adds the days it was late to the next interval.
     """
     result = Replay()
     days = [item["date"] for _, item in attempts]
@@ -256,7 +264,7 @@ def replay(
             continue
         result.verdicts.append((day, verdict))
         result.streak = result.streak + 1 if verdict == "solid" else 0
-        late = (date.fromisoformat(day) - result.expected).days
+        late = late_days(date.fromisoformat(day), result.expected, exam)
         days_on = (
             FIRST_RETRIEVAL_DAYS
             if result.days[day] == LEARNING
@@ -721,15 +729,21 @@ def _due_items(
     return items
 
 
-def unready(record: dict[str, Any], today: date) -> set[str]:
-    """Within the exam run-up, taught topics without a ``solid`` verdict in 14 days."""
+def unready(
+    record: dict[str, Any],
+    today: date,
+    replayed_: dict[str, Replay] | None = None,
+) -> set[str]:
+    """Within the exam run-up, taught topics without a ``solid`` verdict in 14 days.
+
+    ``replayed_`` is the record's ``replays`` when the caller already has them."""
     exam = exam_plan(record)
     if exam is None or not 0 <= (exam.day - today).days <= RUNUP_DAYS:
         return set()
     recent = (today - timedelta(days=RECENT_SOLID_DAYS)).isoformat()
     return {
         key
-        for key, replayed in replays(record).items()
+        for key, replayed in (replayed_ or replays(record)).items()
         if replayed.days or "introduced" in record["topics"][key]
         if not any(
             verdict == "solid" and day > recent for day, verdict in replayed.verdicts
@@ -781,6 +795,7 @@ def due(
     levels: dict[str, dict[str, Any]] | None = None,
     order: list[str] | None = None,
     limit: int = DUE_LIMIT,
+    replayed: dict[str, Replay] | None = None,
 ) -> list[dict[str, Any]]:
     """Reviews due on or before ``today``: today's review first, then the rest.
 
@@ -792,7 +807,7 @@ def due(
     """
     current = levels or standings(record)
     rank = _ranked(record, order)
-    behind = unready(record, today)
+    behind = unready(record, today, replayed)
     items = _due_items(record, today, current)
     items.sort(
         key=lambda item: (

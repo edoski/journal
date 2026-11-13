@@ -291,7 +291,7 @@ def test_the_final_review_lead_is_a_course_preference() -> None:
         {"observations": [attempt("rank", offset=3)]},
         TODAY + timedelta(days=3),
     )
-    assert record["topics"]["rank"]["review"]["due"] == day(14)
+    assert record["topics"]["rank"]["review"]["due"] == day(10)
     record, scheduled = save(record, {"preferences": {"final_review_days": "14"}})
     assert record["topics"]["rank"]["review"]["due"] == day(6)
     assert scheduled.notes == [f"rank: review moved to {day(6)}, after the exam moved"]
