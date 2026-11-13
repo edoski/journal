@@ -1,4 +1,4 @@
-import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, ScheduledDay } from "@/src/core";
+import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, topicSessions } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -6,9 +6,10 @@ import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
  * stored sessions as entries, one per thing on one day. The engine owns
- * every date: today's review is the one `plan` makes, a later review is
- * the date the engine set, an exam is the record's date, and the one
- * clock is the engine's study day. Every function here is pure.
+ * every date: today's review is the one `plan` makes, a later day shows
+ * `plan`'s daily plan (its reviews and new topics), an exam is the
+ * record's date, and the one clock is the engine's study day. Every
+ * function here is pure.
  */
 
 export interface CourseRef {
@@ -21,19 +22,22 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null }
+	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null; doesNotFit: readonly string[] }
 	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; action: TopicAction }
+	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
 	| { kind: "session"; id: string; day: string; title: string; course: CourseRef | null; chat: ChatListItem; type: SessionType; waits: boolean; topic: CourseMapTopic | null };
 
 /** How an entry reads: its words, one per look, and where it sits in its
- *  day: exams first, then what is due, then what was done. A session that
+ *  day: exams first, then what is due (a new topic, the day's lesson,
+ *  before its reviews), then what was done. A session that
  *  waits on him comes right after the exam (`rankOf`). */
-export type EntryLook = "exam" | "overdue" | "review" | "task" | SessionType;
+export type EntryLook = "exam" | "overdue" | "review" | "new" | "task" | SessionType;
 
 export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	exam: { words: "Exam", rank: 0 },
 	overdue: { words: "Overdue", rank: 1 },
+	new: { words: "New topic", rank: 1.5 },
 	review: { words: "Review", rank: 2 },
 	task: { words: "Open task", rank: 3 },
 	lesson: { words: "Lesson", rank: 4 },
@@ -48,6 +52,8 @@ export function lookOf(entry: CalendarEntry): EntryLook {
 			return "exam";
 		case "review":
 			return entry.overdue ? "overdue" : "review";
+		case "new":
+			return "new";
 		case "task":
 			return "task";
 		case "session":
@@ -80,7 +86,8 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
  * Every entry on the calendar, by day and then by look:
  *   - each exam on its date;
  *   - today's review as `plan` made it, each overdue when past its date,
- *     and every later review on the date the engine set;
+ *     and today's new topics from `plan`'s daily plan;
+ *   - each later day's reviews and new topics as the daily plan proposes;
  *   - each open task today, since the engine dates none;
  *   - each session on the day of its last message (a day after the
  *     engine's counts as today).
@@ -99,26 +106,29 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
-	for (const { map, due, runup } of shown) {
+	for (const { map, due, runup, planned, doesNotFit } of shown) {
 		const course = { workspace: map.workspace, title: map.title };
-		if (map.exam) entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup });
+		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
+		if (map.exam) entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf) });
+		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, topicSessions(chats, map.workspace, topic.handle)) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
-			entries.push({
-				kind: "review",
-				id: `review:${map.workspace}#${topic.handle}`,
-				day,
-				title: topic.title,
-				course,
-				topic,
-				overdue,
-				action: topicAction(topic, map, topicSessions(chats, map.workspace, topic.handle)),
-			});
+			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, ...facts(topic) });
+		const fresh = (topic: CourseMapTopic, day: string) => entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, ...facts(topic) });
+		const topicOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle);
 		for (const handle of due ?? []) {
-			const topic = map.topics.find((t) => t.handle === handle);
+			const topic = topicOf(handle);
 			if (topic) review(topic, today, topic.review?.kind === "due" && topic.review.overdue > 0);
 		}
-		for (const topic of map.topics) {
-			if (topic.review?.kind === "scheduled" && topic.review.date > today) review(topic, topic.review.date, false);
+		for (const day of planned) {
+			if (day.date < today) continue;
+			for (const handle of day.date > today ? day.reviews : []) {
+				const topic = topicOf(handle);
+				if (topic) review(topic, day.date, false);
+			}
+			for (const handle of day.new) {
+				const topic = topicOf(handle);
+				if (topic) fresh(topic, day.date);
+			}
 		}
 		for (const task of map.tasks) {
 			const topic = map.topics.find((t) => t.tasks.includes(task.key)) ?? null;
@@ -183,8 +193,13 @@ export function distanceWords(day: string, today: string): string {
 
 /** The exam run-up in words, as `plan` counts it. */
 export function runupWords(runup: CalendarRunup): string {
-	const days = runup.studyDays === 1 ? "1 study day" : `${runup.studyDays} study days`;
-	return `${days} left before the last week, about ${runup.pace} new topics each`;
+	const days = runup.studyDays === 1 ? "1 day" : `${runup.studyDays} days`;
+	return `${days} left for new topics, about ${runup.pace} each`;
+}
+
+/** The topics the plan cannot fit before the exam, named. */
+export function misfitWords(titles: readonly string[]): string | null {
+	return titles.length > 0 ? `Not enough days left for ${titles.join(", ")}` : null;
 }
 
 /** True when no entry falls in [start, end). */

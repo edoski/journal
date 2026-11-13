@@ -52,6 +52,8 @@ function linalg(exam: string | null): CalendarCourse {
 		due: ["span" as TopicHandle],
 		lastActiveDaysAgo: 0,
 		runup: null,
+		planned: [{ date: "2026-11-13", reviews: ["vectors" as TopicHandle], new: [] }],
+		doesNotFit: [],
 	};
 }
 

@@ -5,19 +5,32 @@
  * invents no date.
  */
 
+import type { TopicHandle } from "./course-map.ts";
 import type { StudyCourse } from "./study.ts";
 
 /** The exam run-up as `plan` reports it, inside its last three weeks:
- *  the days with a study window until a week before the exam, and the
- *  topics not yet taught to cover on each of them. */
+ *  the days left that take new topics, and the topics not yet taught to
+ *  cover on each of them. */
 export interface CalendarRunup {
 	studyDays: number;
 	pace: number;
 }
 
+/** One day of the engine's daily plan: the reviews and the new topics it
+ *  proposes, within the learner's budget. */
+export interface PlannedDay {
+	date: string;
+	reviews: readonly TopicHandle[];
+	new: readonly TopicHandle[];
+}
+
 export interface CalendarCourse extends StudyCourse {
-	/** Null outside the run-up, or when the Journal schedules no study day. */
+	/** Null outside the run-up, or when no day is left for new topics. */
 	runup: CalendarRunup | null;
+	/** The daily plan, each day that proposes something, in date order. */
+	planned: readonly PlannedDay[];
+	/** Path topics the plan cannot introduce before the exam. */
+	doesNotFit: readonly TopicHandle[];
 }
 
 /** One study window, "HH:MM" local. */

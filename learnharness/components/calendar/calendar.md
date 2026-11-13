@@ -8,14 +8,15 @@ The engine owns every date; the page invents none (`calendar-facts.ts`, pure, te
 
 | Entry | Day | From |
 |---|---|---|
-| Exam | the record's exam date | `map`'s `exam`; its panel adds `plan`'s run-up (study days left before the last week, the pace) when `plan` gives it |
-| Overdue, Review | today for the reviews `plan` makes today (Overdue when past their date); a later review on the date the engine set | `plan`'s `due`, `map`'s `review` |
+| Exam | the record's exam date | `map`'s `exam`; its panel adds `plan`'s run-up (days left for new topics, the pace) when `plan` gives it, and names the topics the plan cannot fit before the exam (`plan.does_not_fit`) |
+| Overdue, Review | today for the reviews `plan` makes today (Overdue when past their date); a later day's reviews as the engine's daily plan proposes them | `plan`'s `due`; `plan.plan.days`' `reviews` |
+| New topic | the day the daily plan proposes to start it, today included | `plan.plan.days`' `new` |
 | Open task | today, since the engine dates no task | `map`'s `tasks` |
 | Lesson, Practice, Plan, Check-in | the day of the session's last message (a day after the engine's counts as today) | the session store: practice, else the teaching session's phase (the prober's questions, the plan, the lesson) |
 
 A week's day head adds the Journal's study windows for that day, or Day off (`plan --days 42`'s `journal.upcoming_schedule`, read by `src/server/calendar.ts`). The one clock is the engine's study day.
 
-Not in the engine, so not on the page: planned lessons or practice on a date (the engine schedules reviews only), a date for an open task, and the topics the run-up still has to teach on each study day.
+The daily plan is the engine's projection (`learning/agenda.py`): within the learner's `daily_topics`, paced to the exam, assuming each planned review succeeds. A stored review date the plan does not propose that day (one past the budget, or after the exam) is not drawn. Not in the engine, so not on the page: a date for an open task, and practice on a date.
 
 ## Anatomy
 
@@ -28,7 +29,7 @@ Not in the engine, so not on the page: planned lessons or practice on a date (th
 | entry panel | `data-slot="calendar-entry-detail"` | `Popover`, 288 wide: the course, the title 13/600, the look, when in words, then the topic page's action (`topicAction`: Review, Continue, Start, Study, or Resume and Open for a session already running) and Open topic. An open task offers Continue. An exam has no action |
 | quiet | `data-slot="calendar-quiet"` | "Nothing scheduled this week" (or month), centred, muted, when the range holds no entry |
 
-Order within a day: the exam, a session that waits on him, overdue reviews, reviews, open tasks, then sessions.
+Order within a day: the exam, a session that waits on him, overdue reviews, new topics (the day's lesson, so a busy month day never folds it under More), reviews, open tasks, then sessions. A new topic's panel says when it is planned and offers the topic page's Start.
 
 ## Actions
 
