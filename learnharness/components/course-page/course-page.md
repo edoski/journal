@@ -52,7 +52,7 @@ The window's title is the course's name, "Course not found" for an address no li
 ## Entry points
 
 - The lesson's top bar: the first crumb links to the course page (lesson-top-bar.md).
-- The topic page: the course line above the title links to the course page (`../unit-inbox/topic-header.tsx`).
+- The topic page: the course line above the title links to the course page (`../unit-inbox/topic-page/topic-head.tsx`).
 - Sidebar search: matching courses come first, under Courses (unit-inbox.md, Search).
 
 Left alone: Home's course tabs (a tab that sometimes navigates breaks what tabs mean), the sidebar's topic cards, and the course name on Today's rows (decided for him: not a link for now).

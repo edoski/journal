@@ -3,7 +3,7 @@ import { stepMarks, type StepMark } from "@/components/unit-inbox/topic-page/ste
 import type { SessionEntry, TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
- * What the hybrid candidate draws beyond the shared facts (spec:
+ * What the hybrid page draws beyond the shared facts (spec:
  * hybrid.md), pure: which lesson the map shows at first, and each step's
  * mark, the steps after the one the lesson stopped on marked Next.
  */

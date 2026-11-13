@@ -5,7 +5,7 @@ import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /**
- * What every topic page candidate reads (spec: topic-page.md). Engine
+ * What the topic page reads (spec: topic-page.md). Engine
  * fields and session facts only: the app judges no standing, and the one
  * clock is the engine's study day. Every function here is pure.
  */
@@ -256,7 +256,7 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: attempt.unaided ? null : "With a hint" };
 }
 
-/** Everything a candidate draws, from the course, the topic, every
+/** Everything the page draws, from the course, the topic, every
  *  session and the topic read; `read` is null when it failed. */
 export function topicFacts({ course, topic, chats, read }: { course: StudyCourse; topic: CourseMapTopic; chats: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
 	const { map } = course;

@@ -1,6 +1,6 @@
 # Link options (hybrid topic page)
 
-The Link switch (`design-variant.ts`, group `link`, options `split` and `connected`, each wearing Design's Proposed and Topic's `hybrid`). Current keeps the two panes side by side with nothing between them (`PlainPanes`). An option is the component that lays the panes out (`LINK_PANES` in `link-options.ts`, given by `TopicPage`'s `link` prop to `HybridTopic`'s `panes`). Each takes the list and the map already drawn (`PanesProps`) and keeps `data-slot="topic-panes"`.
+The Link switch (`design-variant.ts`, group `link`, options `split` and `connected`, each wearing Design's Proposed). Current keeps the two panes side by side with nothing between them (`PlainPanes`). An option is the component that lays the panes out (`LINK_PANES` in `link-options.ts`, given by `TopicPage`'s `link` prop to `HybridTopic`'s `panes`). Each takes the list and the map already drawn (`PanesProps`) and keeps `data-slot="topic-panes"`.
 
 Edo's ask (13 Nov 2026): tie the list and the lesson's step map together visually, minimal and Apple-like.
 

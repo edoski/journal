@@ -27,12 +27,6 @@ export const NODE_OPTIONS = ["header", "ring", "edge"] as const;
 /** "current" keeps the node as the topic map drew it first. */
 export type NodeVariant = "current" | (typeof NODE_OPTIONS)[number];
 
-/** The topic page's candidates (spec:
- *  components/unit-inbox/topic-page/topic-page.md). */
-export const TOPIC_OPTIONS = ["brief", "steps", "trail", "hybrid"] as const;
-/** "current" keeps the topic page as it is. */
-export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
-
 /** How the hybrid topic page ties its list to the lesson map (spec: components/unit-inbox/topic-page/link/link.md). */
 export const LINK_OPTIONS = ["split", "connected"] as const;
 /** "current" keeps the two panes side by side with nothing between them. */
@@ -45,9 +39,8 @@ export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
  *  sidebar's list as it is or one of its top candidates, each wearing the
  *  Proposed design and sidebar; Node is the topic map's node as it was or
  *  one of its candidates, wherever the topic map draws; Overview is Home's
- *  map behind tabs or following the pointed row; Topic is Current or one of
- *  the topic page's candidates; Link is Current or one of its options, and
- *  wears Topic's hybrid. Read only through the hooks below. */
+ *  map behind tabs or following the pointed row; Link is the topic page's
+ *  panes as they are or one of its options. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", requires: { design: "proposed" } },
@@ -55,8 +48,7 @@ export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "inbox", label: "Inbox", options: INBOX_OPTIONS, requires: { design: "proposed", sidebar: "proposed" } },
 	{ id: "node", label: "Node", options: NODE_OPTIONS, requires: { design: "proposed" } },
 	{ id: "overview", label: "Overview", options: OVERVIEW_OPTIONS, requires: { design: "proposed", home: "proposed" } },
-	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
-	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
+	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -75,8 +67,6 @@ function subscribeSwitch(onChange: () => void): () => void {
 const readCurrent = (): DesignVariant => "current";
 const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" ? "proposed" : "current");
 const readHome = (): DesignVariant => (polishVariant("home") === "proposed" ? "proposed" : "current");
-const readTopicCurrent = (): TopicVariant => "current";
-const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
 const readLinkCurrent = (): LinkVariant => "current";
 const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
@@ -123,12 +113,6 @@ export function useNodeVariant(): NodeVariant {
  *  the Today row he points at ("follow"). Production builds get "current". */
 export function useOverviewVariant(): OverviewVariant {
 	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readOverview : readOverviewCurrent, readOverviewCurrent);
-}
-
-/** Which topic page `/unit/...` draws, or "current" for the page as it is.
- *  Production builds get "current". */
-export function useTopicVariant(): TopicVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readTopic : readTopicCurrent, readTopicCurrent);
 }
 
 /** How the hybrid topic page ties its list to the lesson map, or "current"

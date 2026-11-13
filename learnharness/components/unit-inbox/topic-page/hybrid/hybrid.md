@@ -1,6 +1,6 @@
-# Topic page candidate `hybrid`
+# Topic page body (`hybrid`)
 
-Option `hybrid` of the Topic switch (`../topic-page.md`). Thesis: Steps and Trail in one page that fits the window, each with one job. The history, sorted by relevance into Pick up's sections, says what to pick up and what happened, and holds the page's action (`../pickup/pickup.md`); the map says where one lesson stands and what comes next.
+The topic page's body (`../topic-page.md`), which Edo picked. Thesis: Steps and Trail in one page that fits the window, each with one job. The history, sorted by relevance into Pick up's sections, says what to pick up and what happened, and holds the page's action (`../pickup/pickup.md`); the map says where one lesson stands and what comes next.
 
 Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
 
@@ -37,7 +37,7 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 
 ## Math
 
-A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`, so the steps candidate typesets too) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. Tested in `tests/topic-page-math.test.tsx`.
+A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. Tested in `tests/topic-page-math.test.tsx`.
 
 ## Facts (`hybrid-facts.ts`)
 
@@ -51,7 +51,7 @@ The lesson on the map is kept while its session is listed; a lesson the history 
 
 ## Shared parts it needs
 
-It reads, and changes none of: `TopicHead` (whose button is absent without `onAct`, the one change it declares), `WhyMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`) and `StepNode` (`../steps/step-node.tsx`). If hybrid ships, those three files move into this folder before steps and trail are deleted.
+It reads `TopicHead`, `WhyMark`, `trailDays` (`../trail/trail-facts.ts`), `lessonWords`, `stepsLayout`, `stepMarks` (`../steps/steps-facts.ts`) and `StepNode` (`../steps/step-node.tsx`), the parts of the deleted steps and trail candidates it kept.
 
 ## Layouts tried (13 Nov 2026, throwaway sketches)
 
@@ -63,4 +63,4 @@ It reads, and changes none of: `TopicHead` (whose button is absent without `onAc
 
 ## Signal test
 
-As the other candidates (`../topic-page.md`). The map says nothing is done; Next is the plan's own order, not a verdict.
+As the topic page (`../topic-page.md`). The map says nothing is done; Next is the plan's own order, not a verdict.

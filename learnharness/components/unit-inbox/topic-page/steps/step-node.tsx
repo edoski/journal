@@ -45,7 +45,7 @@ const STAGGER_MS = 15;
 const STAGGER_CAP_MS = 110;
 
 /**
- * One step of a lesson's plan (spec: steps.md): the Plan list's dot and
+ * One step of a lesson's plan (spec: ../hybrid/hybrid.md, Lesson map): the Plan list's dot and
  * the step's title on the topic map's node. Every step has the same
  * surface, since nothing says which are done; the step the lesson stopped
  * on is ringed and tagged. A link to the lesson.

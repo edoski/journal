@@ -31,7 +31,7 @@ export interface HybridPaneProps {
 }
 
 /**
- * Topic page candidate "hybrid" (spec: hybrid.md): the page fits the
+ * The topic page's body (spec: hybrid.md): the page fits the
  * window. The shared head over two bounded panes side by side, each the
  * full height under it: the topic's history sorted into Pick up's sections
  * on the left, which holds the page's action, and the steps of the lesson
@@ -48,7 +48,7 @@ export function HybridTopic({ facts, busy, onAct, onTask, panes: Panes = PlainPa
 	return (
 		<div data-testid="unit-page" data-topic-candidate="hybrid" className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pb-6 pt-6", HYBRID_COLUMN)}>
 			{/* Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
-			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }} busy={busy} />
+			<TopicHead facts={{ ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null }} />
 			{shown ? (
 				<Panes side={side()} map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />} />
 			) : (
