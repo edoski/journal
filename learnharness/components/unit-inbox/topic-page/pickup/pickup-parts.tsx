@@ -9,7 +9,7 @@ import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/to
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
-import { ONE_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
+import { ONE_LINE_ROW, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -123,10 +123,14 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} writing="Tutor writing" />;
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
-						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={ONE_LINE_ROW}>
+						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={item.kind === "task" && item.step ? TWO_LINE_ROW : ONE_LINE_ROW}>
 							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
-							<span className="truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
-							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" && item.step ? <MathText>{item.step}</MathText> : null}</span>
+							<span className="col-span-2 truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
+							{item.kind === "task" && item.step && (
+								<span data-slot="pickup-next-step" className="col-span-2 col-start-2 truncate text-label text-muted-foreground">
+									<MathText>{item.step}</MathText>
+								</span>
+							)}
 						</Button>
 					</li>
 				);
