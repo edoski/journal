@@ -15,8 +15,11 @@ export interface TopicAttempt {
 	/** When it was recorded (ISO), for order within a day; null when absent. */
 	recorded: string | null;
 	result: "correct" | "partial" | "incorrect";
-	/** The engine's rule: an exam, or help "none". */
-	unaided: boolean;
+	/** The help he had: none (an exam, or help "none"), a hint during it,
+	 *  or the method or answer shown before it (the engine's `shown`). */
+	help: "none" | "hint" | "shown";
+	/** He gave up without an answer (the engine's `gave_up`). */
+	gaveUp: boolean;
 	sure: "guess" | "neutral" | "confident" | null;
 	/** The method he reached for in its place (a topic handle), when the tutor recorded one. */
 	chose: string | null;

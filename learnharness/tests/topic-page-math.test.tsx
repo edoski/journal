@@ -59,7 +59,7 @@ const LESSON: ChatListItem = {
 	compacting: false,
 };
 const EARLIER: ChatListItem = { ...LESSON, id: "chat_cofactors", title: "$\\det$ by cofactors", updatedAt: "2026-11-06T08:00:00.000Z", pendingQuestion: false };
-const ATTEMPT = { id: "o1", date: "2026-11-07", recorded: null, result: "partial" as const, unaided: false, sure: null, chose: null, text: "Read $\\det = -2$ as an area doubled and flipped" };
+const ATTEMPT = { id: "o1", date: "2026-11-07", recorded: null, result: "partial" as const, help: "hint" as const, gaveUp: false, sure: null, chose: null, text: "Read $\\det = -2$ as an area doubled and flipped" };
 
 const facts = topicFacts({ course: COURSE, topic: DET, sessions: [LESSON, EARLIER], read: { record: { attempts: [ATTEMPT], tasks: [] }, plans: [PLAN] } });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
