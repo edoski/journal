@@ -277,6 +277,9 @@ export interface QuestionAnswerData {
 	 *  and on explain answers recorded before 7 Nov 2026. */
 	confidence?: Confidence;
 	committed?: string; // explain only (rendering): the model's committed answer
+	/** explain: he pressed Hint instead of answering. Not an answer, so no
+	 *  committed answer is revealed and no confidence is read. */
+	hintRequested?: boolean;
 	dismissed?: boolean;
 	answeredAt: string;
 }
@@ -289,6 +292,7 @@ export interface AnswerRequest {
 	thinking?: string; // the reasoning-on-the-question channel (was `note`)
 	readingThinking?: string; // the thinking-while-reading channel (check answers)
 	confidence?: Confidence; // explain only; defaults to neutral
+	hint?: boolean; // explain only: a hint request, never an answer
 }
 
 // ─── dock selection (the client state machine, pure for tests) ─────────────
@@ -400,7 +404,10 @@ export function buildAnswer(qd: QuestionData, req: AnswerRequest, tool?: string)
 	}
 	if (req.other?.trim()) base.other = req.other.trim();
 	if (req.text?.trim()) base.text = req.text.trim();
-	if (qd.kind === "explain") {
+	if (qd.kind === "explain" && req.hint) {
+		// A hint request: the committed answer stays hidden.
+		base.hintRequested = true;
+	} else if (qd.kind === "explain") {
 		// The commitment snapshots for the reveal + rendering.
 		base.committed = qd.committedAnswer;
 		base.confidence = req.confidence ?? DEFAULT_CONFIDENCE;
@@ -436,6 +443,9 @@ export function dismissedAnswer(kind: QuestionKind, questionText: string): Quest
 export function compactAnswerForModel(ad: QuestionAnswerData): Record<string, unknown> {
 	if (ad.dismissed) return { kind: ad.kind, dismissed: true };
 	const out: Record<string, unknown> = { kind: ad.kind };
+	if (ad.hintRequested) {
+		out.hintRequested = "He pressed Hint: a request, not an answer. Give the next rung of the hint ladder, then ask this check again.";
+	}
 	// Array.isArray: the seam is called with `unknown` answers (test
 	// fixtures, foreign records) — degrade to omission, never crash.
 	if (Array.isArray(ad.answers) && ad.answers.length > 0)

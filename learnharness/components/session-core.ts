@@ -24,6 +24,7 @@ import {
 	newNextMessage,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newPracticeRequestMessage,
 	newUserMessage,
 	projectView,
 	type ChatInput,
@@ -703,6 +704,8 @@ export class SessionModel {
 			// optimistically — the card renders from its details the
 			// moment the button fires.
 			optimistic.push({ ...newThinkingMessage(input.problemCallId, input.text, input.confidence), id: localId() });
+		} else if (input.type === "request") {
+			optimistic.push({ ...newPracticeRequestMessage(input.problemCallId, input.request, input.text), id: localId() });
 		} else if (input.type === "next") {
 			// The move-on signal (owner round 16): the NEXT PROBLEM line
 			// renders the instant the chip/Enter fires.

@@ -1,10 +1,13 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import type { PlanToolResult, PlanTree } from "../../core/contracts.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressInput, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import { createTree, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
+import type { CourseToolContext } from "./course.ts";
+import { sessionTopicsOf } from "../../core/native-messages.ts";
+import { topicsToIntroduce } from "../../core/contracts/course-map.ts";
 
 /** The binding-id reminder riding plan_init's slim content (owner,
  *  2026-10-09): plan_init is the exact moment the node ids become
@@ -19,6 +22,26 @@ export interface PlanToolContext {
 	chatId: string;
 	/** The storage port plan tools persist through. */
 	chatStore: ChatStore;
+	/** The session's course: present, the close marks the lesson's new
+	 *  topics introduced in the engine. */
+	course?: CourseToolContext;
+}
+
+/** The close's record step: the session's topics the engine has never
+ *  seen introduced are saved as introduced, through the engine's own save,
+ *  so the next day's first review is scheduled without relying on the
+ *  tutor to remember it. Returns what it did, for the tutor to read. */
+async function introduceLessonTopics(course: CourseToolContext, candidates: readonly string[]): Promise<string> {
+	if (candidates.length === 0) return "";
+	const mapped = await course.records.map(course.course.workspace);
+	if (!mapped.ok) return `The lesson's topics could not be marked introduced (${mapped.message}).`;
+	const fresh = topicsToIntroduce(candidates, mapped.map);
+	if (fresh.length === 0) return "";
+	const saved = await course.records.run(course.course.workspace, {
+		verb: "save",
+		changes: { topics: Object.fromEntries(fresh.map((handle) => [handle, { introduced: true }])) },
+	});
+	return saved.ok ? `Marked introduced: ${fresh.join(", ")}.` : `The lesson's topics could not be marked introduced (${saved.message}).`;
 }
 
 /**
@@ -61,6 +84,26 @@ const planInitInput = Type.Object({
 
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
 	return {
+		[LESSON_PROGRESS_TOOL]: {
+			name: LESSON_PROGRESS_TOOL,
+			label: LESSON_PROGRESS_TOOL,
+			description:
+				"Mark plan steps done on his map, and say when you close the session for tonight. Call it in the turn that finishes a step, " +
+				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words.",
+			parameters: lessonProgressInput,
+			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done, close }) => {
+				const record = ctx.chatStore.getChat(ctx.chatId);
+				if (!record) return { ok: false, error: `Chat not found: ${ctx.chatId}` };
+				const ids = new Set(record.tree?.nodes.map((n) => n.id) ?? []);
+				const unknown = done.filter((id) => !ids.has(id));
+				if (unknown.length > 0) {
+					return { ok: false, error: `Not node ids of this session's plan: ${unknown.join(", ")}. Valid ids: ${[...ids].join(", ") || "(no plan yet)"}` };
+				}
+				if (!close || !ctx.course) return { ok: true };
+				const introduced = await introduceLessonTopics(ctx.course, [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])]);
+				return introduced ? { ok: true, record: introduced } : { ok: true };
+			}),
+		},
 		plan_init: {
 			name: "plan_init",
 			label: "plan_init",

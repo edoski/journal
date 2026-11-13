@@ -219,7 +219,7 @@ describe("tool toggles (core/pending.ts + factories)", () => {
 			deliver: () => {},
 		};
 		const full = Object.keys(createTeacherTools(ctx)).sort();
-		assert.deepEqual(full, ["ask_user_question", "demo", "explain", "find", "grep", "ls", "pdf", "plan_init", "practice", "read", "research", "visual"]);
+		assert.deepEqual(full, ["ask_user_question", "demo", "explain", "find", "grep", "lesson_progress", "ls", "pdf", "plan_init", "practice", "read", "research", "visual"]);
 
 		const noResearch = Object.keys(createTeacherTools(ctx, { research: false })).sort();
 		assert.deepEqual(noResearch, full.filter((t) => t !== "research"));

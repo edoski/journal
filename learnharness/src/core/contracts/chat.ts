@@ -218,7 +218,7 @@ export function sessionResumeText(title: string, steps: readonly { id: string; t
  *  scope to practise, or the topic to teach. */
 export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
 	practice:
-		"[PRACTICE] — the session moves to practice, on the scope the handoff above names. Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
+		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
 	teach:
 		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
 };
@@ -255,6 +255,34 @@ export const CONCLUDE_ACK_TEXT =
  *  marker; the model reads this and poses (or wraps) per the doctrine. */
 export const NEXT_PROBLEM_TEXT =
 	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
+
+/** The practice dock's request buttons: a hint, the rest of the
+ *  solution, or teaching instead of this problem. A request is never an
+ *  answer: it rides its own marker (`practice-request`), so the agent and
+ *  the record both read what was asked, never a claimed answer. */
+export const PRACTICE_REQUESTS = ["hint", "show", "explain"] as const;
+export type PracticeRequest = (typeof PRACTICE_REQUESTS)[number];
+
+export function isPracticeRequest(value: unknown): value is PracticeRequest {
+	return typeof value === "string" && (PRACTICE_REQUESTS as readonly string[]).includes(value);
+}
+
+/** What the agent reads for each request (the marker's content head). */
+export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
+	explain:
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+};
+
+/** Which rung a Hint request asks for, by how many hints this problem has
+ *  had: the first is a question, the second a nudge, the third and later
+ *  one step. Show me reveals the rest. */
+export function hintRungText(nth: number): string {
+	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
+	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
+}
 
 /** The compaction marker's model-facing header (owner round 14,
  *  2026-10-05). The marker's content is this header + the summary — the

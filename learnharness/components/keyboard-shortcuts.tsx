@@ -134,6 +134,13 @@ export function KeyboardShortcuts() {
 				case "cheat-sheet":
 					handlersRef.current.setCheatOpen(true);
 					break;
+				case "practice-hint":
+				case "practice-show":
+				case "practice-explain":
+					// The problem box owns these; claim the chord from the browser.
+					e.preventDefault();
+					window.dispatchEvent(new CustomEvent(kbdEventForAction(action)));
+					break;
 				case "find":
 				case "pick-course":
 					// The mounted surface owns Find (session text / graph nodes)

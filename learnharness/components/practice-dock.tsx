@@ -1,13 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowDownIcon, ChevronRightIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDownIcon, BookOpenIcon, ChevronRightIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { Button } from "@/components/ui/button";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { ConfidenceChoice } from "@/components/confidence-choice";
+import { Hint } from "@/components/ui/hint";
 import { cn } from "@/lib/utils";
-import { DEFAULT_CONFIDENCE, type Confidence } from "@/src/core";
+import { DEFAULT_CONFIDENCE, kbdEventForAction, type Confidence, type KeyAction, type PracticeRequest } from "@/src/core";
+
+/** The three requests, in the order the row shows them. */
+const REQUESTS: readonly { request: PracticeRequest; label: string; hint: string; icon: LucideIcon; action: KeyAction }[] = [
+	{ request: "hint", label: "Hint", hint: "Get a nudge, not the answer", icon: LightbulbIcon, action: "practice-hint" },
+	{ request: "show", label: "Show me", hint: "Stop here and see the solution", icon: EyeIcon, action: "practice-show" },
+	{ request: "explain", label: "Explain instead", hint: "Leave this problem and be taught the idea", icon: BookOpenIcon, action: "practice-explain" },
+];
 
 /**
  * The practice dock (practice sessions, owner design 2026-10-04): an
@@ -41,6 +49,9 @@ export interface PracticeDockProps {
 	onExpand: () => void;
 	/** text + confidence — POST {type:"thinking"} (one lane; the register is read from the text). */
 	onSubmit: (text: string, confidence: Confidence) => void;
+	/** A request button (Hint, Show me, Explain instead), with the work in
+	 *  the field so far: POST {type:"request"}, never an answer. */
+	onRequest: (request: PracticeRequest, text: string) => void;
 	/** Compaction is running for this chat (owner round 14): the thinking
 	 *  POST would block on the server's compaction gate — disable submit
 	 *  and say so in the hint row. The server registry is the real gate;
@@ -51,7 +62,7 @@ export interface PracticeDockProps {
 	variant?: "current" | "proposed";
 }
 
-export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, compactionRunning = false, variant = "current" }: PracticeDockProps) {
+export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmit, onRequest, compactionRunning = false, variant = "current" }: PracticeDockProps) {
 	const [thinking, setThinking] = useState("");
 	const [confidence, setConfidence] = useState<Confidence>(DEFAULT_CONFIDENCE);
 
@@ -63,6 +74,41 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 		setConfidence(DEFAULT_CONFIDENCE);
 		onSubmit(text, confidence);
 	};
+
+	const request = (kind: PracticeRequest) => {
+		if (compactionRunning) return;
+		const text = thinking.trim();
+		setThinking("");
+		onRequest(kind, text);
+	};
+	const requestRef = useRef(request);
+	requestRef.current = request;
+	useEffect(() => {
+		const listeners = REQUESTS.map(({ request: kind, action }) => {
+			const listener = () => requestRef.current(kind);
+			window.addEventListener(kbdEventForAction(action), listener);
+			return () => window.removeEventListener(kbdEventForAction(action), listener);
+		});
+		return () => listeners.forEach((off) => off());
+	}, []);
+
+	const requestButtons = () =>
+		REQUESTS.map(({ request: kind, label, hint, icon: Icon, action }) => (
+			<Hint key={kind} label={hint} action={action}>
+				<Button
+					type="button"
+					variant="quiet"
+					size="sm"
+					data-testid={`practice-request-${kind}`}
+					disabled={compactionRunning}
+					onClick={() => request(kind)}
+					className="h-8 rounded-full px-3 text-row"
+				>
+					<Icon />
+					{label}
+				</Button>
+			</Hint>
+		));
 
 	/* ENTER SUBMITS FROM ANYWHERE (owner round 6, 2026-10-05): the
 	 * window-level Enter (typing surfaces and buttons excluded) submits
@@ -119,9 +165,11 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				/>
 				<div className="flex items-center gap-3 p-2 pl-3">
 					<ConfidenceChoice value={confidence} onChange={setConfidence} variant="proposed" />
-					<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">
-						{compactionRunning ? "Compacting the conversation…" : "↵ to submit · ⇧↵ for a new line"}
-					</span>
+					{compactionRunning ? (
+						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">Compacting the conversation…</span>
+					) : (
+						<div data-testid="practice-requests" className="flex min-w-0 items-center gap-0.5">{requestButtons()}</div>
+					)}
 					<Button
 						type="button"
 						data-testid="practice-send"

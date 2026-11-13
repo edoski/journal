@@ -1,7 +1,7 @@
 "use client";
 
 import { useContext } from "react";
-import { CheckIcon, SettingsIcon, XIcon } from "lucide-react";
+import { CheckIcon, CircleSlashIcon, SettingsIcon, XIcon } from "lucide-react";
 import { JobsContext } from "@/components/jobs-context";
 import { ChatActionsContext } from "@/components/chat";
 import { isModelsRefusal, isProviderKeyRefusal, type JobKind, type JobRecord } from "@/src/core";
@@ -27,6 +27,14 @@ const KIND_ACTIVITY: Record<JobKind, string> = {
 	demo: "Building a demo…",
 	visual: "Making a figure…",
 	pdf: "Reading the PDF…",
+};
+
+/** The Proposed lesson's one plain line when a helper failed. */
+const KIND_FAILED: Record<JobKind, string> = {
+	research: "The sources couldn't be checked",
+	demo: "The demo couldn't be built",
+	visual: "The figure couldn't be made",
+	pdf: "The PDF couldn't be read",
 };
 
 const KIND_LABEL: Record<JobKind, string> = {
@@ -62,6 +70,14 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	// Delivered: the result arrives in the steer card right below; the
 	// Proposed lesson marks only a failure.
 	if (quiet && !failed) return null;
+	if (quiet) {
+		return (
+			<div className="flex items-center gap-2 text-row text-muted-foreground" data-testid="dispatch-settled">
+				<CircleSlashIcon className="size-3.5" />
+				<span>{KIND_FAILED[kind]}</span>
+			</div>
+		);
+	}
 	return (
 		<div
 			className="flex items-center gap-2 text-xs text-muted-foreground"

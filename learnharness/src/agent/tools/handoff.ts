@@ -37,6 +37,13 @@ export const practiceHandoffInput = Type.Object({
 			"REQUIRED — what to practise, in the learner's own words (a topic, a problem, a file), or \"open\" when he named nothing.",
 	}),
 	reason: Type.String({ description: "REQUIRED — one line: why practice now." }),
+	topics: Type.Optional(
+		Type.Array(Type.String({ minLength: 1 }), {
+			minItems: 1,
+			description:
+				"When practising a whole lesson: the course topic handles the lesson taught, in the order it taught them. Practice then covers every one, interleaved, and ends on one problem that runs the whole chain.",
+		}),
+	),
 });
 
 export const teachHandoffInput = Type.Object({

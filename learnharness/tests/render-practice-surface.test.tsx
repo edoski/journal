@@ -47,6 +47,7 @@ describe("PracticeDock", () => {
 				expanded={true}
 				onExpand={() => {}}
 				onSubmit={() => {}}
+				onRequest={() => {}}
 			/>,
 		);
 		assert.match(html, /Show that the sum is even\./);
@@ -71,6 +72,7 @@ describe("PracticeDock", () => {
 				expanded={false}
 				onExpand={() => {}}
 				onSubmit={() => {}}
+				onRequest={() => {}}
 			/>,
 		);
 		assert.match(html, /data-testid="practice-dock-bar"/);

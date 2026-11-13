@@ -41,7 +41,10 @@ import {
 	HANDOFF_TEXT,
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
+	PRACTICE_REQUEST_TEXT,
+	hintRungText,
 	THINKING_LABEL,
+	type PracticeRequest,
 	type SessionMode,
 } from "./contracts/chat.ts";
 import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
@@ -80,6 +83,7 @@ export interface LhMarkerMessage {
 		| "plan-block"
 		| "practice-thinking"
 		| "practice-next"
+		| "practice-request"
 		| "problem-dismissed"
 		| "compaction"
 		| "session-resume";
@@ -415,6 +419,15 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
 	};
 }
 
+/** How many Hint requests this problem has had so far. */
+export function hintsAsked(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && d.request === "hint";
+	}).length;
+}
+
 /** The learner's thinking submission (ONE send lane, owner round
  *  2026-10-05): the register is no longer declared by a button — the
  *  model READS the text to tell working traces from claimed answers. The
@@ -430,6 +443,30 @@ export function newThinkingMessage(problemCallId: string, text: string, confiden
 		content: `${THINKING_LABEL}:\n${text}${confidence ? `\n\nConfidence: ${confidence}` : ""}`,
 		display: true,
 		details: { problemCallId, text, ...(confidence ? { confidence } : {}) },
+		timestamp: Date.now(),
+	};
+}
+
+/** A practice request (the dock's Hint, Show me and Explain instead):
+ *  never an answer. `details.request` names it for the record and the
+ *  transcript; `text` is any work he had written when he pressed it. */
+export interface PracticeRequestDetails {
+	problemCallId: string;
+	request: PracticeRequest;
+	text?: string;
+}
+
+/** `nth`: which hint on this problem a Hint request is (1 for the first). */
+export function newPracticeRequestMessage(problemCallId: string, request: PracticeRequest, text?: string, nth = 1): LhMarkerMessage {
+	const work = text?.trim();
+	const head = request === "hint" ? `${PRACTICE_REQUEST_TEXT.hint} ${hintRungText(nth)}` : PRACTICE_REQUEST_TEXT[request];
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "practice-request",
+		content: work ? `${head}\n\nHis work so far:\n${work}` : head,
+		display: true,
+		details: { problemCallId, request, ...(work ? { text: work } : {}) } satisfies PracticeRequestDetails,
 		timestamp: Date.now(),
 	};
 }
@@ -1040,7 +1077,7 @@ export function nativeInputCause(message: AgentMessage, history: readonly AgentM
 	if (message.role === "system" || message.role === "assistant") return "neutral";
 	if (message.role === "custom") {
 		if (["probe-handoff", "mode-handoff", "subagent-steer", "subagent-abort"].includes(message.customType)) return "automatic";
-		if (["practice-thinking", "practice-next"].includes(message.customType)) return "learner";
+		if (["practice-thinking", "practice-next", "practice-request"].includes(message.customType)) return "learner";
 		return NEUTRAL_MARKERS.includes(message.customType) ? "neutral" : "unrecognizable";
 	}
 	if (message.role === "toolResult") {

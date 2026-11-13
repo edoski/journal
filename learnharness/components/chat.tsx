@@ -57,11 +57,11 @@ import { QuestionDock } from "@/components/question-dock";
 import { SessionFind } from "@/components/session-find";
 import { SessionMessageNavigation } from "@/components/session-navigation";
 import { PracticeDock } from "@/components/practice-dock";
-import { ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
+import { RequestCard, ThinkingCard, type PracticeThinkingData } from "@/components/practice-cards";
 import { GraphContextCard, type GraphContextData } from "@/components/graph-context-card";
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
-import type { ArtifactPartProps, Confidence, JobRecord, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
+import type { ArtifactPartProps, Confidence, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
 import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
 import { CHIP_LABEL, ModeDivider, PhaseChip, PhaseDivider } from "@/components/phase-divider";
 import {
@@ -532,6 +532,17 @@ export function Chat({
 			const problem = activeProblemRef.current;
 			if (!problem) return;
 			void send({ type: "thinking", problemCallId: problem.toolCallId, text, confidence });
+		},
+		[send],
+	);
+
+	// The dock's Hint, Show me and Explain instead: a request on the active
+	// problem, never an answer; the field's work rides along.
+	const sendPracticeRequest = useCallback(
+		(request: PracticeRequest, text: string) => {
+			const problem = activeProblemRef.current;
+			if (!problem) return;
+			void send({ type: "request", problemCallId: problem.toolCallId, request, ...(text ? { text } : {}) });
 		},
 		[send],
 	);
@@ -1539,6 +1550,8 @@ export function Chat({
 												return <CompactionCutDivider key={pi} data={part.data as CompactionDividerData} variant={design} />;
 											case "data-practice-thinking":
 												return <ThinkingCard key={pi} data={part.data as PracticeThinkingData} variant={design} />;
+											case "data-practice-request":
+												return <RequestCard key={pi} data={part.data as PracticeRequestDetails} variant={design} />;
 											case "data-practice-next":
 												// The learner's move-on signal (owner round 16): a compact
 												// centered mono-caps line — chrome, the dismissal register.
@@ -1817,6 +1830,7 @@ export function Chat({
 					practice={activeProblem}
 					compactionRunning={compacting}
 					onSubmitThinking={submitThinking}
+					onPracticeRequest={sendPracticeRequest}
 					chatId={chatId}
 					onModelChange={setSelectedModel}
 					plan={hasPlan && !proposed ? <PlanMarginalia messages={messages} /> : undefined}
@@ -2052,6 +2066,7 @@ function DockOverlay({
 	practice,
 	compactionRunning,
 	onSubmitThinking,
+	onPracticeRequest,
 	requiresReveal,
 	readingThinking,
 	readingThinkingRevision,
@@ -2085,6 +2100,7 @@ function DockOverlay({
 	practice: { toolCallId: string; input: unknown } | null;
 	/** (commit, text) — the practice dock's two submit lanes. */
 	onSubmitThinking: (text: string, confidence: Confidence) => void;
+	onPracticeRequest: (request: PracticeRequest, text: string) => void;
 	/** Teach-phase pending question: arrives collapsed behind the reveal button (W5). */
 	requiresReveal: boolean;
 	/** The reading-thinking draft (owner 2026-10-03), read from ChatView's
@@ -2527,6 +2543,7 @@ function DockOverlay({
 										void suppressFoldDuringReveal();
 									}}
 									onSubmit={onSubmitThinking}
+									onRequest={onPracticeRequest}
 									compactionRunning={compactionRunning}
 									variant={variant}
 								/>

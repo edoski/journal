@@ -34,6 +34,10 @@ export interface GradedAnswer {
 	response: string;
 	chose?: string;
 	byTopic?: Readonly<Record<string, AttemptResult>>;
+	/** A combined problem that failed: the topic where the answer first
+	 *  broke. The miss is charged to it alone; the other posed topics are
+	 *  charged only with what byTopic gives them. */
+	brokeAt?: string;
 }
 
 export interface PracticeConclusion extends Omit<GradedAnswer, "result"> {
@@ -47,8 +51,17 @@ export interface PracticeConclusion extends Omit<GradedAnswer, "result"> {
 	firstTry?: GradedAnswer & { sure: Confidence | null };
 }
 
-/** Each posed topic's result, in pose order. */
+/** Each charged topic's result, in pose order. With `brokeAt`, a topic
+ *  the answer never reached, or reached on the way to the break with no
+ *  result of its own, is not charged. */
 function topicResults(topics: readonly string[], answer: GradedAnswer): [string, AttemptResult][] {
+	if (answer.brokeAt !== undefined) {
+		return topics.flatMap((topic): [string, AttemptResult][] => {
+			if (topic === answer.brokeAt) return [[topic, answer.byTopic?.[topic] ?? answer.result]];
+			const own = answer.byTopic?.[topic];
+			return own ? [[topic, own]] : [];
+		});
+	}
 	return topics.map((topic) => [topic, answer.byTopic?.[topic] ?? answer.result]);
 }
 
@@ -59,6 +72,14 @@ function answerProblem(topics: readonly string[], answer: GradedAnswer, label: s
 	}
 	if (answer.chose !== undefined && topicResults(topics, answer).every(([, r]) => r === "correct")) {
 		return `${label}chose marks a wrongly chosen method, so the result is not correct on every topic`;
+	}
+	if (answer.brokeAt !== undefined) {
+		if (!topics.includes(answer.brokeAt)) return `${label}brokeAt names ${answer.brokeAt}, which the problem was not posed with (its topics: ${topics.join(", ")})`;
+		if (answer.result === "correct") return `${label}brokeAt marks where a failed answer broke, so the result is not correct`;
+	}
+	const uncharged = answer.result === "incorrect" && topics.length > 1 && answer.chose === undefined && answer.brokeAt === undefined;
+	if (uncharged && Object.keys(answer.byTopic ?? {}).length === 0) {
+		return `${label}an incorrect answer on a problem with several topics names brokeAt, the topic where it first broke, so the miss is charged to that topic alone (or byTopic splits the parts that went differently)`;
 	}
 	return null;
 }
@@ -105,8 +126,8 @@ function answerObservations(
 }
 
 function sameResults(topics: readonly string[], a: GradedAnswer, b: GradedAnswer): boolean {
-	const bResults = topicResults(topics, b);
-	return a.chose === b.chose && topicResults(topics, a).every(([, r], i) => bResults[i]![1] === r);
+	const key = (answer: GradedAnswer) => JSON.stringify(topicResults(topics, answer));
+	return a.chose === b.chose && key(a) === key(b);
 }
 
 /** The observations a concluded problem adds to the course record: the

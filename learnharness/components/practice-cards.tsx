@@ -2,7 +2,8 @@
 
 import { ToolContentResponse } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
-import type { ArtifactPartProps, Confidence } from "@/src/core";
+import type { ArtifactPartProps, Confidence, PracticeRequest, PracticeRequestDetails } from "@/src/core";
+import { BookOpenIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-react";
 
 /**
  * The practice transcript cards (practice sessions, owner design
@@ -294,4 +295,26 @@ export function ThinkingCard({ data, variant = "current" }: { data: PracticeThin
 	// deliberately unread (one lane now). A TRANSCRIPT row (owner round,
 	// 2026-10-07): full-width band + rail, arriving expanded.
 	return <ThinkingBlock testId="thinking-card" label="YOUR THINKING" text={data.text} defaultOpen variant={variant} />;
+}
+
+const REQUEST_LINE: Record<PracticeRequest, { label: string; icon: LucideIcon }> = {
+	hint: { label: "You asked for a hint", icon: LightbulbIcon },
+	show: { label: "You asked to see the solution", icon: EyeIcon },
+	explain: { label: "You asked to be taught this instead", icon: BookOpenIcon },
+};
+
+/** The dock's request in the transcript: what he asked for, and the work he
+ *  had written when he asked. Never an answer row. */
+export function RequestCard({ data, variant = "current" }: { data: PracticeRequestDetails; variant?: "current" | "proposed" }) {
+	const line = REQUEST_LINE[data.request] ?? REQUEST_LINE.hint;
+	const Icon = line.icon;
+	return (
+		<div data-testid="practice-request-card" data-request={data.request} className={variant === "proposed" ? "my-1 w-full rounded-xl bg-card px-4 py-3" : "my-1 w-full"}>
+			<div className={cn("flex items-center gap-2 text-muted-foreground", variant === "proposed" ? "text-row" : "text-sm")}>
+				<Icon className="size-4 shrink-0" />
+				{line.label}
+			</div>
+			{data.text ? <p className="lh-prose mt-1 whitespace-pre-wrap italic text-muted-foreground">{data.text}</p> : null}
+		</div>
+	);
 }

@@ -21,6 +21,7 @@ import { QuestionDock } from "../components/question-dock.tsx";
 import { ProbeDoneCard } from "../components/artifacts/probe-done-card.tsx";
 import { DispatchCard } from "../components/artifacts/dispatch-card.tsx";
 import { JobsContext } from "../components/jobs-context.ts";
+import { LessonDesignContext } from "../components/lesson/lesson-design.ts";
 import { ChatActionsContext } from "../components/chat.tsx";
 import type { JobRecord } from "../src/core/contracts.ts";
 import { AnsweredCard } from "../components/answered-card.tsx";
@@ -152,6 +153,26 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		assert.ok(html.includes("failed"));
 		assert.ok(html.includes("text-red-500"));
 		assert.ok(!html.includes("dispatch-refused"));
+	});
+
+	it("the Proposed lesson reads a failed helper as one plain line per kind", () => {
+		const lines: Record<JobRecord["kind"], string> = {
+			research: "The sources couldn't be checked",
+			demo: "The demo couldn't be built",
+			visual: "The figure couldn't be made",
+			pdf: "The PDF couldn't be read",
+		};
+		for (const [kind, line] of Object.entries(lines) as [JobRecord["kind"], string][]) {
+			const html = renderToStaticMarkup(
+				<LessonDesignContext.Provider value={{ variant: "proposed", activeProblemCallId: null }}>
+					<JobsContext.Provider value={[job({ kind, error: "took longer than 8 minutes" })]}>
+						<DispatchCard toolCallId="t1" kind={kind} />
+					</JobsContext.Provider>
+				</LessonDesignContext.Provider>,
+			);
+			assert.ok(html.includes(line.replace("'", "&#x27;")), `${kind}: ${line}`);
+			assert.ok(!/agent|failed|uppercase/i.test(html), `${kind}: no agent label, no uppercase failure`);
+		}
 	});
 
 	it("a finished worker reads finished, independently of delivery", () => {
