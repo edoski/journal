@@ -129,13 +129,14 @@ describe("why a topic needs him", () => {
 		assert.equal(words("rank"), "Worth another look");
 	});
 
-	it("says how overdue the review of a topic he can do on his own is", () => {
+	it("says how overdue the review of a topic he can do on his own is, as a phrase and in Home's short words", () => {
 		const overdue = (days: number) => needOf(topic("t", { level: "retained", review: due(days) }), titleOf)!;
-		assert.deepEqual(overdue(0), { kind: "review", words: "Review due today" });
+		assert.deepEqual(overdue(0), { kind: "review", words: "Review due today", short: "Due today" });
 		assert.equal(overdue(1).words, "Review overdue by a day");
 		assert.equal(overdue(3).words, "Review overdue by 3 days");
 		assert.equal(overdue(10).words, "Review overdue by a week");
 		assert.equal(overdue(16).words, "Review overdue by 2 weeks");
+		assert.deepEqual([1, 3, 10, 16].map((d) => overdue(d).short), ["1d overdue", "3d overdue", "1w overdue", "2w overdue"]);
 	});
 
 	it("says nothing for a topic still being learned, one resting until its review, or one not started", () => {
@@ -215,7 +216,7 @@ describe("topic map geometry", () => {
 		const column = layoutTopicMap([topic("a"), topic("b"), topic("c")], []);
 		assert.deepEqual(column.layers, [[h("a")], [h("b")], [h("c")]]);
 		assert.equal(column.routes.length, 0);
-		assert.deepEqual(layoutTopicMap([], []), { width: 0, height: 0, topics: new Map(), routes: [], layers: [] });
+		assert.deepEqual(layoutTopicMap([], []), { node: { width: NODE_WIDTH, height: NODE_HEIGHT }, width: 0, height: 0, topics: new Map(), routes: [], layers: [] });
 	});
 
 	it("finds a topic's whole prerequisite chain, itself included", () => {
@@ -295,11 +296,11 @@ describe("topic map drawing", () => {
 		assert.equal(node("eigen").getAttribute("aria-label"), "eigen, Not started");
 	});
 
-	it("shows a title and its pie on every node, and a line under it only where the topic needs him", () => {
+	it("shows a title and its pie on every node, and a line under it only where the topic needs him, overdue in Home's words", () => {
 		assert.equal(document.querySelectorAll('[data-slot="topic-glyph"]').length, 16);
 		assert.deepEqual(
 			[...document.querySelectorAll('[data-slot="topic-need"]')].map((line) => line.textContent),
-			["Review overdue by a week", "A mistake to fix", "Review due today", "Missed last time", "Mixed up with Cramer's rule", "Worth another look", "Sure, but wrong"],
+			["1w overdue", "A mistake to fix", "Due today", "Missed last time", "Mixed up with Cramer's rule", "Worth another look", "Sure, but wrong"],
 		);
 		assert.equal(node("determinant").textContent, "Determinants");
 		assert.equal(node("eigen").querySelector('[data-slot="topic-glyph"]')!.getAttribute("data-fill"), "0");

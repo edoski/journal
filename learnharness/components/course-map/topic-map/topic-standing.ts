@@ -1,4 +1,5 @@
-import type { CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
+import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
+import { mathPlain } from "@/components/ui/math-text";
 
 /** How much of the topic's pie is filled, in quarters. */
 export type Fill = 0 | 0.25 | 0.5 | 0.75 | 1;
@@ -45,8 +46,11 @@ export interface Need {
 	/** `slip`: the engine calls it weak. `review`: a topic he can do on his
 	 *  own whose review has come due. */
 	kind: "slip" | "review";
-	/** A few plain words for the node. */
+	/** The reason as a phrase, for the topic's page and a screen reader. */
 	words: string;
+	/** The few words a node or a row ends with: a late review in Home's
+	 *  words (`overdueWords`), a slip as `words`. */
+	short: string;
 }
 
 /** "Review due today", "Review overdue by 3 days", "Review overdue by 2 weeks". */
@@ -78,9 +82,66 @@ function slipWords(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => stri
  * fields only. Pure.
  */
 export function needOf(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): Need | null {
-	if (topic.weak) return { kind: "slip", words: slipWords(topic, titleOf) };
-	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: reviewWords(topic.review.overdue) };
+	if (topic.weak) {
+		const words = slipWords(topic, titleOf);
+		return { kind: "slip", words, short: words };
+	}
+	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: reviewWords(topic.review.overdue), short: overdueWords(topic.review.overdue) };
 	return null;
+}
+
+/** The one thing a candidate node says about a topic beyond its standing,
+ *  in the order Home's rows give their reasons (row-facts.ts `whyOf`): a
+ *  slip, a review come due, an open task that holds it. */
+export interface Status {
+	kind: "slip" | "review" | "task";
+	/** The words where the node has room for them. */
+	words: string;
+	/** The words at a line's end, Home's own where Home says the same. */
+	short: string;
+}
+
+/** A slip's few words at a line's end. */
+export function slipShort(topic: CourseMapTopic): string {
+	const { gap, lapsed, choiceErrors, confidentErrors } = topic.signals;
+	if (lapsed) return "Missed";
+	if (gap) return "Mistake to fix";
+	if (Object.keys(choiceErrors).length) return "Mixed up";
+	if (confidentErrors > 0) return "Sure, but wrong";
+	return "Look again";
+}
+
+/** A late review in Home's words, "Due today", "3d overdue", "2w overdue":
+ *  the one way overdue is said wherever a row or a node ends with it
+ *  (Home, the sidebar, the map, the course page). Pure. */
+export function overdueWords(overdue: number): string {
+	if (overdue <= 0) return "Due today";
+	if (overdue < 7) return `${overdue}d overdue`;
+	return `${Math.floor(overdue / 7)}w overdue`;
+}
+
+/** Home's task words: where he left off, the step up to its first colon
+ *  ("At part (c)"), else "Unfinished". */
+function taskWords(topic: CourseMapTopic, tasks: readonly CourseMapTask[]): string | null {
+	if (topic.tasks.length === 0) return null;
+	const step = tasks.find((task) => topic.tasks.includes(task.key))?.step?.split(":")[0]!.trimEnd();
+	return step ? `At ${step.charAt(0).toLowerCase()}${step.slice(1)}` : "Unfinished";
+}
+
+/**
+ * What a candidate node says about a topic beyond its standing, or null:
+ * why it is weak, else that its review is due (only for a topic he can do
+ * on his own, the sidebar's rule), else where an open task holding it was
+ * left. Engine fields only. Pure.
+ */
+export function statusOf(topic: CourseMapTopic, tasks: readonly CourseMapTask[], titleOf: (handle: TopicHandle) => string): Status | null {
+	if (topic.weak) return { kind: "slip", words: slipWords(topic, titleOf), short: slipShort(topic) };
+	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") {
+		const words = overdueWords(topic.review.overdue);
+		return { kind: "review", words, short: words };
+	}
+	const task = taskWords(topic, tasks);
+	return task ? { kind: "task", words: task, short: task } : null;
 }
 
 /** The current topic's tag on the map. */
@@ -89,5 +150,5 @@ export const CURRENT_TAG = "You are here";
 /** A node's name for a screen reader: its title, that it is the current
  *  topic, where he stands, and why it needs him. Pure. */
 export function topicLabel(topic: CourseMapTopic, current: boolean, titleOf: (handle: TopicHandle) => string): string {
-	return [topic.title, current ? CURRENT_TAG : null, standingOf(topic).words, needOf(topic, titleOf)?.words ?? null].filter(Boolean).join(", ");
+	return mathPlain([topic.title, current ? CURRENT_TAG : null, standingOf(topic).words, needOf(topic, titleOf)?.words ?? null].filter(Boolean).join(", "));
 }

@@ -10,6 +10,15 @@ import type { CourseMapEdge, CourseMapTopic, TopicHandle } from "@/src/core";
 
 export const NODE_WIDTH = 224;
 export const NODE_HEIGHT = 64;
+
+/** One node's box. Every node of a drawing shares it. */
+export interface NodeSize {
+	width: number;
+	height: number;
+}
+
+/** The box the map's nodes have had since the topic map (224×64). */
+export const NODE_SIZE: NodeSize = { width: NODE_WIDTH, height: NODE_HEIGHT };
 /** Space between topics in a layer, and between layers. */
 export const NODE_GAP = 24;
 export const LAYER_GAP = 56;
@@ -37,6 +46,8 @@ export interface Route {
 }
 
 export interface TopicMapLayout {
+	/** The box every node is drawn in. */
+	node: NodeSize;
 	width: number;
 	height: number;
 	topics: ReadonlyMap<TopicHandle, PlacedTopic>;
@@ -48,26 +59,27 @@ export interface TopicMapLayout {
 type Need = Extract<CourseMapEdge, { kind: "needs" }>;
 
 /** One column in the given order: a course with no `needs` at all. */
-function column(topics: readonly CourseMapTopic[]): TopicMapLayout {
+function column(topics: readonly CourseMapTopic[], node: NodeSize): TopicMapLayout {
 	const placed = new Map<TopicHandle, PlacedTopic>();
-	topics.forEach((topic, index) => placed.set(topic.handle, { handle: topic.handle, x: 0, y: index * (NODE_HEIGHT + NODE_GAP), layer: index }));
+	topics.forEach((topic, index) => placed.set(topic.handle, { handle: topic.handle, x: 0, y: index * (node.height + NODE_GAP), layer: index }));
 	return {
-		width: topics.length ? NODE_WIDTH : 0,
-		height: topics.length ? topics.length * NODE_HEIGHT + (topics.length - 1) * NODE_GAP : 0,
+		node,
+		width: topics.length ? node.width : 0,
+		height: topics.length ? topics.length * node.height + (topics.length - 1) * NODE_GAP : 0,
 		topics: placed,
 		routes: [],
 		layers: topics.map((t) => [t.handle]),
 	};
 }
 
-export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[]): TopicMapLayout {
+export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
-	if (needs.length === 0) return column(topics);
+	if (needs.length === 0) return column(topics, node);
 	const parents = new Map<string, string[]>(topics.map((t) => [t.handle, []]));
 	for (const edge of needs) parents.get(edge.topic)?.push(edge.prerequisite);
 	const dag = graphStratify()(topics.map((t) => ({ id: t.handle as string, parentIds: parents.get(t.handle) ?? [] })));
 	const { width, height } = sugiyama()
-		.nodeSize([NODE_WIDTH, NODE_HEIGHT])
+		.nodeSize([node.width, node.height])
 		.gap([NODE_GAP, LAYER_GAP])
 		.layering(layeringSimplex())
 		.decross(topics.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
@@ -76,15 +88,15 @@ export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonl
 	const placed = new Map<TopicHandle, PlacedTopic>();
 	const layerYs = [...new Set([...dag.nodes()].map((n) => n.y))].sort((a, b) => a - b);
 	const layers: TopicHandle[][] = layerYs.map(() => []);
-	for (const node of dag.nodes()) {
-		const handle = node.data.id as TopicHandle;
-		const layer = layerYs.indexOf(node.y);
-		placed.set(handle, { handle, x: node.x - NODE_WIDTH / 2, y: node.y - NODE_HEIGHT / 2, layer });
+	for (const at of dag.nodes()) {
+		const handle = at.data.id as TopicHandle;
+		const layer = layerYs.indexOf(at.y);
+		placed.set(handle, { handle, x: at.x - node.width / 2, y: at.y - node.height / 2, layer });
 		layers[layer]!.push(handle);
 	}
 	for (const layer of layers) layer.sort((a, b) => placed.get(a)!.x - placed.get(b)!.x);
 
-	const half = NODE_HEIGHT / 2;
+	const half = node.height / 2;
 	const routes: Route[] = [];
 	for (const link of dag.links()) {
 		const centres = link.points;
@@ -100,7 +112,7 @@ export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonl
 			points: [[first[0], first[1] + half], ...passed, [last[0], last[1] - half]],
 		});
 	}
-	return { width, height, topics: placed, routes, layers };
+	return { node, width, height, topics: placed, routes, layers };
 }
 
 /**
@@ -203,9 +215,9 @@ export function cameraAt(layout: TopicMapLayout, point: Point, zoom: number, fra
 	return { x: along(point[0], layout.width, frame.width, room.x, zoom), y: along(point[1], layout.height, frame.height, room.y, zoom), zoom };
 }
 
-/** A topic's centre. */
-export function centreOf(placed: PlacedTopic): Point {
-	return [placed.x + NODE_WIDTH / 2, placed.y + NODE_HEIGHT / 2];
+/** A topic's centre in a drawing. */
+export function centreOf(layout: TopicMapLayout, placed: PlacedTopic): Point {
+	return [placed.x + layout.node.width / 2, placed.y + layout.node.height / 2];
 }
 
 /**
@@ -218,5 +230,5 @@ export function openingCamera(layout: TopicMapLayout, current: TopicHandle | nul
 	const middle: Point = [layout.width / 2, layout.height / 2];
 	if (zoom >= WHOLE_COURSE_ZOOM) return cameraAt(layout, middle, zoom, frame, room);
 	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
-	return cameraAt(layout, at ? centreOf(at) : middle, 1, frame, room);
+	return cameraAt(layout, at ? centreOf(layout, at) : middle, 1, frame, room);
 }

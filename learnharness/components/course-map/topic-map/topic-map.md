@@ -19,13 +19,34 @@ Every word and mark on a node must pass one test: would he understand it at a gl
 | Part | Notes |
 |---|---|
 | pie | 16px, the geometry of Today's course pie (`progress-pie.tsx`), left of the title on its first line: a dashed empty ring for a topic not started; a quarter, a half, three quarters as the engine's level rises through introduced, attempted and assisted; full once he can do it on his own (independent, retained, transferred). A full pie is exactly a topic the course pie counts, so the map and the pie agree by eye. A weak topic's pie wears the warning ink, and one he could do on his own draws three quarters, as the course pie leaves it out |
-| title | 13/18 at 500, up to two lines; muted ink for a topic not started |
-| line | 11/14 muted, only when the topic needs him, led by a 12px icon (Today's and the sidebar's: circle-x for a slip, history for a review). A weak topic gives the first of: "Missed last time" (he had it and then missed), "A mistake to fix" (the engine diagnosed one; its sentence is on the topic's page), "Mixed up with Cramer's rule" (he chose that method in its place), "Sure, but wrong", "Worth another look". Else a topic he can do on his own whose review is due: "Review due today", "Review overdue by 3 days", "by a week", "by 2 weeks". A topic still being learned says nothing about its review, since nearly every one is due (the sidebar's rule) |
+| title | 13/18 at 500, one line ending in … when it is longer than the card; muted ink for a topic not started |
+| line | 11/14 muted, only when the topic needs him, led by a 12px icon (Today's and the sidebar's: circle-x for a slip, history for a review). A weak topic gives the first of: "Missed last time" (he had it and then missed), "A mistake to fix" (the engine diagnosed one; its sentence is on the topic's page), "Mixed up with Cramer's rule" (he chose that method in its place), "Sure, but wrong", "Worth another look". Else a topic he can do on his own whose review is due, in Home's words (`overdueWords`): "Due today", "3d overdue", "1w overdue". The topic's page and a screen reader keep the phrase ("Review overdue by 3 days"). A topic still being learned says nothing about its review, since nearly every one is due (the sidebar's rule) |
 | surface | started: `card` on the page with a 1px `border`. Not started: no fill, a 1px white 6% border. Hover: border white 20% |
 | current | 1px `ring` border and a 3px `ring` halo at 16%, the only blue on the map, with "You are here" (11/14 at 500) 20px above the node's left edge |
 | need | a 1px white 33% line (3:1 on the page, WCAG 1.4.11) from the prerequisite's bottom centre to the topic's top centre: one S-curve between layers that leaves and arrives vertically, and straight down between a layer's topics where it skips that layer, so it never crosses a topic. No arrowheads: down is the direction |
 
 Not on a node: the open task (on the topic's page), "Needs" (the lines say it, and a screen reader hears it as the node's description), "Contrasts with" (said only when he mixed the two up) and the engine's stale flag.
+
+## Node switch
+
+Edo, 13 Nov 2026: the node "does not feel like a clean, polished final state": its spacing, alignment, organisation and what it says. What was off, measured on the seeded Linear Algebra map:
+
+- **Alignment.** A node's text block sits at the box's middle, so a title with a line under it sits 8px higher than one without: titles in one layer share no baseline. The pie hangs from the first line while the block is centred.
+- **Spacing.** A 224×64 box around one 13px line leaves 23px above and below it and most of the width empty.
+- **Organisation.** Two surfaces (filled for started, bare for not started), a pie in two inks and a muted line say three things in three places.
+- **Words.** The map said "Review overdue by a week" where Home's rows say "1w overdue" for the same review.
+
+Edo, 13 Nov 2026, choosing cards and rejecting the first card candidate: "the alignment of the icons and the copy, and its overall structure, just look ugly". The first round's `row`, `card` and `track` are gone; three card interiors replace them.
+
+Three candidates behind the Node switch (`useNodeVariant`, `design-variant.ts`), each a body in `topic-node.tsx` (`NodeBody`, one component per candidate) and a box in `node-size.ts` that every page laying the map out reads (`useNodeSize`). Each draws one surface (`card`, 1px `border`, radius 12) for every topic, has one anatomy for every topic so titles line up across a layer, keeps the title on one 18px line ending in "…" (a formula in it never makes the line taller), and says beyond the standing at most one status (`statusOf`): a slip, else a due review on a topic he can do on his own, else where an open task holding it was left ("At part (c)", the step up to its colon, as the sidebar says it), with Home's icons and words. Text is the app's 13/18 at 500 and 11/14 at 400 only; every icon is 12px, centred on its words' cap height. The current topic's ring and tag are unchanged.
+
+| Candidate | Idea | Box | Anatomy |
+|---|---|---|---|
+| `header` | where he stands, then the topic, as the sidebar puts a course over its lesson | 256×56 | a caption line: a 12px pie and the standing in words ("Not started", "Learning", "On your own"), the status flush right in Home's few words ("Missed", "Mistake to fix", "1w overdue", "At part (c)"); under it the title, on the pie's left edge. The card sits a pixel low, so the caption's cap height and the title's baseline are as far from its edges |
+| `ring` | a ring that closes as he learns, beside the topic | 248×56 | a 28px ring centred on the card (stroke 2.5, a tenth of its width): an arc a quarter per step, closed around a check once he can do it on his own, dashed before he starts, the warning ink on a slip; beside it the title over one line on the title's left edge: the status in full words ("Missed last time", "Mixed up with Cramer's rule", "3d overdue") or else the standing in words |
+| `edge` | the card's bottom edge fills as he learns | 272×44 | one line: the title, the status flush right in Home's few words, up to half the card; a 3px bar along the card's bottom edge, clipped to its corners, filled from the left a quarter per step, the warning ink on a slip, empty before he starts. No pie and no standing in words: the bar and the muted title say it |
+
+Room for a longer status: each status slot holds "Fixed, check again later" (105px at 11px). The ring and the edge's half card take it whole; on the header's line it shortens the standing words beside it unless it has a short form.
 
 ## Behaviour
 
@@ -33,7 +54,8 @@ Not on a node: the open task (on the topic's page), "Needs" (the lines say it, a
 - The map opens on the whole course, centred, when it fits the frame at 75% or more (below that the titles drop under 10px); else at full size with the current topic at the frame's centre, as near as the drawing's edges allow. It returns to that view whenever the frame grows or shrinks, so enlarging the map on Home shows the whole course when the window has room.
 - Drag or scroll pans; a pinch (or Ctrl and scroll) zooms between the whole course (40% at the least) and full size.
 - Hover or focus lights a topic with its whole prerequisite chain: their lines rise to white 70% and everything else drops to 35% (120ms).
-- Keyboard: one tab stop, the current topic. Up goes to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer; a topic reached out of view is brought into it (200ms). The drawing is a `figure` whose caption names the course, its topic count and where he is; each node is a link named by its title, "You are here", its standing in words and its line, and described by its prerequisites.
+- `highlight` (optional, off by default): a set of topics a page lights from elsewhere, drawn as a hover draws a chain (the set's nodes and the lines between them lit, the rest at 35%). A hover or focus takes over while it lasts and the highlight returns after it. The course page's map and split candidates point at a group of topics this way; Home passes none and draws as before.
+- Keyboard: one tab stop, the current topic. Up goes to the nearest prerequisite, Down to the nearest topic that needs it, Left and Right along the layer; a topic reached out of view is brought into it (200ms). The focused node draws a 2px `ring` ring 2px outside its border (`focus-visible:ring-2`, offset on the background): an outline would never show, since the app's no-ring law in `globals.css` removes every outline. The drawing is a `figure` whose caption names the course, its topic count and where he is; each node is a link named by its title, "You are here", its standing in words and its line, and described by its prerequisites.
 - Motion: the map fades in once its camera is placed (180ms), nodes rise 4px over 180ms, 15ms later per layer and at most 110ms. Under reduced motion nothing animates and the camera moves at once.
 
 ## Sources
