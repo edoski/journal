@@ -3,6 +3,7 @@
 import { useRowsVariant } from "@/components/design-variant";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { LineTarget } from "@/components/study-home/agenda-rows/line-target";
+import { HybridRows } from "@/components/study-home/agenda-rows/hybrid/hybrid-rows";
 import { ProgressRows } from "@/components/study-home/agenda-rows/progress/progress-rows";
 import { ReasonRows } from "@/components/study-home/agenda-rows/reason/reason-rows";
 import { RecencyRows } from "@/components/study-home/agenda-rows/recency/recency-rows";
@@ -32,6 +33,8 @@ export function Today(props: RowsProps) {
 				<RecencyRows {...props} />
 			) : variant === "progress" ? (
 				<ProgressRows {...props} />
+			) : variant === "hybrid" ? (
+				<HybridRows {...props} />
 			) : (
 				<TodayLines {...props} />
 			)}

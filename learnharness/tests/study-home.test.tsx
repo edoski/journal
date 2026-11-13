@@ -26,6 +26,7 @@ import { LessonText } from "../components/study-home/lesson-text.tsx";
 import { PathTrack } from "../components/study-home/path/path-track.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lastStudied, whyNow } from "../components/study-home/agenda-rows/row-facts.ts";
+import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
 import { ProgressRows } from "../components/study-home/agenda-rows/progress/progress-rows.tsx";
 import { ReasonRows } from "../components/study-home/agenda-rows/reason/reason-rows.tsx";
 import { RecencyRows } from "../components/study-home/agenda-rows/recency/recency-rows.tsx";
@@ -286,12 +287,13 @@ describe("agenda's row candidates", () => {
 		assert.equal(whyNow(rowOf(PROB), TODAY), "Next on your map");
 	});
 
-	it("says when the course was last studied, and how far along it is", () => {
+	it("says when the course was last studied, and how much of it he can do on his own, weak topics left out", () => {
 		assert.equal(lastStudied(rowOf(LINALG)), "Studied 2 days ago");
 		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 1 })), "Studied yesterday");
 		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: 20 })), "Studied 2 weeks ago");
 		assert.equal(lastStudied(rowOf({ ...LINALG, lastActiveDaysAgo: null })), "Not studied yet");
-		assert.deepEqual(courseProgress(LINALG), { started: 4, of: 5 });
+		assert.deepEqual(courseProgress(LINALG), { solid: 2, of: 5 });
+		assert.deepEqual(courseProgress(PROB), { solid: 2, of: 2 });
 		assert.equal(courseProgress({ ...LINALG, map: { ...LINALG.map, topics: [] } }), null);
 	});
 
@@ -323,7 +325,19 @@ describe("agenda's row candidates", () => {
 
 	it("progress: each line's pie tells a screen reader how far along the course is", () => {
 		const doc = render(<ProgressRows {...props()} />);
-		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-progress"]')].map((l) => l.getAttribute("aria-label")), ["4 of 5 topics taught", "2 of 2 topics taught", "1 of 1 topics taught"]);
+		assert.deepEqual([...doc.querySelectorAll('[data-slot="today-progress"]')].map((l) => l.getAttribute("aria-label")), ["2 of 5 topics you can do on your own", "2 of 2 topics you can do on your own", "1 of 1 topics you can do on your own"]);
+		plain(doc);
+	});
+
+	it("hybrid: each line has its pie, its course with when it was last studied, and its lesson with why it is on Today", () => {
+		const doc = render(<HybridRows {...props()} />);
+		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')].map((l) => l.textContent);
+		assert.deepEqual(lines, [
+			"Linear Algebra · Studied 2 days agoEigen lessonWaiting for your reply",
+			"Probability · Studied 4 days agoContinue Bayes' ruleNext on your map",
+			"Real Analysis · Studied 11 days agoReview SequencesStarting to fade",
+		]);
+		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 3);
 		plain(doc);
 	});
 });
