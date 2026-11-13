@@ -28,6 +28,7 @@ import { useEnterSubmits } from "@/components/enter-submits";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { dockStateKey } from "@/components/dock-state-key";
 import { clearOpeningPrompt, readOpeningPromptEntry, stashOpeningPrompt, OPENING_PROMPT_FAILURE } from "@/components/opening-prompt";
+import { takeLessonMessage } from "@/components/lesson-message";
 import { forwardDockWheel, useDockHeight } from "@/components/dock-height";
 import { QueuedSteersBody, type QueuedSteerLine } from "@/components/queued-steers";
 import { useFieldCycle } from "@/components/field-cycle";
@@ -1263,6 +1264,19 @@ export function Chat({
 		}
 		doSend();
 	};
+
+	/* A message the topic page handed this lesson (lesson-message.ts): taken
+	 * once on mount and sent as the composer sends it, a steer while the
+	 * tutor writes; a lesson that cannot take it now (a question waits)
+	 * keeps it as the draft. */
+	const steerOrSendRef = useRef(doSteerOrSend);
+	steerOrSendRef.current = doSteerOrSend;
+	useEffect(() => {
+		const message = takeLessonMessage(chatId);
+		if (!message) return;
+		applyText(message);
+		steerOrSendRef.current();
+	}, [chatId, applyText]);
 
 	return (
 		<ChatActionsContext.Provider
