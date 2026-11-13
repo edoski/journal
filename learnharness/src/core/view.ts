@@ -442,6 +442,14 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "session-resume": {
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-session-resume", id: `sr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "probe-handoff": {
 			out.push({
 				id: marker.id,

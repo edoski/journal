@@ -21,13 +21,15 @@ Four candidates for the topic page (`/unit/<course>/<topic>`) behind the Topic s
 
 | # | When | Button | What it does |
 |---|---|---|---|
-| 1 | a session of the topic waits on him (`pendingQuestion`, `pendingProblem`) | Resume | opens `/chat/<id>` |
+| 1 | a session of the topic waits on him or the tutor stopped in it mid-reply (`sessionState`: your turn, paused) | Resume | opens `/chat/<id>` |
 | 2 | else the tutor is writing in one (`busy`, `compacting`) | Open | opens `/chat/<id>` |
 | 3 | else a topic he can do on his own whose review is due (`shelfOf` is `review`) | Review | starts a session whose first message is "Review <title>" |
-| 4 | else an open task holds it (the focused one first) | Continue | first message "Continue <task title>" |
+| 4 | else an open task holds it (the focused one first) | Continue | `continueMove` over the sessions holding the task: reopens the finished lesson that holds it (or, with `FINISHED_LESSON` on `fresh`, starts a session from it that skips the probe and keeps its plan); with none, first message "Continue <task title>" |
 | 5 | else not started | Start | first message "<title>" |
-| 6 | else still being learned, its review due or not set | Continue | first message "Continue <title>" |
+| 6 | else still being learned, its review due or not set | Continue | as row 4 over the topic's sessions; with none, first message "Continue <title>" |
 | 7 | else (the next review is dated) | Study, outline | first message "<title>" |
+
+A session's state is one model (`components/nav/session-state.ts`): working, your turn (a question, a problem, or the tutor's words partway through a lesson's plan), paused (its turn stopped before it finished) or finished. A session belongs to a topic when its transcript names it or it holds an open task the engine says holds the topic.
 
 The app's one lever on the tutor is the session's first message; the tutor's own rule takes an unaided first try on any due topic it touches.
 

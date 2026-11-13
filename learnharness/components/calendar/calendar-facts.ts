@@ -111,7 +111,7 @@ export function calendarEntries({
 				course,
 				topic,
 				overdue,
-				action: topicAction(topic, map, topicSessions(chats, map.workspace, topic.handle)),
+				action: topicAction(topic, map, topicSessions(chats, map.workspace, topic)),
 			});
 		for (const handle of due ?? []) {
 			const topic = map.topics.find((t) => t.handle === handle);

@@ -4,7 +4,7 @@ import { useState, type ComponentType } from "react";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
-import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import type { Press, TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { History } from "@/components/unit-inbox/topic-page/hybrid/history";
 import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
@@ -20,8 +20,8 @@ export interface HybridPaneProps {
 	busy: boolean;
 	/** Does the page's action. */
 	onAct?: () => void;
-	/** Starts a session on an open task. */
-	onTask: (opening: string) => void;
+	/** Continues an open task. */
+	onTask: (press: Press) => void;
 	/** The lesson on the map, by session id. */
 	shown: string | null;
 	/** Puts a lesson's steps on the map. */

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BookmarkIcon, DumbbellIcon, MessageSquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HAIRLINE, TWO_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
-import { WRITING, type Pickup } from "@/components/unit-inbox/topic-page/topic-facts";
+import { WRITING, type Pickup, type Press } from "@/components/unit-inbox/topic-page/topic-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
 
 const ICON = "row-span-2 size-4 text-muted-foreground";
@@ -20,7 +20,7 @@ function PickupIcon({ pickup }: { pickup: Pickup }) {
  * writing. A session row opens the session; a task row starts a session
  * that continues the task. Nothing when there is no place.
  */
-export function PickupRows({ pickups, busy, onTask }: { pickups: readonly Pickup[]; busy: boolean; onTask: (opening: string) => void }) {
+export function PickupRows({ pickups, busy, onTask }: { pickups: readonly Pickup[]; busy: boolean; onTask: (press: Press) => void }) {
 	if (pickups.length === 0) return null;
 	return (
 		<ul data-slot="topic-pickups" className="flex flex-col">
@@ -43,7 +43,7 @@ export function PickupRows({ pickups, busy, onTask }: { pickups: readonly Pickup
 								</Link>
 							</Button>
 						) : (
-							<Button variant="quiet" data-slot="topic-pickup" data-kind="task" className={TWO_LINE_ROW} disabled={busy} onClick={() => onTask(pickup.opening)}>
+							<Button variant="quiet" data-slot="topic-pickup" data-kind="task" className={TWO_LINE_ROW} disabled={busy} onClick={() => onTask(pickup.press)}>
 								{lines}
 							</Button>
 						)}

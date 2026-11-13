@@ -1,8 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, TopicLevel, TopicReview } from "../src/core/index.ts";
+import { resumableSession } from "../components/nav/session-state.ts";
 import {
-	activeSession,
 	buildInbox,
 	linkStarts,
 	monogram,
@@ -157,20 +157,28 @@ describe("unitStatus", () => {
 });
 
 describe("the topic page", () => {
-	it("puts the session waiting on the learner first, before a newer or running one, and none when nothing waits or runs", () => {
+	it("puts the session waiting on the learner first, then a running one, then one stopped mid-turn, and none when all finished", () => {
 		const waiting = chat("waiting", { pendingQuestion: true, updatedAt: "2026-11-07T09:00:00.000Z" });
 		const running = chat("running", { busy: true, updatedAt: "2026-11-08T10:00:00.000Z" });
+		const stopped = chat("stopped", { ended: "cut", updatedAt: "2026-11-08T11:00:00.000Z" });
 		const newer = chat("newer", { updatedAt: "2026-11-08T09:00:00.000Z" });
-		assert.equal(activeSession([newer, running, waiting])?.id, "waiting");
-		assert.equal(activeSession([newer, running])?.id, "running");
-		assert.equal(activeSession([newer]), null);
+		assert.equal(resumableSession([stopped, newer, running, waiting])?.id, "waiting");
+		assert.equal(resumableSession([stopped, newer, running])?.id, "running");
+		assert.equal(resumableSession([newer, stopped])?.id, "stopped");
+		assert.equal(resumableSession([newer]), null);
+	});
+
+	it("lists a session holding an open task of the topic under it, though its transcript names another", () => {
+		const sheet = chat("sheet", { topics: ["rank"], tasks: ["sheet-4"] });
+		assert.deepEqual(topicSessions([sheet], "la", { handle: "kernel" as TopicHandle, tasks: ["sheet-4"] }).map((c) => c.id), ["sheet"]);
+		assert.deepEqual(topicSessions([sheet], "la", { handle: "kernel" as TopicHandle, tasks: [] }), [], "a task the engine closed links nothing");
 	});
 
 	it("lists a session started on the topic's page under it before its transcript names the topic", () => {
 		const chats = [chat("new", { topics: [] }), chat("rank-take", { topics: ["rank"] })];
 		const linked = linkStarts(chats, { new: "rank" });
 		assert.deepEqual(
-			topicSessions(linked, "la", "rank")
+			topicSessions(linked, "la", { handle: "rank" as TopicHandle, tasks: [] })
 				.map((c) => c.id)
 				.sort(),
 			["new", "rank-take"],

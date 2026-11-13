@@ -18,7 +18,7 @@ export interface ResumeProps {
 	/** Does the page's action: opens its session, or starts one with its opening. */
 	onAct: () => void;
 	/** Starts a new lesson whose first message is `opening`. */
-	onStart: (opening: string) => void;
+	onStart: (opening: string, from?: string) => void;
 	/** Starts a new lesson with the typed message. */
 	onSend: () => void;
 	/** Opens a session, handing it `message` first when given. */

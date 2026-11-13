@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { examText } from "@/components/start/course-facts";
-import { sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState } from "@/components/nav/session-state";
 
 /** "Span", "Span and Rank", "Span, Rank and more": at most two titles,
  *  never a count. Pure. */
@@ -153,6 +153,13 @@ export function addDays(date: string, days: number): string {
 export function studyQuestion(hour: number): string {
 	const when = hour >= 5 && hour < 12 ? "this morning" : hour >= 12 && hour < 18 ? "this afternoon" : hour >= 18 && hour < 22 ? "this evening" : "tonight";
 	return `What are we studying ${when}?`;
+}
+
+/** The session a course's Continue opens instead of starting one: the one
+ *  that waits on him, is being written or stopped, in the course; null
+ *  when none does and Continue starts the course's next step. Pure. */
+export function courseContinue(chats: readonly ChatListItem[], workspace: string): ChatListItem | null {
+	return resumableSession(chats.filter((c) => c.course?.workspace === workspace));
 }
 
 /** Sessions whose turn is the learner's, most recent first. Pure. */

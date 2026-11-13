@@ -103,7 +103,7 @@ function SessionEntryItem({ entry, opensAtFirst, ends }: { entry: SessionEntry; 
 					</Button>
 				</CollapsibleTrigger>
 				<CollapsibleContent className="col-span-full row-start-2 pl-8">
-					<PlanMap steps={lessonSteps(plan)} currentWord={state === "idle" ? "Left off here" : "Now"} />
+					<PlanMap steps={lessonSteps(plan)} currentWord={state === "paused" || state === "finished" ? "Left off here" : "Now"} />
 				</CollapsibleContent>
 			</li>
 		</Collapsible>

@@ -81,7 +81,8 @@ export interface LhMarkerMessage {
 		| "practice-thinking"
 		| "practice-next"
 		| "problem-dismissed"
-		| "compaction";
+		| "compaction"
+		| "session-resume";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -293,6 +294,28 @@ export function sessionModesOf(messages: readonly LhMessage[], initial: SessionM
 /** The mode the session is in now: the one its next turn runs. */
 export function sessionModeOf(messages: readonly LhMessage[], initial: SessionMode = "teach"): SessionMode {
 	return foldModes(messages, initial).now;
+}
+
+/** The opening of a fresh session that picks up a finished lesson
+ *  (`from`): model-facing (sessionResumeText), and it stands for the
+ *  concluded probe and the plan, which the record's tree carries over. It
+ *  also carries the open tasks the lesson held, so the new session holds
+ *  them from its first message. */
+export function newSessionResumeMessage(from: { id: string; title: string }, text: string, tasks: readonly string[]): LhMarkerMessage {
+	return {
+		id: `resume_${from.id}_${newMessageId()}`,
+		role: "custom",
+		customType: "session-resume",
+		content: text,
+		display: true,
+		details: { from: from.id, title: from.title, tasks: [...tasks] },
+		timestamp: Date.now(),
+	};
+}
+
+/** Does the session pick up an earlier lesson (a session-resume opening)? */
+export function resumesLesson(messages: readonly LhMessage[]): boolean {
+	return messages.some((m) => m.role === "custom" && m.customType === "session-resume");
 }
 
 /** The plan presentation block: pure UI history (a frozen snapshot), no
@@ -546,6 +569,31 @@ export function sessionTopicsOf(messages: readonly LhMessage[], planNodeIds: rea
 	}
 	for (const id of planNodeIds) topics.add(id);
 	return [...topics];
+}
+
+/** The engine tasks a session holds: each task key its saves that went
+ *  through last wrote as open (a task patch, or the `focus`), or that the
+ *  lesson it picked up held, and never removed after (a `null` entry). Which of them the engine still has open,
+ *  and at which step, is the engine's to say. Pure. */
+export function sessionTasksOf(messages: readonly LhMessage[]): string[] {
+	const clean = cleanToolCallIds(messages);
+	const held = new Map<string, boolean>();
+	for (const m of messages) {
+		if (m.role === "custom" && m.customType === "session-resume") {
+			for (const key of strings((m.details as { tasks?: unknown } | null)?.tasks)) held.set(key, true);
+		}
+		if (m.role !== "assistant") continue;
+		for (const block of m.content) {
+			if (block.type !== "toolCall" || block.name !== "course_save" || !clean.has(block.id)) continue;
+			const changes = (block.arguments as { changes?: unknown }).changes as { tasks?: unknown; focus?: unknown } | null | undefined;
+			if (typeof changes !== "object" || changes === null) continue;
+			if (typeof changes.tasks === "object" && changes.tasks !== null) {
+				for (const [key, patch] of Object.entries(changes.tasks)) held.set(key, patch !== null);
+			}
+			if (typeof changes.focus === "string") held.set(changes.focus, true);
+		}
+	}
+	return [...held].filter(([, open]) => open).map(([key]) => key);
 }
 
 /** The conclusion's reveal (owner round, 2026-10-05): the hero of a
@@ -960,7 +1008,7 @@ export type RequestCause = "foreground" | "background";
 export type ReconstructedCause = RequestCause | "ambiguous";
 export type NativeInputCause = "learner" | "automatic" | "neutral" | "unrecognizable";
 /** Markers that carry context, never a new input. */
-const NEUTRAL_MARKERS = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction"];
+export const NEUTRAL_MARKERS: readonly string[] = ["graph-context", "course-context", "session-mode", "plan-block", "problem-dismissed", "compaction", "session-resume"];
 
 /** Whether a message is an input that starts a new agent turn: exactly
  *  the messages `nativeInputCause` does not call neutral, decided without

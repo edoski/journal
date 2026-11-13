@@ -5,12 +5,12 @@ import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
-import { sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState } from "@/components/nav/session-state";
 import { shortTimeAgo } from "@/components/sidebar-next";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
-import { activeSession, monogram, unitStatus, type Unit } from "@/components/unit-inbox/units";
+import { monogram, unitStatus, type Unit } from "@/components/unit-inbox/units";
 import { cn } from "@/lib/utils";
 
 /** A course's 16px mark, T3 Code's project monogram: its initials in a
@@ -50,7 +50,7 @@ const STATUS_SLOT =
  *  topic. Shown on hover and on keyboard focus. */
 function RowAction({ unit, className }: { unit: Unit; className?: string }) {
 	const { start, starting } = useStartUnit();
-	const resume = activeSession(unit.sessions);
+	const resume = resumableSession(unit.sessions);
 	const label = resume ? "Resume" : STUDY_WORDS;
 	const Icon = resume ? PlayIcon : SquarePenIcon;
 	const props = {

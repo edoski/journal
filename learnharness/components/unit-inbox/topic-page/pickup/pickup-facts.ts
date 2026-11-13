@@ -2,7 +2,7 @@ import { shelfOf } from "@/components/unit-inbox/units";
 import { isPlanned, nextSteps, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { resumeLine, type ResumeIcon } from "@/components/unit-inbox/topic-page/resume/resume-facts";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
-import { nextReviewWords, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { nextReviewWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 
 /**
@@ -45,8 +45,8 @@ export interface NowItem {
  *  written, a review that is due, or an open task that holds the topic. */
 export type NextItem =
 	| { kind: "session"; entry: SessionEntry }
-	| { kind: "review"; words: string; opening: string }
-	| { kind: "task"; key: string; title: string; step: string | null; opening: string };
+	| { kind: "review"; words: string; press: Press }
+	| { kind: "task"; key: string; title: string; step: string | null; press: Press };
 
 export interface PickupSections {
 	now: NowItem;
@@ -79,7 +79,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 	// learned would repeat the head's standing, which is no action.
 	const words = line.kind === "study" ? "Nothing due" : action.kind === "continue" && !action.task ? "Keep learning" : line.words;
 	const base = { kind: line.kind, icon: line.icon, words, press: line.press, chat: null, title: null, step: null, detail: line.detail, then: null };
-	if (action.kind === "resume" || action.kind === "open") {
+	if ("chat" in action) {
 		const entry = facts.sessions.find((e) => e.chat.id === action.chat.id);
 		const steps = entry && isPlanned(entry) ? planSteps(entry) : { step: null, then: null };
 		return { ...base, chat: action.chat.id, title: action.chat.title, step: steps.step ? { lead: "Stopped on", title: steps.step } : null, detail: steps.step ? null : line.detail, then: steps.then };
@@ -99,15 +99,15 @@ export function nowItem(facts: TopicFacts): NowItem {
  *  on him, then one the tutor is writing in, a due review the action does
  *  not already start, then each open task the action does not continue. */
 export function nextItems(facts: TopicFacts, now: NowItem): NextItem[] {
-	const sessions = facts.sessions.filter((entry) => entry.chat.id !== now.chat && entry.state !== "idle");
+	const sessions = facts.sessions.filter((entry) => entry.chat.id !== now.chat && entry.state !== "finished");
 	const waiting = [...sessions.filter((entry) => entry.state === "your-turn"), ...sessions.filter((entry) => entry.state === "working")];
 	const review =
 		facts.action.kind !== "review" && shelfOf(facts.topic, null) === "review"
-			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due", opening: `Review ${facts.topic.title}` }]
+			? [{ kind: "review" as const, words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due", press: { opening: `Review ${facts.topic.title}` } }]
 			: [];
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
 	const tasks = facts.pickups.flatMap((pickup): NextItem[] =>
-		pickup.kind === "task" && pickup.task.key !== taken ? [{ kind: "task", key: pickup.task.key, title: pickup.title, step: pickup.task.step, opening: pickup.opening }] : [],
+		pickup.kind === "task" && pickup.task.key !== taken ? [{ kind: "task", key: pickup.task.key, title: pickup.title, step: pickup.task.step, press: pickup.press }] : [],
 	);
 	return [...waiting.map((entry): NextItem => ({ kind: "session", entry })), ...review, ...tasks];
 }

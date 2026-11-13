@@ -1,6 +1,6 @@
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import type { CourseMap, CourseMapTopic } from "@/src/core";
-import { ACTION_WORDS, WRITING, topicAction, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { ACTION_WORDS, WRITING, topicAction, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
  * What the hybrid topic page's resume options say (spec: resume.md), pure,
@@ -79,8 +79,11 @@ export interface ResumeChip {
 	key: string;
 	icon: ResumeIcon;
 	words: string;
-	does: { kind: "open"; chat: string } | { kind: "start"; opening: string };
+	does: { kind: "open"; chat: string } | { kind: "start"; opening: string; from?: string };
 }
+
+/** A press as a chip does it. */
+const chipDoes = (press: Press): ResumeChip["does"] => ("open" in press ? { kind: "open", chat: press.open.id } : { kind: "start", opening: press.opening, ...(press.from ? { from: press.from } : {}) });
 
 /** What the action's chip says: the press and its object, in a few words. */
 function actionChip(facts: TopicFacts): ResumeChip {
@@ -94,10 +97,10 @@ function actionChip(facts: TopicFacts): ResumeChip {
 		}
 		case "review":
 			return { key: "action", icon: "review", words: "Start a review", does: { kind: "start", opening: action.opening } };
-		case "continue":
-			return action.task
-				? { key: "action", icon: "task", words: `Continue ${action.task.title}`, does: { kind: "start", opening: action.opening } }
-				: { key: "action", icon: "standing", words: "Keep learning", does: { kind: "start", opening: action.opening } };
+		case "continue": {
+			const does = chipDoes("chat" in action ? { open: action.chat } : action);
+			return action.task ? { key: "action", icon: "task", words: `Continue ${action.task.title}`, does } : { key: "action", icon: "standing", words: "Keep learning", does };
+		}
 		case "start":
 			return { key: "action", icon: "standing", words: "Start learning", does: { kind: "start", opening: action.opening } };
 		case "study":
@@ -110,7 +113,7 @@ function actionChip(facts: TopicFacts): ResumeChip {
 export function resumeChips(facts: TopicFacts): ResumeChip[] {
 	const taken = facts.action.kind === "continue" ? facts.action.task?.key : undefined;
 	const tasks = facts.pickups.flatMap((pickup): ResumeChip[] =>
-		pickup.kind === "task" && pickup.task.key !== taken ? [{ key: `task:${pickup.task.key}`, icon: "task", words: `Continue ${pickup.task.title}`, does: { kind: "start", opening: pickup.opening } }] : [],
+		pickup.kind === "task" && pickup.task.key !== taken ? [{ key: `task:${pickup.task.key}`, icon: "task", words: `Continue ${pickup.task.title}`, does: chipDoes(pickup.press) }] : [],
 	);
 	return [actionChip(facts), ...tasks];
 }

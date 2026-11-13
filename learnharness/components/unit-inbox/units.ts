@@ -104,9 +104,12 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 	const units: Unit[] = [];
 	for (const { map } of scoped) {
 		const course = { workspace: map.workspace, title: map.title };
+		const inCourse = chats.filter((c) => c.course?.workspace === map.workspace);
 		for (const topic of map.topics) {
 			const key = unitKey(map.workspace, topic.handle);
-			const sessions = [...(sessionsOf.get(key) ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+			const named = sessionsOf.get(key) ?? [];
+			const holding = inCourse.filter((c) => !named.includes(c) && holdsTaskOf(c, topic));
+			const sessions = [...named, ...holding].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 			const now = nowOf(sessions);
 			const shelf = shelfOf(topic, now);
 			if (shelf) units.push({ key, course, topic, shelf, sessions, now });
@@ -174,15 +177,15 @@ export const LEVEL_WORDS: Record<CourseMapTopic["level"], string> = {
 	transferred: "Used in a new setting",
 };
 
-/** The session a unit's page puts first, the one to resume: one waiting
- *  on the learner, else one the tutor writes in, else none. Pure. */
-export function activeSession(sessions: readonly ChatListItem[]): ChatListItem | null {
-	return sessions.find((c) => sessionState(c) === "your-turn") ?? sessions.find((c) => sessionState(c) === "working") ?? null;
-}
+/** Whether a session holds an open task the engine says holds the topic. */
+const holdsTaskOf = (chat: ChatListItem, topic: Pick<CourseMapTopic, "tasks">) => (chat.tasks ?? []).some((key) => topic.tasks.includes(key));
 
-/** A topic's sessions in its course, newest first. Pure. */
-export function topicSessions(chats: readonly ChatListItem[], workspace: string, handle: string): ChatListItem[] {
-	return chats.filter((c) => c.course?.workspace === workspace && (c.topics ?? []).includes(handle)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+/** A topic's sessions in its course, newest first: those whose transcript
+ *  names it, and those holding an open task that holds it. Pure. */
+export function topicSessions(chats: readonly ChatListItem[], workspace: string, topic: Pick<CourseMapTopic, "handle" | "tasks">): ChatListItem[] {
+	return chats
+		.filter((c) => c.course?.workspace === workspace && ((c.topics ?? []).includes(topic.handle) || holdsTaskOf(c, topic)))
+		.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 /** Sessions started on a topic's page, by session id: the topic's handle.

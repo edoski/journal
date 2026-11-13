@@ -1502,6 +1502,10 @@ export function Chat({
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
 									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} />
+								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
+								// A session that picks up an earlier lesson opens teaching:
+								// the plan carried over, so no probe or planning came first.
+								<PhaseDivider key={m.id || `m-${mi}`} phase="teach" variant={design} />
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-probe-handoff") ? (
 								// The probe→teach handoff wake (custom-message scheme): the
 								// PLANNING DIVIDER IS the seam (owner ruling 2026-09-26 — it

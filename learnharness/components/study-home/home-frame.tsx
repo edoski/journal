@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CoursesUnavailable } from "@/components/course-picker";
 import { SetupDialog } from "@/components/setup-dialog";
@@ -7,7 +8,7 @@ import { SidebarToggle } from "@/components/sidebar";
 import { CONTINUE_OPENING } from "@/components/start/course-facts";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
-import { todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { courseContinue, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { useStudyHome, type StudyHomeState } from "@/components/study-home/use-study-home";
 import type { StudyCourse } from "@/src/core";
 
@@ -20,7 +21,7 @@ export interface HomeReady {
 	/** The courses, in Today's order. */
 	courses: readonly StudyCourse[];
 	busy: boolean;
-	/** Take up a course's next step. */
+	/** Take up a course's next step, or open the course's session that waits, is being written or stopped. */
 	onContinue: (workspace: string) => void;
 }
 
@@ -84,6 +85,7 @@ function HomeBody({
 	onStart: (opening: string, workspace: string) => void;
 	children: (home: HomeReady) => React.ReactNode;
 }) {
+	const router = useRouter();
 	switch (state.status) {
 		case "loading":
 			return <Notice>Reading your courses…</Notice>;
@@ -111,7 +113,11 @@ function HomeBody({
 						lessons: rows.map(lessonOf),
 						courses: rows.flatMap((r): StudyCourse[] => (r.course ? [r.course] : [])),
 						busy,
-						onContinue: (workspace) => onStart(CONTINUE_OPENING, workspace),
+						onContinue: (workspace) => {
+							const chat = courseContinue(state.chats, workspace);
+							if (chat) router.push(`/chat/${chat.id}`);
+							else onStart(CONTINUE_OPENING, workspace);
+						},
 					})}
 					{!quiet && state.failed.length > 0 && (
 						<p className="shrink-0 text-row text-muted-foreground">

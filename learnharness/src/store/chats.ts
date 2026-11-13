@@ -15,7 +15,8 @@ import type { ChatStore } from "../core/ports.ts";
 import type { ChatRecord, ChatSettings, ChatSummary, CourseLink, ExtractionRunUsage, PlanTree, TurnUsage } from "../core/contracts.ts";
 import { CURRENT_CHAT_VERSION } from "../core/contracts.ts";
 import type { LhMessage } from "../core/native-messages.ts";
-import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { activeProblemOf, danglingQuestionOf, sessionModeOf, sessionTasksOf, sessionTopicsOf } from "../core/native-messages.ts";
+import { sessionEndOf } from "../core/session-end.ts";
 import { phaseAt3Lh } from "../core/phases.ts";
 import { removeLeftoverTemps, writeFileAtomicSync } from "./atomic-write.ts";
 
@@ -113,6 +114,8 @@ function listChats(): ChatSummary[] {
 						// is refused while one is active.
 						pendingProblem: activeProblemOf(messages) !== null,
 						topics: sessionTopicsOf(messages, tree?.nodes.map((n) => n.id)),
+						ended: sessionEndOf(messages, tree, summary.kind),
+						tasks: sessionTasksOf(messages),
 					};
 				} catch (err) {
 					console.error(`[chat ${summary.id}] summary projection failed:`, err);

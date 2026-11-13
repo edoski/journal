@@ -112,7 +112,7 @@ describe("Now", () => {
 				["review", "Review overdue by 2 days", "Review", null, null, null, null],
 				["continue", "Problem sheet 4", "Continue", null, null, "Part (c)", null],
 				["start", "Not started", "Start", null, null, null, null],
-				["continue", "Keep learning", "Continue", null, `Yesterday's lesson stopped on ${DET_STOPPED}`, null, null],
+				["continue", "Keep learning", "Continue", "chat_demo_det", `Stopped on ${DET_STOPPED}`, null, null],
 				["study", "Nothing due", "Study", null, null, null, null],
 			],
 		);

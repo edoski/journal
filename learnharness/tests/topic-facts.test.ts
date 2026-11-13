@@ -141,7 +141,9 @@ describe("the page's one action", () => {
 	it("starts a topic not started, and continues one still being learned", () => {
 		assert.deepEqual(topicAction(TOPICS.eigen, MAP, []), { kind: "start", opening: "Eigenvalues and eigenvectors" });
 		assert.deepEqual(topicAction(TOPICS.cramer, MAP, []), { kind: "continue", opening: "Continue Cramer's rule", task: null });
-		assert.deepEqual(topicAction(TOPICS.determinant, MAP, [chat()]), { kind: "continue", opening: "Continue Determinants as volume scaling", task: null });
+		const finished = chat();
+		assert.deepEqual(topicAction(TOPICS.determinant, MAP, [finished]), { kind: "continue", chat: finished, task: null }, "Continue reopens the finished lesson");
+		assert.deepEqual(topicAction(TOPICS.determinant, MAP, [chat({ kind: "practice" })]), { kind: "continue", opening: "Continue Determinants as volume scaling", task: null }, "a finished practice round is not reopened");
 	});
 
 	it("only offers Study when the engine has dated the next review", () => {
@@ -313,7 +315,7 @@ describe("where to pick the topic back up", () => {
 			],
 		);
 		const task = rows[1]!;
-		assert.equal(task.kind === "task" && task.opening, "Continue Problem sheet 4: rank and nullity");
+		assert.deepEqual(task.kind === "task" && task.press, { opening: "Continue Problem sheet 4: rank and nullity" });
 	});
 
 	it("calls a task with no step unfinished, and gives nothing when there is no place", () => {
@@ -335,7 +337,7 @@ describe("the topic's sessions", () => {
 			[
 				[newest.id, "your-turn", "Today"],
 				[second.id, "your-turn", "Yesterday"],
-				[old.id, "idle", "2w ago"],
+				[old.id, "finished", "2w ago"],
 			],
 		);
 		assert.deepEqual(

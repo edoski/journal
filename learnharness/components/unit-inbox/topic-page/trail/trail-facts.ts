@@ -43,7 +43,7 @@ export function trailDays(sessions: readonly SessionEntry[], attempts: readonly 
 
 /** The session whose steps show at first: the one the page's action opens. */
 export function opensAtFirst(action: TopicAction): string | null {
-	return action.kind === "resume" || action.kind === "open" ? action.chat.id : null;
+	return "chat" in action ? action.chat.id : null;
 }
 
 /** A lesson's steps in teaching order, marked as the lesson marks them:

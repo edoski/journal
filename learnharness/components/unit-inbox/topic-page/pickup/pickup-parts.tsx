@@ -102,7 +102,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} />;
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
-						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.opening)} className={ONE_LINE_ROW}>
+						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={ONE_LINE_ROW}>
 							{item.kind === "task" ? <BookmarkIcon aria-label="Open task" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
 							<span className="truncate text-row text-foreground">{item.kind === "task" ? item.title : item.words}</span>
 							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" ? item.step : null}</span>

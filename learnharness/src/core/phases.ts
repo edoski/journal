@@ -86,6 +86,9 @@ function advance(
 		// plan → teach only via the first nodeId-tagged question CALL (the call,
 		// not its answer — an errored-and-retried call still proves teaching
 		// began, and the retry lands in the same group anyway).
+		// A session that picks up an earlier lesson starts teaching: its
+		// plan carried over, so no probe or plan of its own.
+		if (part.type === "data-session-resume") phase = "teach";
 		if (
 			phase === "probe" && part.type === "tool-probe_done" && part.state === "output-available" &&
 			(part.output as { ok?: unknown } | null | undefined)?.ok !== false
@@ -171,7 +174,9 @@ export function phaseAt3Lh(messages: readonly LhMessage[], upToIndex?: number): 
 	for (let i = 0; i <= last; i++) {
 		const m = messages[i]!;
 		const role = (m as { role?: string }).role;
-		if (role === "toolResult") {
+		if (role === "custom" && (m as { customType?: string }).customType === "session-resume") {
+			phase = "teach";
+		} else if (role === "toolResult") {
 			if (phase === "probe" && concluded.has(m.id)) phase = "plan";
 		} else if (role === "assistant") {
 			const content = (m as { content?: ReadonlyArray<{ type?: string; name?: string; arguments?: unknown }> }).content ?? [];

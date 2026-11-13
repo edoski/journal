@@ -16,7 +16,7 @@ import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic
 import { HYBRID_COLUMN, HybridTopic, type HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { freshAction } from "@/components/unit-inbox/topic-page/resume/resume-facts";
 import { newLessonPlaceholder, type ResumeOption } from "@/components/unit-inbox/topic-page/resume/resume-parts";
-import { topicFacts, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { stashLessonMessage } from "@/components/lesson-message";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -28,8 +28,8 @@ export interface TopicPageProps {
 	/** Does the page's one action: opens the session, or starts one with the
 	 *  action's opening. Absent when the composer foot holds the action. */
 	onAct?: () => void;
-	/** Starts a session on an open task (a task pick-up row). */
-	onTask: (opening: string) => void;
+	/** Continues an open task (a task pick-up row). */
+	onTask: (press: Press) => void;
 }
 
 /** One body per option of the Topic switch. */
@@ -74,14 +74,15 @@ export function TopicPage({
 	const cycleComposer = useCallback((): readonly HTMLElement[] => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="composer"] textarea')), []);
 	useFieldCycle(cycleComposer);
 	const workspace = course.map.workspace;
-	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic.handle);
+	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic);
 	const topicRead = useTopicRead(
 		workspace,
 		topic.handle,
 		topic.tasks,
 		sessions.map((chat) => chat.id),
 	);
-	const start = (opening: string) => lesson.start(opening, workspace, (id) => recordStart(id, topic.handle));
+	const start = (opening: string, from?: string) => lesson.start(opening, workspace, (id) => recordStart(id, topic.handle), from);
+	const press = (does: Press) => ("open" in does ? router.push(`/chat/${does.open.id}`) : start(does.opening, does.from));
 	const send = () => {
 		if (!text.trim()) return;
 		start(openingFor(topic.title, text));
@@ -91,7 +92,7 @@ export function TopicPage({
 	const act = () => {
 		const { action } = facts;
 		if ("chat" in action) router.push(`/chat/${action.chat.id}`);
-		else start(action.opening);
+		else start(action.opening, "from" in action ? action.from : undefined);
 	};
 	/** Opens a session; a message for it waits in its page's handover. */
 	const open = (chat: string, message?: string) => {
@@ -101,9 +102,9 @@ export function TopicPage({
 	return (
 		<>
 			{pickup ? (
-				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={start} pane={pickup} />
+				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} pane={pickup} />
 			) : (
-				<Candidate facts={facts} busy={lesson.busy} onAct={Resume ? undefined : act} onTask={start} />
+				<Candidate facts={facts} busy={lesson.busy} onAct={Resume ? undefined : act} onTask={press} />
 			)}
 			<div className="shrink-0 bg-background pb-4">
 				<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>

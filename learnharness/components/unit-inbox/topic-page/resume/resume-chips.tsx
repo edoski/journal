@@ -27,7 +27,7 @@ export function ResumeChipsFoot({ facts, busy, text, onText, onSend, onStart, on
 					data-slot="composer-chip"
 					data-chip={chip.key}
 					disabled={busy}
-					onClick={() => (chip.does.kind === "open" ? onOpen(chip.does.chat) : onStart(chip.does.opening))}
+					onClick={() => (chip.does.kind === "open" ? onOpen(chip.does.chat) : onStart(chip.does.opening, chip.does.from))}
 					className="h-8 max-w-72 min-w-0 rounded-full px-3 text-row font-normal text-foreground"
 				>
 					<ResumeIconMark icon={chip.icon} facts={facts} />

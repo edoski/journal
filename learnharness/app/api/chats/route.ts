@@ -1,5 +1,5 @@
 import { chainsForSelection, formatChainLine } from "@/src/core";
-import { newGraphContextMessage, newSessionModeMessage, type GraphContextPick, type LhMessage } from "@/src/core";
+import { derivePlanStatusesLh, newGraphContextMessage, newSessionModeMessage, newSessionResumeMessage, sessionResumeText, sessionTasksOf, type GraphContextPick, type LhMessage } from "@/src/core";
 import { compactionInFlight, courseLinkFor, createChat, isTurnRunning, listChats, readSettingsRecord, stores, titleFromPrompt } from "@/src/server";
 import type { ChatListItem } from "@/src/core";
 
@@ -20,7 +20,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; graphContext?: unknown; course?: unknown; resume?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
@@ -34,6 +34,13 @@ export async function POST(req: Request) {
 	}
 	const course = await courseLinkFor(workspace);
 	if (!course) return Response.json({ error: "Unknown course", code: "unknown_course" }, { status: 400 });
+	// Continue on a finished lesson, when it starts fresh (FINISHED_LESSON):
+	// the lesson it picks up must be one of this course's.
+	const from = (body.resume as { from?: unknown } | undefined)?.from;
+	const resumed = typeof from === "string" ? stores.chatStore.getChat(from) : null;
+	if (typeof from === "string" && resumed?.course?.workspace !== workspace) {
+		return Response.json({ error: "Unknown lesson", code: "unknown_lesson" }, { status: 400 });
+	}
 	const chat = createChat(titleFromPrompt(title || "Untitled session"), course);
 	// PER-SESSION MODELS (owner, 2026-09-28): a session owns its model +
 	// thinking level from birth — stamped verbatim from the STRONG slot,
@@ -69,6 +76,15 @@ export async function POST(req: Request) {
 					.slice(0, 64)
 			: [];
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
+	if (resumed) {
+		// The lesson's plan carries over as this session's plan map, so the
+		// teacher picks it up at the step it stopped on.
+		const steps = resumed.tree?.nodes ?? [];
+		const at = resumed.tree ? derivePlanStatusesLh(resumed.tree, resumed.messages).current : null;
+		if (resumed.tree) stores.chatStore.saveTree(chat.id, resumed.tree);
+		const text = sessionResumeText(resumed.title, steps, steps.find((s) => s.id === at)?.title ?? null);
+		opening.push(newSessionResumeMessage({ id: resumed.id, title: resumed.title }, text, sessionTasksOf(resumed.messages)) as LhMessage);
+	}
 	if (picks.length > 0) {
 		const byId = new Map(stores.graphStore.readNodes().map((n) => [n.id, n]));
 		const pickedNodes = picks.map((p) => byId.get(p.id)).filter((n) => n !== undefined);

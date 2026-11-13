@@ -47,7 +47,7 @@ import { beginTurn, endTurn } from "./turn-liveness.ts";
 import { applyParkedDismissal } from "./dismissal-park.ts";
 import { registerTurn, rememberTurnFailure, unregisterTurn } from "./turn-runs.ts";
 import { persistTurn, triggerExtraction, TurnPersistenceError } from "./turn-service.ts";
-import { hasProbeDone, hasUnresolvedQuestion, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
+import { hasProbeDone, hasUnresolvedQuestion, resumesLesson, sessionModeOf, type LhMessage } from "../core/native-messages.ts";
 import type { ChatRecord, SessionMode } from "../core/contracts/chat.ts";
 import { composeInstructions } from "../agent/teacher-agent.ts";
 import { ensureCompacted, kickCompaction, effectiveThresholdTokens } from "./compaction.ts";
@@ -146,10 +146,11 @@ function resolveEngine(role: ModelRole): PiEngine | undefined {
 }
 
 /** The agent a turn over these messages runs: practice in practice mode;
- *  in teaching the prober until its probe concludes, then the teacher. */
+ *  in teaching the prober until its probe concludes, then the teacher. A
+ *  session that picks up an earlier lesson starts with the teacher. */
 function agentKindOf(messages: readonly LhMessage[], startedIn?: SessionMode): AgentKind {
 	if (sessionModeOf(messages, startedIn) === "practice") return "practice";
-	return hasProbeDone(messages) ? "teacher" : "prober";
+	return hasProbeDone(messages) || resumesLesson(messages) ? "teacher" : "prober";
 }
 
 function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {

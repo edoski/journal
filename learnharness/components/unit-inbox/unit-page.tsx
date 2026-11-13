@@ -12,7 +12,7 @@ import { BrailleSpinner } from "@/components/braille-spinner";
 import { useLessonStart } from "@/components/start/use-lesson-start";
 import { NavRow, NavRowLabel, NavRowTrailing } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
-import { sessionState } from "@/components/nav/session-state";
+import { resumableSession, sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
 import { useDesignVariant, usePickupVariant, useResumeVariant, useTopicVariant } from "@/components/design-variant";
@@ -21,7 +21,7 @@ import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/
 import { RESUME_FEET } from "@/components/unit-inbox/topic-page/resume/resume-options";
 import { PICKUP_PANES } from "@/components/unit-inbox/topic-page/pickup/pickup-options";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
-import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
+import { LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
@@ -137,8 +137,8 @@ function UnitBody({
 	const [starts, recordStart] = useTopicStarts();
 	const [text, setText] = useState("");
 	const workspace = course.map.workspace;
-	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic.handle);
-	const active = activeSession(sessions);
+	const sessions = topicSessions(linkStarts(chats, starts), workspace, topic);
+	const active = resumableSession(sessions);
 	const others = sessions.filter((c) => c !== active);
 	const send = () => {
 		if (!text.trim()) return;

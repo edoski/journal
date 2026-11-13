@@ -31,10 +31,10 @@ const { deliverJobResult, setTurnRunner } = await import("../src/server/jobs.ts"
 const { runningTurn } = await import("../src/server/turn-runs.ts");
 const { createPracticeAgent, createProberAgent, createTeacherAgent } = await import("../src/agent/teacher-agent.ts");
 const { newUserMessage } = await import("../src/core/native-messages.ts");
-const { sessionState } = await import("../components/nav/session-state.ts");
+const { continueMove, resumableSession, sessionState } = await import("../components/nav/session-state.ts");
 const { topicAction } = await import("../components/unit-inbox/topic-page/topic-facts.ts");
 const { todayRows, waitingSessions } = await import("../components/study-home/study-facts.ts");
-const { activeSession, buildInbox, topicSessions } = await import("../components/unit-inbox/units.ts");
+const { buildInbox, topicSessions } = await import("../components/unit-inbox/units.ts");
 const { SessionStarter } = await import("../components/start-session.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
 writeSettings({ version: 1, models: { strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } } } });
@@ -135,20 +135,20 @@ describe("a lesson waiting on his typed answer", () => {
 		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
 
 		for (const t of [RANK, KERNEL]) {
-			const sessions = topicSessions(listed(), WS, t.handle);
+			const sessions = topicSessions(listed(), WS, t);
 			const action = topicAction(t, MAP, sessions);
 			assert.equal(action.kind, "resume", `${t.title}: the page's action resumes the lesson`);
 			assert.equal("chat" in action ? action.chat.id : null, id);
 			const unit = buildInbox([COURSE], listed(), WS).active.find((u) => u.topic.handle === t.handle);
 			assert.equal(unit?.now, "your-turn", `${t.title}: the sidebar row says your turn`);
-			assert.equal(activeSession(unit!.sessions)?.id, id, `${t.title}: the sidebar row's action resumes it`);
+			assert.equal(resumableSession(unit!.sessions)?.id, id, `${t.title}: the sidebar row's action resumes it`);
 		}
 		chatStore.deleteChat(id);
 	});
 
 	it("is picked up when the tutor's turn was cut short, not restarted", () => {
 		const id = seedLesson(assistant([fauxText("Part (c) asks")], "error"));
-		const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL.handle));
+		const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
 		assert.ok("chat" in action && action.chat.id === id, "Continue opens the lesson the tutor stopped in");
 		chatStore.deleteChat(id);
 	});
@@ -201,7 +201,7 @@ async function send(chatId: string, text: string, factory: Parameters<typeof han
 /** What the topic page's Continue does: open the session it names, else
  *  create one through the chat route and send its opening. */
 async function pressContinue(factory: Parameters<typeof handleChatRequest>[1]): Promise<string> {
-	const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL.handle));
+	const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
 	if ("chat" in action) return action.chat.id;
 	const res = await POST(new Request("http://test/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: action.opening, course: { workspace: WS } }) }));
 	const { id } = (await res.json()) as { id: string };
@@ -262,5 +262,56 @@ describe("two rapid presses", () => {
 		const [a, b] = await Promise.all([starter.start(body, fetchLike), starter.start(body, fetchLike)]);
 		assert.equal(posts, 1, "one session is created");
 		assert.equal(a, b, "both presses open it, and its opening is sent once from there");
+	});
+});
+
+// ─── a finished lesson ──────────────────────────────────────────────────────
+
+describe("Continue on a finished lesson", () => {
+	const CLOSE = "Part (c) done: dim ker A = 2. Next time, part (d).";
+	const finishedLesson = () => {
+		const id = seedLesson(assistant([fauxText(CLOSE)], "stop"));
+		const messages = chatStore.getChat(id)!.messages;
+		const closing = messages.pop()!;
+		chatStore.saveMessages(id, [
+			...messages,
+			assistant([callBlock("q-c", "explain", { type: "check", nodeId: "sheet-c", question: "dim ker A?", correctAnswer: "2" })]),
+			result("q-c", "explain", { kind: "explain", text: "2", confidence: "confident" }),
+			closing,
+		]);
+		return id;
+	};
+
+	it("reopens it by default", () => {
+		const id = finishedLesson();
+		assert.equal(sessionState(item(id)), "finished", "the last step was asked and the tutor closed");
+		const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+		assert.deepEqual(action.kind === "continue" && "chat" in action ? action.chat.id : null, id);
+		chatStore.deleteChat(id);
+	});
+
+	it("with the switch on fresh, starts one session that skips the probe and keeps the plan", async () => {
+		const id = finishedLesson();
+		const move = continueMove(topicSessions(listed(), WS, KERNEL), "fresh");
+		assert.equal(move?.kind, "fresh");
+		const { seen, factory } = scripted("We stopped at part (c), which you finished. Part (d): is A onto?");
+		const create = () =>
+			POST(new Request("http://test/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: `Continue ${SHEET.title}`, course: { workspace: WS }, resume: { from: id } }) }));
+		const { id: fresh } = (await (await create()).json()) as { id: string };
+		await send(fresh, `Continue ${SHEET.title}`, factory);
+
+		assert.deepEqual(seen.map((s) => s.agent), ["teacher"], "the fresh session opens with the teacher");
+		assert.ok(!seen[0]!.prompt.includes(ROUTING_STEP));
+		const record = chatStore.getChat(fresh)!;
+		assert.deepEqual(record.tree?.nodes.map((node) => node.id), TREE.nodes.map((node) => node.id), "the plan carries over");
+		const calls = record.messages.flatMap((m) => (m.role === "assistant" ? m.content.filter((b) => b.type === "toolCall").map((b) => b.name) : []));
+		assert.deepEqual(calls.filter((c) => PROBE_OR_PLAN.has(c)), [], "no probe question and no new plan");
+		assert.deepEqual(item(fresh).tasks, ["sheet-4"], "it holds the task the lesson held");
+		assert.equal(sessionState(item(fresh)), "your-turn", "its reconnecting question waits on him");
+
+		const again = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+		assert.ok("chat" in again && again.chat.id === fresh, "a second Continue opens the fresh session, never a third");
+		chatStore.deleteChat(id);
+		chatStore.deleteChat(fresh);
 	});
 });

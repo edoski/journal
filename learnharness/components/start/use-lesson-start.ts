@@ -22,7 +22,7 @@ export function useLessonStart(initialConfigured: boolean) {
 	const [error, setError] = useState<string | null>(null);
 	const [setupOpen, setSetupOpen] = useState(false);
 
-	const start = (opening: string, workspace: string, onCreated?: (chatId: string) => void) => {
+	const start = (opening: string, workspace: string, onCreated?: (chatId: string) => void, from?: string) => {
 		if (busy) return;
 		if (!configured || zeroKeys) return setSetupOpen(true);
 		const strong = catalog?.slots.strong?.model;
@@ -30,7 +30,7 @@ export function useLessonStart(initialConfigured: boolean) {
 		setBusy(true);
 		setError(null);
 		void starter.current
-			.start({ title: opening, course: { workspace } }, fetch, JSON.stringify(catalog?.slots.strong))
+			.start({ title: opening, course: { workspace }, ...(from ? { resume: { from } } : {}) }, fetch, JSON.stringify(catalog?.slots.strong))
 			.then((target) => {
 				onCreated?.(target.slice("/chat/".length));
 				router.push(target);

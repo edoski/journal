@@ -196,6 +196,19 @@ export const HANDOFF_TEXT =
 	"Take your time here and really think this through. " +
 	"When it's genuinely reasoned out, call plan_init and present the plan; I'll accept it or ask for changes.";
 
+/** The model-facing opening of a fresh session that picks up a finished
+ *  lesson: its plan carries over, so the teacher neither probes nor plans
+ *  again, and reconnects in one sentence from where it stopped. */
+export function sessionResumeText(title: string, steps: readonly { id: string; title: string }[], stoppedAt: string | null): string {
+	const plan = steps.length > 0 ? ` Its plan carries over, as this session's plan map: ${steps.map((s) => `${s.id} (${s.title})`).join("; ")}.` : "";
+	const where = stoppedAt ? ` It stopped at ${stoppedAt}.` : "";
+	return (
+		`[CONTINUING] This session picks up the lesson "${title}" from an earlier session.${plan}${where} ` +
+		"Do not probe and do not present a new plan. Reconnect in one sentence to where it stopped, from the course record's task step when there is one, " +
+		"then carry on with the next step, tagging its questions with the plan's node ids."
+	);
+}
+
 /** The model-facing text of a mode handoff's wake, by the mode it starts.
  *  The new agent reads what to do from the handoff call above it: the
  *  scope to practise, or the topic to teach. */
@@ -265,6 +278,13 @@ export interface PlanBlockData {
 	edges: Array<{ from: string; to: string }>;
 }
 
+/** How the tutor's last turn left a session that waits on no question or
+ *  problem it posed: its words asked him to go on partway through a lesson
+ *  ("mid-lesson"), its turn stopped before it finished, so the next word is
+ *  the tutor's ("cut"), or it ended the lesson, a practice round or a
+ *  one-off answer ("closed"). */
+export type SessionEnd = "mid-lesson" | "cut" | "closed";
+
 /** The list view's shape (messageCount instead of full messages) + the
  *  per-session status the picker renders. `phase` and `pendingQuestion`
  *  derive from the stored record (tree + messages); the store computes
@@ -297,6 +317,12 @@ export interface ChatSummary {
 	 *  (sessionTopicsOf): candidates a caller checks against the course map.
 	 *  The list always sets it; a summary made elsewhere may leave it out. */
 	topics?: readonly string[];
+	/** How the tutor's last turn left the session (sessionEndOf); a summary
+	 *  made elsewhere may leave it out, which reads as closed. */
+	ended?: SessionEnd;
+	/** The engine tasks the session last saved as open, by key
+	 *  (sessionTasksOf): the work it holds at a step the engine keeps. */
+	tasks?: readonly string[];
 	/** The record's model-control settings — rides the list payload via the
 	 *  summary spread (the picker never needs it from here; the full record
 	 *  is its source). */
