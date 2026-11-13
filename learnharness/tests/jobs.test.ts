@@ -76,7 +76,7 @@ import { providerKeyMissing, type ModelSlotName } from "../src/core/settings.ts"
 import type { PiEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
-import { subscribe } from "../src/core/events.ts";
+import { emit, subscribe } from "../src/core/events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
 
@@ -872,8 +872,8 @@ describe("researcher agent", () => {
  * (setTurnRunner) — the real wiring (chat-handler's handleChatRequest
  * adapter) never fires here, so no teacher model is touched.
  *
- * Timing: the pump polls at 400ms with a 1.5s grace after the gates open —
- * each happy-path test takes ~2s; waitFor tolerates it.
+ * Timing: the pump waits on the bus (turn-settled, record-changed) and
+ * fires as soon as the gates open; waitFor tolerates the async hops.
  */
 describe("wake pipeline (src/server/jobs.ts)", () => {
 	/** A chat with a finished job ready for delivery. */
@@ -996,6 +996,8 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 				timestamp: 1,
 			} as never,
 		]);
+		// The answer's write announces itself, as the chat handler's does.
+		emit("record-changed", { chatId });
 
 		await waitFor(() => fired > 0, 8000, "wake after the quiz answer");
 		await delivery; // now it resolves — the steer was delivered
@@ -1070,6 +1072,47 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		assert.ok(calls >= 2, "409 was retried");
 		await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "job flip after the retry");
 		assert.equal(jobStore.getJob(jobId)!.status, "done");
+	});
+
+	it("fires the moment the blocking turn settles: no poll and no grace", async () => {
+		const { chatId, steer } = setup();
+		let firedAt = 0;
+		setTurnRunner(async () => {
+			firedAt = performance.now();
+			return 200;
+		});
+		assert.ok(beginTurn(chatId));
+		const delivery = deliverJobResult(steer);
+		await delay(100);
+		assert.equal(firedAt, 0, "no wake while the turn runs");
+		const settledAt = performance.now();
+		endTurn(chatId);
+		await waitFor(() => firedAt > 0, 2000, "wake after the turn settles");
+		assert.ok(firedAt - settledAt < 200, `fired ${Math.round(firedAt - settledAt)}ms after the turn settled`);
+		await delivery;
+	});
+
+	it("after a 409 it waits for the racing turn to settle, then fires at once", async () => {
+		const { chatId, steer } = setup();
+		let calls = 0;
+		let firedAt = 0;
+		setTurnRunner(async () => {
+			calls++;
+			if (calls === 1) {
+				assert.ok(beginTurn(chatId), "a client turn races in");
+				return 409;
+			}
+			firedAt = performance.now();
+			return 200;
+		});
+		const delivery = deliverJobResult(steer);
+		await delay(100);
+		assert.equal(calls, 1, "no retry while the racing turn runs");
+		const settledAt = performance.now();
+		endTurn(chatId);
+		await waitFor(() => firedAt > 0, 2000, "retry after the racing turn settles");
+		assert.ok(firedAt - settledAt < 200, `retried ${Math.round(firedAt - settledAt)}ms after the turn settled`);
+		await delivery;
 	});
 
 	it("is idempotent: a steer already in the transcript flips the job without firing a turn", async () => {
