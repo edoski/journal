@@ -14,7 +14,7 @@ import { parseHTML } from "linkedom";
 import { PlanCard, planMapSteps } from "../components/lesson/plan-map.tsx";
 import { LessonDesignContext } from "../components/lesson/lesson-design.ts";
 import { ConfidenceChoice } from "../components/confidence-choice.tsx";
-import { QuestionDock, QuestionDockBar } from "../components/question-dock.tsx";
+import { QuestionDock, QuestionDockBar, teaserLine } from "../components/question-dock.tsx";
 import { ReadingThinkingField } from "../components/reading-thinking.tsx";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { ProblemCard, ConcludeCard, ThinkingCard } from "../components/practice-cards.tsx";
@@ -105,7 +105,12 @@ describe("the Proposed docks", () => {
 	it("a check waiting behind its reveal invites in sentence case; the reading field sits on the same dock surface", () => {
 		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" design="proposed" />);
 		const reveal = bar.querySelector('[data-testid="teach-check-reveal"]')!;
-		assert.match(reveal.textContent!, /^Check your understandingWhy is det\(A\)=0\?Open$/);
+		assert.equal(reveal.querySelectorAll(".katex").length, 1, "the formula is typeset");
+		assert.match(reveal.textContent!, /^Check your understandingWhy is /);
+		const matrix = "Let $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$. Find $\\lambda$ with **one** $$\\dfrac{a+b}{2}$$";
+		assert.equal(teaserLine(matrix), "Let $A = \\cdots$. Find $\\lambda$ with one $\\tfrac{a+b}{2}$");
+		const collapsed = documentFor(<QuestionDockBar toolName="explain" question={matrix} onExpand={() => {}} variant="reveal" design="proposed" />);
+		assert.doesNotMatch(collapsed.body.textContent!, /beginpmatrix|\*\*|\$/);
 		const field = documentFor(<ReadingThinkingField value="" revision={0} onChange={() => {}} variant="proposed" />).querySelector('[data-testid="reading-thinking-field"]')!;
 		assert.equal(field.getAttribute("data-slot"), "dock-surface");
 		assert.match(field.textContent!, /^Thinking while reading$/);
