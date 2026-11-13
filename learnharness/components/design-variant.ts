@@ -23,18 +23,29 @@ export const RESUME_OPTIONS = ["line", "target", "chips"] as const;
 /** "current" keeps the hybrid's composer as the other candidates have it. */
 export type ResumeVariant = "current" | (typeof RESUME_OPTIONS)[number];
 
+/** Where the hybrid topic page puts the lesson to pick up: in its history,
+ *  sorted by relevance (spec:
+ *  components/unit-inbox/topic-page/pickup/pickup.md). */
+export const PICKUP_OPTIONS = ["sections"] as const;
+/** "current" keeps the hybrid's dated history. */
+export type PickupVariant = "current" | (typeof PICKUP_OPTIONS)[number];
+
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only): Design is Current or Proposed; Home is Current or one of its
  *  options, Sidebar Current or Proposed, and anything but Current wears
  *  Design's Proposed; Topic is Current or one of the topic page's
  *  candidates; Resume is Current or one of the hybrid topic page's resume
- *  options, and wears Topic's hybrid. Read only through the hooks below. */
+ *  options, and wears Topic's hybrid; Pick up is Current or one of its
+ *  options, wears Topic's hybrid and turns Resume to Current, since its
+ *  pane holds the action the Resume options put in the composer. Read
+ *  only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", options: HOME_OPTIONS, requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
 	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
 	{ id: "resume", label: "Resume", options: RESUME_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
+	{ id: "pickup", label: "Pick up", options: PICKUP_OPTIONS, requires: { design: "proposed", topic: "hybrid", resume: "current" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -47,6 +58,8 @@ const readTopicCurrent = (): TopicVariant => "current";
 const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
 const readResumeCurrent = (): ResumeVariant => "current";
 const readResume = (): ResumeVariant => RESUME_OPTIONS.find((option) => option === polishVariant("resume")) ?? "current";
+const readPickupCurrent = (): PickupVariant => "current";
+const readPickup = (): PickupVariant => PICKUP_OPTIONS.find((option) => option === polishVariant("pickup")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
 
 /** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
@@ -78,4 +91,10 @@ export function useTopicVariant(): TopicVariant {
  *  composer alone. Production builds get "current". */
 export function useResumeVariant(): ResumeVariant {
 	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readResume : readResumeCurrent, readResumeCurrent);
+}
+
+/** Where the hybrid topic page puts the lesson to pick up, or "current"
+ *  for its dated history. Production builds get "current". */
+export function usePickupVariant(): PickupVariant {
+	return useSyncExternalStore(DEV ? onPolishChange : subscribeNever, DEV ? readPickup : readPickupCurrent, readPickupCurrent);
 }

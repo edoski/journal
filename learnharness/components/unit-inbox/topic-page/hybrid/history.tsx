@@ -35,7 +35,7 @@ const BELOW = "after:left-[7.5px] after:top-8 after:bottom-0";
 const THROUGH = "before:absolute before:inset-y-0 before:left-[7.5px] before:w-px before:bg-white/33";
 
 /** Where an entry sits on the line: the first has no line above its icon, the last none below. */
-interface Ends {
+export interface Ends {
 	above: boolean;
 	below: boolean;
 }
@@ -64,7 +64,7 @@ function AttemptEntry({ attempt, titleOf, ends }: { attempt: TopicAttempt; title
 /** One session: a link to it, its title, and whether it waits on him or
  *  the tutor is writing. A lesson that planned carries the button that
  *  puts its steps on the map; the lesson on the map has its row filled. */
-function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntry; shown: boolean; onShow: (id: string) => void; ends: Ends }) {
+export function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntry; shown: boolean; onShow: (id: string) => void; ends: Ends }) {
 	const { chat, state } = entry;
 	const planned = isPlanned(entry);
 	const why = state === "your-turn" ? <WhyMark kind="reply" words="Your turn" /> : state === "working" ? <WhyMark kind="writing" words="The tutor is writing" /> : null;
@@ -110,7 +110,7 @@ function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntry; show
 }
 
 /** A day: its words over its sessions, then its attempts. */
-function DayItem({ day, shown, onShow, titleOf, first, last }: { day: TrailDay; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; first: boolean; last: boolean }) {
+export function DayItem({ day, shown, onShow, titleOf, first, last }: { day: TrailDay; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; first: boolean; last: boolean }) {
 	const count = day.sessions.length + day.attempts.length;
 	const ends = (i: number): Ends => ({ above: !(first && i === 0), below: !(last && i === count - 1) });
 	return (
@@ -129,13 +129,12 @@ function DayItem({ day, shown, onShow, titleOf, first, last }: { day: TrailDay; 
 }
 
 /**
- * The topic's history (spec: hybrid.md): every session and scored attempt
- * on one dated line, newest first, in a bounded pane that scrolls inside
- * with no bar and fades the edge more of it lies past. A session row
- * opens the lesson; the map button beside a lesson that planned puts its
- * steps on the map below. Nothing when the topic has neither.
+ * The history's bounded pane (spec: hybrid.md): it scrolls inside with no
+ * bar and fades the edge more of it lies past. It reaches 12px past the
+ * column on each side and its content pads them back, so a row's bleed
+ * keeps its rounded fill inside the clip.
  */
-export function History({ days, shown, onShow, titleOf, className }: { days: readonly TrailDay[]; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; className?: string }) {
+export function HistoryPane({ className, children }: { className?: string; children: React.ReactNode }) {
 	const viewport = useRef<HTMLDivElement>(null);
 	const [edges, setEdges] = useState({ top: false, bottom: false });
 	const measure = useCallback(() => {
@@ -158,14 +157,28 @@ export function History({ days, shown, onShow, titleOf, className }: { days: rea
 			el.removeEventListener("scroll", measure);
 		};
 	}, [measure]);
-	if (days.length === 0) return null;
 	return (
 		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("-mx-3 flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
-			<ol aria-label="History" className="flex flex-col px-3">
+			<div className="flex flex-col px-3">{children}</div>
+		</ScrollArea>
+	);
+}
+
+/**
+ * The topic's history (spec: hybrid.md): every session and scored attempt
+ * on one dated line, newest first, in the bounded pane. A session row
+ * opens the lesson; the map button beside a lesson that planned puts its
+ * steps on the map. Nothing when the topic has neither.
+ */
+export function History({ days, shown, onShow, titleOf, className }: { days: readonly TrailDay[]; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; className?: string }) {
+	if (days.length === 0) return null;
+	return (
+		<HistoryPane className={className}>
+			<ol aria-label="History" className="flex flex-col">
 				{days.map((day, i) => (
 					<DayItem key={day.day} day={day} shown={shown} onShow={onShow} titleOf={titleOf} first={i === 0} last={i === days.length - 1} />
 				))}
 			</ol>
-		</ScrollArea>
+		</HistoryPane>
 	);
 }
