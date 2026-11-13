@@ -264,7 +264,7 @@ describe("routing end to end (scripted model)", () => {
 			(seen) => {
 				assert.equal(seen.agent, "practice");
 				assert.match(seen.last, /actually just explain it/);
-				return call("conclude", { outcome: "movedOn", verdict: "He asked to be taught instead.", rung: null, missClass: null, retest: false, result: "incorrect", response: "asked for an explanation" }, "c-rank");
+				return call("conclude", { outcome: "movedOn", verdict: "He asked to be taught instead.", rung: null, missClass: null, retest: false, result: null, response: "asked for an explanation" }, "c-rank");
 			},
 			() => call("teach", { topic: "rank", reason: "he asked to be taught" }, "h-teach"),
 			(seen) => {

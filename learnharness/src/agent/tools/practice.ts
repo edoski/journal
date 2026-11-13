@@ -151,7 +151,7 @@ export const concludeInputObject = Type.Object({
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
-		{ description: "REQUIRED — the rung of the strongest hint actually given, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes)." },
+		{ description: "REQUIRED — the rung of the strongest hint actually given before he answered or gave up, judged by what it said: R0 through R5, or null = no hint was given (bare, no quotes). The solution revealed after he gives up is not a hint." },
 	),
 	missClass: Type.Union(
 		[
@@ -165,9 +165,10 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the miss classification: cue, discrimination, execution, careless, or structural — or null = no miss (bare, no quotes)." },
 	),
 	retest: Type.Boolean({ description: "REQUIRED — true marks the problem for a fresh-surface retest before the session ends." }),
-	result: attemptResult(
-		"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect. A right guess is correct; his confidence travels separately.",
-	),
+	result: Type.Union([attemptResult("correct, partial or incorrect"), Type.Null()], {
+		description:
+			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
+	}),
 	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
 	chose: Type.Optional(
 		Type.String({
@@ -239,6 +240,7 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	};
 	const problem = conclusionProblem(conclusion, topics);
 	if (problem) return { refused: problem, text: "" };
+	if (conclusion.result === null) return { text: "No attempt recorded: he claimed no answer." };
 	const observations = practiceObservations(
 		{ statement: pose.statement, topics },
 		conclusion,
