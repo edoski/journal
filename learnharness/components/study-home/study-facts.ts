@@ -31,12 +31,14 @@ export function todaysReview(course: StudyCourse): CourseMapTopic[] {
 }
 
 /** What a course's Continue takes up, in the order the doctrine answers
- *  "Let's continue": today's reviews, then the open task at its step, else
- *  the current topic. `topics` are the topics it works on. */
+ *  "Let's continue": today's reviews, then the open task at its step, then
+ *  the new topics the engine's daily plan starts today, else the current
+ *  topic. `topics` are the topics it works on. A topic step is `fresh` when
+ *  it was never taught, and `planned` when today's plan starts it. */
 export type NextStep =
 	| { kind: "review"; titles: readonly string[]; topics: readonly TopicHandle[]; then: string | null }
 	| { kind: "task"; title: string; step: string | null; topics: readonly TopicHandle[] }
-	| { kind: "topic"; title: string; topics: readonly TopicHandle[] }
+	| { kind: "topic"; title: string; topics: readonly TopicHandle[]; fresh: boolean; planned: boolean }
 	| { kind: "none" };
 
 export function nextStepOf(course: StudyCourse): NextStep {
@@ -51,7 +53,11 @@ export function nextStepOf(course: StudyCourse): NextStep {
 		const held = map.topics.filter((t) => t.tasks.includes(task.key)).map((t) => t.handle);
 		return { kind: "task", title: task.title, step: task.step, topics: held.length > 0 ? held : current ? [current.handle] : [] };
 	}
-	return current ? { kind: "topic", title: current.title, topics: [current.handle] } : { kind: "none" };
+	const planned = course.newToday.flatMap((h) => map.topics.find((t) => t.handle === h) ?? []);
+	if (planned.length > 0) {
+		return { kind: "topic", title: titleList(planned.map((t) => t.title)), topics: planned.map((t) => t.handle), fresh: true, planned: true };
+	}
+	return current ? { kind: "topic", title: current.title, topics: [current.handle], fresh: current.level === "new", planned: false } : { kind: "none" };
 }
 
 /** The step as a short instruction: "Review Linear independence and Rank",
@@ -63,7 +69,7 @@ export function stepWords(step: NextStep): string {
 		case "task":
 			return `Continue ${step.title}`;
 		case "topic":
-			return `Continue ${step.title}`;
+			return `${step.fresh ? "Start" : "Continue"} ${step.title}`;
 		case "none":
 			return "Start a lesson";
 	}
