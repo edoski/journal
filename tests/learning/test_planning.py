@@ -227,13 +227,18 @@ def test_journal_rejects_invalid_window_lengths(tmp_path: Path) -> None:
 
 
 def test_plan_names_what_no_longer_fits_across_courses_and_goes_on_after_the_exam(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     topics = {f"t{index:02d}": {} for index in range(30)}
     workspace = course(
         tmp_path / "late",
         {"title": "Late", "exam": {"date": day(14)}, "topics": topics},
     )
+    entry = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    assert "does_not_fit" not in entry
+    monkeypatch.setenv("LEARNING_TODAY", day(-1))
+    records.save(workspace, {"topics": {"t00": {"introduced": True}}})
+    monkeypatch.setenv("LEARNING_TODAY", day(0))
     entry = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
     late = entry["courses"][0]["plan"]
     assert late["does_not_fit"] and late["does_not_fit"][-1] == "t29"
@@ -276,5 +281,5 @@ def test_one_course_is_planned_with_every_other(tmp_path: Path) -> None:
     every = plan(None, tmp_path / "vault", everywhere=True, days=3)
     by_title = {entry["title"]: entry for entry in every["courses"]}
     assert alone["courses"][0]["plan"] == by_title["Far"]["plan"]
-    assert by_title["Near"]["plan"]["days"][0]["new"] == ["a"]
+    assert by_title["Near"]["plan"]["days"][0]["new"] == ["a", "b"]
     assert near is not None
