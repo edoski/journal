@@ -201,14 +201,17 @@ def kept(base: date, expected: date, exam: Exam | None) -> date | None:
     return None if exam is not None and base < exam.day <= expected else expected
 
 
-def replay(topic: dict[str, Any], attempts: list[Attempt], exam: Exam | None) -> Replay:
+def replay(
+    key: str, topic: dict[str, Any], attempts: list[Attempt], exam: Exam | None
+) -> Replay:
     """Classify each attempted day and replay the verdicts in day order.
 
     A learning day (the earlier of ``introduced`` and the first attempt, and the
     ``introduced`` day itself) takes its best grade, at most ``helped``, and the
     next day is its first retrieval. A later day on or after the expected review,
-    or any day with an ``exam``, is a probe: the first try counts, lowered only by
-    a later unaided incorrect. Any other day is practice: only an unaided
+    a day the engine had the topic due when its answer was saved (``due_topics``,
+    so moving the exam never uncounts a review), or any day with an ``exam``, is a
+    probe: the first try counts, lowered only by a later unaided incorrect. Any other day is practice: only an unaided
     incorrect counts.
     """
     result = Replay()
@@ -223,8 +226,9 @@ def replay(topic: dict[str, Any], attempts: list[Attempt], exam: Exam | None) ->
         items = [item for _, item in group]
         verdict: str | None
         assert result.expected is not None
+        was_due = any(key in item.get("due_topics", ()) for item in items)
         if any(item["kind"] == "exam" for item in items) or (
-            day not in learning and day >= result.expected.isoformat()
+            day not in learning and (day >= result.expected.isoformat() or was_due)
         ):
             result.days[day], verdict = PROBE, _probe(items)
         elif day in learning:
@@ -286,10 +290,10 @@ def _since_solid(attempts: list[Attempt], replayed: Replay) -> list[dict[str, An
 
 
 def _standing(
-    topic: dict[str, Any], history: _History, exam: Exam | None
+    key: str, topic: dict[str, Any], history: _History, exam: Exam | None
 ) -> dict[str, Any]:
     attempts = history.attempts
-    replayed = replay(topic, attempts, exam)
+    replayed = replay(key, topic, attempts, exam)
     result: dict[str, Any] = {
         "level": _level(topic, attempts, replayed),
         "attempts": len(attempts),
@@ -319,7 +323,7 @@ def replays(record: dict[str, Any]) -> dict[str, Replay]:
     histories = _histories(record["observations"])
     exam = exam_plan(record)
     return {
-        key: replay(topic, histories.get(key, _History()).attempts, exam)
+        key: replay(key, topic, histories.get(key, _History()).attempts, exam)
         for key, topic in record["topics"].items()
     }
 
@@ -329,7 +333,7 @@ def standings(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     histories = _histories(record["observations"])
     exam = exam_plan(record)
     return {
-        key: _standing(topic, histories.get(key, _History()), exam)
+        key: _standing(key, topic, histories.get(key, _History()), exam)
         for key, topic in record["topics"].items()
     }
 
@@ -370,6 +374,37 @@ def _clamp_tutor_dates(
         scheduled.reviews[key] = _with_review(record, key, due, "tutor")
 
 
+def _engine_due(topic: dict[str, Any], day: str) -> bool:
+    review = topic.get("review", {})
+    return bool(review.get("by") == "engine" and review.get("due", day) <= day)
+
+
+def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
+    """Record on each new answer which of its topics the engine had due when it
+    was saved; a tutor's pin keeps its own rule (``replay``).
+
+    A correction keeps what it corrects had, since it takes that answer's day.
+    """
+    observations = record["observations"] = dict(record["observations"])
+    for key in changes.observations:
+        item = observations[key]
+        if item["kind"] not in SCHEDULING_KINDS:
+            continue
+        inherited = {
+            topic
+            for target in item.get("corrects", ())
+            for topic in observations.get(target, {}).get("due_topics", ())
+        }
+        due = {
+            topic
+            for topic in item["topics"]
+            if _engine_due(record["topics"][topic], item["date"])
+        }
+        stamped = [topic for topic in item["topics"] if topic in due | inherited]
+        if stamped:
+            observations[key] = {**item, "due_topics": stamped}
+
+
 _NONE_BEFORE_EXAM = "no review before the exam; its final review is done"
 
 
@@ -393,7 +428,7 @@ def _resync(
             exam is not None and exam.day > today and stored >= exam.day.isoformat()
         ):
             continue
-        target = replay(topic, histories.get(key, _History()).attempts, exam).due
+        target = replay(key, topic, histories.get(key, _History()).attempts, exam).due
         if target is not None and target.isoformat() != stored:
             scheduled.reviews[key] = _with_review(record, key, target, "engine")
             scheduled.notes.append(
@@ -459,8 +494,8 @@ def _reschedule(
         now, then = histories.get(key, _History()), before.get(key, _History())
         if key in changes.tutor_reviews or _attempt_ids(now) == _attempt_ids(then):
             continue
-        after = replay(topic, now.attempts, exam)
-        previous = replay(topic, then.attempts, exam)
+        after = replay(key, topic, now.attempts, exam)
+        previous = replay(key, topic, then.attempts, exam)
         days = {item["date"] for name, item in now.attempts if name in new}
         changed = after.verdicts != previous.verdicts
         if after.expected is None:
@@ -497,7 +532,7 @@ def _first_retrievals(
             or "due" in topic.get("review", {})
         ):
             continue
-        due = replay(topic, [], exam).due
+        due = replay(key, topic, [], exam).due
         if due is None:
             scheduled.notes.append(f"{key}: {_NONE_BEFORE_EXAM}")
             continue
@@ -548,6 +583,7 @@ def schedule(
     any observation that supersedes an attempt replays that attempt's topics.
     """
     result = {**record, "topics": dict(record["topics"])}
+    _stamp_due(result, changes)
     scheduled = Scheduled()
     histories = _histories(result["observations"])
     if changes.exam_moved:

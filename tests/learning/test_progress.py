@@ -472,3 +472,25 @@ def test_due_puts_prerequisites_first_and_upcoming_sorts_by_day() -> None:
     assert due[0]["overdue"] == 0
     assert progress.upcoming(record, TODAY, 7) == [{"topic": "basis", "due": day(1)}]
     assert len(progress.upcoming(record, TODAY, 9)) == 2
+
+
+def test_moving_the_exam_later_never_uncounts_a_review() -> None:
+    record, _ = save(course(introduced=day(-1)), {"exam": {"date": day(20)}})
+    when = TODAY
+    while (due := record["topics"]["rank"].get("review", {}).get("due")) and (
+        due < day(19)
+    ):
+        when = date.fromisoformat(due)
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=(when - TODAY).days)]},
+            when,
+        )
+    counted = progress.replays(record)["rank"].verdicts
+    assert counted[-1] == (day(14), "solid")
+    moved, _ = save(record, {"exam": {"date": day(60)}}, when)
+    assert progress.replays(moved)["rank"].verdicts == counted
+    assert all(
+        moved["observations"][key]["due_topics"] == ["rank"]
+        for key in moved["observations"]
+    )

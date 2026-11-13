@@ -84,6 +84,7 @@ HELPER_FIELDS = frozenset(
         "updated_at",
         "next_observation",
         "recorded",
+        "due_topics",
         "judged",
         "updated",
         "created",
@@ -176,7 +177,7 @@ FIELDS: dict[str, dict[str, str]] = {
 HELPERS: dict[str, dict[str, str]] = {
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
-    "observation": {"recorded": _STAMP},
+    "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
     "knowledge": {"updated": _DAY},
     "task": {"created": _DAY, "updated": _DAY},
 }
@@ -249,6 +250,7 @@ class Observation(TypedDict, total=False):
     corrects: list[str]
     uncertain: str
     recorded: str
+    due_topics: list[str]
 
 
 class Knowledge(TypedDict, total=False):
@@ -1266,7 +1268,11 @@ def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> s
 
 
 def _content(observation: dict[str, Any]) -> dict[str, Any]:
-    return {name: value for name, value in observation.items() if name != "recorded"}
+    return {
+        name: value
+        for name, value in observation.items()
+        if name not in ("recorded", "due_topics")
+    }
 
 
 def _append_observations(
