@@ -76,6 +76,14 @@ describe("plan map", () => {
 		assert.doesNotMatch(card.textContent!, /Node \d/);
 		assert.equal(card.getAttribute("aria-label"), "Open the plan");
 	});
+
+	it("a step that names a formula shows it typeset", () => {
+		const nodes = [{ id: "eq", title: "The eigen-equation $Av = \\lambda v$", status: "upcoming" }];
+		const data = { kind: "full", at: "x", current: null, nodes, edges: [] } as unknown as PlanBlockData;
+		const card = documentFor(<PlanCard data={data} onOpen={() => {}} />).querySelector('[data-testid="plan-block-full"]')!;
+		assert.equal(card.querySelectorAll(".katex").length, 1);
+		assert.doesNotMatch(card.textContent!, /\$/);
+	});
 });
 
 describe("the Proposed docks", () => {
