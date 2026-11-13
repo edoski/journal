@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "@/src/core";
-import { useCourseVariant } from "@/components/design-variant";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { needOf, standingOf } from "@/components/course-map/topic-map/topic-standing";
 import { Button } from "@/components/ui/button";
@@ -40,22 +39,16 @@ export function TopicHeader({
 }) {
 	const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const tasks = map.tasks.filter((task) => topic.tasks.includes(task.key));
-	// The course line links to the course's page while the Course switch has one.
-	const coursePage = useCourseVariant() !== "current";
 	return (
 		<header data-slot="topic-header" className="flex flex-col gap-1 px-2">
 			<p className="text-label text-muted-foreground">
-				{!coursePage ? (
-					map.title
-				) : (
-					<Link
-						href={courseHref(map.workspace)}
-						data-slot="topic-course-link"
-						className="rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
-					>
-						<MathText>{map.title}</MathText>
-					</Link>
-				)}
+				<Link
+					href={courseHref(map.workspace)}
+					data-slot="topic-course-link"
+					className="rounded-sm outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+				>
+					<MathText>{map.title}</MathText>
+				</Link>
 			</p>
 			<div className="flex min-h-8 items-center justify-between gap-4">
 				<h1 className="text-xl font-semibold text-foreground">

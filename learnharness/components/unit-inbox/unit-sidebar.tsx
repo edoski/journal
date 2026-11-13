@@ -4,7 +4,7 @@ import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
 import { fuzzyScore, type ChatListItem, type StudyCourse } from "@/src/core";
-import { useCourseVariant, useInboxVariant } from "@/components/design-variant";
+import { useInboxVariant } from "@/components/design-variant";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
@@ -86,11 +86,9 @@ export function UnitSidebar() {
 	const s = useSessionsSidebar({ open, toggle });
 	const { state, scope, setScope, folded, fold } = useUnitInbox(s.chats);
 	const query = s.query.trim();
-	// Courses are found only while the Course switch has a course page to open.
-	const coursePage = useCourseVariant() !== "current";
 	const found = useMemo(
-		() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query, coursePage ? state.courses : []) : null),
-		[state, s.chats, query, coursePage],
+		() => (state.status === "ready" && query ? searchInbox(state.inbox, s.chats ?? [], query, state.courses) : null),
+		[state, s.chats, query],
 	);
 	// Under the Inbox switch the list's top is Home's Today, drawn by the
 	// candidate the switch names; "current" keeps the list as it is.
@@ -111,7 +109,7 @@ export function UnitSidebar() {
 			s,
 		};
 	}, [inboxVariant, state, scope, folded, fold, s]);
-	const searchLabel = coursePage ? "Search courses, topics and sessions" : "Search topics and sessions";
+	const searchLabel = "Search courses, topics and sessions";
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";

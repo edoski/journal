@@ -17,7 +17,7 @@ The header is the sidebar's `NavSection` anatomy (nav-section.md: a 28px band, 1
 - `foldable`: the header is a button (`aria-expanded`) that folds the rows away, like the sidebar's Known shelf; hover lifts it to full ink; 2px focus ring. `defaultFolded` starts it folded.
 - `limit`: rows shown before Show more.
 - Neither is stored: each visit starts as the page draws it, so there is nothing for him to keep tidy.
-- An empty group still draws its header with 0; a candidate may leave it out.
+- An empty group still draws its header with 0; the page may leave it out.
 
 ## Sources
 

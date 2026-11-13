@@ -5,13 +5,6 @@ import { onPolishChange, polishVariant, type PolishGroup } from "@/components/de
 
 export type DesignVariant = "current" | "proposed";
 
-/** The course page's candidates (spec:
- *  components/course-page/course-page.md). */
-export const COURSE_OPTIONS = ["list", "map", "brief", "split"] as const;
-/** "current" leaves the app with no course page: its address is an unknown
- *  route and course names stay plain text. */
-export type CourseVariant = "current" | (typeof COURSE_OPTIONS)[number];
-
 /** The Proposed sidebar's top candidates (spec:
  *  components/unit-inbox/unit-inbox.md, "Inbox switch"). */
 export const INBOX_OPTIONS = ["today", "topics"] as const;
@@ -48,8 +41,7 @@ export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
 /** The switch registry, which the Logbook's in-app guide switches (dev
  *  only): Design is Current or Proposed; Home is the composer or the study
  *  home, Sidebar Current or Proposed, and anything but Current wears
- *  Design's Proposed; Course is no course page or one of its candidates,
- *  each wearing the Proposed design and sidebar; Inbox is the Proposed
+ *  Design's Proposed; Inbox is the Proposed
  *  sidebar's list as it is or one of its top candidates, each wearing the
  *  Proposed design and sidebar; Node is the topic map's node as it was or
  *  one of its candidates, wherever the topic map draws; Overview is Home's
@@ -60,7 +52,6 @@ export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", requires: { design: "proposed" } },
 	{ id: "sidebar", label: "Sidebar", requires: { design: "proposed" } },
-	{ id: "course", label: "Course", options: COURSE_OPTIONS, requires: { design: "proposed", sidebar: "proposed" } },
 	{ id: "inbox", label: "Inbox", options: INBOX_OPTIONS, requires: { design: "proposed", sidebar: "proposed" } },
 	{ id: "node", label: "Node", options: NODE_OPTIONS, requires: { design: "proposed" } },
 	{ id: "overview", label: "Overview", options: OVERVIEW_OPTIONS, requires: { design: "proposed", home: "proposed" } },
@@ -89,8 +80,6 @@ const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === 
 const readLinkCurrent = (): LinkVariant => "current";
 const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
-const readCourseCurrent = (): CourseVariant => "current";
-const readCourse = (): CourseVariant => COURSE_OPTIONS.find((option) => option === polishVariant("course")) ?? "current";
 const readInboxCurrent = (): InboxVariant => "current";
 const readInbox = (): InboxVariant => INBOX_OPTIONS.find((option) => option === polishVariant("inbox")) ?? "current";
 const readOverviewCurrent = (): OverviewVariant => "current";
@@ -116,12 +105,6 @@ export function useHomeVariant(): DesignVariant {
  *  ("current"). Production builds get "current". */
 export function useSidebarVariant(): DesignVariant {
 	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readSidebar : readCurrent, readCurrent);
-}
-
-/** Which course page `/unit/<course>` draws, or "current" while there is
- *  none. Production builds get "current". */
-export function useCourseVariant(): CourseVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readCourse : readCourseCurrent, readCourseCurrent);
 }
 
 /** Which top the Proposed sidebar draws, or "current" for its list as it

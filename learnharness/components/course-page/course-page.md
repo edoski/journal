@@ -2,33 +2,22 @@
 
 One course at `/unit/<course>`, the parent of each topic's address (`courseHref` in `../unit-inbox/unit-href.ts`): every topic of the course once, sorted by what he would do about it, with the exam as the frame and one button for the next lesson. `data-slot="course-page"` on the scroller. Home answers "what now, across courses"; the topic page answers "this topic"; this page answers "this course".
 
-It sits behind the `course` group in the Logbook guide (`COURSE_OPTIONS` in `components/design-variant.ts`, read only through `useCourseVariant`, and only in `course-page.tsx` and the entry points below). Every option wears the Proposed design, sidebar and topic map. On Current there is no course page: the address shows what any unknown address shows (Next's 404), course names stay plain text and search finds no courses. Production resolves to Current. Shipping one option deletes the other folders, the `current` case and the `course` group with `useCourseVariant`; the entry points then link unconditionally.
-
-## The candidates
-
-Each lives in its own folder and owns only it; everything here is shared and used unchanged.
-
-| Option | Thesis | Folder |
-|---|---|---|
-| `list` | every topic once, in four groups, in the order he would act; no map | `list/` |
-| `map` | the map Home previews, given the window, with a legend that counts and lights its topics | `map/` |
-| `brief` | three answers (fix first, review, next), then the map | `brief/` |
-| `split` | the list and the map side by side, pointing at one shows it in the other | `split/` |
+The page is the list and the map side by side (`split/`, split-course.md), which Edo picked on 13 Nov 2026 over a list alone, the map alone and a brief of three answers over the map, deleted with the Course switch.
 
 ## Shared parts
 
 | File | What it is |
 |---|---|
-| `course-page.tsx` | the switch: one candidate per option, the 404 on Current; the bare chrome until the page has hydrated (the switch reads Current until then) |
-| `course-frame.tsx` | what every candidate wraps itself in, as Home's candidates wrap themselves in `HomeFrame`: the chrome, the read with its states, the lesson start behind the header's button (its failure shows in the header, course-header.md). A candidate gives its column's classes; the page scrolls with no bar showing (`ScrollArea bar={false}`), and a column of `h-full` fits the window instead |
+| `course-page.tsx` | the page: `SplitCourse` |
+| `course-frame.tsx` | what the page wraps itself in, as Home wraps itself in `HomeFrame`: the chrome, the read with its states, the lesson start behind the header's button (its failure shows in the header, course-header.md). The page gives its column's classes; the page scrolls with no bar showing (`ScrollArea bar={false}`), and a column of `h-full` fits the window instead |
 | `course-chrome.tsx` | the 52px band with the sidebar toggle and the window's drag region |
 | `use-course.ts` | the read: `useStudyHome` (Home's read of `/api/study` and `/api/chats`, once per visit) with the sessions started on a topic's page linked to it, as the sidebar does |
-| `course-model.ts` | the pure model: `courseGroups`, `courseNext`, `courseFacts`, `courseRead` and the types the candidates use (`CourseView`, `CourseGroup`, `CourseTopic`, `TopicFact`) |
+| `course-model.ts` | the pure model: `courseGroups`, `courseNext`, `courseFacts`, `courseRead` and the types the page uses (`CourseView`, `CourseGroup`, `CourseTopic`, `TopicFact`) |
 | `course-header.tsx` | the header (course-header.md) |
 | `course-topic-row.tsx` | one topic as a row (course-topic-row.md) |
 | `course-group.tsx` | a group's header over its rows, with folding and Show more (course-group.md) |
 
-The map and split candidates draw `TopicMap` (`../course-map/topic-map/topic-map.md`) directly, with its `highlight` prop to light a group's topics.
+The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directly, with its `highlight` prop to light a group's topics.
 
 ## The groups
 
@@ -62,8 +51,6 @@ The window's title is the course's name, "Course not found" for an address no li
 
 ## Entry points
 
-Only while the Course switch has a course page; on Current each stays exactly as it was.
-
 - The lesson's top bar: the first crumb links to the course page (lesson-top-bar.md).
 - The topic page: the course line above the title links to the course page (`../unit-inbox/topic-header.tsx`).
 - Sidebar search: matching courses come first, under Courses (unit-inbox.md, Search).
@@ -76,4 +63,4 @@ From the research (13 Nov 2026): a progress bar or percentage of topics touched,
 
 ## Sources
 
-The course page research (`audit/course-page`, 13 Nov 2026): the questions it answers, the four directions, the targets and the rules. Anki's overview (counts and one Study Now button); shadcn table and item (a 36px row); T3 Code's inbox (the sidebar this page agrees with).
+The course page research (`audit/course-page`, 13 Nov 2026): the questions it answers, the four directions (Edo kept split), the targets and the rules. Anki's overview (counts and one Study Now button); shadcn table and item (a 36px row); T3 Code's inbox (the sidebar this page agrees with).

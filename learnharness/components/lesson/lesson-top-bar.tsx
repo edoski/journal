@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRightIcon, EllipsisIcon, WaypointsIcon } from "lucide-react";
-import { useCourseVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,7 +25,7 @@ export function LessonTopBar({
 }: {
 	title: ReactNode;
 	course?: string;
-	/** The course's page: the crumb links there while the Course switch has a course page. */
+	/** The course's page, which the crumb links to. */
 	courseHref?: string;
 	/** Sentence case: "Probing", "Planning", "Teaching", "Practice". */
 	phase: string;
@@ -34,7 +33,7 @@ export function LessonTopBar({
 	plan?: { open: boolean; onOpenChange: (open: boolean) => void; body: ReactNode };
 	details: ReactNode;
 }) {
-	const linked = useCourseVariant() !== "current" && courseHref !== undefined;
+	const linked = courseHref !== undefined;
 	return (
 		<>
 			<div className="flex min-w-0 flex-1 items-center gap-1.5">

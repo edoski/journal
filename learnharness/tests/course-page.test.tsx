@@ -14,7 +14,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
-import { COURSE_OPTIONS, POLISH_GROUPS } from "../components/design-variant.ts";
 import { courseFacts, courseGroups, courseNext, courseRead, GROUP_IDS, type CourseGroup as Group } from "../components/course-page/course-model.ts";
 import { CourseHeader, CourseLessonError } from "../components/course-page/course-header.tsx";
 import { CourseHeaderSkeleton } from "../components/course-page/course-header-skeleton.tsx";
@@ -99,12 +98,6 @@ describe("the course page's address", () => {
 		const href = courseHref(WS);
 		assert.ok(unitHref(WS, "rank").startsWith(`${href}/`));
 		assert.equal(workspaceOf(href.slice("/unit/".length)), WS);
-	});
-
-	it("is behind a Course switch of four candidates that wears the Proposed design and sidebar", () => {
-		assert.deepEqual([...COURSE_OPTIONS], ["list", "map", "brief", "split"]);
-		const group = POLISH_GROUPS.find((g) => g.id === "course");
-		assert.deepEqual(group?.requires, { design: "proposed", sidebar: "proposed" });
 	});
 });
 

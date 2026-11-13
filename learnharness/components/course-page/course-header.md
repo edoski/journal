@@ -1,6 +1,6 @@
 # CourseHeader
 
-The course page's header, the same on every candidate (course-page.md). `course-header.tsx`, `data-slot="course-header"`; its skeleton `course-header-skeleton.tsx`, `data-slot="course-header-skeleton"`.
+The course page's header, (course-page.md). `course-header.tsx`, `data-slot="course-header"`; its skeleton `course-header-skeleton.tsx`, `data-slot="course-header-skeleton"`.
 
 ## Anatomy, top to bottom (gap 8)
 
@@ -16,7 +16,7 @@ Height 88px. The marks are 16px so the pie and the icons are one size.
 ## States
 
 - Busy (a lesson starting): the button is disabled.
-- The lesson could not start: `course-lesson-error`, one line under the next step in the danger ink ("Couldn’t open the session. Try again."), `role="alert"`, so the feedback sits under the button he pressed. The course frame sets it through `CourseLessonError`, so every candidate gets it unchanged.
+- The lesson could not start: `course-lesson-error`, one line under the next step in the danger ink ("Couldn’t open the session. Try again."), `role="alert"`, so the feedback sits under the button he pressed. The course frame sets it through `CourseLessonError`, so the page gets it unchanged.
 - Loading: the skeleton draws the same three rows at the same heights (a 24px block for the name, the button's 80x32 block, two 14px lines), `role="status"`, "Reading the course"; shadcn `Skeleton` with its pulse off under reduced motion.
 - Long names: the name and the next step truncate; the button and the reason never shrink.
 

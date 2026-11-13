@@ -7,7 +7,7 @@ The session's top bar under the Proposed design, rendered in the shared `TopBar`
 | Slot | Notes |
 |---|---|
 | sidebar toggle | `TopBar`'s own, only while the sidebar is closed |
-| course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60%. While the Course switch has a course page (`useCourseVariant`, components/course-page/course-page.md) it is a link to that page (`courseHref`), lifting to full ink on hover as shadcn's breadcrumb link does, with a 2px focus ring; on Current it stays plain text |
+| course | 14 `muted-foreground`, first, at most 160px, truncates before the title does (`shrink-[2]`), then a 14px chevron at 60%. It is a link to the course's page (`courseHref`, components/course-page/course-page.md), lifting to full ink on hover as shadcn's breadcrumb link does, with a 2px focus ring; with no course page to open it stays plain text |
 | title | 14 at 500 (`text-control font-medium`), after the course as T3 Code's breadcrumb does (project › thread); truncates; a click (or F2) renames it in place, the input in the same style |
 | phase | 13/18 `muted-foreground`, sentence case ("Probing", "Planning", "Teaching", "Practice"); not interactive |
 | plan toggle | quiet button, 32px, 16px waypoints icon and "Plan" at 13/400; `data-slot="plan-toggle"`; the trigger of the plan popover (plan-map.md, popover.md), right-aligned under it |

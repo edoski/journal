@@ -1,6 +1,6 @@
 # CourseTopicRow
 
-One topic on a course page (course-page.md), shared by the list, split and brief candidates. `course-topic-row.tsx`; `data-slot` `course-topic` (the list item), `course-topic-row` (the link, with `data-group` naming its group), `course-topic-title`, `course-topic-fact` (with `data-kind`). Rows sit in a `ul`, usually a `CourseGroup`'s (course-group.md).
+One topic on a course page (course-page.md), drawn by the split page's list. `course-topic-row.tsx`; `data-slot` `course-topic` (the list item), `course-topic-row` (the link, with `data-group` naming its group), `course-topic-title`, `course-topic-fact` (with `data-kind`). Rows sit in a `ul`, usually a `CourseGroup`'s (course-group.md).
 
 ## Anatomy, left to right
 
