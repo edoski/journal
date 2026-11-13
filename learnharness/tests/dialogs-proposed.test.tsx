@@ -90,8 +90,7 @@ describe("Proposed dialogs keep their actions", () => {
 		assert.equal($('[data-testid="node-delete-confirm"]')?.textContent, "Delete");
 	});
 
-	it("delete session: the session named in the system font, the traces checkbox and its retry on failure", async () => {
-		const traces: boolean[] = [];
+	it("delete lesson: plain words with the lesson named, no engine talk or traces checkbox, and a plain retry on failure", async () => {
 		await mount(
 			<AlertDialog open>
 				<DeleteSessionBody
@@ -99,20 +98,20 @@ describe("Proposed dialogs keep their actions", () => {
 					chat={{ id: "c1", title: "Rank practice" }}
 					traces={false}
 					busy={false}
-					failure={{ code: "network", error: "Delete failed — network error. Try again." }}
-					onTraces={(next) => traces.push(next)}
+					failure={{ code: "jobs_running", error: "Background jobs are still running in this session — try again when they finish" }}
+					onTraces={() => {}}
 					onClose={() => {}}
 					onRun={() => {}}
 				/>
 			</AlertDialog>,
 		);
+		assert.equal($('[data-slot="alert-dialog-title"]')?.textContent, "Delete this lesson?");
 		const name = $('[data-testid="session-name-code"]');
 		assert.equal(name?.tagName, "P", "not a code element");
 		assert.equal(name?.textContent, "Rank practice");
-		const checkbox = $('[data-testid="delete-traces-checkbox"]');
-		assert.equal(checkbox?.getAttribute("role"), "checkbox");
-		await act(async () => { checkbox!.dispatchEvent(new dom.window.Event("click", { bubbles: true, cancelable: true })); });
-		assert.deepEqual(traces, [true]);
-		assert.match($('[data-testid="delete-failure"]')?.textContent ?? "", /Try again/);
+		const dialog = $('[data-testid="delete-session-dialog"]')!.textContent ?? "";
+		assert.doesNotMatch(dialog, /graph|extraction|background job|session/i);
+		assert.equal($('[data-testid="delete-traces-checkbox"]'), null);
+		assert.match($('[data-testid="delete-failure"]')?.textContent ?? "", /^The tutor is still working in this lesson\. Delete it once that ends\. Try again$/);
 	});
 });

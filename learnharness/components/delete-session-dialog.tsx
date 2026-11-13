@@ -28,6 +28,15 @@ export const TRACES_COPY = {
 	body: "This session’s topics, links, and events leave the graph too. Topics other sessions or imported notes also cover survive; topics only this session created are removed entirely.",
 };
 
+/** A refused delete in the Proposed dialog, by the route's code, in the
+ *  learner's words. */
+const FAILURE_WORDS: Record<string, string> = {
+	turn_in_flight: "The tutor is still replying. Delete it once the reply ends.",
+	jobs_running: "The tutor is still working in this lesson. Delete it once that ends.",
+	extraction_winding_down: "This lesson is still being saved. Try again in a moment.",
+	network: "Couldn't reach the app. Check it's running, then try again.",
+};
+
 /**
  * Session deletion (wave 6 chunk A; owner flow rework 2026-09-24) — THE
  * destructive-confirmation surface, portaled z-50 like the setup dialog,
@@ -192,31 +201,15 @@ export function DeleteSessionBody({
 		return (
 			<AlertDialogContent data-testid="delete-session-dialog">
 				<AlertDialogHeader>
-					<AlertDialogTitle>Delete session?</AlertDialogTitle>
+					<AlertDialogTitle>Delete this lesson?</AlertDialogTitle>
 					<p data-testid="session-name-code" className="text-control font-medium text-foreground">
 						{chat.title}
 					</p>
-					<AlertDialogDescription>
-						This permanently removes the session — its messages, background jobs, and extraction records. Everything
-						it added to the graph stays unless you check below. This cannot be undone.
-					</AlertDialogDescription>
+					<AlertDialogDescription>Its messages are deleted for good. What you learned in it stays in your course.</AlertDialogDescription>
 				</AlertDialogHeader>
-				<Label data-testid={TRACES_COPY.testid} className="cursor-pointer items-start gap-3 rounded-lg border p-3 font-normal">
-					<Checkbox
-						data-testid={TRACES_COPY.checkbox}
-						checked={traces}
-						onCheckedChange={(next) => onTraces(next === true)}
-						disabled={busy}
-						className="mt-0.5"
-					/>
-					<span className="flex min-w-0 flex-col gap-1">
-						<span className="text-row text-foreground">{TRACES_COPY.title}</span>
-						<span className="text-label text-muted-foreground">{TRACES_COPY.body}</span>
-					</span>
-				</Label>
 				{failure && (
 					<p role="alert" data-testid="delete-failure" className="text-row text-danger">
-						{failure.error}{" "}
+						{FAILURE_WORDS[failure.code] ?? failure.error}{" "}
 						<button type="button" data-testid="delete-retry" onClick={onRun} disabled={busy} className="text-foreground underline-offset-2 hover:underline disabled:opacity-50">
 							Try again
 						</button>
