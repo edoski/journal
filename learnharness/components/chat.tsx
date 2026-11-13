@@ -1485,7 +1485,7 @@ export function Chat({
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
 				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
 					<SessionMessageNavigation />
-					<ConversationContent className="min-h-full gap-0 p-0">
+					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						<div data-session-find-root="" className={`${proposed ? LESSON_COLUMN : COLUMN} flex flex-1 flex-col gap-4 ${proposed ? "pt-6" : "pt-4"}`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
