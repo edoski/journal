@@ -1,7 +1,7 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import type { PlanToolResult, PlanTree } from "../../core/contracts.ts";
+import { LESSON_PROGRESS_TOOL, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
 import { createTree, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
@@ -59,8 +59,38 @@ const planInitInput = Type.Object({
 	}),
 });
 
+const lessonProgressInput = Type.Object({
+	done: Type.Array(Type.String({ minLength: 1 }), {
+		description:
+			"REQUIRED — the plan node ids this turn finished teaching (taught, and he showed he has it), or [] when none. They show as done on his map.",
+	}),
+	close: Type.Optional(
+		Type.Boolean({
+			description: "true when this turn ends the session for tonight (your close). Omit otherwise.",
+		}),
+	),
+});
+
 export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> {
 	return {
+		[LESSON_PROGRESS_TOOL]: {
+			name: LESSON_PROGRESS_TOOL,
+			label: LESSON_PROGRESS_TOOL,
+			description:
+				"Mark plan steps done on his map, and say when you close the session for tonight. Call it in the turn that finishes a step, " +
+				"with that step's node id in `done`; in the turn that ends the session, add `close: true` before your closing words.",
+			parameters: lessonProgressInput,
+			execute: serverExecute(LESSON_PROGRESS_TOOL, lessonProgressInput, async ({ done }) => {
+				const record = ctx.chatStore.getChat(ctx.chatId);
+				if (!record) return { ok: false, error: `Chat not found: ${ctx.chatId}` };
+				const ids = new Set(record.tree?.nodes.map((n) => n.id) ?? []);
+				const unknown = done.filter((id) => !ids.has(id));
+				if (unknown.length > 0) {
+					return { ok: false, error: `Not node ids of this session's plan: ${unknown.join(", ")}. Valid ids: ${[...ids].join(", ") || "(no plan yet)"}` };
+				}
+				return { ok: true };
+			}),
+		},
 		plan_init: {
 			name: "plan_init",
 			label: "plan_init",

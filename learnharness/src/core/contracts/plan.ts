@@ -79,24 +79,48 @@ export function derivedNodeStatus(statuses: DerivedPlanStatuses, nodeId: string)
 	return "upcoming";
 }
 
-export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarrier[]): DerivedPlanStatuses {
+/** The teacher's progress tool: marks plan steps done and closes the
+ *  session for tonight. Its calls feed the same fold as the question tags. */
+export const LESSON_PROGRESS_TOOL = "lesson_progress";
+
+/** One tool call, as the fold reads it. */
+interface PlanCall {
+	name: string;
+	input: unknown;
+}
+
+/** Where the lesson stands, from its calls in order: a tagged question
+ *  moves the position there (leaving a node marks it visited); a
+ *  lesson_progress call marks its `done` nodes visited and, when one is the
+ *  current node, leaves it, so nothing is current until the next tag.
+ *  Ids missing from the tree move nothing. */
+function foldPlanCalls(tree: PlanTree, calls: Iterable<PlanCall>): DerivedPlanStatuses {
 	const ids = new Set(tree.nodes.map((n) => n.id));
-	const runs: string[] = []; // distinct tagged nodes in call order, CONSECUTIVE
-	// duplicates collapsed (several checks on one node = one stay on it)
-	for (const m of messages) {
-		for (const part of m.parts) {
-			if (!part.type.startsWith("tool-") || !POSITION_QUESTION_TOOLS.includes(part.type.slice("tool-".length))) continue;
-			const nodeId = (part.input as { nodeId?: unknown } | undefined)?.nodeId;
-			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue; // untagged/unknown — moves nothing
-			if (runs.at(-1) !== nodeId) runs.push(nodeId);
+	let current: string | null = null;
+	const visited = new Set<string>();
+	for (const call of calls) {
+		if (POSITION_QUESTION_TOOLS.includes(call.name)) {
+			const nodeId = (call.input as { nodeId?: unknown } | undefined)?.nodeId;
+			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
+			if (current !== null && current !== nodeId) visited.add(current);
+			current = nodeId;
+		} else if (call.name === LESSON_PROGRESS_TOOL) {
+			const done = (call.input as { done?: unknown } | undefined)?.done;
+			for (const id of Array.isArray(done) ? done : []) {
+				if (typeof id !== "string" || !ids.has(id)) continue;
+				visited.add(id);
+				if (current === id) current = null;
+			}
 		}
 	}
-	const current = runs.at(-1) ?? null;
-	// Visited = been there in an EARLIER stay: everything before the current
-	// run. A revisit (a→b→a) puts a in visited AND current — current wins at
-	// render (derivedNodeStatus), visited records it has been left before.
-	const visited = new Set(runs.slice(0, -1));
 	return { current, visited };
+}
+
+export function derivePlanStatuses(tree: PlanTree, messages: readonly PartsCarrier[]): DerivedPlanStatuses {
+	return foldPlanCalls(
+		tree,
+		messages.flatMap((m) => m.parts.filter((p) => p.type.startsWith("tool-")).map((p) => ({ name: p.type.slice("tool-".length), input: p.input }))),
+	);
 }
 
 /**
@@ -129,20 +153,17 @@ import { POSITION_QUESTION_TOOLS } from "../question-core.ts";
 /** The same derivation over the NATIVE record: tagged question CALLS only (any state —
  *  a dangling call still moves position; results feed nothing). */
 export function derivePlanStatusesLh(tree: PlanTree, messages: readonly LhMessage[]): DerivedPlanStatuses {
-	const ids = new Set(tree.nodes.map((n) => n.id));
-	const runs: string[] = [];
-	for (const m of messages) {
-		if ((m as { role?: string }).role !== "assistant") continue;
+	return foldPlanCalls(tree, lhToolCalls(messages));
+}
+
+/** Every tool call the record's assistant messages made, in order. */
+export function lhToolCalls(messages: readonly LhMessage[]): PlanCall[] {
+	return messages.flatMap((m) => {
+		if ((m as { role?: string }).role !== "assistant") return [];
 		const content = (m as { content?: unknown }).content;
-		if (!Array.isArray(content)) continue;
-		for (const block of content as Array<{ type?: string; name?: string; arguments?: unknown }>) {
-			if (block.type !== "toolCall" || !POSITION_QUESTION_TOOLS.includes(block.name ?? "")) continue;
-			const nodeId = (block.arguments as { nodeId?: unknown } | undefined)?.nodeId;
-			if (typeof nodeId !== "string" || !ids.has(nodeId)) continue;
-			if (runs.at(-1) !== nodeId) runs.push(nodeId);
-		}
-	}
-	const current = runs.at(-1) ?? null;
-	const visited = new Set(runs.slice(0, -1));
-	return { current, visited };
+		if (!Array.isArray(content)) return [];
+		return (content as Array<{ type?: string; name?: string; arguments?: unknown }>)
+			.filter((block) => block.type === "toolCall")
+			.map((block) => ({ name: block.name ?? "", input: block.arguments }));
+	});
 }
