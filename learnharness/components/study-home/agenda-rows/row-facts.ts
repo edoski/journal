@@ -8,7 +8,7 @@ export interface RowsProps {
 	rows: readonly TodayRow[];
 	busy: boolean;
 	onContinue: (workspace: string) => void;
-	/** Under the Overview switch's follow: the line Home's map follows, and
+	/** The line Home's map follows, and
 	 *  where a line reports that he points at it (by pointer or focus) or
 	 *  stops pointing. */
 	pointed?: string | null;

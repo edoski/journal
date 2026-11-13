@@ -1,5 +1,5 @@
 /**
- * Home's Overview switch, follow (home-map.md): which Today line the map
+ * Home's map following Today (home-map.md): which Today line the map
  * follows, and how a line reports that he points at it.
  */
 import assert from "node:assert/strict";

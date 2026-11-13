@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useOverviewVariant } from "@/components/design-variant";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
 import { HomeMap } from "@/components/study-home/home-map";
 import { followedRow, lineKey } from "@/components/study-home/agenda-rows/row-facts";
@@ -21,9 +20,9 @@ const FOLLOW_DWELL_MS = 150;
 
 /**
  * The agenda study home (spec: study-home.md): what to study now, in one
- * window. A course's map on top behind course tabs, then Today, one line per course. Under the
- * Overview switch's follow the map shows the course of the Today line he
- * points at, with that line's topics lit (home-map.md).
+ * window. A course's map on top behind course tabs, then Today, one line per course. The
+ * map follows Today: it shows the course of the line he points at, with
+ * that line's topics lit (home-map.md).
  */
 export function StudyHome({ initialConfigured }: { initialConfigured: boolean }) {
 	const [enlarged, setEnlarged] = useState(false);
@@ -44,12 +43,11 @@ type Chosen = { by: "line"; key: string } | { by: "tab"; workspace: string };
 
 function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: boolean; onEnlarge: (enlarged: boolean) => void }) {
 	const { rows, courses, busy, onContinue } = ready;
-	const follow = useOverviewVariant() === "follow";
 	const [chosen, setChosen] = useState<Chosen | null>(null);
 	const dwell = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => () => clearTimeout(dwell.current), []);
 
-	const followed = follow && chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
+	const followed = chosen?.by !== "tab" ? followedRow(rows, chosen?.by === "line" ? chosen.key : null) : null;
 	const workspace = chosen?.by === "tab" ? chosen.workspace : (followed?.course?.map.workspace ?? courses[0]!.map.workspace);
 	const highlight = useMemo<ReadonlySet<TopicHandle> | null>(() => {
 		const topics = followed ? lessonOf(followed).topics : [];
@@ -80,7 +78,9 @@ function HomeBody({ ready, enlarged, onEnlarge }: { ready: HomeReady; enlarged: 
 					rows={rows}
 					busy={busy}
 					onContinue={onContinue}
-					{...(follow && { pointed: followed ? lineKey(followed) : null, onPoint, onPointEnd: () => clearTimeout(dwell.current) })}
+					pointed={followed ? lineKey(followed) : null}
+					onPoint={onPoint}
+					onPointEnd={() => clearTimeout(dwell.current)}
 				/>
 			)}
 		</>

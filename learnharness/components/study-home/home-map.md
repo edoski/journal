@@ -13,18 +13,13 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 
 Nowhere in the Proposed design: the old Map page's List view, Import notes… and Statements… (Edo, 12 Nov 2026: he would never use them, and the engine should grow from his studying with nothing for him to manage). They went with that page on 13 Nov 2026.
 
-## Overview switch
+## The map follows Today
 
-Edo, 13 Nov 2026: Home felt disjointed, its map showing one course behind tabs and always opening on Linear Algebra rather than giving an overview. Of three sketched answers (small multiples, course tiles, the map following Today) he chose to try the map following Today, then asked to keep the tabs, with the tab moving smoothly to the course of the line he points at. `useOverviewVariant` in `design-variant.ts`, group `overview`, requires Home's Proposed.
+Edo, 13 Nov 2026: Home felt disjointed, its map showing one course behind tabs and always opening on Linear Algebra rather than giving an overview. Of three sketched answers (small multiples, course tiles, the map following Today) he chose the map following Today, then asked to keep the tabs, with the tab moving smoothly to the course of the line he points at; he kept it over tabs alone, deleted with the Overview switch.
 
-| Option | What the map does |
-|---|---|
-| `current` | the tabs pick the course; it opens on Today's first course |
-| `follow` | the tabs follow Today: pointing at a line (hover after a 150ms rest, so crossing lines on the way to the map does not flip it; focus at once) moves the tab to that line's course and lights that line's topics, the rest dimmed (TopicMap's `highlight`). At rest it follows Today's first line with a course. A tab pressed by hand holds until he points at a line again. The followed line keeps a quiet `fill-hover`, so the tie reads both ways |
-
-Both options:
+- The tabs follow Today: pointing at a line (hover after a 150ms rest, so crossing lines on the way to the map does not flip it; focus at once) moves the tab to that line's course and lights that line's topics, the rest dimmed (TopicMap's `highlight`). At rest it follows Today's first line with a course. A tab pressed by hand holds until he points at a line again. The followed line keeps a quiet `fill-hover`, so the tie reads both ways.
 - Every course's map stays drawn, one per course stacked in the frame, and the chosen one shows (200ms crossfade). A change of course never draws a map afresh, so its nodes do not replay their entrance (Edo saw that as a glitch).
 - The tabs' underline is one bar that slides to the chosen tab (200ms), in place of each tab's own underline fading.
-- The page's arrows (`components/spatial-arrows.ts`) walk Today's lines by where they sit; a line the arrows reach takes focus, so under `follow` the map follows it at once. Enter opens the line.
+- The page's arrows (`components/spatial-arrows.ts`) walk Today's lines by where they sit; a line the arrows reach takes focus, so the map follows it at once. Enter opens the line.
 
 `followedRow` and `pointProps` (`agenda-rows/row-facts.ts`) are the pure parts, tested in `tests/home-follow.test.ts`.
