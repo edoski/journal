@@ -90,11 +90,16 @@ export function lastStudied(row: TodayRow): string | null {
 	return `Studied ${Math.floor(days / 30)} months ago`;
 }
 
-/** How far along a course the learner is: the topics the engine has seen
- *  taught (any level past "new"), of all the map's topics; null for an
- *  empty map. Pure. */
-export function courseProgress(course: StudyCourse): { started: number; of: number } | null {
+/** The levels at which the learner can do a topic on their own: the
+ *  engine's independent, retained and transferred. */
+const ON_YOUR_OWN = new Set<CourseMapTopic["level"]>(["independent", "retained", "transferred"]);
+
+/** How far along a course the learner is, as it matters before an exam:
+ *  the topics they can do on their own (independent or better) that the
+ *  engine does not call weak, of all the map's topics; null for an empty
+ *  map. Pure. */
+export function courseProgress(course: StudyCourse): { solid: number; of: number } | null {
 	const of = course.map.topics.length;
 	if (of === 0) return null;
-	return { started: course.map.topics.filter((t) => t.level !== "new").length, of };
+	return { solid: course.map.topics.filter((t) => ON_YOUR_OWN.has(t.level) && !t.weak).length, of };
 }

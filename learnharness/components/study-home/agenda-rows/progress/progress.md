@@ -8,7 +8,7 @@ Thesis: each row is a course he is working through, so it is its own object, and
 |---|---|
 | tile | each row its own surface: `card`, radius 8, 56px, padding 16 across, 6 between tiles; hover `accent` |
 | columns | pie 16, course 144, lesson (fills); 16 between |
-| pie | a 16px circle (1.5 stroke, muted ink) that fills clockwise from twelve o'clock with the share of the course's topics past "new"; a screen reader hears "10 of 16 topics taught" |
+| pie | a 16px circle (1.5 stroke, muted ink) that fills clockwise from twelve o'clock with the share of the course's topics he can do on his own (`courseProgress`, hybrid/hybrid.md); a screen reader hears "2 of 5 topics you can do on your own" |
 | course | 13 in ink |
 | lesson | 13 at 500 in ink |
 

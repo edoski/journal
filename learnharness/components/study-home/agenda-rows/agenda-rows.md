@@ -1,16 +1,17 @@
 # Agenda rows
 
-Three candidates for how a line of agenda's Today reads, behind the Rows switch (`design-variant.ts`, group `rows`, which wears Home's `agenda`). Current is the line after Edo's cuts of 12 Nov 2026: course and lesson only (today.md). `today.tsx` branches once on the switch; each candidate is one folder with its spec. Edo picks one; the others are deleted with their folders.
+Four candidates for how a line of agenda's Today reads, behind the Rows switch (`design-variant.ts`, group `rows`, which wears Home's `agenda`). Current is the line after Edo's cuts of 12 Nov 2026: course and lesson only (today.md). `today.tsx` branches once on the switch; each candidate is one folder with its spec. Edo picks one; the others are deleted with their folders.
 
 | Option | Thesis | The signal on a row | Delineation | Spec |
 |---|---|---|---|---|
 | `reason` | every row says why it is there now | "Waiting for your reply", "You missed Chain rule last time", "Starting to fade", "Left off at part (c)…", "Next on your map" | one quiet panel, hairlines inset to the text | reason/reason.md |
 | `recency` | a row is a thread, as in Mail and T3 Code | when he last studied the course: "Studied 2 days ago" (a waiting session says "Waiting for your reply") | two lines, hairlines between rows, no container | recency/recency.md |
 | `progress` | each course is a thing he is working through | how far along the course is, as a pie that fills (Things' project pie) | each row its own tile | progress/progress.md |
+| `hybrid` | progress, recency and reason, each beside what it is about | the pie by the course, "Studied 2 days ago" on the course line, the reason at the end of the lesson line | two lines, hairlines between rows, no surface | hybrid/hybrid.md |
 
 ## Shared
 
-`row-facts.ts` holds what the candidates read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyNow` (a session's age from its `updatedAt`; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `lastStudied` (`lastActiveDaysAgo`), `courseProgress` (topics past `new`, of the map's topics), `foldLines` (past five courses, "Also today"). `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
+`row-facts.ts` holds what the candidates read, engine fields only, each pure and tested (`tests/study-home.test.tsx`): `whyNow` (a session's age from its `updatedAt`; a review's lapse from `signals.lapsed`, else its most overdue `review.overdue`; an open task's `step`; the current topic), `lastStudied` (`lastActiveDaysAgo`), `courseProgress` (topics he can do on his own, `independent` or better and not weak, of the map's topics), `foldLines` (past five courses, "Also today"). `line-target.tsx` makes a whole line one control (a link to a waiting session, or Continue); `today-also.tsx` is the overflow line.
 
 ## The signal test
 
