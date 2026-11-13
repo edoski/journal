@@ -52,6 +52,19 @@ describe("the practice dock's requests", () => {
 		assert.doesNotMatch(marker!.content, /Your thinking|Confidence:/);
 	});
 
+	it("hints climb: the first asks for a question, the second a nudge, the third one step", () => {
+		let messages = posed();
+		const rungs: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const [marker] = inputAppends({ messages, kind: "practice" }, { type: "request", problemCallId: "call_p1", request: "hint" }) as LhMarkerMessage[];
+			rungs.push(marker!.content);
+			messages = [...messages, marker!];
+		}
+		assert.match(rungs[0]!, /first hint.*one question.*No method, no step, no answer/);
+		assert.match(rungs[1]!, /second hint.*one nudge/);
+		assert.match(rungs[2]!, /hint 3.*one step.*never the rest of the solution/);
+	});
+
 	it("each of the three requests names itself to the agent", () => {
 		for (const [request, head] of [["hint", "[HINT]"], ["show", "[SHOW ME]"], ["explain", "[EXPLAIN INSTEAD]"]] as const) {
 			const [marker] = inputAppends({ messages: posed(), kind: "practice" }, { type: "request", problemCallId: "call_p1", request }) as LhMarkerMessage[];

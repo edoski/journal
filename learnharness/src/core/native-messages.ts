@@ -42,6 +42,7 @@ import {
 	MODE_HANDOFF_TEXT,
 	NEXT_PROBLEM_TEXT,
 	PRACTICE_REQUEST_TEXT,
+	hintRungText,
 	THINKING_LABEL,
 	type PracticeRequest,
 	type SessionMode,
@@ -418,6 +419,15 @@ export function newGraphContextMessage(picks: readonly GraphContextPick[], chain
 	};
 }
 
+/** How many Hint requests this problem has had so far. */
+export function hintsAsked(messages: readonly LhMessage[], problemCallId: string): number {
+	return messages.filter((m) => {
+		if (m.role !== "custom" || m.customType !== "practice-request") return false;
+		const d = m.details as Partial<PracticeRequestDetails> | null;
+		return d?.problemCallId === problemCallId && d.request === "hint";
+	}).length;
+}
+
 /** The learner's thinking submission (ONE send lane, owner round
  *  2026-10-05): the register is no longer declared by a button — the
  *  model READS the text to tell working traces from claimed answers. The
@@ -446,13 +456,15 @@ export interface PracticeRequestDetails {
 	text?: string;
 }
 
-export function newPracticeRequestMessage(problemCallId: string, request: PracticeRequest, text?: string): LhMarkerMessage {
+/** `nth`: which hint on this problem a Hint request is (1 for the first). */
+export function newPracticeRequestMessage(problemCallId: string, request: PracticeRequest, text?: string, nth = 1): LhMarkerMessage {
 	const work = text?.trim();
+	const head = request === "hint" ? `${PRACTICE_REQUEST_TEXT.hint} ${hintRungText(nth)}` : PRACTICE_REQUEST_TEXT[request];
 	return {
 		id: newMessageId(),
 		role: "custom",
 		customType: "practice-request",
-		content: work ? `${PRACTICE_REQUEST_TEXT[request]}\n\nHis work so far:\n${work}` : PRACTICE_REQUEST_TEXT[request],
+		content: work ? `${head}\n\nHis work so far:\n${work}` : head,
 		display: true,
 		details: { problemCallId, request, ...(work ? { text: work } : {}) } satisfies PracticeRequestDetails,
 		timestamp: Date.now(),

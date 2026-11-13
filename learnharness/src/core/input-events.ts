@@ -41,6 +41,7 @@ import {
 	newProblemDismissedMarker,
 	newThinkingMessage,
 	newPracticeRequestMessage,
+	hintsAsked,
 	newUserMessage,
 	newMessageId,
 	malformedQuestionsOf,
@@ -283,7 +284,7 @@ export function inputAppends(
 			if (!active || active.toolCallId !== input.problemCallId) {
 				throw new ChatInputError("request input targets no active problem");
 			}
-			return [newPracticeRequestMessage(input.problemCallId, input.request, input.text)];
+			return [newPracticeRequestMessage(input.problemCallId, input.request, input.text, hintsAsked(record.messages, input.problemCallId) + 1)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

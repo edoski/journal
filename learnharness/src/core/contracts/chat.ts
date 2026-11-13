@@ -271,6 +271,15 @@ export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = 
 		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
 };
 
+/** Which rung a Hint request asks for, by how many hints this problem has
+ *  had: the first is a question, the second a nudge, the third and later
+ *  one step. Show me reveals the rest. */
+export function hintRungText(nth: number): string {
+	if (nth <= 1) return "This is his first hint on this problem: ask him one question that points at where to look (R0 or R1). No method, no step, no answer.";
+	if (nth === 2) return "This is his second hint on this problem: one nudge that names the pattern or the idea (R2 or R3). Carrying it out stays his.";
+	return `This is hint ${nth} on this problem: one step, worked or outlined (R4 or R5), never the rest of the solution. Show me is how he sees the rest.`;
+}
+
 /** The compaction marker's model-facing header (owner round 14,
  *  2026-10-05). The marker's content is this header + the summary — the
  *  single text the provider sees in place of the dropped span. Wording
