@@ -55,7 +55,7 @@ Every row is a Tab stop; `sidebar-tree.ts` moves focus without opening: ↑/↓ 
 
 ## Search
 
-Topics and sessions whose titles match, under Topics and Sessions, in the rows' own anatomy. Matching courses come first under Courses, each a 36px shelf row (`course-result-row.tsx`, `data-slot` `course-result`: the course's mark and name) that opens the course's page (components/course-page/course-page.md); the field's label reads "Search courses, topics and sessions".
+Topics and sessions whose titles match, under Topics and Sessions, in the rows' own anatomy. Matching courses come first under Courses, each a 36px shelf row (`course-result-row.tsx`, `data-slot` `course-result`: the course's mark and name) that opens the course's page (components/course-page/course-page.md); the field's label and tooltip read "Search topics, lessons and courses", the words its shortcut has in the keyboard list (`src/core/keyboard.ts`), and its placeholder "Search".
 
 ## The topic page
 

@@ -86,7 +86,7 @@ export interface KeyActionDef {
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "new-session", label: "New lesson", scope: "global", binding: "mod+n" },
 	{ id: "jump-graph", label: "Go home", scope: "global", binding: "mod+g" },
-	{ id: "sessions-search", label: "Search topics and lessons", scope: "global", binding: "mod+shift+f" },
+	{ id: "sessions-search", label: "Search topics, lessons and courses", scope: "global", binding: "mod+shift+f" },
 	{ id: "toggle-sidebar", label: "Show or hide the sidebar", scope: "global", binding: "mod+b" },
 	{ id: "open-settings", label: "Settings", scope: "global", binding: "mod+," },
 	{ id: "cheat-sheet", label: "All shortcuts", scope: "global", binding: "?" },

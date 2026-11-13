@@ -3,7 +3,7 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, type ChatListItem, type StudyCourse } from "@/src/core";
+import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
@@ -48,6 +48,9 @@ export function searchInbox(
 		sessions: filterSessions([...chats], query),
 	};
 }
+
+/** Search's label and tooltip, in its shortcut's own words. */
+const SEARCH_LABEL = KEYBOARD_ACTIONS.find((action) => action.id === "sessions-search")!.label;
 
 /** A results heading, T3 Code's quiet 12px label. */
 function ResultsLabel({ children }: { children: React.ReactNode }) {
@@ -103,7 +106,6 @@ export function UnitSidebar() {
 			s,
 		};
 	}, [state, scope, folded, fold, s]);
-	const searchLabel = "Search courses, topics and sessions";
 	const walked = s.kbdIndex !== null ? found?.sessions[s.kbdIndex]?.id : undefined;
 	const isOpen = (u: Unit) => isUnitOpen(u, s.pathname);
 	const today = state.status === "ready" ? state.inbox.today : "";
@@ -161,7 +163,7 @@ export function UnitSidebar() {
 
 					<div data-slot="sidebar-header" className="flex shrink-0 items-center gap-1 px-2">
 						<div className="flex h-8 min-w-0 flex-1 items-center rounded-md pr-0.5 text-control font-medium text-muted-foreground transition-colors focus-within:bg-fill-hover focus-within:text-foreground focus-within:ring-1 focus-within:ring-inset focus-within:ring-ring/70 hover:bg-fill-hover hover:text-foreground motion-reduce:transition-none">
-							<Hint label={searchLabel} action="sessions-search" side="bottom">
+							<Hint label={SEARCH_LABEL} action="sessions-search" side="bottom">
 								<label className="flex h-full min-w-0 flex-1 cursor-text items-center gap-2 pl-2">
 									<SearchIcon aria-hidden className="size-4 shrink-0" />
 									<input
@@ -178,7 +180,7 @@ export function UnitSidebar() {
 											s.onSearchKeyDown(e, found?.sessions ?? null);
 										}}
 										placeholder="Search"
-										aria-label={searchLabel}
+										aria-label={SEARCH_LABEL}
 										spellCheck={false}
 										className="min-w-0 flex-1 bg-transparent text-control font-medium text-foreground outline-none placeholder:text-muted-foreground"
 									/>
