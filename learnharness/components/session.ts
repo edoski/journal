@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { ChatInput, LhMessage, QuestionAnswerData } from "@/src/core";
 import { SessionModel, type SessionState } from "@/components/session-core";
+import { useNotifyHub } from "@/components/server-events";
 
 export interface UseChatSessionOptions {
 	chatId: string;
@@ -49,6 +50,22 @@ export function useChatSession({ chatId, initialMessages, initialError, initiall
 			model.onChange = undefined;
 		};
 	}, [model, bump]);
+
+	// The 409 retry waits for this chat's next turn-settled on the channel.
+	const hub = useNotifyHub();
+	useEffect(() => {
+		model.setTurnSettled(
+			hub
+				? () => {
+						let off = () => {};
+						const promise = new Promise<void>((resolve) => {
+							off = hub.subscribe("turn-settled", (p) => p.chatId === chatId && resolve());
+						});
+						return { promise, cancel: off };
+					}
+				: undefined,
+		);
+	}, [hub, model, chatId]);
 
 	// Reattach on mount (StrictMode-safe: a newer resume cancels the older).
 	// ATTACH-FIRST (owner, reattach round 2026-10-02): the page render just

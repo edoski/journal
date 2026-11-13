@@ -38,17 +38,19 @@ import {
 
 export type SessionStatus = "ready" | "submitted" | "streaming" | "error";
 
-/** How often to poll turnInFlight while a racing turn runs (409 retry). */
-export const TURN_POLL_MS = 500;
 /** Give up waiting (a wake turn can run long) and surface the 409. */
 export const TURN_WAIT_MAX_MS = 30_000;
+
+/** The chat's next turn-settled, subscribed when called; `cancel` drops it. */
+export type TurnSettledWaiter = () => { promise: Promise<void>; cancel: () => void };
 
 export interface SessionModelDeps {
 	/** Injectable fetch (tests); defaults to the global. */
 	fetch?: typeof globalThis.fetch;
-	/** Injectable retry timing (tests). */
-	pollMs?: number;
+	/** Injectable retry deadline (tests). */
 	waitMaxMs?: number;
+	/** The 409 retry's wait (the adapter wires the events channel). */
+	turnSettled?: TurnSettledWaiter;
 }
 
 /** A local optimistic id (never a server stamp — absorption and the
@@ -58,17 +60,17 @@ function localId(): string {
 	return `c_${Date.now().toString(36)}_${(localSeq++).toString(36)}`;
 }
 
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const t = setTimeout(resolve, ms);
-		signal?.addEventListener(
-			"abort",
-			() => {
-				clearTimeout(t);
-				reject(new DOMException("Aborted", "AbortError"));
-			},
-			{ once: true },
-		);
+/** Resolves when `event` does, when `ms` pass (the retry's deadline), or
+ *  when `signal` aborts, whichever comes first. */
+function settleOrDeadline(event: Promise<void> | undefined, ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((resolve) => {
+		const t = setTimeout(resolve, Math.max(0, ms));
+		const done = () => {
+			clearTimeout(t);
+			resolve();
+		};
+		void event?.then(done);
+		signal?.addEventListener("abort", done, { once: true });
 	});
 }
 
@@ -230,8 +232,8 @@ export class SessionModel {
 	fetch: typeof globalThis.fetch;
 	/** Steers sent but not yet drained (the queued indicator's truth). */
 	private steerQueueValue: SteerQueueItem[] = [];
-	private readonly pollMs: number;
 	private readonly waitMaxMs: number;
+	private turnSettled?: TurnSettledWaiter;
 	private onReattachSettled?: () => void;
 	/** The hook's re-render trigger (set by the adapter). */
 	onChange?: () => void;
@@ -276,10 +278,15 @@ export class SessionModel {
 		// (Node's undici doesn't care, so the tests never saw it). Always go
 		// through a receiver-preserving wrapper.
 		this.fetch = opts.fetch ?? ((...args) => globalThis.fetch(...args));
-		this.pollMs = opts.pollMs ?? TURN_POLL_MS;
 		this.waitMaxMs = opts.waitMaxMs ?? TURN_WAIT_MAX_MS;
+		this.turnSettled = opts.turnSettled;
 		this.onChange = opts.onChange;
 		this.onReattachSettled = opts.onReattachSettled;
+	}
+
+	/** The 409 retry's wait for the racing turn (the adapter wires the hub). */
+	setTurnSettled(fn: TurnSettledWaiter | undefined): void {
+		this.turnSettled = fn;
 	}
 
 	/** Injectable settle hook (the adapter wires its ref). */
@@ -338,7 +345,8 @@ export class SessionModel {
 
 	/** The 409 identity-retry fetch (the Wave B contract): the event was
 	 *  never persisted (write-ahead happens only on acceptance), so the
-	 *  retry waits out the running turn and re-POSTs the SAME body. */
+	 *  retry waits for the racing turn to settle (the events channel's
+	 *  turn-settled, within the deadline) and re-POSTs the SAME body. */
 	async postInputEvent(input: ChatInput, signal?: AbortSignal): Promise<Response> {
 		const body = JSON.stringify({ chatId: this.chatId, input });
 		const init: RequestInit = {
@@ -348,14 +356,15 @@ export class SessionModel {
 			signal,
 		};
 		let response = await this.fetch("/api/chat", init);
-		let waited = 0;
+		const deadline = Date.now() + this.waitMaxMs;
 		while (response.status === 409) {
 			await response.body?.cancel().catch(() => {});
-			if (signal?.aborted || waited >= this.waitMaxMs) return response;
-			await delay(this.pollMs, signal);
-			waited += this.pollMs;
-			if (signal?.aborted) return response;
-			if ((await turnInFlight(this)) !== false) continue;
+			if (signal?.aborted || Date.now() >= deadline) return response;
+			// Subscribed before the check, so a settle in between is not missed.
+			const settled = this.turnSettled?.();
+			if ((await turnInFlight(this)) !== false) await settleOrDeadline(settled?.promise, deadline - Date.now(), signal);
+			settled?.cancel();
+			if (signal?.aborted || Date.now() >= deadline) return response;
 			response = await this.fetch("/api/chat", init); // may 409 again → loop
 		}
 		return response;
