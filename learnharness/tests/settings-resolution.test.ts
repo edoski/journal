@@ -17,7 +17,8 @@ import {
 	resolveSettings,
 	resolveSlot,
 } from "../src/core/settings-resolution.ts";
-import { BACKGROUND_MODEL_ROLES, type UserSettings } from "../src/core/settings.ts";
+import { BACKGROUND_MODEL_ROLES, sanitizeUserSettings, type UserSettings } from "../src/core/settings.ts";
+import { CLAUDE_MODEL_IDS } from "../src/core/contracts/claude.ts";
 
 describe("resolveSettings", () => {
 	it("null record (first boot): non-model knobs land on factory defaults; every model view is EMPTY", () => {
@@ -216,5 +217,34 @@ describe("the prober graph tools gate", () => {
 		assert.deepEqual(eff.agent.graphTools, {});
 		const off = resolveSettings({ version: 1, agent: { graphTools: { enabled: false } } });
 		assert.deepEqual(off.agent.graphTools, { enabled: false });
+	});
+});
+describe("a saved Claude model the app no longer offers", () => {
+	const claude = (provider: string, id: string, thinkingLevel?: "high" | "low") => ({ model: { provider, id }, ...(thinkingLevel ? { thinkingLevel } : {}) });
+	const saved = {
+		version: 1,
+		models: {
+			strong: claude("claude-subscription", "claude-opus-5-5", "high"),
+			cheap: claude("claude-subscription", "claude-haiku-5-5", "low"),
+			vision: claude("claude-subscription-work", "claude-sonnet-5-5"),
+		},
+		agent: { models: { demoBuilder: claude("claude-subscription", "claude-sonnet-5-5") } },
+	};
+
+	it("reads as the model Claude offers, on the same account and thinking level, so demo and figure jobs still run", () => {
+		const eff = resolveSettings(sanitizeUserSettings(saved));
+		assert.deepEqual(eff.models.cheap, { provider: "claude-subscription", id: "claude-opus-5-5", thinkingLevel: "low" });
+		assert.deepEqual([eff.models.vision?.provider, eff.models.vision?.id], ["claude-subscription-work", "claude-opus-5-5"]);
+		for (const role of ["demoBuilder", "visualMaker", "researcher"] as const) {
+			assert.ok((CLAUDE_MODEL_IDS as readonly string[]).includes(eff.agent.models[role]!.id), role);
+		}
+	});
+
+	it("is written back migrated, and leaves an offered model and other providers as they are", () => {
+		const record = sanitizeUserSettings(saved)!;
+		assert.deepEqual(record.models?.strong, claude("claude-subscription", "claude-opus-5-5", "high"));
+		assert.equal(record.agent?.models?.demoBuilder?.model?.id, "claude-opus-5-5");
+		const chatgpt = sanitizeUserSettings({ version: 1, models: { cheap: claude("chatgpt", "gpt-5.5-mini") } })!;
+		assert.deepEqual(chatgpt.models?.cheap, claude("chatgpt", "gpt-5.5-mini"));
 	});
 });

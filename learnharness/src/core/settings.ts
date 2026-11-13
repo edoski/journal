@@ -28,7 +28,7 @@
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
-import { isClaudeProvider } from "./contracts/claude.ts";
+import { CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULT, isClaudeProvider } from "./contracts/claude.ts";
 import type { ModelRole } from "../../config.ts";
 import type { ChatSettings } from "./contracts/chat.ts";
 
@@ -348,6 +348,15 @@ const THINKING_LEVELS: readonly ThinkingLevel[] = [
 	"max",
 ];
 
+/** A Claude model the app does not offer (a slot saved as
+ *  claude-haiku-5-5 or claude-sonnet-5-5 before Opus became the only one)
+ *  reads as the one it offers, on the same account: no Claude account runs
+ *  any other, so a job on that slot would fail at once. Pure. */
+function offeredModel(model: { provider: string; id: string }): { provider: string; id: string } {
+	if (!isClaudeProvider(model.provider) || (CLAUDE_MODEL_IDS as readonly string[]).includes(model.id)) return model;
+	return { provider: model.provider, id: CLAUDE_ROLE_DEFAULT.id };
+}
+
 function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 	if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
 	const r = raw as Record<string, unknown>;
@@ -359,10 +368,10 @@ function sanitizeRoleOverride(raw: unknown): RoleModelOverride | undefined {
 		typeof (r.model as Record<string, unknown>).provider === "string" &&
 		typeof (r.model as Record<string, unknown>).id === "string"
 	) {
-		out.model = {
+		out.model = offeredModel({
 			provider: (r.model as { provider: string }).provider,
 			id: (r.model as { id: string }).id,
-		};
+		});
 	}
 	if (typeof r.thinkingLevel === "string" && THINKING_LEVELS.includes(r.thinkingLevel as ThinkingLevel)) {
 		out.thinkingLevel = r.thinkingLevel as ThinkingLevel;
