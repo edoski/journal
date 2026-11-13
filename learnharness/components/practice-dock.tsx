@@ -92,17 +92,17 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 		return () => listeners.forEach((off) => off());
 	}, []);
 
-	const requestButtons = (proposed: boolean) =>
+	const requestButtons = () =>
 		REQUESTS.map(({ request: kind, label, hint, icon: Icon, action }) => (
 			<Hint key={kind} label={hint} action={action}>
 				<Button
 					type="button"
-					variant={proposed ? "quiet" : "ghost"}
+					variant="quiet"
 					size="sm"
 					data-testid={`practice-request-${kind}`}
 					disabled={compactionRunning}
 					onClick={() => request(kind)}
-					className={proposed ? "h-8 rounded-full px-3 text-row" : "h-9 px-2.5 text-sm"}
+					className="h-8 rounded-full px-3 text-row"
 				>
 					<Icon />
 					{label}
@@ -168,7 +168,7 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 					{compactionRunning ? (
 						<span aria-hidden className="min-w-0 truncate text-label text-muted-foreground">Compacting the conversation…</span>
 					) : (
-						<div data-testid="practice-requests" className="flex min-w-0 items-center gap-0.5">{requestButtons(true)}</div>
+						<div data-testid="practice-requests" className="flex min-w-0 items-center gap-0.5">{requestButtons()}</div>
 					)}
 					<Button
 						type="button"
@@ -253,11 +253,9 @@ export function PracticeDock({ problemCallId, input, expanded, onExpand, onSubmi
 				    field 10 − p-1 (4) = button 6. */}
 				<div className="flex items-center justify-between gap-2 p-1">
 					<ConfidenceChoice value={confidence} onChange={setConfidence} />
-					{compactionRunning ? (
-						<span aria-hidden className="min-w-0 truncate pl-1.5 text-xs text-muted-foreground">compacting session…</span>
-					) : (
-						<div data-testid="practice-requests" className="flex min-w-0 items-center">{requestButtons(false)}</div>
-					)}
+					<span aria-hidden className="min-w-0 truncate pl-1.5 text-xs text-muted-foreground">
+						{compactionRunning ? "compacting session…" : "↵ submits · ⇧↵ newline"}
+					</span>
 					<Button
 						type="button"
 						data-testid="practice-send"
