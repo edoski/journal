@@ -8,14 +8,13 @@ import { layoutCourseMap } from "@/components/course-map/course-map-layout";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { mapFade } from "@/components/study-home/map-frame";
+
+/** How far the fade reaches in from the sides and from the top and bottom. */
+const FADE = { x: 64, y: 40 };
 
 /** The map's edges fade into the page on every side, like a vignette. */
-const VIGNETTE = {
-	maskImage:
-		"linear-gradient(to right, transparent, #000 64px, #000 calc(100% - 64px), transparent), linear-gradient(to bottom, transparent, #000 40px, #000 calc(100% - 40px), transparent)",
-	maskComposite: "intersect",
-	WebkitMaskComposite: "source-in",
-} as const;
+const VIGNETTE = mapFade(FADE.x, FADE.y);
 
 /**
  * The selected course's map on Home (spec: home-map.md): course tabs over
@@ -92,6 +91,8 @@ export function HomeMap({
 						onStudy={(topic) => onStudy(topic, map.workspace)}
 						busy={busy}
 						anchor={0.5}
+						// As much room as the fade, so a topic at the edge scrolls clear of it.
+						margin={FADE}
 						className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 					/>
 				) : (

@@ -19,6 +19,7 @@ import { CURRENT_TAG, topicCaption } from "./topic-words";
 
 /** Space around the drawing: room for the current topic's tag above layer 0. */
 const PAD = 32;
+const NO_MARGIN = { x: 0, y: 0 };
 /** The open's per-layer stagger, capped so the whole entrance ends under 300ms. */
 const STAGGER_MS = 15;
 const STAGGER_CAP_MS = 110;
@@ -59,6 +60,7 @@ export function CourseMapGraph({
 	onStudy,
 	busy,
 	anchor = 0.4,
+	margin = NO_MARGIN,
 	className,
 }: {
 	map: CourseMap;
@@ -69,6 +71,9 @@ export function CourseMapGraph({
 	busy: boolean;
 	/** Where the current topic sits down the view, as a share of its height. */
 	anchor?: number;
+	/** Room around the drawing at screen size, for a frame that fades its
+	 *  edges: a topic at the drawing's edge scrolls clear of the fade. */
+	margin?: { x: number; y: number };
 	/** The scroll box's own classes, for a frame that embeds the map. */
 	className?: string;
 }) {
@@ -107,12 +112,12 @@ export function CourseMapGraph({
 			const placed = map.current ? layout.topics.get(map.current) : undefined;
 			if (!box || !placed) return;
 			box.scrollTo({
-				top: (PAD + placed.y + NODE_HEIGHT / 2) * fit - box.clientHeight * anchor,
-				left: (PAD + placed.x + NODE_WIDTH / 2) * fit - box.clientWidth / 2,
+				top: margin.y + (PAD + placed.y + NODE_HEIGHT / 2) * fit - box.clientHeight * anchor,
+				left: margin.x + (PAD + placed.x + NODE_WIDTH / 2) * fit - box.clientWidth / 2,
 				behavior,
 			});
 		},
-		[layout, map.current, fit, anchor],
+		[layout, map.current, fit, anchor, margin.x, margin.y],
 	);
 	useEffect(() => jump("auto"), [jump]);
 	useEffect(() => {
@@ -148,12 +153,12 @@ export function CourseMapGraph({
 
 	return (
 		<div ref={scrollRef} data-slot="course-map-scroll" className={cn("min-h-0 flex-1 overflow-auto", className)}>
-			<div className="relative mx-auto" style={{ width: width * fit, height: height * fit }}>
+			<div className="relative mx-auto" style={{ width: width * fit + margin.x * 2, height: height * fit + margin.y * 2 }}>
 				<figure
 					data-slot="course-map-graph"
 					aria-labelledby="course-map-caption"
-					className="absolute top-0 left-0 origin-top-left"
-					style={{ width, height, transform: fit < 1 ? `scale(${fit})` : undefined }}
+					className="absolute origin-top-left"
+					style={{ top: margin.y, left: margin.x, width, height, transform: fit < 1 ? `scale(${fit})` : undefined }}
 				>
 					<figcaption id="course-map-caption" className="sr-only">
 						{`${map.title}: ${map.topics.length} topics, prerequisites above the topics that need them.`}

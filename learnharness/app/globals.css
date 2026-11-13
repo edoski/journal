@@ -276,28 +276,32 @@ body {
 	line-height: 1.25;
 }
 
-/* Thin dark native scrollbar (app-wide): dark thumb, transparent track. */
-* {
-	scrollbar-width: thin;
-	scrollbar-color: var(--color-border) transparent;
-}
+/* Thin dark native scrollbar (app-wide): dark thumb, transparent track.
+   In the base layer, so a utility such as `[scrollbar-width:none]` on a
+   scroll box that draws no bar wins over it; unlayered, it beat them all. */
+@layer base {
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-border) transparent;
+	}
 
-::-webkit-scrollbar {
-	width: 8px;
-	height: 8px;
-}
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
 
-::-webkit-scrollbar-track {
-	background: transparent;
-}
+	::-webkit-scrollbar-track {
+		background: transparent;
+	}
 
-::-webkit-scrollbar-thumb {
-	background: var(--color-border);
-	border-radius: 8px;
-}
+	::-webkit-scrollbar-thumb {
+		background: var(--color-border);
+		border-radius: 8px;
+	}
 
-::-webkit-scrollbar-thumb:hover {
-	background: var(--color-muted-foreground);
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-muted-foreground);
+	}
 }
 
 /* Dock variant swap — quick fade/rise on content change; the shell's HEIGHT
