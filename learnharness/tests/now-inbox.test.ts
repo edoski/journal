@@ -80,7 +80,7 @@ describe("restShelves", () => {
 });
 
 describe("shelfStatus", () => {
-	const unit = (over: Partial<Unit>): Unit => ({ key: "k", course: { workspace: "w", title: "W" }, topic: topic("t", "T", "assisted"), shelf: "learning", sessions: [], now: null, task: null, ...over });
+	const unit = (over: Partial<Unit>): Unit => ({ key: "k", course: { workspace: "w", title: "W" }, topic: topic("t", "T", "assisted"), shelf: "learning", sessions: [], now: null, task: null, slip: null, ...over });
 
 	it("says how long since a Learning topic was studied in Home's words, falling back to the day it was first taught", () => {
 		assert.deepEqual(shelfStatus(unit({ sessions: [chat("a", { updatedAt: "2026-11-07T09:00:00.000Z" })] }), TODAY), { kind: "studied", words: "Yesterday" });

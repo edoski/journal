@@ -1,5 +1,5 @@
-import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse } from "@/src/core";
-import { overdueWords, slipShort } from "@/components/course-map/topic-map/topic-standing";
+import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
+import { overdueWords, returnWords, slipWords } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
 import { sessionState } from "@/components/nav/session-state";
 
@@ -34,6 +34,8 @@ export interface Unit {
 	/** The open task that holds the topic, the course's focused one first
 	 *  (`taskOf`), or null. */
 	task: CourseMapTask | null;
+	/** Why the engine calls the topic weak (`slipOf`), or null. */
+	slip: string | null;
 }
 
 /**
@@ -80,6 +82,14 @@ export function taskOf(map: Pick<CourseMap, "tasks" | "focus">, topic: CourseMap
 	return held.find((task) => task.key === map.focus) ?? held[0] ?? null;
 }
 
+/** Why the engine calls a topic weak, in the app's words, a method he
+ *  mixed it up with named by its title on the course's map; null when it
+ *  does not. Pure. */
+export function slipOf(map: Pick<CourseMap, "topics">, topic: CourseMapTopic): string | null {
+	if (!topic.weak) return null;
+	return slipWords(topic.signals, (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle);
+}
+
 /** What a topic's sessions are doing now. Pure. */
 export function nowOf(sessions: readonly ChatListItem[]): UnitNow {
 	const states = sessions.map(sessionState);
@@ -112,7 +122,7 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
 			const now = nowOf(sessions);
 			const shelf = shelfOf(topic, now);
-			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic) });
+			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic) });
 		}
 	}
 	const listed = new Set(units.flatMap((u) => u.sessions.map((s) => s.id)));
@@ -139,7 +149,7 @@ export function daysBetween(from: string, to: string): number {
  *   - a session waits on the learner ("Your turn"), or the tutor writes
  *     in one (Working), as the session state reads them;
  *   - the engine calls the topic weak ("Missed last time", "Mistake to
- *     fix", "Mixed up", "Sure, but wrong");
+ *     fix", "Mixed up with Rank", "Sure, but wrong");
  *   - a solid topic's review is due ("Due today", "3d overdue");
  *   - an open task holds it, and where he left off ("At part (c)");
  *   - when its next review comes ("Back in 5d");
@@ -178,7 +188,7 @@ export function studiedWords(at: string, today: string): string {
 export function unitStatus(unit: Unit, today: string): UnitStatus {
 	if (unit.now) return { kind: unit.now };
 	const { topic } = unit;
-	if (topic.weak) return { kind: "slip", words: topic.signals.lapsed ? "Missed last time" : slipShort(topic) };
+	if (unit.slip) return { kind: "slip", words: unit.slip };
 	if (unit.shelf === "review" && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (unit.task) return { kind: "task", words: taskWords(unit.task) };
 	if (topic.review?.kind === "scheduled") return { kind: "returns", words: returnWords(Math.max(1, daysBetween(today, topic.review.date))) };
@@ -208,27 +218,6 @@ export function monogram(title: string): string {
 		.join("");
 }
 
-/** "Back in 5d", "Back in 3w", "Back in 2mo": when a known topic's review
- *  comes, short enough for the trailing column, in the course page's
- *  "Back" word. Pure. */
-export function returnWords(days: number): string {
-	if (days < 14) return `Back in ${days}d`;
-	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
-	return `Back in ${Math.round(days / 30)}mo`;
-}
-
-/** The standing in plain words: what the engine's level means for him.
- *  The engine owns the level; this only names it. Pure. */
-export const LEVEL_WORDS: Record<CourseMapTopic["level"], string> = {
-	new: "Not started",
-	introduced: "Taught, not tried yet",
-	attempted: "Tried, not right yet",
-	assisted: "Right with help",
-	independent: "Right on your own once",
-	retained: "Right on your own, more than once",
-	transferred: "Used in a new setting",
-};
-
 /** A topic's sessions in its course, newest first: those the engine's
  *  records tie to it (a problem posed on it, an attempt saved on it, its
  *  introduction) and those started on it. Never a session that only holds
@@ -251,13 +240,4 @@ const newestFirst = (a: ChatListItem, b: ChatListItem) => b.updatedAt.localeComp
 export function openingFor(topicTitle: string, prompt: string): string {
 	const text = prompt.trim();
 	return text.toLowerCase().includes(topicTitle.toLowerCase()) ? text : `${topicTitle}: ${text}`;
-}
-
-const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-
-/** The review in words, with no overdue count: "Review due", "Back Thu
- *  13 Nov". Pure. */
-export function reviewWords(review: CourseMapTopic["review"]): string | null {
-	if (!review) return null;
-	return review.kind === "due" ? "Review due" : `Back ${DAY.format(new Date(`${review.date}T00:00:00Z`)).replace(",", "")}`;
 }

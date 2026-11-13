@@ -1,8 +1,8 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { needsYouNow, type NeedsYou } from "@/components/study-home/needs-you";
 import { todaysReview } from "@/components/study-home/study-facts";
-import { overdueWords } from "@/components/course-map/topic-map/topic-standing";
-import { byLearning, nowOf, shelfOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
+import { overdueWords } from "@/components/study-words";
+import { byLearning, nowOf, shelfOf, slipOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
 
 /**
  * The sidebar's list (spec: unit-inbox.md, "Today on top"): the top is
@@ -37,7 +37,7 @@ export function unitFor(course: StudyCourse, topic: CourseMapTopic, chats: reado
 	const { workspace, title } = course.map;
 	const sessions = topicSessions(chats, workspace, topic.handle);
 	const now = nowOf(sessions);
-	return { key: unitKey(workspace, topic.handle), course: { workspace, title }, topic, shelf: shelfOf(topic, now) ?? "learning", sessions, now, task: taskOf(course.map, topic) };
+	return { key: unitKey(workspace, topic.handle), course: { workspace, title }, topic, shelf: shelfOf(topic, now) ?? "learning", sessions, now, task: taskOf(course.map, topic), slip: slipOf(course.map, topic) };
 }
 
 /** The shelves' rows: every listed unit not on top, and the sessions on no

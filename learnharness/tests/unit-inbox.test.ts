@@ -7,7 +7,6 @@ import {
 	taskSessions,
 	monogram,
 	openingFor,
-	returnWords,
 	sessionTwins,
 	shelfOf,
 	topicSessions,
@@ -130,6 +129,8 @@ describe("unitStatus", () => {
 	const slipped = { ...topic("chain", "retained", due(4), true), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
 	const gapped = { ...topic("kernel", "attempted", due(1), true), signals: { gap: "Counts nonzero entries", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } };
 	const held = { ...topic("det", "assisted", due(2)), tasks: ["sheet4"] };
+	const mixed = { ...topic("elimination", "assisted", due(2), true), signals: { ...slipped.signals, lapsed: false, choiceErrors: { cramer: 1 } } };
+	const fixed = { ...topic("matmul", "independent", due(2), true), signals: { ...slipped.signals, repaired: true } };
 	const la = course("la", [
 		topic("rank", "assisted", due(3)),
 		topic("cramer", "introduced", later("2026-11-09")),
@@ -141,6 +142,8 @@ describe("unitStatus", () => {
 		slipped,
 		gapped,
 		held,
+		mixed,
+		fixed,
 	]);
 	const inbox = buildInbox(
 		[{ ...la, map: { ...la.map, tasks: [{ key: "sheet4", title: "Problem sheet 4", step: "Part (c): show dim ker A = 2" }] } }],
@@ -154,13 +157,14 @@ describe("unitStatus", () => {
 		assert.deepEqual(unitStatus(by("eigen"), inbox.today), { kind: "your-turn" });
 		assert.deepEqual(unitStatus(by("chain"), inbox.today), { kind: "slip", words: "Missed last time" });
 		assert.deepEqual(unitStatus(by("kernel"), inbox.today), { kind: "slip", words: "Mistake to fix" });
+		assert.deepEqual(unitStatus(by("elimination"), inbox.today), { kind: "slip", words: "Mixed up with cramer" }, "the method named by its title, as the map says it");
+		assert.deepEqual(unitStatus(by("matmul"), inbox.today), { kind: "slip", words: "Fixed, check again later" });
 		assert.deepEqual(unitStatus(by("span"), inbox.today), { kind: "review", words: "2d overdue" });
 		assert.deepEqual(unitStatus(by("basis"), inbox.today), { kind: "review", words: "1w overdue" });
 		assert.deepEqual(unitStatus(by("det"), inbox.today), { kind: "task", words: "At part (c)" });
 		assert.deepEqual(unitStatus(by("cramer"), inbox.today), { kind: "returns", words: "Back in 1d" });
 		assert.deepEqual(unitStatus(by("vectors"), inbox.today), { kind: "returns", words: "Back in 3w" });
 		assert.deepEqual(unitStatus(by("trace"), inbox.today), { kind: "studied", words: "3d ago" });
-		assert.equal(returnWords(5), "Back in 5d");
 	});
 
 	it("says Your turn only on a row whose session waits on him", () => {

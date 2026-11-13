@@ -5,14 +5,16 @@ import { examWords, todayRows, type TodayRow } from "@/components/study-home/stu
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
-import { buildInbox, reviewWords, type Unit, type UnitNow } from "@/components/unit-inbox/units";
+import { buildInbox, daysBetween, type Unit, type UnitNow } from "@/components/unit-inbox/units";
+import { returnWords } from "@/components/study-words";
 
 /**
  * The course page's model (spec: course-page.md): one course's topics, each
  * sorted once into the group he would act on it from, with the one fact its
  * row ends with, and the header's facts and next lesson. Built on the
  * sidebar's classifier (`buildInbox`, `shelfOf`) and the topic map's words
- * (`standingOf`, `needOf`), so the sidebar, the map and the page agree.
+ * (`standingOf`, `needOf`), in the app's one wording (study-words.ts), so
+ * the sidebar, the map and the page agree.
  * Engine fields only. Pure.
  */
 
@@ -43,7 +45,7 @@ export type TopicFact =
 	| { kind: "here"; words: string }
 	/** An open task holds it, and where he left it: "At part (c)". */
 	| { kind: "task"; words: string }
-	/** He can do it on his own, and the day it comes back: "Back Fri 13 Nov". */
+	/** He can do it on his own, and when it comes back: "Back in 5d". */
 	| { kind: "back"; words: string };
 
 /** One topic as the page lists it. */
@@ -89,7 +91,7 @@ function factOf(course: StudyCourse, topic: CourseMapTopic, group: GroupId, now:
 	if (now === "working") return { kind: "working", words: "Working" };
 	switch (group) {
 		case "needs-you":
-			return need ? { kind: need.kind, words: need.short } : null;
+			return need ? { kind: need.kind, words: need.words } : null;
 		case "learning": {
 			if (current) return { kind: "here", words: CURRENT_TAG };
 			const task = taskWords(course, topic);
@@ -97,10 +99,8 @@ function factOf(course: StudyCourse, topic: CourseMapTopic, group: GroupId, now:
 		}
 		case "not-started":
 			return current ? { kind: "here", words: CURRENT_TAG } : null;
-		case "on-your-own": {
-			const back = topic.review?.kind === "scheduled" ? reviewWords(topic.review) : null;
-			return back ? { kind: "back", words: back } : null;
-		}
+		case "on-your-own":
+			return topic.review?.kind === "scheduled" ? { kind: "back", words: returnWords(Math.max(1, daysBetween(course.map.today, topic.review.date))) } : null;
 	}
 }
 

@@ -126,7 +126,7 @@ describe("every topic once, in the group he would act on it from", () => {
 		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["kernel", "independence", "span"]);
 		assert.deepEqual(
 			groupOf(groups, "needs-you").topics.map((t) => t.fact?.words),
-			["Sure, but wrong", "A mistake to fix", "1w overdue"],
+			["Sure, but wrong", "Mistake to fix", "1w overdue"],
 		);
 	});
 
@@ -139,11 +139,11 @@ describe("every topic once, in the group he would act on it from", () => {
 		assert.equal(fact("determinant"), null, "a topic still being learned never says its review is due");
 	});
 
-	it("lists what is not started in the engine's path order, and the solid topics resting, the soonest back first, with the day", () => {
+	it("lists what is not started in the engine's path order, and the solid topics resting, the soonest back first, with when it comes back", () => {
 		assert.deepEqual(handles(groupOf(groups, "not-started")), ["invertible", "eigen"]);
 		const own = groupOf(groups, "on-your-own");
 		assert.deepEqual(handles(own), ["vectors", "basis"]);
-		assert.deepEqual(own.topics[0]!.fact, { kind: "back", words: "Back Fri 13 Nov" });
+		assert.deepEqual(own.topics[0]!.fact, { kind: "back", words: "Back in 5d" });
 	});
 
 	it("agrees with the sidebar: Needs you and Learning together are its listed topics outside Known, Not started is what it leaves out", () => {
@@ -275,7 +275,7 @@ describe("the course topic row and group", () => {
 		const link = document.querySelector('[data-slot="course-topic-row"]')!;
 		assert.equal(link.getAttribute("href"), unitHref(WS, "kernel"));
 		assert.ok(document.querySelector('[data-slot="topic-glyph"]'));
-		assert.equal(document.querySelector('[data-slot="course-topic-title"]')!.textContent, "Kernel, Learning");
+		assert.equal(document.querySelector('[data-slot="course-topic-title"]')!.textContent, "Kernel, Tried, not right yet");
 		assert.equal(document.querySelector('[data-slot="course-topic-fact"]')!.textContent, "Sure, but wrong");
 	});
 

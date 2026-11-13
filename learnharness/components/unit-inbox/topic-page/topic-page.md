@@ -7,7 +7,7 @@ The topic page (`/unit/<course>/<topic>`): `UnitPage` in `../unit-page.tsx` draw
 | His question | Where it is answered |
 |---|---|
 | What is the one thing to do now? | Now in the history pane (`pickup/pickup.md`): Resume, Open, Review, Continue, Start, or Study |
-| Is there anything to review, and when? | The head line: "Review due today", "Review overdue by a week" (at any level, as the action), or "Next review Fri 13 Nov" |
+| Is there anything to review, and when? | The head line, in the app's one wording (`components/study-words.ts`): "Due today", "1w overdue" (at any level, as the action), or "Back in 5d" |
 | Where do I pick this up? | Now and Next in the history pane: the session that waits or is being written, at the step it is on, and each open task that holds the topic, at its step. Else Earlier dates the last study |
 
 ## The one action, first match wins (`topicAction`)
@@ -28,7 +28,7 @@ The app's one lever on the tutor is the session's first message; the tutor's own
 
 ## Shared
 
-- `topic-facts.ts`: every fact the page reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's short words for time are Home's, pinned by test to `studiedAgo`.
+- `topic-facts.ts`: every fact the page reads, pure, engine fields and session facts only, the one clock the engine's study day (`map.today`), a session dated by its local day and never after the engine's; tested in `tests/topic-facts.test.ts`. `topicFacts` folds them into `TopicFacts`. The page's short words for time are Home's, pinned by test to `studiedAgo`; where he stands and why the topic needs him are the app's one wording (`components/study-words.ts`): the standing follows the pie, so a weak topic he could do on his own says "Right with help" beside its 3/4 pie.
 - `use-topic-read.ts`: `useTopicRead` over `GET /api/topic` (`src/server/topic.ts`, contract `src/core/contracts/topic.ts`, tested in `tests/topic-read.test.ts`): the engine's scored attempts on the topic and when each open task was last touched (`show`), and the plan of each of its 20 newest sessions with the step its newest tagged question is about. Nothing else of a transcript leaves the server. Read again on `turn-settled`, `chats-changed` and `record-changed`; a failed read keeps the last good one.
 - `topic-page.tsx`: `TopicPage` (the start, the hybrid body, a start's error under the panes, the setup dialog; no composer: a new lesson starts from the sidebar's New lesson) and `TopicPageProps` (what the body takes: `facts`, `busy`, `onAct`, `onTask`).
 - `topic-head.tsx` (`topic-head.md`), `why-mark.tsx` (Home's why mark restated) and `row-classes.ts` (Home's Hybrid row classes restated).

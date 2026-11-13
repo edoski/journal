@@ -21,7 +21,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 |---|---|---|
 | Resume | the step the lesson stopped on, else its title | Your turn |
 | Open | the same | Tutor writing |
-| Review | "Review overdue by 2 days", the head's mark | |
+| Review | "2d overdue", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
 | Start | Not started | |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |

@@ -105,7 +105,7 @@ describe("Now", () => {
 			[
 				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
 				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
-				["review", "Review overdue by 2 days", null, "Review", null],
+				["review", "2d overdue", null, "Review", null],
 				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
 				["start", "Not started", null, "Start", null],
 				["continue", DET_STOPPED, "Left off yesterday", "Continue", "chat_demo_det"],
@@ -134,7 +134,7 @@ describe("the sections' order", () => {
 		assert.equal(now.chat, "chat_practice");
 		assert.deepEqual(
 			next.map((item) => (item.kind === "session" ? item.entry.chat.id : item.kind === "task" ? item.key : item.words)),
-			["chat_question", "chat_writing", "Review due today", "sheet-4", "sheet-5"],
+			["chat_question", "chat_writing", "Due today", "sheet-4", "sheet-5"],
 		);
 		assert.equal(scheduled, null);
 		assert.deepEqual(earlier.flatMap((day) => day.sessions.map((entry) => entry.chat.id)), ["chat_done"]);

@@ -23,6 +23,7 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
 import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
+import { overdueWords } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<EntryLook, LucideIcon> = {
@@ -149,7 +150,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
 		const date = entry.topic.review?.date ?? entry.day;
-		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? "Due today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
 	} else if (entry.kind === "new") {
 		lines.push(entry.day === today ? "Planned for today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
 	} else if (entry.task.step) {

@@ -1,5 +1,5 @@
 import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { overdueWords } from "@/components/course-map/topic-map/topic-standing";
+import { overdueWords } from "@/components/study-words";
 import { sessionState } from "@/components/nav/session-state";
 import { stepWords, type TodayRow } from "@/components/study-home/study-facts";
 
