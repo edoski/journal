@@ -15,10 +15,9 @@ import { NavSection } from "@/components/nav/nav-section";
 import { resumableSession, sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useDesignVariant, useLinkVariant, usePickupVariant, useTopicVariant } from "@/components/design-variant";
+import { useDesignVariant, useLinkVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
-import { PICKUP_PANES } from "@/components/unit-inbox/topic-page/pickup/pickup-options";
 import { LINK_PANES } from "@/components/unit-inbox/topic-page/link/link-options";
 import { LEVEL_WORDS, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 import { MathText, mathPlain } from "@/components/ui/math-text";
@@ -217,7 +216,6 @@ function UnitBody({
 export function UnitPage({ workspace, handle, initialConfigured }: { workspace: string; handle: string; initialConfigured: boolean }) {
 	const read = useUnitRead(workspace);
 	const variant = useTopicVariant();
-	const pickup = usePickupVariant();
 	const link = useLinkVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
@@ -232,8 +230,7 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 				) : (
 					<TopicPage
 						candidate={TOPIC_CANDIDATES[variant]}
-						pickup={variant === "hybrid" && pickup !== "current" ? PICKUP_PANES[pickup] : undefined}
-						link={variant === "hybrid" && pickup !== "current" && link !== "current" ? LINK_PANES[link] : undefined}
+						link={variant === "hybrid" && link !== "current" ? LINK_PANES[link] : undefined}
 						course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
 				)
 			) : (

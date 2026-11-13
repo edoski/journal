@@ -40,15 +40,7 @@ export const TOPIC_OPTIONS = ["brief", "steps", "trail", "hybrid"] as const;
 /** "current" keeps the topic page as it is. */
 export type TopicVariant = "current" | (typeof TOPIC_OPTIONS)[number];
 
-/** Where the hybrid topic page puts the lesson to pick up: in its history,
- *  sorted by relevance (spec:
- *  components/unit-inbox/topic-page/pickup/pickup.md). */
-export const PICKUP_OPTIONS = ["sections"] as const;
-/** "current" keeps the hybrid's dated history. */
-export type PickupVariant = "current" | (typeof PICKUP_OPTIONS)[number];
-
-/** How the hybrid topic page ties its list to the lesson map under Pick up
- *  (spec: components/unit-inbox/topic-page/link/link.md). */
+/** How the hybrid topic page ties its list to the lesson map (spec: components/unit-inbox/topic-page/link/link.md). */
 export const LINK_OPTIONS = ["split", "connected"] as const;
 /** "current" keeps the two panes side by side with nothing between them. */
 export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
@@ -62,9 +54,8 @@ export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
  *  Proposed design and sidebar; Node is the topic map's node as it was or
  *  one of its candidates, wherever the topic map draws; Overview is Home's
  *  map behind tabs or following the pointed row; Topic is Current or one of
- *  the topic page's candidates; Pick up is Current or Sections, and wears
- *  Topic's hybrid; Link is Current or one of its options, and wears Pick
- *  up's Sections. Read only through the hooks below. */
+ *  the topic page's candidates; Link is Current or one of its options, and
+ *  wears Topic's hybrid. Read only through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "design", label: "Design" },
 	{ id: "home", label: "Home", requires: { design: "proposed" } },
@@ -74,8 +65,7 @@ export const POLISH_GROUPS: readonly PolishGroup[] = [
 	{ id: "node", label: "Node", options: NODE_OPTIONS, requires: { design: "proposed" } },
 	{ id: "overview", label: "Overview", options: OVERVIEW_OPTIONS, requires: { design: "proposed", home: "proposed" } },
 	{ id: "topic", label: "Topic", options: TOPIC_OPTIONS, requires: { design: "proposed" } },
-	{ id: "pickup", label: "Pick up", options: PICKUP_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
-	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed", topic: "hybrid", pickup: "sections" } },
+	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed", topic: "hybrid" } },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -96,8 +86,6 @@ const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" 
 const readHome = (): DesignVariant => (polishVariant("home") === "proposed" ? "proposed" : "current");
 const readTopicCurrent = (): TopicVariant => "current";
 const readTopic = (): TopicVariant => TOPIC_OPTIONS.find((option) => option === polishVariant("topic")) ?? "current";
-const readPickupCurrent = (): PickupVariant => "current";
-const readPickup = (): PickupVariant => PICKUP_OPTIONS.find((option) => option === polishVariant("pickup")) ?? "current";
 const readLinkCurrent = (): LinkVariant => "current";
 const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
 const readSidebar = (): DesignVariant => (polishVariant("sidebar") === "proposed" ? "proposed" : "current");
@@ -158,12 +146,6 @@ export function useOverviewVariant(): OverviewVariant {
  *  Production builds get "current". */
 export function useTopicVariant(): TopicVariant {
 	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readTopic : readTopicCurrent, readTopicCurrent);
-}
-
-/** Where the hybrid topic page puts the lesson to pick up, or "current"
- *  for its dated history. Production builds get "current". */
-export function usePickupVariant(): PickupVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readPickup : readPickupCurrent, readPickupCurrent);
 }
 
 /** How the hybrid topic page ties its list to the lesson map, or "current"

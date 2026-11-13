@@ -1,33 +1,32 @@
 # Topic page candidate `hybrid`
 
-Option `hybrid` of the Topic switch (`../topic-page.md`). Thesis: Steps and Trail in one page that fits the window, each with one job. The history says when and what happened; the map says where one lesson stands and what comes next. A Pick up option replaces the history pane with one sorted by relevance that holds the action (`../pickup/pickup.md`).
+Option `hybrid` of the Topic switch (`../topic-page.md`). Thesis: Steps and Trail in one page that fits the window, each with one job. The history, sorted by relevance into Pick up's sections, says what to pick up and what happened, and holds the page's action (`../pickup/pickup.md`); the map says where one lesson stands and what comes next.
 
-Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN`), `history.tsx` (`History`), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
+Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN`), `history.tsx` (`HistoryPane` and its rows), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
 
 ## Roles
 
 | Pane | Its job | What it does not do |
 |---|---|---|
-| History | The dated index of the topic: every session and scored attempt, newest first. A session row opens the lesson; the map button beside a lesson that planned puts its steps on the map | List a lesson's steps |
+| History | The topic's sessions and scored attempts in Now, Next, Scheduled and Earlier. A session row opens the lesson; the map button beside a lesson that planned puts its steps on the map | List a lesson's steps |
 | Lesson map | Where the lesson on the map stands: the step it stopped on ringed, the steps asked about before dotted, the steps right after it marked Next. Every step opens the lesson | Date anything, or list the other lessons |
-| Composer foot | A new lesson; absent under Pick up, where the sidebar's New lesson starts one | |
 
 ## Anatomy
 
-Column `max-w-[60rem]` (`HYBRID_COLUMN`, which the composer foot shares), `px-6 pt-6 pb-4`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls.
+Column `max-w-[60rem]` (`HYBRID_COLUMN`, which the error line under it shares), `px-6 pt-6 pb-6`, blocks `gap-5`, root `data-testid="unit-page"` `data-topic-candidate="hybrid"`, `flex-1 min-h-0`: nothing on the page scrolls.
 
 | Block | Shown when | Size |
 |---|---|---|
-| `TopicHead` (shared), no button: the composer foot holds the action | always | its own height |
-| `data-slot="topic-panes"`: two columns the full height under the head, the history (or the Pick up pane) on the left up to 24rem, the map filling the rest on the right, 24px apart (`grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
-| `History` alone, the column's width | no session planned | fills |
+| `TopicHead` (shared), no button: Now holds the action | always | its own height |
+| `data-slot="topic-panes"`: two columns the full height under the head, the history on the left up to 24rem, the map filling the rest on the right, 24px apart (`grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6`). Sized for Edo's 14-inch MacBook Pro window (1512×982), the only screen it is fitted to (his ruling of 13 Nov 2026) | a session of the topic planned | fills |
+| The history alone, the column's width | no session planned | fills |
 
 Measured at 1440x900 and 1280x720 with the sidebar open: the document is the window's height, and only the two panes scroll.
 
 ## History (`history.tsx`)
 
-- Trail's line restated: day headings (`dayWords`), sessions then attempts per day, the 1px spine in the map's edge ink, attempts as plain entries: the result icon (`attemptMark`'s result) and the tutor's sentence, with no help words (Edo, 13 Nov 2026: "With a hint" told him nothing). Every row is one grid, the icon column, the text in its own column wrapping to two lines, and in Pick up's Earlier the date flush right in one column; an attempt's sentence and date share a baseline. No "Earlier" fold: the pane scrolls instead.
-- Bounded: `HistoryPane`, which the Pick up options draw in too: `ScrollArea bar={false}` (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip, and the titles stay on the head's edge. An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
+- Earlier restates Trail's line: sessions then attempts per day, the 1px spine in the map's edge ink, attempts as plain entries: the result icon (`attemptMark`'s result) and the tutor's sentence, with no help words (Edo, 13 Nov 2026: "With a hint" told him nothing). Every row is one grid, the icon column, the text in its own column wrapping to two lines, and in Pick up's Earlier the date flush right in one column; an attempt's sentence and date share a baseline. No "Earlier" fold: the pane scrolls instead.
+- Bounded: `HistoryPane`: `ScrollArea bar={false}` (`data-slot="topic-history"`), a flex column whose viewport shrinks to the pane. The pane reaches 12px past the column on each side (`-mx-3`) and its list pads them back (`px-3`), so a row's 12px bleed (`../row-classes.ts`, Home's row) keeps its rounded fill and the icon's inset inside the clip, and the titles stay on the head's edge. An edge fades 32px only while more of the history lies past it, so at rest the first day is never dimmed.
 - A session row (`data-slot="topic-history-session"`, link `data-testid="unit-page-session"`): kind icon, title, `WhyMark` ("Your turn", or the spinner), then for a lesson that planned the map button (`data-slot="topic-map-toggle"`, `WaypointsIcon`, the lesson page's Plan icon, `size="icon-inline"`, `aria-pressed`, hint "Show its steps on the map"). The lesson on the map has its row filled `bg-fill-selected` and its button in ink (`data-shown`).
 
 ## Lesson map (`lesson-map.tsx`)

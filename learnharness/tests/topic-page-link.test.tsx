@@ -1,5 +1,5 @@
 /**
- * The Link switch on the hybrid topic page under Pick up: how the list and
+ * The Link switch on the hybrid topic page: how the list and
  * the lesson map are tied. Split draws both in one surface with a hairline
  * between them; connected draws the panes as they are with a line layer
  * whose path runs down the gap and across to the step. Same tsx
@@ -22,9 +22,9 @@ const map = <div data-slot="topic-lesson-map" />;
 const panes = (Panes: React.ComponentType<PanesProps>) => parseHTML(`<html><body>${renderToStaticMarkup(<Panes side={side} map={map} />)}</body></html>`).document.querySelector('[data-slot="topic-panes"]')!;
 
 describe("the Link switch", () => {
-	it("offers split and connected, each wearing Pick up's sections", () => {
+	it("offers split and connected, each wearing the hybrid topic page", () => {
 		assert.deepEqual(LINK_OPTIONS, ["split", "connected"]);
-		assert.deepEqual(POLISH_GROUPS.find((group) => group.id === "link")?.requires, { design: "proposed", topic: "hybrid", pickup: "sections" });
+		assert.deepEqual(POLISH_GROUPS.find((group) => group.id === "link")?.requires, { design: "proposed", topic: "hybrid" });
 	});
 
 	it("draws the list and the map in every option, and names the option on the panes for the rows to answer", () => {

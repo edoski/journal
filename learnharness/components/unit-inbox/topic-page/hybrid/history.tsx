@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
-import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
 import { MathText } from "@/components/ui/math-text";
@@ -33,7 +32,6 @@ function edgeFade(top: boolean, bottom: boolean): React.CSSProperties | undefine
 const SPINE = "before:absolute before:w-px before:bg-white/33 after:absolute after:w-px after:bg-white/33";
 const ABOVE = "before:left-[7.5px] before:top-0 before:h-2";
 const BELOW = "after:left-[7.5px] after:top-8 after:bottom-0";
-const THROUGH = "before:absolute before:inset-y-0 before:left-[7.5px] before:w-px before:bg-white/33";
 
 /** Where an entry sits on the line: the first has no line above its icon, the last none below. */
 export interface Ends {
@@ -148,25 +146,6 @@ export function SessionItem({
 	);
 }
 
-/** A day: its words over its sessions, then its attempts. */
-export function DayItem({ day, shown, onShow, titleOf, first, last }: { day: TrailDay; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; first: boolean; last: boolean }) {
-	const count = day.sessions.length + day.attempts.length;
-	const ends = (i: number): Ends => ({ above: !(first && i === 0), below: !(last && i === count - 1) });
-	return (
-		<li>
-			<h2 className={cn("relative flex h-7 items-center pl-8 text-label font-medium text-muted-foreground", !first && THROUGH)}>{day.label}</h2>
-			<ul className="flex flex-col">
-				{day.sessions.map((entry, i) => (
-					<SessionItem key={entry.chat.id} entry={entry} shown={entry.chat.id === shown} onShow={onShow} ends={ends(i)} />
-				))}
-				{day.attempts.map((attempt, i) => (
-					<AttemptEntry key={attempt.id} attempt={attempt} titleOf={titleOf} ends={ends(day.sessions.length + i)} />
-				))}
-			</ul>
-		</li>
-	);
-}
-
 /**
  * The history's bounded pane (spec: hybrid.md): it scrolls inside with no
  * bar and fades the edge more of it lies past. It reaches 12px past the
@@ -200,24 +179,5 @@ export function HistoryPane({ className, children }: { className?: string; child
 		<ScrollArea bar={false} viewportRef={viewport} viewportClassName="min-h-0" data-slot="topic-history" className={cn("-mx-3 flex min-h-0 flex-col", className)} style={edgeFade(edges.top, edges.bottom)}>
 			<div className="flex flex-col px-3">{children}</div>
 		</ScrollArea>
-	);
-}
-
-/**
- * The topic's history (spec: hybrid.md): every session and scored attempt
- * on one dated line, newest first, in the bounded pane. A session row
- * opens the lesson; the map button beside a lesson that planned puts its
- * steps on the map. Nothing when the topic has neither.
- */
-export function History({ days, shown, onShow, titleOf, className }: { days: readonly TrailDay[]; shown: string | null; onShow: (id: string) => void; titleOf: (handle: string) => string; className?: string }) {
-	if (days.length === 0) return null;
-	return (
-		<HistoryPane className={className}>
-			<ol aria-label="History" className="flex flex-col">
-				{days.map((day, i) => (
-					<DayItem key={day.day} day={day} shown={shown} onShow={onShow} titleOf={titleOf} first={i === 0} last={i === days.length - 1} />
-				))}
-			</ol>
-		</HistoryPane>
 	);
 }

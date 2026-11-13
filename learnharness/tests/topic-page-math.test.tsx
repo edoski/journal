@@ -24,7 +24,6 @@ import type { SessionPlan } from "../src/core/contracts/topic.ts";
 import { sessionPlanOf } from "../src/server/topic.ts";
 import { topicFacts } from "../components/unit-inbox/topic-page/topic-facts.ts";
 import { HybridTopic } from "../components/unit-inbox/topic-page/hybrid/hybrid-topic.tsx";
-import { PICKUP_PANES } from "../components/unit-inbox/topic-page/pickup/pickup-options.ts";
 
 const FIXTURES = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "topic");
 const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(FIXTURES, name), "utf-8"));
@@ -66,7 +65,7 @@ const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () 
 const document = parseHTML(
 	`<html><body>${renderToStaticMarkup(
 		<AppRouterContext.Provider value={router as never}>
-			<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} pane={PICKUP_PANES.sections} />
+			<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} />
 		</AppRouterContext.Provider>,
 	)}</body></html>`,
 ).document;
@@ -116,7 +115,7 @@ describe("math in the topic page's head and Next", () => {
 	const page = parseHTML(
 		`<html><body>${renderToStaticMarkup(
 			<AppRouterContext.Provider value={router as never}>
-				<HybridTopic facts={rankFacts} busy={false} onAct={() => {}} onTask={() => {}} pane={PICKUP_PANES.sections} />
+				<HybridTopic facts={rankFacts} busy={false} onAct={() => {}} onTask={() => {}} />
 			</AppRouterContext.Provider>,
 		)}</body></html>`,
 	).document;

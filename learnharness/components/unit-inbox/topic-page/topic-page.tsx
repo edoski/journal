@@ -12,7 +12,7 @@ import { openingFor, topicSessions } from "@/components/unit-inbox/units";
 import { BriefTopic } from "@/components/unit-inbox/topic-page/brief/brief-topic";
 import { StepsTopic } from "@/components/unit-inbox/topic-page/steps/steps-topic";
 import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic";
-import { HYBRID_COLUMN, HybridTopic, type HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
+import { HYBRID_COLUMN, HybridTopic } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { topicFacts, type Press, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 import type { PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
@@ -23,7 +23,7 @@ export interface TopicPageProps {
 	/** A start is in flight: the action and the task rows are disabled. */
 	busy: boolean;
 	/** Does the page's one action: opens the session, or starts one with the
-	 *  action's opening. Absent when a Pick up pane holds the action. */
+	 *  action's opening. */
 	onAct?: () => void;
 	/** Continues an open task (a task pick-up row). */
 	onTask: (press: Press) => void;
@@ -40,14 +40,12 @@ export const TOPIC_CANDIDATES: Record<(typeof TOPIC_OPTIONS)[number], ComponentT
 /**
  * The topic page behind the Topic switch (spec: topic-page.md): what the
  * page as it is owns, the start and the composer, around the chosen
- * candidate's body. With a `pickup` option the hybrid's history is that
- * option's pane, which holds the action, and the page has no composer: a
- * new lesson starts from the sidebar's New lesson. The page appears once the topic read has answered, so nothing
- * shifts in afterwards.
+ * candidate's body. The hybrid's history pane holds the action, so it has
+ * no composer: a new lesson starts from the sidebar's New lesson. The page
+ * appears once the topic read has answered, so nothing shifts in afterwards.
  */
 export function TopicPage({
 	candidate: Candidate,
-	pickup,
 	link,
 	course,
 	topic,
@@ -55,9 +53,7 @@ export function TopicPage({
 	initialConfigured,
 }: {
 	candidate: ComponentType<TopicPageProps>;
-	/** A Pick up option's pane, which takes the hybrid's history's place. */
-	pickup?: ComponentType<HybridPaneProps>;
-	/** A Link option's way of tying the pane to the map (with `pickup` only). */
+	/** A Link option's way of tying the hybrid's pane to the map. */
 	link?: ComponentType<PanesProps>;
 	course: StudyCourse;
 	topic: CourseMapTopic;
@@ -92,12 +88,12 @@ export function TopicPage({
 	};
 	return (
 		<>
-			{pickup ? (
-				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} pane={pickup} panes={link} />
+			{Candidate === HybridTopic ? (
+				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={press} panes={link} />
 			) : (
 				<Candidate facts={facts} busy={lesson.busy} onAct={act} onTask={press} />
 			)}
-			{pickup ? (
+			{Candidate === HybridTopic ? (
 				lesson.error && (
 					<p role="alert" className={`mx-auto w-full px-6 pb-4 text-row text-danger ${HYBRID_COLUMN}`}>
 						{lesson.error}
@@ -105,7 +101,7 @@ export function TopicPage({
 				)
 			) : (
 				<div className="shrink-0 bg-background pb-4">
-					<div className={`mx-auto w-full px-4 ${Candidate === HybridTopic ? HYBRID_COLUMN : "max-w-[46rem]"}`}>
+					<div className="mx-auto w-full max-w-[46rem] px-4">
 						{lesson.error && (
 							<p role="alert" className="mb-2 px-2 text-row text-danger">
 								{lesson.error}

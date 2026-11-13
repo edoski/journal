@@ -1,6 +1,6 @@
 # Pick up (hybrid topic page)
 
-The Pick up switch (`design-variant.ts`, group `pickup`, Current or `sections`, which wears Design's Proposed and Topic's `hybrid`). Current keeps the hybrid's dated history. Sections replaces the history pane (`HybridTopic`'s `pane` prop, `PICKUP_PANES` in `pickup-options.ts`, given by `TopicPage`'s `pickup` prop) and holds the page's action, so the head has no button, and the page has no composer: resuming the lesson is the established path, Now holds the action that applies when nothing waits (Start, Review, Continue a task), and a deliberate new lesson starts from the sidebar's New lesson, as everywhere else (Edo's ruling, 13 Nov 2026).
+The hybrid topic page's history pane (`SectionsPane`, which `HybridTopic` always draws; the Pick up switch is gone since Edo picked `sections`). It holds the page's action, so the head has no button, and the page has no composer: resuming the lesson is the established path, Now holds the action that applies when nothing waits (Start, Review, Continue a task), and a deliberate new lesson starts from the sidebar's New lesson, as everywhere else (Edo's ruling, 13 Nov 2026).
 
 Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons, within a lesson and across its steps, so it belongs in the page, inside the list of sessions, not on the composer. The sessions sorted by relevance, with quiet dividers saying what to pick up now, what is scheduled, what comes next and what is past.
 
@@ -27,7 +27,7 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date) | |
 
-The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. Under Pick up the head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step or session title may hold TeX (`MathText`).
+The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step or session title may hold TeX (`MathText`).
 
 Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (kept) and in a gutter on the spine's left (dropped: it pushed Earlier's icons off the column's left edge and wrapped "Tue 3 Nov" onto two lines).
 
@@ -42,11 +42,8 @@ Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (ke
 - `ScheduledEntry`, `EarlierDays` (the history's `SessionItem` and `AttemptEntry` with their `date` column, 4.5rem, the day on each day's first row), `MapToggle` (the history's map button over a stretched press). A session row says "Tutor writing" while the tutor writes.
 - Every pane is the history's `HistoryPane`: `-mx-3` with `px-3` inside, so a row's bleed keeps its room inside the clip.
 
-## What it changed in shared parts
+## Moved here
 
-- `../hybrid/history.tsx`: `HistoryPane` (the bounded pane with its edge fade) split out of `History`; `SessionItem`, `DayItem` and `Ends` exported. `History` draws as before.
-- `../hybrid/hybrid-topic.tsx`: `HybridPaneProps` and the optional `pane`, which takes the history's place and the head's button.
-- `../topic-page.tsx`: the `pickup` prop and the new-lesson placeholder.
-- `resumeLine` (now in `pickup-facts.ts`) and `NowIconMark` (now in `pickup-parts.tsx`) moved here from the deleted Resume options.
+`resumeLine` (now in `pickup-facts.ts`) and `NowIconMark` (now in `pickup-parts.tsx`) moved here from the deleted Resume options.
 
 Tests: `tests/topic-page-pickup.test.tsx` (every action row as Now, the sections' order on the page, the lesson on the map).
