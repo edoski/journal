@@ -16,13 +16,15 @@ import type { ChatRecord, DigestLedger } from "../../core/contracts/chat.ts";
 import type { CourseMap } from "../../core/contracts/course-map.ts";
 import type { ChatStore, CourseRecords } from "../../core/ports.ts";
 import { derivePlanStatusesLh, derivedNodeStatus } from "../../core/contracts/plan.ts";
-import { sessionSavesOf, sessionTasksOf, sessionTopicsOf } from "../../core/native-messages.ts";
+import { sessionSavesOf, sessionTasksOf } from "../../core/native-messages.ts";
 import { sessionMarkdown } from "../../core/session-markdown.ts";
 import {
 	digestChanges,
 	digestible,
 	digestWindow,
 	planFinished,
+	reachedSteps,
+	WARM_UP,
 	type DigestCourseView,
 	type DigestSubmit,
 	type DigestWindow,
@@ -33,6 +35,8 @@ import { finishRun, setRunPhase } from "./extraction.ts";
 import { runSubmitAgent } from "./submit-agent.ts";
 
 const SUBMIT_TOOL = "submit_digest";
+
+const stepField = Type.String({ description: `The id of the plan step whose part of the lesson shows this, or "${WARM_UP}" for the part before the plan.` });
 
 const digestSchema = Type.Object({
 	topics: Type.Array(
@@ -47,12 +51,15 @@ const digestSchema = Type.Object({
 				}),
 			),
 			note: Type.Optional(Type.String({ description: "Any other judgement worth carrying (fluent but slow, relies on a picture)." })),
+			step: stepField,
 		}),
 	),
 	knowledge: Type.Array(
 		Type.Object({
-			text: Type.String({ description: "One course fact: a notation, a convention, which source is authoritative for what." }),
+			handle: Type.Optional(Type.String({ description: "The handle of the course knowledge entry this corrects or extends; omit for a fact the course has no entry for." })),
+			text: Type.String({ description: "One course fact: a notation, a convention, which source is authoritative for what. For an entry given by handle, its whole new text." }),
 			topics: Type.Array(Type.String(), { description: "Handles of the topics it belongs to." }),
+			step: stepField,
 		}),
 	),
 	task: Type.Optional(
@@ -70,11 +77,13 @@ export const DIGEST_INSTRUCTIONS = `You read a finished lesson and update the le
 
 What to record:
 - topics: for each topic the lesson worked on, a \`gap\` when the learner showed a precise misconception or missing piece (phrase it so a later session can test it), \`null\` when the lesson showed a recorded gap resolved, and a \`note\` for any other judgement worth carrying. Mark \`introduced: true\` for course topics the lesson taught. Create a topic, with \`title\` and \`needs\`, only when the lesson taught an idea the course has no topic for.
-- knowledge: course facts the lesson established, each a separate entry: notation, conventions the learner chose, which source is authoritative for what. Never facts about the learner.
+- knowledge: course facts the lesson established, each a separate entry: notation, conventions the learner chose, which source is authoritative for what. Never facts about the learner. The course's entries are listed under "Course knowledge" with their handles. A fact one of them already states, in any wording, is not new: leave it out, or give that entry's \`handle\` with its whole corrected or extended text.
 - task: the session's open task at the exact step where the lesson stopped, and the help given. \`finished: true\` only when the lesson met the task's goal.
 - current: the topic the course should continue from next time.
 
 Rules:
+- Judge from the whole lesson, to its end. A later answer that went wrong outweighs an earlier one that went right: never call a step smooth when a later turn showed a gap in it.
+- Every topic and knowledge entry names its \`step\`: a plan step the lesson reached (marked current or visited under "The lesson's plan"), or "${WARM_UP}" for the part before the plan. Record nothing about a step the lesson did not reach, even when the plan or the tutor described it in advance.
 - Graded answers are already recorded. Never restate an attempt; judge from the learner's questions, confusions, explanations and self-corrections.
 - Leave out what the saves made during the lesson already hold, and anything the lesson did not show.
 - Write to the learner, in plain words they understand days later: "you", never "he" or "the learner"; no dates or ids; math in $…$.
@@ -96,7 +105,11 @@ function digestPrompt(record: ChatRecord, window: DigestWindow, map: CourseMap, 
 	if (record.tree && record.tree.nodes.length > 0) {
 		const statuses = derivePlanStatusesLh(record.tree, record.messages);
 		lines.push("", "## The lesson's plan");
-		for (const node of record.tree.nodes) lines.push(`- ${node.title}: ${derivedNodeStatus(statuses, node.id)}`);
+		for (const node of record.tree.nodes) lines.push(`- ${node.id}: ${node.title} (${derivedNodeStatus(statuses, node.id)})`);
+	}
+	if (view.knowledge.length > 0) {
+		lines.push("", "## Course knowledge");
+		for (const k of view.knowledge) lines.push(`- ${k.handle}: ${k.text}${k.topics.length > 0 ? ` (topics: ${k.topics.join(", ")})` : ""}`);
 	}
 	const saves = sessionSavesOf(record.messages);
 	if (saves.length > 0) {
@@ -110,10 +123,14 @@ function digestPrompt(record: ChatRecord, window: DigestWindow, map: CourseMap, 
 	return lines.join("\n");
 }
 
-/** One topic's `note`, from `show`'s items. */
-function notesOf(json: unknown): Map<string, string> {
-	const items = (json as { items?: Record<string, { note?: unknown }> } | null)?.items ?? {};
-	return new Map(Object.entries(items).flatMap(([h, item]) => (typeof item?.note === "string" ? [[h, item.note]] : [])));
+/** The topics' notes and the knowledge entries, from `show --all`'s record. */
+function recordOf(json: unknown): { notes: Map<string, string>; knowledge: DigestCourseView["knowledge"] } {
+	const record = json as { topics?: Record<string, { note?: unknown }>; knowledge?: Record<string, { text?: unknown; topics?: unknown }> } | null;
+	const notes = new Map(Object.entries(record?.topics ?? {}).flatMap(([h, t]) => (typeof t?.note === "string" ? [[h, t.note]] : [])));
+	const knowledge = Object.entries(record?.knowledge ?? {}).flatMap(([handle, k]) =>
+		typeof k?.text === "string" ? [{ handle, text: k.text, topics: Array.isArray(k.topics) ? k.topics.filter((t): t is string => typeof t === "string") : [] }] : [],
+	);
+	return { notes, knowledge };
 }
 
 export interface LessonDigestDeps {
@@ -178,10 +195,9 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 		const mapped = await courseRecords.map(workspace);
 		if (!mapped.ok) throw new Error(`course map: ${mapped.message}`);
 		const map = mapped.map;
-		const listed = new Set(map.topics.map((t) => t.handle as string));
-		const touched = [...new Set([...(record.topics ?? []), ...sessionTopicsOf(record.messages)])].filter((h) => listed.has(h));
-		const shown = touched.length > 0 ? await courseRecords.run(workspace, { verb: "show", handles: touched }) : null;
-		const notes = shown?.ok ? notesOf(shown.json) : new Map<string, string>();
+		const whole = await courseRecords.run(workspace, { verb: "show", handles: "all" });
+		if (!whole.ok) throw new Error(`course record: ${whole.message}`);
+		const { notes, knowledge } = recordOf(whole.json);
 		const view: DigestCourseView = {
 			topics: map.topics.map((t) => ({
 				handle: t.handle,
@@ -193,6 +209,8 @@ export function createLessonDigest(deps: LessonDigestDeps): LessonDigest {
 			current: map.current,
 			tasks: sessionTasksOf(record.messages).filter((key) => map.tasks.some((t) => t.key === key)),
 			planFinished: planFinished(record.tree, record.messages),
+			knowledge,
+			reached: reachedSteps(record.tree, record.messages),
 		};
 		const submit = await withBgLlmSlot(signal, () =>
 			runSubmitAgent<DigestSubmit>({

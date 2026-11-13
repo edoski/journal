@@ -67,6 +67,7 @@ const lesson = (last: string): LhMessage[] => [
 const FINISHED = "Good place to stop. Practice comes next, in a day or two.";
 const PARTWAY = "Right. So with rank 3 and 5 columns, how many free variables are there?";
 
+
 function chatWith(messages: LhMessage[], workspace = "/courses/linalg"): string {
 	const record = chatStore.createChat("Rank", { workspace, title: "Linear algebra" });
 	chatStore.saveMessages(record.id, messages);
@@ -90,7 +91,9 @@ const MAP: CourseMap = {
 	edges: [],
 };
 
-/** An in-memory engine: the map above, `show` with one note, and every save kept. */
+const KNOWN = { handle: "rank-notation", text: "The course writes rank as $r(A)$", topics: ["rank"] };
+
+/** An in-memory engine: the map above, one note and one knowledge entry, and every save kept. */
 function memoryCourse() {
 	const saves: Array<Record<string, unknown>> = [];
 	const records: CourseRecords = {
@@ -98,6 +101,9 @@ function memoryCourse() {
 		map: async () => ({ ok: true, map: MAP }),
 		create: async () => ({ ok: true, workspace: "/courses/linalg" }),
 		run: async (_workspace, verb) => {
+			if (verb.verb === "show" && verb.handles === "all") {
+				return { ok: true, json: { topics: { rank: { note: "Reads matrices by rows" } }, knowledge: { [KNOWN.handle]: { text: KNOWN.text, topics: KNOWN.topics } } } };
+			}
 			if (verb.verb === "show") return { ok: true, json: { items: { rank: { kind: "topic", note: "Reads matrices by rows" } } } };
 			if (verb.verb === "save") {
 				saves.push(verb.changes as Record<string, unknown>);
@@ -111,23 +117,24 @@ function memoryCourse() {
 
 const SUBMIT = {
 	topics: [
-		{ handle: "rank", gap: "You count rows instead of pivots", note: "Reads matrices by rows" },
-		{ handle: "nullity", introduced: true },
+		{ handle: "rank", gap: "You count rows instead of pivots", note: "Reads matrices by rows", step: "rank-picture" },
+		{ handle: "nullity", introduced: true, step: "rank-picture" },
 	],
-	knowledge: [{ text: "The course writes rank as $r(A)$", topics: ["rank"] }],
+	knowledge: [{ text: "Pivots are circled in the notes", topics: ["rank"], step: "rank-picture" }],
 	task: { key: "sheet-2", step: "Exercise 2: find the rank of $B$" },
 };
 
-/** A scripted model whose one answer is the digest's submit; `onCall`
- *  fires at the moment of the call. */
-function submitEngine(input: unknown, onCall?: () => void): PiEngine {
+/** A scripted model that answers every run with the digest's submit for
+ *  the prompt it read; `onCall` fires at the moment of each call. */
+function submitEngine(input: unknown | ((prompt: string) => unknown), onCall?: (prompt: string) => void): PiEngine {
 	const faux = createFauxCore({});
-	faux.setResponses([
-		() => {
-			onCall?.();
-			return fauxAssistantMessage([fauxToolCall("submit_digest", input as ToolCall["arguments"], { id: "digest-call" })], { stopReason: "toolUse" });
-		},
-	]);
+	const answer = (context: unknown) => {
+		const prompt = JSON.stringify(context);
+		onCall?.(prompt);
+		const submit = typeof input === "function" ? (input as (p: string) => unknown)(prompt) : input;
+		return fauxAssistantMessage([fauxToolCall("submit_digest", submit as ToolCall["arguments"], { id: `digest-call-${++n}` })], { stopReason: "toolUse" });
+	};
+	faux.setResponses(Array.from({ length: 8 }, () => answer));
 	return { model: faux.getModel(), streamFn: faux.streamSimple };
 }
 
@@ -140,17 +147,19 @@ describe("the digest's patch", () => {
 		current: "rank",
 		tasks: ["sheet-2"],
 		planFinished: false,
+		knowledge: [KNOWN],
+		reached: ["warm-up", "rank-picture"],
 	};
 
 	it("merges by handle, keeps what is unchanged out, and never carries observations", () => {
 		const patch = digestChanges(
 			{
 				topics: [
-					{ handle: "rank", gap: "Old gap", note: "Same note", introduced: true },
-					{ handle: "nullity", introduced: true, gap: "You forget the free columns" },
-					{ handle: "ghost" },
+					{ handle: "rank", gap: "Old gap", note: "Same note", introduced: true, step: "rank-picture" },
+					{ handle: "nullity", introduced: true, gap: "You forget the free columns", step: "rank-picture" },
+					{ handle: "ghost", step: "rank-picture" },
 				],
-				knowledge: [{ text: "Pivots are circled in the notes", topics: ["rank", "ghost"] }],
+				knowledge: [{ text: "Pivots are circled in the notes", topics: ["rank", "ghost"], step: "warm-up" }],
 				task: { key: "sheet-2", step: "Exercise 2" },
 				current: "rank",
 			},
@@ -165,11 +174,11 @@ describe("the digest's patch", () => {
 	});
 
 	it("is null when nothing changes", () => {
-		assert.equal(digestChanges({ topics: [{ handle: "rank", gap: "Old gap" }], knowledge: [], current: "rank" }, view), null);
+		assert.equal(digestChanges({ topics: [{ handle: "rank", gap: "Old gap", step: "rank-picture" }], knowledge: [], current: "rank" }, view), null);
 	});
 
 	it("a new topic needs a title and takes its place after its prerequisite", () => {
-		const patch = digestChanges({ topics: [{ handle: "pivot", title: "Pivots", needs: ["rank"] }, { handle: "untitled" }], knowledge: [] }, view);
+		const patch = digestChanges({ topics: [{ handle: "pivot", title: "Pivots", needs: ["rank"], step: "rank-picture" }, { handle: "untitled", step: "rank-picture" }], knowledge: [] }, view);
 		assert.deepEqual(patch?.changes, {
 			topics: { pivot: { title: "Pivots", introduced: true, needs: ["rank"] } },
 			path: { order: ["rank", "pivot", "nullity"] },
@@ -181,6 +190,33 @@ describe("the digest's patch", () => {
 		assert.equal(digestChanges(done, view), null);
 		assert.deepEqual(digestChanges(done, { ...view, planFinished: true })?.changes, { tasks: { "sheet-2": null } });
 		assert.equal(digestChanges({ topics: [], knowledge: [], task: { key: "other", step: "x" } }, view), null);
+	});
+
+	it("a known fact, restated or reworded, adds no entry: a rewording updates the entry by its handle", () => {
+		const restated = { text: "the course writes rank as  $r(A)$.", topics: ["rank"], step: "rank-picture" };
+		assert.equal(digestChanges({ topics: [], knowledge: [restated, { ...KNOWN, step: "rank-picture" }] }, view), null);
+		const reworded = { handle: KNOWN.handle, text: "Rank is written $r(A)$ in this course, never $\\operatorname{rk}$", topics: ["rank"], step: "rank-picture" };
+		const patch = digestChanges({ topics: [], knowledge: [reworded, { ...reworded, handle: undefined, text: `  ${reworded.text}` }] }, view);
+		assert.deepEqual(patch?.changes, { knowledge: { [KNOWN.handle]: { text: reworded.text, topics: ["rank"] } } });
+	});
+
+	it("states nothing about a plan step the lesson did not reach", () => {
+		const patch = digestChanges(
+			{
+				topics: [
+					{ handle: "nullity", note: "You will find the free columns easy", step: "rank-rule" },
+					{ handle: "rank", note: "You counted pivots once shown", step: "rank-picture" },
+				],
+				knowledge: [
+					{ text: "The rule: rank plus nullity is the number of columns", topics: ["rank"], step: "rank-rule" },
+					{ text: "Rank counts pivots", topics: ["rank"], step: "no-such-step" },
+				],
+			},
+			view,
+		);
+		assert.deepEqual(patch?.changes, { topics: { rank: { note: "You counted pivots once shown" } } });
+		const unplanned = digestChanges({ topics: [{ handle: "nullity", note: "Seen in passing", step: "" }], knowledge: [] }, { ...view, reached: null });
+		assert.deepEqual(unplanned?.changes, { topics: { nullity: { note: "Seen in passing" } } }, "a lesson with no plan has no steps to check");
 	});
 
 	it("knowledge handles come from the text, so a repeat merges into the same entry", () => {
@@ -222,10 +258,12 @@ describe("a digest run", () => {
 		const seen: string[] = [];
 		const stop = subscribe((e) => void seen.push(e.type));
 		let dockRow: unknown;
+		let prompt = "";
 		const digest = createLessonDigest({
 			chatStore,
 			courseRecords: course.records,
-			engine: submitEngine(SUBMIT, () => {
+			engine: submitEngine(SUBMIT, (p) => {
+				prompt = p;
 				dockRow = extractionStatuses().find((r) => r.chatId === chatId);
 			}),
 		});
@@ -236,10 +274,11 @@ describe("a digest run", () => {
 		assert.deepEqual(course.saves, [
 			{
 				topics: { rank: { gap: "You count rows instead of pivots" }, nullity: { introduced: true } },
-				knowledge: { [knowledgeHandle("The course writes rank as $r(A)$")]: { text: "The course writes rank as $r(A)$", topics: ["rank"] } },
+				knowledge: { [knowledgeHandle("Pivots are circled in the notes")]: { text: "Pivots are circled in the notes", topics: ["rank"] } },
 				tasks: { "sheet-2": { step: "Exercise 2: find the rank of $B$" } },
 			},
 		]);
+		assert.match(prompt, /rank-notation: The course writes rank as/, "the agent reads the course's knowledge with its handles");
 		assert.equal((dockRow as { kind?: string; phase?: string })?.kind, "digest");
 		assert.equal((dockRow as { phase?: string }).phase, "digesting");
 		assert.equal(extractionStatuses().some((r) => r.chatId === chatId), false, "the row leaves when the run ends");

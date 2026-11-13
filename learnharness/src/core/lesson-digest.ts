@@ -71,6 +71,17 @@ export function lessonLeftMidway(record: ChatRecord): boolean {
 	return digestible(record) && sessionEndOf(record.messages, record.tree, record.kind) === "mid-lesson";
 }
 
+/** The step a digest names for what the lesson showed before its plan. */
+export const WARM_UP = "warm-up";
+
+/** The steps a digest may speak about: the warm-up and every plan step the
+ *  lesson reached; null when the lesson had no plan. Pure. */
+export function reachedSteps(tree: PlanTree | undefined, messages: readonly LhMessage[]): string[] | null {
+	if (!tree || tree.nodes.length === 0) return null;
+	const { current, visited } = derivePlanStatusesLh(tree, messages);
+	return [WARM_UP, ...tree.nodes.filter((node) => node.id === current || visited.has(node.id)).map((node) => node.id)];
+}
+
 /** Every plan step was reached: the lesson's plan has nothing left. */
 export function planFinished(tree: PlanTree | undefined, messages: readonly LhMessage[]): boolean {
 	if (!tree || tree.nodes.length === 0) return false;
@@ -82,6 +93,8 @@ export function planFinished(tree: PlanTree | undefined, messages: readonly LhMe
 
 export interface DigestTopic {
 	handle: string;
+	/** The step whose part of the lesson shows this (see reachedSteps). */
+	step: string;
 	/** Required for a topic the course does not have yet. */
 	title?: string;
 	needs?: string[];
@@ -91,9 +104,17 @@ export interface DigestTopic {
 	note?: string;
 }
 
+export interface DigestKnowledge {
+	/** An existing entry's handle, to replace its text; absent for a new fact. */
+	handle?: string;
+	text: string;
+	topics: string[];
+	step: string;
+}
+
 export interface DigestSubmit {
 	topics: DigestTopic[];
-	knowledge: { text: string; topics: string[] }[];
+	knowledge: DigestKnowledge[];
 	task?: { key: string; step?: string; help?: string; finished?: boolean };
 	/** The topic the course path should stand on next. */
 	current?: string;
@@ -109,6 +130,10 @@ export interface DigestCourseView {
 	tasks: readonly string[];
 	/** Whether the lesson's plan has nothing left. */
 	planFinished: boolean;
+	/** The course's knowledge entries. */
+	knowledge: ReadonlyArray<{ handle: string; text: string; topics: readonly string[] }>;
+	/** reachedSteps for the lesson. */
+	reached: readonly string[] | null;
 }
 
 const HANDLE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -129,20 +154,31 @@ export function knowledgeHandle(text: string): string {
 	return `${slug || "k"}-${hash}`;
 }
 
+/** Two knowledge texts say the same words, up to case, spacing and a
+ *  closing full stop. */
+function sameText(a: string, b: string): boolean {
+	const plain = (t: string) => t.trim().toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
+	return plain(a) === plain(b);
+}
+
 /** The engine patch for an answer, and one line saying what it changes;
- *  null when it changes nothing. A topic the course lacks is created only
- *  with a title, and takes its place in the path right after its last
- *  prerequisite. Pure. */
+ *  null when it changes nothing. It drops whatever names a step the lesson
+ *  did not reach. A topic the course lacks is created only with a title,
+ *  and takes its place in the path right after its last prerequisite. A
+ *  knowledge entry given by handle is replaced; a new one is added only
+ *  when no entry has its text. Pure. */
 export function digestChanges(submit: DigestSubmit, view: DigestCourseView): { changes: Record<string, unknown>; summary: string } | null {
+	const shown = ({ step }: { step: string }) => view.reached === null || view.reached.includes(step);
+	const submitTopics = submit.topics.filter(shown);
 	const known = new Map(view.topics.map((t) => [t.handle, t]));
 	const order = view.topics.map((t) => t.handle);
 	const created = new Set(
-		submit.topics.filter((t) => validHandle(t.handle) && !known.has(t.handle) && t.title?.trim()).map((t) => t.handle),
+		submitTopics.filter((t) => validHandle(t.handle) && !known.has(t.handle) && t.title?.trim()).map((t) => t.handle),
 	);
 	const exists = (h: string) => known.has(h) || created.has(h);
 	const said: string[] = [];
 	const topics: Record<string, Record<string, unknown>> = {};
-	for (const t of submit.topics) {
+	for (const t of submitTopics) {
 		if (!exists(t.handle)) continue;
 		const current = known.get(t.handle);
 		const patch: Record<string, unknown> = {};
@@ -171,15 +207,24 @@ export function digestChanges(submit: DigestSubmit, view: DigestCourseView): { c
 		}
 		if (Object.keys(patch).length > 0) topics[t.handle] = { ...topics[t.handle], ...patch };
 	}
-	const knowledge: Record<string, Record<string, unknown>> = {};
-	for (const k of submit.knowledge) {
+	const entries = new Map(view.knowledge.map((k) => [k.handle, k]));
+	const knowledge: Record<string, { text: string; topics?: string[] }> = {};
+	let added = 0;
+	for (const k of submit.knowledge.filter(shown)) {
 		const text = k.text.trim();
 		if (!text) continue;
 		const linked = k.topics.filter(exists);
-		knowledge[knowledgeHandle(text)] = { text, ...(linked.length > 0 ? { topics: linked } : {}) };
+		const entry = k.handle === undefined ? undefined : entries.get(k.handle);
+		const sameTopics = linked.length === 0 || (entry && linked.length === entry.topics.length && linked.every((h) => entry.topics.includes(h)));
+		if (entry && sameText(text, entry.text) && sameTopics) continue;
+		if (!entry && [...view.knowledge, ...Object.values(knowledge)].some((e) => sameText(e.text, text))) continue;
+		knowledge[entry?.handle ?? knowledgeHandle(text)] = { text, ...(linked.length > 0 ? { topics: linked } : {}) };
+		if (!entry) added++;
 	}
-	const facts = Object.keys(knowledge).length;
-	if (facts > 0) said.push(`${facts} knowledge ${facts === 1 ? "entry" : "entries"}`);
+	const updated = Object.keys(knowledge).length - added;
+	if (added > 0) said.push(`${added} new knowledge ${added === 1 ? "entry" : "entries"}`);
+	if (updated > 0) said.push(`${updated} knowledge ${updated === 1 ? "entry" : "entries"} updated`);
+	const facts = added + updated;
 	const changes: Record<string, unknown> = {};
 	if (Object.keys(topics).length > 0) changes.topics = topics;
 	if (facts > 0) changes.knowledge = knowledge;
