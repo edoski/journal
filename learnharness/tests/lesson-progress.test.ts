@@ -13,6 +13,7 @@ import { sessionEndOf } from "../src/core/session-end.ts";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
 import { sessionState } from "../components/nav/session-state.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
+import { composeInstructions } from "../src/agent/teacher-agent.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 
 const TREE: PlanTree = {
@@ -99,5 +100,51 @@ describe("closing for tonight", () => {
 	it("his next message reopens the session", () => {
 		const reopened = [...evening(), ...progress("p1", { done: [], close: true }), closing, newUserMessage("Actually, one more question."), assistant([fauxText("Sure, ask away.")], "stop")];
 		assert.notEqual(sessionEndOf(reopened, TREE), "closed");
+	});
+});
+
+describe("the close marks the lesson's new topics introduced", () => {
+	const TOPIC_TREE: PlanTree = { nodes: [{ id: "eigen", title: "Eigenvalues" }, { id: "warm-up", title: "Warm up" }], edges: [], version: 1 };
+	const mapTopic = (handle: string, introduced: string | null) => ({ handle, title: handle, level: introduced ? "attempted" : "new", introduced });
+
+	function closeWith(map: unknown) {
+		const runs: unknown[] = [];
+		const course = {
+			course: { workspace: "/study/la", title: "Linear Algebra" },
+			records: {
+				map: async () => ({ ok: true, map }),
+				run: async (_w: string, verb: unknown) => { runs.push(verb); return { ok: true, json: {} }; },
+			},
+		};
+		const messages = [assistant([call("s1", "course_save", { changes: { observations: [{ topics: ["rank"], result: "correct" }] } })]), result("s1", "course_save", null)];
+		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree: TOPIC_TREE, messages }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
+		return { tool, runs };
+	}
+
+	it("saves introduced on the session's topics the engine has never seen introduced, in code", async () => {
+		const { tool, runs } = closeWith({ topics: [mapTopic("eigen", null), mapTopic("rank", "2026-11-03"), mapTopic("span", null)] });
+		const res = await tool.execute("t1", { done: ["eigen"], close: true });
+		assert.deepEqual(runs, [{ verb: "save", changes: { topics: { eigen: { introduced: true } } } }]);
+		assert.match((res.content[0] as { text: string }).text, /Marked introduced: eigen/);
+	});
+
+	it("saves nothing without a close, or when every topic is already introduced", async () => {
+		const open = closeWith({ topics: [mapTopic("eigen", null)] });
+		await open.tool.execute("t1", { done: ["eigen"] });
+		assert.deepEqual(open.runs, []);
+		const known = closeWith({ topics: [mapTopic("eigen", "2026-11-01")] });
+		await known.tool.execute("t2", { done: [], close: true });
+		assert.deepEqual(known.runs, []);
+	});
+});
+
+describe("the engine's re-teach and readiness rules in the prompts", () => {
+	it("practice hands a topic marked relearn to teaching, as it does a second lapse", () => {
+		assert.match(composeInstructions("practice"), /lapses again or the record marks it `relearn`/);
+	});
+	it("the teacher starts only ready topics and re-teaches after two failures at one step", () => {
+		const teacher = composeInstructions("teacher");
+		assert.match(teacher, /Start only ready topics\..*`needs` is `independent` or better.*`relearn`/s);
+		assert.match(teacher, /Two failures at the same step mean stop asking/);
 	});
 });
