@@ -272,24 +272,6 @@ export interface AppearanceSettings {
 	mdRendering?: MdRenderingSettings;
 }
 
-/**
- * COMPACTION (owner round 14, 2026-10-05): the context-fitting mechanic's
- * user-facing knob. One number — the trigger threshold in context tokens.
- * The effective trigger is min(this, model contextWindow − 16k reserve)
- * (owner ruling: on big models the setting rules; on small ones the
- * window rules before the provider overflows).
- *
- * FACTORY DEFAULT 150_000 (owner ruling).
- *
- * FLOOR 32_000 (implementer's call, the chunk-budget discipline): below
- * the kept tail (20k) + a summary the chat would re-compact every turn —
- * a burn, not a preference. NO CEILING: a huge threshold just means "fit
- * everything" until the window rule binds.
- */
-export interface CompactionSettings {
-	thresholdTokens?: number;
-}
-
 /** THE record. Every section optional (delta); unknown top-level keys are
  *  preserved verbatim by the sanitizer (forward-compat with newer records). */
 export interface UserSettings {
@@ -298,7 +280,6 @@ export interface UserSettings {
 	/** The strong/cheap/vision model slots (model slots wave, 2026-09-20). */
 	models?: ModelsSettings;
 	appearance?: AppearanceSettings;
-	compaction?: CompactionSettings;
 	[key: string]: unknown;
 }
 
@@ -320,7 +301,6 @@ export interface FactorySettings {
 			italicColor: string | null;
 		};
 	};
-	compaction: Required<CompactionSettings>;
 }
 
 export const FACTORY_SETTINGS: FactorySettings = {
@@ -333,7 +313,6 @@ export const FACTORY_SETTINGS: FactorySettings = {
 		sessionNameSerif: true,
 		mdRendering: { headingWeight: 900, boldColor: null, italicColor: null },
 	},
-	compaction: { thresholdTokens: 150_000 },
 };
 
 // ─── Sanitizer ─────────────────────────────────────────────────────────────
@@ -465,21 +444,6 @@ function sanitizeAppearance(raw: Record<string, unknown>): AppearanceSettings {
 	return out;
 }
 
-/** clamp-never-reject (the sanitizer's discipline): a finite positive
- *  number floors to COMPACTION_THRESHOLD_FLOOR, anything else drops (the
- *  factory default resolves at read time). Exported for the PUT parser's
- *  reject-with-rationale (the graph chunk-budget precedent). */
-export const COMPACTION_THRESHOLD_FLOOR = 32_000;
-
-function sanitizeCompaction(raw: Record<string, unknown>): CompactionSettings {
-	const out: CompactionSettings = {};
-	const rawTokens = raw.thresholdTokens;
-	if (typeof rawTokens === "number" && Number.isFinite(rawTokens) && rawTokens > 0) {
-		out.thresholdTokens = Math.max(COMPACTION_THRESHOLD_FLOOR, Math.floor(rawTokens));
-	}
-	return out;
-}
-
 /**
  * Coerce arbitrary JSON (disk file, network body) into a valid delta record:
  * known fields validated strictly (invalid ones drop/clamp per module doc),
@@ -501,9 +465,6 @@ export function sanitizeUserSettings(raw: unknown): UserSettings | null {
 	if (r.models !== null && typeof r.models === "object" && !Array.isArray(r.models)) {
 		const models = sanitizeModels(r.models as Record<string, unknown>);
 		if (Object.keys(models).length) out.models = models;
-	}
-	if (r.compaction !== undefined && r.compaction !== null && typeof r.compaction === "object") {
-		out.compaction = sanitizeCompaction(r.compaction as Record<string, unknown>);
 	}
 	// Unknown top-level keys ride along untouched (forward-compat). One
 	// known-DEAD key is stripped instead of riding: `chat` (the old

@@ -31,7 +31,6 @@ import {
 	type AgentSettings,
 	type BackgroundModelRole,
 	type FactorySettings,
-	type CompactionSettings,
 	type ModelSlot,
 	type ModelSlotName,
 	type RoleModelOverride,
@@ -77,9 +76,6 @@ export interface EffectiveSettings {
 	 *  picker captions and the per-need refusal gates read. */
 	models: Record<ModelSlotName, EffectiveSlot | null>;
 	appearance: EffectiveAppearance;
-	/** Compaction (owner round 14): resolved concrete — absent record
-	 *  section resolves to the factory 150k. */
-	compaction: Required<CompactionSettings>;
 }
 
 /** The conversation pair's chain (BYOK, owner 2026-09-22): the chat's own
@@ -180,9 +176,6 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 				boldColor: md.boldColor ?? factoryMd.boldColor,
 				italicColor: md.italicColor ?? factoryMd.italicColor,
 			},
-		},
-		compaction: {
-			thresholdTokens: record?.compaction?.thresholdTokens ?? FACTORY_SETTINGS.compaction.thresholdTokens,
 		},
 	};
 }

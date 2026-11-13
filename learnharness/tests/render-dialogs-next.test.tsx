@@ -59,10 +59,8 @@ describe("Settings › Agent under the Proposed design", () => {
 				<AgentSection
 					agent={undefined}
 					models={undefined}
-					compaction={undefined}
 					onSectionChange={() => {}}
 					onModelsChange={() => {}}
-					onCompactionChange={() => {}}
 				/>,
 			),
 		);

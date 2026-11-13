@@ -35,7 +35,6 @@ import {
 	CURRENT_SETTINGS_VERSION,
 	type AgentSettings,
 	type AppearanceSettings,
-	type CompactionSettings,
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
@@ -253,7 +252,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "agent" | "models" | "appearance" | "compaction",
+			section: "agent" | "models" | "appearance",
 			body: object,
 		) => {
 			setError(null);
@@ -345,15 +344,11 @@ export function SettingsDialogBody({
 									<AgentSection
 										agent={record.agent}
 										models={record.models}
-										compaction={record.compaction}
 										onModelsChange={(next: ModelsSettings) =>
 											void write("models", next)
 										}
 										onSectionChange={(next: AgentSettings) =>
 											void write("agent", next)
-										}
-										onCompactionChange={(next: CompactionSettings) =>
-											void write("compaction", next)
 										}
 									/>
 								</SettingsSection>

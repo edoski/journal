@@ -35,10 +35,8 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 			root.render(<AgentSection
 				agent={{ tools: { research: true } }}
 				models={undefined}
-				compaction={undefined}
 				onSectionChange={(next) => { written = next; }}
 				onModelsChange={() => {}}
-				onCompactionChange={() => {}}
 			/>);
 		});
 		const row = document.querySelector<HTMLElement>('[data-testid="tool-row-research"]')!;

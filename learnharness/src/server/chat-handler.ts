@@ -282,7 +282,6 @@ export async function handleChatInput(
 			modelId: modelIdForCompaction,
 			kind: compactionKind(record),
 			thresholdTokens: effectiveThresholdTokens(
-				effective.compaction?.thresholdTokens,
 				catalogContextLimits().get(modelIdForCompaction),
 			),
 			systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(record.messages, record.kind)).length / 4),
@@ -658,7 +657,6 @@ export async function handleChatInput(
 							modelId: kickModelId,
 							kind: compactionKind(freshRecord),
 							thresholdTokens: effectiveThresholdTokens(
-								fresh.compaction?.thresholdTokens,
 								catalogContextLimits().get(kickModelId),
 							),
 							systemPromptTokens: Math.ceil(composeInstructions(agentKindOf(freshRecord.messages, freshRecord.kind)).length / 4),

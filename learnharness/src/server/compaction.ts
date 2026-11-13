@@ -139,14 +139,17 @@ export async function awaitCompaction(chatId: string): Promise<void> {
 	if (running) await running;
 }
 
-// ─── the effective threshold (owner ruling: min(setting, window − reserve)) ─
+// ─── the effective threshold: min(bound, window − reserve) ─────────────────
 
-/** Resolve the effective trigger. Unknown window → the setting alone
- *  (honest: no fake window — the catalog-index precedent). */
-export function effectiveThresholdTokens(settingTokens: number | undefined, contextWindowTokens: number | undefined): number {
-	const setting = settingTokens ?? 150_000;
-	if (contextWindowTokens === undefined) return setting;
-	return Math.min(setting, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
+/** Every Claude reply re-sends the whole transcript, so this bound caps
+ *  what each reply of a long lesson draws, well inside every window. */
+const COMPACTION_THRESHOLD_TOKENS = 150_000;
+
+/** Resolve the trigger from the model's context window. Unknown window →
+ *  the bound alone (honest: no fake window — the catalog-index precedent). */
+export function effectiveThresholdTokens(contextWindowTokens: number | undefined): number {
+	if (contextWindowTokens === undefined) return COMPACTION_THRESHOLD_TOKENS;
+	return Math.min(COMPACTION_THRESHOLD_TOKENS, Math.max(contextWindowTokens - COMPACTION_RESERVE_TOKENS, 1));
 }
 
 // ─── the estimate over the ACTIVE projection ────────────────────────────────

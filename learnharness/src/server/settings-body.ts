@@ -17,11 +17,10 @@ import type {
 	AgentSettings,
 	AppearanceSettings,
 	BackgroundModelRole,
-	CompactionSettings,
 	ModelsSettings,
 	RoleModelOverride,
 } from "../core/settings.ts";
-import { BACKGROUND_MODEL_ROLES, COMPACTION_THRESHOLD_FLOOR, MODEL_SLOTS } from "../core/settings.ts";
+import { BACKGROUND_MODEL_ROLES, MODEL_SLOTS } from "../core/settings.ts";
 import { TOGGLEABLE_TOOLS } from "../core/pending.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
@@ -278,40 +277,11 @@ export function parseModelsSettingsBody(body: unknown): SettingsBodyResult<Model
 	return { ok: true, settings };
 }
 
-/** compaction (owner round 14): the context-compaction threshold — the
- *  projected-token budget over which a session summarizes its own history
- *  into the compaction marker. Strict write side: a present
- *  thresholdTokens must be a number at or above the floor (the floor is
- *  anti-churn: each compaction keeps a ~20k-token recent tail, so a
- *  smaller threshold would re-summarize the tail it just wrote). Absent =
- *  factory default 150k at resolution. Replace-whole, like every
- *  section. */
-export function parseCompactionSettingsBody(body: unknown): SettingsBodyResult<CompactionSettings> {
-	const raw = asRecord(body);
-	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	const settings: CompactionSettings = {};
-	if (raw.thresholdTokens !== undefined) {
-		if (typeof raw.thresholdTokens !== "number" || !Number.isFinite(raw.thresholdTokens)) {
-			return { ok: false, error: "thresholdTokens must be a number" };
-		}
-		const floored = Math.floor(raw.thresholdTokens);
-		if (floored < COMPACTION_THRESHOLD_FLOOR) {
-			return {
-				ok: false,
-				error: `thresholdTokens must be at least ${COMPACTION_THRESHOLD_FLOOR} (compaction keeps a ~20k-token recent tail — smaller budgets would churn it)`,
-			};
-		}
-		settings.thresholdTokens = floored;
-	}
-	return { ok: true, settings };
-}
-
 /** The section→parser map for PUT /api/settings/[section]. */
 export const SETTINGS_SECTIONS = {
 	chat: parseSettingsBody,
 	agent: parseAgentSettingsBody,
 	appearance: parseAppearanceSettingsBody,
-	compaction: parseCompactionSettingsBody,
 	models: parseModelsSettingsBody,
 } as const;
 
