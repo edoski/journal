@@ -13,6 +13,7 @@ import { ONE_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import type { NextItem, NowItem, ResumeIcon } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { MathText } from "@/components/ui/math-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -124,7 +125,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.opening)} className={ONE_LINE_ROW}>
 							{item.kind === "task" ? <BookmarkIcon aria-label="Open task" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
-							<span className="truncate text-row text-foreground">{item.kind === "task" ? item.title : item.words}</span>
+							<span className="truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
 							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" ? item.step : null}</span>
 						</Button>
 					</li>
@@ -160,16 +161,24 @@ export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly T
 function NowLines({ now }: { now: NowItem }) {
 	return (
 		<span className="col-start-2 flex min-w-0 flex-col gap-0.5 text-label text-muted-foreground">
-			{now.title && <span className="truncate text-row">{now.title}</span>}
+			{now.title && (
+				<span className="truncate text-row">
+					<MathText>{now.title}</MathText>
+				</span>
+			)}
 			{now.step && (
 				<span data-slot="pickup-step" className="line-clamp-2">
-					{now.step.lead} <span className="text-foreground">{now.step.title}</span>
+					{now.step.lead} <span className="text-foreground">
+						<MathText>{now.step.title}</MathText>
+					</span>
 				</span>
 			)}
 			{now.detail && <span className="truncate">{now.detail}</span>}
 			{now.then && (
 				<span data-slot="pickup-then" className="line-clamp-2">
-					Then <span className="text-foreground/80">{now.then}</span>
+					Then <span className="text-foreground/80">
+						<MathText>{now.then}</MathText>
+					</span>
 				</span>
 			)}
 		</span>

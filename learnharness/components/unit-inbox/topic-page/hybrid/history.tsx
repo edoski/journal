@@ -12,6 +12,7 @@ import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-pa
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
+import { MathText } from "@/components/ui/math-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -55,7 +56,9 @@ function AttemptEntry({ attempt, titleOf, ends }: { attempt: TopicAttempt; title
 	return (
 		<li data-slot="topic-attempt" data-result={mark.result} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-4 py-2.75", spine(ends))}>
 			<Icon role="img" aria-label={words} className={cn(ICON, "mt-px")} />
-			<p className="line-clamp-2 text-row text-muted-foreground">{attempt.text}</p>
+			<p className="line-clamp-2 text-row text-muted-foreground">
+				<MathText>{attempt.text}</MathText>
+			</p>
 			{mark.words ? <span className="mt-px justify-self-end text-label text-muted-foreground">{mark.words}</span> : <span />}
 		</li>
 	);
@@ -81,7 +84,9 @@ export function SessionItem({ entry, shown, onShow, ends }: { entry: SessionEntr
 			>
 				<Link href={`/chat/${chat.id}`}>
 					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
-					<span className="truncate text-row text-foreground">{chat.title}</span>
+					<span className="truncate text-row text-foreground">
+						<MathText>{chat.title}</MathText>
+					</span>
 					{(planned || why) && (
 						<span className="flex items-center gap-2 justify-self-end">
 							{why}

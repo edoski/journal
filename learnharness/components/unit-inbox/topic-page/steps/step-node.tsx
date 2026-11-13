@@ -7,6 +7,7 @@ import type { PlanNodeStatus, TopicHandle } from "@/src/core";
 import { TopicMapContext } from "@/components/course-map/topic-map/topic-node";
 import { Hint } from "@/components/ui/hint";
 import { cn } from "@/lib/utils";
+import { MathText } from "@/components/ui/math-text";
 
 /** What the steps map hands each node: the step, its mark, and the lesson a click opens. */
 export type StepFlowNode = Node<
@@ -77,7 +78,9 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 			)}
 		>
 			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
-			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground">{title}</span>
+			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground">
+				<MathText>{title}</MathText>
+			</span>
 		</Link>
 	);
 	return (

@@ -36,6 +36,10 @@ Measured at 1440x900 and 1280x720 with the sidebar open: the document is the win
 - Opens on the whole plan when it fits at 75% or more, else full size on the step the lesson stopped on (`openingCamera`). Fades in once placed (180ms); a new lesson mounts a new map with the same fade.
 - Steps are `StepNode` (`../steps/step-node.tsx`) on `stepsLayout`, marked by `hybridMarks`: the steps tab's marks, plus "Next" over each step that rests on the one it stopped on and no question was about yet. "Left off here" over the step a lesson that waits on nobody stopped on. Keyboard, hover chain and caption as the steps map.
 
+## Math
+
+A step title, a session's title and an attempt's sentence may hold TeX; each is drawn through the shared `MathText` (`../../../ui/math-text.md`) in the map's nodes (`StepNode`, so the steps candidate typesets too) and the history's rows, and `mathPlain` gives a node's label and the map's caption plain words. A title with no formula stays plain text. Tested in `tests/topic-page-math.test.tsx`.
+
 ## Facts (`hybrid-facts.ts`)
 
 | Function | Out |
