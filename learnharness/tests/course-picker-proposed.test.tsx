@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
+import { DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
+import { pickWords } from "../components/new-course-facts.ts";
 import { Dialog } from "../components/ui/dialog.tsx";
 
 // The Proposed course chip and New course's study root, mounted on the real
@@ -100,5 +102,154 @@ describe("Proposed New course study root", () => {
 		await press(options[1]!, "pointerdown");
 		await press(options[1]!, "pointerup");
 		assert.equal(element('[data-testid="new-course-root"]').textContent, "university/msc");
+	});
+});
+
+/** A fetch that records each request and answers with `reply`. */
+function recorder(reply: (init: RequestInit) => Response) {
+	const sent: RequestInit[] = [];
+	const fetchLike = (async (_url: unknown, init?: RequestInit) => {
+		sent.push(init ?? {});
+		return reply(init ?? {});
+	}) as typeof fetch;
+	return { sent, fetchLike };
+}
+
+async function typeInto(input: HTMLInputElement, value: string) {
+	await act(async () => {
+		// linkedom reports no type for an untyped input, which React needs to
+		// read it as a text field.
+		if (!input.getAttribute("type")) input.setAttribute("type", "text");
+		// The prototype's setter, as a typed value arrives, so React sees a change.
+		let proto = Object.getPrototypeOf(input);
+		while (proto && !Object.getOwnPropertyDescriptor(proto, "value")?.set) proto = Object.getPrototypeOf(proto);
+		Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(input, value);
+		input.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+	});
+}
+
+async function pickFiles(input: HTMLInputElement, files: File[]) {
+	await act(async () => {
+		Object.defineProperty(input, "files", { value: files, configurable: true });
+		input.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+	});
+}
+
+describe("Proposed New course", () => {
+	it("asks for the title, the exam day and the material in plain words, with no folder choice when one is known", async () => {
+		await mount(
+			<Dialog open>
+				<NewCourseBody variant="proposed" roots={["/vault/courses"]} onClose={() => {}} onCreated={() => {}} />
+			</Dialog>,
+		);
+		const text = element('[data-testid="new-course-dialog"]').textContent ?? "";
+		for (const words of ["Title", "Exam day", "Not set yet", "Course material", "Add files", "Add a folder"]) assert.match(text, new RegExp(words));
+		assert.doesNotMatch(text, /Study root/);
+		assert.equal(document.querySelector('[data-testid="new-course-root"]'), null);
+	});
+
+	it("sends the title, the picked exam day and every picked file under its folder path", async () => {
+		const created: unknown[] = [];
+		const { sent, fetchLike } = recorder(() => Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }));
+		await mount(
+			<Dialog open>
+				<NewCourseBody variant="proposed" roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={(c) => created.push(c)} />
+			</Dialog>,
+		);
+		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "  Group Theory ");
+		await press(element('[data-testid="new-course-exam"]'), "click");
+		const days = [...document.querySelectorAll<HTMLButtonElement>('[data-testid="new-course-exam-calendar"] button[data-day]')].filter((b) => !b.disabled);
+		assert.ok(days.length > 0, "the calendar offers days from today on");
+		const picked = days.at(-1)!;
+		await press(picked, "click");
+		assert.doesNotMatch(element('[data-testid="new-course-exam"]').textContent ?? "", /Not set yet/, "the picked day shows on the button");
+
+		const syllabus = new File(["s"], "Syllabus.pdf");
+		const week = new File(["w"], "Week 1.md");
+		Object.defineProperty(week, "webkitRelativePath", { value: "Lectures/Week 1.md" });
+		await pickFiles(element('[data-testid="new-course-files-input"]') as HTMLInputElement, [syllabus, new File(["x"], ".DS_Store")]);
+		await pickFiles(element('[data-testid="new-course-folder-input"]') as HTMLInputElement, [week]);
+		assert.deepEqual([...document.querySelectorAll('[data-testid="new-course-material-pick"]')].map((r) => r.textContent), ["Syllabus.pdf", "Lectures"]);
+
+		await press(element('[data-testid="new-course-create"]'), "click");
+		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		assert.equal(sent.length, 1);
+		const form = sent[0]!.body as FormData;
+		assert.equal(form.get("title"), "Group Theory");
+		assert.match(String(form.get("exam")), /^\d{4}-\d{2}-\d{2}$/);
+		assert.equal(form.get("root"), "/vault/courses");
+		assert.deepEqual(form.getAll("material").map((f) => (f as File).name), ["Syllabus.pdf", "Lectures/Week 1.md"]);
+		assert.equal(created.length, 1);
+	});
+
+	it("shows the server's plain sentence when a course cannot be made, and keeps the form", async () => {
+		const { fetchLike } = recorder(() => Response.json({ error: "You already have a course called Group Theory.", code: "course_exists" }, { status: 409 }));
+		await mount(
+			<Dialog open>
+				<NewCourseBody variant="proposed" roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={() => assert.fail("not created")} />
+			</Dialog>,
+		);
+		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "group theory");
+		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		assert.equal(element('[data-testid="new-course-dialog"] [role="alert"]').textContent, "You already have a course called Group Theory.");
+		assert.equal((element('[data-testid="new-course-title"]') as HTMLInputElement).value, "group theory");
+	});
+
+	it("names a pick of files by up to two names and a folder by its name, never a count", () => {
+		const f = (name: string, at = "") => Object.defineProperty(new File([""], name), "webkitRelativePath", { value: at });
+		assert.equal(pickWords({ kind: "files", files: [f("A.pdf")] }), "A.pdf");
+		assert.equal(pickWords({ kind: "files", files: [f("A.pdf"), f("B.pdf")] }), "A.pdf and B.pdf");
+		assert.equal(pickWords({ kind: "files", files: [f("A.pdf"), f("B.pdf"), f("C.pdf")] }), "A.pdf, B.pdf and more");
+		assert.equal(pickWords({ kind: "folder", files: [f("x.pdf", "Slides/w1/x.pdf")] }), "Slides");
+	});
+});
+
+describe("Proposed course menu: rename and delete", () => {
+	it("offers Rename and Delete for the picked course only, and hands the course to the host", async () => {
+		const asked: Array<[string, string | null]> = [];
+		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} onManage={(action, course) => asked.push([action, course.title])} />);
+		await press(element('[data-testid="course-picker"]'), "pointerdown");
+		assert.equal(element('[data-testid="course-rename"]').textContent, "Rename SMM…");
+		assert.equal(element('[data-testid="course-delete"]').textContent, "Delete SMM…");
+		await press(element('[data-testid="course-delete"]'), "click");
+		assert.deepEqual(asked, [["delete", "SMM"]]);
+	});
+
+	it("has no Rename or Delete while no course is picked", async () => {
+		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} onManage={() => {}} />);
+		await press(element('[data-testid="course-picker"]'), "pointerdown");
+		assert.equal(document.querySelector('[data-testid="course-rename"]'), null);
+		assert.equal(document.querySelector('[data-testid="course-delete"]'), null);
+	});
+
+	it("Rename sends the new title for that course and reports it", async () => {
+		const renamed: string[] = [];
+		const { sent, fetchLike } = recorder(() => Response.json({ ok: true }));
+		await mount(<RenameCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onRenamed={(t) => renamed.push(t)} />);
+		await typeInto(element('[data-testid="rename-course-title"]') as HTMLInputElement, " Stochastic Models ");
+		await act(async () => { element('[data-testid="rename-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		assert.deepEqual([sent[0]?.method, JSON.parse(String(sent[0]?.body))], ["PATCH", { workspace: "/study/smm", title: "Stochastic Models" }]);
+		assert.deepEqual(renamed, ["Stochastic Models"]);
+	});
+
+	it("Delete asks first, says what stays, then deletes that course", async () => {
+		let deleted = 0;
+		const { sent, fetchLike } = recorder(() => Response.json({ ok: true }));
+		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => deleted++} />);
+		const dialog = element('[data-testid="delete-course-dialog"]');
+		assert.equal(dialog.getAttribute("role"), "alertdialog");
+		assert.match(dialog.textContent ?? "", /Delete SMM\?/);
+		assert.match(dialog.textContent ?? "", /lessons stay in your history/);
+		assert.equal(sent.length, 0, "nothing is deleted before he confirms");
+		await press(element('[data-testid="delete-course-confirm"]'), "click");
+		assert.deepEqual([sent[0]?.method, JSON.parse(String(sent[0]?.body))], ["DELETE", { workspace: "/study/smm" }]);
+		assert.equal(deleted, 1);
+	});
+
+	it("a refused delete shows the server's sentence and keeps the question open", async () => {
+		const { fetchLike } = recorder(() => Response.json({ error: "That course is no longer in your list." }, { status: 404 }));
+		await mount(<DeleteCourseDialog course={{ workspace: "/study/smm", title: "SMM" }} fetchLike={fetchLike} onClose={() => {}} onDeleted={() => assert.fail("not deleted")} />);
+		await press(element('[data-testid="delete-course-confirm"]'), "click");
+		assert.equal(element('[data-testid="delete-course-dialog"] [role="alert"]').textContent, "That course is no longer in your list.");
 	});
 });

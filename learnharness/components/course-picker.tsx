@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDownIcon, GraduationCapIcon, PlusIcon } from "lucide-react";
+import { ChevronDownIcon, GraduationCapIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useBackdropDismiss } from "@/components/backdrop-dismiss";
 import { useDesignVariant } from "@/components/design-variant";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { ExamDayField, MaterialField } from "@/components/new-course-fields";
+import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
+import { useServerEvent } from "@/components/server-events";
+import { newCourseForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, type CourseListing, type CourseSummary } from "@/src/core";
 
 /** Where the last picked course is remembered (per device). */
@@ -45,6 +49,10 @@ export interface CourseChoice {
 	choose: (workspace: string) => void;
 	/** A course the New course dialog just created: listed and picked. */
 	add: (course: CourseSummary) => void;
+	/** A course renamed here: its new title shows at once. */
+	renamed: (workspace: string, title: string) => void;
+	/** A course deleted here: it leaves the list, and the pick if it held it. */
+	removed: (workspace: string) => void;
 	/** The picked workspace, or null after showing why nothing can start. */
 	requireCourse: () => string | null;
 }
@@ -76,6 +84,7 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 	const [state, setState] = useState<CourseState>({ status: "loading" });
 	const [workspace, setWorkspace] = useState("");
 	const [notice, setNotice] = useState<string | null>(null);
+	const [revision, setRevision] = useState(0);
 	useEffect(() => {
 		let live = true;
 		void fetchCourses()
@@ -87,7 +96,10 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 				}
 				setState({ status: "ready", courses: listing.courses, roots: listing.roots });
 				const remembered = remember ? localStorage.getItem(COURSE_CHOICE_KEY) ?? "" : "";
-				if (listing.courses.some((c) => c.workspace === remembered)) setWorkspace(remembered);
+				setWorkspace((picked) => {
+					if (picked) return listing.courses.some((c) => c.workspace === picked) ? picked : "";
+					return listing.courses.some((c) => c.workspace === remembered) ? remembered : "";
+				});
 			})
 			.catch(() => {
 				if (live) setState({ status: "unavailable", reason: "the course list could not be loaded" });
@@ -95,7 +107,9 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 		return () => {
 			live = false;
 		};
-	}, [remember]);
+	}, [remember, revision]);
+	// Another window created, renamed or deleted a course.
+	useServerEvent("courses-changed", () => setRevision((n) => n + 1));
 	const choose = (next: string) => {
 		setWorkspace(next);
 		setNotice(null);
@@ -105,12 +119,22 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 		setState((s) => (s.status === "ready" ? { ...s, courses: [...s.courses, course] } : s));
 		choose(course.workspace);
 	};
+	const renamed = (target: string, title: string) => {
+		setState((s) => (s.status === "ready" ? { ...s, courses: s.courses.map((c) => (c.workspace === target ? { ...c, title } : c)) } : s));
+	};
+	const removed = (target: string) => {
+		setState((s) => (s.status === "ready" ? { ...s, courses: s.courses.filter((c) => c.workspace !== target) } : s));
+		if (workspace === target) {
+			setWorkspace("");
+			if (remember) localStorage.removeItem(COURSE_CHOICE_KEY);
+		}
+	};
 	const requireCourse = () => {
 		if (state.status === "ready" && workspace) return workspace;
 		setNotice(state.status === "unavailable" ? unavailableMessage(state.reason) : PICK_A_COURSE);
 		return null;
 	};
-	return { state, workspace, notice, choose, add, requireCourse };
+	return { state, workspace, notice, choose, add, renamed, removed, requireCourse };
 }
 
 /** The composer row's course control: the picker, or one line saying why
@@ -122,6 +146,7 @@ export function CourseControl({ choice, variant = "current" }: {
 	variant?: "current" | "proposed";
 }) {
 	const [creating, setCreating] = useState(false);
+	const [managing, setManaging] = useState<{ action: "rename" | "delete"; course: CourseSummary } | null>(null);
 	const { state } = choice;
 	if (state.status === "loading") return null;
 	if (state.status === "unavailable") return variant === "proposed" ? null : <CoursesUnavailable reason={state.reason} />;
@@ -132,6 +157,7 @@ export function CourseControl({ choice, variant = "current" }: {
 				workspace={choice.workspace}
 				onChange={choice.choose}
 				onNew={() => setCreating(true)}
+				onManage={(action, course) => setManaging({ action, course })}
 				variant={variant}
 			/>
 			{choice.notice && variant === "current" && (
@@ -146,6 +172,26 @@ export function CourseControl({ choice, variant = "current" }: {
 					onCreated={(course) => {
 						setCreating(false);
 						choice.add(course);
+					}}
+				/>
+			)}
+			{managing?.action === "rename" && (
+				<RenameCourseDialog
+					course={managing.course}
+					onClose={() => setManaging(null)}
+					onRenamed={(title) => {
+						choice.renamed(managing.course.workspace, title);
+						setManaging(null);
+					}}
+				/>
+			)}
+			{managing?.action === "delete" && (
+				<DeleteCourseDialog
+					course={managing.course}
+					onClose={() => setManaging(null)}
+					onDeleted={() => {
+						choice.removed(managing.course.workspace);
+						setManaging(null);
 					}}
 				/>
 			)}
@@ -181,6 +227,8 @@ export function CoursePicker(props: {
 	workspace: string;
 	onChange: (workspace: string) => void;
 	onNew: () => void;
+	/** Proposed: Rename or Delete the picked course. */
+	onManage?: (action: "rename" | "delete", course: CourseSummary) => void;
 	/** "proposed": a quiet 32px pill for the composer toolbar that opens the
 	 *  shared dropdown menu. */
 	variant?: "current" | "proposed";
@@ -219,13 +267,15 @@ export function CoursePicker(props: {
 	);
 }
 
-/** The Proposed course chip: the courses as one choice, then "New course…"
- *  as an action. No due counts: Today says what is waiting, in words. */
-function CourseMenu({ courses, workspace, onChange, onNew }: {
+/** The Proposed course chip: the courses as one choice, then "New course…",
+ *  then Rename and Delete for the picked course. No due counts: Today says
+ *  what is waiting, in words. */
+function CourseMenu({ courses, workspace, onChange, onNew, onManage }: {
 	courses: readonly CourseSummary[];
 	workspace: string;
 	onChange: (workspace: string) => void;
 	onNew: () => void;
+	onManage?: (action: "rename" | "delete", course: CourseSummary) => void;
 }) {
 	const picked = courses.find((c) => c.workspace === workspace);
 	return (
@@ -260,6 +310,19 @@ function CourseMenu({ courses, workspace, onChange, onNew }: {
 					<PlusIcon aria-hidden="true" />
 					New course…
 				</DropdownMenuItem>
+				{picked && onManage && (
+					<>
+						<DropdownMenuSeparator />
+						<DropdownMenuItem onSelect={() => onManage("rename", picked)} data-testid="course-rename">
+							<PencilIcon aria-hidden="true" />
+							<span className="min-w-0 flex-1 truncate">Rename {courseLabel(picked)}…</span>
+						</DropdownMenuItem>
+						<DropdownMenuItem variant="destructive" onSelect={() => onManage("delete", picked)} data-testid="course-delete">
+							<Trash2Icon aria-hidden="true" />
+							<span className="min-w-0 flex-1 truncate">Delete {courseLabel(picked)}…</span>
+						</DropdownMenuItem>
+					</>
+				)}
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
@@ -270,12 +333,13 @@ function rootLabel(root: string): string {
 	return root.split("/").filter(Boolean).slice(-2).join("/");
 }
 
-/** The New course dialog's study root under the Proposed design: the
- *  shared select at the field's width; the hint carries the full path. */
+/** Where the course goes, under the Proposed design, shown only when more
+ *  than one folder is known: the shared select at the field's width; the
+ *  hint carries the full path. */
 function RootSelect({ roots, value, onChange }: { roots: readonly string[]; value: string; onChange: (root: string) => void }) {
 	const trigger = (
-		<SelectTrigger data-testid="new-course-root" aria-label="Study root" disabled={roots.length === 0} className="w-full font-normal">
-			<SelectValue placeholder="No study root" />
+		<SelectTrigger data-testid="new-course-root" aria-label="Save in" className="w-full font-normal">
+			<SelectValue placeholder="Pick a folder" />
 		</SelectTrigger>
 	);
 	return (
@@ -292,8 +356,11 @@ function RootSelect({ roots, value, onChange }: { roots: readonly string[]; valu
 	);
 }
 
-/** The New course form: a title and the study root it goes in. The server
- *  creates `<root>/<slug>` and has the engine make it a course. */
+/** The New course form. Proposed: a title, the exam day and the material,
+ *  plus where it goes when more than one folder is known. The server makes
+ *  `<root>/<slug>`, copies the material in, and has the engine make it a
+ *  course with that exam day and material. Current: the title and the
+ *  folder. */
 export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, variant = "current" }: {
 	roots: readonly string[];
 	onClose: () => void;
@@ -304,6 +371,8 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 }) {
 	const [title, setTitle] = useState("");
 	const [root, setRoot] = useState(roots[0] ?? "");
+	const [exam, setExam] = useState<string | null>(null);
+	const [picks, setPicks] = useState<MaterialPick[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const backdropDismiss = useBackdropDismiss(onClose);
@@ -313,37 +382,45 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch, va
 		setBusy(true);
 		setError(null);
 		try {
-			const res = await fetchLike("/api/courses", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ root, title: title.trim() }),
-			});
+			const res = await fetchLike("/api/courses", { method: "POST", body: newCourseForm({ title, exam, root, picks }) });
 			const body = (await res.json()) as CourseSummary | { error?: string };
-			if (!res.ok) throw new Error("error" in body && body.error ? body.error : "The course could not be created");
+			if (!res.ok) throw new Error("error" in body && body.error ? body.error : "The course could not be made. Try again.");
 			onCreated(body as CourseSummary);
 		} catch (err) {
-			setError((err as Error).message);
+			setError(err instanceof TypeError ? "LearnHarness could not be reached. Check it is running, then try again." : (err as Error).message);
 			setBusy(false);
 		}
 	};
 	if (variant === "proposed") {
+		const field = "flex flex-col gap-2 text-row font-medium text-foreground";
 		return (
 				<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">
 					<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
 						<DialogHeader>
 							<DialogTitle>New course</DialogTitle>
 						</DialogHeader>
-						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
+						<label className={field}>
 							Title
-							<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required data-testid="new-course-title" className="font-normal" />
+							<Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus required disabled={busy} placeholder="Group Theory" data-testid="new-course-title" className="font-normal" />
 						</label>
-						<label className="flex flex-col gap-2 text-row font-medium text-foreground">
-							Study root
-							<RootSelect roots={roots} value={root} onChange={setRoot} />
-						</label>
+						<div role="group" aria-labelledby="new-course-exam-label" className={field}>
+							<span id="new-course-exam-label">Exam day</span>
+							<ExamDayField value={exam} onChange={setExam} disabled={busy} />
+						</div>
+						<div role="group" aria-labelledby="new-course-material-label" className={field}>
+							<span id="new-course-material-label">Course material</span>
+							<span className="text-label font-normal text-muted-foreground">Slides, notes or past papers. They are copied into the course, so the tutor can read them.</span>
+							<MaterialField picks={picks} onChange={setPicks} disabled={busy} />
+						</div>
+						{roots.length > 1 && (
+							<label className={field}>
+								Save in
+								<RootSelect roots={roots} value={root} onChange={setRoot} />
+							</label>
+						)}
 						{roots.length === 0 && (
 							<p className="text-row text-muted-foreground">
-								No study root is known yet: register a first course with the engine&apos;s <code>study init</code>.
+								LearnHarness does not know your courses folder yet. Set up the first course from the Terminal with <code>study init</code>.
 							</p>
 						)}
 						{error && <p role="alert" className="text-row text-danger">{error}</p>}
