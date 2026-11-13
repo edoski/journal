@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { Maximize2Icon, Minimize2Icon } from "lucide-react";
 import type { CourseMapTopic, StudyCourse } from "@/src/core";
-import { CourseMapGraph } from "@/components/course-map/course-map-graph";
+import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
 import { layoutCourseMap } from "@/components/course-map/course-map-layout";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
@@ -82,7 +82,7 @@ export function HomeMap({
 			</div>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={VIGNETTE}>
 				{map.topics.length > 0 ? (
-					<CourseMapGraph
+					<CourseMapDrawing
 						key={map.workspace}
 						map={map}
 						layout={layout}

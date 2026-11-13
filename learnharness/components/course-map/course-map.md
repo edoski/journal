@@ -2,6 +2,8 @@
 
 The Proposed design's Knowledge page (`/knowledge`): one course's topics and prerequisites as a map, where the learner is in it, and Study this on any topic. `course-map-view.tsx` (`data-slot` `course-map-view`, header `course-map-header`), `course-map-graph.tsx` (`course-map-graph`, `course-map-node`, `course-map-current-tag`, `course-map-contrast`), `course-map-list.tsx` (`course-map-list`, `course-map-row`), `topic-detail.tsx` (`topic-detail`), `course-map-layout.ts` (geometry) and `topic-words.ts` (captions). Data: `GET /api/courses/map?workspace=`, the engine's read-only `map` verb as a `CourseMap` (`src/core/contracts/course-map.ts`). The app computes no standing: every level, review, due and weak word is the engine's.
 
+A study home draws the course through `course-map-drawing.tsx`, which shows the topic map (`topic-map/topic-map.md`) while the Map switch is on Proposed and `CourseMapGraph` as described here otherwise. Shipping the topic map deletes `course-map-drawing.tsx`, `course-map-graph.tsx` and `topic-detail.tsx`.
+
 ## Anatomy
 
 | Part | Notes |

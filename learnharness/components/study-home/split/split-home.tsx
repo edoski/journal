@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Maximize2Icon } from "lucide-react";
-import { CourseMapGraph } from "@/components/course-map/course-map-graph";
+import { CourseMapDrawing } from "@/components/course-map/course-map-drawing";
 import { layoutCourseMap } from "@/components/course-map/course-map-layout";
 import { DayHeading } from "@/components/study-home/day-heading";
 import { HomeFrame, type HomeReady } from "@/components/study-home/home-frame";
@@ -138,7 +138,7 @@ function MapPane({
 			</Hint>
 			<div data-slot="home-map-frame" className="relative flex min-h-0 flex-1 flex-col" style={FADE}>
 				{map.topics.length > 0 ? (
-					<CourseMapGraph
+					<CourseMapDrawing
 						key={map.workspace}
 						map={map}
 						layout={layout}

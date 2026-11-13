@@ -26,7 +26,7 @@ The `map` option of Home's switch: the course map near the top with the course t
 | column | 960px, 32px sides, 52px above, 24px below; 20px between title, card and lessons; the page never scrolls |
 | card | 1px `border`, radius 12, as wide as a lesson row's fill (12px past the text edge on each side); between 224 and 416px tall |
 | card line | 48px: shadcn `Tabs` (tabs.md), one tab per course in Today's order, opening on the first lesson's course; at the end "You are at <topic>" 12 muted (it truncates before the tabs do) and the quiet 32px Enlarge control |
-| map | `CourseMapGraph` as it is, edges faded 48px across and 24px down, a short drawing at the card's middle |
+| map | the course's map (`CourseMapDrawing`, home-map.md) as it is, edges faded 48px across and 24px down, a short drawing at the card's middle |
 | lessons | rows 2px apart, radius 12, padding 10 12, hover `fill-hover`; `LessonText`; the whole row opens the lesson. Past the room left, the list scrolls inside itself |
 | picked row | the lesson of the tab's course: `fill-selected` and the primary button's look at its end (part of the row, not a second control) |
 | enlarged | `HomeMap` enlarged takes the page (home-map.md) |
