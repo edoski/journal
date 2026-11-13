@@ -1,6 +1,6 @@
 # Pick up options (hybrid topic page)
 
-The Pick up switch (`design-variant.ts`, group `pickup`, options `sections`, `block`, each wearing Design's Proposed, Topic's `hybrid` and Resume's Current). Current keeps the hybrid's dated history. An option replaces the history pane (`HybridTopic`'s `pane` prop, `PICKUP_PANES` in `pickup-options.ts`, given by `TopicPage`'s `pickup` prop) and holds the page's action, so the head has no button and the composer foot is the plain composer: a typed message starts a new lesson, and its field says so ("Ask about <topic> to start a new lesson").
+The Pick up switch (`design-variant.ts`, group `pickup`, options `sections`, `block`, `nowline`, each wearing Design's Proposed, Topic's `hybrid` and Resume's Current). Current keeps the hybrid's dated history. An option replaces the history pane (`HybridTopic`'s `pane` prop, `PICKUP_PANES` in `pickup-options.ts`, given by `TopicPage`'s `pickup` prop) and holds the page's action, so the head has no button and the composer foot is the plain composer: a typed message starts a new lesson, and its field says so ("Ask about <topic> to start a new lesson").
 
 Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons, within a lesson and across its steps, so it belongs in the page, inside the list of sessions, not on the composer. The sessions sorted by relevance, with quiet dividers saying what to pick up now, what is scheduled, what comes next and what is past.
 
@@ -8,6 +8,7 @@ Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons,
 |---|---|---|---|---|
 | `sections` | The history sorted by relevance, as an inbox: Now, Next, Scheduled, Earlier | Now, Next, Scheduled, Earlier | the first row, larger words, an accent rule down its left edge, the press word in the accent | `sections.tsx` |
 | `block` | A pick-up block heads the pane, set apart by its own surface, with the lesson's path from the step it stopped on to the next | Now's block, Next, Scheduled, Earlier | a bordered block with the step path and a foot holding the press | `block.tsx` |
+| `nowline` | A calendar's now-line: the list reads from what is coming down to what is past, and the present is a line in the accent carrying the one thing to pick up | Scheduled, Next, Now, the past by day | its place on the line, under the accent divider | `nowline.tsx` |
 
 ## Sections (`pickup-facts.ts`, pure)
 
@@ -26,7 +27,7 @@ Now's words per row: Resume "Your turn in today's lesson", Open "The tutor is wr
 
 - `Divider`, `Section`: a 32px label in `text-label` with a hairline to the column's end; Now line's in the accent.
 - `NowPress`: the press stretched over its container (`after:absolute inset-0`), so the whole row or block is the press; a link to the session it opens, else a button that starts one. The press word in the accent with a 16px arrow that moves 2px on hover. Its focus ring is inset, inside the pane's clip.
-- `NowRow` (sections): 1rem icon column, the words in `text-control` medium, the press flush right, then the title, the step ("Stopped on" muted, the step in ink) and "Then" the step after, each wrapping to two lines at most. Bleeds 12px as Home's row; `marked` draws a 2px accent rule down its left edge. The lesson on the map fills it `bg-fill-selected`.
+- `NowRow` (sections, nowline): 1rem icon column, the words in `text-control` medium, the press flush right, then the title, the step ("Stopped on" muted, the step in ink) and "Then" the step after, each wrapping to two lines at most. Bleeds 12px as Home's row; `marked` draws a 2px accent rule down its left edge. The lesson on the map fills it `bg-fill-selected`.
 - `NextList`: a session is the history's own row (`SessionItem`) with its map button; a review or a task is Home's one-line row (`../row-classes.ts`), a button that starts the session.
 - `ScheduledEntry`, `EarlierDays` (the history's `DayItem`s), `MapToggle` (the history's map button over a stretched press).
 - Every pane is the history's `HistoryPane`: `-mx-3` with `px-3` inside, so a row's bleed and a block's border keep their room inside the clip.
@@ -43,3 +44,9 @@ Now's words per row: Resume "Your turn in today's lesson", Open "The tutor is wr
 - It reads `resumeLine` (`../resume/resume-facts.ts`) and `ResumeIconMark` (`../resume/resume-parts.tsx`). If a Pick up option ships, those two move here before the Resume options are deleted.
 
 Tests: `tests/topic-page-pickup.test.tsx` (every action row as Now in every option, the sections' order, each option's order on the page, the lesson on the map).
+
+## Trade-offs (13 Nov 2026)
+
+- `sections` gives the clearest answer to "what now, what next, what later" and keeps every row in one rhythm; Now weighs by size and the accent rule, which is lighter than a block.
+- `block` weighs most and is the only one that draws the lesson's path from where it stopped to what follows, so it ties the pane to the map; it is a surface on a page that otherwise has none, and Next and Scheduled under it read as an appendix.
+- `nowline` says when each thing is, as a calendar does; the one thing to do now sits in the middle when anything is scheduled or next, so the eye travels past the future first.

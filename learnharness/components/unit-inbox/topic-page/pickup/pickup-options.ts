@@ -1,5 +1,6 @@
 import type { PICKUP_OPTIONS } from "@/components/design-variant";
 import { BlockPane } from "@/components/unit-inbox/topic-page/pickup/block";
+import { NowLinePane } from "@/components/unit-inbox/topic-page/pickup/nowline";
 import { SectionsPane } from "@/components/unit-inbox/topic-page/pickup/sections";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 
@@ -7,4 +8,5 @@ import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/
 export const PICKUP_PANES: Record<(typeof PICKUP_OPTIONS)[number], React.ComponentType<HybridPaneProps>> = {
 	sections: SectionsPane,
 	block: BlockPane,
+	nowline: NowLinePane,
 };

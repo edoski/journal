@@ -169,9 +169,11 @@ describe("each option drawn", () => {
 	it("orders its parts by its thesis, and draws no empty section", () => {
 		assert.deepEqual(order(page("sections", RICH)), ["now", "next", "scheduled", "earlier"]);
 		assert.deepEqual(order(page("block", RICH)), ["now block", "next", "scheduled", "earlier"]);
+		assert.deepEqual(order(page("nowline", RICH)), ["scheduled", "next", "now", "days"]);
 		const alone = ROWS[4]![1];
 		assert.deepEqual(order(page("sections", alone)), ["now"]);
 		assert.deepEqual(order(page("block", alone)), ["now block"]);
+		assert.deepEqual(order(page("nowline", alone)), ["now"]);
 	});
 
 	it("draws every row of the action table as Now, the session it opens as a link and every other press as a button, with no button in the head", () => {
