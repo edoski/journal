@@ -10,7 +10,7 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN
 |---|---|---|
 | History | The dated index of the topic: every session and scored attempt, newest first. A session row opens the lesson; the map button beside a lesson that planned puts its steps on the map | List a lesson's steps |
 | Lesson map | Where the lesson on the map stands: the step it stopped on ringed, the steps asked about before dotted, the steps right after it marked Next. Every step opens the lesson | Date anything, or list the other lessons |
-| Composer foot | A new lesson | |
+| Composer foot | A new lesson; absent under Pick up, where the sidebar's New lesson starts one | |
 
 ## Anatomy
 

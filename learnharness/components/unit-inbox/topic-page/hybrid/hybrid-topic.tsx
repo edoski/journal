@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ComponentType } from "react";
+import { cn } from "@/lib/utils";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { TopicHead } from "@/components/unit-inbox/topic-page/topic-head";
 import type { TopicPageProps } from "@/components/unit-inbox/topic-page/topic-page";
@@ -51,7 +52,7 @@ export function HybridTopic({ facts, busy, onAct, onTask, pane: Pane }: TopicPag
 			<History days={days} shown={shown?.chat.id ?? null} onShow={setChosen} titleOf={facts.titleOf} className={className} />
 		);
 	return (
-		<div data-testid="unit-page" data-topic-candidate="hybrid" className={`mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pt-6 pb-4 ${HYBRID_COLUMN}`}>
+		<div data-testid="unit-page" data-topic-candidate="hybrid" className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pt-6", Pane ? "pb-6" : "pb-4", HYBRID_COLUMN)}>
 			<TopicHead facts={facts} busy={busy} onAct={Pane ? undefined : onAct} />
 			{shown ? (
 				<div data-slot="topic-panes" className="grid min-h-0 flex-1 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6">

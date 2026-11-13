@@ -1,6 +1,6 @@
 # Pick up (hybrid topic page)
 
-The Pick up switch (`design-variant.ts`, group `pickup`, Current or `sections`, which wears Design's Proposed and Topic's `hybrid`). Current keeps the hybrid's dated history. Sections replaces the history pane (`HybridTopic`'s `pane` prop, `PICKUP_PANES` in `pickup-options.ts`, given by `TopicPage`'s `pickup` prop) and holds the page's action, so the head has no button and the composer foot is the plain composer: a typed message starts a new lesson, and its field says so ("Ask about <topic> to start a new lesson").
+The Pick up switch (`design-variant.ts`, group `pickup`, Current or `sections`, which wears Design's Proposed and Topic's `hybrid`). Current keeps the hybrid's dated history. Sections replaces the history pane (`HybridTopic`'s `pane` prop, `PICKUP_PANES` in `pickup-options.ts`, given by `TopicPage`'s `pickup` prop) and holds the page's action, so the head has no button, and the page has no composer: resuming the lesson is the established path, Now holds the action that applies when nothing waits (Start, Review, Continue a task), and a deliberate new lesson starts from the sidebar's New lesson, as everywhere else (Edo's ruling, 13 Nov 2026).
 
 Edo's ask (13 Nov 2026): resuming is resuming his study, tracked across lessons, within a lesson and across its steps, so it belongs in the page, inside the list of sessions, not on the composer. The sessions sorted by relevance, with quiet dividers saying what to pick up now, what is scheduled, what comes next and what is past.
 
