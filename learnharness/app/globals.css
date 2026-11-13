@@ -36,6 +36,14 @@
 	}
 }
 
+/* Tailwind's outline-none sets the outline style to none for every later
+   outline utility too, so a target that pairs it with a focus-visible:outline
+   ring (the maps' nodes) drew nothing when the arrows reached it. On the
+   page, a keyboard focus gives such a ring its solid style back. */
+main [class*="focus-visible:outline-"]:not([class*="focus-visible:outline-none"]):not([class*="focus-visible:outline-hidden"]):focus-visible {
+	outline-style: solid;
+}
+
 /* Palette (owner's hexes): main #141414, raised #1C1C1C, edges #434343.
    Mono chrome = JetBrains Mono; prose = Source Sans 3; titles = CMU Serif. */
 :root {
