@@ -1587,11 +1587,10 @@ export function Chat({
 									) : null}
 									{m.role === "user" && proposed ? (
 										// The learner's words: a quiet surface, full width (the
-										// transcript reads as a document), no label.
+										// transcript reads as a document), no label, set in the
+										// lesson's markdown and math like the tutor's.
 										<div data-testid="user-message" data-slot="learner-message" className="my-1 w-full rounded-xl bg-card px-4 py-3">
-											<div className="lh-prose whitespace-pre-wrap text-foreground">
-												{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}
-											</div>
+											<MessageResponse className="text-foreground">{m.parts.filter((p) => p.type === "text").map((p) => p.text).join("\n")}</MessageResponse>
 										</div>
 									) : m.role === "user" ? (
 										/* THE DOCUMENT ROW (owner round, 2026-10-05): no right-aligned

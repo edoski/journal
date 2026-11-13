@@ -37,6 +37,8 @@ const proposed = (node: React.ReactNode, activeProblemCallId: string | null = nu
 	<LessonDesignContext.Provider value={{ variant: "proposed", activeProblemCallId }}>{node}</LessonDesignContext.Provider>
 );
 
+const AnswerFor = ({ answer }: { answer: QuestionAnswerData }) => <AnsweredCard answer={answer} variant="proposed" />;
+
 const part = (over: Record<string, unknown>) => over as unknown as ArtifactPartProps["part"];
 
 const NODES = [
@@ -185,6 +187,16 @@ describe("Proposed lesson cards", () => {
 		assert.match(card.textContent!, /“The kernel is nonzero\.”/);
 		assert.match(card.textContent!, /The answerA nonzero kernel means not invertible\./);
 		assert.doesNotMatch(card.textContent!, /EXPLAIN|Correct|Incorrect/);
+	});
+
+	it("the learner's own math is typeset, in an answer and in his thinking", () => {
+		const answer = { kind: "explain", tool: "explain", questionText: "Why?", answers: [], text: "Because $Av = \\lambda v$ with $v \\neq 0$." } as unknown as QuestionAnswerData;
+		const card = documentFor(<AnswerFor answer={answer} />);
+		assert.equal(card.querySelectorAll(".katex").length, 2);
+		assert.doesNotMatch(card.body.textContent!, /\$/, "no delimiter left as text");
+		const thinking = documentFor(<ThinkingCard data={{ problemCallId: "p1", text: "Row 3 is $R_1 + R_2$" }} variant="proposed" />);
+		assert.ok(thinking.querySelector(".katex"));
+		assert.doesNotMatch(thinking.body.textContent!, /\$/);
 	});
 
 	it("the course link banner is one line with one Link action", () => {
