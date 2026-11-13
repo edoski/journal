@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 import { parseHTML } from "linkedom";
 import { createNotifyHub } from "../components/server-events.tsx";
-import { createWebChatGPTBridge, createWebNativeBridge } from "../components/settings/subscription-client.ts";
+import { createWebChatGPTBridge } from "../components/settings/subscription-client.ts";
 import { createRequire } from "node:module";
 
 const dom = parseHTML("<html><body></body></html>");
@@ -43,21 +43,6 @@ test("blocked popups do not start OAuth; failed login closes the reserved tab", 
 	await assert.rejects(bridge.login()); assert(tab.closed);
 });
 
-test("native web login retains device prompts; only the explicit Open browser action opens a tab", async () => {
-	const requests: Record<string, unknown>[] = []; let tabs = 0;
-	const tab = { opener: {}, closed: false, location: { href: "" }, close() {} };
-	window.open = (() => { tabs++; return tab; }) as unknown as typeof window.open;
-	globalThis.fetch = async (_url, options) => {
-		const command = JSON.parse(String(options?.body)); requests.push(command);
-		return Response.json(command.op === "open" ? { browserAction: action } : {});
-	};
-	const bridge = createWebNativeBridge(null);
-	await bridge.login("github-copilot", false); assert.equal(tabs, 0);
-	await bridge.respond("github-copilot", "attempt", "prompt", "");
-	await bridge.open("github-copilot", "attempt", "action"); assert.equal(tabs, 1); assert.equal(tab.location.href, action);
-	assert.deepEqual(requests, [{ providerId: "github-copilot", op: "login", enabled: false }, { providerId: "github-copilot", op: "respond", attemptId: "attempt", promptId: "prompt", value: "" }, { providerId: "github-copilot", op: "open", attemptId: "attempt", actionId: "action" }]);
-});
-
 test("Electron dev uses its narrow external-browser bridge, without attempting a renderer popup", async () => {
 	const opened: string[] = [];
 	window.lh = { expandWindow() {}, subscriptionTransport: "web", openSubscriptionBrowser: async (target) => { opened.push(target); } };
@@ -68,15 +53,9 @@ test("Electron dev uses its narrow external-browser bridge, without attempting a
 
 test("web notices identify the server machine and same-machine ChatGPT sign-in; desktop copy stays unchanged", async () => {
 	const { CHATGPT_NOTICE, chatGPTNotice } = await import("../components/settings/chatgpt-connection.tsx");
-	const { subscriptionNotice, subscriptionDisconnectCopy } = await import("../components/settings/subscription-connections.tsx");
 	assert.equal(chatGPTNotice(), CHATGPT_NOTICE); assert(CHATGPT_NOTICE.includes("on this device"));
 	assert(chatGPTNotice(true).includes("on the machine running LearnHarness"));
 	assert(chatGPTNotice(true).endsWith("Complete ChatGPT sign-in in a browser on that same machine."));
-	for (const label of ["GitHub Copilot", "Grok"]) {
-		assert(subscriptionNotice(label).includes("stored locally")); assert(subscriptionDisconnectCopy(label).includes("from this device"));
-		assert(subscriptionNotice(label, true).includes("on the machine running LearnHarness"));
-		assert(subscriptionDisconnectCopy(label, true).includes("from the machine running LearnHarness"));
-	}
 });
 
 const require = createRequire(import.meta.url);

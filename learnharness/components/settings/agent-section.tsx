@@ -76,7 +76,6 @@ import { ModelCommand, ThinkingMenuItems } from "./model-pickers";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ChatGPTBackgroundAccess } from "./chatgpt-connection";
-import { NativeSubscriptionBackgroundAccess } from "./subscription-connections";
 
 /** One slot's display identity — the tier's roster as the row hint rides
  *  with the resolved default (owner: the hint ALWAYS names the default). */
@@ -623,7 +622,7 @@ export function AgentSection({
 						return (
 							<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`slot-row-${slot}`}>
 								<span className="flex items-center gap-2">
-									{slot !== "strong" && <><ChatGPTBackgroundAccess provider={coord?.provider} /><NativeSubscriptionBackgroundAccess provider={coord?.provider} /></>}
+									{slot !== "strong" && <ChatGPTBackgroundAccess provider={coord?.provider} />}
 									<Popover modal open={thisMenuOpen === "model"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "model" } : null)}>
 										{modelId ? <Hint label={`${provider}:${modelId}`}>{modelTrigger}</Hint> : modelTrigger}
 										<PopoverContent align="end" className="w-[22rem] p-1" data-testid={`slot-model-menu-${slot}`}>
@@ -655,7 +654,7 @@ export function AgentSection({
 								ref={thisMenuOpen ? menuAnchorRef : undefined}
 								className="relative flex items-center gap-2"
 							>
-								{slot !== "strong" && <><ChatGPTBackgroundAccess provider={coord?.provider} /><NativeSubscriptionBackgroundAccess provider={coord?.provider} /></>}
+								{slot !== "strong" && <ChatGPTBackgroundAccess provider={coord?.provider} />}
 								<MenuTrigger
 									value={modelId ? prettyModel(modelId) : ""}
 									hint={modelId ? `${provider}:${modelId}` : undefined}

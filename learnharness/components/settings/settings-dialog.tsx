@@ -58,7 +58,6 @@ import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
-import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
 /** Owner (2026-09-20): hints earn their place — mechanics-explaining
  *  prose is out; only the keyboard note stays (storage location is a
@@ -92,12 +91,12 @@ export function SettingsDialogProvider({
 		setShow(true);
 	}, []);
 	return (
-		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>
+		<ChatGPTUIProvider><DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
 				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
 			)}
-		</DialogContext.Provider></NativeSubscriptionUIProvider></ChatGPTUIProvider>
+		</DialogContext.Provider></ChatGPTUIProvider>
 	);
 }
 

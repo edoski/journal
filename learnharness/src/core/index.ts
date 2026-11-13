@@ -51,10 +51,8 @@ export * from "./answer-presentation.ts";
 export * from "./prices.ts";
 export * from "./context-usage.ts";
 export type { ChatGPTStatus, ChatGPTControlBridge } from "./contracts/chatgpt.ts";
-export { NATIVE_SUBSCRIPTIONS } from "./contracts/subscriptions.ts";
 export { CLAUDE_SUBSCRIPTION, CLAUDE_MODEL_IDS, CLAUDE_ROLE_DEFAULT, CLAUDE_USAGE_URL, CLAUDE_LIMIT_TEXT, claudeProviderId, isClaudeProvider, isClaudeLimitFailure, nextClaudeAccount, soonestClaudeReset } from "./contracts/claude.ts";
 export type { ClaudeAccount, ClaudeAccountStatus, ClaudeConnection, ClaudeModelId, ClaudeUsage } from "./contracts/claude.ts";
-export type { NativeSubscriptionProviderId, NativeSubscriptionLogicalId, NativeSubscriptionStatus, NativeSubscriptionSnapshot, NativeSubscriptionScope, NativeSubscriptionControlBridge, SubscriptionInteraction, SubscriptionPrompt } from "./contracts/subscriptions.ts";
 export * from "./cost-summary.ts";
 export * from "./fuzzy.ts";
 // settings.ts + settings-resolution.ts (settings-storage wave, 2026-09-19):

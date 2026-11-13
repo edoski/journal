@@ -51,7 +51,7 @@ import { Hint } from "@/components/ui/hint";
 import { type ProviderKeyInfo } from "@/components/settings/keys-section";
 import { ProviderMenuList } from "@/components/settings/model-menu";
 import { ChatGPTBackgroundAccess } from "@/components/settings/chatgpt-connection";
-import { NativeSubscriptionBackgroundAccess, SubscriptionConnections } from "@/components/settings/subscription-connections";
+import { SubscriptionConnections } from "@/components/settings/subscription-connections";
 import { defaultOrderLevel, populateLevel, THINKING_LABEL } from "@/components/thinking-default";
 import { ThinkingMenuList } from "@/components/settings/model-menu";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
@@ -541,7 +541,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 											return (
 												<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`setup-slot-${slot}`}>
 													<span className="flex shrink-0 items-center gap-2">
-														{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
+														{slot !== "strong" && <ChatGPTBackgroundAccess provider={entry?.provider} />}
 														<Popover modal open={modelOpen} onOpenChange={(next) => setOpenMenu(next ? { slot, kind: "model" } : null)}>
 															<Hint label={entry ? `${entry.provider}:${entry.id}` : "Pick a model…"}>
 																<PopoverTrigger asChild>
@@ -675,7 +675,7 @@ function OpenSetupDialog({ onClose, onDone }: SetupDialogProps) {
 										)}
 									</span>
 									<span className="text-xs text-muted-foreground/70">{SLOT_META[slot].roster}</span>
-									{slot !== "strong" && <><ChatGPTBackgroundAccess provider={entry?.provider} /><NativeSubscriptionBackgroundAccess provider={entry?.provider} /></>}
+									{slot !== "strong" && <ChatGPTBackgroundAccess provider={entry?.provider} />}
 									<div className="flex items-center gap-2">
 										<div className="relative flex-1">
 											<Hint label={entry ? `${entry.provider}:${entry.id}` : "Pick a model…"}>

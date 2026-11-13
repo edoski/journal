@@ -9,7 +9,6 @@ import {
 } from "../agent/teacher-agent.ts";
 import { piEngineForSpec, type PiEngine } from "../agent/models.ts";
 import { connectionBackgroundAllowed, connectionScopeCurrent, isSubscriptionProvider } from "../agent/subscription-connections.ts";
-import { nativeSubscriptionError } from "../agent/subscription-stream.ts";
 import { chatGPTStreamError } from "../agent/chatgpt-stream.ts";
 import { claudeErrorMessage, claudeTurnError } from "../agent/claude-stream.ts";
 import { isClaudeProvider } from "../core/contracts/claude.ts";
@@ -274,7 +273,7 @@ export async function handleChatInput(
 	};
 	let conversationEngine: PiEngine;
 	try { conversationEngine = piEngineForSpec(conversation, () => callPurpose.background, lifecycle); }
-	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : isSubscriptionProvider(conversation.provider) ? nativeSubscriptionError(conversation.provider, "model catalog") : "The selected model is unavailable." }, { status: 503 }); }
+	catch { return Response.json({ error: conversation.provider === "chatgpt" ? chatGPTStreamError("model catalog") : isClaudeProvider(conversation.provider) ? claudeErrorMessage({ code: "model_not_found" }) : "The selected model is unavailable." }, { status: 503 }); }
 	const modelIdForCompaction = `${conversationEngine.model.provider}:${conversationEngine.model.id}`;
 	await ensureCompacted(
 		{
@@ -570,7 +569,6 @@ export async function handleChatInput(
 					console.error(`[chat ${chatId}] Claude turn error:`, error);
 					return claudeTurnError(error instanceof Error ? error.message : String(error));
 				}
-				if (isSubscriptionProvider(conversation.provider)) return nativeSubscriptionError(conversation.provider, String(error));
 				console.error(`[chat ${chatId}] turn error:`, error);
 				return "An error occurred.";
 			},

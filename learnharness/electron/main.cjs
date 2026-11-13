@@ -27,8 +27,6 @@
 const { app, BrowserWindow, Menu, ipcMain, session, shell } = require("electron");
 const { createChatGPT, fileStore } = require("./chatgpt.cjs");
 const { attachChatGPTChild, trustedSender, chatGPTControl } = require("./chatgpt-ipc.cjs");
-const { createSubscriptions, loadSubscriptionSDK } = require("./subscriptions.cjs");
-const { attachSubscriptionChild, subscriptionControl } = require("./subscription-ipc.cjs");
 const { desktopAPIHeaders } = require("./desktop-api.cjs");
 const { openWebSubscriptionBrowser } = require("./web-subscription-browser.cjs");
 const { randomBytes } = require("node:crypto");
@@ -137,8 +135,6 @@ if (process.argv.includes("--browser-service")) {
 let serverProcess = null;
 let chatgpt = null;
 let chatgptChild = null;
-let subscriptions = null;
-let subscriptionChild = null;
 // Per-launch request capability, never OAuth tokens and never renderer state.
 let desktopAPISecret = null;
 let reopenWindow = null;
@@ -228,7 +224,6 @@ function startServer(port) {
 		);
 		serverProcess = child;
 		chatgptChild = attachChatGPTChild(child, chatgpt);
-		subscriptionChild = attachSubscriptionChild(child, subscriptions);
 		const fwd = (buf) => buf.toString().trimEnd().split("\n").forEach((l) => l && log(`server: ${l}`));
 		child.stdout.on("data", fwd);
 		child.stderr.on("data", fwd);
@@ -237,10 +232,7 @@ function startServer(port) {
 			serverProcess = null;
 			chatgptChild?.dispose();
 			chatgptChild = null;
-			subscriptionChild?.dispose();
-			subscriptionChild = null;
 			chatgpt?.close();
-			subscriptions?.close();
 		});
 		resolve(child);
 	});
@@ -265,7 +257,6 @@ function waitUntilUp(url, tries = 150) {
 
 function killServer() {
 	chatgpt?.close();
-	subscriptions?.close();
 	if (!serverProcess) return;
 	const child = serverProcess;
 	serverProcess = null;
@@ -477,7 +468,6 @@ function installMenu() {
 async function main() {
 	app.on("window-all-closed", () => {
 		chatgpt?.pause();
-		subscriptions?.pause();
 		// macOS convention: the app stays resident, reactivated from the Dock.
 		if (process.platform !== "darwin") app.quit();
 	});
@@ -509,16 +499,6 @@ async function main() {
 				for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:chatgpt:changed");
 			},
 		});
-		subscriptions = createSubscriptions({
-			directory: app.getPath("userData"),
-			loadSDK: () => loadSubscriptionSDK(path.dirname(serverEntry())),
-			openExternal: (target) => shell.openExternal(target),
-			onChange: (snapshot) => {
-				subscriptionChild?.send(snapshot);
-				for (const win of BrowserWindow.getAllWindows()) win.webContents.send("lh:subscriptions:changed");
-			},
-		});
-		await subscriptions.ready;
 		log(`starting server: ${serverEntry()}`);
 		log(`data dir: ${DATA_DIR()}${fs.existsSync(AUTH_FILE()) ? " · auth.json: present" : " · auth.json: ABSENT (no BYOK keys yet)"}`);
 		await startServer(new URL(url).port);
@@ -534,15 +514,6 @@ async function main() {
 		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) return { error: "Untrusted desktop request." };
 		if (!chatgpt || !serverProcess?.connected) return { available: false, pending: false, activeId: null, accounts: [], error: "ChatGPT sign-in requires the desktop app's private server connection. Browser-only and externally launched development servers keep API-key connections." };
 		return chatGPTControl(command, chatgpt);
-	});
-
-	ipcMain.handle("lh:subscriptions:control", async (event, command) => {
-		if (!trustedAppWindows.has(BrowserWindow.fromWebContents(event.sender)) || !trustedSender(event, new URL(url).origin, BrowserWindow)) throw new Error("Untrusted desktop request.");
-		if (!subscriptions || !serverProcess?.connected) {
-			if (command?.op === "status") return [];
-			throw new Error("Subscription sign-in requires the desktop app's private server connection.");
-		}
-		return subscriptionControl(command, subscriptions);
 	});
 
 	// The dev shell has no browser tabs. Only a one-use action on its own
@@ -569,7 +540,7 @@ async function main() {
 		const target = SIDEBAR_AUTOCLOSE;
 		if (width < target) win.setBounds({ x, y, width: target, height });
 	});
-	reopenWindow = () => { chatgpt?.resume(); subscriptions?.resume(); return createWindow(url); };
+	reopenWindow = () => { chatgpt?.resume(); return createWindow(url); };
 	app.on("activate", () => {
 		if (BrowserWindow.getAllWindows().length === 0) reopenWindow();
 	});

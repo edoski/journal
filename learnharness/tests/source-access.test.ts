@@ -42,12 +42,10 @@ await write("home/.claudette/ok.md", "ordinary lookalike notes\n");
 await write("home/.ssh/id_ed25519");
 await write("transcripts/projects/session.jsonl");
 await write("keyfiles/chatgpt-credentials.json");
-await write("keyfiles/github-copilot-credentials.json");
-await write("keyfiles/xai-credentials.json");
 await write("keyfiles/.auth.json.tmp-123");
 const uuid = "12345678-1234-4123-8123-123456789abc";
 const authTemp = await write(`keyfiles/custom-keys.json.tmp-${uuid}`);
-for (const name of ["chatgpt", "github-copilot", "xai"]) await write(`keyfiles/${name}-credentials.json.${uuid}.tmp`);
+await write(`keyfiles/chatgpt-credentials.json.${uuid}.tmp`);
 const targetKey = await write("relocated-token");
 await link(path.join(root, "keyfiles"), path.join(root, "private"), true);
 await link(targetKey, auth);
@@ -86,7 +84,7 @@ describe("source access: configured credentials only", () => {
 	const protectedFiles = [
 		auth, targetKey, path.join(home, "notes", "key-alias"),
 		authTemp, `${auth}.tmp-${uuid}`, path.join(home, "notes", "key-temp-alias"),
-		...(["chatgpt", "github-copilot", "xai"].flatMap((name) => [
+		...(["chatgpt"].flatMap((name) => [
 			path.join(root, "private", `${name}-credentials.json`),
 			path.join(root, "keyfiles", `${name}-credentials.json`),
 			path.join(root, "private", `${name}-credentials.json.${uuid}.tmp`),
@@ -331,8 +329,6 @@ describe("source access: credential case aliases on the fixture filesystem", () 
 		if (!await caseAliasesAvailable()) return t.skip("fixture filesystem is case-sensitive");
 		const aliases = [
 			path.join(root, "keyfiles", "CHATGPT-CREDENTIALS.JSON"),
-			path.join(root, "KEYFILES", "github-copilot-credentials.json"),
-			path.join(root, "KEYFILES", "XAI-CREDENTIALS.JSON"),
 			path.join(root, "RELOCATED-TOKEN"),
 			path.join(root, "KEYFILES", ".auth.json.tmp-123"),
 			path.join(root, "KEYFILES", `chatgpt-credentials.json.${uuid}.tmp`),

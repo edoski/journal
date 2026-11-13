@@ -16,28 +16,26 @@ const turn = (model: string, id: string): TurnUsage => ({ id, messageId: id, at:
 
 test("only explicit subscription route IDs count as subscription use; names stay compact and unique", () => {
 	assert.equal(subscriptionLabel("chatgpt:gpt-5"), "ChatGPT");
-	assert.equal(subscriptionLabel("github-copilot-subscription:fixture"), "GitHub Copilot");
-	assert.equal(subscriptionLabel("xai-subscription:grok"), "Grok");
-	for (const model of ["openai:gpt-5", "xai:grok", "github-copilot:fixture", "meta:muse", "radius:any", "kimi-coding:any"]) assert(!isSubscriptionModel(model));
-	assert.deepEqual(subscriptionLabels(["chatgpt:a", "xai-subscription:b", "chatgpt:c", "github-copilot-subscription:d"]), ["ChatGPT", "Grok", "GitHub Copilot"]);
-	assert.equal(planCostLabel(0.12, ["Grok"], (n) => `$${n.toFixed(2)}`), "$0.12 + Grok");
+	assert.equal(subscriptionLabel("claude-subscription:claude-opus-5-5"), "Claude");
+	for (const model of ["openai:gpt-5", "xai:grok", "github-copilot-subscription:fixture", "meta:muse", "radius:any", "kimi-coding:any"]) assert(!isSubscriptionModel(model));
+	assert.deepEqual(subscriptionLabels(["chatgpt:a", "claude-subscription:b", "chatgpt:c"]), ["ChatGPT", "Claude"]);
 	assert.equal(planCostLabel(0.67, ["ChatGPT"], (n) => `$${n.toFixed(2)}`), "$0.67 + ChatGPT");
-	assert.equal(planCostLabel(null, ["ChatGPT", "GitHub Copilot", "Grok"]), "ChatGPT + GitHub Copilot + Grok");
+	assert.equal(planCostLabel(null, ["ChatGPT", "Claude"]), "ChatGPT + Claude");
 });
 test("mixed session pricing sums only API dollars and retains all subscription providers, not unpriced errors", () => {
-	const turns = [turn("github-copilot-subscription:gpt-5", "copilot"), turn("xai-subscription:grok", "grok"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];
-	const pricing = sessionCost({ turns }); assert.equal(pricing.subscription, 3); assert.equal(pricing.unpriced, 0); assert.equal(pricing.cost, callCost(step, "openai:gpt-5"));
-	assert.deepEqual(pricing.subscriptionProviders, ["GitHub Copilot", "Grok", "ChatGPT"]);
+	const turns = [turn("claude-subscription:claude-opus-5-5", "claude"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];
+	const pricing = sessionCost({ turns }); assert.equal(pricing.subscription, 2); assert.equal(pricing.unpriced, 0); assert.equal(pricing.cost, callCost(step, "openai:gpt-5"));
+	assert.deepEqual(pricing.subscriptionProviders, ["Claude", "ChatGPT"]);
 	const html = renderToStaticMarkup(<StatsBar turns={turns} pricing={pricing} />);
-	assert.match(html, /\$[\d.]+ \+ GitHub Copilot \+ Grok \+ ChatGPT/); assert(!html.includes(" API +")); assert(!html.includes("ChatGPT plan"));
+	assert.match(html, /\$[\d.]+ \+ Claude \+ ChatGPT/); assert(!html.includes(" API +")); assert(!html.includes("ChatGPT plan"));
 });
 test("graph stage/recent aggregates retain distinct subscription providers without inventing dollars", () => {
-	const summary = graphCostSummary({ chats: [{ title: "Fixture", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: { model: "github-copilot-subscription:gpt-5", steps: [step] }, auditor: { model: "xai-subscription:grok", steps: [step] } } }] }], sources: [] }, callCost);
+	const summary = graphCostSummary({ chats: [{ title: "Fixture", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: { model: "claude-subscription:claude-haiku-5-5", steps: [step] }, auditor: { model: "chatgpt:gpt-5", steps: [step] } } }] }], sources: [] }, callCost);
 	assert.equal(summary.totalDollars, 0); assert.equal(summary.unpricedRuns, 0); assert.equal(summary.runs[0]!.dollars, null);
-	assert.deepEqual(summary.subscriptionProviders, ["GitHub Copilot", "Grok"]); assert.deepEqual(summary.runs[0]!.subscriptionProviders, ["GitHub Copilot", "Grok"]);
+	assert.deepEqual(summary.subscriptionProviders, ["Claude", "ChatGPT"]); assert.deepEqual(summary.runs[0]!.subscriptionProviders, ["Claude", "ChatGPT"]);
 });
 test("model menu distinguishes subscription connection and shows provider label rather than API prices", () => {
-	const native = piModels().getModels("xai")[0]!;
-	const html = renderToStaticMarkup(<ModelMenuList models={[toModelDto({ ...native, provider: "xai-subscription" })]} effectiveId={undefined} onPick={() => {}} />);
-	assert(html.includes("Grok (subscription)")); assert(html.includes(">Grok</span>")); assert(!html.includes("USD per 1M")); assert(!html.includes("$0"));
+	const native = piModels().getModels("openai").find((m) => m.api === "openai-responses")!;
+	const html = renderToStaticMarkup(<ModelMenuList models={[toModelDto({ ...native, provider: "chatgpt" })]} effectiveId={undefined} onPick={() => {}} />);
+	assert(html.includes("ChatGPT (subscription)")); assert(html.includes(">ChatGPT</span>")); assert(!html.includes("USD per 1M")); assert(!html.includes("$0"));
 });
