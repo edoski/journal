@@ -4,7 +4,7 @@ import { courseTitle, foldLines, lastStudied, lessonTitle, lineKey, whyNow, type
 import { TodayAlso } from "@/components/study-home/agenda-rows/today-also";
 
 /** The two lines, the same on every row. */
-const ROW = "-mx-3 grid h-16 w-[calc(100%+1.5rem)] items-center gap-x-6 rounded-lg px-3 text-left font-normal whitespace-normal";
+const ROW = "-mx-3 grid h-16 w-[calc(100%+1.5rem)] grid-cols-[minmax(0,1fr)] items-center gap-x-6 rounded-lg px-3 text-left font-normal whitespace-normal";
 
 /**
  * Agenda rows "recency" (spec: recency.md): each row two lines, as Mail
