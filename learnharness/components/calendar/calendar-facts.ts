@@ -169,7 +169,7 @@ function windowWords({ start, end }: { start: string; end: string }): string {
 export function studyTimeWords(day: ScheduledDay | undefined): string | null {
 	if (!day) return null;
 	if (day.off) return "Day off";
-	return day.windows.length > 0 ? day.windows.map(windowWords).join(", ") : null;
+	return day.windows.length > 0 ? `Study ${day.windows.map(windowWords).join(", ")}` : null;
 }
 
 const LONG_DAY = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
