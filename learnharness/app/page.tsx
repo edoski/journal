@@ -1,4 +1,4 @@
-import { Home } from "@/components/home";
+import { StudyHome } from "@/components/study-home/study-home";
 import { readSettingsRecord } from "@/src/server";
 import { slotsConfigured } from "@/src/core";
 
@@ -12,5 +12,5 @@ export default function HomePage() {
 	// has picked all three slots — the dock shows the CTA while the raw
 	// record's models section lacks any slot pin.
 	const record = readSettingsRecord();
-	return <Home initialConfigured={slotsConfigured(record?.models)} />;
+	return <StudyHome initialConfigured={slotsConfigured(record?.models)} />;
 }

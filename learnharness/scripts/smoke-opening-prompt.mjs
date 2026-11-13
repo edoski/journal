@@ -108,27 +108,27 @@ try {
 		// Release synthetic streams from prior cases rather than pin slots.
 		await Promise.all(held.splice(0).map(request => request.abort("aborted").catch(() => {})));
 		await page.goto(origin + route, { waitUntil: "domcontentloaded", timeout: 120000 });
-		await page.waitForSelector(route === "/" ? "textarea" : '[data-testid="composer"] textarea');
+		await page.waitForSelector('[data-testid="composer"] textarea');
 		await page.waitForFunction(() => !document.querySelector('[data-testid="setup-cta"]') && !document.querySelector('[data-testid="setup-cta-keys"]'));
 	}
 	async function fill(text) {
 		await page.evaluate(value => {
-			const textarea = document.querySelector('[data-testid="composer"] textarea') || document.querySelector("textarea");
+			const textarea = document.querySelector('[data-testid="composer"] textarea');
 			Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(textarea, value);
 			textarea.dispatchEvent(new Event("input", { bubbles: true }));
 		}, text);
 	}
 	async function submit() {
 		await page.waitForFunction(() => {
-			const button = document.querySelector('button[aria-label="Start session"], [data-testid="composer"] button[aria-label="Send"]');
+			const button = document.querySelector('[data-testid="composer"] button[aria-label="Send"]');
 			return button && !button.disabled;
 		});
-		await page.locator('button[aria-label="Start session"], [data-testid="composer"] button[aria-label="Send"]').click();
+		await page.locator('[data-testid="composer"] button[aria-label="Send"]').click();
 	}
 	async function stash(id) { return page.evaluate(chat => sessionStorage.getItem(`lh.openingPrompt.${chat}`), id); }
 	async function assertDraft(text) { await page.waitForFunction(value => document.querySelector('[data-testid="composer"] textarea')?.value === value, {}, text); }
 	const long = "A full synthetic syllabus — 世界 & ? #. ".repeat(1200).trim();
-	for (const route of ["/", "/chat/new"]) {
+	for (const route of ["/chat/new"]) {
 		for (const text of ["a short synthetic topic", long]) {
 			await open(route);
 			const count = posts.length;
@@ -148,7 +148,7 @@ try {
 	assert.equal(oldResponse.status, 431); await oldResponse.text();
 	checks.push("old long-query request returned431 (browser-shell blank appearance not asserted)");
 
-	for (const route of ["/", "/chat/new"]) {
+	for (const route of ["/chat/new"]) {
 		await open(route);
 		await page.evaluate(() => {
 			const setItem = Storage.prototype.setItem;
@@ -238,7 +238,7 @@ try {
 	console.log(JSON.stringify({ checks, pageErrors: errors, isolation: "synthetic catalog/POST+streams; empty auth; no providers", origin }, null, 2));
 } catch (err) {
 	console.error(err);
-	console.error(JSON.stringify({ checks, errors, url: page?.url(), dom: await page?.evaluate(() => ({ textareas: [...document.querySelectorAll('textarea')].map(e => ({ length: e.value.length, placeholder: e.placeholder })), buttons: [...document.querySelectorAll('button[aria-label="Send"], button[aria-label="Start session"]')].map(e => ({ disabled: e.disabled, label: e.getAttribute('aria-label') })), alerts: [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent), failStorage: window.failOpeningStorage, text: document.body.innerText.slice(-1200) })).catch(() => null) }, null, 2));
+	console.error(JSON.stringify({ checks, errors, url: page?.url(), dom: await page?.evaluate(() => ({ textareas: [...document.querySelectorAll('textarea')].map(e => ({ length: e.value.length, placeholder: e.placeholder })), buttons: [...document.querySelectorAll('button[aria-label="Send"]')].map(e => ({ disabled: e.disabled, label: e.getAttribute('aria-label') })), alerts: [...document.querySelectorAll('[role="alert"]')].map(e => e.textContent), failStorage: window.failOpeningStorage, text: document.body.innerText.slice(-1200) })).catch(() => null) }, null, 2));
 	console.error(logs); process.exitCode = 1;
 } finally {
 	await browser?.close();

@@ -159,7 +159,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 
 /** The activity feed seam for the rest of the shell: the dock's data +
  *  its refresh nudge. The remaining nudgers are client-visible causes
- *  (the extract/import buttons — extraction-coverage, graph-view); every
+ *  (the extract button — extraction-coverage); every
  *  server-side cause announces itself on the events channel now. */
 export function useActivity(): { feed: ActivityFeed; refresh: () => void } {
 	return useContext(ActivityContext);

@@ -9,9 +9,6 @@ import { useModelSetup } from "../components/setup-cta.tsx";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { SidebarProvider } from "../components/sidebar.tsx";
 import { ChatGPTConnection, ChatGPTUIProvider } from "../components/settings/chatgpt-connection.tsx";
-import { GraphCostControl } from "../components/graph-view.tsx";
-import { graphCostSummary as foldGraphCostSummary, type CostSummaryInput } from "../src/core/cost-summary.ts";
-const graphCostSummary = (input: CostSummaryInput) => foldGraphCostSummary(input, () => null);
 import type { ModelCatalogResponse, ChatGPTStatus } from "../src/core/index.ts";
 const dom = parseHTML("<html><body></body></html>");
 Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, HTMLFormElement: (dom.window as unknown as Record<string, unknown>).HTMLFormElement ?? class {}, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true, localStorage: { getItem: () => null, setItem() {} } });
@@ -46,20 +43,6 @@ test("shared ChatGPT-only readiness admits without API keys; connection invalida
  await act(async () => requests[1]!.resolve(Response.json(body("stale-A"))));
  for (const value of Object.values(snapshots)) { assert.equal(value.catalog?.models.length, 0); assert.equal(value.unconnected, true); }
  assert(!document.body.textContent?.includes("chatgpt:A"));
-});
-
-test("plan plus unknown graph rows keep the existing unknown suffix without fabricating API dollars", async () => {
- const step = { inputTokens: 100, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 };
- const plan = { model: "chatgpt:gpt-5", steps: [step] };
- const unknown = { model: "unknown:missing", steps: [step] };
- const costs = graphCostSummary({ chats: [{ title: "Scratch", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: plan, auditor: unknown } }, { startedAt: 2, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: unknown, auditor: plan } }] }], sources: [] });
- await mount(<GraphCostControl costs={costs} />);
- await act(async () => { document.querySelector("button")!.click(); });
- const recent = [...document.querySelectorAll(".border-t .shrink-0.tabular-nums")];
- assert.equal(recent.length, 2);
- for (const row of recent) assert.equal(row.textContent, "ChatGPT +1 unpriced", "both recent two-stage runs disclose their unknown stage");
- assert.equal((document.body.textContent?.match(/\+1 unpriced/g) ?? []).length, 4, "both mixed stage rows also retain their unknown suffix");
- assert(!document.body.textContent?.includes("$0.00"));
 });
 
 test("root-lifetime safe bridge publishes with Connections unmounted; commands/panel pushes do not duplicate global signals", async () => {

@@ -22,7 +22,7 @@
  *      keyboard (the arrow-walked menus; Tab is dead app-wide, so this
  *      only happens inside overlays);
  *   2. buttons inside an OPEN OVERLAY — menus walk focus with arrows and
- *      Enter activates the walked button natively (menu-shell's contract),
+ *      Enter activates the walked button natively (the Radix menus' contract),
  *      dialogs are their own surfaced layer (the ONE-ESC LAW's layers).
  * The pointer-clicked transcript button fails both tests → Enter is ours
  * (preventDefault also suppresses the browser's default activation, so

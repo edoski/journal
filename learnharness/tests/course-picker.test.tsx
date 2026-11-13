@@ -7,7 +7,6 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
-import { ComposerActions } from "../components/composer-actions.tsx";
 import { CourseControl, CoursesUnavailable, type CourseChoice, type CourseState } from "../components/course-picker.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
 
@@ -26,15 +25,10 @@ function choice(over: Partial<CourseChoice> = {}): CourseChoice {
 }
 
 describe("course picker", () => {
-	it("shows the picked course and leads the composer action row", () => {
-		const document = documentFor(
-			<ComposerActions course={<CourseControl choice={choice({ workspace: "/study/smm" })} />} setup={<button data-testid="setup-cta">Set up</button>} />,
-		);
-		const row = document.querySelector('[data-testid="composer-actions"]')!;
-		assert.ok(row.classList.contains("justify-start"));
-		assert.equal(row.firstElementChild!.getAttribute("data-testid"), "course-picker");
-		assert.equal(row.querySelector('[data-testid="course-picker"] span')!.textContent, "SMM");
-		assert.equal(row.querySelector('[data-testid="course-notice"]'), null);
+	it("shows the picked course", () => {
+		const document = documentFor(<CourseControl choice={choice({ workspace: "/study/smm" })} />);
+		assert.equal(document.querySelector('[data-testid="course-picker"] span')!.textContent, "SMM");
+		assert.equal(document.querySelector('[data-testid="course-notice"]'), null);
 	});
 
 	it("an unavailable engine leaves no picker, and its line names the reason and the two settings", () => {

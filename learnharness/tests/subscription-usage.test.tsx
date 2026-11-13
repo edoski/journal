@@ -7,7 +7,6 @@ import { subscriptionLabel, subscriptionLabels, isSubscriptionModel, type TurnUs
 import { sessionCost, callCost } from "../src/server/pricing.ts";
 import { graphCostSummary } from "../src/core/cost-summary.ts";
 import { planCostLabel } from "../components/usage-format.ts";
-import { StatsBar } from "../components/stats-bar.tsx";
 import { ModelCommand } from "../components/settings/model-pickers.tsx";
 import { toModelDto } from "../src/server/model-catalog.ts";
 import { piModels } from "../src/agent/models.ts";
@@ -26,8 +25,6 @@ test("mixed session pricing sums only API dollars and retains all subscription p
 	const turns = [turn("claude-subscription:claude-opus-5-5", "claude"), turn("chatgpt:gpt-5", "chatgpt"), turn("openai:gpt-5", "api")];
 	const pricing = sessionCost({ turns }); assert.equal(pricing.subscription, 2); assert.equal(pricing.unpriced, 0); assert.equal(pricing.cost, callCost(step, "openai:gpt-5"));
 	assert.deepEqual(pricing.subscriptionProviders, ["Claude", "ChatGPT"]);
-	const html = renderToStaticMarkup(<StatsBar turns={turns} pricing={pricing} />);
-	assert.match(html, /\$[\d.]+ \+ Claude \+ ChatGPT/); assert(!html.includes(" API +")); assert(!html.includes("ChatGPT plan"));
 });
 test("graph stage/recent aggregates retain distinct subscription providers without inventing dollars", () => {
 	const summary = graphCostSummary({ chats: [{ title: "Fixture", extractions: [{ startedAt: 1, at: "2026-10-24T00:00:00Z", durationMs: 1, stages: { extractor: { model: "claude-subscription:claude-haiku-5-5", steps: [step] }, auditor: { model: "chatgpt:gpt-5", steps: [step] } } }] }], sources: [] }, callCost);

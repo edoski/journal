@@ -17,10 +17,8 @@ import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
 import { priceLabel } from "../components/settings/model-pickers.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
-import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
 import { hintBinding } from "../components/ui/hint.tsx";
 import { bindingForAction, formatBinding, KEYBOARD_ACTIONS } from "../src/core/index.ts";
-import type { GraphChain, GraphNode } from "../src/core/contracts.ts";
 
 function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
@@ -139,42 +137,5 @@ describe("background agents", () => {
 		assert.equal(doc.querySelector('[data-testid="activity-abort"]')?.getAttribute("aria-label"), "End Researcher in Eigenvalues and eigenvectors");
 		assert.equal(doc.querySelector('[data-testid="activity-blob-cost"]'), null, "no cost on the row's face");
 		assert.equal(doc.querySelector('[data-testid="activity-total-cost"]'), null, "no running total in the header");
-	});
-});
-
-describe("the Proposed chain table", () => {
-	const node = (id: string, name: string, chatId: string | null) =>
-		({ id, name, statement: `${name}.`, aliases: [], state: "new", createdAt: "2026-09-20T10:00:00.000Z", provenance: chatId ? [{ chatId, messageId: `m_${id}` }] : [] }) as unknown as GraphNode;
-	const nodes = [node("a", "Premise", "chat1"), node("c", "Conclusion", "chat1"), node("o", "Orphan", null)];
-	const chains: GraphChain[] = [{ id: "c", premises: ["a"], conclusion: "c", provenance: [], createdAt: "2026-09-20T10:00:00.000Z" }];
-	const props = {
-		nodes,
-		chains,
-		sessions: {},
-		fileSources: {},
-		query: "",
-		onQuery: () => {},
-		sort: { col: "name", dir: 1 } as ChainSort,
-		onSort: () => {},
-		selection: new Set<string>(),
-		expandedClusters: new Set<string>(),
-		expandedChains: new Set<string>(),
-		onToggleCluster: () => {},
-		onToggleChain: () => {},
-		onToggleNodes: () => {},
-		onClear: () => {},
-		onDelete: () => {},
-		onClose: () => {},
-	};
-
-	it("heads its columns in plain words and names a cluster with no label in sentence case", () => {
-		const doc = documentFor(<ChainTableBody {...props} variant="proposed" />);
-		assert.match(doc.querySelector('[data-testid="sort-props"]')?.textContent ?? "", /^Statements/);
-		assert.ok([...doc.querySelectorAll("span")].some((s) => s.textContent === "Unlabeled"));
-	});
-
-	it("keeps the Current headings in the Current design", () => {
-		const doc = documentFor(<ChainTableBody {...props} />);
-		assert.match(doc.querySelector('[data-testid="sort-props"]')?.textContent ?? "", /^Props/);
 	});
 });

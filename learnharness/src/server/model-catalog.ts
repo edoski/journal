@@ -162,7 +162,7 @@ export function toModelDto(model: Model<Api>): ModelDto {
 
 /** The live-limits index: provider:id → contextWindow over the connected
  *  subscriptions' models. The one source for every context meter's
- *  denominator — the stats-bar join holds /api/models' copy, and the
+ *  denominator — the lesson top bar's join holds /api/models' copy, and the
  *  activity feed (observability.ts) resolves job limits server-side
  *  through this. A model missing here reads limit-null (usage-only). */
 export function catalogContextLimits(): Map<string, number> {

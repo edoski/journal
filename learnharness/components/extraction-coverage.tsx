@@ -132,7 +132,7 @@ export function useSessionCoverage(chatId: string): {
 	return { coverage, extracting, extract: () => void onExtract() };
 }
 
-/** The session menu's one coverage item (components/ui/menu.md): its label,
+/** The session menu's one coverage item: its label,
  *  the backlog as its detail while there is one, and whether Extract can
  *  run. Pure. */
 export function coverageItem(

@@ -9,7 +9,7 @@ import { AgentSection } from "../components/settings/agent-section.tsx";
 import { useModelCatalog } from "../components/model-catalog.ts";
 import { notifySettingsSaved } from "../components/settings-signal.ts";
 import { useModelSetup, savedSlotsConfigured, selectedModelUnavailable, openModelPicker } from "../components/setup-cta.tsx";
-import { StatsBar } from "../components/stats-bar.tsx";
+import { ModelControl } from "../components/model-picker.tsx";
 import type { ModelCatalogEntry, ModelCatalogResponse, ModelsSettings } from "../src/core/index.ts";
 
 const originalFetch = globalThis.fetch;
@@ -214,7 +214,7 @@ test("blocked session recovery opens its ordinary picker, never changes Strong o
 		return requestsOnly(input, init);
 	};
 	await warm(body); let selected: string | undefined;
-	await render(<><Reader /><StatsBar turns={[]} chatId="fixture" onModelChange={(id) => { selected = id; }} /></>);
+	await render(<><Reader /><ModelControl chatId="fixture" onModelChange={(id) => { selected = id; }} /></>);
 	assert.equal(selected, `${a.provider}:${a.id}`, "current session does not inherit a different Strong pin");
 	assert.equal(selectedModelUnavailable(body, selected), true);
 	assert.deepEqual(sessionWrites, []);
@@ -242,7 +242,7 @@ for (const result of ["override", "legacy", "http-failure", "network-failure"] a
 		return requestsOnly(input, init);
 	};
 	await warm(body); const identities: Array<string | undefined> = [];
-	await render(<><Reader /><StatsBar turns={[]} chatId="fixture" onModelChange={(id) => { identities.push(id); }} /></>);
+	await render(<><Reader /><ModelControl chatId="fixture" onModelChange={(id) => { identities.push(id); }} /></>);
 	assert.ok(snapshot.catalog, "catalog is already known, not the deferred unknown-catalog case");
 	assert.equal(element("stats-model").textContent, "—");
 	assert.equal(identities.at(-1), undefined);

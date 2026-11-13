@@ -23,7 +23,7 @@ const START_PLACEHOLDER = "Name a topic, ask a question or paste a problem";
  * The Proposed start surface (spec: start-screen.md), T3 Code's new-chat
  * anatomy: a light question and the composer centred in a 736px column,
  * nothing else. It is the draft at /chat/new; a session is created only
- * when something is sent, through the same path the current screens use.
+ * when something is sent.
  */
 export function StartScreen({ initialConfigured }: { initialConfigured: boolean }) {
 	const router = useRouter();

@@ -19,11 +19,10 @@ export function filterSessions(list: ChatListItem[], query: string): ChatListIte
 }
 
 /**
- * The session sidebar's behaviour, shared by both designs (Current's
- * SessionsSidebar and Proposed's UnitSidebar): the push-driven list, the
- * instant rename and turn-state patches, the context menu with inline
- * rename, export and delete, and the search walk. The rationale for each
- * piece lives beside it; the designs only draw.
+ * The session sidebar's behaviour behind UnitSidebar: the push-driven
+ * list, the instant rename and turn-state patches, inline rename, export
+ * and delete, and the search walk. The rationale for each piece lives
+ * beside it; the sidebar only draws.
  */
 export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: () => void }) {
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
@@ -181,62 +180,16 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		}
 	};
 
-	/* ── Wave 6 chunk A: context menu + inline rename + deletion ──
-	   Right-click a session row → MenuShell: the management actions first
-	   (owner ruling), then — below a hairline — the extraction coverage
-	   block (owner-locked redesign 2026-09-24). The anchor is the row that
-	   was right-clicked — assigned into a ref before the state flip so the
-	   shell measures it on its first (hidden) pass. */
-	const [ctxChatId, setCtxChatId] = useState<string | null>(null);
-	const ctxAnchorRef = useRef<HTMLElement | null>(null);
+	/* Inline rename and deletion: the row's own menu names the session it
+	   acts on. */
 	const [renamingId, setRenamingId] = useState<string | null>(null);
 	const [deleting, setDeleting] = useState<ChatListItem | null>(null);
 
-	const openContext = (e: React.MouseEvent<HTMLElement>, chat: ChatListItem) => {
-		e.preventDefault(); // suppress the native menu
-		ctxAnchorRef.current = e.currentTarget;
-		setCtxChatId(chat.id);
-	};
-
-	// The menu contract (agent-section's): any pointerdown outside the menu
-	// or its row closes it; Esc is CLAIMED so it never also aborts a turn
-	// or folds the sidebar. Right-clicking another row re-anchors: its
-	// pointerdown closes this menu, its contextmenu opens the next.
-	useEffect(() => {
-		if (ctxChatId === null) return;
-		const onPointerDown = (e: PointerEvent) => {
-			const target = e.target as Node;
-			if (target instanceof Element && target.closest("[data-lh-menu]")) return;
-			if (ctxAnchorRef.current?.contains(target)) return;
-			setCtxChatId(null);
-		};
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.stopPropagation();
-				setCtxChatId(null);
-			}
-		};
-		document.addEventListener("pointerdown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("pointerdown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [ctxChatId]);
-
-	// The menu's actions take the session they act on: Current's menu acts
-	// on the right-clicked row (ctxChatId), Proposed's per-row menus pass
-	// their own.
-	const renameChat = (chatId: string | null) => {
-		setRenamingId(chatId);
-		setCtxChatId(null);
-	};
-	const renameFromMenu = () => renameChat(ctxChatId);
+	const renameChat = (chatId: string) => setRenamingId(chatId);
 
 	// Export as Markdown (owner, release polish 2026-10-06): same-origin
 	// anchor download; the route's Content-Disposition names the file.
-	const exportChat = (chatId: string | null) => {
-		setCtxChatId(null);
+	const exportChat = (chatId: string) => {
 		const a = document.createElement("a");
 		a.href = `/api/chats/${chatId}/markdown`;
 		a.download = ""; // the route's filename wins
@@ -244,14 +197,11 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		a.click();
 		a.remove();
 	};
-	const exportFromMenu = () => exportChat(ctxChatId);
 
-	const deleteChat = (chatId: string | null) => {
+	const deleteChat = (chatId: string) => {
 		const target = chats?.find((c) => c.id === chatId);
 		if (target) setDeleting(target);
-		setCtxChatId(null);
 	};
-	const deleteFromMenu = () => deleteChat(ctxChatId);
 
 	// Inline rename (owner ruling, wave 6): the row swaps to a text input;
 	// commit rides the SAME plumbing as the header rename — PUT the title,
@@ -327,17 +277,10 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		query,
 		changeQuery,
 		kbdIndex,
-		setKbdIndex,
 		searchRef,
 		listRef,
 		onSearchKeyDown,
 		openChat,
-		ctxChatId,
-		ctxAnchorRef,
-		openContext,
-		renameFromMenu,
-		exportFromMenu,
-		deleteFromMenu,
 		renameChat,
 		exportChat,
 		deleteChat,

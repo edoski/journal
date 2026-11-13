@@ -9,7 +9,6 @@ import { Dialog } from "../components/ui/dialog.tsx";
 import { AlertDialog } from "../components/ui/alert-dialog.tsx";
 import { NewCourseBody } from "../components/course-picker.tsx";
 import { AbortTurnBody } from "../components/abort-turn-dialog.tsx";
-import { DeleteNodeBody } from "../components/delete-node-dialog.tsx";
 import { DeleteSessionBody } from "../components/delete-session-dialog.tsx";
 
 // The dialogs on Radix Dialog and AlertDialog: what each says and
@@ -77,18 +76,6 @@ describe("dialogs keep their actions", () => {
 		assert.match($('[data-testid="abort-turn-line"]')?.textContent ?? "", /The working turn stops too\./);
 		const footer = [...document.querySelectorAll('[data-slot="alert-dialog-footer"] button')].map((b) => b.textContent);
 		assert.deepEqual(footer, ["Cancel", "Discard"]);
-	});
-
-	it("delete notes: counts in the title, names listed, the delete button named for what it does", async () => {
-		const nodes = ["A", "B", "C"].map((name) => ({ id: name.toLowerCase(), name }));
-		await mount(
-			<AlertDialog open>
-				<DeleteNodeBody variant="proposed" nodes={nodes} busy={false} failure={null} onClose={() => {}} onRun={() => {}} />
-			</AlertDialog>,
-		);
-		assert.equal($('[data-slot="alert-dialog-title"]')?.textContent, "Delete 3 nodes?");
-		assert.equal($('[data-testid="node-names-code"]')?.textContent, "A, B, C");
-		assert.equal($('[data-testid="node-delete-confirm"]')?.textContent, "Delete");
 	});
 
 	it("delete lesson: plain words with the lesson named, no engine talk or traces checkbox, and a plain retry on failure", async () => {

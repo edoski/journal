@@ -1,7 +1,6 @@
-import { KnowledgeView } from "@/components/knowledge-view";
+import { redirect } from "next/navigation";
 
-/** The course content view: the knowledge graph with its search, chain
- *  table and notes import. */
+/** The course map lives on Home: an old link or shortcut to `/knowledge` lands there. */
 export default function KnowledgePage() {
-	return <KnowledgeView />;
+	redirect("/");
 }
