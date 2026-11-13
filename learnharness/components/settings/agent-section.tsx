@@ -38,7 +38,6 @@ import {
 	resolveSettings,
 	type AgentSettings,
 	type CompactionSettings,
-	type GraphSettings,
 	type ModelCatalogEntry,
 	type ModelSlotName,
 	type ModelsSettings,
@@ -164,7 +163,6 @@ function MenuTrigger({
 export function AgentSection({
 	agent,
 	models,
-	graph,
 	compaction,
 	onSectionChange,
 	onModelsChange,
@@ -173,10 +171,6 @@ export function AgentSection({
 	agent: AgentSettings | undefined;
 	/** The `models` section (slot pins — engine-level, PUT /api/settings/models). */
 	models: ModelsSettings | undefined;
-	/** The `graph` section — READ ONLY here: the graphTools row composes its
-	 *  master switch (graph.enabled off dims + disables the row; the
-	 *  effective gate is server-side, per-turn fresh). */
-	graph: GraphSettings | undefined;
 	/** The `compaction` section — its own PUT (the threshold is engine
 	 *  behavior, not an agent-section key; owner round 14, Agent tab). */
 	compaction: CompactionSettings | undefined;
@@ -399,24 +393,17 @@ export function AgentSection({
 				    (agent.graphTools), with a
 				    smaller line under it explaining what it is — this
 				    connects prior sessions' knowledge into new ones. */}
-				{(() => {
-					const graphOn = graph?.enabled ?? true;
-					return (
-						<SettingsRow
-							label="Graph tools"
-							hint={graphOn ? "Lets the tutor consult your knowledge map between sessions" : "Graph is disabled"}
-							testid="graph-tools-row"
-							dimmed={!graphOn}
-						>
-							<Toggle
-								checked={agent?.graphTools?.enabled ?? true}
-								disabled={!graphOn}
-								label="graph tools"
-								onChange={(on) => onSectionChange(composeGraphTools(agent, on))}
-							/>
-						</SettingsRow>
-					);
-				})()}
+				<SettingsRow
+					label="Graph tools"
+					hint="Lets the tutor consult your knowledge map between sessions"
+					testid="graph-tools-row"
+				>
+					<Toggle
+						checked={agent?.graphTools?.enabled ?? true}
+						label="graph tools"
+						onChange={(on) => onSectionChange(composeGraphTools(agent, on))}
+					/>
+				</SettingsRow>
 				{TOGGLE_TOOLS.map((id) => (
 					<SettingsRow
 						key={id}

@@ -36,7 +36,6 @@ import {
 	type AgentSettings,
 	type AppearanceSettings,
 	type CompactionSettings,
-	type GraphSettings,
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
@@ -49,7 +48,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
 import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { Hint } from "@/components/ui/hint";
-import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
+import { AppearanceSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { SettingsDesignContext } from "./settings-design";
@@ -66,7 +65,6 @@ const SECTIONS = [
 	{ id: "keys", label: "Providers" },
 	{ id: "agent", label: "Agent" },
 	{ id: "appearance", label: "Appearance" },
-	{ id: "graph", label: "Graph" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
 	{ id: "general", label: "General" },
 ] as const;
@@ -255,7 +253,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "agent" | "models" | "appearance" | "graph" | "compaction",
+			section: "agent" | "models" | "appearance" | "compaction",
 			body: object,
 		) => {
 			setError(null);
@@ -347,7 +345,6 @@ export function SettingsDialogBody({
 									<AgentSection
 										agent={record.agent}
 										models={record.models}
-										graph={record.graph}
 										compaction={record.compaction}
 										onModelsChange={(next: ModelsSettings) =>
 											void write("models", next)
@@ -370,19 +367,6 @@ export function SettingsDialogBody({
 										appearance={record.appearance}
 										onSectionChange={(next: AppearanceSettings) =>
 											void write("appearance", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "graph" && (
-								<SettingsSection
-									title="Graph"
-									testid="section-graph"
-								>
-									<GraphSection
-										graph={record.graph}
-										onSectionChange={(next: GraphSettings) =>
-											void write("graph", next)
 										}
 									/>
 								</SettingsSection>

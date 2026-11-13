@@ -14,7 +14,6 @@ import {
 	parseModelsSettingsBody,
 	parseAppearanceSettingsBody,
 	parseCompactionSettingsBody,
-	parseGraphSettingsBody,
 	SETTINGS_SECTIONS,
 } from "../src/server/settings-body.ts";
 
@@ -124,62 +123,6 @@ describe("parseAppearanceSettingsBody", () => {
 	});
 });
 
-describe("parseGraphSettingsBody", () => {
-	it("parses the collapsed section replace-whole (wave 7: the master switch ONLY)", () => {
-		const r = parseGraphSettingsBody({ enabled: false });
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, { enabled: false });
-		assert.equal(parseGraphSettingsBody({}).ok, true);
-	});
-
-	it("rejects non-boolean switches and unknown bodies", () => {
-		assert.equal(parseGraphSettingsBody({ enabled: "off" }).ok, false);
-		assert.equal(parseGraphSettingsBody("nope").ok, false);
-	});
-
-	it("rendering (2026-10-06): boolean display switch — replace-whole like every sibling", () => {
-		const off = parseGraphSettingsBody({ enabled: true, rendering: false });
-		assert.ok(off.ok);
-		assert.deepEqual(off.settings, { enabled: true, rendering: false });
-		// absent = unset (factory ON at resolution)
-		const absent = parseGraphSettingsBody({ enabled: true });
-		assert.ok(absent.ok);
-		assert.deepEqual(absent.settings, { enabled: true });
-		assert.equal(parseGraphSettingsBody({ rendering: "off" }).ok, false, "rendering must be a boolean");
-	});
-
-	it("extractionChunkTokens: whole tokens ≥ the 500 floor (extraction-UX redesign, 2026-09-24)", () => {
-		const ok = parseGraphSettingsBody({ enabled: true, extractionChunkTokens: 2048 });
-		assert.ok(ok.ok);
-		assert.deepEqual(ok.settings, { enabled: true, extractionChunkTokens: 2048 });
-		// absent = unset — replace-whole keeps the factory default at resolution
-		const absent = parseGraphSettingsBody({ enabled: true });
-		assert.ok(absent.ok);
-		assert.deepEqual(absent.settings, { enabled: true });
-		// fractions floor to whole tokens
-		const fraction = parseGraphSettingsBody({ extractionChunkTokens: 1024.9 });
-		assert.ok(fraction.ok);
-		assert.equal(fraction.settings.extractionChunkTokens, 1024);
-		// below the cost floor: 400 with the floor named (penny-batches)
-		const tiny = parseGraphSettingsBody({ extractionChunkTokens: 100 });
-		assert.equal(tiny.ok, false, "below-floor rejected");
-		assert.match(tiny.ok === false ? tiny.error : "", /at least 500/);
-		// junk shapes: 400
-		assert.equal(parseGraphSettingsBody({ extractionChunkTokens: "4096" }).ok, false);
-		assert.equal(parseGraphSettingsBody({ extractionChunkTokens: NaN }).ok, false);
-		assert.equal(parseGraphSettingsBody({ extractionChunkTokens: null }).ok, false);
-	});
-
-	it("the dead wave-6 rungs in a body are ignored — the section collapses on write", () => {
-		// Old clients may still send {embedding: true, embeddingModel: …};
-		// the parser reads ONLY the master switch — the dead keys are not
-		// an error, they are just not part of the section anymore.
-		const r = parseGraphSettingsBody({ enabled: false, clustering: true, labeling: true });
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, { enabled: false });
-	});
-});
-
 describe("parseCompactionSettingsBody (owner round 14)", () => {
 	it("parses a threshold; absent = the empty section (factory default at resolution)", () => {
 		const r = parseCompactionSettingsBody({ thresholdTokens: 120000 });
@@ -208,12 +151,12 @@ describe("parseCompactionSettingsBody (owner round 14)", () => {
 });
 
 describe("SETTINGS_SECTIONS (the route's section map)", () => {
-	it("maps exactly the seven record sections", () => {
+	it("maps exactly the record sections", () => {
 		// compaction joined (owner round 14): its own section PUT — the
 		// threshold is engine behavior, not an agent-section key.
 		assert.deepEqual(
 			Object.keys(SETTINGS_SECTIONS),
-			["chat", "agent", "appearance", "graph", "compaction", "models"],
+			["chat", "agent", "appearance", "compaction", "models"],
 		);
 	});
 });

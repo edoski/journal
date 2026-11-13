@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { SettingsDesignContext } from "../components/settings/settings-design.ts";
-import { AppearanceSection, GraphSection } from "../components/settings/appearance-section.tsx";
+import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
@@ -52,19 +52,13 @@ describe("Settings › Appearance under the Proposed design", () => {
 	});
 });
 
-describe("Settings › Graph and Agent under the Proposed design", () => {
-	it("says the chains view replaces Knowledge, where the graph lives in this design", () => {
-		const doc = documentFor(inSettings(<GraphSection graph={undefined} onSectionChange={() => {}} />));
-		assert.match(doc.querySelector('[data-testid="graph-row-rendering"]')?.textContent ?? "", /Knowledge shows the chains view/);
-	});
-
+describe("Settings › Agent under the Proposed design", () => {
 	it("names the tools plainly inside the Tools group, one switch each", () => {
 		const html = renderToStaticMarkup(
 			inSettings(
 				<AgentSection
 					agent={undefined}
 					models={undefined}
-					graph={undefined}
 					compaction={undefined}
 					onSectionChange={() => {}}
 					onModelsChange={() => {}}

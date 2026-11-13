@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TOGGLE_TOOLS, AgentSection } from "../components/settings/agent-section.tsx";
-import { AppearanceSection, GraphSection } from "../components/settings/appearance-section.tsx";
+import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import type { GraphSettings } from "../src/core/index.ts";
 import { SettingsDialogBody, SettingsDialogProvider } from "../components/settings/settings-dialog.tsx";
@@ -47,7 +47,8 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 		assert.ok(html.includes('role="dialog"'));
 		assert.ok(html.includes('aria-modal="true"'));
 		assert.ok(html.includes('aria-label="Close settings"'));
-		for (const id of ["general", "keys", "agent", "appearance", "graph", "keyboard"]) {
+		for (const id of ["general", "keys", "agent", "appearance", "keyboard"]) {
+			assert.ok(!html.includes("settings-nav-graph"), "no Graph tab");
 			assert.ok(html.includes(`data-testid="settings-nav-${id}"`), id);
 		}
 		// Providers is the first landing section; internal keys deep links survive.
@@ -64,7 +65,7 @@ describe("SettingsDialog (the designed surface, SSR)", () => {
 describe("the shared settings dropdown trigger", () => {
 	it("Agent and Appearance use the same compact dark mono trigger", () => {
 		const surfaces = [
-			[renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />), "slot-model-strong"],
+			[renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />), "slot-model-strong"],
 			[renderToStaticMarkup(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />), "font-trigger"],
 		] as const;
 		for (const [html, id] of surfaces) {
@@ -102,7 +103,7 @@ describe("Providers settings-label typography", () => {
 
 describe("AgentSection (thin SSR)", () => {
 	it("renders the three model SLOT rows (slots-only, fix wave: unpicked reads —, no Default option)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		for (const slot of ["strong", "cheap", "vision"]) {
 			assert.ok(html.includes(`data-testid="slot-row-${slot}"`), slot);
 			// The shared model-picker dropdown as the opened menu (owner,
@@ -128,14 +129,14 @@ describe("AgentSection (thin SSR)", () => {
 	});
 
 	it("has no search-engine row", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		assert.ok(!html.includes('data-testid="search-engine-row"'));
 	});
 
 	it("the prober graph-tools row: FIRST in the Tools group, default ON, its own key (wave 7)", () => {
 		// Default state: graph on, graphTools absent → ON, the describing
 		// hint rides.
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		const toolsGroup = html.split('data-testid="group-tools"')[1] ?? "";
 		const rows = [...toolsGroup.matchAll(/data-testid="(graph-tools-row|tool-row-\w+)"/g)].map((m) => m[1]);
 		assert.equal(rows[0], "graph-tools-row", "graph tools is the FIRST row of the Tools group");
@@ -143,22 +144,12 @@ describe("AgentSection (thin SSR)", () => {
 		assert.ok(html.includes("Lets the tutor consult your knowledge map between sessions"), "the describing hint");
 		assert.ok((html.split('data-testid="graph-tools-row"')[1] ?? "").includes('aria-checked="true"'), "absent = on");
 		const rowHtml = html.split('data-testid="graph-tools-row"')[1]?.split('data-testid="tool-row-')[0] ?? "";
-		assert.ok(!rowHtml.includes("opacity-40"), "lit while the graph is on (the search row may dim — no keys in SSR)");
-	});
-
-	it("graph disabled dims the graph-tools row with the honest hint (the predicate composes)", () => {
-		const html = renderToStaticMarkup(
-			<AgentSection agent={undefined} models={undefined} graph={{ enabled: false }} onSectionChange={() => {}} onModelsChange={() => {}} />,
-		);
-		const row = html.split('data-testid="graph-tools-row"')[1]?.split('data-testid="tool-row-')[0] ?? "";
-		assert.ok(row.includes("opacity-40"), "row dims when the graph is off");
-		assert.ok(row.includes("Graph is disabled"), "the reason hint replaces the description");
-		assert.ok(row.includes("disabled"), "toggle untouchable while the graph is off");
+		assert.ok(!rowHtml.includes("opacity-40"), "never dimmed");
 	});
 
 	it("an explicit graphTools off shows stored-off (the record never lies)", () => {
 		const html = renderToStaticMarkup(
-			<AgentSection agent={{ graphTools: { enabled: false } }} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />,
+			<AgentSection agent={{ graphTools: { enabled: false } }} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />,
 		);
 		const row = html.split('data-testid="graph-tools-row"')[1] ?? "";
 		assert.ok(row.includes('aria-checked="false"'), "stored-off renders off");
@@ -166,12 +157,12 @@ describe("AgentSection (thin SSR)", () => {
 
 	it("renders the owner's FINAL tool list — research, demo, visual, pdf", () => {
 		assert.deepEqual([...TOGGLE_TOOLS], ["research", "demo", "visual", "pdf"]);
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		for (const id of TOGGLE_TOOLS) assert.ok(html.includes(`data-testid="tool-row-${id}"`), id);
 	});
 
 	it("tools default ON (absent key = enabled)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
+		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
 		for (const id of TOGGLE_TOOLS) {
 			assert.ok(tagOf(html, `toggle-tool-${id}`).includes('aria-checked="true"'), `${id} defaults on`);
 		}
@@ -194,56 +185,6 @@ describe("AgentSection (thin SSR)", () => {
 	});
 });
 
-describe("GraphSection — master switch + chunk budget (wave 7 + 2026-10-02)", () => {
-	// Wave 7 (owner ruling 2026-09-23): the section is the master switch —
-	// the embedding/clustering/labeling rungs and the BYOK model picker are
-	// gone (clustering is the free birth-session partition, labels ARE
-	// session names). The chunk budget (2026-10-02) joined as the second and
-	// only other control — it denominates the coverage ring and gates the
-	// auto-extraction trigger, resolved through the same core resolver the
-	// server uses (the 4096-fallback fix).
-	it("renders the master-switch row — EXTRACTION since 2026-10-06 (the data channel, renamed when rendering split off)", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		assert.ok(html.includes('data-testid="graph-row-enabled"'));
-		assert.ok(html.includes(">Extraction<"), "the row names the DATA channel, not 'Graph'");
-		assert.ok(!html.includes("graph-row-embedding"), "the dead rungs render nothing");
-		assert.ok(!html.includes("Embedding model"), "the picker is gone");
-		assert.ok(!html.includes("graph-row-clustering"));
-		assert.ok(!html.includes("graph-row-labeling"));
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "absent record = factory ON");
-	});
-
-	it("a stored off record shows the extraction switch off", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={{ enabled: false }} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="false"'));
-	});
-
-	it("the GRAPH RENDERING row (2026-10-06): display-only — absent record = factory ON, stored off shows off", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		assert.ok(html.includes('data-testid="graph-row-rendering"'));
-		assert.ok(html.includes(">Graph rendering<"));
-		assert.ok(tagOf(html, "toggle-graph-rendering-enabled").includes('aria-checked="true"'), "the home defaults to the canvas");
-		const off = renderToStaticMarkup(<GraphSection graph={{ rendering: false }} onSectionChange={() => {}} />);
-		assert.ok(tagOf(html, "toggle-extraction-enabled").includes('aria-checked="true"'), "rendering off does NOT touch extraction");
-		assert.ok(tagOf(off, "toggle-graph-rendering-enabled").includes('aria-checked="false"'));
-	});
-
-	it("the chunk-budget row: unset shows EMPTY with the factory placeholder + hint — one truth with the trigger", () => {
-		const html = renderToStaticMarkup(<GraphSection graph={undefined} onSectionChange={() => {}} />);
-		const input = tagOf(html, "input-chunk-tokens");
-		assert.ok(input.includes('placeholder="4096"'), "the placeholder IS the resolved factory default");
-		assert.ok(!/value="\d/.test(input), "unset renders EMPTY, not a materialized 4096");
-		assert.ok(html.includes(">4096 tok</"), "the hint reports the resolved truth");
-	});
-
-	it("a stored budget shows its value and denominates the hint", () => {
-		const html = renderToStaticMarkup(
-			<GraphSection graph={{ enabled: true, extractionChunkTokens: 6000 }} onSectionChange={() => {}} />,
-		);
-		assert.ok(tagOf(html, "input-chunk-tokens").includes('value="6000"'));
-		assert.ok(html.includes(">6000 tok</"));
-	});
-});
 
 describe("AppearanceSection (thin SSR)", () => {
 	it("mode is rendered DISABLED — dark-only this wave, no lying control", () => {

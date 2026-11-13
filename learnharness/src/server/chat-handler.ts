@@ -36,7 +36,6 @@ import { effectiveSettings, stores } from "./stores.ts";
 import { courseBriefMarker, fetchCourseBrief } from "./course-brief.ts";
 import { providerConnected as providerKeyPresent } from "./model-catalog.ts";
 import {
-	extractionEnabled,
 	graphToolsEnabled,
 	resolveConversationSpec,
 	resolveRoleSpec,
@@ -601,16 +600,11 @@ export async function handleChatInput(
 						steps,
 					});
 				}
-				// GRAPH GATE (settings-storage wave, 2026-09-19): the write channel —
-				// extraction, its auditor — dies with the master switch.
 				// PRACTICE (owner, 2026-10-04): practice sessions write nothing —
 				// no extraction, no graph, no coverage (v1: the session itself
 				// is the deliverable).
-				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice" && extractionEnabled(effective.graph)) {
-					// Fresh per-turn read of the graph section's chunk budget
-					// (extraction-UX redesign, 2026-09-24): the trigger compares
-					// against it and the pipeline's batches share it.
-					triggerExtraction(stores, extraction, chatId, effective.graph.extractionChunkTokens);
+				if ((!requestCycle || requestCycle.dispatched) && agentKind !== "practice") {
+					triggerExtraction(stores, extraction, chatId);
 				}
 				// PARKED DISMISSAL (owner, 2026-10-04): a dismissal that arrived
 				// mid-turn was parked by the dismiss route (202); now that

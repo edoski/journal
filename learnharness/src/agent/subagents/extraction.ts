@@ -5,7 +5,6 @@ import { Type, type Static, type TSchema } from "typebox";
 import { toToolResult } from "../tool-execute.ts";
 import type { ModelRole } from "../../../config.ts";
 import {
-	FACTORY_SETTINGS,
 	ModelsNotConfiguredError,
 	ProviderKeyMissingError,
 	ROLE_SLOT,
@@ -27,7 +26,7 @@ import { getGraph, mergeFindings, type DerivedGraph, type EmissionStats, type Gr
 import type { GraphStore } from "../../core/ports.ts";
 import { emit } from "../../core/events.ts";
 import { settleGraphLayout } from "../../core/layout-settle.ts";
-import { batchRuns, coverageOf, messageViewLines } from "../../core/coverage.ts";
+import { batchRuns, coverageOf, EXTRACTION_CHUNK_TOKENS, messageViewLines } from "../../core/coverage.ts";
 import { failedOutputCallIds, type LhMessage } from "../../core/native-messages.ts";
 import { prepareAuditorReview } from "../tools/graph.ts";
 import { runSubmitAgent, healStringifiedArrays } from "./submit-agent.ts";
@@ -743,11 +742,8 @@ export interface ExtractionModels {
 
 export interface ExtractionPipelineDeps extends GraphDeps, ExtractionModels {
 	/** The chunk budget — the transcript-token share of the extractor's
-	 *  context; batches fill to it (the trigger fires on the same number,
-	 *  read fresh per turn by the composition root). OPTIONAL with the
-	 *  factory default (4096) so test fixtures stay minimal; the server
-	 *  callers wire the live effective settings (extraction-UX redesign,
-	 *  2026-09-24). */
+	 *  context; batches fill to it. Defaults to EXTRACTION_CHUNK_TOKENS (the
+	 *  number the trigger fires on); tests pass a smaller one. */
 	getChunkTokens?: () => number;
 }
 
@@ -1136,7 +1132,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 				console.info(`[extraction ${chatId}] nothing uncovered — no-op`);
 				return { nodes: 0, chains: 0 };
 			}
-			const chunkTokens = deps.getChunkTokens?.() ?? FACTORY_SETTINGS.graph.extractionChunkTokens;
+			const chunkTokens = deps.getChunkTokens?.() ?? EXTRACTION_CHUNK_TOKENS;
 			// The batcher's one rule (owner, Wave D): a tool-call message and
 			// its result message(s) are INSEPARABLE — one chunk, covered
 			// together, read together (core/coverage.ts batchRuns).
@@ -1331,7 +1327,7 @@ export function createExtractionPipeline(deps: ExtractionPipelineDeps): Extracti
 			// standalone extract → audit → merge, so no single call carries a
 			// whole large file. Abort mid-run keeps earlier chunks merged
 			// (same doctrine as chat batches).
-			const chunkTokens = deps.getChunkTokens?.() ?? FACTORY_SETTINGS.graph.extractionChunkTokens;
+			const chunkTokens = deps.getChunkTokens?.() ?? EXTRACTION_CHUNK_TOKENS;
 			const chunks = chunkNotes(input.text, chunkTokens);
 			console.info(
 				`[extraction ${id}] notes pipeline start (${input.filePath}) — ${chunks.length} chunk(s) of ≤${chunkTokens} tok`,

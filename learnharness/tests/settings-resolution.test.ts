@@ -10,9 +10,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-	extractionEnabled,
 	graphToolsEnabled,
-	renderingEnabled,
 	resolveConversationSpec,
 	resolveModelSpec,
 	resolveRoleSpec,
@@ -39,10 +37,6 @@ describe("resolveSettings", () => {
 		assert.equal(eff.appearance.proseFontSize, 16);
 		assert.equal(eff.appearance.sessionNameSerif, true);
 		assert.equal(eff.appearance.mdRendering.headingWeight, 900);
-		// wave 7 collapse: the master switch ONLY + the redesign's chunk
-		// budget — absent record resolves the factory 4096 (halved back
-		// from the digest-era 8192, owner, 2026-10-13)
-		assert.deepEqual(eff.graph, { enabled: true, rendering: true, extractionChunkTokens: 4096 });
 	});
 
 	it("explicit record values win over every factory default", () => {
@@ -53,7 +47,6 @@ describe("resolveSettings", () => {
 				tools: { research: false },
 			},
 			appearance: { mode: "light", proseFontSize: 20, mdRendering: { headingWeight: 600 } },
-			graph: { enabled: false },
 		};
 		const eff = resolveSettings(record);
 		assert.deepEqual(eff.agent.models.researcher, {
@@ -67,25 +60,6 @@ describe("resolveSettings", () => {
 		assert.equal(eff.appearance.mode, "light");
 		assert.equal(eff.appearance.proseFontSize, 20);
 		assert.equal(eff.appearance.mdRendering.headingWeight, 600);
-		// wave 7 collapse: the section IS the master switch (absent budget
-		// field = factory 4096 — a pre-redesign record resolves cleanly).
-		assert.deepEqual(eff.graph, { enabled: false, rendering: true, extractionChunkTokens: 4096 });
-		// The DISPLAY split (owner, 2026-10-06): extraction off leaves the
-		// rendering switch ON — the data channel and the view are separate.
-		assert.equal(renderingEnabled(eff.graph), true);
-		// The chunk budget rides the same resolution: stored value wins.
-		const budgeted = resolveSettings({ version: 1, graph: { extractionChunkTokens: 2000 } });
-		assert.deepEqual(budgeted.graph, { enabled: true, rendering: true, extractionChunkTokens: 2000 });
-	});
-
-	it("graph rendering (2026-10-06): display-only — off resolves off, extraction untouched", () => {
-		const eff = resolveSettings({ version: 1, graph: { rendering: false } });
-		assert.equal(eff.graph.rendering, false, "stored off wins");
-		assert.equal(eff.graph.enabled, true, "the data channel is untouched");
-		assert.equal(renderingEnabled(eff.graph), false);
-		assert.equal(extractionEnabled(eff.graph), true);
-		// absent = factory ON (the home defaults to the canvas)
-		assert.equal(resolveSettings({ version: 1, graph: {} }).graph.rendering, true);
 	});
 
 	it("partial role override: thinkingLevel alone borrows the SLOT's model (or nothing, without one)", () => {
@@ -230,26 +204,11 @@ describe("resolveConversationSpec (the turn gate's chain)", () => {
 	});
 });
 
-describe("the graph channel gates (the wave's seam honoring)", () => {
-	it("WRITE channel (extraction): dies with the master switch — the ONLY graph setting since wave 7", () => {
-		assert.equal(extractionEnabled({ enabled: true }), true);
-		assert.equal(extractionEnabled({ enabled: false }), false);
-	});
-
-	it("the write gate rides resolveSettings' factory defaults (all on → open)", () => {
-		const eff = resolveSettings(null);
-		assert.equal(extractionEnabled(eff.graph), true);
-		const off = resolveSettings({ version: 1, graph: { enabled: false } });
-		assert.equal(extractionEnabled(off.graph), false);
-	});
-
-	it("PROBER GRAPH TOOLS gate (wave 7, owner ruling 2026-09-23): the agent toggle AND the graph master switch compose", () => {
-		const graph = { enabled: true };
-		assert.equal(graphToolsEnabled({ graph, agent: { graphTools: {} } }), true, "absent subsection = ON");
-		assert.equal(graphToolsEnabled({ graph, agent: { graphTools: { enabled: true } } }), true);
-		assert.equal(graphToolsEnabled({ graph, agent: { graphTools: { enabled: false } } }), false);
-		const dead = { ...graph, enabled: false };
-		assert.equal(graphToolsEnabled({ graph: dead, agent: { graphTools: { enabled: true } } }), false, "graph off kills the tools regardless of the toggle");
+describe("the prober graph tools gate", () => {
+	it("the agent toggle alone decides; absent subsection = ON", () => {
+		assert.equal(graphToolsEnabled({ agent: { graphTools: {} } }), true);
+		assert.equal(graphToolsEnabled({ agent: { graphTools: { enabled: true } } }), true);
+		assert.equal(graphToolsEnabled({ agent: { graphTools: { enabled: false } } }), false);
 	});
 
 	it("graphTools rides resolveSettings: absent record → the empty subsection (ON); a record's delta passes through", () => {

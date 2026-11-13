@@ -35,7 +35,6 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 			root.render(<AgentSection
 				agent={{ tools: { research: true } }}
 				models={undefined}
-				graph={undefined}
 				compaction={undefined}
 				onSectionChange={(next) => { written = next; }}
 				onModelsChange={() => {}}

@@ -183,7 +183,7 @@ test("Agent opens with cached thinking metadata; refresh and disconnect never cl
 	installFetch(); await warm();
 	const models: ModelsSettings = { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" } };
 	let changed: ModelsSettings | undefined;
-	await render(<><Reader /><AgentSection agent={undefined} models={models} graph={undefined} compaction={undefined} onSectionChange={() => {}} onModelsChange={(next) => { changed = next; }} onCompactionChange={() => {}} /></>);
+	await render(<><Reader /><AgentSection agent={undefined} models={models} compaction={undefined} onSectionChange={() => {}} onModelsChange={(next) => { changed = next; }} onCompactionChange={() => {}} /></>);
 	await click("slot-thinking-strong"); assert.deepEqual(levels(), ["off", "low✓", "high"]);
 	assert.equal(element("slot-model-strong").textContent, "model:free▾");
 	await answer(1, catalog());

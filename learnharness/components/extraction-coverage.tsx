@@ -3,12 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useActivity } from "@/components/activity-dock";
 import { usePopoverDismiss } from "@/components/popover-dismiss";
-import { useSettingsSaved } from "@/components/settings-signal";
 import { formatTokens } from "@/components/usage-format";
 import { Hint } from "@/components/ui/hint";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { timeAgo } from "@/components/sidebar";
-import { resolveSettings } from "@/src/core";
+import { EXTRACTION_CHUNK_TOKENS } from "@/src/core";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,12 +18,10 @@ import { cn } from "@/lib/utils";
  * with this wave). Coverage is the SAME derivation, scoped to one session:
  * GET /api/chats/[id] now carries `coverage` (Platform's eed4b4e).
  *
- * The ring fills with uncoveredTokens / extractionChunkTokens — the chunk
- * budget the threshold setting (Graph ▸ extractionChunkTokens) pins: the
- * meter is "how close this session is to firing its next extraction run".
- * It DRAINS as a run folds (coverage re-derives per request), pulses while
- * a run is in flight, and vanishes entirely when the graph is off (the
- * master kill-switch means no extraction, so no meter).
+ * The ring fills with uncoveredTokens / EXTRACTION_CHUNK_TOKENS — the
+ * number the extraction trigger waits for: the meter is "how close this
+ * session is to firing its next extraction run". It DRAINS as a run folds
+ * (coverage re-derives per request) and pulses while a run is in flight.
  *
  * The manual affordance stays POST /api/graph/coverage/extract {chatId}
  * (409 = already running, BENIGN — the trigger raced us; the dock's
@@ -51,31 +48,6 @@ async function fetchCoverage(chatId: string): Promise<SessionCoverage | null> {
 		if (!res.ok) return null;
 		const body = (await res.json()) as { coverage?: SessionCoverage | null };
 		return body.coverage ?? null;
-	} catch {
-		return null;
-	}
-}
-
-/** The ring's denominator + visibility, resolved through the SAME core
- *  resolver the server's effective settings use (fix, 2026-10-02): the
- *  meter denominates at exactly the number the extraction trigger waits
- *  for — the old hand-rolled `?? 4096` fallback drifted from the factory
- *  default (8192) and the ring filled at half the truth. Null on fetch
- *  failure → no ring. */
-export interface GraphRead {
-	enabled: boolean;
-	chunkTokens: number;
-}
-
-/** Exported for the render pin (the ringFill precedent): resolves the
- *  raw settings delta to the factory-true graph section. */
-export async function fetchGraphRead(): Promise<GraphRead | null> {
-	try {
-		const res = await fetch("/api/settings");
-		if (!res.ok) return null;
-		const body = (await res.json()) as { settings?: Parameters<typeof resolveSettings>[0] };
-		const graph = resolveSettings(body.settings ?? null).graph;
-		return { enabled: graph.enabled, chunkTokens: graph.extractionChunkTokens };
 	} catch {
 		return null;
 	}
@@ -274,10 +246,8 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 	variant?: "current" | "proposed";
 }) {
 	const proposed = variant === "proposed";
-	const [graph, setGraph] = useState<GraphRead | null>(null);
 	const [coverage, setCoverage] = useState<SessionCoverage | null>(null);
 	const [open, setOpen] = useState(false);
-	const [nonce, setNonce] = useState(0);
 	const rootRef = useRef<HTMLDivElement>(null);
 	usePopoverDismiss(rootRef, open && !proposed, () => setOpen(false));
 
@@ -289,25 +259,13 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 	const feed = useActivity().feed;
 	const runHere = feed.extractions.some((run) => run.chatId === chatId);
 
-	useSettingsSaved((section) => {
-		if (section === "graph") setNonce((n) => n + 1);
-	});
-
-	useEffect(() => {
-		let alive = true;
-		void fetchGraphRead().then((g) => alive && setGraph(g));
-		return () => {
-			alive = false;
-		};
-	}, [nonce]);
-
 	useEffect(() => {
 		let alive = true;
 		void fetchCoverage(chatId).then((c) => alive && setCoverage(c));
 		return () => {
 			alive = false;
 		};
-	}, [chatId, refreshKey, nonce, runHere]);
+	}, [chatId, refreshKey, runHere]);
 
 	// While a run is in flight: poll at 2s so the ring DRAINS as folds land
 	// and settles at zero when the run completes (the "resets on
@@ -325,11 +283,10 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 		return () => clearInterval(timer);
 	}, [chatId, coverage?.running]);
 
-	// Vanishes entirely when the graph is off, or before the first honest
-	// read (no fake zeros — the doctrine).
-	if (graph === null || !graph.enabled || coverage === null) return null;
+	// Nothing before the first honest read (no fake zeros — the doctrine).
+	if (coverage === null) return null;
 
-	const fill = ringFill(coverage.uncoveredTokens, graph.chunkTokens);
+	const fill = ringFill(coverage.uncoveredTokens, EXTRACTION_CHUNK_TOKENS);
 	if (proposed) {
 		return (
 			<Popover open={open} onOpenChange={setOpen}>
@@ -345,7 +302,7 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 					</PopoverTrigger>
 				</Hint>
 				<PopoverContent align="end" data-testid="coverage-ring-popover" className="w-64 p-3">
-					<CoverageRingDetail coverage={coverage} chunkTokens={graph.chunkTokens} variant="proposed" />
+					<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} variant="proposed" />
 				</PopoverContent>
 			</Popover>
 		);
@@ -374,7 +331,7 @@ export function CoverageRing({ chatId, refreshKey = 0, variant = "current" }: {
 					data-testid="coverage-ring-popover"
 					className="absolute top-full right-0 z-40 mt-1.5 w-64 rounded-xl border bg-card p-3 text-xs shadow-xl"
 				>
-					<CoverageRingDetail coverage={coverage} chunkTokens={graph.chunkTokens} />
+					<CoverageRingDetail coverage={coverage} chunkTokens={EXTRACTION_CHUNK_TOKENS} />
 				</div>
 			)}
 		</div>

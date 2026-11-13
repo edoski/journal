@@ -32,7 +32,6 @@ import {
 	type BackgroundModelRole,
 	type FactorySettings,
 	type CompactionSettings,
-	type GraphSettings,
 	type ModelSlot,
 	type ModelSlotName,
 	type RoleModelOverride,
@@ -78,7 +77,6 @@ export interface EffectiveSettings {
 	 *  picker captions and the per-need refusal gates read. */
 	models: Record<ModelSlotName, EffectiveSlot | null>;
 	appearance: EffectiveAppearance;
-	graph: Required<GraphSettings>;
 	/** Compaction (owner round 14): resolved concrete — absent record
 	 *  section resolves to the factory 150k. */
 	compaction: Required<CompactionSettings>;
@@ -154,7 +152,6 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 	const modelsSection = record?.models ?? {};
 	const appearance = record?.appearance ?? {};
 	const md = appearance.mdRendering ?? {};
-	const graph = record?.graph ?? {};
 	const factoryAppearance = FACTORY_SETTINGS.appearance;
 	const factoryMd = factoryAppearance.mdRendering;
 	const models = {} as Record<BackgroundModelRole, EffectiveModelSpec | undefined>;
@@ -184,57 +181,20 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 				italicColor: md.italicColor ?? factoryMd.italicColor,
 			},
 		},
-		graph: {
-			// Wave 7 collapse (owner ruling 2026-09-23): the master switch ONLY —
-			// the embedding/clustering/labeling rungs and the BYOK embeddingModel
-			// are gone (stale record keys are simply never read here).
-			enabled: graph.enabled ?? FACTORY_SETTINGS.graph.enabled,
-			// The RENDERING switch (owner, 2026-10-06): display-only — gates
-			// the home's main view (canvas vs chains), never the data.
-			rendering: graph.rendering ?? FACTORY_SETTINGS.graph.rendering,
-			// The chunk budget (extraction-UX redesign, 2026-09-24): absent
-			// (pre-redesign record, fresh install) resolves to the factory
-			// 4096; the sanitizer has already clamped/floored any stored value.
-			extractionChunkTokens: graph.extractionChunkTokens ?? FACTORY_SETTINGS.graph.extractionChunkTokens,
-		},
 		compaction: {
 			thresholdTokens: record?.compaction?.thresholdTokens ?? FACTORY_SETTINGS.compaction.thresholdTokens,
 		},
 	};
 }
 
-// ─── Graph channel gates (the settings wave's seam honoring) ─────────────────
-
 /**
- * The WRITE channel gate (extraction + its auditor): dies with the master
- * switch. Used by the chat-handler's post-turn trigger. (Wave 7: the master
- * switch is the ONLY graph setting left — the section collapsed.)
- */
-export function extractionEnabled(graph: { enabled: boolean }): boolean {
-	return graph.enabled;
-}
-
-/**
- * The RENDERING gate (owner, 2026-10-06): graph off = the home shows the
- * chains view, not the canvas. Display-only by construction — every data
- * path (ledgers, extraction, tools) never consults this.
- */
-export function renderingEnabled(graph: { rendering: boolean }): boolean {
-	return graph.rendering;
-}
-
-/**
- * The PROBER GRAPH TOOLS gate (wave 7, owner ruling 2026-09-23): the
- * toggle is an agent-capability switch (it gates tool registration), but
- * the tools only mean anything when the graph itself runs — so the
- * effective gate composes the graph master switch AND the toggle.
- * Teacher's tool factories consume this at registration time.
+ * The PROBER GRAPH TOOLS gate (wave 7, owner ruling 2026-09-23): an
+ * agent-capability switch that gates tool registration. Absent = ON.
  */
 export function graphToolsEnabled(effective: {
-	graph: { enabled: boolean };
 	agent: { graphTools: { enabled?: boolean } };
 }): boolean {
-	return effective.graph.enabled && (effective.agent.graphTools.enabled ?? true);
+	return effective.agent.graphTools.enabled ?? true;
 }
 
 
