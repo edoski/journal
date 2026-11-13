@@ -510,6 +510,16 @@ function projectMarker(marker: LhMarkerMessage, out: LhViewMessage[]): void {
 			});
 			return;
 		}
+		case "practice-request": {
+			// The dock's Hint, Show me or Explain instead: a learner row naming
+			// the request (and the work he had written), never an answer card.
+			out.push({
+				id: marker.id,
+				role: "user",
+				parts: [{ type: "data-practice-request", id: `pr_${marker.id}`, data: marker.details }],
+			});
+			return;
+		}
 		case "practice-next": {
 			// The learner's explicit move-on signal (owner round 16): a compact
 			// centered system line — the mono-caps chrome register, not prose.

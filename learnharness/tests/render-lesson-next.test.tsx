@@ -110,7 +110,7 @@ describe("the Proposed docks", () => {
 
 	it("the practice dock has the same anatomy: the problem once, the thinking field, confidence and Submit", () => {
 		const document = documentFor(
-			<PracticeDock problemCallId="p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} variant="proposed" />,
+			<PracticeDock problemCallId="p1" input={{ statement: "Find the rank." }} expanded onExpand={() => {}} onSubmit={() => {}} onRequest={() => {}} variant="proposed" />,
 		);
 		const dock = document.querySelector('[data-testid="practice-dock"]')!;
 		assert.match(dock.textContent!, /Find the rank\./);

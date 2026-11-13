@@ -35,7 +35,10 @@ export type KeyAction =
 	| "question-pick-row"
 	| "question-submit"
 	| "open-settings"
-	| "toggle-user-thinking";
+	| "toggle-user-thinking"
+	| "practice-hint"
+	| "practice-show"
+	| "practice-explain";
 
 /** Where the cheat sheet groups an action (display only — dispatch is
  *  global; a seam that isn't mounted simply no-ops). */
@@ -67,6 +70,10 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "new-session", label: "New session", scope: "global", binding: "mod+n" },
 	{ id: "rename-session", label: "Rename session", scope: "chat", binding: "f2" },
 	{ id: "toggle-user-thinking", label: "Toggle all your thinking", scope: "chat", binding: "mod+t" },
+	// The practice problem's requests: the mounted problem box answers them.
+	{ id: "practice-hint", label: "Problem · hint", scope: "chat", binding: "mod+shift+h" },
+	{ id: "practice-show", label: "Problem · show me", scope: "chat", binding: "mod+shift+s" },
+	{ id: "practice-explain", label: "Problem · explain instead", scope: "chat", binding: "mod+shift+e" },
 	// Mod+F is surface-scoped: graph node search and session text Find share
 	// one action/binding. Only the currently mounted surface listens.
 	{ id: "find", label: "Find", scope: "global", binding: "mod+f" },

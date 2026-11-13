@@ -40,6 +40,7 @@ import {
 	newNextMessage,
 	newProblemDismissedMarker,
 	newThinkingMessage,
+	newPracticeRequestMessage,
 	newUserMessage,
 	newMessageId,
 	malformedQuestionsOf,
@@ -48,6 +49,7 @@ import {
 } from "./native-messages.ts";
 import { QUESTION_TOOLS, toolQuestionKind } from "./pending.ts";
 import { CONFIDENCE_STATES, isConfidence, type Confidence } from "./contracts/course.ts";
+import { isPracticeRequest, PRACTICE_REQUESTS, type PracticeRequest } from "./contracts/chat.ts";
 
 /** One client-originated input event (the POST body's `input`). */
 export type ChatInput =
@@ -63,6 +65,10 @@ export type ChatInput =
 	 *  whether it claims an answer is read from the text. One
 	 *  problem may carry many submissions; each is its own turn. */
 	| { type: "thinking"; problemCallId: string; text: string; confidence?: Confidence }
+	/** The practice dock's request buttons (Hint, Show me, Explain
+	 *  instead) on the ACTIVE problem: a request, never an answer. `text`
+	 *  is the work in the field when he pressed it, if any. */
+	| { type: "request"; problemCallId: string; request: PracticeRequest; text?: string }
 	/** The practice move-on signal (owner round 16): the learner's
 	 *  explicit go-ahead during the between-problems pause — the Next
 	 *  chip or Enter on an empty composer. Practice sessions only, and
@@ -213,6 +219,20 @@ export function parseChatInput(input: unknown): ChatInput {
 				text: i.text,
 				...(i.confidence !== undefined ? { confidence: i.confidence } : {}),
 			};
+		case "request":
+			if (typeof i.problemCallId !== "string" || i.problemCallId.length === 0) {
+				throw new ChatInputError("request input requires problemCallId");
+			}
+			if (!isPracticeRequest(i.request)) {
+				throw new ChatInputError(`request input must be one of ${PRACTICE_REQUESTS.join(", ")}`);
+			}
+			if (i.text !== undefined && typeof i.text !== "string") throw new ChatInputError("request input text must be a string");
+			return {
+				type: "request",
+				problemCallId: i.problemCallId,
+				request: i.request,
+				...(typeof i.text === "string" && i.text.trim() ? { text: i.text } : {}),
+			};
 		case "next":
 			return { type: "next" };
 		default:
@@ -257,6 +277,13 @@ export function inputAppends(
 				throw new ChatInputError("thinking input targets no active problem");
 			}
 			return [...dismissalConclusion(record), newThinkingMessage(input.problemCallId, input.text, input.confidence)];
+		}
+		case "request": {
+			const active = activeProblemOf(record.messages);
+			if (!active || active.toolCallId !== input.problemCallId) {
+				throw new ChatInputError("request input targets no active problem");
+			}
+			return [newPracticeRequestMessage(input.problemCallId, input.request, input.text)];
 		}
 		case "next": {
 			// Honest 400s, the thinking gate's discipline: the signal is a

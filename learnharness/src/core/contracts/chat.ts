@@ -252,6 +252,25 @@ export const CONCLUDE_ACK_TEXT =
 export const NEXT_PROBLEM_TEXT =
 	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
 
+/** The practice dock's request buttons: a hint, the rest of the
+ *  solution, or teaching instead of this problem. A request is never an
+ *  answer: it rides its own marker (`practice-request`), so the agent and
+ *  the record both read what was asked, never a claimed answer. */
+export const PRACTICE_REQUESTS = ["hint", "show", "explain"] as const;
+export type PracticeRequest = (typeof PRACTICE_REQUESTS)[number];
+
+export function isPracticeRequest(value: unknown): value is PracticeRequest {
+	return typeof value === "string" && (PRACTICE_REQUESTS as readonly string[]).includes(value);
+}
+
+/** What the agent reads for each request (the marker's content head). */
+export const PRACTICE_REQUEST_TEXT: Readonly<Record<PracticeRequest, string>> = {
+	hint: "[HINT] — the learner pressed Hint on the active problem. This is a request, not an answer: give the next rung of the hint ladder, one rung only, then wait for his work.",
+	show: "[SHOW ME] — the learner pressed Show me on the active problem. This is a request, not an answer: he stops working on it. Conclude it now (surrendered with rung R5, unless his work already solved it) so the committed solution shows, then point at the step where his work stopped.",
+	explain:
+		"[EXPLAIN INSTEAD] — the learner pressed Explain instead on the active problem. This is a request, not an answer: he wants teaching, not this problem. Conclude it with outcome movedOn (no attempt is recorded unless he already submitted work on it), then hand the session to teaching with `teach`.",
+};
+
 /** The compaction marker's model-facing header (owner round 14,
  *  2026-10-05). The marker's content is this header + the summary — the
  *  single text the provider sees in place of the dropped span. Wording

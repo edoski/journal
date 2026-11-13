@@ -216,6 +216,17 @@ function lastSubmissionConfidence(messages: readonly LhMessage[], problemCallId:
 	return states[states.length - 1];
 }
 
+/** True when he pressed Explain instead on this problem before submitting
+ *  any work on it: he asked to be taught, so nothing was attempted. */
+function explainedBeforeAnyWork(messages: readonly LhMessage[], problemCallId: string): boolean {
+	const onProblem = messages
+		.filter((m): m is LhMessage & LhMarkerMessage => m.role === "custom")
+		.filter((m) => (m.details as { problemCallId?: unknown } | null)?.problemCallId === problemCallId);
+	const explained = onProblem.some((m) => m.customType === "practice-request" && (m.details as { request?: unknown }).request === "explain");
+	const worked = onProblem.some((m) => m.customType === "practice-thinking" || (m.customType === "practice-request" && typeof (m.details as { text?: unknown }).text === "string"));
+	return explained && !worked;
+}
+
 /** Save a concluded problem's attempts; a refusal names what to fix. */
 async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): Promise<{ refused?: string; text: string }> {
 	if (input.outcome === "dismissed") return { text: "" };
@@ -226,6 +237,9 @@ async function recordConclusion(rec: ConcludeRecording, input: ConcludeInput): P
 	const pose = active ? boundaryParse<ProblemInput>(problemInputObject, active.input) : undefined;
 	if (!record || !active || !pose) {
 		return { text: "The attempt could not be recorded: the posed problem was not found in the session record." };
+	}
+	if (explainedBeforeAnyWork(record.messages, active.toolCallId)) {
+		return { text: "No attempt recorded: he asked to be taught before submitting any work on this problem." };
 	}
 	const topics = pose.topics;
 	const conclusion: PracticeConclusion = {
