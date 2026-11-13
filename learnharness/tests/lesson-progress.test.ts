@@ -1,6 +1,7 @@
 /**
  * The tutor's turn moves the lesson map: steps it taught are marked done
- * whether or not a check was tagged to them,.
+ * whether or not a check was tagged to them, and its close reads as
+ * finished for tonight, not "Your turn".
  */
 
 import assert from "node:assert/strict";
@@ -8,8 +9,11 @@ import { describe, it } from "node:test";
 import { fauxText } from "@earendil-works/pi-ai";
 
 import { derivePlanStatusesLh, LESSON_PROGRESS_TOOL, type PlanTree } from "../src/core/contracts/plan.ts";
+import { sessionEndOf } from "../src/core/session-end.ts";
 import { newUserMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { sessionState } from "../components/nav/session-state.ts";
 import { planTools } from "../src/agent/tools/plan.ts";
+import type { ChatListItem } from "../src/core/contracts/chat.ts";
 
 const TREE: PlanTree = {
 	nodes: ["map", "eigen-def", "char-poly", "spectrum-2x2", "eigenspace", "diagonalize"].map((id) => ({ id, title: id })),
@@ -47,6 +51,9 @@ function evening(): LhMessage[] {
 	];
 }
 
+const listItem = (messages: LhMessage[]) =>
+	({ id: "chat_eigen", title: "Eigenvalues", kind: "teach", busy: false, compacting: false, pendingQuestion: null, pendingProblem: null, ended: sessionEndOf(messages, TREE) }) as unknown as ChatListItem;
+
 describe("steps the tutor's turn marks done", () => {
 	it("show as done on the map even with no check tagged to them", () => {
 		const before = derivePlanStatusesLh(TREE, evening());
@@ -68,5 +75,24 @@ describe("steps the tutor's turn marks done", () => {
 		assert.match(JSON.stringify(refused.content), /Not node ids of this session's plan: eigenvalues/);
 		const ok = await tool.execute("t2", { done: ["map"] });
 		assert.match((ok.content[0] as { text: string }).text, /"ok":true/);
+	});
+});
+
+describe("closing for tonight", () => {
+	const closing = assistant([fauxText("Good place to stop. Next session: diagonalization.")], "stop");
+
+	it("without a close, a lesson stopped partway still waits on him", () => {
+		assert.equal(sessionState(listItem([...evening(), closing])), "your-turn");
+	});
+
+	it("the tutor's close reads as finished on every surface's state", () => {
+		const closed = [...evening(), ...progress("p1", { done: ["spectrum-2x2"], close: true }), closing];
+		assert.equal(sessionEndOf(closed, TREE), "closed");
+		assert.equal(sessionState(listItem(closed)), "finished");
+	});
+
+	it("his next message reopens the session", () => {
+		const reopened = [...evening(), ...progress("p1", { done: [], close: true }), closing, newUserMessage("Actually, one more question."), assistant([fauxText("Sure, ask away.")], "stop")];
+		assert.notEqual(sessionEndOf(reopened, TREE), "closed");
 	});
 });
