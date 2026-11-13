@@ -15,6 +15,7 @@ day after it), where the course's reviews go on.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import heapq
@@ -698,47 +699,150 @@ def schedule(
 # --- lists ------------------------------------------------------------------
 
 
-def path_order(record: dict[str, Any]) -> list[str]:
-    """Topics in prerequisite order, ties broken by ``path.order`` then handle."""
+def excluded(record: dict[str, Any]) -> set[str]:
+    """Topics the course leaves out (``excluded``): off the plan, history kept."""
+    return {key for key, topic in record["topics"].items() if "excluded" in topic}
+
+
+def needs(record: dict[str, Any], key: str) -> list[str]:
+    """A topic's prerequisites that the course still studies."""
     topics = record["topics"]
-    position = {
-        key: index for index, key in enumerate(record.get("path", {}).get("order", []))
+    return [
+        need
+        for need in topics[key].get("needs", ())
+        if need in topics and "excluded" not in topics[need]
+    ]
+
+
+def _placed(
+    topics: Collection[str], links: dict[str, list[str]], stored: list[str]
+) -> dict[str, float]:
+    """Each topic's place in the order: its index in ``stored``; a topic outside
+    it goes just before the first stored topic that builds on it, else just
+    after its last placed prerequisite, else at the end."""
+    place: dict[str, float] = {
+        key: float(index) for index, key in enumerate(stored) if key in topics
     }
+    dependents: dict[str, list[str]] = defaultdict(list)
+    for key in topics:
+        for need in links[key]:
+            dependents[need].append(key)
 
-    def rank(key: str) -> tuple[int, int, str]:
-        return (0, position[key], key) if key in position else (1, 0, key)
+    def first_dependent(key: str) -> float | None:
+        seen, stack, found = {key}, list(dependents[key]), []
+        while stack:
+            other = stack.pop()
+            if other in seen:
+                continue
+            seen.add(other)
+            if other in place:
+                found.append(place[other])
+            stack.extend(dependents[other])
+        return min(found, default=None)
 
+    end = float(len(stored))
+    unplaced = [key for key in topics if key not in place]
+    for key in unplaced:
+        if (anchor := first_dependent(key)) is not None:
+            place[key] = anchor - 0.5
+    pending = [key for key in unplaced if key not in place]
+    while pending:
+        progressed = False
+        for key in list(pending):
+            if any(need in pending for need in links[key]):
+                continue
+            after = [place[need] for need in links[key]]
+            place[key] = max(after) + 0.5 if after else end
+            pending.remove(key)
+            progressed = True
+        if not progressed:
+            for key in pending:
+                place[key] = end
+            break
+    return place
+
+
+def path_order(record: dict[str, Any], *, everything: bool = False) -> list[str]:
+    """Topics in prerequisite order, ties broken by their place then handle.
+
+    The place is the topic's index in ``path.order``, and a topic outside it is
+    placed where its prerequisites put it (``_placed``), so a topic added later
+    never drops to the end. Excluded topics are left out unless ``everything``.
+    """
+    topics = {
+        key
+        for key, topic in record["topics"].items()
+        if everything or "excluded" not in topic
+    }
+    links = {
+        key: [need for need in record["topics"][key].get("needs", ()) if need in topics]
+        for key in topics
+    }
+    place = _placed(topics, links, record.get("path", {}).get("order", []))
     waiting: dict[str, int] = {}
     dependents: dict[str, list[str]] = defaultdict(list)
-    for key, topic in topics.items():
-        needs = [need for need in topic.get("needs", ()) if need in topics]
-        waiting[key] = len(needs)
-        for need in needs:
+    for key in topics:
+        waiting[key] = len(links[key])
+        for need in links[key]:
             dependents[need].append(key)
-    ready = [rank(key) for key, count in waiting.items() if count == 0]
+    ready = [(place[key], key) for key, count in waiting.items() if count == 0]
     heapq.heapify(ready)
     order: list[str] = []
     while ready:
-        key = heapq.heappop(ready)[2]
+        key = heapq.heappop(ready)[1]
         order.append(key)
         for dependent in dependents[key]:
             waiting[dependent] -= 1
             if waiting[dependent] == 0:
-                heapq.heappush(ready, rank(dependent))
+                heapq.heappush(ready, (place[dependent], dependent))
     return order
+
+
+def path_health(record: dict[str, Any]) -> dict[str, list[str]]:
+    """What a half-built path leaves undone, per studied topic: no title, no
+    place in ``path.order``, no link to any other topic (with two or more
+    topics), no reference to where it is taught. Empty when nothing is."""
+    topics = record["topics"]
+    order = path_order(record)
+    stored = set(record.get("path", {}).get("order", []))
+    partners = contrasts(record)
+    linked: set[str] = set()
+    for key in order:
+        prerequisites = needs(record, key)
+        if prerequisites or partners[key]:
+            linked.update((key, *prerequisites, *partners[key]))
+    health = {
+        "untitled": [key for key in order if "title" not in topics[key]],
+        "unplaced": [key for key in order if key not in stored],
+        "unlinked": [key for key in order if key not in linked]
+        if len(order) > 1
+        else [],
+        "unreferenced": [key for key in order if not topics[key].get("refs")],
+    }
+    return {name: keys for name, keys in health.items() if keys}
 
 
 def _ranked(record: dict[str, Any], order: list[str] | None) -> dict[str, int]:
     return {key: index for index, key in enumerate(order or path_order(record))}
 
 
-def contrasts(record: dict[str, Any]) -> dict[str, list[str]]:
-    """Competing methods, symmetric: a topic's own list, then topics that list it."""
+def contrasts(
+    record: dict[str, Any], *, everything: bool = False
+) -> dict[str, list[str]]:
+    """Competing methods, symmetric: a topic's own list, then topics that list it.
+
+    An excluded partner is left out unless ``everything``."""
     topics = record["topics"]
-    partners = {key: list(topic.get("contrasts", ())) for key, topic in topics.items()}
+    left_out = set() if everything else excluded(record)
+    partners: dict[str, list[str]] = {
+        key: [other for other in topic.get("contrasts", ()) if other not in left_out]
+        for key, topic in topics.items()
+    }
     for key, topic in topics.items():
+        if key in left_out:
+            continue
         for other in topic.get("contrasts", ()):
-            if key not in partners[other]:
+            if other not in left_out and key not in partners[other]:
                 partners[other].append(key)
     return partners
 
@@ -748,6 +852,8 @@ def _due_items(
 ) -> list[dict[str, Any]]:
     items = []
     for key, topic in record["topics"].items():
+        if "excluded" in topic:
+            continue
         review = topic.get("review", {})
         when = review.get("due")
         if when is None or when > today.isoformat():
@@ -784,6 +890,7 @@ def unready(
     return {
         key
         for key, replayed in (replayed_ or replays(record)).items()
+        if "excluded" not in record["topics"][key]
         if replayed.days or "introduced" in record["topics"][key]
         if not any(
             verdict == "solid" and day > recent for day, verdict in replayed.verdicts
@@ -795,13 +902,12 @@ def _interleaved(
     record: dict[str, Any], chosen: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Prerequisites first; each topic followed by its first ready competing method."""
-    topics = record["topics"]
     partners = contrasts(record)
     pending = {item["topic"]: item for item in chosen}
     placed: list[dict[str, Any]] = []
 
     def ready(key: str) -> bool:
-        return all(need not in pending for need in topics[key].get("needs", ()))
+        return all(need not in pending for need in needs(record, key))
 
     def place(key: str) -> None:
         placed.append(pending.pop(key))
@@ -870,6 +976,7 @@ def upcoming(
     items = [
         {"topic": key, "due": topic["review"]["due"]}
         for key, topic in record["topics"].items()
+        if "excluded" not in topic
         if start < topic.get("review", {}).get("due", "") <= end
     ]
     items.sort(key=lambda item: (item["due"], rank[item["topic"]]))

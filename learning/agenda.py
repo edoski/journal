@@ -138,7 +138,7 @@ class _Course:
 
     def ready(self, topic: str) -> bool:
         """Its prerequisites are solid, and no competing method is half-learned."""
-        needs = self.record["topics"][topic].get("needs", ())
+        needs = progress.needs(self.record, topic)
         return all(solid(self.levels[need]) for need in needs) and not any(
             self.levels[other]["level"] != "new" and not solid(self.levels[other])
             for other in self.partners[topic]

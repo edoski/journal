@@ -215,7 +215,7 @@ def _new_short(
         ready = [
             key
             for key in untaught
-            if all(solid(need) for need in record["topics"][key].get("needs", ()))
+            if all(solid(need) for need in progress.needs(record, key))
             and not any(
                 starts.get(other, day) < day and not solid(other)
                 for other in partners[key]

@@ -136,6 +136,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "gap": _TEXT,
         "note": _TEXT,
         "review": _REVIEW,
+        "excluded": _TEXT,
     },
     "review": {"due": _DAY, "prompt": _TEXT, "points": _POINTS},
     "observation": {
@@ -234,6 +235,7 @@ class Topic(TypedDict, total=False):
     note: str
     judged: str
     review: Review
+    excluded: str
 
 
 class Observation(TypedDict, total=False):

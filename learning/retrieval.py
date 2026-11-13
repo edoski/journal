@@ -346,10 +346,12 @@ def resume(workspace: Workspace, task: str | None = None) -> dict[str, Any]:
                 "current": path.get("current"),
                 "basis": path.get("basis"),
                 "topics": [[topic, levels[topic]["level"]] for topic in order],
+                "excluded": sorted(progress.excluded(record)) or None,
             }
         )
-        if order
+        if record["topics"]
         else None,
+        "path_health": progress.path_health(record) or None,
         "weak": _weak(record, levels, order, topics),
         "task": {"key": key, **chosen} if key else None,
         "tasks": _other_tasks(record, key),
@@ -462,12 +464,12 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
     record = records.load(workspace)
     today = clock.today()
     levels = progress.standings(record)
-    order = progress.path_order(record)
+    order = progress.path_order(record, everything=True)
     overdue = {
         item["topic"]: item["overdue"]
-        for item in progress.due(record, today, levels=levels, order=order)
+        for item in progress.due(record, today, levels=levels)
     }
-    partners = progress.contrasts(record)
+    partners = progress.contrasts(record, everything=True)
     tasks = record["tasks"]
     topics = []
     for key in order:
@@ -483,6 +485,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "overdue": overdue.get(key),
             "weak": _is_weak(topic, standing),
             "gap": topic.get("gap"),
+            "excluded": topic.get("excluded"),
             **{
                 flag: standing[flag]
                 for flag in (*WEAK_FLAGS, "repaired")
