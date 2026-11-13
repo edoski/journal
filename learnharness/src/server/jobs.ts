@@ -122,8 +122,6 @@ interface WakeState {
 	liveAgents: Map<string, Agent>;
 	/** Chats whose pump loop is currently active (serialization per chat). */
 	pumping: Set<string>;
-	/** Throttle bookkeeping for the stale-job sweep. */
-	lastSweepAt: number;
 	stopConnectionWatch?: () => void;
 	automaticDeferred: WeakSet<Agent>;
 }
@@ -134,7 +132,7 @@ interface LhWakeGlobal {
 
 function state(): WakeState {
 	const g = globalThis as typeof globalThis & LhWakeGlobal;
-	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set(), lastSweepAt: 0, automaticDeferred: new WeakSet() });
+	return (g.__lhWakePipeline ??= { queues: new Map(), liveAgents: new Map(), userSteers: new Map(), pumping: new Set(), automaticDeferred: new WeakSet() });
 }
 
 /** chat-handler wires this at module init: its adapter around handleChatRequest. */
@@ -712,28 +710,21 @@ async function waitForIdle(chatId: string): Promise<void> {
 
 // ─── crash recovery ──────────────────────────────────────────────────────────
 
-const SWEEP_THROTTLE_MS = 30_000;
-
 /**
- * Lazy sweep (called off the /api/jobs poll, throttled), LIVENESS-GATED
- * (accuracy wave, 2026-09-19): a "running" record without a live loop
- * registration (subagents/aborts.ts) is an orphan of a process death —
- * re-deliver its stored result (idempotently) or re-spawn the loop, at
- * once (the old 15-minute age heuristic waited on ghosts AND re-ran
- * hung-but-alive loops beside themselves — the figure-maker incident,
- * 2026-09-18). A record WITH a live registration is provably executing
- * in THIS process — never touched, however old: a hung first model call
- * stays honestly running until END kills it. Terminal workers with known
- * pending delivery are restored independently; old terminal records without
- * delivery metadata are never inferred to owe a delivery.
+ * Crash recovery, run once at server start (instrumentation.ts), after the
+ * Claude sign-in check that respawns gate on: a process death is noticed
+ * only by the next process. LIVENESS-GATED (accuracy wave, 2026-09-19): a
+ * "running" record without a live loop registration (subagents/aborts.ts)
+ * is an orphan of a process death — re-deliver its stored result
+ * (idempotently) or re-spawn the loop, at once. A record WITH a live
+ * registration is provably executing in THIS process — never touched,
+ * however old: a hung first model call stays honestly running until END
+ * kills it. Terminal workers with known pending delivery are restored
+ * independently; old terminal records without delivery metadata are never
+ * inferred to owe a delivery.
  */
-/** Re-run a job's sub-agent loop — exposed for the sweep's tests (the
- *  /api/jobs poll is its only production caller, disabled under NODE_ENV=test). */
 export function recoverStaleJobs(): void {
 	const s = state();
-	const now = Date.now();
-	if (now - s.lastSweepAt < SWEEP_THROTTLE_MS) return;
-	s.lastSweepAt = now;
 	try {
 		for (const chat of stores.chatStore.listChats()) {
 			for (const job of stores.jobStore.listJobs(chat.id)) {
@@ -757,8 +748,7 @@ export function recoverStaleJobs(): void {
 	}
 }
 
-/** The /api/jobs entry: job list for the client poll (+ lazy recovery). */
+/** The /api/jobs entry: a chat's job list. */
 export function listJobs(chatId: string): JobRecord[] {
-	if (process.env.NODE_ENV !== "test") recoverStaleJobs();
 	return stores.jobStore.listJobs(chatId);
 }

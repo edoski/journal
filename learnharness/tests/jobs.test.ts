@@ -1714,12 +1714,6 @@ describe("abort (src/server/jobs.ts abortJob)", () => {
 // immediacy by running the sweep on FRESH records.
 
 describe("stale-job recovery sweep (liveness-gated)", () => {
-	/** Reset the sweep's 30s throttle — tests fire it directly, repeatedly. */
-	function resetSweepThrottle(): void {
-		const g = globalThis as { __lhWakePipeline?: { lastSweepAt: number } };
-		if (g.__lhWakePipeline) g.__lhWakePipeline.lastSweepAt = 0;
-	}
-
 	/** A FRESH "running" record (no loop registration): the orphan shape.
 	 *  Freshness is the point — the old code needed 15 minutes of age. */
 	function orphanJob(withResult?: ResearchResult): { chatId: string; jobId: string } {
@@ -1747,7 +1741,6 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 		setJobRespawn((id) => {
 			respawnedIds.push(id);
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		assert.ok(!respawnedIds.includes(jobId), "a live loop is provably executing — no respawn beside it");
 		assert.equal(jobStore.getJob(jobId)!.activity, "starting", "the record is untouched");
@@ -1765,13 +1758,25 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 		setJobRespawn((id) => {
 			respawnedIds.push(id);
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		assert.ok(respawnedIds.includes(jobId), "the orphan's loop is re-spawned at once");
 		assert.equal(jobStore.getJob(jobId)!.activity, "recovering: re-running");
 		// Hermetic teardown (see above) — the respawned loop is the TEST's
 		// fake seam, nothing real runs.
 		jobStore.updateJob(jobId, { status: "done", activity: "settled (test)" });
+	});
+
+	it("runs whenever it is called (once, at server start): no 30 s throttle swallows a second sweep", () => {
+		const respawnedIds: string[] = [];
+		setJobRespawn((id) => {
+			respawnedIds.push(id);
+		});
+		const first = orphanJob();
+		recoverStaleJobs();
+		const second = orphanJob();
+		recoverStaleJobs();
+		assert.ok(respawnedIds.includes(first.jobId) && respawnedIds.includes(second.jobId), "both sweeps recovered their orphan");
+		for (const { jobId } of [first, second]) jobStore.updateJob(jobId, { status: "done", activity: "settled (test)" });
 	});
 
 	it("an orphan WITH a stored result is re-delivered: the wake fires and the job flips done", async () => {
@@ -1781,7 +1786,6 @@ describe("stale-job recovery sweep (liveness-gated)", () => {
 			fired++;
 			return 200;
 		});
-		resetSweepThrottle();
 		recoverStaleJobs();
 		await waitFor(() => fired > 0, 8000, "recovery wake fired");
 		await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "orphan settled after re-delivery");
@@ -1930,7 +1934,6 @@ describe("job time limit", () => {
 			if (id === jobId) void runner.runJob(id);
 		});
 		try {
-			(globalThis as { __lhWakePipeline?: { lastSweepAt: number } }).__lhWakePipeline!.lastSweepAt = 0;
 			recoverStaleJobs();
 			await waitFor(() => jobStore.getJob(jobId)!.status !== "running", 8000, "orphan settled");
 			const done = jobStore.getJob(jobId)!;
