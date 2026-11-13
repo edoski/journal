@@ -75,6 +75,8 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 				"pointer-events-auto flex size-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 outline-none transition-colors duration-150 motion-reduce:transition-none",
 				"hover:border-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
 				current && "border-ring shadow-[0_0_0_3px_color-mix(in_oklab,var(--ring)_16%,transparent)] hover:border-ring",
+				// Link "connected": the step answers its row being pointed at.
+				current && "in-data-[lit]:shadow-[0_0_0_4px_color-mix(in_oklab,var(--ring)_36%,transparent)]",
 			)}
 		>
 			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />

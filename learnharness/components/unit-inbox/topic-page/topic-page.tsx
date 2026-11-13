@@ -16,6 +16,7 @@ import { TrailTopic } from "@/components/unit-inbox/topic-page/trail/trail-topic
 import { HYBRID_COLUMN, HybridTopic, type HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { topicFacts, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { useTopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
+import type { PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
 
 /** What every candidate takes. */
 export interface TopicPageProps {
@@ -48,6 +49,7 @@ export const TOPIC_CANDIDATES: Record<(typeof TOPIC_OPTIONS)[number], ComponentT
 export function TopicPage({
 	candidate: Candidate,
 	pickup,
+	link,
 	course,
 	topic,
 	chats,
@@ -56,6 +58,8 @@ export function TopicPage({
 	candidate: ComponentType<TopicPageProps>;
 	/** A Pick up option's pane, which takes the hybrid's history's place. */
 	pickup?: ComponentType<HybridPaneProps>;
+	/** A Link option's way of tying the pane to the map (with `pickup` only). */
+	link?: ComponentType<PanesProps>;
 	course: StudyCourse;
 	topic: CourseMapTopic;
 	chats: readonly ChatListItem[];
@@ -90,7 +94,7 @@ export function TopicPage({
 	return (
 		<>
 			{pickup ? (
-				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={start} pane={pickup} />
+				<HybridTopic facts={facts} busy={lesson.busy} onAct={act} onTask={start} pane={pickup} panes={link} />
 			) : (
 				<Candidate facts={facts} busy={lesson.busy} onAct={act} onTask={start} />
 			)}

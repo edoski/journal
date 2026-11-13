@@ -15,10 +15,11 @@ import { NavSection } from "@/components/nav/nav-section";
 import { sessionState } from "@/components/nav/session-state";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { shortTimeAgo } from "@/components/sidebar-next";
-import { useDesignVariant, usePickupVariant, useTopicVariant } from "@/components/design-variant";
+import { useDesignVariant, useLinkVariant, usePickupVariant, useTopicVariant } from "@/components/design-variant";
 import { TopicHeader } from "@/components/unit-inbox/topic-header";
 import { TOPIC_CANDIDATES, TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 import { PICKUP_PANES } from "@/components/unit-inbox/topic-page/pickup/pickup-options";
+import { LINK_PANES } from "@/components/unit-inbox/topic-page/link/link-options";
 import { useTopicStarts } from "@/components/unit-inbox/use-unit-inbox";
 import { activeSession, LEVEL_WORDS, linkStarts, openingFor, reviewWords, topicSessions } from "@/components/unit-inbox/units";
 
@@ -212,6 +213,7 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 	const read = useUnitRead(workspace);
 	const variant = useTopicVariant();
 	const pickup = usePickupVariant();
+	const link = useLinkVariant();
 	const topic = read.status === "ready" ? read.course.map.topics.find((t) => t.handle === handle) : undefined;
 	return (
 		<div className="relative flex h-dvh min-w-0 flex-col">
@@ -226,6 +228,7 @@ export function UnitPage({ workspace, handle, initialConfigured }: { workspace: 
 					<TopicPage
 						candidate={TOPIC_CANDIDATES[variant]}
 						pickup={variant === "hybrid" && pickup !== "current" ? PICKUP_PANES[pickup] : undefined}
+						link={variant === "hybrid" && pickup !== "current" && link !== "current" ? LINK_PANES[link] : undefined}
 						course={read.course} topic={topic} chats={read.chats} initialConfigured={initialConfigured} />
 				)
 			) : (

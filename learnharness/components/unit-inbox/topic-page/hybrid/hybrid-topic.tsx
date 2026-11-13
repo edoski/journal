@@ -10,6 +10,7 @@ import { trailDays } from "@/components/unit-inbox/topic-page/trail/trail-facts"
 import { History } from "@/components/unit-inbox/topic-page/hybrid/history";
 import { isPlanned, mapLessonAtFirst } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { LessonMap } from "@/components/unit-inbox/topic-page/hybrid/lesson-map";
+import { PlainPanes, type PanesProps } from "@/components/unit-inbox/topic-page/link/link-panes";
 
 /** The hybrid page's column, which its composer foot shares: wide enough
  *  for the history beside a map two steps wide plus the frame's fade. */
@@ -38,9 +39,17 @@ export interface HybridPaneProps {
  * down with little branching. With no lesson that planned, the history
  * takes the width. The
  * page's action lives in the composer foot, or, given a `pane` (a Pick up
- * option), in that pane, which takes the history's place.
+ * option), in that pane, which takes the history's place. `panes` (a Link
+ * option) is how the two are tied; plain side by side by default.
  */
-export function HybridTopic({ facts, busy, onAct, onTask, pane: Pane }: TopicPageProps & { pane?: ComponentType<HybridPaneProps> }) {
+export function HybridTopic({
+	facts,
+	busy,
+	onAct,
+	onTask,
+	pane: Pane,
+	panes: Panes = PlainPanes,
+}: TopicPageProps & { pane?: ComponentType<HybridPaneProps>; panes?: ComponentType<PanesProps> }) {
 	const days = trailDays(facts.sessions, facts.attempts, facts.today);
 	const planned = facts.sessions.filter(isPlanned);
 	const [chosen, setChosen] = useState(() => mapLessonAtFirst(facts.sessions, facts.action));
@@ -56,10 +65,7 @@ export function HybridTopic({ facts, busy, onAct, onTask, pane: Pane }: TopicPag
 			{/* Under Pick up, Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
 			<TopicHead facts={Pane ? { ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null } : facts} busy={busy} onAct={Pane ? undefined : onAct} />
 			{shown ? (
-				<div data-slot="topic-panes" className="grid min-h-0 flex-1 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6">
-					{side()}
-					<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />
-				</div>
+				<Panes side={side()} map={<LessonMap key={shown.chat.id} entry={shown} label={lessonWords(shown.day, facts.today, shown.chat.kind === "practice" ? "practice" : "lesson")} />} />
 			) : (
 				side("flex-1")
 			)}
