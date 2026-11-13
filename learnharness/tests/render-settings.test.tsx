@@ -222,7 +222,7 @@ describe("KeyboardSection (thin SSR)", () => {
 			assert.ok(html.includes(`data-testid="kbd-row-${def.id}"`), def.id);
 		}
 		assert.ok(html.includes("kbd-scope-global"));
-		assert.ok(html.includes("kbd-scope-chat"));
+		assert.ok(html.includes("kbd-scope-lesson"));
 	});
 
 	it("open-settings is in the registry with the settings chord", () => {

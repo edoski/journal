@@ -37,13 +37,20 @@ export type KeyAction =
 	| "open-settings"
 	| "toggle-user-thinking";
 
-/** Where the cheat sheet groups an action (display only — dispatch is
- *  global; a seam that isn't mounted simply no-ops). */
-export type KeyScope = "global" | "chat" | "graph";
+/** Where Settings and the cheat sheet group an action (display only —
+ *  dispatch is global; a seam that isn't mounted simply no-ops). */
+export type KeyScope = "global" | "lesson" | "question";
+
+/** The group headings, in the app's words. */
+export const KEY_SCOPES: readonly { scope: KeyScope; label: string }[] = [
+	{ scope: "global", label: "Anywhere" },
+	{ scope: "lesson", label: "In a lesson" },
+	{ scope: "question", label: "Answering a question" },
+];
 
 export interface KeyActionDef {
 	id: KeyAction;
-	/** Cheat-sheet label. */
+	/** What the shortcut does, in the app's words. */
 	label: string;
 	scope: KeyScope;
 	binding: string;
@@ -51,39 +58,46 @@ export interface KeyActionDef {
 	 *  question dock's row machine); never dispatched from the registry,
 	 *  so they can't leak to pages where the surface isn't mounted. */
 	displayOnly?: boolean;
+	/** Only the Current design listens (its model picker); the Proposed
+	 *  design keeps model and thinking out of the lesson, so its lists
+	 *  leave the action out. */
+	currentOnly?: boolean;
 }
 
 export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
-	{ id: "open-settings", label: "Open settings", scope: "global", binding: "mod+," },
-	{ id: "open-model-picker", label: "Model selector", scope: "global", binding: "mod+k" },
-	{ id: "cycle-thinking", label: "Cycle thinking level", scope: "global", binding: "shift+tab" },
-	{ id: "toggle-sidebar", label: "Toggle sessions sidebar", scope: "global", binding: "mod+b" },
-	{ id: "sessions-search", label: "Search sessions", scope: "global", binding: "mod+shift+f" },
+	{ id: "new-session", label: "New lesson", scope: "global", binding: "mod+n" },
+	{ id: "jump-graph", label: "Go home", scope: "global", binding: "mod+g" },
+	{ id: "sessions-search", label: "Search topics and lessons", scope: "global", binding: "mod+shift+f" },
+	{ id: "toggle-sidebar", label: "Show or hide the sidebar", scope: "global", binding: "mod+b" },
+	{ id: "open-settings", label: "Settings", scope: "global", binding: "mod+," },
+	{ id: "cheat-sheet", label: "All shortcuts", scope: "global", binding: "?" },
 	// (The Alt+↑/↓/↵ session cycle was RETIRED, owner 2026-10-10: barely
 	// used, felt laggy. Session navigation lives IN the search now — ↑/↓
 	// walk the filtered list, Enter opens (first match when nothing
 	// walked) — see sidebar.tsx's search input.)
-	{ id: "jump-graph", label: "Graph view", scope: "global", binding: "mod+g" },
-	{ id: "new-session", label: "New session", scope: "global", binding: "mod+n" },
-	{ id: "rename-session", label: "Rename session", scope: "chat", binding: "f2" },
-	{ id: "toggle-user-thinking", label: "Toggle all your thinking", scope: "chat", binding: "mod+t" },
-	// Mod+F is surface-scoped: graph node search and session text Find share
-	// one action/binding. Only the currently mounted surface listens.
-	{ id: "find", label: "Find", scope: "global", binding: "mod+f" },
-	{ id: "cheat-sheet", label: "Shortcut cheat sheet", scope: "global", binding: "?" },
+	// Mod+F is surface-scoped: the lesson's text Find (and the Current
+	// design's graph node search) share one action; only the mounted
+	// surface listens.
+	{ id: "find", label: "Find in this lesson", scope: "lesson", binding: "mod+f" },
+	{ id: "rename-session", label: "Rename this lesson", scope: "lesson", binding: "f2" },
+	{ id: "toggle-user-thinking", label: "Show or hide your thinking", scope: "lesson", binding: "mod+t" },
+	{ id: "open-model-picker", label: "Lesson details", scope: "lesson", binding: "mod+k" },
+	{ id: "cycle-thinking", label: "Cycle thinking level", scope: "lesson", binding: "shift+tab", currentOnly: true },
 	// The question dock's row machine (wave B) — displayOnly: the dock owns
-	// the keys while a question is expanded; the registry never dispatches
+	// the keys while a question is open; the registry never dispatches
 	// them, so bare arrows stay free everywhere else.
-	{ id: "question-focus", label: "Question · focus thinking ↔ rows", scope: "chat", binding: "tab", displayOnly: true },
-	// (The model-menu entries — "walk results" ↑/↓, "pick result" ↵ — were
-	// REMOVED, owner 2026-10-10: obvious in-field menu navigation, never
-	// dispatched, never rebindable — not settings material. The menu's own
-	// arrow machine (menu-shell.tsx) is unchanged.)
-	{ id: "question-next-row", label: "Question · next row", scope: "chat", binding: "arrowdown", displayOnly: true },
-	{ id: "question-prev-row", label: "Question · previous row", scope: "chat", binding: "arrowup", displayOnly: true },
-	{ id: "question-pick-row", label: "Question · pick row", scope: "chat", binding: "space", displayOnly: true },
-	{ id: "question-submit", label: "Question · submit", scope: "chat", binding: "enter", displayOnly: true },
+	{ id: "question-focus", label: "Move between the choices and your thinking", scope: "question", binding: "tab", displayOnly: true },
+	{ id: "question-next-row", label: "Next choice", scope: "question", binding: "arrowdown", displayOnly: true },
+	{ id: "question-prev-row", label: "Previous choice", scope: "question", binding: "arrowup", displayOnly: true },
+	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true },
+	{ id: "question-submit", label: "Send your answer", scope: "question", binding: "enter", displayOnly: true },
 ];
+
+/** The actions a design's lists show: the Proposed design leaves out what
+ *  only the Current design listens to. */
+export function keyActionsFor(design: "current" | "proposed"): readonly KeyActionDef[] {
+	return design === "proposed" ? KEYBOARD_ACTIONS.filter((a) => !a.currentOnly) : KEYBOARD_ACTIONS;
+}
 
 const STORAGE_KEY = "lh:keymap";
 

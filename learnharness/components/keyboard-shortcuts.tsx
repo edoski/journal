@@ -36,7 +36,9 @@ import {
 	formatBinding,
 	isTypingSurface,
 	kbdEventForAction,
-	KEYBOARD_ACTIONS,
+	KEY_SCOPES,
+	keyActionsFor,
+	type KeyScope,
 } from "@/src/core";
 import { useSettingsDialog } from "@/components/settings/settings-dialog.tsx";
 
@@ -151,12 +153,7 @@ export function KeyboardShortcuts() {
 function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => void; variant: DesignVariant }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 	if (!open) return null;
-	const scopes = ["global", "chat", "graph"] as const;
-	const scopeLabels: Record<(typeof scopes)[number], string> = {
-		global: "Global",
-		chat: "Chat",
-		graph: "Graph view",
-	};
+	const actionsIn = (scope: KeyScope) => keyActionsFor(variant).filter((a) => a.scope === scope);
 	if (variant === "proposed") {
 		// The dialog anatomy (dialog.md) with a two-column list: the action,
 		// then its keys as plain glyphs (kbd.md).
@@ -169,12 +166,12 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<Hint label="Close" binding="escape" side="left">
 						<DialogClose aria-label="Close shortcuts" />
 					</Hint>
-					{scopes.map((scope) => {
-						const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+					{KEY_SCOPES.map(({ scope, label }) => {
+						const actions = actionsIn(scope);
 						if (actions.length === 0) return null;
 						return (
-							<section key={scope} aria-label={scopeLabels[scope]} className="flex flex-col">
-								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{scopeLabels[scope]}</h3>
+							<section key={scope} aria-label={label} className="flex flex-col">
+								<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
 								{actions.map((a) => (
 									<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
 										<span className="truncate text-foreground">{a.label}</span>
@@ -202,13 +199,13 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<span className="text-sm font-medium text-card-foreground">Keyboard shortcuts</span>
 					<span className="text-xs text-muted-foreground">Esc to close</span>
 				</div>
-				{scopes.map((scope) => {
-					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+				{KEY_SCOPES.map(({ scope, label }) => {
+					const actions = actionsIn(scope);
 					if (actions.length === 0) return null;
 					return (
 						<div key={scope} className="mb-4">
 							<div className="mb-1.5 text-xs uppercase tracking-widest text-muted-foreground/70">
-								{scopeLabels[scope]}
+								{label}
 							</div>
 							<div className="flex flex-col gap-1">
 								{actions.map((a) => (
