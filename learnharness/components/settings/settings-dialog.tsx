@@ -119,7 +119,7 @@ function SettingsDialog({
 					<DialogContent
 						aria-describedby={undefined}
 						data-testid="settings-dialog"
-						className="h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
+						className="h-[792px] max-h-[90vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
 					>
 						<DialogTitle className="sr-only">Settings</DialogTitle>
 						<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
