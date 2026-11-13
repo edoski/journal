@@ -157,7 +157,7 @@ export const concludeInputObject = Type.Object({
 		{ description: "REQUIRED — the outcome: solved, solvedWithHints, movedOn, or surrendered — bare words, no quotes (dismissed is synthesized, never yours)." },
 	),
 	verdict: Type.String({
-		description: "REQUIRED — the plain-language verdict, shown to the learner on the card: addressed to him as \"you\", what was credited, where it broke. On a wrong answer: localize the break, do NOT give the correction.",
+		description: "REQUIRED — the plain-language verdict, shown to the learner on the card: addressed to him as \"you\", what was credited, where it broke, with math in `$…$` LaTeX. On a wrong answer: localize the break, do NOT give the correction.",
 	}),
 	rung: Type.Union(
 		[Type.Literal("R0"), Type.Literal("R1"), Type.Literal("R2"), Type.Literal("R3"), Type.Literal("R4"), Type.Literal("R5"), Type.Null()],
@@ -179,7 +179,7 @@ export const concludeInputObject = Type.Object({
 		description:
 			"REQUIRED — the attempt's result for his course record: correct, partial (a right answer reached by reasoning that does not hold) or incorrect; giving up is incorrect. A right guess is correct; his confidence travels separately. null only with movedOn when he claimed no answer at all, as when he asked to be taught instead: nothing is recorded.",
 	}),
-	response: Type.String({ description: "REQUIRED — his final answer, in a short line." }),
+	response: Type.String({ description: "REQUIRED — his final answer, in a short line, with math in `$…$` LaTeX (it is recorded as the attempt the learner reads later)." }),
 	chose: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -193,7 +193,7 @@ export const concludeInputObject = Type.Object({
 		Type.Object(
 			{
 				result: attemptResult("REQUIRED — the result of his first answer."),
-				response: Type.String({ description: "REQUIRED — his first answer, in a short line." }),
+				response: Type.String({ description: "REQUIRED — his first answer, in a short line, with math in `$…$` LaTeX." }),
 				sure: Type.Union([...CONFIDENCE_STATES.map((s) => Type.Literal(s)), Type.Null()], {
 					description:
 						"REQUIRED — the Confidence line of the submission that made this first claim (guessing, neutral or confident), or null when it had none. A working note before the claim is not the claim.",

@@ -47,7 +47,8 @@ const saveInput = Type.Object({
 	changes: Type.Record(Type.String(), Type.Unknown(), {
 		description:
 			"One JSON merge patch for the course record: only what changed. `observations` is a list of new entries; " +
-			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam`, `preferences` merge by field; `focus` names the task to continue.",
+			"`topics`, `tasks`, `knowledge` merge by handle (a null entry removes it); `path`, `exam`, `preferences` merge by field; `focus` names the task to continue. " +
+			"Texts the learner reads later (topic titles, gaps and notes, task titles, goals and steps, observation texts) put every piece of math in `$…$` LaTeX, never bare (`$\\sin(x^2)$`, not sin(x^2)).",
 	}),
 });
 

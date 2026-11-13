@@ -2,7 +2,7 @@
 
 A workspace holds one course. Its record has course facts (`title`, `goal`, `exam`, `journal`), `sources`, `topics` (the knowledge path), `observations` (learner evidence, recorded as [evidence.md](evidence.md) says), `knowledge` (what you know about the course), `tasks` (unfinished activities), `focus` (the current task), `path` (study order and position) and course `preferences`. The helper owns ids, dates, revisions and everything it computes.
 
-The learner reads some of it in their study app, days later: a topic's `title` and `gap`, a task's `title`, `goal` and `step`, and an attempt's `text`. Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids, since the app dates every entry itself; math in `$…$`, as in the lesson.
+The learner reads some of it in their study app, days later: a topic's `title`, `gap` and `note`, a task's `title`, `goal` and `step`, and an attempt's `text`. Write these to the learner, in plain words a reader understands after days away: "you", never "he" or "the learner"; no dates, observation ids or plan-node ids, since the app dates every entry itself. Every piece of math goes in `$…$` LaTeX, as in the lesson, never bare: `$\sin(x^2)$`, not sin(x^2). The app typesets only what is inside `$…$`.
 
 ## Saving
 
