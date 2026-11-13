@@ -13,15 +13,14 @@ from learning.workspace import support_directory
 DIMENSION = re.compile(r"[a-z][a-z0-9_]{0,39}")
 _SCHEMA = 1
 
-# Dimensions the engine reads as well as the tutor: a count of days or topics,
-# or yes or no. ``final_review_days`` shapes the course's stored review dates, so
-# it belongs to the course, never to the global preferences.
-DAILY_TOPICS = "daily_topics"
+# The dimension the engine reads as well as the tutor, a count of days.
+# ``final_review_days`` shapes the course's stored review dates, so it belongs
+# to the course, never to the global preferences.
 FINAL_REVIEW_DAYS = "final_review_days"
-WEEKEND_TOPICS = "new_topics_on_weekends"
-COUNTS = {DAILY_TOPICS: (1, 50), FINAL_REVIEW_DAYS: (1, 14)}
-FLAGS = {"yes": True, "no": False}
+COUNTS = {FINAL_REVIEW_DAYS: (1, 14)}
 COURSE_ONLY = frozenset({FINAL_REVIEW_DAYS})
+# How much a day holds, and which days, come from what the learner completes.
+LEARNED = frozenset({"daily_topics", "new_topics_on_weekends"})
 _LEADING_NUMBER = re.compile(r"\s*(\d+)\b")
 
 
@@ -79,10 +78,6 @@ def _count(value: str, low: int, high: int) -> int | None:
     return number if number is not None and low <= number <= high else None
 
 
-def _flag(value: str) -> bool | None:
-    return FLAGS.get(value.strip().casefold())
-
-
 def check_engine(changes: dict[str, str | None], field: str) -> None:
     """Refuse an engine dimension the engine could not read, naming the fix."""
     for dimension, instruction in changes.items():
@@ -94,14 +89,18 @@ def check_engine(changes: dict[str, str | None], field: str) -> None:
             )
         if instruction is None:
             continue
+        if dimension in LEARNED:
+            raise ValueError(
+                f"{field}.{dimension} is not a setting: the daily plan holds what "
+                "the learner actually completes on each weekday, learned from the "
+                "record; send null to delete it"
+            )
         if dimension in COUNTS and _count(instruction, *COUNTS[dimension]) is None:
             low, high = COUNTS[dimension]
             raise ValueError(
                 f"{field}.{dimension} must start with a whole number from {low} to "
                 f'{high}, e.g. "{low + 3}"'
             )
-        if dimension == WEEKEND_TOPICS and _flag(instruction) is None:
-            raise ValueError(f'{field}.{dimension} must be "yes" or "no"')
 
 
 def count(preferences: dict[str, str], dimension: str, default: int) -> int:
@@ -109,13 +108,6 @@ def count(preferences: dict[str, str], dimension: str, default: int) -> int:
     value = preferences.get(dimension)
     number = _count(value, *COUNTS[dimension]) if value is not None else None
     return default if number is None else number
-
-
-def flag(preferences: dict[str, str], dimension: str, default: bool) -> bool:
-    """An engine yes or no from the preferences; the default when unset or unreadable."""
-    value = preferences.get(dimension)
-    answer = _flag(value) if value is not None else None
-    return default if answer is None else answer
 
 
 def merge(current: dict[str, str], changes: dict[str, str | None]) -> dict[str, str]:

@@ -66,7 +66,7 @@ def level(observations: list[dict[str, Any]], **topic: Any) -> str:
         ([attempt("rank", "correct", "Hinted at row 3")], {}, "assisted"),
         ([attempt("rank", "incorrect"), attempt("rank")], {}, "assisted"),
         (
-            [attempt("rank", offset=-5), attempt("rank", offset=-3), attempt("rank")],
+            [attempt("rank", offset=-5), attempt("rank", offset=-4), attempt("rank")],
             {},
             "retained",
         ),
@@ -241,12 +241,14 @@ def test_an_exam_caps_reviews_at_its_final_review() -> None:
 
 
 @pytest.mark.parametrize("days", [1, 2, 3, 160])
-def test_after_the_final_review_nothing_is_due_before_the_exam(days: int) -> None:
+def test_after_the_final_review_the_next_review_is_after_the_exam(days: int) -> None:
     base = date(2026, 10, 10)
     soon = exam(date(2026, 10, 11))
     expected = progress.review_day(base, days, soon)
     assert expected == base + timedelta(days=days)
-    assert progress.kept(base, expected, soon) is None
+    after = max(expected, date(2026, 10, 12))
+    assert progress.kept(base, expected, soon) == after
+    assert progress.kept(base, expected, soon, solid=True) == after
     assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
 
 
@@ -263,18 +265,16 @@ def test_a_miss_after_the_final_review_is_relearned_then_settles() -> None:
     record, scheduled = save(
         record, {"observations": [attempt("rank", offset=1)]}, later
     )
-    assert "review" not in record["topics"]["rank"]
-    assert scheduled.notes == [
-        "rank: no review before the exam; its final review is done"
-    ]
+    assert record["topics"]["rank"]["review"]["due"] == day(6)
+    assert scheduled.notes == [f"rank: next review {day(6)}, after the exam"]
 
 
-def test_after_the_exam_nothing_is_due_until_a_new_date() -> None:
+def test_after_the_exam_reviews_go_on_at_their_dates() -> None:
     record = course(introduced=day(-30), review={"due": day(-1)})
     record = schema.apply_patch(
         record, {"exam": {"date": day(-2)}}, today=TODAY, now=NOW
     )[0]
-    assert progress.due(record, TODAY) == []
+    assert [item["topic"] for item in progress.due(record, TODAY)] == ["rank"]
     record, _ = save(record, {"exam": {"date": day(30)}})
     assert [item["topic"] for item in progress.due(record, TODAY)] == ["rank"]
 

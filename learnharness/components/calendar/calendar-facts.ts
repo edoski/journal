@@ -1,4 +1,4 @@
-import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
+import type { CalendarCourse, ChatListItem, CourseMapTask, CourseMapTopic, PlannedDay, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, topicSessions } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -22,7 +22,7 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null; doesNotFit: readonly string[]; road: readonly RoadWeek[]; finalReview: string | null }
+	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; road: readonly RoadWeek[]; finalReview: string | null; doesNotFit: readonly string[]; allStarted: boolean }
 	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; action: TopicAction }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
@@ -137,12 +137,13 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
-	for (const { map, due, runup, planned, doesNotFit, finalReview } of shown) {
+	for (const { map, due, planned, doesNotFit, finalReview } of shown) {
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 		if (map.exam) {
 			const road = roadOf(planned, map.exam.date, titleOf);
-			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf), road, finalReview });
+			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), allStarted });
 		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, topicSessions(chats, map.workspace, topic)) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
@@ -235,20 +236,21 @@ export function spanWords({ from, to }: Pick<RoadWeek, "from" | "to">): string {
 	return a.split(" ")[1] === b.split(" ")[1] ? `${a.split(" ")[0]} to ${b}` : `${a} to ${b}`;
 }
 
-/** When the final review starts: "Final review from 27 Nov". Pure. */
-export function finalReviewWords(day: string): string {
-	return `Final review from ${short(day)}`;
+/** When the final review starts, "Final review from 27 Nov", or that it is
+ *  under way. Pure. */
+export function finalReviewWords(day: string | null, today: string): string | null {
+	if (day === null) return null;
+	return day > today ? `Final review from ${short(day)}` : "Final review now, until the exam";
 }
 
-/** The exam run-up in words, as `plan` counts it. */
-export function runupWords(runup: CalendarRunup): string {
-	const days = runup.studyDays === 1 ? "1 day" : `${runup.studyDays} days`;
-	return `${days} left for new topics, about ${runup.pace} each`;
+/** "A, B and C". */
+function listWords(items: readonly string[]): string {
+	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-/** The topics the plan cannot fit before the exam, named. */
+/** The topics the plan has no room to start before the exam, named. */
 export function misfitWords(titles: readonly string[]): string | null {
-	return titles.length > 0 ? `Not enough days left for ${titles.join(", ")}` : null;
+	return titles.length > 0 ? `No room before the exam to start ${listWords(titles)}` : null;
 }
 
 /** True when no entry falls in [start, end). */

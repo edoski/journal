@@ -243,7 +243,7 @@ def test_a_correction_takes_the_place_of_what_it_replaced() -> None:
         (on(5).isoformat(), "solid"),
     ]
     assert course.standing["level"] == "retained"
-    assert course.due == on(12).isoformat()
+    assert course.due == on(13).isoformat()
 
 
 def test_a_topic_dropped_by_a_correction_is_rescheduled() -> None:
@@ -299,12 +299,25 @@ def test_a_self_report_that_supersedes_a_miss_reschedules_its_topic() -> None:
 def test_the_final_review_caps_every_replayed_interval() -> None:
     course = Course({**TOPICS, "exam": {"date": on(14).isoformat()}})
     course.attempts(1, att("correct"))
-    course.attempts(4, att("correct", text="probe"))
-    assert course.due == on(7).isoformat()
-    course.attempts(7, att("correct", text="probe 2"))
+    course.attempts(2, att("correct", text="probe"))
+    assert course.due == on(5).isoformat()
+    course.attempts(5, att("correct", text="probe 2"))
     assert course.due == on(8).isoformat()
     course.attempts(8, att("correct", text="the final review"))
-    assert "review" not in course.record["topics"]["a"]
+    assert course.due == on(24).isoformat()
+    assert course.scheduled.notes == [
+        f"a: next review {on(24).isoformat()}, after the exam"
+    ]
+
+
+def test_a_review_answered_late_earns_a_longer_interval() -> None:
+    course = started(att("correct"))
+    course.attempts(1, att("correct", text="on time"))
+    assert course.due == on(4).isoformat()
+    course.attempts(9, att("correct", text="five days late"))
+    assert course.due == on(9 + 7 + 5).isoformat()
+    course.attempts(30, att("incorrect", text="late and missed"))
+    assert course.due == on(31).isoformat()
 
 
 def test_an_identical_attempt_is_skipped_at_5_minutes_and_kept_at_31() -> None:
@@ -350,3 +363,23 @@ def test_a_helped_step_then_an_unaided_solve_before_the_review_changes_nothing()
     assert course.verdicts == [(on(1).isoformat(), "solid")]
     assert course.scheduled.reviews == {}
     assert course.due == on(4).isoformat()
+
+
+def test_two_misses_in_a_row_ask_for_reteaching_first() -> None:
+    course = started(att("correct"))
+    course.attempts(1, att("incorrect", text="first miss"))
+    assert "relearn" not in course.standing
+    course.attempts(2, att("incorrect", text="second miss"))
+    assert course.standing["relearn"] is True
+    item = progress.due(course.record, on(3))[0]
+    assert item["topic"] == "a"
+    course.attempts(3, att("correct", text="after reteaching"))
+    assert "relearn" not in course.standing
+
+
+def test_with_an_exam_ahead_a_late_review_earns_no_longer_gap() -> None:
+    course = Course({**TOPICS, "exam": {"date": on(60).isoformat()}})
+    course.attempts(0, att("correct"))
+    course.attempts(1, att("correct", text="on time"))
+    course.attempts(9, att("correct", text="five days late"))
+    assert course.due == on(16).isoformat()

@@ -21,7 +21,7 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, runupWords, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
 import { cn } from "@/lib/utils";
 
@@ -144,9 +144,9 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	const lines: string[] = [];
 	if (entry.kind === "exam") {
 		lines.push(`${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
-		if (entry.runup) lines.push(runupWords(entry.runup));
 		const misfit = misfitWords(entry.doesNotFit);
 		if (misfit) lines.push(misfit);
+		if (entry.allStarted) lines.push("Every topic started");
 	} else if (entry.kind === "review") {
 		const date = entry.topic.review?.date ?? entry.day;
 		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? "Due today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
@@ -175,16 +175,17 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 					</p>
 				))}
 			</div>
-			{entry.kind === "exam" && <Road entry={entry} />}
+			{entry.kind === "exam" && <Road entry={entry} today={today} />}
 			<EntryActions entry={entry} busy={busy} onStart={onStart} />
 		</>
 	);
 }
 
 /** The road to the exam as the engine planned it: each week's new topics,
- *  then the final review. Nothing when the plan starts no new topic. */
-function Road({ entry }: { entry: Extract<CalendarEntry, { kind: "exam" }> }) {
-	if (entry.road.length === 0 && !entry.finalReview) return null;
+ *  then the final review. Nothing when the plan gives neither. */
+function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }>; today: string }) {
+	const finalReview = finalReviewWords(entry.finalReview, today);
+	if (entry.road.length === 0 && !finalReview) return null;
 	return (
 		<div data-slot="exam-road" className="flex flex-col gap-1.5 border-t border-border pt-3">
 			<p className="text-label font-medium text-muted-foreground">The road to it</p>
@@ -193,14 +194,17 @@ function Road({ entry }: { entry: Extract<CalendarEntry, { kind: "exam" }> }) {
 					<li key={week.from} className="flex gap-2 text-label">
 						<BookOpenIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
 						<span className="min-w-0">
-							<span className="text-muted-foreground">{spanWords(week)}</span> <span className="text-foreground">{week.titles.join(", ")}</span>
+							<span className="text-muted-foreground">{spanWords(week)}</span>{" "}
+							<span className="text-foreground">
+								<MathText>{week.titles.join(", ")}</MathText>
+							</span>
 						</span>
 					</li>
 				))}
-				{entry.finalReview && (
+				{finalReview && (
 					<li className="flex gap-2 text-label text-muted-foreground">
 						<HistoryIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-						{finalReviewWords(entry.finalReview)}
+						{finalReview}
 					</li>
 				)}
 			</ol>

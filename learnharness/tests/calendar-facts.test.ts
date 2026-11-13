@@ -10,8 +10,8 @@ import { describe, it } from "node:test";
 import type { CalendarCourse } from "../src/core/contracts/calendar.ts";
 import type { ChatListItem } from "../src/core/contracts/chat.ts";
 import type { CourseMap, CourseMapTopic, TopicHandle } from "../src/core/contracts/course-map.ts";
-import { doesNotFitOf, finalReviewOf, planDays, plannedOf, runupOf, scheduleOf } from "../src/server/calendar.ts";
-import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, roadOf, runupWords, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
+import { doesNotFitOf, finalReviewOf, planDays, plannedOf, scheduleOf } from "../src/server/calendar.ts";
+import { calendarEntries, distanceWords, finalReviewWords, lookOf, misfitWords, quietBetween, roadOf, sessionType, spanWords, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
 const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
@@ -29,7 +29,7 @@ const topic = (handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTop
 
 function course(workspace: string, title: string, over: Partial<CourseMap> = {}, rest: Partial<CalendarCourse> = {}): CalendarCourse {
 	const map: CourseMap = { workspace, title, today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [], edges: [], ...over };
-	return { map, unready: null, due: [], newToday: [], lastActiveDaysAgo: 0, runup: null, planned: [], doesNotFit: [], finalReview: null, ...rest };
+	return { map, unready: null, due: [], newToday: [], lastActiveDaysAgo: 0, planned: [], doesNotFit: [], finalReview: null, ...rest };
 }
 
 const LINALG = course(
@@ -48,7 +48,7 @@ const LINALG = course(
 	},
 	{
 		due: ["span" as TopicHandle, "basis" as TopicHandle],
-		runup: { studyDays: 9, pace: 1.5 },
+		finalReview: "2026-11-23",
 		planned: [
 			{ date: TODAY, reviews: ["span" as TopicHandle, "basis" as TopicHandle, "rank" as TopicHandle], new: [] },
 			{ date: "2026-11-09", reviews: [], new: ["eigen" as TopicHandle] },
@@ -117,9 +117,8 @@ describe("calendar entries", () => {
 		assert.equal(eigen?.kind === "new" && eigen.action.kind, "start");
 		const exam = entries.find((e) => e.kind === "exam");
 		assert.deepEqual(exam?.kind === "exam" && exam.doesNotFit, ["Eigenvalues"]);
-		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "Not enough days left for Eigenvalues, Rank");
+		assert.equal(misfitWords(["Eigenvalues", "Rank"]), "No room before the exam to start Eigenvalues and Rank");
 		assert.equal(misfitWords([]), null);
-		assert.equal(runupWords({ studyDays: 9, pace: 1.5 }), "9 days left for new topics, about 1.5 each");
 	});
 
 	it("gives a review the topic page's action and an open task its opening and topic", () => {
@@ -130,7 +129,7 @@ describe("calendar entries", () => {
 		assert.equal(task?.kind === "task" && task.opening, "Continue Problem sheet 4");
 		assert.equal(task?.kind === "task" && task.topic?.handle, "rank");
 		const exam = entries.find((e) => e.kind === "exam" && e.course.workspace === "/study/linalg");
-		assert.deepEqual(exam?.kind === "exam" && exam.runup, { studyDays: 9, pace: 1.5 });
+		assert.deepEqual(exam?.kind === "exam" && [exam.road, exam.finalReview], [[{ from: "2026-11-09", to: "2026-11-09", titles: ["Eigenvalues"] }], "2026-11-23"]);
 	});
 
 	it("puts each session on the day of its last message, with its type, its topic and whether it waits", () => {
@@ -187,6 +186,12 @@ describe("calendar words", () => {
 		assert.equal(studyTimeWords(undefined), null);
 	});
 
+	it("says when the final review starts, or that it is under way", () => {
+		assert.equal(finalReviewWords("2026-11-13", TODAY), "Final review from 13 Nov");
+		assert.equal(finalReviewWords(TODAY, TODAY), "Final review now, until the exam");
+		assert.equal(finalReviewWords(null, TODAY), null);
+	});
+
 	it("says how far a day is from the engine's", () => {
 		assert.deepEqual(
 			["2026-11-08", "2026-11-09", "2026-11-07", "2026-11-19", "2026-11-29", "2026-11-01"].map((d) => distanceWords(d, TODAY)),
@@ -196,11 +201,11 @@ describe("calendar words", () => {
 });
 
 describe("the calendar's read of plan", () => {
-	it("takes the run-up's study days and pace only when plan gives both", () => {
-		assert.deepEqual(runupOf({ courses: [{ runup: { days_left: 11, study_days: 6, pace: 0.5 } }] }), { studyDays: 6, pace: 0.5 });
-		assert.equal(runupOf({ courses: [{ runup: { days_left: 11 } }] }), null);
-		assert.equal(runupOf({ courses: [{}] }), null);
-		assert.equal(runupOf(null), null);
+	it("takes the final review's start only when plan gives its lead", () => {
+		const exam = { date: "2026-11-29", daysLeft: 21 };
+		assert.equal(finalReviewOf({ courses: [{ plan: { final_review_days: 6 } }] }, exam), "2026-11-23");
+		assert.equal(finalReviewOf({ courses: [{}] }, exam), null);
+		assert.equal(finalReviewOf(null, exam), null);
 	});
 
 	it("reads the daily plan's days and the topics that do not fit, keeping the handles the map lists", () => {
@@ -247,6 +252,23 @@ describe("the calendar's read of plan", () => {
 		]);
 		assert.deepEqual(scheduleOf({ journal: { error: "no vault" } }), []);
 	});
+
+	it("makes a weekday he does not study a day off, whatever the Journal says", () => {
+		const journal = {
+			upcoming_schedule: [
+				{ date: "2026-11-08", study_windows: [{ start: "08:30", end: "12:00" }], is_off_day: false },
+				{ date: "2026-11-09", study_windows: [], is_off_day: true },
+			],
+		};
+		const capacity = { study_days: ["mon", "tue"] };
+		assert.deepEqual(scheduleOf({ journal, capacity }), [
+			{ date: "2026-11-08", off: true, windows: [] },
+			{ date: "2026-11-09", off: false, windows: [] },
+		]);
+		const alone = scheduleOf({ today: "2026-11-08", capacity });
+		assert.equal(alone.length, 42);
+		assert.deepEqual(alone.slice(0, 3).map((d) => d.off), [true, false, false]);
+	});
 });
 
 describe("the road to an exam", () => {
@@ -262,7 +284,7 @@ describe("the road to an exam", () => {
 		]);
 		assert.deepEqual(road.map(spanWords), ["9 to 13 Nov", "16 Nov"]);
 		assert.equal(spanWords({ from: "2026-11-30", to: "2026-12-04" }), "30 Nov to 4 Dec");
-		assert.equal(finalReviewWords("2026-12-08"), "Final review from 8 Dec");
+		assert.equal(finalReviewWords("2026-12-08", TODAY), "Final review from 8 Dec");
 	});
 
 	it("gives the exam entry its road and its final review", () => {
@@ -271,6 +293,18 @@ describe("the road to an exam", () => {
 		const exam = calendarEntries({ courses: [gt], chats: [], scope: null }).find((e) => e.kind === "exam");
 		assert.ok(exam?.kind === "exam");
 		assert.deepEqual([exam.road, exam.finalReview], [[{ from: "2026-11-09", to: "2026-11-10", titles: ["Groups", "Subgroups"] }], "2026-12-08"]);
+		assert.equal(exam.allStarted, false);
+	});
+
+	it("says every topic started only when the plan starts none and none is left without room", () => {
+		const started = (rest: Partial<CalendarCourse>, topics = [topic("a", { title: "Groups" })]) => {
+			const gt = course("/study/gt", "Group Theory", { exam: { date: "2026-12-14", daysLeft: 36 }, topics }, rest);
+			const exam = calendarEntries({ courses: [gt], chats: [], scope: null }).find((e) => e.kind === "exam");
+			return exam?.kind === "exam" && exam.allStarted;
+		};
+		assert.equal(started({}), true);
+		assert.equal(started({ doesNotFit: ["a" as TopicHandle] }), false);
+		assert.equal(started({}, []), false, "a course with no topics yet has started none");
 	});
 
 	it("reads the final review's first day from the plan, and asks the plan up to the exam, at least six weeks", () => {

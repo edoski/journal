@@ -212,8 +212,11 @@ class Run:
 
     def planned(self, n: int) -> tuple[list[str], list[str]]:
         assert self.agenda is not None
-        settings = self.agenda.settings(self.record["preferences"])
-        today = self.agenda.plan_days(self.record, day(n), settings, 1)[0]
+        if hasattr(self.agenda, "plan_days"):
+            settings = self.agenda.settings(self.record["preferences"])
+            today = self.agenda.plan_days(self.record, day(n), settings, 1)[0]
+        else:
+            today = self.agenda.plan({"c": self.record}, day(n), 1).days["c"][0]
         return list(today["reviews"]), list(today["new"])
 
     def study(self, n: int, reviews: list[str], new: list[str]) -> None:

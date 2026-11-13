@@ -1,26 +1,22 @@
 /**
  * The calendar's server seam: the study home's read of every course, with
- * `plan` asked for six weeks ahead, the most a month view shows, so it
- * also gives the daily plan for those days, the run-up's figures and the
- * Journal's study windows. The study windows are the vault's, the same for every
- * course, so the first plan that lists them is read.
+ * `plan` asked up to the course's exam and at least six weeks ahead, the
+ * most a month view shows, so it also gives the daily plan for those days,
+ * the final review's start, the weekdays he studies and the Journal's study
+ * windows. The study windows are the vault's, the same for every course, so
+ * the first plan that lists them is read.
  */
 
-import type { CalendarListing, CalendarRunup, PlannedDay, ScheduledDay, StudyWindow } from "../core/contracts/calendar.ts";
+import { CALENDAR_DAYS, type CalendarListing, type PlannedDay, type ScheduledDay, type StudyWindow } from "../core/contracts/calendar.ts";
 import type { CourseSummary } from "../core/contracts/course.ts";
 import type { CourseMap, TopicHandle } from "../core/contracts/course-map.ts";
 import { readCourses, studyCourseOf } from "./study.ts";
 
-/** How many days ahead `plan` looks at least: the six weeks a month view
- *  can show. A course whose exam is further off is read up to its exam, so
- *  its whole road shows. */
-export const CALENDAR_DAYS = 42;
-
 /** The engine refuses a longer plan (`learning/planning.py`, MAX_DAYS). */
 const ENGINE_MAX_DAYS = 366;
 
-/** The days to ask `plan` for one course: up to its exam, at least the
- *  month view's six weeks. Pure. */
+/** The days to ask `plan` for one course: up to its exam, so its whole
+ *  road shows, and at least the month view's six weeks. Pure. */
 export function planDays(course: Pick<CourseSummary, "exam">): number {
 	return Math.min(ENGINE_MAX_DAYS, Math.max(CALENDAR_DAYS, course.exam?.daysLeft ?? 0));
 }
@@ -34,11 +30,14 @@ function courseEntry(plan: unknown): Record<string, unknown> | null {
 	return record(Array.isArray(courses) ? courses[0] : null);
 }
 
-/** `plan`'s `runup.study_days` and `pace`, or null when it gives neither. Pure. */
-export function runupOf(plan: unknown): CalendarRunup | null {
-	const runup = record(courseEntry(plan)?.runup);
-	const { study_days: studyDays, pace } = runup ?? {};
-	return typeof studyDays === "number" && typeof pace === "number" ? { studyDays, pace } : null;
+const WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+
+/** The weekdays the engine has learned he studies, Monday 0, or null when
+ *  `plan` gives none. Pure. */
+export function studyWeekdaysOf(plan: unknown): Set<number> | null {
+	const days = record(record(plan)?.capacity)?.study_days;
+	if (!Array.isArray(days)) return null;
+	return new Set(days.flatMap((day) => (typeof day === "string" && WEEKDAYS.includes(day) ? [WEEKDAYS.indexOf(day)] : [])));
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,7 +71,7 @@ export function doesNotFitOf(plan: unknown, map: Pick<CourseMap, "topics">): Top
 export function finalReviewOf(plan: unknown, exam: CourseMap["exam"]): string | null {
 	const days = record(courseEntry(plan)?.plan)?.final_review_days;
 	if (!exam || typeof days !== "number" || !DAY.test(exam.date)) return null;
-	return new Date(Date.parse(`${exam.date}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
+	return addDays(exam.date, -days);
 }
 
 const TIME = /^\d{2}:\d{2}$/;
@@ -82,16 +81,37 @@ function windowOf(value: unknown): StudyWindow | null {
 	return typeof start === "string" && typeof end === "string" && TIME.test(start) && TIME.test(end) ? { start, end } : null;
 }
 
-/** `plan`'s `journal.upcoming_schedule` as days ahead; empty when the
- *  Journal has none or could not be read. Pure. */
+function weekday(day: string): number {
+	return (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7;
+}
+
+function addDays(day: string, days: number): string {
+	const date = new Date(`${day}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + days);
+	return date.toISOString().slice(0, 10);
+}
+
+/** The days ahead: off on a weekday the engine has learned he does not
+ *  study, else the Journal's windows (`journal.upcoming_schedule`) or its
+ *  day off. Without a Journal schedule, the engine's study days alone;
+ *  empty when neither says anything. Pure. */
 export function scheduleOf(plan: unknown): ScheduledDay[] {
+	const studies = studyWeekdaysOf(plan);
 	const upcoming = record(record(plan)?.journal)?.upcoming_schedule;
-	if (!Array.isArray(upcoming)) return [];
-	return upcoming.flatMap((entry) => {
+	const journal = new Map<string, { off: boolean; windows: StudyWindow[] }>();
+	for (const entry of Array.isArray(upcoming) ? upcoming : []) {
 		const day = record(entry);
-		if (!day || typeof day.date !== "string") return [];
+		if (!day || typeof day.date !== "string") continue;
 		const windows = (Array.isArray(day.study_windows) ? day.study_windows : []).map(windowOf).filter((w) => w !== null);
-		return [{ date: day.date, off: day.is_off_day === true, windows }];
+		journal.set(day.date, { off: day.is_off_day === true, windows });
+	}
+	const today = record(plan)?.today;
+	const dates =
+		journal.size > 0 ? [...journal.keys()] : studies && typeof today === "string" ? Array.from({ length: CALENDAR_DAYS }, (_, n) => addDays(today, n)) : [];
+	return dates.map((date) => {
+		const scheduled = journal.get(date);
+		const off = studies ? !studies.has(weekday(date)) : (scheduled?.off ?? false);
+		return { date, off, windows: off ? [] : (scheduled?.windows ?? []) };
 	});
 }
 
@@ -103,7 +123,6 @@ export async function calendarRead(): Promise<CalendarListing> {
 		available: true,
 		courses: read.map(({ map, plan }) => ({
 			...studyCourseOf(map, plan),
-			runup: runupOf(plan),
 			planned: plannedOf(plan, map),
 			doesNotFit: doesNotFitOf(plan, map),
 			finalReview: finalReviewOf(plan, map.exam),
