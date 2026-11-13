@@ -67,6 +67,46 @@ const lesson = (last: string): LhMessage[] => [
 const FINISHED = "Good place to stop. Practice comes next, in a day or two.";
 const PARTWAY = "Right. So with rank 3 and 5 columns, how many free variables are there?";
 
+/** The tutor's close: `lesson_progress` with `close: true`, then its last words. */
+const close = (done: string[] = ["rank-picture"]): LhMessage[] => [
+	assistant([call("lp", "lesson_progress", { done, close: true })]),
+	result("lp", "lesson_progress", { ok: true }),
+	assistant([text(FINISHED)], "stop"),
+];
+/** A lesson the tutor closed for tonight. */
+const closedLesson = (): LhMessage[] => [...lesson("Pivots it is."), ...close()];
+
+/** A tutor turn that ends on a quiz question he has not answered yet, its
+ *  words sent ahead of it, as the live tutor does. */
+const asks = (id: string, question: string, before: unknown[] = []): LhMessage[] => [
+	assistant([...before, call(`m${id}`, "send_to_user", { message: "Next one." }), call(id, "explain", { type: "check", nodeId: "rank-picture", question, correctAnswer: "Pivots." })]),
+	result(`m${id}`, "send_to_user", null),
+];
+/** His answer to a question. */
+const answers = (id: string, question: string, words: string): LhMessage =>
+	result(id, "explain", { kind: "explain", tool: "explain", questionText: question, options: [], answers: [], text: words, confidence: "confident", answeredAt: "2026-11-13T20:00:00Z" });
+const Q1 = "What does rank count?";
+const Q2 = "What is the rank of $\\begin{pmatrix} 1 & 2 \\\\ 2 & 4 \\end{pmatrix}$?";
+const Q3 = "How many free variables does a rank-1 2x2 system have?";
+/** A lesson as its turns settle: a right answer, then a wrong one, then
+ *  "stop for tonight" and the tutor's close. Each entry is the record when
+ *  a turn settles. */
+function lessonTurns(): LhMessage[][] {
+	const opening: LhMessage[] = [
+		newUserMessage("Rank, please."),
+		assistant([call("pd", "probe_done", { strands: [{ strand: "rank", assessment: "new" }], summary: "ready" })]),
+		result("pd", "probe_done", { ok: true }),
+		assistant([text("Two steps."), call("plan", "plan_init", { mermaid: "graph TD" })]),
+		result("plan", "plan_init", { ok: true, tree: TREE }),
+		assistant([text("Say go.")], "stop"),
+		newUserMessage("Go."),
+	];
+	const turn1 = [...opening, ...asks("q1", Q1)];
+	const turn2 = [...turn1, answers("q1", Q1, "Pivots."), ...asks("q2", Q2)];
+	const turn3 = [...turn2, answers("q2", Q2, "2, because both rows are nonzero."), ...asks("q3", Q3)];
+	const turn4 = [...turn3, newUserMessage("I have to stop for tonight, sorry."), ...close([])];
+	return [turn1, turn2, turn3, turn4];
+}
 
 function chatWith(messages: LhMessage[], workspace = "/courses/linalg"): string {
 	const record = chatStore.createChat("Rank", { workspace, title: "Linear algebra" });
@@ -253,7 +293,7 @@ describe("a digest run", () => {
 	});
 
 	it("saves to the engine once, shows in the dock while it runs, and leaves the chat's messages alone", async () => {
-		const chatId = chatWith(lesson(FINISHED));
+		const chatId = chatWith(closedLesson());
 		const course = memoryCourse();
 		const seen: string[] = [];
 		const stop = subscribe((e) => void seen.push(e.type));
@@ -297,10 +337,10 @@ describe("a digest run", () => {
 		const course = memoryCourse();
 		const digest = createLessonDigest({ chatStore, courseRecords: course.records, engine: submitEngine(SUBMIT) });
 		const loose = chatStore.createChat("No course");
-		chatStore.saveMessages(loose.id, lesson(FINISHED));
+		chatStore.saveMessages(loose.id, closedLesson());
 		assert.equal((await digest.digestLesson(loose.id)).status, "skipped");
 		const practice = chatStore.createChat("Drill", { workspace: "/courses/linalg", title: "Linear algebra" });
-		chatStore.saveMessages(practice.id, [newSessionModeMessage("practice") as LhMessage, ...lesson(FINISHED)]);
+		chatStore.saveMessages(practice.id, [newSessionModeMessage("practice") as LhMessage, ...closedLesson()]);
 		assert.equal((await digest.digestLesson(practice.id)).status, "skipped");
 		assert.equal(course.saves.length, 0);
 	});
@@ -322,32 +362,76 @@ describe("what starts a digest", () => {
 		return { digested, extracted, stop };
 	}
 
-	it("a turn that finishes a lesson starts the digest and the graph's tail, however short the lesson", () => {
-		const finished = chatWith(lesson(FINISHED));
+	it("a turn that closes a lesson starts the digest and the graph's tail, however short the lesson", () => {
+		const finished = chatWith(closedLesson());
 		const partway = chatWith(lesson(PARTWAY));
+		const signedOff = chatWith(lesson(FINISHED));
 		const { digested, extracted, stop } = listen();
 		emit("turn-settled", { chatId: partway });
+		emit("turn-settled", { chatId: signedOff });
 		emit("turn-settled", { chatId: finished });
 		stop();
-		assert.deepEqual(digested, [finished]);
+		assert.deepEqual(digested, [finished], "only the tutor's close finishes a lesson, not words that sound final");
 		assert.deepEqual(extracted, [finished], "the tail runs at lesson finish, below the chunk budget");
 	});
 
-	it("the next lesson of the course digests the one left partway", () => {
+	it("a quiz question waiting on his answer never starts it; the close starts it once", () => {
+		const turns = lessonTurns();
+		const chatId = chatWith(turns[0]!);
+		const { digested, stop } = listen();
+		for (const messages of turns) {
+			chatStore.saveMessages(chatId, messages);
+			emit("turn-settled", { chatId });
+		}
+		stop();
+		assert.deepEqual(digested, [chatId]);
+	});
+
+	it("reads the whole lesson at its close, so a gap a later turn showed is never called smooth", async () => {
+		const turns = lessonTurns();
+		const chatId = chatWith(turns[0]!);
+		const course = memoryCourse();
+		const prompts: string[] = [];
+		const engine = submitEngine((prompt: string) => ({
+			topics: [
+				prompt.includes("both rows are nonzero")
+					? { handle: "rank", gap: "You count nonzero rows instead of pivots", note: "Step 1 needed a correction", step: "rank-picture" }
+					: { handle: "rank", note: "Step 1 went smoothly", step: "rank-picture" },
+			],
+			knowledge: [],
+		}), (p) => void prompts.push(p));
+		const real = createLessonDigest({ chatStore, courseRecords: course.records, engine });
+		const runs: Promise<unknown>[] = [];
+		const stop = onLessonEvents({ chatStore, digest: { digestLesson: (id) => { const run = real.digestLesson(id); runs.push(run); return run; } }, extractTail: () => {} });
+		for (const messages of turns) {
+			chatStore.saveMessages(chatId, messages);
+			emit("turn-settled", { chatId });
+			await Promise.all(runs);
+		}
+		stop();
+		assert.equal(prompts.length, 1, "one digest run, at the close");
+		assert.equal(JSON.stringify(course.saves).includes("went smoothly"), false);
+		assert.deepEqual(course.saves, [{ topics: { rank: { gap: "You count nonzero rows instead of pivots", note: "Step 1 needed a correction" } } }]);
+	});
+
+	it("the next lesson of the course digests the one left partway, a waiting quiz question included", () => {
 		const partway = chatWith(lesson(PARTWAY));
 		const otherCourse = chatWith([newUserMessage("Hi")], "/courses/other");
 		const next = chatWith([newUserMessage("Eigenvalues today.")]);
 		const { digested, stop } = listen();
 		emit("turn-started", { chatId: otherCourse });
 		emit("turn-started", { chatId: next });
+		const quiz = chatWith(lessonTurns()[1]!);
+		const after = chatWith([newUserMessage("Kernels today.")]);
+		emit("turn-started", { chatId: after });
 		stop();
-		assert.deepEqual(digested, [partway]);
+		assert.deepEqual(digested, [partway, quiz]);
 	});
 
 	it("the app's start finishes a digest a quit cut short", () => {
-		const cut = chatWith(lesson(FINISHED));
+		const cut = chatWith(closedLesson());
 		chatStore.saveDigestLedger(cut, { done: [], pending: { fingerprint: "f", throughMessageId: "m" } });
-		chatWith(lesson(FINISHED));
+		chatWith(closedLesson());
 		const digested: string[] = [];
 		resumeCutDigests({ chatStore, digest: { digestLesson: async (id) => (digested.push(id), { status: "nothing" }) } });
 		assert.deepEqual(digested, [cut]);

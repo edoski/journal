@@ -16,7 +16,7 @@ import type { PlanTree } from "./contracts/plan.ts";
 import { derivePlanStatusesLh } from "./contracts/plan.ts";
 import { sessionMarkdown } from "./session-markdown.ts";
 import { sessionModeOf, type LhMessage } from "./native-messages.ts";
-import { sessionEndOf } from "./session-end.ts";
+import { closedTonight } from "./session-end.ts";
 import { CLAUDE_ROLE_DEFAULT, claudeProviderId, isClaudeProvider } from "./contracts/claude.ts";
 
 /** The digest's model: Opus 5.5 at high effort, like every agent, on the
@@ -61,14 +61,12 @@ export function digestible(record: ChatRecord): boolean {
 	return !!record.course && sessionModeOf(record.messages, record.kind) !== "practice";
 }
 
-/** The lesson finished: the tutor's last turn left the session closed. */
+/** The lesson finished: the tutor closed it for tonight (`lesson_progress`
+ *  with `close: true`) and he has not written since. A turn that ends on a
+ *  question waiting for his answer, or in words that only sound final,
+ *  leaves it open. */
 export function lessonFinished(record: ChatRecord): boolean {
-	return digestible(record) && sessionEndOf(record.messages, record.tree, record.kind) === "closed";
-}
-
-/** The lesson stopped partway, waiting on the learner. */
-export function lessonLeftMidway(record: ChatRecord): boolean {
-	return digestible(record) && sessionEndOf(record.messages, record.tree, record.kind) === "mid-lesson";
+	return digestible(record) && closedTonight(record.messages);
 }
 
 /** The step a digest names for what the lesson showed before its plan. */

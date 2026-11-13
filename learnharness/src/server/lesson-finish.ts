@@ -1,10 +1,11 @@
 /**
  * What a lesson finishing starts. One subscriber on the event bus:
  *
- * - a turn settles and leaves its lesson closed: the lesson digest runs,
- *   and the graph extraction takes the lesson's tail whatever its size;
+ * - a turn settles on the tutor's close (`lesson_progress` with `close`):
+ *   the lesson digest runs, and the graph extraction takes the lesson's
+ *   tail whatever its size;
  * - a new lesson's first turn starts: the course's previous lesson, if it
- *   was left partway, is digested;
+ *   was left partway or its digest never finished, is digested;
  * - the app starts: a digest a quit cut short runs again.
  *
  * Nothing here runs on a clock.
@@ -12,7 +13,7 @@
 
 import type { ChatStore } from "../core/ports.ts";
 import { subscribe } from "../core/events.ts";
-import { digestWindow, lessonFinished, lessonLeftMidway } from "../core/lesson-digest.ts";
+import { digestible, digestWindow, lessonFinished } from "../core/lesson-digest.ts";
 import type { LessonDigest } from "../agent/subagents/lesson-digest.ts";
 
 export interface LessonFinishDeps {
@@ -27,13 +28,13 @@ function startDigest(deps: LessonFinishDeps, chatId: string): void {
 	void deps.digest.digestLesson(chatId).catch(() => {});
 }
 
-/** The course's most recent other lesson, when it stopped partway and has
- *  something left to digest. */
-function previousLessonLeftMidway(deps: LessonFinishDeps, chatId: string, workspace: string): string | null {
+/** The course's most recent other lesson, when part of it is still
+ *  undigested: it stopped before a close, a question waiting on him
+ *  included, or its close's digest never finished. */
+function previousLessonUndigested(deps: LessonFinishDeps, chatId: string, workspace: string): string | null {
 	const previous = deps.chatStore.listChats().find((c) => c.id !== chatId && c.course?.workspace === workspace);
-	if (!previous || previous.ended !== "mid-lesson") return null;
-	const record = deps.chatStore.getChat(previous.id);
-	return record && lessonLeftMidway(record) && digestWindow(record.messages, record.digest) ? record.id : null;
+	const record = previous && deps.chatStore.getChat(previous.id);
+	return record && digestible(record) && digestWindow(record.messages, record.digest) ? record.id : null;
 }
 
 /** Subscribe to the events that finish a lesson. Returns the unsubscribe. */
@@ -47,7 +48,7 @@ export function onLessonEvents(deps: LessonFinishDeps): () => void {
 		} else if (event.type === "turn-started") {
 			const record = deps.chatStore.getChat(event.chatId);
 			if (!record?.course || record.messages.some((m) => m.role === "assistant")) return;
-			const previous = previousLessonLeftMidway(deps, record.id, record.course.workspace);
+			const previous = previousLessonUndigested(deps, record.id, record.course.workspace);
 			if (previous) startDigest(deps, previous);
 		}
 	});
