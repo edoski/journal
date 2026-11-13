@@ -177,10 +177,18 @@ describe("Proposed lesson cards", () => {
 		assert.match(settled.querySelector('[data-slot="lesson-card"]')!.textContent!, /^ProblemFind the rank\./);
 	});
 
+	it("a given-up problem says so in plain words, with no tutor bookkeeping under Details", () => {
+		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c2", input: { outcome: "surrendered", verdict: "You read the rows by eye.", rung: "R2", missClass: "execution" }, reveal: "Eliminate." });
+		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
+		assert.match(card.textContent!, /^How it went·You gave up/);
+		assert.equal(card.querySelector('[data-testid="metadata-toggle"]'), null);
+		assert.doesNotMatch(card.textContent!, /Surrendered|Details|rung|Miss class/i);
+	});
+
 	it("a conclusion names its outcome in sentence case and shows the model solution", () => {
 		const conclude = part({ type: "tool-conclude", state: "output-available", toolCallId: "c1", input: { outcome: "movedOn", verdict: "Pairs are not enough." }, reveal: "The third is the sum." });
 		const card = documentFor(proposed(<ConcludeCard part={conclude} />)).querySelector('[data-testid="conclude-card"]')!;
-		assert.match(card.textContent!, /Concluded·Moved on/);
+		assert.match(card.textContent!, /^How it went·Moved on/);
 		assert.match(card.textContent!, /Model solution/);
 		assert.match(card.textContent!, /The third is the sum\./);
 	});
