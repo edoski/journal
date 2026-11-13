@@ -164,6 +164,10 @@ class Run:
         self.agenda = engine.get("agenda")
         self.scenario = scenario
         self.rng = random.Random(f"{scenario.learner}/{scenario.late}/{scenario.seed}")
+        # Days off from their own stream, so every engine meets the same days.
+        self.days_off = random.Random(
+            f"{scenario.learner}/{scenario.late}/{scenario.seed}/days off"
+        )
         self.ease = {
             handle(i): ease * self.rng.lognormvariate(0, 0.5) for i in range(TOPICS)
         }
@@ -248,7 +252,7 @@ class Run:
                 self.sit_exam()
             if self.scenario.late and n == LATE_SET_DAY:
                 self.save({"exam": {"date": day(EXAM_DAY).isoformat()}}, n)
-            if n < EXAM_DAY and self.rng.random() < skip:
+            if n < EXAM_DAY and self.days_off.random() < skip:
                 continue
             reviews, new = self.planned(n) if self.agenda else self.doctrine(n)
             self.study(n, reviews, new)

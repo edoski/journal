@@ -1,13 +1,15 @@
 """The daily plan across every course: which reviews and which new topics each
-day, as much as the learner gets through and only on the days he studies.
+day, everything owed until the learner has shown he stops short of it, and
+only on the days he studies.
 
 Pure and read-only. The plan projects every course's record forward from today
-together. Each study day (``capacity.Capacity``) takes as many reviews and new
-topics as he completes on that weekday, the fractions carried from day to day;
-nothing lands on a weekday he does not study. Planned reviews are assumed
-``solid``, so a later day's reviews are the ladder's next steps; what does not
-fit stays due. The plan never stores anything; the next save and the next plan
-start again from what happened.
+together. Each study day (``capacity.Capacity``) takes every review due, and
+each exam course's pace of new topics, unless he has shown a limit for that
+kind of work: then it takes as many as his limit on that weekday, the
+fractions carried from day to day. Nothing lands on a weekday he does not
+study. Planned reviews are assumed ``solid``, so a later day's reviews are the
+ladder's next steps; what does not fit stays due. The plan never stores
+anything; the next save and the next plan start again from what happened.
 
 Reviews, when there are more than fit:
   1. re-teaching, relearning and first retrievals (a topic not yet solid);
@@ -22,7 +24,8 @@ New topics come only from the ready set: topics whose prerequisites are all
 solid and not lapsed, and that no taught but not yet solid competing method
 (``contrasts``) would interfere with. A course with an exam ahead first gets
 its pace, the topics it has left over the study days it has left before its
-new topics should end, nearest exam first; spare new-topic capacity then goes
+new topics should end, nearest exam first, past the pace he has shown until he
+has shown a limit; spare new-topic capacity then goes
 to the nearest exam with topics left, even within its final review, since a
 topic started late is better known at the exam than one never started; then to
 courses with no exam. A topic a course cannot start before its exam does not
@@ -40,17 +43,9 @@ from typing import Any
 from learning import capacity, progress
 from learning.capacity import Capacity
 
-# The last new topic needs its first retrieval and one solid review before the
-# final review: the ladder's first two steps.
-NEW_BEFORE_FINAL = progress.FIRST_RETRIEVAL_DAYS + progress.LADDER[0]
 SECURE = frozenset({"independent", "retained", "transferred"})
 NOT_YET_SOLID = frozenset({"introduced", "attempted", "assisted"})
 RELEARNING, EXAM_AHEAD, NO_EXAM, EXAM_PASSED = range(4)
-
-
-def last_new_day(exam: progress.Exam) -> date:
-    """The day by which the path's new topics should all be introduced."""
-    return exam.final - timedelta(days=NEW_BEFORE_FINAL)
 
 
 def waiting(
@@ -192,8 +187,7 @@ class _Course:
         if not self.ahead(day):
             return None
         assert self.exam is not None
-        last = last_new_day(self.exam)
-        return last if day <= last else self.exam.final - timedelta(days=1)
+        return progress.new_end(self.exam, day)
 
 
 @dataclass
@@ -224,7 +218,7 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
 
 
 def _reviews(
-    courses: list[_Course], day: date, room: int, week: Capacity
+    courses: list[_Course], day: date, room: float, week: Capacity
 ) -> dict[str, list[str]]:
     candidates: list[tuple[tuple[int, float, int], _Course, str]] = []
     quota: dict[str, int] = {}
@@ -259,14 +253,21 @@ def _reviews(
 
 
 def _new(
-    courses: list[_Course], day: date, room: int, week: Capacity
+    courses: list[_Course],
+    day: date,
+    room: float,
+    week: Capacity,
+    begun: int | None,
 ) -> dict[str, list[str]]:
+    """New topics within ``room``. Until he has shown a limit (``begun`` is not
+    None), every exam course's pace is proposed even past ``room``, less the
+    ``begun`` topics he already started today."""
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
 
-    def take(course: _Course, count: int) -> int:
+    def take(course: _Course, count: float) -> int:
         taken = 0
         for topic in list(course.untaught):
-            if taken == count:
+            if taken >= count:
                 break
             if course.ready(topic):
                 course.start(topic, day)
@@ -278,12 +279,18 @@ def _new(
         (course for course in courses if course.new_end(day) is not None),
         key=lambda course: (course.exam.day if course.exam else day, course.name),
     )
+    paces: dict[str, int] = {}
     for course in exams:
         end = course.new_end(day)
         assert end is not None
         left = _study_days(week, day, end)
-        if room > 0 and left > 0 and course.untaught:
-            room -= take(course, min(room, math.ceil(len(course.untaught) / left)))
+        if left > 0 and course.untaught:
+            paces[course.name] = math.ceil(len(course.untaught) / left)
+    if begun is not None:
+        room = max(room, sum(paces.values()) - begun)
+    for course in exams:
+        if room > 0 and course.name in paces:
+            room -= take(course, min(room, paces[course.name]))
     for course in exams:
         if room > 0:
             room -= take(course, room)
@@ -309,7 +316,7 @@ def plan(
     ``week`` defaults to the capacity learned from these records. Today's
     allowance is what is left after what the record shows done today.
     """
-    history = capacity.activity(records.values())
+    history = capacity.activity(records.values(), today)
     week = week or capacity.estimate(history, today)
     courses = [_Course.of(name, record) for name, record in records.items()]
     done = history.get(today, capacity.Done())
@@ -317,11 +324,18 @@ def plan(
     for offset in range(days):
         day = today + timedelta(days=offset)
         rates = week.on(day)
+        reviews_room: float = 0
+        new_room: float = 0
+        begun: int | None = None
         if week.studies(day):
-            reviews_room = allowance.take("reviews", rates.reviews)
-            new_room = allowance.take("new", rates.new)
-        else:
-            reviews_room = new_room = 0
+            reviews_room = (
+                allowance.take("reviews", rates.reviews.value)
+                if rates.reviews.shown
+                else math.inf
+            )
+            new_room = allowance.take("new", rates.new.value)
+            if not rates.new.shown:
+                begun = done.new if offset == 0 else 0
         if offset == 0:
             reviews_room = max(reviews_room - done.reviews, 0)
             new_room = max(new_room - done.new, 0)
@@ -329,7 +343,7 @@ def plan(
         for course in courses:
             for topic in reviews[course.name]:
                 course.reviewed(topic, day)
-        new = _new(courses, day, new_room, week)
+        new = _new(courses, day, new_room, week, begun)
         for course in courses:
             course.days.append(
                 {

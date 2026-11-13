@@ -52,6 +52,25 @@ class Exam:
     final: date
 
 
+# The last new topic needs its first retrieval and one solid review before the
+# final review: the ladder's first two steps.
+NEW_BEFORE_FINAL = FIRST_RETRIEVAL_DAYS + LADDER[0]
+
+
+def last_new_day(exam: Exam) -> date:
+    """The day by which the path's new topics should all be introduced."""
+    return exam.final - timedelta(days=NEW_BEFORE_FINAL)
+
+
+def new_end(exam: Exam, day: date) -> date:
+    """The last day the course takes new topics, seen from ``day`` before its
+    exam: the last new-topic day, or once that has passed, the day before the
+    final review, since a topic started late is better known at the exam than
+    one never started."""
+    last = last_new_day(exam)
+    return last if day <= last else exam.final - timedelta(days=1)
+
+
 def exam_plan(record: dict[str, Any]) -> Exam | None:
     """The course's exam with its final review, from the course's own preference."""
     value = record.get("exam", {}).get("date")
@@ -80,7 +99,8 @@ class Replay:
     every attempted day as learning, probe or practice; ``expected`` is the next
     expected review day after the last verdict, and ``due`` the date the engine
     stores for it: after the exam when that day is on or after an exam still
-    ahead of the verdict.
+    ahead of the verdict. ``schedule`` keeps each ``(day, due)`` the replay set,
+    so what was due on any past day can be read back.
     """
 
     verdicts: list[tuple[str, str]] = field(default_factory=list)
@@ -88,12 +108,14 @@ class Replay:
     expected: date | None = None
     due: date | None = None
     streak: int = 0
+    schedule: list[tuple[date, date]] = field(default_factory=list)
 
     def expect(
         self, base: date, days: int, exam: Exam | None, *, solid: bool = False
     ) -> None:
         self.expected = review_day(base, days, exam)
         self.due = kept(base, self.expected, exam, solid=solid)
+        self.schedule.append((base, self.due))
 
 
 @dataclass

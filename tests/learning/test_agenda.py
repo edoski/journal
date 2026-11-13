@@ -3,7 +3,7 @@ import math
 from typing import Any
 
 from learning import agenda, capacity, progress, schema
-from learning.capacity import Capacity, Weekday
+from learning.capacity import Capacity, Done, Limit, Weekday
 
 MONDAY = date(2026, 1, 5)
 WEEKDAYS = frozenset(range(5))
@@ -55,9 +55,18 @@ def taught(record: dict[str, Any], due: date) -> dict[str, Any]:
     return save(record, {"topics": pins}, MONDAY)
 
 
-def week(reviews: float, new: float, study: frozenset[int] = WEEKDAYS) -> Capacity:
+def week(
+    reviews: float,
+    new: float,
+    study: frozenset[int] = WEEKDAYS,
+    *,
+    shown: bool = True,
+) -> Capacity:
+    """His week, with these limits shown or, with ``shown`` false, as the most
+    he has shown he does."""
     days = tuple(
-        Weekday(1.0 if day in study else 0.0, reviews, new) for day in range(7)
+        Weekday(1.0 if day in study else 0.0, Limit(reviews, shown), Limit(new, shown))
+        for day in range(7)
     )
     return Capacity(days, study, 20.0)
 
@@ -108,7 +117,7 @@ def test_courses_share_one_day_and_the_nearest_exam_starts_first() -> None:
 
 def test_new_topics_finish_before_the_final_review_and_the_rest_does_not_fit() -> None:
     days = plan({"c": course(8, exam=28)}, 28, week(10, 2))
-    last = agenda.last_new_day(progress.Exam(on(28), on(22))).isoformat()
+    last = progress.last_new_day(progress.Exam(on(28), on(22))).isoformat()
     assert max(started(days.days["c"]).values()) <= last
     assert days.does_not_fit == {}
     tight = plan({"c": course(20, exam=10)}, 10, week(10, 1))
@@ -181,14 +190,14 @@ def test_capacity_is_learned_from_the_days_he_studied() -> None:
     }
     learned = capacity.estimate(days, on(28))
     assert learned.study_weekdays == frozenset({0, 2, 4})
-    assert 7 < learned.on(on(28)).reviews <= 8
-    assert 1.5 < learned.on(on(28)).new <= 2
+    assert learned.on(on(28)).reviews == Limit(8.0)
+    assert learned.on(on(28)).new == Limit(2.0)
 
 
 def test_with_no_record_the_prior_holds_every_day() -> None:
     cold = capacity.estimate({}, MONDAY)
     assert cold.study_weekdays == frozenset(range(7))
-    assert cold.on(MONDAY) == Weekday(1.0, capacity.PRIOR_REVIEWS, capacity.PRIOR_NEW)
+    assert cold.on(MONDAY) == Weekday(1.0, Limit(0.0), Limit(capacity.PRIOR_NEW))
 
 
 def test_today_holds_only_what_is_left_after_what_he_already_did() -> None:
@@ -223,3 +232,100 @@ def test_the_days_before_his_first_record_are_not_days_off() -> None:
     assert capacity.estimate(days, MONDAY).study_weekdays == frozenset(range(7))
     yesterday = capacity.estimate({on(-1): capacity.Done(4, 1)}, MONDAY)
     assert 6 in yesterday.study_weekdays
+
+
+def every_day(done: Done, days: int = 28) -> dict[date, Done]:
+    return {on(offset - days): done for offset in range(days)}
+
+
+def test_a_learner_who_finishes_every_plan_is_never_held_back() -> None:
+    learned = capacity.estimate(every_day(Done(reviews=2, new=1)), MONDAY)
+    assert learned.on(MONDAY).reviews == Limit(2.0)
+    record = taught(course(12), on(-1))
+    days = plan({"c": record}, 1, learned).days["c"]
+    assert len(days[0]["reviews"]) == 12
+
+
+def test_stopping_short_shows_a_limit_the_plan_keeps_to() -> None:
+    learned = capacity.estimate(every_day(Done(reviews=4, reviews_short=True)), MONDAY)
+    assert learned.on(MONDAY).reviews == Limit(4.0, shown=True)
+    record = taught(course(12), on(-1))
+    days = plan({"c": record}, 3, learned).days["c"]
+    assert [len(day["reviews"]) for day in days] == [4, 4, 4]
+
+
+def test_a_day_finished_below_the_limit_leaves_it_and_doing_more_raises_it() -> None:
+    days = every_day(Done(reviews=6, reviews_short=True))
+    light = {**days, **{on(-7 * n): Done(reviews=1) for n in range(1, 4)}}
+    assert capacity.estimate(light, MONDAY).on(MONDAY).reviews.value == 6
+    more = {**days, **{on(-7 * n): Done(reviews=12) for n in range(1, 4)}}
+    assert capacity.estimate(more, MONDAY).on(MONDAY).reviews.value > 6
+
+
+def test_until_he_shows_a_limit_each_exam_gets_its_pace() -> None:
+    open_ = plan({"c": course(20, exam=10)}, 10, week(10, 1, shown=False))
+    assert open_.does_not_fit == {}
+    assert len(open_.days["c"][0]["new"]) > 1
+    held = plan({"c": course(20, exam=10)}, 10, week(10, 1))
+    assert len(held.days["c"][0]["new"]) == 1
+    assert held.does_not_fit["c"]
+
+
+def test_a_day_he_left_owed_work_is_a_day_he_stopped_short() -> None:
+    record = course(4, exam=10)
+    record = save(record, {"topics": {"t00": {"introduced": True}}}, MONDAY)
+    record = save(record, {"topics": {"t01": {"introduced": True}}}, on(1))
+    record = save(record, {"observations": [answer("t00")]}, on(2))
+    done = capacity.activity([record], on(3))
+    assert done[MONDAY].new_short
+    assert done[on(2)].reviews_short
+    every = save(record, {"observations": [answer("t01")]}, on(2))
+    assert not capacity.activity([every], on(3))[on(2)].reviews_short
+
+
+def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
+    record = course(12, exam=40, needs={"t03": ["t02"]})
+    for offset in range(21):
+        if offset % 7 == 5:
+            continue
+        today = plan_for(record, on(offset))
+        patch: dict[str, Any] = {}
+        if today["new"]:
+            patch["topics"] = {topic: {"introduced": True} for topic in today["new"]}
+        if today["reviews"]:
+            patch["observations"] = [answer(topic) for topic in today["reviews"]]
+        if patch:
+            record = save(record, patch, on(offset))
+    learned = capacity.of([record], on(21))
+    assert not learned.on(on(21)).reviews.shown
+    assert not learned.on(on(21)).new.shown
+
+
+def plan_for(record: dict[str, Any], day: date) -> dict[str, Any]:
+    first: dict[str, Any] = agenda.plan({"c": record}, day, 1).days["c"][0]
+    return first
+
+
+def study(skipped: set[int], weeks: int = 4) -> dict[date, Done]:
+    """Every day of ``weeks`` weeks up to yesterday, but the given offsets."""
+    return {
+        on(offset): Done(reviews=3)
+        for offset in range(-7 * weeks, 0)
+        if offset not in skipped
+    }
+
+
+def test_a_skip_leaves_a_weekday_and_a_run_of_skips_turns_it_off() -> None:
+    wednesdays = [offset for offset in range(-28, 0) if on(offset).weekday() == 2]
+    once = capacity.estimate(study({wednesdays[-1]}), MONDAY)
+    assert 2 in once.study_weekdays
+    run = capacity.estimate(study(set(wednesdays[-3:])), MONDAY)
+    assert 2 not in run.study_weekdays
+
+
+def test_a_day_off_stays_off_until_he_studies_on_it() -> None:
+    wednesdays = {offset for offset in range(-70, 0) if on(offset).weekday() == 2}
+    off = capacity.estimate(study(wednesdays, weeks=10), MONDAY)
+    assert 2 not in off.study_weekdays
+    back = study(wednesdays - {max(wednesdays)}, weeks=10)
+    assert 2 in capacity.estimate(back, MONDAY).study_weekdays

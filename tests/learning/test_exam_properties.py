@@ -9,7 +9,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from learning import agenda, capacity, progress, schema
-from learning.capacity import Capacity, Weekday
+from learning.capacity import Capacity, Limit, Weekday
 
 START = date(2026, 1, 5)
 ACTIONS = ("introduce", "correct", "incorrect", "partial", "hint", "pin")
@@ -125,15 +125,19 @@ def test_no_review_is_ever_on_the_exam_day_and_reviews_go_on_after_it(
 
 
 def every_day(reviews: float, new: float) -> Capacity:
-    return Capacity(
-        tuple(Weekday(1.0, reviews, new) for _ in range(7)), frozenset(range(7)), 0.0
-    )
+    """He studies every day and has shown these limits."""
+    rates = Weekday(1.0, Limit(reviews, shown=True), Limit(new, shown=True))
+    return Capacity(tuple(rates for _ in range(7)), frozenset(range(7)), 0.0)
 
 
 weeks = st.builds(
     lambda rates, study: Capacity(
         tuple(
-            Weekday(1.0 if day in study else 0.0, r, n)
+            Weekday(
+                1.0 if day in study else 0.0,
+                Limit(r, shown=True),
+                Limit(n, shown=True),
+            )
             for day, (r, n) in enumerate(rates)
         ),
         frozenset(study),
@@ -159,7 +163,8 @@ def test_the_plan_never_exceeds_his_capacity_or_touches_a_day_off(
         rate = week.on(day)
         reviews = sum(len(entry["reviews"]) for entry in planned)
         new = sum(len(entry["new"]) for entry in planned)
-        assert reviews <= math.ceil(rate.reviews) and new <= math.ceil(rate.new)
+        assert reviews <= math.ceil(rate.reviews.value)
+        assert new <= math.ceil(rate.new.value)
         if not week.studies(day):
             assert reviews == new == 0
         for entry in planned:
@@ -186,8 +191,9 @@ def test_the_estimate_converges_to_a_steady_learner(
     assert learned.study_weekdays == frozenset(study)
     for day in study:
         rates = learned.weekdays[day]
-        assert abs(rates.reviews - reviews) < 0.1 * max(reviews, capacity.PRIOR_REVIEWS)
-        assert abs(rates.new - new) < 0.1 * max(new, capacity.PRIOR_NEW)
+        assert not rates.reviews.shown and not rates.new.shown
+        assert math.isclose(rates.reviews.value, reviews)
+        assert math.isclose(rates.new.value, max(new, capacity.PRIOR_NEW))
 
 
 @settings(max_examples=150, deadline=None)

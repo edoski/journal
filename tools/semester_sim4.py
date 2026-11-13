@@ -99,6 +99,8 @@ class Run:
         self.agenda, self.capacity = engine["agenda"], engine.get("capacity")
         self.learner = learner
         self.rng = random.Random(f"{learner.name}/{seed}")
+        # Days off from their own stream, so every engine meets the same days.
+        self.days_off = random.Random(f"{learner.name}/{seed}/days off")
         self.ease = {
             f"c{c}/t{i:02d}": self.rng.lognormvariate(0, 0.5)
             for c in range(len(EXAMS))
@@ -253,14 +255,13 @@ class Run:
                 self.estimates.append(
                     {
                         "day": n,
-                        "reviews": statistics.mean(r.reviews for r in rates),
-                        "new": statistics.mean(r.new for r in rates),
+                        "reviews": statistics.mean(_value(r.reviews) for r in rates),
+                        "new": statistics.mean(_value(r.new) for r in rates),
                         "weekdays": sorted(week.study_weekdays),
                     }
                 )
-            if day(n).weekday() not in self.learner.weekdays or self.rng.random() < (
-                self.learner.skip
-            ):
+            off = day(n).weekday() not in self.learner.weekdays
+            if off or self.days_off.random() < self.learner.skip:
                 plan = self.plan(n)
                 self.days.append(
                     Day(
@@ -276,6 +277,11 @@ class Run:
             "never": self.never,
             "estimates": self.estimates,
         }
+
+
+def _value(rate: Any) -> float:
+    """A weekday's rate: a number, or a limit with its value."""
+    return float(getattr(rate, "value", rate))
 
 
 _ENGINE: dict[str, ModuleType] = {}
