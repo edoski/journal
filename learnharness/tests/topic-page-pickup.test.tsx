@@ -98,28 +98,28 @@ function order(document: Document): string[] {
 }
 
 describe("Now", () => {
-	it("holds every row of the action table: what waits, the press, the session it opens and where the lesson stands", () => {
+	it("holds every row of the action table: what to pick up, where it stands in a few words, the press and the session it opens", () => {
 		assert.deepEqual(
 			ROWS.map(([, facts]) => {
 				const { now } = pickupSections(facts);
-				return [now.kind, now.words, now.press, now.chat, now.step && `${now.step.lead} ${now.step.title}`, now.detail, now.then];
+				return [now.kind, now.words, now.note, now.press, now.chat];
 			}),
 			[
-				["resume", "Your turn in today's lesson", "Resume", "chat_demo_eigen", "Stopped on Computing a 2×2 spectrum", null, "An eigenbasis makes A diagonal"],
-				["open", "The tutor is writing in today's lesson", "Open", "chat_demo_eigen", "Stopped on Computing a 2×2 spectrum", null, "An eigenbasis makes A diagonal"],
-				["review", "Review overdue by 2 days", "Review", null, null, null, null],
-				["continue", "Problem sheet 4", "Continue", null, null, "Part (c)", null],
-				["start", "Not started", "Start", null, null, null, null],
-				["continue", "Keep learning", "Continue", null, `Yesterday's lesson stopped on ${DET_STOPPED}`, null, null],
-				["study", "Nothing due", "Study", null, null, null, null],
+				["resume", "Computing a 2×2 spectrum", "Your turn", "Resume", "chat_demo_eigen"],
+				["open", "Computing a 2×2 spectrum", "Tutor writing", "Open", "chat_demo_eigen"],
+				["review", "Review overdue by 2 days", null, "Review", null],
+				["continue", "Problem sheet 4", "Part (c)", "Continue", null],
+				["start", "Not started", null, "Start", null],
+				["continue", DET_STOPPED, "Left off yesterday", "Continue", null],
+				["study", "Nothing due", null, "Study", null],
 			],
 		);
 	});
 
-	it("says what waits when the lesson planned nothing", () => {
+	it("names the session when the lesson planned nothing", () => {
 		const facts = factsOf(RANK, [chat("chat_demo_rank", "Rank practice", "2026-11-08T07:54:30.000Z", { kind: "practice", pendingProblem: true, topics: ["rank"] })]);
 		const { now } = pickupSections(facts);
-		assert.deepEqual([now.words, now.title, now.step, now.detail], ["Your turn in today's practice", "Rank practice", null, "Problem waiting"]);
+		assert.deepEqual([now.words, now.note], ["Rank practice", "Your turn"]);
 	});
 });
 
@@ -152,7 +152,7 @@ describe("the sections' order", () => {
 	it("dates only a review the engine set ahead, as Scheduled", () => {
 		assert.deepEqual(
 			ROWS.map(([, facts]) => pickupSections(facts).scheduled),
-			[null, null, null, null, null, null, "Next review Fri 13 Nov"],
+			[null, null, null, null, null, null, "Fri 13 Nov"],
 		);
 	});
 });

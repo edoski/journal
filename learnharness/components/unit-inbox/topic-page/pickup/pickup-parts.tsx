@@ -5,13 +5,13 @@ import { ArrowRightIcon, BookmarkIcon, CircleDashedIcon, HistoryIcon, MessageCir
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
-import { DayItem, SessionItem } from "@/components/unit-inbox/topic-page/hybrid/history";
+import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { ONE_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import type { NextItem, NowItem, ResumeIcon } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
+import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { MathText } from "@/components/ui/math-text";
 
@@ -75,7 +75,7 @@ export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: 
 /** The icon Now leads with, the app's own for the same thing: the reply mark in the accent, the tutor's spinner, the review
  *  clock, the task bookmark, or the topic's pie (a dashed ring while the
  *  head line is silent). */
-export function ResumeIconMark({ icon, facts, className = "size-4" }: { icon: ResumeIcon; facts: TopicFacts; className?: string }) {
+export function NowIconMark({ icon, facts, className = "size-4" }: { icon: NowIconKind; facts: TopicFacts; className?: string }) {
 	switch (icon) {
 		case "reply":
 			return <MessageCircleQuestionIcon aria-hidden className={`${className} shrink-0 text-link`} />;
@@ -92,7 +92,7 @@ export function ResumeIconMark({ icon, facts, className = "size-4" }: { icon: Re
 
 /** The icon Now leads with. */
 export function NowIcon({ now, facts }: { now: NowItem; facts: HybridPaneProps["facts"] }) {
-	return <ResumeIconMark icon={now.icon} facts={facts} />;
+	return <NowIconMark icon={now.icon} facts={facts} />;
 }
 
 /** The map button of a lesson that planned, above a stretched press. */
@@ -120,7 +120,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 	return (
 		<ul className="flex flex-col">
 			{items.map((item) => {
-				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} />;
+				if (item.kind === "session") return <SessionItem key={item.entry.chat.id} entry={item.entry} shown={item.entry.chat.id === shown} onShow={onShow} ends={{ above: false, below: false }} writing="Tutor writing" />;
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.opening)} className={ONE_LINE_ROW}>
@@ -135,60 +135,46 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 	);
 }
 
-/** Scheduled: the engine's next review, a date and not a control. */
-export function ScheduledEntry({ words }: { words: string }) {
+/** Scheduled: the engine's next review, its day in the date column. A
+ *  date, not a control. */
+export function ScheduledEntry({ day }: { day: string }) {
 	return (
-		<p data-slot="pickup-scheduled" className="grid h-10 grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-4">
+		<p data-slot="pickup-scheduled" className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
 			<HistoryIcon aria-hidden className={ICON} />
-			<span className="truncate text-row text-muted-foreground">{words}</span>
+			<span className="truncate text-row text-muted-foreground">Review</span>
+			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
+				{day}
+			</span>
 		</p>
 	);
 }
 
-/** Earlier: the history's own days on its line, newest first. */
+/** Earlier: the history's sessions and attempts on its line, newest
+ *  first, each day's words in the date column of its first row. */
 export function EarlierDays({ days, shown, onShow, titleOf }: { days: readonly TrailDay[]; titleOf: (handle: string) => string } & Pick<HybridPaneProps, "shown" | "onShow">) {
+	const count = days.reduce((n, day) => n + day.sessions.length + day.attempts.length, 0);
+	let at = 0;
+	const ends = (): Ends => {
+		const i = at++;
+		return { above: i > 0, below: i < count - 1 };
+	};
 	return (
 		<ol aria-label="Earlier" className="flex flex-col">
-			{days.map((day, i) => (
-				<DayItem key={day.day} day={day} shown={shown} onShow={onShow} titleOf={titleOf} first={i === 0} last={i === days.length - 1} />
-			))}
+			{days.flatMap((day) => [
+				...day.sessions.map((entry, i) => (
+					<SessionItem key={entry.chat.id} entry={entry} shown={entry.chat.id === shown} onShow={onShow} ends={ends()} date={i === 0 ? day.label : null} writing="Tutor writing" />
+				)),
+				...day.attempts.map((attempt, i) => (
+					<AttemptEntry key={attempt.id} attempt={attempt} titleOf={titleOf} ends={ends()} date={i === 0 && day.sessions.length === 0 ? day.label : null} />
+				)),
+			])}
 		</ol>
 	);
 }
 
-/** Where Now stands, under its words: the lesson's title, the step it
- *  stopped on, else what waits, then the step after. */
-function NowLines({ now }: { now: NowItem }) {
-	return (
-		<span className="col-start-2 flex min-w-0 flex-col gap-0.5 text-label text-muted-foreground">
-			{now.title && (
-				<span className="truncate text-row">
-					<MathText>{now.title}</MathText>
-				</span>
-			)}
-			{now.step && (
-				<span data-slot="pickup-step" className="line-clamp-2">
-					{now.step.lead} <span className="text-foreground">
-						<MathText>{now.step.title}</MathText>
-					</span>
-				</span>
-			)}
-			{now.detail && <span className="truncate">{now.detail}</span>}
-			{now.then && (
-				<span data-slot="pickup-then" className="line-clamp-2">
-					Then <span className="text-foreground/80">
-						<MathText>{now.then}</MathText>
-					</span>
-				</span>
-			)}
-		</span>
-	);
-}
-
 /**
- * Now as a row (the Sections and Now line options): its icon, what waits
- * and the press on top, where it stands under them, the whole row the
- * press. Bleeds 12px as Home's row. `marked` draws the accent rule down its
+ * Now as a row: its icon, what to pick up and the press on top, where it
+ * stands in a few words under them, the whole row the press. Bleeds 12px as Home's row. `marked` draws the accent rule down its
  * left edge so the eye lands there first; the lesson on the map has the
  * row filled, as the history's rows do.
  */
@@ -206,9 +192,15 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 			)}
 		>
 			<NowIcon now={now} facts={facts} />
-			<span className="truncate text-control font-medium text-foreground">{now.words}</span>
+			<span data-slot="pickup-now-words" className="line-clamp-2 text-control font-medium text-foreground">
+				<MathText>{now.words}</MathText>
+			</span>
 			<NowPress now={now} busy={busy} onAct={onAct} className="justify-self-end" />
-			<NowLines now={now} />
+			{now.note && (
+				<span data-slot="pickup-now-note" className="col-start-2 truncate text-label text-muted-foreground">
+					<MathText>{now.note}</MathText>
+				</span>
+			)}
 			{now.chat && facts.sessions.some((entry) => entry.chat.id === now.chat && entry.plan?.tree.nodes.length) && (
 				<MapToggle chat={now.chat} shown={onMap} onShow={onShow} className="col-start-3 self-end justify-self-end" />
 			)}

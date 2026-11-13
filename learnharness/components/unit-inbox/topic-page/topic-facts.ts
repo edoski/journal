@@ -99,7 +99,8 @@ export function topicAction(topic: CourseMapTopic, map: CourseMap, sessions: rea
 }
 
 const DAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-const dayOf = (date: string) => DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
+/** A date as the page writes it: "Tue 3 Nov". */
+export const dayOf = (date: string) => DAY.format(new Date(`${date}T00:00:00Z`)).replace(",", "");
 
 /** "Next review Fri 13 Nov". */
 export function nextReviewWords(date: string): string {

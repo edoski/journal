@@ -53,7 +53,8 @@ export function HybridTopic({ facts, busy, onAct, onTask, pane: Pane }: TopicPag
 		);
 	return (
 		<div data-testid="unit-page" data-topic-candidate="hybrid" className={cn("mx-auto flex min-h-0 w-full flex-1 flex-col gap-5 px-6 pt-6", Pane ? "pb-6" : "pb-4", HYBRID_COLUMN)}>
-			<TopicHead facts={facts} busy={busy} onAct={Pane ? undefined : onAct} />
+			{/* Under Pick up, Now and Scheduled say the review and Earlier dates the last study, so the head says neither. */}
+			<TopicHead facts={Pane ? { ...facts, marks: facts.marks.filter((mark) => mark.kind !== "review"), studied: null } : facts} busy={busy} onAct={Pane ? undefined : onAct} />
 			{shown ? (
 				<div data-slot="topic-panes" className="grid min-h-0 flex-1 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-6">
 					{side()}

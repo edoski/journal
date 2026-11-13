@@ -58,9 +58,10 @@ const LESSON: ChatListItem = {
 	busy: false,
 	compacting: false,
 };
+const EARLIER: ChatListItem = { ...LESSON, id: "chat_cofactors", title: "$\\det$ by cofactors", updatedAt: "2026-11-06T08:00:00.000Z", pendingQuestion: false };
 const ATTEMPT = { id: "o1", date: "2026-11-07", recorded: null, result: "partial" as const, unaided: false, sure: null, chose: null, text: "Read $\\det = -2$ as an area doubled and flipped" };
 
-const facts = topicFacts({ course: COURSE, topic: DET, sessions: [LESSON], read: { record: { attempts: [ATTEMPT], tasks: [] }, plans: [PLAN] } });
+const facts = topicFacts({ course: COURSE, topic: DET, sessions: [LESSON, EARLIER], read: { record: { attempts: [ATTEMPT], tasks: [] }, plans: [PLAN] } });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const document = parseHTML(
 	`<html><body>${renderToStaticMarkup(
@@ -88,10 +89,11 @@ describe("math on the topic page", () => {
 		assert.match(node.textContent!, new RegExp(PLAIN));
 	});
 
-	it("typesets the step Now stopped on, the session's title and an attempt's sentence in the list", () => {
+	it("typesets the step Now stopped on, a session's title and an attempt's sentence in the list", () => {
 		const now = document.querySelector('[data-slot="pickup-now"]')!;
-		assert.ok(now.querySelector('[data-slot="pickup-step"] [data-slot="math-text"] .katex'), "Now's step");
-		assert.ok(now.querySelector('[data-slot="math-text"] .katex'), "Now's lesson title");
+		assert.ok(now.querySelector('[data-slot="pickup-now-words"] [data-slot="math-text"] .katex'), "Now's step");
+		const row = document.querySelector('[data-slot="topic-history-session"]')!;
+		assert.ok(row.querySelector('[data-slot="math-text"] .katex'), "a session's title");
 		const attempt = document.querySelector('[data-slot="topic-attempt"]')!;
 		assert.ok(attempt.querySelector('[data-slot="math-text"] .katex'), "the attempt");
 		for (const el of [now, attempt]) assert.doesNotMatch(el.textContent!, /\$/, "no dollar is left in the words");
