@@ -25,7 +25,6 @@ describe("resolveSettings", () => {
 	it("null record (first boot): non-model knobs land on factory defaults; every model view is EMPTY", () => {
 		const eff = resolveSettings(null);
 		assert.deepEqual(eff.agent.tools, {});
-		assert.deepEqual(eff.agent.prompts, {});
 		// BYOK (owner, 2026-09-22): no factory floor — every role undefined,
 		// every slot null. No phantom ids anywhere.
 		for (const role of BACKGROUND_MODEL_ROLES) {
@@ -52,7 +51,6 @@ describe("resolveSettings", () => {
 			agent: {
 				models: { researcher: { model: { provider: "openrouter", id: "qwen/qwen3.8-flash" } } },
 				tools: { research: false },
-				prompts: { "system-prompt.md": true },
 			},
 			appearance: { mode: "light", proseFontSize: 20, mdRendering: { headingWeight: 600 } },
 			graph: { enabled: false },
@@ -66,7 +64,6 @@ describe("resolveSettings", () => {
 			thinkingLevel: undefined,
 		});
 		assert.deepEqual(eff.agent.tools, { research: false });
-		assert.deepEqual(eff.agent.prompts, { "system-prompt.md": true });
 		assert.equal(eff.appearance.mode, "light");
 		assert.equal(eff.appearance.proseFontSize, 20);
 		assert.equal(eff.appearance.mdRendering.headingWeight, 600);

@@ -103,7 +103,7 @@ function parseRoleOverride(value: unknown, role: string): { ok: true; override: 
 	return { ok: true, override };
 }
 
-/** A boolean map (tools / prompts switches): every value must be boolean. */
+/** A boolean map (tool switches): every value must be boolean. */
 function parseBooleanMap(value: unknown, field: string): { map?: Record<string, boolean>; error?: string } {
 	if (value === undefined) return {};
 	const raw = asRecord(value);
@@ -116,9 +116,9 @@ function parseBooleanMap(value: unknown, field: string): { map?: Record<string, 
 	return { map: out };
 }
 
-/** agent: { models?, tools?, prompts? } — model/thinking validity against
- *  the catalog is checked by the route (validateChatSettings discipline);
- *  prompt switch-on membership is checked by the route (needs the store). */
+/** agent: { models?, tools?, graphTools? } — model/thinking validity
+ *  against the catalog is checked by the route (validateChatSettings
+ *  discipline). */
 export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentSettings> {
 	const raw = asRecord(body);
 	if (!raw) return { ok: false, error: "Invalid JSON body" };
@@ -157,9 +157,6 @@ export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentS
 		}
 		settings.tools = map;
 	}
-	const prompts = parseBooleanMap(raw.prompts, "prompts");
-	if (prompts.error) return { ok: false, error: prompts.error };
-	if (prompts.map) settings.prompts = prompts.map;
 	// Prober graph tools (wave 7, owner ruling 2026-09-23): an agent-section
 	// subsection, not a tool-toggles key — the mechanism is agent capability
 	// (tool registration), the subject is the graph. Strict write side:
@@ -352,8 +349,7 @@ export function parseCompactionSettingsBody(body: unknown): SettingsBodyResult<C
 	return { ok: true, settings };
 }
 
-/** The section→parser map for PUT /api/settings/[section] (the route also
- *  carries the special prompts sub-resource). */
+/** The section→parser map for PUT /api/settings/[section]. */
 export const SETTINGS_SECTIONS = {
 	chat: parseSettingsBody,
 	agent: parseAgentSettingsBody,

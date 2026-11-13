@@ -461,10 +461,6 @@ export async function handleChatInput(
 		// Debug (owner, 2026-10-04): teacher/prober raw provider events under
 		// LH_PROVIDER_EVENTS=1 (provider-events.ts); no-op otherwise.
 		chatId,
-		// The prompt-override switches (P2, 2026-09-19): same resolution
-		// point as the tool delta — the agent layer composes the system
-		// prompt fresh per turn, swapping in any enabled override segments.
-		promptSwitches: effective.agent.prompts,
 		// A course-linked session reads and writes the learner's course
 		// record through the engine, whatever the agent kind.
 		...(record.course ? { course: { course: record.course, records: stores.courseRecords } } : {}),

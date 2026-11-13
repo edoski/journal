@@ -61,7 +61,6 @@ describe("sanitizeUserSettings", () => {
 					visualMaker: { thinkingLevel: "max" },
 				},
 				tools: { research: false, quiz: true },
-				prompts: { "system-prompt.md": true, "teacher/20-teaching.md": false },
 			},
 			models: {
 				strong: { model: { provider: "zai", id: "glm-5.3-flash" }, thinkingLevel: "low" },

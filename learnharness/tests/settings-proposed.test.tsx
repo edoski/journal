@@ -41,7 +41,6 @@ async function mount(node: React.ReactElement) {
 		assert.equal(init?.method ?? "GET", "GET", "the kit itself never writes; its host does");
 		const path = new URL(String(input), "http://localhost").pathname;
 		if (path === "/api/models") return Response.json({ providers: [], models: MODELS, slots: {} });
-		if (path === "/api/settings/prompts") return Response.json({ prober: [], teacher: [] });
 		return Response.json({});
 	};
 	host = document.createElement("div");

@@ -17,9 +17,7 @@
  *   conversation chain in chat-handler (chat.model → strong slot) — prober
  *   and teacher stay chat-controlled, never settings-record-controlled;
  * - tool toggles: passed through as the delta map; consumers look up by
- *   tool id with absent → enabled (the honoring lives in the agent band);
- * - prompt switches: passed through; effective composition lives in
- *   src/store/prompt-overrides.ts (segment list derived from source).
+ *   tool id with absent → enabled (the honoring lives in the agent band).
  */
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
@@ -70,8 +68,6 @@ export interface EffectiveSettings {
 		models: Record<BackgroundModelRole, EffectiveModelSpec | undefined>;
 		/** Delta map as stored — consumers resolve absent key → enabled. */
 		tools: Record<string, boolean>;
-		/** Delta map as stored — absent key → override off. */
-		prompts: Record<string, boolean>;
 		/** Prober graph tools (wave 7): passthrough delta as stored —
 		 * absent/undefined enabled = ON; consumers use graphToolsEnabled. */
 		graphTools: { enabled?: boolean };
@@ -169,7 +165,6 @@ export function resolveSettings(record: UserSettings | null): EffectiveSettings 
 		agent: {
 			models,
 			tools: agent.tools ?? {},
-			prompts: agent.prompts ?? {},
 			graphTools: agent.graphTools ?? {},
 		},
 		models: {

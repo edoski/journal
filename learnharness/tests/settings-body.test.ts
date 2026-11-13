@@ -38,15 +38,11 @@ describe("parseAgentSettingsBody", () => {
 		assert.equal(malformed.ok, false);
 	});
 
-	it("tools and prompts: boolean maps; non-boolean values are 400s", () => {
+	it("tools: a boolean map; non-boolean values are 400s; the retired prompt switches are dropped", () => {
 		const r = parseAgentSettingsBody({ tools: { research: false }, prompts: { "system-prompt.md": true } });
 		assert.ok(r.ok);
-		assert.deepEqual(r.settings.tools, { research: false });
-		assert.deepEqual(r.settings.prompts, { "system-prompt.md": true });
+		assert.deepEqual(r.settings, { tools: { research: false } });
 		assert.equal(parseAgentSettingsBody({ tools: { quiz: "no" } }).ok, false);
-		assert.equal(parseAgentSettingsBody({ prompts: { "x.md": 1 } }).ok, false);
-		// switch validity (segment membership, file presence) is the ROUTE's
-		// cross-validation — the parser only sees shapes.
 	});
 
 	it("a stale search field is dropped like any unknown key", () => {

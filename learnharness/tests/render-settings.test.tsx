@@ -124,7 +124,7 @@ describe("AgentSection (thin SSR)", () => {
 		}
 		assert.ok(html.includes('data-testid="group-models"'), "Models sub-group");
 		assert.ok(html.includes('data-testid="group-tools"'), "Tools sub-group");
-		assert.ok(html.includes('data-testid="group-prompts"'), "System prompts sub-group");
+		assert.ok(!html.includes("group-prompts") && !html.includes("System prompts"), "no system prompt viewers");
 	});
 
 	it("has no search-engine row", () => {
@@ -191,11 +191,6 @@ describe("AgentSection (thin SSR)", () => {
 		assert.ok(html.includes("glm-4.7-flash"), "the override id is visible (prettyModel form, no auto-caps)");
 		assert.ok(tagOf(html, "toggle-tool-demo").includes('aria-checked="false"'), "demo off");
 		assert.ok(tagOf(html, "toggle-tool-visual").includes('aria-checked="true"'), "visual still on");
-	});
-
-	it("prompts show the loading state under SSR (effects never fire)", () => {
-		const html = renderToStaticMarkup(<AgentSection agent={undefined} models={undefined} graph={undefined} onSectionChange={() => {}} onModelsChange={() => {}} />);
-		assert.ok(html.includes("Loading prompt segments"));
 	});
 });
 

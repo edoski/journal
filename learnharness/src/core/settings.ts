@@ -242,11 +242,6 @@ export interface AgentSettings {
 	 *  in its OWN subsection, not in the tool-toggles map. Absent = enabled (the toggle discipline); the
 	 *  effective gate composes graph.enabled AND this switch. */
 	graphTools?: { enabled?: boolean };
-	/** System-prompt override SWITCHES keyed by segment path (absent key =
-	 *  off). Switch-on requires the override file to exist (enforced by the
-	 *  route); the switch is explicit so users keep a file on disk but run
-	 *  the source default to compare (owner decision 2026-09-19). */
-	prompts?: Record<string, boolean>;
 }
 
 /** Markdown-rendering knobs — the bare-bones set (owner decision). */
@@ -357,8 +352,7 @@ export interface UserSettings {
 /** Factory defaults for everything core can pin (owner decisions
  *  2026-09-19). NO factory models exist anywhere (owner, 2026-09-22 — BYOK
  *  all the way down): the chat section and every slot stay empty until the
- *  user picks, and the per-need gates refuse honestly; tools default on;
- *  prompts default off — hence their absence here. */
+ *  user picks, and the per-need gates refuse honestly; tools default on. */
 export interface FactorySettings {
 	version: number;
 	appearance: {
@@ -486,8 +480,6 @@ function sanitizeAgent(raw: Record<string, unknown>): AgentSettings {
 	}
 	const tools = sanitizeBooleanMap(raw.tools);
 	if (tools) out.tools = tools;
-	const prompts = sanitizeBooleanMap(raw.prompts);
-	if (prompts) out.prompts = prompts;
 	// Prober graph tools (wave 7): its own agent-section subsection —
 	// lenient read side (a bad shape drops the key and the default ON
 	// resumes; the write side's parser is strict).
