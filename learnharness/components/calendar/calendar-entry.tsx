@@ -21,7 +21,7 @@ import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { CourseMark } from "@/components/unit-inbox/unit-row";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
-import { distanceWords, longDayWords, lookOf, LOOKS, misfitWords, runupWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
+import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, newTopicWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<EntryLook, LucideIcon> = {
@@ -135,9 +135,9 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	const lines: string[] = [];
 	if (entry.kind === "exam") {
 		lines.push(`${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
-		if (entry.runup) lines.push(runupWords(entry.runup));
-		const misfit = misfitWords(entry.doesNotFit);
-		if (misfit) lines.push(misfit);
+		for (const line of [newTopicWords(entry.newDays, entry.doesNotFit), finalReviewWords(entry.finalReview, today), misfitWords(entry.doesNotFit)]) {
+			if (line) lines.push(line);
+		}
 	} else if (entry.kind === "review") {
 		const date = entry.topic.review?.date ?? entry.day;
 		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? "Due today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);

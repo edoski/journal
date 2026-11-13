@@ -8,16 +8,12 @@
 import type { TopicHandle } from "./course-map.ts";
 import type { StudyCourse } from "./study.ts";
 
-/** The exam run-up as `plan` reports it, inside its last three weeks:
- *  the days left that take new topics, and the topics not yet taught to
- *  cover on each of them. */
-export interface CalendarRunup {
-	studyDays: number;
-	pace: number;
-}
+/** How many days ahead the calendar asks `plan` for: the six weeks a
+ *  month view can show. */
+export const CALENDAR_DAYS = 42;
 
 /** One day of the engine's daily plan: the reviews and the new topics it
- *  proposes, within the learner's budget. */
+ *  proposes, as much as he gets through on that weekday. */
 export interface PlannedDay {
 	date: string;
 	reviews: readonly TopicHandle[];
@@ -25,8 +21,9 @@ export interface PlannedDay {
 }
 
 export interface CalendarCourse extends StudyCourse {
-	/** Null outside the run-up, or when no day is left for new topics. */
-	runup: CalendarRunup | null;
+	/** How many days before the exam its final review starts (`plan`'s
+	 *  `final_review_days`); null without an exam ahead. */
+	finalReviewDays: number | null;
 	/** The daily plan, each day that proposes something, in date order. */
 	planned: readonly PlannedDay[];
 	/** Path topics the plan cannot introduce before the exam. */
@@ -39,8 +36,10 @@ export interface StudyWindow {
 	end: string;
 }
 
-/** One day ahead as the Journal schedules it: its study windows (lunch
- *  left out), or a day off. */
+/** One day ahead: a day off when the engine has learned that he does not
+ *  study on that weekday (`plan`'s `capacity.study_days`; the Journal's day
+ *  off when the engine says nothing), else the Journal's study windows
+ *  (lunch left out). */
 export interface ScheduledDay {
 	date: string;
 	off: boolean;

@@ -1,4 +1,4 @@
-import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, ScheduledDay, TopicHandle } from "@/src/core";
+import { CALENDAR_DAYS, type CalendarCourse, type ChatListItem, type CourseMapTask, type CourseMapTopic, type ScheduledDay, type TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { daysBetween, topicSessions } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
@@ -22,7 +22,7 @@ export interface CourseRef {
 export type SessionType = "check-in" | "plan" | "lesson" | "practice";
 
 export type CalendarEntry =
-	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; runup: CalendarRunup | null; doesNotFit: readonly string[] }
+	| { kind: "exam"; id: string; day: string; title: string; course: CourseRef; newDays: readonly string[] | null; finalReview: string | null; doesNotFit: readonly string[] }
 	| { kind: "review"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; overdue: boolean; action: TopicAction }
 	| { kind: "new"; id: string; day: string; title: string; course: CourseRef; topic: CourseMapTopic; action: TopicAction }
 	| { kind: "task"; id: string; day: string; title: string; course: CourseRef; task: CourseMapTask; topic: CourseMapTopic | null; opening: string }
@@ -106,10 +106,16 @@ export function calendarEntries({
 	const shown = scope === null ? courses : courses.filter((c) => c.map.workspace === scope);
 	const today = courses[0]?.map.today ?? "";
 	const entries: CalendarEntry[] = [];
-	for (const { map, due, runup, planned, doesNotFit } of shown) {
+	for (const { map, due, finalReviewDays, planned, doesNotFit } of shown) {
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
-		if (map.exam) entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf) });
+		if (map.exam) {
+			const exam = map.exam.date;
+			const seen = daysBetween(today, exam) < CALENDAR_DAYS;
+			const newDays = seen ? planned.filter((d) => d.new.length > 0 && d.date >= today && d.date < exam).map((d) => d.date) : null;
+			const finalReview = finalReviewDays === null ? null : addDays(exam, -finalReviewDays);
+			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: exam, title: `${map.title} exam`, course, newDays, finalReview, doesNotFit: doesNotFit.map(titleOf) });
+		}
 		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, topicSessions(chats, map.workspace, topic)) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, ...facts(topic) });
@@ -191,15 +197,52 @@ export function distanceWords(day: string, today: string): string {
 	return days > 0 ? `In ${words}` : `${words} ago`;
 }
 
-/** The exam run-up in words, as `plan` counts it. */
-export function runupWords(runup: CalendarRunup): string {
-	const days = runup.studyDays === 1 ? "1 day" : `${runup.studyDays} days`;
-	return `${days} left for new topics, about ${runup.pace} each`;
+function addDays(day: string, days: number): string {
+	const date = new Date(`${day}T00:00:00Z`);
+	date.setUTCDate(date.getUTCDate() + days);
+	return date.toISOString().slice(0, 10);
 }
 
-/** The topics the plan cannot fit before the exam, named. */
+/** "A, B and C". */
+function listWords(items: readonly string[]): string {
+	return items.length <= 1 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+const WEEKDAY_DATE = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", timeZone: "UTC" });
+const MONTH_NAME = new Intl.DateTimeFormat("en-GB", { month: "long", timeZone: "UTC" });
+
+/** "Monday 9, Wednesday 11 and Thursday 12 November", each month's days
+ *  before its name. */
+export function dayListWords(days: readonly string[]): string {
+	const months: { month: string; days: string[] }[] = [];
+	for (const day of days) {
+		const date = new Date(`${day}T00:00:00Z`);
+		const month = MONTH_NAME.format(date);
+		const words = WEEKDAY_DATE.format(date).replace(",", "");
+		if (months.at(-1)?.month === month) months.at(-1)!.days.push(words);
+		else months.push({ month, days: [words] });
+	}
+	return listWords(months.map(({ month, days: inMonth }) => `${listWords(inMonth)} ${month}`));
+}
+
+/** When the plan starts the exam's remaining new topics: the days the
+ *  calendar shows them on, or that none are left to start. Null when the
+ *  exam is past what the calendar shows. */
+export function newTopicWords(days: readonly string[] | null, misfits: readonly string[]): string | null {
+	if (days === null) return null;
+	if (days.length === 0) return misfits.length > 0 ? null : "Every topic started";
+	return `New topics on ${dayListWords(days)}`;
+}
+
+/** When the final review starts, or that it is under way. */
+export function finalReviewWords(day: string | null, today: string): string | null {
+	if (day === null) return null;
+	return day > today ? `Final review from ${longDayWords(day)}` : "Final review now, until the exam";
+}
+
+/** The topics the plan has no room to start before the exam, named. */
 export function misfitWords(titles: readonly string[]): string | null {
-	return titles.length > 0 ? `Not enough days left for ${titles.join(", ")}` : null;
+	return titles.length > 0 ? `No room before the exam to start ${listWords(titles)}` : null;
 }
 
 /** True when no entry falls in [start, end). */
