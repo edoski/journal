@@ -58,10 +58,12 @@ function reviewWords(overdue: number): string {
 }
 
 /** Why the engine calls a topic weak, as the first of its signals in a few
- *  words: a miss after he had it, a diagnosed mistake, a method chosen in
- *  its place, a wrong answer he was sure of. */
+ *  words: a mistake he has answered right since, a miss after he had it, a
+ *  diagnosed mistake, a method chosen in its place, a wrong answer he was
+ *  sure of. */
 function slipWords(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): string {
-	const { gap, lapsed, choiceErrors, confidentErrors } = topic.signals;
+	const { gap, lapsed, choiceErrors, confidentErrors, repaired } = topic.signals;
+	if (repaired) return "Fixed, check again later";
 	if (lapsed) return "Missed last time";
 	if (gap) return "A mistake to fix";
 	const [method] = Object.keys(choiceErrors);

@@ -171,6 +171,29 @@ def test_a_judgement_older_than_the_latest_evidence_is_stale() -> None:
     assert "stale" not in progress.standing(fresh, "rank")
 
 
+def test_a_mistake_answered_right_since_is_repaired_until_a_later_check() -> None:
+    gap = {"gap": "Writes det as ad + bc"}
+    slip = attempt("rank", "incorrect", sure="confident", offset=0)
+    fixed = attempt("rank", help="Reminded him det is ad - bc", offset=0)
+    repaired = progress.standing(course([slip, fixed], **gap), "rank")
+    assert repaired["repaired"] is True
+    assert repaired["confident_errors"] == 1
+    assert "repaired" not in progress.standing(course([fixed, slip], **gap), "rank")
+    assert "repaired" not in progress.standing(course([fixed]), "rank")
+    diagnosed_after = course([attempt("rank", offset=-1)], **gap)
+    assert "repaired" not in progress.standing(diagnosed_after, "rank")
+    lapse = course(
+        [
+            attempt("rank", offset=-8),
+            attempt("rank", "incorrect", offset=0),
+            attempt("rank", "correct", "Pointed at the pivots", offset=0),
+        ],
+        introduced=day(-9),
+    )
+    standing = progress.standing(lapse, "rank")
+    assert (standing["lapsed"], standing["repaired"]) == (True, True)
+
+
 @pytest.mark.parametrize(
     ("verdict", "streak", "expected"),
     [

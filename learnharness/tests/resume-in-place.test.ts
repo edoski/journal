@@ -53,7 +53,7 @@ afterEach(() => setTurnRunner(async () => 200));
 // ─── the course, as the engine maps it ──────────────────────────────────────
 
 const TODAY = "2026-11-08";
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, title: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic => ({
 	handle: handle as TopicHandle,
 	title,

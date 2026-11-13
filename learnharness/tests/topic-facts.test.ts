@@ -33,7 +33,7 @@ import {
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (date: string, overdue: number) => ({ kind: "due" as const, date, overdue });
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {

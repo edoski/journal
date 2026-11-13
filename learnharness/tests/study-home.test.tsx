@@ -41,7 +41,7 @@ function topic(handle: string, title: string, level: TopicLevel, over: Partial<C
 		introduced: null,
 		review: null,
 		weak: false,
-		signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 },
+		signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false },
 		tasks: [],
 		...over,
 	};
@@ -73,7 +73,7 @@ const LINALG: StudyCourse = {
 		topics: [
 			topic("vectors", "Vectors", "transferred", { review: { kind: "scheduled", date: "2026-11-13" } }),
 			topic("span", "Span", "retained", { review: due(10) }),
-			topic("independence", "Linear independence", "assisted", { review: due(16), weak: true, signals: { gap: "Misses a third vector", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 } }),
+			topic("independence", "Linear independence", "assisted", { review: due(16), weak: true, signals: { gap: "Misses a third vector", lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } }),
 			topic("rank", "Rank", "assisted", { review: due(3), weak: true }),
 			topic("eigen", "Eigenvalues", "new"),
 		],
@@ -286,7 +286,7 @@ describe("what a line of Today reads", () => {
 	const waiting = chat({ id: "q", title: "Eigen lesson", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" } });
 	const lapsed: StudyCourse = {
 		...ANALYSIS,
-		map: { ...ANALYSIS.map, topics: [topic("seq", "Sequences", "independent", { review: due(0), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0 } })] },
+		map: { ...ANALYSIS.map, topics: [topic("seq", "Sequences", "independent", { review: due(0), signals: { gap: null, lapsed: true, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false } })] },
 	};
 	const rowOf = (course: StudyCourse) => todayRows([course], [], TODAY)[0]!;
 

@@ -323,7 +323,25 @@ def _standing(
     judged = topic.get("judged")
     if judged is not None and history.latest > judged:
         result["stale"] = True
+    if _repaired(topic, attempts, result):
+        result["repaired"] = True
     return result
+
+
+_MISTAKES = ("lapsed", "choice_errors", "confident_errors")
+
+
+def _repaired(
+    topic: dict[str, Any], attempts: list[Attempt], standing: dict[str, Any]
+) -> bool:
+    """A mistake answered right since: the newest attempt is correct and the
+    gap, if any, was not diagnosed after it. It stays weak until a later
+    day's unaided answer settles it."""
+    if not attempts or attempts[-1][1]["result"] != "correct":
+        return False
+    if "gap" in topic:
+        return str(topic.get("judged", "")) <= str(attempts[-1][1]["date"])
+    return any(flag in standing for flag in _MISTAKES)
 
 
 def replays(record: dict[str, Any]) -> dict[str, Replay]:

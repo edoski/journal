@@ -20,7 +20,7 @@ const topic = (handle: string, level: TopicLevel, review: TopicReview | null = n
 	introduced: level === "new" ? null : "2026-10-20",
 	review,
 	weak,
-	signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 },
+	signals: { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false },
 	tasks: [],
 });
 const due = (overdue: number): TopicReview => ({ kind: "due", date: "2026-11-01", overdue });

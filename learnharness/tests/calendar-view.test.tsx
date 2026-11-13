@@ -22,7 +22,7 @@ import { calendarEntries } from "../components/calendar/calendar-facts.ts";
 import { CalendarView } from "../components/calendar/calendar-view.tsx";
 
 const TODAY = "2026-11-08";
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, title: string, review: CourseMapTopic["review"]): CourseMapTopic => ({
 	handle: handle as TopicHandle,
 	title,

@@ -211,6 +211,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 			stale: e.stale === true,
 			choiceErrors,
 			confidentErrors: count(e.confident_errors),
+			repaired: e.repaired === true,
 		},
 		tasks: strings(e.tasks),
 		needs: strings(e.needs),

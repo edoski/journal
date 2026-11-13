@@ -65,7 +65,12 @@ function dueLine(d: Json, role: BriefRole): string {
 }
 
 function weakLine(w: Json, role: BriefRole): string {
-	const facts = [str(w.level), w.lapsed === true ? "lapsed" : undefined, w.stale === true ? "judgement older than the evidence" : undefined]
+	const facts = [
+		str(w.level),
+		w.lapsed === true ? "lapsed" : undefined,
+		w.stale === true ? "judgement older than the evidence" : undefined,
+		w.repaired === true ? "answered right since" : undefined,
+	]
 		.filter(Boolean)
 		.join(", ");
 	let line = `- ${str(w.topic) ?? "?"}${facts ? ` (${facts})` : ""}${str(w.gap) ? `: ${w.gap}` : ""}`;

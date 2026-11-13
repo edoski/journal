@@ -32,7 +32,7 @@ import { courseProgress } from "../components/study-home/agenda-rows/row-facts.t
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
 
 const h = (handle: string) => handle as TopicHandle;
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const due = (overdue: number) => ({ kind: "due" as const, date: "2026-11-01", overdue });
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {
@@ -127,6 +127,12 @@ describe("why a topic needs him", () => {
 		assert.equal(words("elimination"), "Mixed up with Cramer's rule");
 		assert.equal(words("kernel"), "Sure, but wrong");
 		assert.equal(words("rank"), "Worth another look");
+	});
+
+	it("says a mistake he has answered right since is fixed, to be checked again", () => {
+		const fixed = (signals: { gap?: string; lapsed?: boolean }) => needOf(topic("t", { level: "assisted", weak: true, signals: { ...QUIET, ...signals, repaired: true } }), titleOf)!.words;
+		assert.equal(fixed({ gap: "Writes det as ad + bc" }), "Fixed, check again later");
+		assert.equal(fixed({ lapsed: true }), "Fixed, check again later");
 	});
 
 	it("says how overdue the review of a topic he can do on his own is", () => {

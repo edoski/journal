@@ -31,7 +31,7 @@ const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(
 
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 
 function topic(handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 	return { handle: handle as TopicHandle, title: handle, level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [], ...over };

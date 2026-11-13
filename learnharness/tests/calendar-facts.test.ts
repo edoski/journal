@@ -14,7 +14,7 @@ import { doesNotFitOf, plannedOf, runupOf, scheduleOf } from "../src/server/cale
 import { calendarEntries, distanceWords, lookOf, misfitWords, quietBetween, runupWords, sessionType, studyTimeWords } from "../components/calendar/calendar-facts.ts";
 
 const TODAY = "2026-11-08";
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const topic = (handle: string, over: Partial<CourseMapTopic> = {}): CourseMapTopic => ({
 	handle: handle as TopicHandle,
 	title: handle,

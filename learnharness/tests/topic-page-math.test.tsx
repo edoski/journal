@@ -31,7 +31,7 @@ const fixture = (name: string): unknown => JSON.parse(fs.readFileSync(path.join(
 
 const TODAY = "2026-11-08";
 const WORKSPACE = "/study/linalg";
-const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0 };
+const QUIET = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
 const DET: CourseMapTopic = { handle: "determinant" as TopicHandle, title: "Determinants as volume scaling", level: "new", introduced: null, review: null, weak: false, signals: QUIET, tasks: [] };
 const MAP: CourseMap = { workspace: WORKSPACE, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: null, focus: null, tasks: [], topics: [DET], edges: [] };
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };

@@ -27,6 +27,9 @@ export interface TopicSignals {
 	/** Wrongly chosen method -> times, since the last solid verdict. */
 	choiceErrors: Readonly<Record<string, number>>;
 	confidentErrors: number;
+	/** His newest answer was right since the mistake: the topic stays weak
+	 *  until a later day's unaided answer settles it. */
+	repaired: boolean;
 }
 
 export interface CourseMapTopic {
