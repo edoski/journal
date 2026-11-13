@@ -78,7 +78,7 @@ function chat(over: Partial<ChatListItem> = {}): ChatListItem {
 	};
 }
 
-const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = []): TopicFacts => topicFacts({ course: COURSE, topic: t, sessions, read: null });
+const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = []): TopicFacts => topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: null });
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
@@ -103,9 +103,9 @@ describe("the topic head", () => {
 	it("says where he stands, when he last studied it and what went wrong", () => {
 		const document = head(factsOf(RANK));
 		assert.equal(document.querySelector("h1")!.textContent, "Rank and the column space");
-		assert.equal(document.querySelector('[data-slot="unit-standing"]')!.textContent, "Nearly on your own. A mistake to fixStudied 9 days ago");
+		assert.equal(document.querySelector('[data-slot="unit-standing"]')!.textContent, "Nearly on your own. A mistake to fix. Review overdue by 3 daysStudied 9 days ago");
 		const marks = Array.from(document.querySelectorAll('[data-slot="topic-mark"]'));
-		assert.deepEqual(marks.map((mark) => [mark.getAttribute("data-kind"), mark.textContent, mark.querySelectorAll("svg").length]), [["slip", ". A mistake to fix", 1]]);
+		assert.deepEqual(marks.map((mark) => [mark.getAttribute("data-kind"), mark.textContent, mark.querySelectorAll("svg").length]), [["slip", ". A mistake to fix", 1], ["review", ". Review overdue by 3 days", 1]]);
 		assert.equal(document.querySelector('[data-slot="topic-studied"]')!.textContent, "Studied 9 days ago");
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");
 	});

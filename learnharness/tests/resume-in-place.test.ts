@@ -34,7 +34,7 @@ const { newUserMessage } = await import("../src/core/native-messages.ts");
 const { continueMove, resumableSession, sessionState } = await import("../components/nav/session-state.ts");
 const { topicAction } = await import("../components/unit-inbox/topic-page/topic-facts.ts");
 const { todayRows, waitingSessions } = await import("../components/study-home/study-facts.ts");
-const { buildInbox, topicSessions } = await import("../components/unit-inbox/units.ts");
+const { buildInbox, taskSessions } = await import("../components/unit-inbox/units.ts");
 const { SessionStarter } = await import("../components/start-session.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
 writeSettings({ version: 1, models: { strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } } } });
@@ -66,7 +66,7 @@ const topic = (handle: string, title: string, over: Partial<CourseMapTopic> = {}
 	...over,
 });
 const RANK = topic("rank", "Rank and the column space");
-const KERNEL = topic("kernel", "Kernel and rank-nullity");
+const KERNEL = topic("kernel", "Kernel and rank-nullity", { review: { kind: "scheduled", date: "2026-11-12" } });
 const SHEET = { key: "sheet-4", title: "Problem sheet 4: rank and nullity", step: "Part (c): show dim ker A = 2 for the 3x5 matrix A" };
 const MAP: CourseMap = { workspace: WS, title: "Linear Algebra", today: TODAY, revision: 1, exam: null, current: RANK.handle, focus: SHEET.key, tasks: [SHEET], topics: [RANK, KERNEL], edges: [] };
 const COURSE: StudyCourse = { map: MAP, unready: null, due: null, lastActiveDaysAgo: 0 };
@@ -134,21 +134,22 @@ describe("a lesson waiting on his typed answer", () => {
 		assert.equal(first?.kind, "session", "Home's Today line for the course is the lesson");
 		assert.equal(first?.kind === "session" ? first.chat.id : null, id);
 
-		for (const t of [RANK, KERNEL]) {
-			const sessions = topicSessions(listed(), WS, t);
-			const action = topicAction(t, MAP, sessions);
-			assert.equal(action.kind, "resume", `${t.title}: the page's action resumes the lesson`);
-			assert.equal("chat" in action ? action.chat.id : null, id);
-			const unit = buildInbox([COURSE], listed(), WS).active.find((u) => u.topic.handle === t.handle);
-			assert.equal(unit?.now, "your-turn", `${t.title}: the sidebar row says your turn`);
-			assert.equal(resumableSession(unit!.sessions)?.id, id, `${t.title}: the sidebar row's action resumes it`);
-		}
+		const action = topicAction(RANK, MAP, listed());
+		assert.equal(action.kind, "resume", "the page of the topic it worked on resumes the lesson");
+		assert.equal("chat" in action ? action.chat.id : null, id);
+		const unit = buildInbox([COURSE], listed(), WS).active.find((u) => u.topic.handle === RANK.handle);
+		assert.equal(unit?.now, "your-turn", "that topic's sidebar row says your turn");
+		assert.equal(resumableSession(unit!.sessions)?.id, id, "and its action resumes it");
+
+		const held = topicAction(KERNEL, MAP, listed());
+		assert.ok(held.kind === "continue" && "chat" in held && held.chat.id === id, "a topic its task holds continues the task in that lesson");
+		assert.equal(buildInbox([COURSE], listed(), WS).active.find((u) => u.topic.handle === KERNEL.handle)?.now, null, "but its row does not say your turn: the lesson never worked on it");
 		chatStore.deleteChat(id);
 	});
 
 	it("is picked up when the tutor's turn was cut short, not restarted", () => {
 		const id = seedLesson(assistant([fauxText("Part (c) asks")], "error"));
-		const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+		const action = topicAction(KERNEL, MAP, listed());
 		assert.ok("chat" in action && action.chat.id === id, "Continue opens the lesson the tutor stopped in");
 		chatStore.deleteChat(id);
 	});
@@ -201,7 +202,7 @@ async function send(chatId: string, text: string, factory: Parameters<typeof han
 /** What the topic page's Continue does: open the session it names, else
  *  create one through the chat route and send its opening. */
 async function pressContinue(factory: Parameters<typeof handleChatRequest>[1]): Promise<string> {
-	const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+	const action = topicAction(KERNEL, MAP, listed());
 	if ("chat" in action) return action.chat.id;
 	const res = await POST(new Request("http://test/api/chats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: action.opening, course: { workspace: WS } }) }));
 	const { id } = (await res.json()) as { id: string };
@@ -285,14 +286,14 @@ describe("Continue on a finished lesson", () => {
 	it("reopens it by default", () => {
 		const id = finishedLesson();
 		assert.equal(sessionState(item(id)), "finished", "the last step was asked and the tutor closed");
-		const action = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+		const action = topicAction(KERNEL, MAP, listed());
 		assert.deepEqual(action.kind === "continue" && "chat" in action ? action.chat.id : null, id);
 		chatStore.deleteChat(id);
 	});
 
 	it("with the switch on fresh, starts one session that skips the probe and keeps the plan", async () => {
 		const id = finishedLesson();
-		const move = continueMove(topicSessions(listed(), WS, KERNEL), "fresh");
+		const move = continueMove(taskSessions(listed(), WS, SHEET.key), "fresh");
 		assert.equal(move?.kind, "fresh");
 		const { seen, factory } = scripted("We stopped at part (c), which you finished. Part (d): is A onto?");
 		const create = () =>
@@ -309,7 +310,7 @@ describe("Continue on a finished lesson", () => {
 		assert.deepEqual(item(fresh).tasks, ["sheet-4"], "it holds the task the lesson held");
 		assert.equal(sessionState(item(fresh)), "your-turn", "its reconnecting question waits on him");
 
-		const again = topicAction(KERNEL, MAP, topicSessions(listed(), WS, KERNEL));
+		const again = topicAction(KERNEL, MAP, listed());
 		assert.ok("chat" in again && again.chat.id === fresh, "a second Continue opens the fresh session, never a third");
 		chatStore.deleteChat(id);
 		chatStore.deleteChat(fresh);

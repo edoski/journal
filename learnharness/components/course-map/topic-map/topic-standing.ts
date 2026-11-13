@@ -50,7 +50,7 @@ export interface Need {
 }
 
 /** "Review due today", "Review overdue by 3 days", "Review overdue by 2 weeks". */
-function reviewWords(overdue: number): string {
+export function reviewWords(overdue: number): string {
 	if (overdue === 0) return "Review due today";
 	if (overdue < 7) return overdue === 1 ? "Review overdue by a day" : `Review overdue by ${overdue} days`;
 	const weeks = Math.floor(overdue / 7);

@@ -6,6 +6,8 @@ interface SessionCreation {
 	graphContext?: { propositions: readonly { id: string; name: string; statement: string }[] };
 	/** The picked course's workspace (the course chooser). */
 	course?: { workspace: string };
+	/** The course topics it is started on, by handle. */
+	topics?: readonly string[];
 	/** The finished lesson a fresh session picks up (FINISHED_LESSON). */
 	resume?: { from: string };
 }

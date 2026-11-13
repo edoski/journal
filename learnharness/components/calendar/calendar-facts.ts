@@ -1,6 +1,6 @@
 import type { CalendarCourse, CalendarRunup, ChatListItem, CourseMapTask, CourseMapTopic, ScheduledDay, TopicHandle } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
-import { daysBetween, topicSessions } from "@/components/unit-inbox/units";
+import { daysBetween } from "@/components/unit-inbox/units";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
@@ -91,7 +91,7 @@ function sessionTopic(chat: ChatListItem, courses: readonly CalendarCourse[]): C
  *   - each open task today, since the engine dates none;
  *   - each session on the day of its last message (a day after the
  *     engine's counts as today).
- * `chats` carry their topic links (units.ts linkStarts); `scope` keeps one
+ * `chats` are every session, each with its topics; `scope` keeps one
  * course, and with it no session outside a course.
  */
 export function calendarEntries({
@@ -110,7 +110,7 @@ export function calendarEntries({
 		const course = { workspace: map.workspace, title: map.title };
 		const titleOf = (handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 		if (map.exam) entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, runup, doesNotFit: doesNotFit.map(titleOf) });
-		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, topicSessions(chats, map.workspace, topic)) });
+		const facts = (topic: CourseMapTopic) => ({ title: topic.title, course, topic, action: topicAction(topic, map, chats) });
 		const review = (topic: CourseMapTopic, day: string, overdue: boolean) =>
 			entries.push({ kind: "review", id: `review:${map.workspace}#${topic.handle}@${day}`, day, overdue, ...facts(topic) });
 		const fresh = (topic: CourseMapTopic, day: string) => entries.push({ kind: "new", id: `new:${map.workspace}#${topic.handle}`, day, ...facts(topic) });

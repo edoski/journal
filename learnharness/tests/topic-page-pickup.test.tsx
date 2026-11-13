@@ -71,7 +71,7 @@ const DET_STOPPED = DET_PLAN.tree.nodes.find((node) => node.id === DET_PLAN.curr
 const RANK_RECORD = topicRecordOf(fixture("show.rank+task.json"), "rank", ["sheet-4"]);
 
 const factsOf = (t: CourseMapTopic, sessions: ChatListItem[] = [], plans: SessionPlan[] = [], record: TopicRecord | null = null): TopicFacts =>
-	topicFacts({ course: COURSE, topic: t, sessions, read: { record, plans } });
+	topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: { record, plans } });
 
 const EIGEN_LESSON = chat("chat_demo_eigen", "Eigenvalues and eigenvectors", "2026-11-08T08:19:40.000Z", { pendingQuestion: true, topics: ["eigen"] });
 

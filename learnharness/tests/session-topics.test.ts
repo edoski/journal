@@ -34,8 +34,22 @@ describe("sessionTopicsOf", () => {
 		assert.deepEqual(sessionTopicsOf(messages), []);
 	});
 
-	it("adds the plan's node ids as candidates, and a general question touches nothing", () => {
-		assert.deepEqual(sessionTopicsOf(transcript(), ["eigen", "charpoly"]), ["eigen", "charpoly"]);
+	it("reads a save sent as JSON text, as the engine does", () => {
+		const messages = transcript(
+			assistant(call("s1", "course_save", { changes: JSON.stringify({ observations: [{ topics: ["chain-rule"], text: "…" }] }) })),
+			result("s1"),
+			assistant(call("s2", "course_save", { changes: "not json" })),
+			result("s2"),
+		);
+		assert.deepEqual(sessionTopicsOf(messages), ["chain-rule"]);
+	});
+
+	it("never takes a topic from a plan step's name, and a general question touches nothing", () => {
+		const messages = transcript(
+			assistant(call("plan", "plan_init", { mermaid: "graph TD\n  span[Span] --> diagonal[Diagonalization]" })),
+			result("plan"),
+		);
+		assert.deepEqual(sessionTopicsOf(messages), []);
 		assert.deepEqual(sessionTopicsOf(transcript({ role: "user", content: "Why columns?", timestamp: 0 })), []);
 	});
 });

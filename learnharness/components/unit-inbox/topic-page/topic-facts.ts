@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
-import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
+import { needOf, reviewWords as dueWords, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
-import { daysBetween, shelfOf } from "@/components/unit-inbox/units";
+import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
 /**
@@ -29,9 +29,6 @@ export function pressOf(move: ContinueMove | null, opening: string): Press {
 	if (move?.kind === "open") return { open: move.chat };
 	return move ? { opening, from: move.from.id } : { opening };
 }
-
-/** The sessions that hold an open task. */
-const holding = (sessions: readonly ChatListItem[], task: CourseMapTask) => sessions.filter((chat) => chat.tasks?.includes(task.key));
 
 /** Continue on a task or a topic, as the page's action. */
 function continueAction(sessions: readonly ChatListItem[], opening: string, task: CourseMapTask | null): TopicAction {
@@ -102,23 +99,25 @@ export function heldTasks(topic: CourseMapTopic, map: CourseMap): CourseMapTask[
 
 /**
  * The one thing to do on the topic now, first match: resume the session
- * that waits on him or that the tutor stopped in, open the one the tutor
- * is writing in, review a topic he can do on his own whose review is due,
- * continue the open task that holds it, start a topic not started,
- * continue one still being learned whose review is due or not set, else
- * study (the engine has set the next review in the future, so nothing
- * needs him). Continue picks up the lesson that holds the task, or the
- * topic's newest lesson, as the session model says (`continueMove`).
+ * on the topic that waits on him or that the tutor stopped in, open the one
+ * the tutor is writing in, review it when the engine has its review due
+ * (a new review session, never an old lesson), continue the open task that
+ * holds it, start a topic not started, continue one being learned that has
+ * no review set, else study (the engine has set the next review in the
+ * future, so nothing needs him). Continue picks up the lesson that holds
+ * the task, or the topic's newest lesson, as the session model says
+ * (`continueMove`). `chats` are every session; the topic's are those the
+ * engine's records tie to it (`topicSessions`).
  */
-export function topicAction(topic: CourseMapTopic, map: CourseMap, sessions: readonly ChatListItem[]): TopicAction {
+export function topicAction(topic: CourseMapTopic, map: CourseMap, chats: readonly ChatListItem[]): TopicAction {
+	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const active = resumableSession(sessions);
 	if (active) return { kind: sessionState(active) === "working" ? "open" : "resume", chat: active };
-	const shelf = shelfOf(topic, null);
-	if (shelf === "review") return { kind: "review", opening: `Review ${topic.title}` };
+	if (topic.review?.kind === "due") return { kind: "review", opening: `Review ${topic.title}` };
 	const [task] = heldTasks(topic, map);
-	if (task) return continueAction(holding(sessions, task), `Continue ${task.title}`, task);
+	if (task) return continueAction(taskSessions(chats, map.workspace, task.key), `Continue ${task.title}`, task);
 	if (topic.level === "new") return { kind: "start", opening: topic.title };
-	if (shelf === "learning" && topic.review?.kind !== "scheduled") return continueAction(sessions, `Continue ${topic.title}`, null);
+	if (shelfOf(topic, null) === "learning" && !topic.review) return continueAction(sessions, `Continue ${topic.title}`, null);
 	return { kind: "study", opening: topic.title };
 }
 
@@ -162,14 +161,13 @@ export function studiedWords(days: number): string {
 /**
  * What the head says beside the pie, in the map's words, each drawn as an
  * icon and a few words: why the engine calls the topic weak, then its
- * review, due (only for a topic he can do on his own: nearly every topic
- * being learned is due) or dated.
+ * review, due or dated, as the page's action and Home say it.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string): HeadMark[] {
 	const slip = topic.weak ? needOf(topic, titleOf)?.words : null;
 	const review =
-		shelfOf(topic, null) === "review"
-			? needOf({ ...topic, weak: false }, titleOf)?.words
+		topic.review?.kind === "due"
+			? dueWords(topic.review.overdue)
 			: topic.review?.kind === "scheduled"
 				? nextReviewWords(topic.review.date)
 				: null;
@@ -234,16 +232,15 @@ function whereOf(entry: SessionEntry): string {
  * topic at the step it was left on, the focused one first, except a task
  * that session holds. A task's press continues the lesson that holds it.
  */
-export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], record: TopicRecord | null, today: string): Pickup[] {
-	const chats = entries.map((entry) => entry.chat);
-	const active = resumableSession(chats);
+export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readonly SessionEntry[], chats: readonly ChatListItem[], record: TopicRecord | null, today: string): Pickup[] {
+	const active = resumableSession(entries.map((entry) => entry.chat));
 	const entry = entries.find((e) => e.chat === active);
 	const session: Pickup[] = entry ? [{ kind: "session", chat: entry.chat, waits: entry.state !== "working", title: entry.chat.title, where: whereOf(entry), when: entry.when }] : [];
 	const tasks = heldTasks(topic, map)
 		.filter((task) => !active?.tasks?.includes(task.key))
 		.map((task): Pickup => {
 			const updated = record?.tasks.find((t) => t.key === task.key)?.updated;
-			const press = pressOf(continueMove(holding(chats, task)), `Continue ${task.title}`);
+			const press = pressOf(continueMove(taskSessions(chats, map.workspace, task.key)), `Continue ${task.title}`);
 			return { kind: "task", task, title: task.title, where: task.step ?? "Unfinished", when: updated ? agoWords(daysBetween(updated, today)) : null, press };
 		});
 	return [...session, ...tasks];
@@ -259,14 +256,15 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: attempt.unaided ? null : "With a hint" };
 }
 
-/** Everything a candidate draws, from the course, the topic, its sessions
- *  (newest first) and the topic read; `read` is null when it failed. */
-export function topicFacts({ course, topic, sessions, read }: { course: StudyCourse; topic: CourseMapTopic; sessions: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
+/** Everything a candidate draws, from the course, the topic, every
+ *  session and the topic read; `read` is null when it failed. */
+export function topicFacts({ course, topic, chats, read }: { course: StudyCourse; topic: CourseMapTopic; chats: readonly ChatListItem[]; read: TopicRead | null }): TopicFacts {
 	const { map } = course;
+	const sessions = topicSessions(chats, map.workspace, topic.handle);
 	const titleOf = (handle: string) => map.topics.find((t) => t.handle === handle)?.title ?? handle;
 	const attempts = read?.record?.attempts ?? [];
 	const entries = sessionEntries(sessions, read?.plans ?? [], map.today);
-	const pickups = pickupsOf(topic, map, entries, read?.record ?? null, map.today);
+	const pickups = pickupsOf(topic, map, entries, chats, read?.record ?? null, map.today);
 	const picked = new Set(pickups.flatMap((pickup) => (pickup.kind === "session" ? [pickup.chat.id] : [])));
 	const silent = topic.level === "new" && sessions.length > 0;
 	const studied = lastStudiedDay(topic, entries, attempts);
@@ -278,7 +276,7 @@ export function topicFacts({ course, topic, sessions, read }: { course: StudyCou
 		marks: silent ? [] : headMarks(topic, titleOf),
 		studied: !silent && studied ? studiedWords(daysBetween(studied, map.today)) : null,
 		mistake: mistakeOf(topic, attempts),
-		action: topicAction(topic, map, sessions),
+		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,
 		listed: entries.filter((entry) => !picked.has(entry.chat.id)),

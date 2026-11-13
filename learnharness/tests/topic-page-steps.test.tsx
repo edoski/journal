@@ -66,7 +66,7 @@ function chat(id: string, over: Partial<ChatListItem> = {}): ChatListItem {
 		...over,
 	};
 }
-const factsOf = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[]): TopicFacts => topicFacts({ course: COURSE, topic: t, sessions, read: { record: null, plans } });
+const factsOf = (t: CourseMapTopic, sessions: ChatListItem[], plans: SessionPlan[]): TopicFacts => topicFacts({ course: COURSE, topic: t, chats: sessions.map((c) => ((c.topics ?? []).includes(t.handle) ? c : { ...c, topics: [...(c.topics ?? []), t.handle] })), read: { record: null, plans } });
 
 const router = { push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} };
 const render = (node: React.ReactNode) =>

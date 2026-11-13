@@ -11,7 +11,7 @@ Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and 
 | Section | Holds | Shown when |
 |---|---|---|
 | Now | The page's action (`topicAction`, all seven rows): what to pick up, where it stands in a few words, the press, and the session it opens | always |
-| Next | Every other place that waits on him, most pressing first: another session whose turn is his, one the tutor is writing in, a due review the action does not already start (only for a topic he can do on his own, as the head), each open task the action does not continue | not empty |
+| Next | Every other place that waits on him, most pressing first: another session whose turn is his, one the tutor is writing in, a due review the action does not already start, each open task the action does not continue | not empty |
 | Scheduled | The engine's next review when dated ahead: Review, its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
 | Earlier | Every session neither Now nor Next holds, and every scored attempt, newest first on the history's line (`trailDays`), each day's words ("Yesterday", "Tue 3 Nov") in a trailing date column on its first row | not empty |
 
