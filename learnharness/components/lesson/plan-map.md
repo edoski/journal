@@ -9,7 +9,7 @@ The plan under the Proposed design: a small, calm map instead of the node diagra
 | step | 28px row, 13/18 (`text-row`), title truncates |
 | marker | 8px circle: `primary` fill for the current step, `muted-foreground` fill for visited, a 1px `muted-foreground` ring for upcoming |
 | title | `foreground` for the current step, `muted-foreground` otherwise |
-| Now / Next | quiet trailing words in `muted-foreground`: "Now" on the current step, "Next" on the first upcoming step after it |
+| Now / Next | quiet trailing words in `muted-foreground`: "Now" on the current step (or `currentWord`, for a lesson shown when nobody is in it, such as the topic page's trail saying "Left off here"), "Next" on the first upcoming step after it |
 
 Steps run in teaching order: each after the steps it rests on (`topoFor`, the diagram's own order). No node numbers, no colours beyond the one accent dot.
 
