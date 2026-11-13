@@ -99,6 +99,17 @@ describe("the topic head", () => {
 		assert.equal(document.querySelector('[data-slot="unit-gap"]')!.textContent, "Counts nonzero entries instead of pivots");
 	});
 
+	it("puts every line on one left edge, the shared pie leading where he stands, the words following the pie", () => {
+		const document = head(factsOf(RANK));
+		const header = document.querySelector('[data-slot="topic-head"]')!;
+		for (const line of header.children) assert.doesNotMatch(line.getAttribute("class") ?? "", /\b(pl|ml|ps|ms)-/, "no line indented");
+		const words = document.querySelector('[data-slot="topic-standing-words"]')!;
+		const pie = words.firstElementChild!;
+		assert.equal(pie.getAttribute("data-slot"), "topic-glyph", "the pie leads the standing");
+		assert.equal(pie.getAttribute("data-fill"), "0.75");
+		assert.equal(words.textContent, "Right with help", "a three-quarter pie says Right with help");
+	});
+
 	it("draws no head line for a topic not started whose lesson waits on him", () => {
 		const document = head(factsOf(EIGEN, [chat({ pendingQuestion: true, topics: ["eigen"] })]));
 		assert.equal(document.querySelector('[data-slot="unit-standing"]'), null);

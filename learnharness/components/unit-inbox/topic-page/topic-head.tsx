@@ -13,11 +13,12 @@ const MARK_ICON: Record<HeadMark["kind"], LucideIcon> = { slip: CircleXIcon, rev
 const PAUSE = <span className="sr-only">. </span>;
 
 /**
- * The topic page's head (spec: topic-head.md): the course, which opens
- * the course's page, the topic, the map's pie with where he stands, then
- * why it needs him as icons and a few words, when he last studied it, and
- * what went wrong when the engine can say. The page's action is in the
- * history's Now, so the head has no button.
+ * The topic page's head (spec: topic-head.md), every line on the
+ * column's one left edge: the course, which opens the course's page; the
+ * topic; the pie Home's rows and the map draw, leading where he stands in
+ * words, then why it needs him as icons and a few words, and when he last
+ * studied it flush right; and what went wrong when the engine can say.
+ * The page's action is in the history's Now, so the head has no button.
  */
 export function TopicHead({ facts }: { facts: TopicFacts }) {
 	const { standing, marks, studied, mistake } = facts;
@@ -38,10 +39,12 @@ export function TopicHead({ facts }: { facts: TopicFacts }) {
 				</h1>
 			</div>
 			{standing && (
-				<div data-slot="unit-standing" className="flex items-center gap-4 text-row text-muted-foreground">
-					<TopicGlyph standing={standing} />
+				<div data-slot="unit-standing" className="flex min-h-5 items-center gap-4 text-row text-muted-foreground">
 					<p className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-1">
-						<span>{standing.words}</span>
+						<span data-slot="topic-standing-words" className="inline-flex items-center gap-1.5">
+							<TopicGlyph standing={standing} />
+							{standing.words}
+						</span>
 						{marks.map((mark) => {
 							const Icon = MARK_ICON[mark.kind];
 							return (
@@ -61,7 +64,7 @@ export function TopicHead({ facts }: { facts: TopicFacts }) {
 				</div>
 			)}
 			{mistake && (
-				<p data-slot="unit-gap" className="pl-8 text-row text-foreground/90">
+				<p data-slot="unit-gap" className="text-row text-foreground/90">
 					<MathText>{mistake}</MathText>
 				</p>
 			)}
