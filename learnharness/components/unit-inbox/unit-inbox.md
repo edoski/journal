@@ -1,6 +1,6 @@
 # Topic sidebar and topic page
 
-The Proposed sidebar (`unit-sidebar.tsx`; Edo picked it on 13 Nov 2026 over the sessions grouped by course, deleted with the Sidebar switch) is T3 Code's sidebar with course topics in place of threads. A row is a topic the learner has started; one click opens its page (`unit-page.tsx`, `/unit/<course>/<topic>`). Sessions are never rows under a topic: they live on the topic's page.
+The sidebar (`unit-sidebar.tsx`; Edo picked it on 13 Nov 2026 over the sessions grouped by course, deleted with the Sidebar switch) is T3 Code's sidebar with course topics in place of threads. A row is a topic the learner has started; one click opens its page (`unit-page.tsx`, `/unit/<course>/<topic>`). Sessions are never rows under a topic: they live on the topic's page.
 
 ## Sections
 

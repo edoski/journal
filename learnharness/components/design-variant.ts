@@ -3,8 +3,6 @@
 import { useSyncExternalStore } from "react";
 import { onPolishChange, polishVariant, type PolishGroup } from "@/components/dev/polish-variant.js";
 
-export type DesignVariant = "current" | "proposed";
-
 /** The topic map's node candidates, three card interiors (spec:
  *  components/course-map/topic-map/topic-map.md, "Node switch"): where
  *  he stands on top of the title, a ring beside it, or the card's edge
@@ -19,15 +17,13 @@ export const LINK_OPTIONS = ["split", "connected"] as const;
 export type LinkVariant = "current" | (typeof LINK_OPTIONS)[number];
 
 /** The switch registry, which the Logbook's in-app guide switches (dev
- *  only): Design is Current or Proposed; Node is the topic map's node as it
- *  was or one of its candidates, wherever the topic map draws, and wears
- *  Design's Proposed; Link is the topic page's panes as they are or one of
- *  its options, and wears Design's Proposed. Read only through the hooks
- *  below. */
+ *  only): Node is the topic map's node as it was or one of its candidates,
+ *  wherever the topic map draws; Link is the topic page's panes as they are
+ *  or one of its options. Every other surface has one version. Read only
+ *  through the hooks below. */
 export const POLISH_GROUPS: readonly PolishGroup[] = [
-	{ id: "design", label: "Design" },
-	{ id: "node", label: "Node", options: NODE_OPTIONS, requires: { design: "proposed" } },
-	{ id: "link", label: "Link", options: LINK_OPTIONS, requires: { design: "proposed" } },
+	{ id: "node", label: "Node", options: NODE_OPTIONS },
+	{ id: "link", label: "Link", options: LINK_OPTIONS },
 ];
 
 const DEV = process.env.NODE_ENV === "development";
@@ -43,18 +39,10 @@ function subscribeSwitch(onChange: () => void): () => void {
 		window.removeEventListener("polish:host", onChange);
 	};
 }
-const readCurrent = (): DesignVariant => "current";
-const readSwitch = (): DesignVariant => (polishVariant("design") === "proposed" ? "proposed" : "current");
 const readLinkCurrent = (): LinkVariant => "current";
 const readLink = (): LinkVariant => LINK_OPTIONS.find((option) => option === polishVariant("link")) ?? "current";
 const readNodeCurrent = (): NodeVariant => "current";
 const readNode = (): NodeVariant => NODE_OPTIONS.find((option) => option === polishVariant("node")) ?? "current";
-
-/** The one reader of the design switch: "proposed" only in development with the guide on Proposed.
- *  Production builds always get "current" until a surface ships. */
-export function useDesignVariant(): DesignVariant {
-	return useSyncExternalStore(DEV ? subscribeSwitch : subscribeNever, DEV ? readSwitch : readCurrent, readCurrent);
-}
 
 /** Which node the topic map draws, or "current" for the node as it was.
  *  Production builds get "current". */

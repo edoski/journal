@@ -1,6 +1,6 @@
 # Kbd
 
-A key or chord under the Proposed design: the keyboard cheat sheet, Settings › Keyboard, tooltips. `components/ui/kbd.tsx`, `data-slot="kbd"`; the text is `formatBinding()`'s output (⌘, ⌥, ⇧, ↵, Esc, F2 …).
+A key or chord: the keyboard cheat sheet, Settings › Keyboard, tooltips. `components/ui/kbd.tsx`, `data-slot="kbd"`; the text is `formatBinding()`'s output (⌘, ⌥, ⇧, ↵, Esc, F2 …).
 
 | Slot | Notes |
 |---|---|

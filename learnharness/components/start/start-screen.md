@@ -1,6 +1,6 @@
 # StartScreen
 
-The Proposed start surface: the draft at `/chat/new` (`/` is the study home). The composer and nothing else, as T3 Code's new-chat screen. `data-slot="start-screen"`. T3 Code's new-chat anatomy (research/agent-apps.md).
+The start surface: the draft at `/chat/new` (`/` is the study home). The composer and nothing else, as T3 Code's new-chat screen. `data-slot="start-screen"`. T3 Code's new-chat anatomy (research/agent-apps.md).
 
 ## Anatomy, top to bottom
 

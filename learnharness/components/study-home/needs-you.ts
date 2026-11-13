@@ -89,8 +89,8 @@ function nowLine(row: TodayRow): NowLine {
 /**
  * What needs the learner now (spec: today.md, "Needs you now"): Home's
  * Today lines, in Today's order and with Today's reasons, each with the
- * topics it takes up. Home draws `rows`; the sidebar's top under the
- * Inbox switch draws `lines`, each as the topic it leads with. Pure.
+ * topics it takes up. Home draws `rows`; the sidebar's top draws
+ * `lines`, each as the topic it leads with. Pure.
  */
 export function needsYouNow(courses: readonly StudyCourse[], chats: readonly ChatListItem[], today: string): NeedsYou {
 	const rows = todayRows(courses, openSessions(chats), today);

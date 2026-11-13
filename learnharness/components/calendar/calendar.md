@@ -1,6 +1,6 @@
 # Calendar
 
-`/calendar`, the Proposed design's page (Current goes Home): when and what is scheduled, across every course, by day. Reached from the sidebar's Calendar row, under Home. `data-slot="calendar"`.
+`/calendar`: when and what is scheduled, across every course, by day. Reached from the sidebar's Calendar row, under Home. `data-slot="calendar"`.
 
 ## Data
 

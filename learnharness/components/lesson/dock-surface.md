@@ -1,6 +1,6 @@
 # Dock surface
 
-`DOCK_SURFACE` (`components/lesson/dock-surface.ts`): the class string every Proposed dock occupant draws, with `data-slot="dock-surface"` on its root (the composer keeps its own `data-slot="composer"`).
+`DOCK_SURFACE` (`components/lesson/dock-surface.ts`): the class string every dock occupant draws, with `data-slot="dock-surface"` on its root (the composer keeps its own `data-slot="composer"`).
 
 | Property | Value |
 |---|---|

@@ -1,6 +1,6 @@
 # TurnError
 
-A failed reply under the Proposed design, under the learner's message. `data-testid="turn-error"`, `role="alert"`, `data-kind` from `turnErrorText` (turn-error-text.ts).
+A failed reply, under the learner's message. `data-testid="turn-error"`, `role="alert"`, `data-kind` from `turnErrorText` (turn-error-text.ts).
 
 | Slot | Notes |
 |---|---|

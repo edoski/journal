@@ -1,6 +1,6 @@
 # PlanMap and PlanPanel
 
-The plan under the Proposed design: a small, calm map instead of the node diagram. `data-slot="plan-map"`; each step `data-testid="plan-step-<id>"` with `data-status`.
+The plan: a small, calm map instead of the node diagram. `data-slot="plan-map"`; each step `data-testid="plan-step-<id>"` with `data-status`.
 
 ## PlanMap
 

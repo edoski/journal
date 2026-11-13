@@ -8,7 +8,6 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import fs from "node:fs";
 import net from "node:net";
-import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
@@ -16,15 +15,6 @@ import puppeteer from "puppeteer-core";
 const root = path.resolve(import.meta.dirname, "..");
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "lh154-ui-"));
 fs.mkdirSync(path.join(home, "data"));
-// Next's supported font fixture avoids external font downloads in this check.
-const require = createRequire(import.meta.url);
-const { getFontAxes } = require("next/dist/compiled/@next/font/dist/google/get-font-axes.js");
-const { getGoogleFontsUrl } = require("next/dist/compiled/@next/font/dist/google/get-google-fonts-url.js");
-const fonts = Object.fromEntries(["JetBrains Mono", "Source Sans 3"].map(family => [
-	getGoogleFontsUrl(family, getFontAxes(family, ["variable"], ["normal"]), "swap"),
-	`@font-face { font-family: '${family}'; src: local('Arial'); font-weight: 100 900; }`,
-]));
-fs.writeFileSync(path.join(home, "fonts.cjs"), `module.exports = ${JSON.stringify(fonts)};\n`);
 const listener = net.createServer();
 listener.listen(0, "127.0.0.1");
 await once(listener, "listening");
@@ -35,7 +25,6 @@ const env = {
 	PATH: process.env.PATH, HOME: home, TMPDIR: home, NODE_ENV: "development",
 	LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home,
 	NEXT_TELEMETRY_DISABLED: "1",
-	NEXT_FONT_GOOGLE_MOCKED_RESPONSES: path.join(home, "fonts.cjs"),
 };
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
 	cwd: root, env, stdio: ["ignore", "pipe", "pipe"],

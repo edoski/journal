@@ -1,6 +1,6 @@
 # Why mark
 
-Why a line is on Today, as an icon and a few words. `why-mark.tsx` (`WhyMark`, `WHY_ICON`). Drawn by Home's hybrid rows (`agenda-rows/hybrid`), and by the sidebar's status slot under the Inbox switch (`unit-inbox/now-card.tsx`); the course page's header takes its icons from `WHY_ICON`.
+Why a line is on Today, as an icon and a few words. `why-mark.tsx` (`WhyMark`, `WHY_ICON`). Drawn by Home's hybrid rows (`agenda-rows/hybrid`), and by the sidebar's status slot (`unit-inbox/now-card.tsx`); the course page's header takes its icons from `WHY_ICON`.
 
 ## Anatomy
 

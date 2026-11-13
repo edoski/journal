@@ -22,9 +22,9 @@ const map = <div data-slot="topic-lesson-map" />;
 const panes = (Panes: React.ComponentType<PanesProps>) => parseHTML(`<html><body>${renderToStaticMarkup(<Panes side={side} map={map} />)}</body></html>`).document.querySelector('[data-slot="topic-panes"]')!;
 
 describe("the Link switch", () => {
-	it("offers split and connected, each wearing the Proposed design", () => {
+	it("offers split and connected, needing no other switch", () => {
 		assert.deepEqual(LINK_OPTIONS, ["split", "connected"]);
-		assert.deepEqual(POLISH_GROUPS.find((group) => group.id === "link")?.requires, { design: "proposed" });
+		assert.equal(POLISH_GROUPS.find((group) => group.id === "link")?.requires, undefined);
 	});
 
 	it("draws the list and the map in every option, and names the option on the panes for the rows to answer", () => {

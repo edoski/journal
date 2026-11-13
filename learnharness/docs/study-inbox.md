@@ -1,6 +1,6 @@
 # The sidebar as T3 Code's, for topics
 
-Design note for the Proposed sidebar (12 Nov 2026), which replaced the course-grouped session list when the Sidebar switch was deleted. The code is in `components/unit-inbox/`, its spec in `unit-inbox.md`.
+Design note for the sidebar (12 Nov 2026), which replaced the course-grouped session list when the Sidebar switch was deleted. The code is in `components/unit-inbox/`, its spec in `unit-inbox.md`.
 
 ## The goal
 

@@ -25,7 +25,7 @@ Reviews are named, never counted: every title, joined by commas only (`titleList
 
 ## Needs you now
 
-What needs the learner now is exactly Today's lines: `needs-you.ts` (`needsYouNow(courses, chats, today)`), tested in `tests/needs-you.test.ts`. Home draws its `rows` (`home-frame.tsx`); the Proposed sidebar's top under the Inbox switch draws its `lines` (`unit-inbox/unit-inbox.md`, "Inbox switch"), so both answer "what next?" with the same lines, in the same order, with the same reasons.
+What needs the learner now is exactly Today's lines: `needs-you.ts` (`needsYouNow(courses, chats, today)`), tested in `tests/needs-you.test.ts`. Home draws its `rows` (`home-frame.tsx`); the sidebar's top draws its `lines` (`unit-inbox/unit-inbox.md`, "Today on top"), so both answer "what next?" with the same lines, in the same order, with the same reasons.
 
 | Field | Notes |
 |---|---|

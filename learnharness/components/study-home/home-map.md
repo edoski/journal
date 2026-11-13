@@ -11,7 +11,7 @@ The selected course's map on Home. `home-map.tsx`, `data-slot` `home-map` (`data
 | enlarged | the tabs and the map take Home's full width and height; Today hides. Esc or the same control returns |
 | empty | "Topics appear as you study this course." |
 
-Nowhere in the Proposed design: the old Map page's List view, Import notes… and Statements… (Edo, 12 Nov 2026: he would never use them, and the engine should grow from his studying with nothing for him to manage). They went with that page on 13 Nov 2026.
+Nowhere in the app: the old Map page's List view, Import notes… and Statements… (Edo, 12 Nov 2026: he would never use them, and the engine should grow from his studying with nothing for him to manage). They went with that page on 13 Nov 2026.
 
 ## The map follows Today
 

@@ -14,7 +14,7 @@ import { byLearning, nowOf, shelfOf, taskOf, topicSessions, unitKey, unitStatus,
 export type NowShelf = "working" | "learning" | "known" | "other";
 
 /** The shelves' names. "On your own" is the course page's group and Home's
- *  "N of M on your own"; Current's shelf keeps "Known". */
+ *  "N of M on your own". */
 export const NOW_SHELF_WORDS: Record<NowShelf, string> = { working: "Working", learning: "Learning", known: "On your own", other: "Other sessions" };
 
 /** Today's lines for the sidebar: every course's, or under the course

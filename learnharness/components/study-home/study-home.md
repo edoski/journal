@@ -1,6 +1,6 @@
 # Study home
 
-The Proposed design's study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. Edo picked it over the composer at `/` on 13 Nov 2026; the Home switch is gone, and the composer is the draft at `/chat/new`.
+The study home at `/`: what to study now, at the start of a day or a session, in one window. `data-slot="study-home"`. Edo picked it over the composer at `/` on 13 Nov 2026; the Home switch is gone, and the composer is the draft at `/chat/new`.
 
 Explore mode ran twice on 12 Nov 2026 and built split, map-first and path homes beside the agenda; on 13 Nov Edo kept the agenda and those three were deleted. The page frame is `home-frame.tsx` (lessons.md).
 

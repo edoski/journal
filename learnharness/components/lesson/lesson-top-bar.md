@@ -1,6 +1,6 @@
 # LessonTopBar and LessonDetails
 
-The session's top bar under the Proposed design, rendered in the shared `TopBar` at `size="slim"` (52px, padding 0 16).
+The session's top bar, rendered in the shared `TopBar` at `size="slim"` (52px, padding 0 16).
 
 ## Anatomy, left to right
 
