@@ -1,12 +1,13 @@
-"""Planning overview: due and upcoming reviews, open work, exams and Journal effort."""
+"""Planning overview: due and upcoming reviews, the daily plan, open work, exams
+and Journal effort."""
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-from learning import clock, progress, records
+from learning import agenda, clock, progress, records
 from learning.retrieval import (
     DUE_LIMIT,
     compact,
@@ -19,7 +20,6 @@ from learning.workspace import Workspace
 from sync.study.context import journal_summary
 
 MAX_DAYS = 366
-EXAM_GAP_DAYS = 8
 Loaded = tuple[Workspace, dict[str, Any] | None, str | None]
 
 
@@ -66,16 +66,25 @@ def _week(
     return result or None
 
 
-def _study_days(journal: dict[str, Any], exam_day: date) -> int:
-    """Days with a scheduled study window from today until a week before the exam."""
+def _study_days(journal: dict[str, Any], last: date) -> int:
+    """Days with a scheduled study window from today until ``last``."""
     if "error" in journal:
         return 0
-    last = (exam_day - timedelta(days=EXAM_GAP_DAYS)).isoformat()
     return sum(
         1
         for entry in journal.get("upcoming_schedule") or ()
-        if entry["date"] <= last and entry["study_windows"]
+        if entry["date"] <= last.isoformat() and entry["study_windows"]
     )
+
+
+def _study_day(journal: dict[str, Any]) -> agenda.StudyDay:
+    """A day takes new topics unless the Journal schedules no study window on it."""
+    unscheduled = {
+        entry["date"]
+        for entry in journal.get("upcoming_schedule") or ()
+        if not entry["study_windows"]
+    }
+    return lambda day: day.isoformat() not in unscheduled
 
 
 def _days_left(record: dict[str, Any], today: date) -> int | None:
@@ -106,11 +115,42 @@ def _runup(
         "not_introduced": untaught,
         "unready": [key for key in order if key in behind],
     }
-    study_days = _study_days(journal, today + timedelta(days=days_left))
+    exam = progress.exam_plan(record)
+    assert exam is not None
+    study_days = _study_days(journal, agenda.last_new_day(exam))
     if study_days:
         result["study_days"] = study_days
         result["pace"] = round(len(untaught) / study_days, 2)
     return compact(result, keep=("days_left",))
+
+
+def _settings(record: dict[str, Any]) -> agenda.Settings:
+    try:
+        return agenda.settings(records.effective_preferences(record))
+    except OSError:
+        return agenda.settings(record["preferences"])
+
+
+def _days(
+    record: dict[str, Any], today: date, days: int, journal: dict[str, Any]
+) -> dict[str, Any] | None:
+    """The daily plan: its settings and each day that proposes something."""
+    settings = _settings(record)
+    exam = progress.exam_plan(record)
+    planned = agenda.plan_days(
+        record, today, settings, days, study_day=_study_day(journal)
+    )
+    proposed = [day for day in planned if day["reviews"] or day["new"]]
+    if not proposed:
+        return None
+    return compact(
+        {
+            "daily_topics": settings.budget,
+            "final_review_days": (exam.day - exam.final).days if exam else None,
+            "new_topics_on_weekends": settings.weekends,
+            "days": proposed,
+        }
+    )
 
 
 def _course(
@@ -153,6 +193,7 @@ def _course(
             "journal": _effort(record.get("journal"), journal),
             "week": _week(record, today, week_journal),
             "runup": _runup(record, today, order, levels, journal),
+            "plan": _days(record, today, days, journal),
         }
     )
 
@@ -175,15 +216,23 @@ def _load(workspace: Workspace) -> Loaded:
 def plan(
     workspace: Workspace | None, vault: Path, *, everywhere: bool, days: int
 ) -> dict[str, Any]:
-    """Reviews, open work, the week, exam run-ups and recorded effort."""
+    """Reviews, the daily plan, open work, the week, exam run-ups and recorded effort.
+
+    The Journal's schedule reaches the farthest exam ahead, so the plan paces new
+    topics against its days off.
+    """
     if type(days) is not int or not 1 <= days <= MAX_DAYS:
         raise ValueError(f"--days must be between 1 and {MAX_DAYS}")
     today = clock.today()
     loaded = [_load(target) for target in _targets(workspace, everywhere)]
-    near = any(
-        _in_runup(record, today) for _, record, _ in loaded if record is not None
-    )
-    horizon = max(days, progress.RUNUP_DAYS) if near else days
+    ahead = [
+        left
+        for _, record, _ in loaded
+        if record is not None and (left := _days_left(record, today)) is not None
+    ]
+    near = any(0 <= left <= progress.RUNUP_DAYS for left in ahead)
+    shown = max(days, progress.RUNUP_DAYS) if near else days
+    horizon = min(MAX_DAYS, max([shown, *ahead]))
     journal = _journal(vault, days, today, horizon)
     week_journal = (
         journal
@@ -198,5 +247,12 @@ def plan(
             else {"workspace": str(target.directory), "error": error}
             for target, record, error in loaded
         ],
-        "journal": journal,
+        "journal": _shown(journal, shown),
     }
+
+
+def _shown(journal: dict[str, Any], days: int) -> dict[str, Any]:
+    """The Journal summary with its schedule cut to the days the plan shows."""
+    if not journal.get("upcoming_schedule"):
+        return journal
+    return {**journal, "upcoming_schedule": journal["upcoming_schedule"][:days]}

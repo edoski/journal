@@ -164,13 +164,15 @@ def test_unready_uses_the_14_day_window_and_untaught_topics_are_listed(
     assert result["unready"] == ["span", "eigen", "basis"]
 
 
-def test_study_days_count_windows_until_a_week_before_the_exam(tmp_path: Path) -> None:
+def test_study_days_count_windows_until_the_last_day_for_new_topics(
+    tmp_path: Path,
+) -> None:
     vault = tmp_path / "vault"
     write_protocol(vault, day(1), day(2), day(7))
     workspace = runup_course(tmp_path, 14)
     result = runup(workspace, vault)
-    assert result["study_days"] == 5
-    assert result["pace"] == 0.2
+    assert result["study_days"] == 3
+    assert result["pace"] == 0.33
     full = plan(workspace, vault, everywhere=False, days=7)
     assert len(full["journal"]["upcoming_schedule"]) == 21
 

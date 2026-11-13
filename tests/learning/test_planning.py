@@ -96,6 +96,16 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
+        "plan": {
+            "daily_topics": 8,
+            "final_review_days": 6,
+            "new_topics_on_weekends": False,
+            "days": [
+                {"date": day(0), "reviews": ["systems"], "new": []},
+                {"date": day(3), "reviews": ["systems", "rank"], "new": []},
+                {"date": day(6), "reviews": ["rank"], "new": []},
+            ],
+        },
     }
     assert "daily" not in result["journal"]
     assert result["journal"]["by_activity"]["Other"]["study_minutes"] == 30
