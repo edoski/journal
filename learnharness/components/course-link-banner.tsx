@@ -20,9 +20,9 @@ export function CourseLinkBody({ choice, busy, error, onLink }: {
 			<div className="flex flex-wrap items-center gap-x-3 gap-y-2">
 				<p className="min-w-0 flex-1 text-row text-muted-foreground">Link this session to a course to continue.</p>
 				{choice.state.status === "unavailable" ? (
-					<CoursesUnavailable reason={choice.state.reason} variant="proposed" />
+					<CoursesUnavailable reason={choice.state.reason} />
 				) : (
-					<CourseControl choice={choice} variant="proposed" />
+					<CourseControl choice={choice} />
 				)}
 				{choice.state.status === "ready" && (
 					<Button

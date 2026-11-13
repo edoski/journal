@@ -18,6 +18,8 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 		document: dom.document,
 		navigator: globals.navigator ?? { userAgent: "", platform: "" },
 		HTMLElement: dom.window.HTMLElement,
+		// The Radix switch checks for an enclosing form.
+		HTMLFormElement: (dom.window as unknown as Record<string, unknown>).HTMLFormElement ?? class {},
 		IS_REACT_ACT_ENVIRONMENT: true,
 		fetch: async (url: string) => {
 			assert.ok(url in bodies, `unexpected request: ${url}`);
@@ -44,7 +46,7 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 		assert.ok(toggle);
 		assert.equal(toggle.hasAttribute("disabled"), false);
 		assert.equal(toggle.getAttribute("aria-checked"), "true");
-		assert.ok(!row.className.includes("opacity-40"));
+		assert.ok(!row.className.includes("opacity-50"), "the row is not dimmed");
 		act(() => { toggle.click(); });
 		assert.equal(written?.tools?.research, false, "the toggle emits the stored boolean");
 		assert.equal(document.querySelector('[data-testid="search-engine-row"]'), null);

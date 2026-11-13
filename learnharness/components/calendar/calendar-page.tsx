@@ -38,7 +38,7 @@ function CalendarRoute({ initialConfigured }: { initialConfigured: boolean }) {
 	if (read.status !== "ready") {
 		return (
 			<div className="flex h-dvh items-center justify-center px-6">
-				{read.status === "loading" ? <p className="text-row text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} variant="proposed" />}
+				{read.status === "loading" ? <p className="text-row text-muted-foreground">Reading your courses…</p> : <CoursesUnavailable reason={read.reason} />}
 			</div>
 		);
 	}

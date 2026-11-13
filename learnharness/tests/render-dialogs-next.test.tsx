@@ -1,7 +1,6 @@
 /**
- * The Proposed settings, dialogs, menus and overlays (polish pass phase 4):
- * what a learner can see and use under the Proposed design. Settings rows
- * that would do nothing there are absent, keys read as glyphs, dialogs keep
+ * The settings, dialogs, menus and overlays (polish pass phase 4): what a
+ * learner can see and use. Settings rows that would do nothing are absent, keys read as glyphs, dialogs keep
  * their actions, the chain table and the background agents read in plain
  * words. Same tsx classic-JSX shim as the other render tests.
  */
@@ -12,12 +11,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
-import { SettingsDesignContext } from "../components/settings/settings-design.ts";
 import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
-import { ThinkingMenuList } from "../components/settings/model-menu.tsx";
 import { priceLabel } from "../components/settings/model-pickers.tsx";
 import { ActivitySection, type ActivityFeed } from "../components/activity-dock.tsx";
 import { ChainTableBody, type ChainSort } from "../components/chain-table.tsx";
@@ -29,16 +26,12 @@ function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
 }
 
-const inSettings = (node: React.ReactNode) => (
-	<SettingsDesignContext.Provider value="proposed">{node}</SettingsDesignContext.Provider>
-);
-
 const testids = (doc: ReturnType<typeof documentFor>) =>
 	[...doc.querySelectorAll("[data-testid]")].map((el) => el.getAttribute("data-testid"));
 
-describe("Settings › Appearance under the Proposed design", () => {
+describe("Settings › Appearance", () => {
 	it("offers only what still applies: text size and the emphasis colours, no mode, background, font, serif or heading weight", () => {
-		const doc = documentFor(inSettings(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />));
+		const doc = documentFor(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />);
 		const ids = testids(doc);
 		for (const kept of ["row-prose-size", "row-bold-color", "row-italic-color"]) assert.ok(ids.includes(kept), `keeps ${kept}`);
 		for (const gone of ["row-mode", "row-background", "row-font", "font-trigger", "row-session-serif", "row-heading-weight"])
@@ -48,24 +41,17 @@ describe("Settings › Appearance under the Proposed design", () => {
 		assert.ok(!/px|Empty =/.test(text), "no pixel counts or equals-sign notes");
 	});
 
-	it("the Current design keeps every appearance row", () => {
-		const ids = testids(documentFor(<AppearanceSection appearance={undefined} onSectionChange={() => {}} />));
-		for (const row of ["row-mode", "row-background", "row-font", "row-session-serif", "row-heading-weight", "row-prose-size"])
-			assert.ok(ids.includes(row), `Current keeps ${row}`);
-	});
 });
 
-describe("Settings › Agent under the Proposed design", () => {
+describe("Settings › Agent", () => {
 	it("names the tools plainly inside the Tools group, one switch each", () => {
 		const html = renderToStaticMarkup(
-			inSettings(
-				<AgentSection
-					agent={undefined}
-					models={undefined}
-					onSectionChange={() => {}}
-					onModelsChange={() => {}}
-				/>,
-			),
+			<AgentSection
+				agent={undefined}
+				models={undefined}
+				onSectionChange={() => {}}
+				onModelsChange={() => {}}
+			/>,
 		);
 		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
 		assert.ok(!html.includes("Tool · "), "no repeated Tool prefix");
@@ -75,9 +61,9 @@ describe("Settings › Agent under the Proposed design", () => {
 	});
 });
 
-describe("Settings › Keyboard under the Proposed design", () => {
+describe("Settings › Keyboard", () => {
 	it("lists every shortcut the Proposed design answers to, each changeable, in the app's words", () => {
-		const doc = documentFor(inSettings(<KeyboardSection />));
+		const doc = documentFor(<KeyboardSection />);
 		for (const def of KEYBOARD_ACTIONS) {
 			const row = doc.querySelector(`[data-testid="kbd-row-${def.id}"]`);
 			const listed = !def.displayOnly && !def.currentOnly;
@@ -93,33 +79,21 @@ describe("Settings › Keyboard under the Proposed design", () => {
 	});
 });
 
-describe("the Proposed switch", () => {
+describe("the settings switch", () => {
 	it("reports its state to assistive tech", () => {
-		const on = documentFor(inSettings(<Toggle checked label="graph tools" onChange={() => {}} />)).querySelector('[role="switch"]');
-		const off = documentFor(inSettings(<Toggle checked={false} label="graph tools" onChange={() => {}} />)).querySelector('[role="switch"]');
+		const on = documentFor(<Toggle checked label="graph tools" onChange={() => {}} />).querySelector('[role="switch"]');
+		const off = documentFor(<Toggle checked={false} label="graph tools" onChange={() => {}} />).querySelector('[role="switch"]');
 		assert.equal(on?.getAttribute("aria-checked"), "true");
 		assert.equal(off?.getAttribute("aria-checked"), "false");
 		assert.equal(on?.getAttribute("aria-label"), "graph tools");
 	});
 });
 
-describe("the Proposed thinking menu", () => {
-	it("lists the levels and marks only the effective one as chosen", () => {
-		const doc = documentFor(<ThinkingMenuList variant="proposed" levels={["low", "high"]} effectiveLevel="high" onPick={() => {}} footer="Levels this model actually supports" />);
-		const items = [...doc.querySelectorAll("button")];
-		assert.deepEqual(items.map((b) => b.textContent), ["low", "high"]);
-		assert.equal(items[1]!.querySelector("svg") !== null, true, "the chosen level carries the check");
-		assert.equal(items[0]!.querySelector("svg"), null);
-		assert.match(doc.body.textContent ?? "", /Levels this model actually supports/);
-	});
-});
-
-describe("the Proposed model menu's prices", () => {
-	it("prints every price with two decimals, beside Current's trimmed form", () => {
+describe("the model picker's prices", () => {
+	it("prints every price with two decimals", () => {
 		const cost = { input: 0.1, output: 0.5, cacheRead: 0, cacheWrite: 0 };
-		assert.equal(priceLabel(cost, "proposed"), "$0.10/$0.50");
-		assert.equal(priceLabel({ ...cost, input: 3, output: 15 }, "proposed"), "$3.00/$15.00");
-		assert.equal(priceLabel(cost), "$0.1/$0.5");
+		assert.equal(priceLabel(cost), "$0.10/$0.50");
+		assert.equal(priceLabel({ ...cost, input: 3, output: 15 }), "$3.00/$15.00");
 	});
 });
 

@@ -11,7 +11,7 @@ import { pickWords } from "../components/new-course-facts.ts";
 import { kbdEventForAction } from "../src/core/keyboard.ts";
 import { Dialog } from "../components/ui/dialog.tsx";
 
-// The Proposed course chip and New course's study root, mounted on the real
+// The course chip and New course's study root, mounted on the real
 // Radix layers: what the learner picks reaches the host, and Esc stays put.
 const COURSES = [
 	{ workspace: "/study/smm", title: "SMM", due: 2, reviews: [], current: "rank", currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null },
@@ -58,9 +58,9 @@ async function escapeReachesWindow(): Promise<boolean> {
 	return reached;
 }
 
-describe("Proposed course chip", () => {
+describe("course chip", () => {
 	it("opens a menu of the courses by name, with no counts, then New course", async () => {
-		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} />);
+		await mount(<CoursePicker courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} />);
 		const chip = element('[data-testid="course-picker"]');
 		assert.equal(chip.textContent, "SMM");
 		assert.equal(document.querySelectorAll("select").length, 0, "no browser select");
@@ -74,7 +74,7 @@ describe("Proposed course chip", () => {
 	it("picking a course or New course reaches the host, and Esc closes the menu only", async () => {
 		const picks: string[] = [];
 		let created = 0;
-		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={(w) => picks.push(w)} onNew={() => created++} />);
+		await mount(<CoursePicker courses={COURSES} workspace="" onChange={(w) => picks.push(w)} onNew={() => created++} />);
 		await press(element('[data-testid="course-picker"]'), "pointerdown");
 		await press(document.querySelectorAll('[data-testid="course-option"]')[1]!, "click");
 		assert.deepEqual(picks, ["/study/untitled-dir"]);
@@ -88,11 +88,11 @@ describe("Proposed course chip", () => {
 	});
 });
 
-describe("Proposed New course study root", () => {
+describe("New course study root", () => {
 	it("shows the root's last two folders and picks another from the shared select", async () => {
 		await mount(
 			<Dialog open>
-				<NewCourseBody variant="proposed" roots={["/vault/learn", "/vault/university/msc"]} onClose={() => {}} onCreated={() => {}} />
+				<NewCourseBody roots={["/vault/learn", "/vault/university/msc"]} onClose={() => {}} onCreated={() => {}} />
 			</Dialog>,
 		);
 		const trigger = element('[data-testid="new-course-root"]');
@@ -136,11 +136,11 @@ async function pickFiles(input: HTMLInputElement, files: File[]) {
 	});
 }
 
-describe("Proposed New course", () => {
+describe("New course", () => {
 	it("asks for the title, the exam day and the material in plain words, with no folder choice when one is known", async () => {
 		await mount(
 			<Dialog open>
-				<NewCourseBody variant="proposed" roots={["/vault/courses"]} onClose={() => {}} onCreated={() => {}} />
+				<NewCourseBody roots={["/vault/courses"]} onClose={() => {}} onCreated={() => {}} />
 			</Dialog>,
 		);
 		const text = element('[data-testid="new-course-dialog"]').textContent ?? "";
@@ -154,7 +154,7 @@ describe("Proposed New course", () => {
 		const { sent, fetchLike } = recorder(() => Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }));
 		await mount(
 			<Dialog open>
-				<NewCourseBody variant="proposed" roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={(c) => created.push(c)} />
+				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={(c) => created.push(c)} />
 			</Dialog>,
 		);
 		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "  Group Theory ");
@@ -187,7 +187,7 @@ describe("Proposed New course", () => {
 		const { fetchLike } = recorder(() => Response.json({ error: "You already have a course called Group Theory.", code: "course_exists" }, { status: 409 }));
 		await mount(
 			<Dialog open>
-				<NewCourseBody variant="proposed" roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={() => assert.fail("not created")} />
+				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={() => assert.fail("not created")} />
 			</Dialog>,
 		);
 		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "group theory");
@@ -205,10 +205,10 @@ describe("Proposed New course", () => {
 	});
 });
 
-describe("Proposed course menu: rename and delete", () => {
+describe("course menu: rename and delete", () => {
 	it("offers Rename and Delete for the picked course only, and hands the course to the host", async () => {
 		const asked: Array<[string, string | null]> = [];
-		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} onManage={(action, course) => asked.push([action, course.title])} />);
+		await mount(<CoursePicker courses={COURSES} workspace="/study/smm" onChange={() => {}} onNew={() => {}} onManage={(action, course) => asked.push([action, course.title])} />);
 		await press(element('[data-testid="course-picker"]'), "pointerdown");
 		assert.equal(element('[data-testid="course-rename"]').textContent, "Rename SMM…");
 		assert.equal(element('[data-testid="course-delete"]').textContent, "Delete SMM…");
@@ -217,7 +217,7 @@ describe("Proposed course menu: rename and delete", () => {
 	});
 
 	it("has no Rename or Delete while no course is picked", async () => {
-		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} onManage={() => {}} />);
+		await mount(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} onManage={() => {}} />);
 		await press(element('[data-testid="course-picker"]'), "pointerdown");
 		assert.equal(document.querySelector('[data-testid="course-rename"]'), null);
 		assert.equal(document.querySelector('[data-testid="course-delete"]'), null);
@@ -255,15 +255,15 @@ describe("Proposed course menu: rename and delete", () => {
 	});
 });
 
-describe("Proposed course chip by keyboard", () => {
+describe("course chip by keyboard", () => {
 	it("Command O opens the course menu, and a send blocked for want of a course opens it too", async () => {
-		await mount(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={0} />);
+		await mount(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={0} />);
 		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent(kbdEventForAction("pick-course"))); });
 		assert.ok(document.querySelector('[data-testid="course-menu"]'), "the shortcut's event opens the menu");
 		await escapeReachesWindow();
 		assert.equal(document.querySelector('[data-testid="course-menu"]'), null);
-		await act(async () => { root!.render(<CoursePicker variant="proposed" courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={1} />); });
+		await act(async () => { root!.render(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} asked={1} />); });
 		assert.ok(document.querySelector('[data-testid="course-menu"]'), "a blocked send opens the menu");
 	});
 });

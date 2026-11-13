@@ -5,7 +5,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-	CoverageMenuBody,
 	CoverageRingDetail,
 	CoverageRingGlyph,
 	coverageItem,
@@ -15,8 +14,8 @@ import {
 
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
- * dispatch 2026-09-24): the sidebar context-menu block (numbers + the
- * manual Extract affordance) and the chat top bar's ring meter. The pure
+ * dispatch 2026-09-24): the session menu's coverage item (its label and
+ * the manual Extract) and the chat top bar's ring meter. The pure
  * folds and the presentational bodies are pinned here; the live fetch
  * chains (menu-open read, the 2s running poll, the turn-settle bump, the
  * settings signal) are Playwright's beat.
@@ -46,49 +45,6 @@ describe("ringFill (the donut's fold, pure)", () => {
 	it("a non-positive threshold reads zero (never NaN, never a fake full)", () => {
 		assert.equal(ringFill(2048, 0), 0);
 		assert.equal(ringFill(2048, -5), 0);
-	});
-});
-
-describe("CoverageMenuBody — the context-menu block", () => {
-	it("renders the uncovered numbers + the Extract affordance", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage()} extracting={false} onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage"'), "the block carries its testid");
-		assert.match(html, /2k tok uncovered/, "the unit is typed out — tok (owner refinement round)");
-		assert.match(html, /5 messages unextracted/);
-		assert.ok(html.includes('data-testid="ctx-extract"'), "the Extract affordance");
-		assert.ok(!html.includes('disabled=""'), "an uncovered session can extract (the disabled: utilities alone don't count)");
-	});
-
-	it("fully extracted: the quiet line, Extract disabled (never a fake run)", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody
-				coverage={coverage({ uncoveredTokens: 0, uncoveredCount: 0 })}
-				extracting={false}
-				onExtract={() => {}}
-			/>,
-		);
-		assert.match(html, /fully extracted/);
-		assert.ok(html.includes("disabled"), "nothing to run — the button rests");
-	});
-
-	it("running: the pulse line + 'Running', not the numbers (motion is the state)", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage({ running: true })} extracting={false} onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage-running"'));
-		assert.match(html, /extracting…/);
-		assert.ok(html.includes(">Running</button>"), "the affordance reads Running while in flight");
-		assert.ok(html.includes("disabled"), "no double-fire");
-	});
-
-	it("optimistic (click-pending, server not yet saying running): same running shape", () => {
-		const html = renderToStaticMarkup(
-			<CoverageMenuBody coverage={coverage()} extracting onExtract={() => {}} />,
-		);
-		assert.ok(html.includes('data-testid="ctx-coverage-running"'), "the optimistic state shows at once");
-		assert.match(html, />Running</);
 	});
 });
 

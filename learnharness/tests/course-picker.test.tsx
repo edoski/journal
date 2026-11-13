@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { parseHTML } from "linkedom";
 import { ComposerActions } from "../components/composer-actions.tsx";
-import { CourseControl, CoursePicker, NewCourseBody, PICK_A_COURSE, type CourseChoice, type CourseState } from "../components/course-picker.tsx";
+import { CourseControl, CoursesUnavailable, type CourseChoice, type CourseState } from "../components/course-picker.tsx";
 import { CourseLinkBody } from "../components/course-link-banner.tsx";
 
 const COURSES = [
@@ -26,19 +26,6 @@ function choice(over: Partial<CourseChoice> = {}): CourseChoice {
 }
 
 describe("course picker", () => {
-	it("lists every registered course with due counts and directory fallback names, then New course, and no No course", () => {
-		const document = documentFor(<CoursePicker courses={COURSES} workspace="" onChange={() => {}} onNew={() => {}} />);
-		const options = [...document.querySelectorAll("option")].map((o) => [o.getAttribute("value"), o.textContent, o.hasAttribute("disabled")]);
-		assert.deepEqual(options, [
-			["", "Pick a course", true],
-			["/study/smm", "SMM (2 due)", false],
-			["/study/untitled-dir", "untitled-dir", false],
-			["new", "New course…", false],
-		]);
-		assert.equal(document.querySelector('[data-testid="course-picker"] span')!.textContent, "Pick a course");
-		assert.ok(!document.body.textContent!.includes("No course"));
-	});
-
 	it("shows the picked course and leads the composer action row", () => {
 		const document = documentFor(
 			<ComposerActions course={<CourseControl choice={choice({ workspace: "/study/smm" })} />} setup={<button data-testid="setup-cta">Set up</button>} />,
@@ -50,14 +37,9 @@ describe("course picker", () => {
 		assert.equal(row.querySelector('[data-testid="course-notice"]'), null);
 	});
 
-	it("a blocked send shows its reason beside the picker", () => {
-		const document = documentFor(<CourseControl choice={choice({ notice: PICK_A_COURSE })} />);
-		assert.equal(document.querySelector('[data-testid="course-notice"]')!.textContent, "Pick a course first");
-	});
-
-	it("an unavailable engine replaces the picker with one line naming the reason and the two settings", () => {
-		const document = documentFor(<CourseControl choice={choice({ state: { status: "unavailable", reason: "The learning engine could not start: spawn ENOENT" } })} />);
-		assert.equal(document.querySelector('[data-testid="course-picker"]'), null);
+	it("an unavailable engine leaves no picker, and its line names the reason and the two settings", () => {
+		assert.equal(renderToStaticMarkup(<CourseControl choice={choice({ state: { status: "unavailable", reason: "The learning engine could not start: spawn ENOENT" } })} />), "");
+		const document = documentFor(<CoursesUnavailable reason="The learning engine could not start: spawn ENOENT" />);
 		const line = document.querySelector('[data-testid="courses-unavailable"]')!.textContent!;
 		assert.match(line, /^Courses are unavailable: The learning engine could not start: spawn ENOENT\./);
 		assert.match(line, /LH_LEARNING_ENGINE/);
@@ -66,19 +48,6 @@ describe("course picker", () => {
 
 	it("renders nothing while the engine is being asked", () => {
 		assert.equal(renderToStaticMarkup(<CourseControl choice={choice({ state: { status: "loading" } })} />), "");
-	});
-});
-
-describe("new course dialog", () => {
-	it("asks for a title and one of the offered study roots", () => {
-		const document = documentFor(<NewCourseBody roots={READY.status === "ready" ? READY.roots : []} onClose={() => {}} onCreated={() => {}} />);
-		assert.ok(document.querySelector('[data-testid="new-course-title"]')!.hasAttribute("required"));
-		const roots = [...document.querySelectorAll('[data-testid="new-course-root"] option')].map((o) => [o.getAttribute("value"), o.textContent]);
-		assert.deepEqual(roots, [
-			["/vault/learn", "vault/learn"],
-			["/vault/university/msc", "university/msc"],
-		]);
-		assert.ok(document.querySelector('[data-testid="new-course-create"]')!.hasAttribute("disabled"), "no title yet");
 	});
 });
 

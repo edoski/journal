@@ -8,7 +8,7 @@ import { sessionCost, callCost } from "../src/server/pricing.ts";
 import { graphCostSummary } from "../src/core/cost-summary.ts";
 import { planCostLabel } from "../components/usage-format.ts";
 import { StatsBar } from "../components/stats-bar.tsx";
-import { ModelMenuList } from "../components/settings/model-menu.tsx";
+import { ModelCommand } from "../components/settings/model-pickers.tsx";
 import { toModelDto } from "../src/server/model-catalog.ts";
 import { piModels } from "../src/agent/models.ts";
 const step = { inputTokens: 1000, outputTokens: 100, cacheReadTokens: undefined, cacheWriteTokens: undefined, reasoningTokens: undefined };
@@ -34,8 +34,8 @@ test("graph stage/recent aggregates retain distinct subscription providers witho
 	assert.equal(summary.totalDollars, 0); assert.equal(summary.unpricedRuns, 0); assert.equal(summary.runs[0]!.dollars, null);
 	assert.deepEqual(summary.subscriptionProviders, ["Claude", "ChatGPT"]); assert.deepEqual(summary.runs[0]!.subscriptionProviders, ["Claude", "ChatGPT"]);
 });
-test("model menu distinguishes subscription connection and shows provider label rather than API prices", () => {
+test("model picker distinguishes subscription connection and shows provider label rather than API prices", () => {
 	const native = piModels().getModels("openai").find((m) => m.api === "openai-responses")!;
-	const html = renderToStaticMarkup(<ModelMenuList models={[toModelDto({ ...native, provider: "chatgpt" })]} effectiveId={undefined} onPick={() => {}} />);
-	assert(html.includes("ChatGPT (subscription)")); assert(html.includes(">ChatGPT</span>")); assert(!html.includes("USD per 1M")); assert(!html.includes("$0"));
+	const html = renderToStaticMarkup(<ModelCommand models={[toModelDto({ ...native, provider: "chatgpt" })]} effectiveId={undefined} onPick={() => {}} />);
+	assert(html.includes("ChatGPT (subscription)")); assert(html.includes(">ChatGPT</span>")); assert(!html.includes("$0"));
 });

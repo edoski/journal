@@ -14,7 +14,7 @@ import { graphCostSummary as foldGraphCostSummary, type CostSummaryInput } from 
 const graphCostSummary = (input: CostSummaryInput) => foldGraphCostSummary(input, () => null);
 import type { ModelCatalogResponse, ChatGPTStatus } from "../src/core/index.ts";
 const dom = parseHTML("<html><body></body></html>");
-Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true, localStorage: { getItem: () => null, setItem() {} } });
+Object.assign(globalThis, { window: dom.window, document: dom.document, Element: dom.window.Element, HTMLElement: dom.window.HTMLElement, HTMLFormElement: (dom.window as unknown as Record<string, unknown>).HTMLFormElement ?? class {}, CustomEvent: dom.window.CustomEvent, IS_REACT_ACT_ENVIRONMENT: true, localStorage: { getItem: () => null, setItem() {} } });
 const originalFetch = globalThis.fetch;
 let root: Root | undefined, host: HTMLDivElement | undefined;
 function deferred<T>() { let resolve!: (v: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; }

@@ -7,8 +7,8 @@
  * the six per-role rows disappeared; per-role overrides remain in the
  * schema for a future advanced surface): Strong = Prober + Teacher, Cheap
  * = the five workhorse roles, Vision = Visual maker + PDF reader. Each
- * slot row carries the shared dropdown (fuzzy search, arrow-walk, Enter
- * pick — ModelMenuList/ThinkingMenuList from ./model-menu.tsx) over the
+ * slot row carries the shared pickers (ModelCommand's search list and
+ * ThinkingMenuItems from ./model-pickers.tsx) over the
  * FEDERATED catalog (/api/models serves only keyed providers, fresh per
  * call — saving a key in Keys immediately widens this picker). The
  * vision slot filters to image-capable models (Model.input). The slots
@@ -26,12 +26,10 @@
  * all four (simpler to reason about, sanitize-equivalent).
  */
 
-import { useEffect, useRef, useState } from "react";
-import { MenuShell } from "@/components/menu-shell";
+import { useState } from "react";
 import { defaultOrderLevel, populateLevel } from "@/components/thinking-default";
 import { useModelCatalog } from "@/components/model-catalog";
 import { Hint } from "@/components/ui/hint";
-import type React from "react";
 import {
 	MODEL_SLOTS,
 	type AgentSettings,
@@ -42,11 +40,6 @@ import {
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import { prettyModel } from "@/components/usage-format";
 import { SettingsGroup, SettingsRow, SettingsMenuTrigger, Toggle } from "./controls.tsx";
-import { useSettingsProposed } from "./settings-design";
-import { cn } from "@/lib/utils";
-import { Label } from "@/components/ui/label";
-import { MENU_SURFACE } from "@/components/ui/menu";
-import { ModelMenuList, ThinkingMenuList } from "./model-menu";
 import { ModelCommand, ThinkingMenuItems } from "./model-pickers";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -64,7 +57,7 @@ export const SLOT_META: Record<ModelSlotName, { label: string; roster: string }>
  *  changing — the Teacher stream settled this 2026-09-19). */
 export const TOGGLE_TOOLS = ["research", "demo", "visual", "pdf"] as const;
 
-/** The tool rows' names under the Proposed design, where the group already says "Tools". */
+/** The tool rows' names; the group already says "Tools". */
 const TOOL_LABEL: Record<(typeof TOGGLE_TOOLS)[number], string> = {
 	research: "Research",
 	demo: "Interactive demos",
@@ -112,51 +105,6 @@ export function composeSlotModel(
 	return next;
 }
 
-/** The collapsed select look (owner: "the look of the collapsed menu is
- *  good") — now a button that opens the shared model-picker dropdown. */
-function MenuTrigger({
-	value,
-	emptyLabel,
-	ariaLabel,
-	testid,
-	open,
-	onClick,
-	widthClass,
-	hint,
-}: {
-	value: string;
-	hint?: string;
-	/** What the trigger shows when there is no override ("Default"). */
-	emptyLabel: string;
-	ariaLabel: string;
-	testid: string;
-	open: boolean;
-	onClick: () => void;
-	/** Owner (2026-09-20): the thinking trigger is FIXED at the width the
-	 *  Default state needs (values shifting it mid-edit shifted the row);
-	 *  the model trigger takes the same width as a MINIMUM — its values
-	 *  genuinely vary in length. */
-	widthClass: string;
-}) {
-	const button = (
-		<SettingsMenuTrigger
-			value={value || emptyLabel}
-			aria-label={ariaLabel}
-			aria-expanded={open}
-			data-testid={testid}
-			onClick={onClick}
-			className={widthClass}
-		/>
-	);
-	return hint ? <Hint label={hint}>{button}</Hint> : button;
-}
-
-/* The section's dropdowns all mount the shared MenuShell (fix wave chunk
- * B): portaled to document.body, fixed-anchored to the open trigger by
- * testid (the section's one-ref pattern), opening DOWN with the shell's
- * viewport cap and auto-flip. data-lh-menu rides the shell — the
- * outside-click contract's exemption mark. */
-
 export function AgentSection({
 	agent,
 	models,
@@ -176,45 +124,11 @@ export function AgentSection({
 	const slots = body?.slots;
 	/** One open dropdown for the whole section: which slot, which kind. */
 	const [openMenu, setOpenMenu] = useState<{ target: ModelSlotName; kind: "model" | "thinking" } | null>(null);
-	const menuAnchorRef = useRef<HTMLSpanElement>(null);
-	const proposed = useSettingsProposed();
-	const menuVariant = proposed ? "proposed" : "current";
-
-	// The dropdown contract (the chat model selector's, mirrored): any
-	// click outside the open menu — or an Esc — closes it. Esc is CLAIMED
-	// with stopPropagation so the settings dialog behind does NOT also
-	// close. A pointerdown on the backdrop is left for the dialog (its own
-	// click closes everything); a click inside the dialog just closes us.
-	useEffect(() => {
-		// Proposed: the Radix layers dismiss themselves (overlay.md).
-		if (openMenu === null || proposed) return;
-		const onPointerDown = (e: PointerEvent) => {
-			const target = e.target as Node;
-			if (menuAnchorRef.current?.contains(target)) return;
-			if (target instanceof Element && target.closest("[data-lh-menu]")) return;
-			if (target instanceof Element && target.closest('[role="dialog"]')) {
-				setOpenMenu(null);
-			}
-			// else: outside the dialog — the dialog's own close handles it.
-		};
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.stopPropagation();
-				setOpenMenu(null);
-			}
-		};
-		document.addEventListener("pointerdown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("pointerdown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [openMenu, proposed]);
 
 	return (
 		<>
 			<SettingsGroup label="Models" testid="group-models">
-				{catalogFailed && <p role="alert" className={proposed ? "px-4 py-2.5 text-label text-danger" : "text-xs text-red-400"}>Model catalog could not be loaded. Check the connection and retry. <button type="button" className="underline" onClick={refreshCatalog}>Retry</button></p>}
+				{catalogFailed && <p role="alert" className="px-4 py-2.5 text-label text-danger">Model catalog could not be loaded. Check the connection and retry. <button type="button" className="underline" onClick={refreshCatalog}>Retry</button></p>}
 				{MODEL_SLOTS.map((slot) => {
 					const override = models?.[slot];
 					const modelId = override?.model?.id ?? "";
@@ -252,120 +166,31 @@ export function AgentSection({
 					const modelFooter = catalog && catalog.length === 0 ? "No models — sign in to Claude or ChatGPT in Settings → Accounts" : SLOT_META[slot].roster;
 					// The catalog's own name ("Claude Opus 5.5 · Claude · A"), not the id.
 					const modelName = modelId ? chosen?.name ?? prettyModel(modelId) : "—";
-					if (proposed) {
-						const modelTrigger = (
-							<PopoverTrigger asChild>
-								<SettingsMenuTrigger value={modelName} aria-label={`${SLOT_META[slot].label} model`} data-testid={`slot-model-${slot}`} className="w-40" />
-							</PopoverTrigger>
-						);
-						return (
-							<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`slot-row-${slot}`}>
-								<span className="flex items-center gap-2">
-									{slot !== "strong" && <ChatGPTBackgroundAccess provider={coord?.provider} />}
-									<Popover modal open={thisMenuOpen === "model"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "model" } : null)}>
-										{modelId ? <Hint label={modelName}>{modelTrigger}</Hint> : modelTrigger}
-										<PopoverContent align="end" className="w-[22rem] p-1" data-testid={`slot-model-menu-${slot}`}>
-											<ModelCommand models={slotCatalog ?? undefined} effectiveId={modelId} effectiveProvider={provider} onPick={pickModel} footer={modelFooter} />
-										</PopoverContent>
-									</Popover>
-									<DropdownMenu open={thisMenuOpen === "thinking"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "thinking" } : null)}>
-										<Hint label="How hard it thinks">
-											<DropdownMenuTrigger asChild>
-												<SettingsMenuTrigger value={effectiveLevel ?? "—"} aria-label={`${SLOT_META[slot].label} thinking`} data-testid={`slot-thinking-${slot}`} className="w-24" />
-											</DropdownMenuTrigger>
-										</Hint>
-										<DropdownMenuContent align="end" className="w-44" data-testid={`slot-thinking-menu-${slot}`}>
-											<ThinkingMenuItems levels={levels.map(String)} effectiveLevel={effectiveLevel} onPick={pickLevel} />
-										</DropdownMenuContent>
-									</DropdownMenu>
-								</span>
-							</SettingsRow>
-						);
-					}
+					const modelTrigger = (
+						<PopoverTrigger asChild>
+							<SettingsMenuTrigger value={modelName} aria-label={`${SLOT_META[slot].label} model`} data-testid={`slot-model-${slot}`} className="w-40" />
+						</PopoverTrigger>
+					);
 					return (
-						<SettingsRow
-							key={slot}
-							label={SLOT_META[slot].label}
-							hint={SLOT_META[slot].roster}
-							testid={`slot-row-${slot}`}
-						>
-							{/* The anchor for the outside-click contract is the
-							    span holding BOTH triggers of the open menu. */}
-							<span
-								ref={thisMenuOpen ? menuAnchorRef : undefined}
-								className="relative flex items-center gap-2"
-							>
+						<SettingsRow key={slot} label={SLOT_META[slot].label} hint={SLOT_META[slot].roster} testid={`slot-row-${slot}`}>
+							<span className="flex items-center gap-2">
 								{slot !== "strong" && <ChatGPTBackgroundAccess provider={coord?.provider} />}
-								<MenuTrigger
-									value={modelId ? prettyModel(modelId) : ""}
-									hint={modelId ? `${provider}:${modelId}` : undefined}
-									emptyLabel="—"
-									ariaLabel={`${SLOT_META[slot].label} model`}
-									testid={`slot-model-${slot}`}
-									open={thisMenuOpen === "model"}
-									onClick={() => setOpenMenu(thisMenuOpen === "model" ? null : { target: slot, kind: "model" })}
-									widthClass={proposed ? "w-40" : "min-w-20"}
-								/>
-								<MenuTrigger
-									// Legacy display (chunk 2 item 4): no stored level + a known
-									// model → the RESOLVED level (the ordering's first supported —
-									// what the engine build runs). Display-only until a pick writes.
-									value={thinking || (chosen ? defaultOrderLevel(levels) : "")}
-									emptyLabel="—"
-									ariaLabel={`${SLOT_META[slot].label} thinking`}
-									testid={`slot-thinking-${slot}`}
-									open={thisMenuOpen === "thinking"}
-									onClick={() => setOpenMenu(thisMenuOpen === "thinking" ? null : { target: slot, kind: "thinking" })}
-									widthClass={proposed ? "w-24" : "w-20"}
-								/>
-								{thisMenuOpen === "model" && (
-									<MenuShell
-										preferredSide="down"
-											anchorTestid={`slot-model-${slot}`}
-										testid={`slot-model-menu-${slot}`}
-										menuClass={proposed ? cn(MENU_SURFACE, "w-[22rem]") : "flex w-[22rem] flex-col rounded-xl border border-border bg-card p-2 text-xs shadow-xl"}
-									>
-										<ModelMenuList
-											variant={menuVariant}
-											models={slotCatalog ?? undefined}
-											effectiveId={modelId}
-											effectiveProvider={provider}
-											onPick={(entry) => {
-												// Auto-populate (chunk 2, owner: "populate everywhere"): the
-												// fresh pick writes a level — the stored one rides as-is
-												// (the write clamps server-side), else the ordering's level.
-												const next = populateLevel(thinking || undefined, entry.supportedLevels);
-												onModelsChange(composeSlotModel(models, slot, entry.provider, entry.id, next));
-												setOpenMenu(null);
-											}}
-											footer={
-												catalog && catalog.length === 0
-													? "No models — sign in to Claude or ChatGPT in Settings → Accounts"
-													: "Runs every agent of this tier"
-											}
-										/>
-									</MenuShell>
-								)}
-								{thisMenuOpen === "thinking" && (
-									<MenuShell
-										preferredSide="down"
-											anchorTestid={`slot-thinking-${slot}`}
-										testid={`slot-thinking-menu-${slot}`}
-										menuClass={proposed ? cn(MENU_SURFACE, "w-44") : "flex w-44 flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"}
-									>
-										<ThinkingMenuList
-											variant={menuVariant}
-											levels={levels.map(String)}
-											// The ✓ sits on the RESOLVED level for legacy unset records —
-											// the same one the trigger shows.
-											effectiveLevel={thinking || (chosen ? defaultOrderLevel(levels) : undefined)}
-											onPick={(level) => {
-												onModelsChange(composeSlotModel(models, slot, provider, modelId, level));
-												setOpenMenu(null);
-											}}
-										/>
-									</MenuShell>
-								)}
+								<Popover modal open={thisMenuOpen === "model"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "model" } : null)}>
+									{modelId ? <Hint label={modelName}>{modelTrigger}</Hint> : modelTrigger}
+									<PopoverContent align="end" className="w-[22rem] p-1" data-testid={`slot-model-menu-${slot}`}>
+										<ModelCommand models={slotCatalog ?? undefined} effectiveId={modelId} effectiveProvider={provider} onPick={pickModel} footer={modelFooter} />
+									</PopoverContent>
+								</Popover>
+								<DropdownMenu open={thisMenuOpen === "thinking"} onOpenChange={(next) => setOpenMenu(next ? { target: slot, kind: "thinking" } : null)}>
+									<Hint label="How hard it thinks">
+										<DropdownMenuTrigger asChild>
+											<SettingsMenuTrigger value={effectiveLevel ?? "—"} aria-label={`${SLOT_META[slot].label} thinking`} data-testid={`slot-thinking-${slot}`} className="w-24" />
+										</DropdownMenuTrigger>
+									</Hint>
+									<DropdownMenuContent align="end" className="w-44" data-testid={`slot-thinking-menu-${slot}`}>
+										<ThinkingMenuItems levels={levels.map(String)} effectiveLevel={effectiveLevel} onPick={pickLevel} />
+									</DropdownMenuContent>
+								</DropdownMenu>
 							</span>
 						</SettingsRow>
 					);
@@ -394,7 +219,7 @@ export function AgentSection({
 				{TOGGLE_TOOLS.map((id) => (
 					<SettingsRow
 						key={id}
-						label={proposed ? TOOL_LABEL[id] : `Tool · ${id}`}
+						label={TOOL_LABEL[id]}
 						testid={`tool-row-${id}`}
 					>
 						<Toggle
@@ -405,8 +230,6 @@ export function AgentSection({
 					</SettingsRow>
 				))}
 			</SettingsGroup>
-
-
 		</>
 	);
 }

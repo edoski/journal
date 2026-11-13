@@ -103,7 +103,7 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 						canSend={text.trim().length > 0}
 						autoFocus
 						placeholder={START_PLACEHOLDER}
-						toolbar={<CourseControl choice={courseChoice} variant="proposed" />}
+						toolbar={<CourseControl choice={courseChoice} />}
 					/>
 				</div>
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">
@@ -127,7 +127,7 @@ export function StartScreen({ initialConfigured }: { initialConfigured: boolean 
 					)}
 					{state.status === "unavailable" && (
 						<div className="px-4">
-							<CoursesUnavailable reason={state.reason} variant="proposed" />
+							<CoursesUnavailable reason={state.reason} />
 						</div>
 					)}
 				</div>

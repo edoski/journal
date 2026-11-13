@@ -8,17 +8,17 @@ import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, MENU_SEPARATOR } from "@/components/ui/dropdown-menu";
 
-/** The Proposed pickers' bodies (spec: model-pickers.md): the model and
+/** The pickers' bodies (spec: model-pickers.md): the model and
  *  provider pickers are a Command inside a picker Popover, the thinking level
  *  a radio group inside a DropdownMenu. One body per picker, shared by the
  *  lesson's details, Settings › Agent and Keys, and setup. */
 
 const NOTE = "px-2 py-1.5 text-label text-muted-foreground";
 
-/** USD per 1M tokens in/out. Proposed keeps two decimals on every price
- *  (one format in a column of figures); Current trims a trailing zero under $1. */
-export function priceLabel(cost: ModelCatalogEntry["cost"], variant: "current" | "proposed" = "current"): string {
-	const fmt = (n: number) => `$${variant === "proposed" || n >= 1 ? n.toFixed(2) : n.toFixed(2).replace(/0$/, "")}`;
+/** USD per 1M tokens in/out, two decimals on every price (one format in a
+ *  column of figures). */
+export function priceLabel(cost: ModelCatalogEntry["cost"]): string {
+	const fmt = (n: number) => `$${n.toFixed(2)}`;
 	return `${fmt(cost.input)}/${fmt(cost.output)}`;
 }
 
@@ -76,7 +76,7 @@ export function ModelCommand({
 						>
 							<span className="flex items-center justify-between gap-3">
 								<span className="truncate">{m.name}</span>
-								<CommandShortcut className="shrink-0">{subscription ?? priceLabel(m.cost, "proposed")}</CommandShortcut>
+								<CommandShortcut className="shrink-0">{subscription ?? priceLabel(m.cost)}</CommandShortcut>
 							</span>
 							<span className="flex items-center justify-between gap-3 text-label text-muted-foreground tabular-nums">
 								<span className="truncate">{subscription ? `${subscription} (subscription)` : m.provider} · {m.id}</span>

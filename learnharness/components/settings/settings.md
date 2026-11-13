@@ -1,6 +1,6 @@
-# Settings (Proposed)
+# Settings
 
-The settings sheet and its control kit under the Proposed design: `settings-dialog.tsx` draws the frame, `controls.tsx` the groups, rows and fields, `settings-design.ts` carries the design to them (read once by the dialog that hosts the kit: Settings, setup, the connection dialogs). Outside a provider the kit draws Current, so the lesson's figure cards keep their switch.
+The settings sheet and its control kit: `settings-dialog.tsx` draws the frame, `controls.tsx` the groups, rows and fields. Settings, setup and the connection dialogs share the kit. The lesson's figure cards use `Toggle` with a disc icon, which draws a plain button in the switch role instead of the `Switch`.
 
 ## Frame
 
@@ -24,9 +24,9 @@ The settings sheet and its control kit under the Proposed design: `settings-dial
 | buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect, default (the accent) for Save |
 | pickers | model: a modal picker `Popover` with `ModelCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
 
-## What Proposed leaves out of Appearance
+## What Appearance leaves out
 
-Proposed is dark only, in SF Pro, with fixed heading weights and its own palette (the owner's decisions), and the stylesheet ignores those settings there (`appearance.tsx`). Mode (the disabled light row), Background, Reading font, Session names in serif and Heading weight are therefore not shown; Text size and the bold and italic colours stay. What the settings store is unchanged.
+The app is dark only, in SF Pro, with fixed heading weights and its own palette (the owner's decisions), and the stylesheet owns those (`appearance.tsx`). Mode (the disabled light row), Background, Reading font, Session names in serif and Heading weight are therefore not shown; Text size and the bold and italic colours stay. What the settings store is unchanged.
 
 ## Sources
 

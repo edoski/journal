@@ -91,7 +91,7 @@ function HomeBody({
 		case "loading":
 			return <Notice>Reading your courses…</Notice>;
 		case "unavailable":
-			return <CoursesUnavailable reason={state.reason} variant="proposed" />;
+			return <CoursesUnavailable reason={state.reason} />;
 		case "failed":
 			return (
 				<Notice>

@@ -1,6 +1,6 @@
 # Model pickers
 
-The Proposed bodies of the agent pickers (`model-pickers.tsx`), one per picker, shared by the lesson's details, Settings › Agent, and setup. Each host owns its trigger and its Popover or DropdownMenu.
+The bodies of the agent pickers (`model-pickers.tsx`), one per picker, shared by the lesson's details, Settings › Agent, and setup. Each host owns its trigger and its Popover or DropdownMenu.
 
 | Body | Inside | Notes |
 |---|---|---|

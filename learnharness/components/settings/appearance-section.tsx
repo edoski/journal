@@ -2,83 +2,18 @@
 /**
  * The Appearance section (thin settings wave).
  *
- * Appearance controls resolve against the factory in the provider; writes
- * PUT the whole appearance section and hand the delta back so the CSS
- * variables move IMMEDIATELY (the section's whole point — it must DO
- * something). Hex inputs commit on blur/Enter; the background derives the
- * raised/accent/edge palette in code (components/settings/appearance.tsx).
- * Mode is dark-only this wave: control rendered DISABLED with a note — the
- * light palette is the design wave's work, and a lying control is worse
- * than an honest disabled one.
- *
- * Reading font (appearance wave, 2026-09-26, owner ruling): a searchable
- * dropdown of the user's INSTALLED fonts (FontMenuList over model-menu's
- * machine) fed by window.queryLocalFonts() in the desktop shell — the
- * enumeration is click-bound (the API requires user activation), deduped
- * to unique families, the factory family excluded (the DEFAULT row is
- * it). In a plain dev browser the API is absent → a small curated list
- * + a footer that says exactly that — never a fabricated system list.
- * The custom-family input inside the menu is the manual escape path.
- * Empty/unset keeps meaning Source Sans 3.
- *
- * Emphasis inks (same wave): the factory tokens default to the regular
- * text color now (globals.css); the rows' empty-state labels say "same
- * as text".
+ * Writes PUT the whole appearance section and hand the delta back so the
+ * CSS variables move IMMEDIATELY (components/settings/appearance.tsx).
+ * The app is dark only, in SF Pro, with fixed heading weights and palette
+ * (the owner's decisions), and the stylesheet owns those, so mode,
+ * background, reading font, serif session names and heading weight have no
+ * row (their schema fields stay); reading size and the emphasis inks do.
+ * Inputs commit on blur/Enter. The emphasis inks default to the regular
+ * text color (globals.css); the empty-state placeholders say "same as text".
  */
 
-import { useEffect, useRef, useState } from "react";
 import type { AppearanceSettings } from "@/src/core";
-import { MenuShell } from "@/components/menu-shell";
-import { Hint } from "@/components/ui/hint";
-import { useAppearance } from "./appearance.tsx";
-import { FontMenuList } from "./model-menu";
-import { CommitInput, SettingsGroup, SettingsMenuTrigger, SettingsRow, ThinSelect, Toggle } from "./controls.tsx";
-import { useSettingsProposed } from "./settings-design";
-
-/** The factory reading family — the DEFAULT row's identity (unset =
- *  this). Exported for tests. */
-export const DEFAULT_READING_FONT = "Source Sans 3";
-
-/** The dev-browser fallback list (queryLocalFonts is absent there):
- *  the app's own knowns plus a handful of ubiquitous macOS families,
- *  honestly LABELED as common — never presented as the system's real
- *  list. The factory family is absent: the DEFAULT row is it. Exported
- *  for tests. */
-export const CURATED_FALLBACK_FONTS: readonly string[] = [
-	"Arial",
-	"CMU Serif",
-	"Courier New",
-	"Georgia",
-	"Helvetica",
-	"Helvetica Neue",
-	"Menlo",
-	"Times New Roman",
-	"Trebuchet MS",
-	"Verdana",
-];
-
-/** window.queryLocalFonts' shape as this section consumes it (family is
- *  the only field used; the API returns one FontData per FACE — the
- *  caller dedupes). */
-type LocalFontsApi = () => Promise<Array<{ family: string }>>;
-
-/** The Local Font Access seam — read lazily (SSR has no window, and
- *  render-time access would evaluate the API on the server). */
-function localFontsApi(): LocalFontsApi | null {
-	if (typeof window === "undefined") return null;
-	return (window as unknown as { queryLocalFonts?: LocalFontsApi }).queryLocalFonts ?? null;
-}
-
-/** Compose the reading-font pick: null (or blank) = the factory
- *  Source Sans 3; otherwise the family verbatim (trimmed — the
- *  sanitizer trims again server-side). Pure — exported for tests. */
-export function composeFontFamily(
-	appearance: AppearanceSettings | undefined,
-	family: string | null,
-): AppearanceSettings {
-	const value = family?.trim() ?? "";
-	return { ...appearance, fontFamily: value === "" ? null : value };
-}
+import { CommitInput, SettingsGroup, SettingsRow } from "./controls.tsx";
 
 export function AppearanceSection({
 	appearance,
@@ -89,61 +24,8 @@ export function AppearanceSection({
 	/** PUT the whole appearance section; the page re-applies on success. */
 	onSectionChange: (next: AppearanceSettings) => void;
 }) {
-	const { appearance: resolved } = useAppearance();
 	const md = appearance?.mdRendering;
 
-	// The font dropdown's open state + its enumeration cache. undefined =
-	// not enumerated yet (desktop: click-bound queryLocalFonts pending);
-	// null = enumeration UNAVAILABLE (the API is absent in a plain
-	// browser, rejected, or resolved EMPTY — Electron 44's local-fonts
-	// grant passes and the enumeration still yields zero fonts,
-	// reproduced 2026-09-26) → the curated fallback; a list = the deduped
-	// families. enumEmpty distinguishes WHY it fell back, for the footer.
-	const [fontMenuOpen, setFontMenuOpen] = useState(false);
-	const [localFonts, setLocalFonts] = useState<string[] | null | undefined>(undefined);
-	const [enumEmpty, setEnumEmpty] = useState(false);
-	const menuAnchorRef = useRef<HTMLSpanElement>(null);
-
-	// The enumeration runs INSIDE the trigger click — queryLocalFonts
-	// requires user activation, so it cannot be a mount effect. First
-	// open only: the families are cached for the section's life (font
-	// installs mid-dialog are not a case); ANY unavailable enumeration
-	// (absent / rejected / empty) falls back to the curated list rather
-	// than an empty picker.
-	const openFontMenu = () => {
-		setFontMenuOpen((open) => {
-			if (!open && localFonts === undefined) {
-				const api = localFontsApi();
-				if (api === null) {
-					setLocalFonts(null);
-					setEnumEmpty(false);
-				} else {
-					void api()
-						.then((fonts) => {
-							const families = [...new Set(fonts.map((f) => f.family))]
-								.filter((f) => f !== DEFAULT_READING_FONT)
-								.sort((a, b) => a.localeCompare(b));
-							if (families.length === 0) {
-								// Resolved-but-empty: not a failure the catch sees —
-								// an honest unavailable (this Electron 44 build
-								// enumerates nothing even granted).
-								setLocalFonts(null);
-								setEnumEmpty(true);
-							} else {
-								setLocalFonts(families);
-							}
-						})
-						.catch(() => {
-							setLocalFonts(null);
-							setEnumEmpty(false);
-						});
-				}
-			}
-			return !open;
-		});
-	};
-
-	const proposed = useSettingsProposed();
 	const commitProseSize = (v: string) => {
 		// Empty = factory default (owner, fix wave): omit the key so the record
 		// UNSETS and the field stays empty (absence, not null, is the
@@ -157,155 +39,9 @@ export function AppearanceSection({
 		onSectionChange({ ...appearance, proseFontSize: Math.min(24, Math.max(12, Math.round(n))) });
 	};
 
-	const pickFont = (family: string | null) => {
-		setFontMenuOpen(false);
-		onSectionChange(composeFontFamily(appearance, family));
-	};
-
-	// The dropdown contract (agent-section's, mirrored): any click
-	// outside the open menu — or an Esc — closes it. Esc is CLAIMED with
-	// stopPropagation so the settings dialog behind does NOT also close.
-	useEffect(() => {
-		if (!fontMenuOpen) return;
-		const onPointerDown = (e: PointerEvent) => {
-			const target = e.target as Node;
-			if (menuAnchorRef.current?.contains(target)) return;
-			if (target instanceof Element && target.closest("[data-lh-menu]")) return;
-			if (target instanceof Element && target.closest('[role="dialog"]')) {
-				setFontMenuOpen(false);
-			}
-			// else: outside the dialog — the dialog's own close handles it.
-		};
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				e.stopPropagation();
-				setFontMenuOpen(false);
-			}
-		};
-		document.addEventListener("pointerdown", onPointerDown);
-		document.addEventListener("keydown", onKeyDown);
-		return () => {
-			document.removeEventListener("pointerdown", onPointerDown);
-			document.removeEventListener("keydown", onKeyDown);
-		};
-	}, [fontMenuOpen]);
-
-	// Proposed is dark only, in SF Pro, with fixed heading weights and
-	// palette (the owner's decisions), and the stylesheet ignores those
-	// settings there (appearance.tsx). So their rows would be controls that
-	// do nothing: mode, background, reading font, serif session names and
-	// heading weight are left out; reading size and the emphasis inks stay.
-	if (proposed) {
-		return (
-			<SettingsGroup label="Reading" testid="group-reading">
-				<SettingsRow label="Text size" testid="row-prose-size">
-					<CommitInput
-						type="number"
-						value={String(appearance?.proseFontSize ?? "")}
-						placeholder="16"
-						ariaLabel="prose font size"
-						testid="input-prose-size"
-						onCommit={commitProseSize}
-					/>
-				</SettingsRow>
-				<SettingsRow label="Bold color" testid="row-bold-color">
-					<CommitInput
-						value={md?.boldColor ?? ""}
-						placeholder="same as text"
-						ariaLabel="bold color"
-						testid="input-bold-color"
-						onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
-					/>
-				</SettingsRow>
-				<SettingsRow label="Italic color" testid="row-italic-color">
-					<CommitInput
-						value={md?.italicColor ?? ""}
-						placeholder="same as text"
-						ariaLabel="italic color"
-						testid="input-italic-color"
-						onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
-					/>
-				</SettingsRow>
-			</SettingsGroup>
-		);
-	}
 	return (
-		<>
-			<SettingsRow label="Mode" hint="Coming soon" testid="row-mode" dimmed>
-				<ThinSelect value="dark" ariaLabel="mode" onChange={() => {}} testid="select-mode" disabled>
-					<option value="dark">Dark</option>
-				</ThinSelect>
-			</SettingsRow>
-			<SettingsRow
-				label="Background"
-				hint={`Empty = ${resolved.background ?? "#141414"}`}
-				testid="row-background"
-			>
-				<CommitInput
-					value={appearance?.background ?? ""}
-					placeholder="#141414"
-					ariaLabel="background hex"
-					testid="input-background"
-					onCommit={(v) => onSectionChange({ ...appearance, background: v === "" ? null : v })}
-				/>
-			</SettingsRow>
-			<SettingsRow
-				label="Reading font"
-				hint={`Empty = ${DEFAULT_READING_FONT}`}
-				testid="row-font"
-			>
-				<span ref={fontMenuOpen ? menuAnchorRef : undefined} className="relative flex items-center gap-2">
-					{/* The shared Agent/Appearance collapsed-menu trigger.
-					    The tooltip rides the CLOSED button ONLY
-					    (owner ruling 2026-09-26: never while
-					    the dropdown is out — it popped over the open
-					    menu when the wrap covered the whole anchor
-					    span). */}
-					{(() => {
-						const triggerButton = (
-							<SettingsMenuTrigger
-								value={appearance?.fontFamily || DEFAULT_READING_FONT}
-								aria-label="Reading font"
-								aria-expanded={fontMenuOpen}
-								data-testid="font-trigger"
-								onClick={openFontMenu}
-								className="min-w-20"
-							/>
-						);
-						return fontMenuOpen ? (
-							triggerButton
-						) : (
-							<Hint label="Choose from your installed fonts" side="left">
-								{triggerButton}
-							</Hint>
-						);
-					})()}
-					{fontMenuOpen && (
-						<MenuShell
-							preferredSide="down"
-							anchorTestid="font-trigger"
-							testid="font-menu"
-							menuClass="flex w-[18rem] flex-col gap-0.5 rounded-xl border border-border bg-card p-2 text-xs shadow-xl"
-						>
-							<FontMenuList
-								families={localFonts === undefined ? undefined : (localFonts ?? [...CURATED_FALLBACK_FONTS])}
-								effectiveFamily={appearance?.fontFamily ?? null}
-								onPick={pickFont}
-								footer={
-									localFonts === undefined
-										? undefined
-										: localFonts === null
-											? enumEmpty
-												? "Common families — installed fonts could not be read"
-												: "Common families — your installed list needs the desktop app"
-											: "Your installed fonts"
-								}
-							/>
-						</MenuShell>
-					)}
-				</span>
-			</SettingsRow>
-			<SettingsRow label="Reading font size" hint={`${resolved.proseFontSize}px`} testid="row-prose-size">
+		<SettingsGroup label="Reading" testid="group-reading">
+			<SettingsRow label="Text size" testid="row-prose-size">
 				<CommitInput
 					type="number"
 					value={String(appearance?.proseFontSize ?? "")}
@@ -315,40 +51,7 @@ export function AppearanceSection({
 					onCommit={commitProseSize}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Session names in serif" testid="row-session-serif">
-				<Toggle
-					checked={appearance?.sessionNameSerif ?? true}
-					label="session names serif"
-					onChange={(on) => onSectionChange({ ...appearance, sessionNameSerif: on })}
-				/>
-			</SettingsRow>
-			<SettingsRow label="Heading weight" hint={`${resolved.mdRendering.headingWeight}`} testid="row-heading-weight">
-				<CommitInput
-					type="number"
-					value={String(md?.headingWeight ?? "")}
-					placeholder="900"
-					ariaLabel="heading weight"
-					testid="input-heading-weight"
-					onCommit={(v) => {
-						// Empty = factory default (owner, fix wave): Number("") is 0, so
-						// Absence is the unset representation — the old clamp wrote 100.
-						if (v === "") {
-							onSectionChange({ ...appearance, mdRendering: { ...md, headingWeight: undefined } });
-							return;
-						}
-						const n = Number(v);
-						if (!Number.isFinite(n)) return;
-						onSectionChange({
-							...appearance,
-							mdRendering: { ...md, headingWeight: Math.min(900, Math.max(100, Math.round(n))) },
-						});
-					}}
-				/>
-			</SettingsRow>
-			{/* The emphasis inks default to the REGULAR TEXT COLOR now
-			    (appearance wave, 2026-09-26) — the empty-state labels say
-			    so; explicit hex overrides ride unchanged. */}
-			<SettingsRow label="Bold color" hint="Empty = same as text" testid="row-bold-color">
+			<SettingsRow label="Bold color" testid="row-bold-color">
 				<CommitInput
 					value={md?.boldColor ?? ""}
 					placeholder="same as text"
@@ -357,7 +60,7 @@ export function AppearanceSection({
 					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, boldColor: v === "" ? null : v } })}
 				/>
 			</SettingsRow>
-			<SettingsRow label="Italic color" hint="Empty = same as text" testid="row-italic-color">
+			<SettingsRow label="Italic color" testid="row-italic-color">
 				<CommitInput
 					value={md?.italicColor ?? ""}
 					placeholder="same as text"
@@ -366,6 +69,6 @@ export function AppearanceSection({
 					onCommit={(v) => onSectionChange({ ...appearance, mdRendering: { ...md, italicColor: v === "" ? null : v } })}
 				/>
 			</SettingsRow>
-		</>
+		</SettingsGroup>
 	);
 }

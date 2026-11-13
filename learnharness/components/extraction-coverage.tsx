@@ -11,7 +11,7 @@ import { EXTRACTION_CHUNK_TOKENS } from "@/src/core";
 /**
  * The extraction-coverage surfaces (extraction-UX redesign, owner-locked
  * dispatch 2026-09-24): the ring meter in the chat top bar and the coverage
- * block in the sidebar's session context menu — the two replacements for
+ * item in the session menu (unit-inbox/coverage-menu-item.tsx) — the two replacements for
  * the graph view's coverage panel (components/graph-coverage.tsx, retired
  * with this wave). Coverage is the SAME derivation, scoped to one session:
  * GET /api/chats/[id] now carries `coverage` (Platform's eed4b4e).
@@ -69,26 +69,11 @@ async function requestExtract(chatId: string): Promise<boolean> {
 	}
 }
 
-// ─── The sidebar context menu's coverage block ──────────────────────────────
-
-/**
- * The info block at the bottom of the session context menu (owner-locked
- * redesign): what the extractor hasn't covered yet, plus the manual Extract
- * affordance — visually separated from Rename/Delete below (those stay the
- * two session-management actions). Fetched ON MENU OPEN (the block mounts
- * with the menu — on-demand, never eagerly), polled at 2s while a run is
- * in flight so the numbers settle live. No coverage (fetch failed, 404):
- * the whole block renders nothing — no fake zeros.
- */
-export function CoverageMenuBlock({ chatId }: { chatId: string }) {
-	const { coverage, extracting, extract } = useSessionCoverage(chatId);
-	if (coverage === null) return null;
-	return <CoverageMenuBody coverage={coverage} extracting={extracting} onExtract={extract} />;
-}
+// ─── The session menu's coverage item ──────────────────────────────────────
 
 /** One session's coverage while its menu is open, and the manual Extract:
- *  the block's data, shared by both designs' menus. `coverage` stays null
- *  until the first read lands, and when it fails. */
+ *  the menu item's data. `coverage` stays null until the first read lands,
+ *  and when it fails (the item then renders nothing — no fake zeros). */
 export function useSessionCoverage(chatId: string): {
 	coverage: SessionCoverage | null;
 	extracting: boolean;
@@ -114,7 +99,7 @@ export function useSessionCoverage(chatId: string): {
 		setCoverage(next);
 	}, [chatId]);
 
-	// On MENU OPEN (the block mounts with the menu — on-demand, never
+	// On MENU OPEN (the item mounts with the menu — on-demand, never
 	// eagerly): one read, then the 2s poll below takes over while running.
 	useEffect(() => {
 		lastUncoveredRef.current = null;
@@ -122,9 +107,9 @@ export function useSessionCoverage(chatId: string): {
 		void load();
 	}, [load]);
 
-	// While a run is in flight the block polls at 2s (the old panel's
+	// While a run is in flight the item polls at 2s (the old panel's
 	// open-only cadence, bounded to the running state) — the numbers
-	// settle live and the block ends in "fully extracted".
+	// settle live and the item ends in "Notes fully extracted".
 	// ACCEPTED BY DESIGN (owner, 2026-10-02): the ring drains per fold,
 	// and the events channel is per phase — that granularity gap is why
 	// this bounded, run-scoped poll stays.
@@ -147,7 +132,7 @@ export function useSessionCoverage(chatId: string): {
 	return { coverage, extracting, extract: () => void onExtract() };
 }
 
-/** The Proposed menu's one coverage item (components/ui/menu.md): its label,
+/** The session menu's one coverage item (components/ui/menu.md): its label,
  *  the backlog as its detail while there is one, and whether Extract can
  *  run. Pure. */
 export function coverageItem(
@@ -165,53 +150,6 @@ export function coverageItem(
 		running,
 		disabled: running || complete,
 	};
-}
-
-/** The block's presentational core (exported for static-render tests):
- *  the numbers, the running pulse, and the Extract affordance with its
- *  optimistic "Running" state. */
-export function CoverageMenuBody({
-	coverage,
-	extracting,
-	onExtract,
-}: {
-	coverage: SessionCoverage;
-	/** Click-pending (optimistic) until the server says running. */
-	extracting: boolean;
-	onExtract: () => void;
-}) {
-	const busy = coverage.running || extracting;
-	const complete = coverage.uncoveredTokens === 0 && coverage.uncoveredCount === 0;
-	return (
-		<div data-testid="ctx-coverage" className="flex flex-col gap-1 px-2.5 pt-1 pb-2">
-			{busy ? (
-				<span className="flex items-center gap-1.5 text-muted-foreground" data-testid="ctx-coverage-running">
-					<span className="size-1.5 animate-pulse rounded-full bg-foreground/70" aria-hidden />
-					extracting…
-				</span>
-			) : complete ? (
-				<span className="text-muted-foreground">fully extracted</span>
-			) : (
-				<span className="flex flex-col">
-					<span className="tabular-nums text-foreground">
-						{formatTokens(coverage.uncoveredTokens)} tok uncovered
-					</span>
-					<span className="tabular-nums text-muted-foreground">
-						{coverage.uncoveredCount} message{coverage.uncoveredCount === 1 ? "" : "s"} unextracted
-					</span>
-				</span>
-			)}
-			<button
-				type="button"
-				data-testid="ctx-extract"
-				onClick={onExtract}
-				disabled={busy || complete}
-				className="flex items-center justify-center rounded-lg border px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent"
-			>
-				{busy ? "Running" : "Extract"}
-			</button>
-		</div>
-	);
 }
 
 // ─── The chat top bar's ring meter ──────────────────────────────────────────

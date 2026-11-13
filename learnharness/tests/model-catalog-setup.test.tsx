@@ -1,6 +1,6 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
-import "./helpers/radix-dom.ts";
+import { dom } from "./helpers/radix-dom.ts";
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
@@ -49,7 +49,11 @@ async function render(children: React.ReactNode) {
 async function answer(index: number, body: ModelCatalogResponse | null) { await act(async () => requests[index]!.resolve(body ? Response.json(body) : new Response("unavailable", { status: 503 }))); }
 function element(testid: string) { const e = document.querySelector<HTMLElement>(`[data-testid="${testid}"]`); assert.ok(e, testid); return e; }
 async function click(testid: string) { await act(async () => element(testid).click()); }
-function levels() { return [...document.querySelectorAll('[data-testid^="thinking-option-"]')].map((e) => e.textContent); }
+/** Thinking menus open and close on keydown, as Radix menus do. */
+async function toggleMenu(testid: string) {
+	await act(async () => { const key = new dom.window.Event("keydown", { bubbles: true, cancelable: true }); Object.assign(key, { key: "Enter" }); element(testid).dispatchEvent(key); });
+}
+function levels() { return [...document.querySelectorAll('[data-testid^="thinking-option-"]')].map((e) => `${e.textContent}${e.getAttribute("aria-checked") === "true" ? "✓" : ""}`); }
 async function warm(body = catalog()) { await render(<Reader />); await answer(0, body); }
 
 afterEach(async () => {
@@ -75,17 +79,17 @@ test("cached setup is immediately usable; fresh metadata/untouched slots update 
 	assert.equal(requests.length, 2);
 	assert.ok(element("setup-stage-pickers"));
 	assert.equal(document.querySelector('[data-testid="setup-stage-keys"]'), null);
-	assert.equal(element("setup-trigger-strong").textContent, "model:free▾");
+	assert.equal(element("setup-trigger-strong").textContent, "model:free");
 	await click("setup-trigger-strong"); await click("model-option-claude-opus-5-5");
-	await click("setup-thinking-strong"); await click("thinking-option-medium");
+	await toggleMenu("setup-thinking-strong"); await click("thinking-option-medium");
 	const fresh = catalog(); fresh.slots.cheap = { model: { provider: b.provider, id: b.id }, thinkingLevel: "off" };
 	fresh.models[1] = { ...b, supportedLevels: ["off", "medium", "high"] };
 	await answer(1, fresh);
-	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium▾");
-	assert.equal(element("setup-trigger-cheap").textContent, "claude-opus-5-5▾");
-	await click("setup-thinking-strong"); assert.deepEqual(levels(), ["off", "medium✓", "high"]);
-	await click("setup-thinking-strong");
+	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium");
+	assert.equal(element("setup-trigger-cheap").textContent, "claude-opus-5-5");
+	await toggleMenu("setup-thinking-strong"); assert.deepEqual(levels(), ["off", "medium✓", "high"]);
+	await toggleMenu("setup-thinking-strong");
 	await act(async () => snapshot.refresh()); await answer(2, null);
 	assert.ok(element("setup-catalog-error")); assert.equal(element("setup-save").hasAttribute("disabled"), false);
 	await click("setup-save");
@@ -126,8 +130,10 @@ test("cold saved disconnected pins still enter the provider stage, without any m
 		return null;
 	}
 	await render(<><Reader />{setup()}<Probe /></>);
+	assert.ok(element("setup-stage-loading"));
 	await answer(1, catalog(false));
-	assert.deepEqual(stages, ["setup-stage-loading", "setup-stage-keys"]);
+	// The dialog's portal mounts a commit after Probe's first frame.
+	assert.deepEqual(stages.filter(Boolean), ["setup-stage-keys"]);
 });
 
 for (const count of [0, 1, 2]) test(`connecting with ${count} saved slots only requires the missing slots; stale identities/thinking survive`, async () => {
@@ -146,7 +152,7 @@ for (const count of [0, 1, 2]) test(`connecting with ${count} saved slots only r
 		if (before.slots[slot]) continue;
 		await click(`setup-trigger-${slot}`); await click("model-option-claude-opus-5-5");
 	}
-	if (count > 0) assert.equal(element("setup-thinking-strong").textContent?.trim(), "xhigh▾");
+	if (count > 0) assert.equal(element("setup-thinking-strong").textContent?.trim(), "xhigh");
 	await click("setup-save");
 	for (const slot of ["strong", "cheap", "vision"] as const) {
 		if (before.slots[slot]) assert.deepEqual(writes[0]?.[slot], before.slots[slot]);
@@ -158,15 +164,15 @@ test("a partial setup's model/thinking edits survive exclusive provider recovery
 	installFetch(); const before = catalog(); before.slots.cheap = null; before.slots.vision = null;
 	await warm(before); await render(<><Reader />{setup()}</>); await answer(1, before);
 	await click("setup-trigger-strong"); await click("model-option-claude-opus-5-5");
-	await click("setup-thinking-strong"); await click("thinking-option-medium");
+	await toggleMenu("setup-thinking-strong"); await click("thinking-option-medium");
 	await act(async () => notifySettingsSaved("keys")); await answer(2, { ...before, models: [], providers: [] });
 	assert.ok(element("setup-stage-keys")); assert.equal(document.querySelector('[data-testid="setup-stage-pickers"]'), null);
 	await act(async () => notifySettingsSaved("keys")); await answer(3, before);
-	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium▾");
+	assert.equal(element("setup-trigger-strong").textContent, "claude-opus-5-5");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "medium");
 	await render(<Reader />); await render(<><Reader />{setup()}</>);
-	assert.equal(element("setup-trigger-strong").textContent, "model:free▾");
-	assert.equal(element("setup-thinking-strong").textContent?.trim(), "low▾"); await answer(4, before);
+	assert.equal(element("setup-trigger-strong").textContent, "model:free");
+	assert.equal(element("setup-thinking-strong").textContent?.trim(), "low"); await answer(4, before);
 });
 
 test("Agent opens with cached thinking metadata; refresh and disconnect never clear saved levels", async () => {
@@ -174,11 +180,11 @@ test("Agent opens with cached thinking metadata; refresh and disconnect never cl
 	const models: ModelsSettings = { strong: { model: { provider: a.provider, id: a.id }, thinkingLevel: "low" } };
 	let changed: ModelsSettings | undefined;
 	await render(<><Reader /><AgentSection agent={undefined} models={models} onSectionChange={() => {}} onModelsChange={(next) => { changed = next; }} /></>);
-	await click("slot-thinking-strong"); assert.deepEqual(levels(), ["off", "low✓", "high"]);
-	assert.equal(element("slot-model-strong").textContent, "model:free▾");
+	await toggleMenu("slot-thinking-strong"); assert.deepEqual(levels(), ["off", "low✓", "high"]);
+	assert.equal(element("slot-model-strong").textContent, "Model free");
 	await answer(1, catalog());
 	await act(async () => notifySettingsSaved("keys")); await answer(2, catalog(false));
-	assert.equal(element("slot-thinking-strong").textContent, "low▾");
+	assert.equal(element("slot-thinking-strong").textContent, "low");
 	await click("thinking-option-xhigh"); assert.equal(changed?.strong?.thinkingLevel, "xhigh"); assert.equal(changed?.strong?.model?.id, a.id);
 });
 
