@@ -26,7 +26,7 @@ export type ResumeVariant = "current" | (typeof RESUME_OPTIONS)[number];
 /** Where the hybrid topic page puts the lesson to pick up: in its history,
  *  sorted by relevance (spec:
  *  components/unit-inbox/topic-page/pickup/pickup.md). */
-export const PICKUP_OPTIONS = ["sections"] as const;
+export const PICKUP_OPTIONS = ["sections", "block"] as const;
 /** "current" keeps the hybrid's dated history. */
 export type PickupVariant = "current" | (typeof PICKUP_OPTIONS)[number];
 
