@@ -124,9 +124,9 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 				return (
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={ONE_LINE_ROW}>
-							{item.kind === "task" ? <BookmarkIcon aria-label="Open task" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
+							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
 							<span className="truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
-							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" ? item.step : null}</span>
+							<span className="max-w-40 truncate text-label text-muted-foreground">{item.kind === "task" && item.step ? <MathText>{item.step}</MathText> : null}</span>
 						</Button>
 					</li>
 				);
