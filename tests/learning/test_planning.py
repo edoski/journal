@@ -96,6 +96,16 @@ def test_plan_joins_reviews_open_work_and_recorded_effort(tmp_path: Path) -> Non
         "last_activity": {"date": TODAY.isoformat(), "days_ago": 0},
         "journal": {"activity": "SMM", "study_minutes": 140, "sessions": 2},
         "week": {"minutes": 140},
+        "plan": {
+            "daily_topics": 8,
+            "final_review_days": 6,
+            "new_topics_on_weekends": False,
+            "days": [
+                {"date": day(0), "reviews": ["systems"], "new": []},
+                {"date": day(3), "reviews": ["systems", "rank"], "new": []},
+                {"date": day(6), "reviews": ["rank"], "new": []},
+            ],
+        },
     }
     assert "daily" not in result["journal"]
     assert result["journal"]["by_activity"]["Other"]["study_minutes"] == 30
@@ -211,3 +221,27 @@ def test_journal_rejects_invalid_window_lengths(tmp_path: Path) -> None:
         journal_summary(tmp_path, horizon=0)
     with pytest.raises(ValueError, match="days"):
         journal_summary(tmp_path, days=0)
+
+
+def test_plan_names_the_topics_that_no_longer_fit_and_pauses_after_the_exam(
+    tmp_path: Path,
+) -> None:
+    topics = {f"t{index:02d}": {} for index in range(30)}
+    workspace = course(
+        tmp_path / "late",
+        {"title": "Late", "exam": {"date": day(14)}, "topics": topics},
+    )
+    entry = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    late = entry["courses"][0]["plan"]
+    assert late["does_not_fit"] and late["does_not_fit"][-1] == "t29"
+    assert set(late["does_not_fit"]).isdisjoint(
+        topic for day_ in late["days"] for topic in day_["new"]
+    )
+    records.save(workspace, {"exam": {"date": day(-1)}})
+    over = plan(workspace, tmp_path / "vault", everywhere=False, days=7)
+    assert over["courses"][0]["plan"] == {
+        "daily_topics": 8,
+        "final_review_days": 6,
+        "new_topics_on_weekends": False,
+        "paused": "the exam has passed; reviews wait for the next exam date",
+    }

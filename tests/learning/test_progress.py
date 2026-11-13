@@ -205,19 +205,100 @@ def test_grades(observation: dict[str, Any], expected: str) -> None:
     assert progress.grade(observation) == expected
 
 
-def test_exam_pulls_reviews_in_but_never_before_the_attempt() -> None:
+def exam(day_: date, lead: int = progress.FINAL_REVIEW_DAYS) -> progress.Exam:
+    return progress.Exam(day_, day_ - timedelta(days=lead))
+
+
+def test_an_exam_caps_reviews_at_its_final_review() -> None:
     base = date(2026, 10, 10)
     assert progress.review_day(base, 16, None) == date(2026, 10, 26)
-    assert progress.review_day(base, 16, date(2026, 10, 20)) == date(2026, 10, 13)
-    assert progress.review_day(base, 2, date(2026, 10, 30)) == date(2026, 10, 12)
-    assert progress.review_day(base, 3, date(2026, 10, 12)) == date(2026, 10, 11)
-    assert progress.review_day(base, 3, date(2026, 10, 1)) == date(2026, 10, 13)
+    assert progress.review_day(base, 16, exam(date(2026, 10, 20))) == date(2026, 10, 14)
+    assert progress.review_day(base, 2, exam(date(2026, 10, 30))) == date(2026, 10, 12)
+    assert progress.review_day(base, 3, exam(date(2026, 10, 1))) == date(2026, 10, 13)
 
 
 @pytest.mark.parametrize("days", [1, 2, 3, 160])
-def test_an_exam_tomorrow_puts_the_review_on_the_exam_day(days: int) -> None:
+def test_after_the_final_review_nothing_is_due_before_the_exam(days: int) -> None:
     base = date(2026, 10, 10)
-    assert progress.review_day(base, days, date(2026, 10, 11)) == date(2026, 10, 11)
+    soon = exam(date(2026, 10, 11))
+    expected = progress.review_day(base, days, soon)
+    assert expected == base + timedelta(days=days)
+    assert progress.kept(base, expected, soon) is None
+    assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
+
+
+def test_a_miss_after_the_final_review_is_relearned_then_settles() -> None:
+    record = schema.apply_patch(
+        course(introduced=day(-20)),
+        {"exam": {"date": day(5)}},
+        today=TODAY,
+        now=NOW,
+    )[0]
+    record, scheduled = save(record, {"observations": [attempt("rank", "incorrect")]})
+    assert scheduled.reviews == {"rank": {"due": day(1), "by": "engine"}}
+    later = TODAY + timedelta(days=1)
+    record, scheduled = save(
+        record, {"observations": [attempt("rank", offset=1)]}, later
+    )
+    assert "review" not in record["topics"]["rank"]
+    assert scheduled.notes == [
+        "rank: no review before the exam; its final review is done"
+    ]
+
+
+def test_after_the_exam_nothing_is_due_until_a_new_date() -> None:
+    record = course(introduced=day(-30), review={"due": day(-1)})
+    record = schema.apply_patch(
+        record, {"exam": {"date": day(-2)}}, today=TODAY, now=NOW
+    )[0]
+    assert progress.due(record, TODAY) == []
+    record, _ = save(record, {"exam": {"date": day(30)}})
+    assert [item["topic"] for item in progress.due(record, TODAY)] == ["rank"]
+
+
+def test_setting_an_exam_pulls_every_engine_date_before_it() -> None:
+    record = course(introduced=day(-27))
+    for offset in (-26, -23, -16, 0):
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=offset)]},
+            TODAY + timedelta(days=offset),
+        )
+    assert record["topics"]["rank"]["review"]["due"] == day(35)
+    moved, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert moved["topics"]["rank"]["review"] == {"due": day(14), "by": "engine"}
+    assert scheduled.notes == [f"rank: review moved to {day(14)}, after the exam moved"]
+    back, _ = save(moved, {"exam": None})
+    assert back["topics"]["rank"]["review"] == record["topics"]["rank"]["review"]
+    again, scheduled = save(moved, {"exam": {"date": day(20)}})
+    assert again == moved and scheduled.reviews == {}
+
+
+def test_a_tutor_date_after_a_moved_exam_goes_to_the_engine() -> None:
+    record = course(introduced=day(-3), review={"due": day(30)})
+    record, _ = save(record, {"exam": {"date": day(40)}})
+    assert record["topics"]["rank"]["review"]["by"] == "tutor"
+    record, scheduled = save(record, {"exam": {"date": day(20)}})
+    assert record["topics"]["rank"]["review"] == {"due": day(-2), "by": "engine"}
+
+
+def test_the_final_review_lead_is_a_course_preference() -> None:
+    record = course(introduced=day(-40))
+    record, _ = save(record, {"exam": {"date": day(20)}})
+    record, _ = save(record, {"observations": [attempt("rank", offset=0)]})
+    record, _ = save(
+        record,
+        {"observations": [attempt("rank", offset=3)]},
+        TODAY + timedelta(days=3),
+    )
+    assert record["topics"]["rank"]["review"]["due"] == day(10)
+    record, scheduled = save(record, {"preferences": {"final_review_days": "14"}})
+    assert record["topics"]["rank"]["review"]["due"] == day(6)
+    assert scheduled.notes == [f"rank: review moved to {day(6)}, after the exam moved"]
+    with pytest.raises(ValueError, match="belongs to one course"):
+        schema.check_patch({"global_preferences": {"final_review_days": "5"}})
+    with pytest.raises(ValueError, match="whole number from 1 to 14"):
+        schema.check_patch({"preferences": {"final_review_days": "a week"}})
 
 
 def test_new_attempts_climb_the_ladder_and_keep_the_prompt() -> None:
@@ -397,3 +478,25 @@ def test_due_puts_prerequisites_first_and_upcoming_sorts_by_day() -> None:
     assert due[0]["overdue"] == 0
     assert progress.upcoming(record, TODAY, 7) == [{"topic": "basis", "due": day(1)}]
     assert len(progress.upcoming(record, TODAY, 9)) == 2
+
+
+def test_moving_the_exam_later_never_uncounts_a_review() -> None:
+    record, _ = save(course(introduced=day(-1)), {"exam": {"date": day(20)}})
+    when = TODAY
+    while (due := record["topics"]["rank"].get("review", {}).get("due")) and (
+        due < day(19)
+    ):
+        when = date.fromisoformat(due)
+        record, _ = save(
+            record,
+            {"observations": [attempt("rank", offset=(when - TODAY).days)]},
+            when,
+        )
+    counted = progress.replays(record)["rank"].verdicts
+    assert counted[-1] == (day(14), "solid")
+    moved, _ = save(record, {"exam": {"date": day(60)}}, when)
+    assert progress.replays(moved)["rank"].verdicts == counted
+    assert all(
+        moved["observations"][key]["due_topics"] == ["rank"]
+        for key in moved["observations"]
+    )

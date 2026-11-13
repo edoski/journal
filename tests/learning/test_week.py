@@ -155,27 +155,29 @@ def test_the_runup_appears_only_within_21_days(
     assert (runup(workspace, tmp_path / "vault") is not None) is present
 
 
-def test_unready_uses_the_14_day_window_and_untaught_topics_are_listed(
+def test_unready_uses_the_14_day_window_and_lists_only_taught_topics(
     tmp_path: Path,
 ) -> None:
     result = runup(runup_course(tmp_path, 14), tmp_path / "vault")
     assert result["days_left"] == 14
     assert result["not_introduced"] == ["eigen"]
-    assert result["unready"] == ["span", "eigen", "basis"]
+    assert result["unready"] == ["span", "basis"]
 
 
-def test_study_days_count_windows_until_a_week_before_the_exam(tmp_path: Path) -> None:
+def test_study_days_count_windows_until_the_last_day_for_new_topics(
+    tmp_path: Path,
+) -> None:
     vault = tmp_path / "vault"
     write_protocol(vault, day(1), day(2), day(7))
     workspace = runup_course(tmp_path, 14)
     result = runup(workspace, vault)
-    assert result["study_days"] == 5
-    assert result["pace"] == 0.2
+    assert result["study_days"] == 2
+    assert result["pace"] == 0.5
     full = plan(workspace, vault, everywhere=False, days=7)
     assert len(full["journal"]["upcoming_schedule"]) == 21
 
 
-def test_journal_errors_or_no_study_days_omit_study_days_and_pace(
+def test_no_study_days_omit_the_pace_and_a_broken_journal_counts_weekdays(
     tmp_path: Path,
 ) -> None:
     vault = tmp_path / "vault"
@@ -188,7 +190,7 @@ def test_journal_errors_or_no_study_days_omit_study_days_and_pace(
         "no table\n", encoding="utf-8"
     )
     broken = runup(workspace, vault)
-    assert "study_days" not in broken and "pace" not in broken
+    assert (broken["study_days"], broken["pace"]) == (3, 0.33)
     assert broken["not_introduced"] == ["eigen"]
 
 

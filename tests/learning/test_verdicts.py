@@ -296,13 +296,15 @@ def test_a_self_report_that_supersedes_a_miss_reschedules_its_topic() -> None:
     assert course.due == on(4).isoformat()
 
 
-def test_the_exam_clamp_applies_to_every_replayed_interval() -> None:
-    course = Course({**TOPICS, "exam": {"date": on(10).isoformat()}})
+def test_the_final_review_caps_every_replayed_interval() -> None:
+    course = Course({**TOPICS, "exam": {"date": on(14).isoformat()}})
     course.attempts(1, att("correct"))
     course.attempts(4, att("correct", text="probe"))
-    assert course.due == on(6).isoformat()
-    course.attempts(6, att("correct", text="probe 2"))
     assert course.due == on(7).isoformat()
+    course.attempts(7, att("correct", text="probe 2"))
+    assert course.due == on(8).isoformat()
+    course.attempts(8, att("correct", text="the final review"))
+    assert "review" not in course.record["topics"]["a"]
 
 
 def test_an_identical_attempt_is_skipped_at_5_minutes_and_kept_at_31() -> None:

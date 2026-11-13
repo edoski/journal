@@ -84,6 +84,7 @@ HELPER_FIELDS = frozenset(
         "updated_at",
         "next_observation",
         "recorded",
+        "due_topics",
         "judged",
         "updated",
         "created",
@@ -176,7 +177,7 @@ FIELDS: dict[str, dict[str, str]] = {
 HELPERS: dict[str, dict[str, str]] = {
     "topic": {"judged": _DAY},
     "review": {"by": _BY},
-    "observation": {"recorded": _STAMP},
+    "observation": {"recorded": _STAMP, "due_topics": _HANDLES},
     "knowledge": {"updated": _DAY},
     "task": {"created": _DAY, "updated": _DAY},
 }
@@ -249,6 +250,7 @@ class Observation(TypedDict, total=False):
     corrects: list[str]
     uncertain: str
     recorded: str
+    due_topics: list[str]
 
 
 class Knowledge(TypedDict, total=False):
@@ -312,6 +314,7 @@ class PatchResult:
     introduced: list[str] = field(default_factory=list)
     judged: list[str] = field(default_factory=list)
     global_preferences: dict[str, str | None] | None = None
+    exam_moved: bool = False
 
 
 # --- messages ---------------------------------------------------------------
@@ -1083,6 +1086,7 @@ def check_patch(patch: Any) -> dict[str, Any]:
             ]
         else:
             result[name] = preferences.validate(value, name)
+            preferences.check_engine(result[name], name)
     return result
 
 
@@ -1264,7 +1268,11 @@ def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> s
 
 
 def _content(observation: dict[str, Any]) -> dict[str, Any]:
-    return {name: value for name, value in observation.items() if name != "recorded"}
+    return {
+        name: value
+        for name, value in observation.items()
+        if name not in ("recorded", "due_topics")
+    }
 
 
 def _append_observations(
@@ -1300,6 +1308,14 @@ def _append_observations(
         record["observations"][key] = {**item, "recorded": now}
         outcome.observations.append(key)
     record["next_observation"] = sequence
+
+
+def _exam_plan(record: dict[str, Any]) -> tuple[Any, Any]:
+    """What review dates hang on: the exam day and the course's final-review lead."""
+    return (
+        record.get("exam", {}).get("date"),
+        record.get("preferences", {}).get(preferences.FINAL_REVIEW_DAYS),
+    )
 
 
 def apply_patch(
@@ -1369,4 +1385,5 @@ def apply_patch(
             f"{', '.join(citing[:12])} cite it; change those refs first, or keep "
             "the source"
         )
+    outcome.exam_moved = _exam_plan(record) != _exam_plan(result)
     return validate_record(result), outcome
