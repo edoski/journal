@@ -84,9 +84,11 @@ class Replay:
     due: date | None = None
     streak: int = 0
 
-    def expect(self, base: date, days: int, exam: Exam | None) -> None:
+    def expect(
+        self, base: date, days: int, exam: Exam | None, *, solid: bool = False
+    ) -> None:
         self.expected = review_day(base, days, exam)
-        self.due = kept(base, self.expected, exam)
+        self.due = kept(base, self.expected, exam, solid=solid)
 
 
 @dataclass
@@ -195,10 +197,16 @@ def review_day(base: date, days: int, exam: Exam | None) -> date:
     return min(natural, exam.final)
 
 
-def kept(base: date, expected: date, exam: Exam | None) -> date | None:
+def kept(
+    base: date, expected: date, exam: Exam | None, *, solid: bool = False
+) -> date | None:
     """The review the engine stores: none when it falls on or after an exam
-    still ahead of ``base``."""
-    return None if exam is not None and base < exam.day <= expected else expected
+    still ahead of ``base``, or after a ``solid`` answer from the final review on.
+    A miss or a helped answer then still comes back before the exam."""
+    if exam is None or base >= exam.day:
+        return expected
+    settled = solid and base >= exam.final
+    return None if settled or expected >= exam.day else expected
 
 
 def replay(
@@ -245,7 +253,7 @@ def replay(
             if result.days[day] == LEARNING
             else interval(verdict, result.streak)
         )
-        result.expect(date.fromisoformat(day), days_on, exam)
+        result.expect(date.fromisoformat(day), days_on, exam, solid=verdict == "solid")
     return result
 
 
@@ -668,7 +676,7 @@ def _due_items(
 
 
 def unready(record: dict[str, Any], today: date) -> set[str]:
-    """Within the exam run-up, topics without a ``solid`` verdict in 14 days."""
+    """Within the exam run-up, taught topics without a ``solid`` verdict in 14 days."""
     exam = exam_plan(record)
     if exam is None or not 0 <= (exam.day - today).days <= RUNUP_DAYS:
         return set()
@@ -676,10 +684,17 @@ def unready(record: dict[str, Any], today: date) -> set[str]:
     return {
         key
         for key, replayed in replays(record).items()
+        if replayed.days or "introduced" in record["topics"][key]
         if not any(
             verdict == "solid" and day > recent for day, verdict in replayed.verdicts
         )
     }
+
+
+def paused(record: dict[str, Any], today: date) -> bool:
+    """The course's exam has passed: its reviews wait for the next exam date."""
+    exam = exam_plan(record)
+    return exam is not None and exam.day < today
 
 
 def _interleaved(
@@ -722,8 +737,11 @@ def due(
     Priority: lapsed topics, then (within 21 days of the exam) topics without a
     recent ``solid`` verdict, then the most overdue, then path order. The first
     ``limit`` by priority are today's review, ordered so prerequisites come first
-    and competing methods sit together; the rest follow by priority.
+    and competing methods sit together; the rest follow by priority. Nothing is
+    due once the course's exam has passed, until a new exam date is set.
     """
+    if paused(record, today):
+        return []
     current = levels or standings(record)
     rank = _ranked(record, order)
     behind = unready(record, today)

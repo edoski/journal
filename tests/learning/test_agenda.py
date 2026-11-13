@@ -105,3 +105,14 @@ def test_settings_read_the_preferences(
     values: dict[str, str], expected: agenda.Settings
 ) -> None:
     assert agenda.settings(values) == expected
+
+
+def test_a_late_start_is_capped_at_a_teachable_pace() -> None:
+    days = plan(course(30, exam=14), 14)
+    assert max(len(day["new"]) for day in days) == agenda.NEW_PER_DAY
+    assert len(introduced(days)) < 30
+
+
+def test_after_the_exam_the_plan_waits_for_a_new_date() -> None:
+    record = course(5, exam=-1)
+    assert all(not day["reviews"] and not day["new"] for day in plan(record, 7))

@@ -27,6 +27,8 @@ from learning import preferences, progress
 DAILY_TOPICS = 8
 NEW_ON_WEEKENDS = False
 NEW_BEFORE_FINAL = 4
+# More new topics than this in a day cannot be taught well; the rest do not fit.
+NEW_PER_DAY = 3
 SATURDAY = 5
 
 StudyDay = Callable[[date], bool]
@@ -58,6 +60,32 @@ def last_new_day(exam: progress.Exam) -> date:
     return exam.final - timedelta(days=NEW_BEFORE_FINAL)
 
 
+def waiting(
+    record: dict[str, Any], levels: dict[str, dict[str, Any]], order: list[str]
+) -> list[str]:
+    """Path topics still to introduce: never taught and without a review date."""
+    return [
+        key
+        for key in order
+        if levels[key]["level"] == "new"
+        and "due" not in record["topics"][key].get("review", {})
+    ]
+
+
+def takes_new(day: date, plan: Settings, study_day: StudyDay) -> bool:
+    """Whether a day takes new topics: a study day, on a weekday unless the
+    learner wants them on weekends too."""
+    return study_day(day) and (plan.weekends or day.weekday() < SATURDAY)
+
+
+def new_days(first: date, last: date, plan: Settings, study_day: StudyDay) -> int:
+    """How many days from ``first`` to ``last`` take new topics."""
+    return sum(
+        takes_new(first + timedelta(days=offset), plan, study_day)
+        for offset in range((last - first).days + 1)
+    )
+
+
 @dataclass
 class _Projection:
     """The record as the plan expects it to stand, one day at a time."""
@@ -67,9 +95,9 @@ class _Projection:
     streaks: dict[str, int]
     exam: progress.Exam | None
 
-    def set_due(self, topic: str, base: date, days: int) -> None:
+    def set_due(self, topic: str, base: date, days: int, *, solid: bool) -> None:
         expected = progress.review_day(base, days, self.exam)
-        due = progress.kept(base, expected, self.exam)
+        due = progress.kept(base, expected, self.exam, solid=solid)
         entry = dict(self.record["topics"][topic])
         review = {
             name: value
@@ -84,34 +112,33 @@ class _Projection:
     def reviewed(self, topic: str, day: date) -> None:
         self.streaks[topic] += 1
         self.levels[topic] = {**self.levels[topic], "lapsed": False}
-        self.set_due(topic, day, progress.interval("solid", self.streaks[topic]))
+        step = progress.interval("solid", self.streaks[topic])
+        self.set_due(topic, day, step, solid=True)
 
     def introduced(self, topic: str, day: date) -> None:
         self.streaks[topic] = 0
         self.levels[topic] = {**self.levels[topic], "level": "introduced"}
-        self.set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS)
+        self.set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
 
 
 def _new_count(
     untaught: int,
     day: date,
     exam: progress.Exam | None,
-    takes_new: Callable[[date], bool],
+    plan: Settings,
+    study_day: StudyDay,
     due_today: int,
-    budget: int,
 ) -> int:
-    if not untaught or not takes_new(day):
+    if not untaught or not takes_new(day, plan, study_day):
         return 0
     if exam is None or exam.day <= day:
-        return 1 if due_today < budget else 0
+        return 1 if due_today < plan.budget else 0
     last = last_new_day(exam)
     if day > last:
         last = exam.final - timedelta(days=1)
-    left = sum(
-        takes_new(day + timedelta(days=offset))
-        for offset in range((last - day).days + 1)
-    )
-    return min(budget, math.ceil(untaught / left)) if left > 0 else 0
+    left = new_days(day, last, plan, study_day)
+    pace = math.ceil(untaught / left) if left > 0 else 0
+    return min(plan.budget, NEW_PER_DAY, pace)
 
 
 def plan_days(
@@ -125,8 +152,8 @@ def plan_days(
     """The plan for ``days`` days from today: ``{date, reviews, new}`` per day.
 
     ``reviews`` and ``new`` are topic handles; together they never exceed the
-    budget. The exam day, and every day after an exam not yet past, propose
-    nothing. ``study_day`` says whether a day takes new topics.
+    budget. The exam day and every day after it propose nothing, and once the
+    exam has passed no day does, until a new exam date is set. ``study_day`` says whether a day takes new topics.
     """
     order = progress.path_order(record)
     levels = progress.standings(record)
@@ -138,26 +165,18 @@ def plan_days(
         {key: item.streak for key, item in replayed.items()},
         exam,
     )
-    untaught = [
-        key
-        for key in order
-        if levels[key]["level"] == "new"
-        and "due" not in record["topics"][key].get("review", {})
-    ]
-
-    def takes_new(day: date) -> bool:
-        return study_day(day) and (plan.weekends or day.weekday() < SATURDAY)
+    untaught = waiting(record, levels, order)
 
     result: list[dict[str, Any]] = []
     for offset in range(days):
         day = today + timedelta(days=offset)
-        if exam is not None and today <= exam.day <= day:
+        if exam is not None and (exam.day < today or today <= exam.day <= day):
             result.append({"date": day.isoformat(), "reviews": [], "new": []})
             continue
         due = progress.due(
             projection.record, day, levels=projection.levels, order=order
         )
-        count = _new_count(len(untaught), day, exam, takes_new, len(due), plan.budget)
+        count = _new_count(len(untaught), day, exam, plan, study_day, len(due))
         new, untaught = untaught[:count], untaught[count:]
         reviews = [item["topic"] for item in due[: plan.budget - len(new)]]
         for topic in reviews:

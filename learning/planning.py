@@ -66,17 +66,6 @@ def _week(
     return result or None
 
 
-def _study_days(journal: dict[str, Any], last: date) -> int:
-    """Days with a scheduled study window from today until ``last``."""
-    if "error" in journal:
-        return 0
-    return sum(
-        1
-        for entry in journal.get("upcoming_schedule") or ()
-        if entry["date"] <= last.isoformat() and entry["study_windows"]
-    )
-
-
 def _study_day(journal: dict[str, Any]) -> agenda.StudyDay:
     """A day takes new topics unless the Journal schedules no study window on it."""
     unscheduled = {
@@ -104,7 +93,8 @@ def _runup(
     levels: dict[str, dict[str, Any]],
     journal: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """The exam run-up: what is untaught or not recently solid, and the pace."""
+    """The exam run-up: what is untaught or not recently solid, and the pace:
+    untaught topics per day left that takes new topics, as the daily plan counts."""
     days_left = _days_left(record, today)
     if days_left is None or not _in_runup(record, today):
         return None
@@ -117,8 +107,10 @@ def _runup(
     }
     exam = progress.exam_plan(record)
     assert exam is not None
-    study_days = _study_days(journal, agenda.last_new_day(exam))
-    if study_days:
+    study_days = agenda.new_days(
+        today, agenda.last_new_day(exam), _settings(record), _study_day(journal)
+    )
+    if study_days > 0 and untaught:
         result["study_days"] = study_days
         result["pace"] = round(len(untaught) / study_days, 2)
     return compact(result, keep=("days_left",))
@@ -137,18 +129,31 @@ def _days(
     """The daily plan: its settings and each day that proposes something."""
     settings = _settings(record)
     exam = progress.exam_plan(record)
+    left = (exam.day - today).days if exam is not None else 0
+    ahead = left > 0
+    horizon = min(MAX_DAYS, max(days, left))
     planned = agenda.plan_days(
-        record, today, settings, days, study_day=_study_day(journal)
+        record, today, settings, horizon, study_day=_study_day(journal)
     )
-    proposed = [day for day in planned if day["reviews"] or day["new"]]
-    if not proposed:
+    proposed = [day for day in planned[:days] if day["reviews"] or day["new"]]
+    introduced = {topic for day in planned for topic in day["new"]}
+    untaught = agenda.waiting(
+        record, progress.standings(record), progress.path_order(record)
+    )
+    misfits = [key for key in untaught if key not in introduced] if ahead else []
+    paused = progress.paused(record, today)
+    if not proposed and not misfits and not paused:
         return None
     return compact(
         {
             "daily_topics": settings.budget,
             "final_review_days": (exam.day - exam.final).days if exam else None,
             "new_topics_on_weekends": settings.weekends,
+            "paused": "the exam has passed; reviews wait for the next exam date"
+            if paused
+            else None,
             "days": proposed,
+            "does_not_fit": misfits,
         }
     )
 

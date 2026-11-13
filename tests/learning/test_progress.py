@@ -227,7 +227,7 @@ def test_after_the_final_review_nothing_is_due_before_the_exam(days: int) -> Non
     assert progress.kept(base, expected, exam(date(2026, 10, 1))) == expected
 
 
-def test_a_miss_after_the_final_review_is_relearned_before_the_exam() -> None:
+def test_a_miss_after_the_final_review_is_relearned_then_settles() -> None:
     record = schema.apply_patch(
         course(introduced=day(-20)),
         {"exam": {"date": day(5)}},
@@ -240,14 +240,20 @@ def test_a_miss_after_the_final_review_is_relearned_before_the_exam() -> None:
     record, scheduled = save(
         record, {"observations": [attempt("rank", offset=1)]}, later
     )
-    assert scheduled.reviews == {"rank": {"due": day(4), "by": "engine"}}
-    record, scheduled = save(
-        record, {"observations": [attempt("rank", offset=4)]}, TODAY + timedelta(4)
-    )
     assert "review" not in record["topics"]["rank"]
     assert scheduled.notes == [
         "rank: no review before the exam; its final review is done"
     ]
+
+
+def test_after_the_exam_nothing_is_due_until_a_new_date() -> None:
+    record = course(introduced=day(-30), review={"due": day(-1)})
+    record = schema.apply_patch(
+        record, {"exam": {"date": day(-2)}}, today=TODAY, now=NOW
+    )[0]
+    assert progress.due(record, TODAY) == []
+    record, _ = save(record, {"exam": {"date": day(30)}})
+    assert [item["topic"] for item in progress.due(record, TODAY)] == ["rank"]
 
 
 def test_setting_an_exam_pulls_every_engine_date_before_it() -> None:
