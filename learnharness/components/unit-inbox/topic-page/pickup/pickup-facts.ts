@@ -1,8 +1,7 @@
 import { shelfOf } from "@/components/unit-inbox/units";
 import { isPlanned, nextSteps, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { resumeLine, type ResumeIcon } from "@/components/unit-inbox/topic-page/resume/resume-facts";
 import { lessonWords } from "@/components/unit-inbox/topic-page/steps/steps-facts";
-import { nextReviewWords, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { ACTION_WORDS, WRITING, nextReviewWords, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 
 /**
@@ -12,6 +11,59 @@ import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/tra
  * place that waits on him; Scheduled is the engine's dated review; Earlier
  * is the rest of the history, by day.
  */
+
+/** The icon Now leads with, the one the rest of the app uses for the same
+ *  thing: the reply mark, the tutor's spinner, the review clock, the task
+ *  bookmark, or the topic's pie. */
+export type ResumeIcon = "reply" | "writing" | "review" | "task" | "standing";
+
+/** The page's action in Now's words. */
+export interface ResumeLine {
+	kind: TopicAction["kind"];
+	icon: ResumeIcon;
+	/** What waits, in a few words: "Your turn in today's lesson". */
+	words: string;
+	/** Where, when known: the step the lesson is on, the task's step. */
+	detail: string | null;
+	/** The press: "Resume", "Review", "Start". */
+	press: string;
+}
+
+/** A session's name in a sentence: "today's lesson", "lesson of Tue 3 Nov". */
+export function sessionName(entry: SessionEntry, today: string): string {
+	const words = lessonWords(entry.day, today, entry.chat.kind === "practice" ? "practice" : "lesson");
+	return words.charAt(0).toLowerCase() + words.slice(1);
+}
+
+const entryOf = (facts: TopicFacts, id: string) => facts.sessions.find((entry) => entry.chat.id === id);
+
+/** Every one of the action table's seven rows in Now's words. */
+export function resumeLine(facts: TopicFacts): ResumeLine {
+	const { action } = facts;
+	const press = ACTION_WORDS[action.kind];
+	switch (action.kind) {
+		case "resume":
+		case "open": {
+			const entry = entryOf(facts, action.chat.id);
+			const name = entry ? sessionName(entry, facts.today) : "the lesson";
+			const pickup = facts.pickups.find((p) => p.kind === "session" && p.chat.id === action.chat.id);
+			const where = pickup?.kind === "session" && pickup.where !== WRITING ? pickup.where : null;
+			return action.kind === "resume"
+				? { kind: action.kind, icon: "reply", words: `Your turn in ${name}`, detail: where, press }
+				: { kind: action.kind, icon: "writing", words: `The tutor is writing in ${name}`, detail: where, press };
+		}
+		case "review":
+			return { kind: action.kind, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Review due", detail: null, press };
+		case "continue":
+			return action.task
+				? { kind: action.kind, icon: "task", words: action.task.title, detail: action.task.step, press }
+				: { kind: action.kind, icon: "standing", words: facts.standing?.words ?? "Still learning", detail: null, press };
+		case "start":
+			return { kind: action.kind, icon: "standing", words: facts.standing?.words ?? "Not started", detail: null, press };
+		case "study":
+			return { kind: action.kind, icon: "review", words: facts.marks.find((mark) => mark.kind === "review")?.words ?? "Nothing due", detail: null, press };
+	}
+}
 
 /** A step of a lesson's plan, and which lesson it is in when that is not
  *  the one Now opens. */

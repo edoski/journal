@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRightIcon, BookmarkIcon, HistoryIcon, WaypointsIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { DayItem, SessionItem } from "@/components/unit-inbox/topic-page/hybrid/history";
 import type { HybridPaneProps } from "@/components/unit-inbox/topic-page/hybrid/hybrid-topic";
-import { ResumeIconMark } from "@/components/unit-inbox/topic-page/resume/resume-parts";
+import { BrailleSpinner } from "@/components/braille-spinner";
+import { TopicGlyph } from "@/components/course-map/topic-map/topic-glyph";
 import { ONE_LINE_ROW } from "@/components/unit-inbox/topic-page/row-classes";
 import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import type { NextItem, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
+import type { NextItem, NowItem, ResumeIcon } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
+import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -67,6 +69,24 @@ export function NowPress({ now, busy, onAct, className }: { now: NowItem; busy: 
 			{words}
 		</button>
 	);
+}
+
+/** The icon Now leads with, the app's own for the same thing: the reply mark in the accent, the tutor's spinner, the review
+ *  clock, the task bookmark, or the topic's pie (a dashed ring while the
+ *  head line is silent). */
+export function ResumeIconMark({ icon, facts, className = "size-4" }: { icon: ResumeIcon; facts: TopicFacts; className?: string }) {
+	switch (icon) {
+		case "reply":
+			return <MessageCircleQuestionIcon aria-hidden className={`${className} shrink-0 text-link`} />;
+		case "writing":
+			return <BrailleSpinner className="shrink-0 text-muted-foreground" />;
+		case "review":
+			return <HistoryIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
+		case "task":
+			return <BookmarkIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
+		case "standing":
+			return facts.standing ? <TopicGlyph standing={facts.standing} /> : <CircleDashedIcon aria-hidden className={`${className} shrink-0 text-muted-foreground`} />;
+	}
 }
 
 /** The icon Now leads with. */

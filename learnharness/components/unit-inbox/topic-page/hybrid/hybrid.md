@@ -1,6 +1,6 @@
 # Topic page candidate `hybrid`
 
-Option `hybrid` of the Topic switch (`../topic-page.md`). Thesis: Steps and Trail in one page that fits the window, each with one job. The history says when and what happened; the map says where one lesson stands and what comes next. The page's action leaves the head for the composer foot (`../resume/resume.md`). A Pick up option replaces the history pane with one sorted by relevance that holds the action (`../pickup/pickup.md`).
+Option `hybrid` of the Topic switch (`../topic-page.md`). Thesis: Steps and Trail in one page that fits the window, each with one job. The history says when and what happened; the map says where one lesson stands and what comes next. A Pick up option replaces the history pane with one sorted by relevance that holds the action (`../pickup/pickup.md`).
 
 Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN`), `history.tsx` (`History`), `lesson-map.tsx` (`LessonMap`), `hybrid-facts.ts` (pure). Tests: `tests/topic-page-hybrid.test.tsx`.
 
@@ -10,7 +10,7 @@ Files: `hybrid-topic.tsx` (`HybridTopic`, takes `TopicPageProps`; `HYBRID_COLUMN
 |---|---|---|
 | History | The dated index of the topic: every session and scored attempt, newest first. A session row opens the lesson; the map button beside a lesson that planned puts its steps on the map | List a lesson's steps |
 | Lesson map | Where the lesson on the map stands: the step it stopped on ringed, the steps asked about before dotted, the steps right after it marked Next. Every step opens the lesson | Date anything, or list the other lessons |
-| Composer foot | The page's action and a new lesson (`../resume/resume.md`) | |
+| Composer foot | A new lesson | |
 
 ## Anatomy
 

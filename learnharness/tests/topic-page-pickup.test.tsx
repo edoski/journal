@@ -91,12 +91,10 @@ const render = (node: React.ReactNode) =>
 	parseHTML(`<html><body>${renderToStaticMarkup(<AppRouterContext.Provider value={router as never}>{node}</AppRouterContext.Provider>)}</body></html>`).document;
 const page = (option: (typeof PICKUP_OPTIONS)[number], facts: TopicFacts) => render(<HybridTopic facts={facts} busy={false} onAct={() => {}} onTask={() => {}} pane={PICKUP_PANES[option]} />);
 
-/** The pane's parts top to bottom: each section by its label, Now's block, and the past's days. */
+/** The pane's sections top to bottom, by label. */
 function order(document: Document): string[] {
 	const pane = document.querySelector('[data-slot="topic-history"]')!;
-	return [...pane.querySelectorAll('[data-slot="pickup-section"], [data-slot="pickup-now"], ol[aria-label="Earlier"]')]
-		.filter((el) => el.getAttribute("data-slot") === "pickup-section" || !el.closest('[data-slot="pickup-section"]'))
-		.map((el) => el.getAttribute("data-section") ?? (el.getAttribute("data-slot") === "pickup-now" ? "now block" : "days"));
+	return [...pane.querySelectorAll('[data-slot="pickup-section"]')].map((el) => el.getAttribute("data-section")!);
 }
 
 describe("Now", () => {
@@ -166,14 +164,10 @@ describe("each option drawn", () => {
 		chat("chat_old", "Vectors, first pass", "2026-11-02T08:00:00.000Z", { topics: ["vectors"] }),
 	], [EIGEN_PLAN]);
 
-	it("orders its parts by its thesis, and draws no empty section", () => {
+	it("orders Now, Next, Scheduled and Earlier, and draws no empty section", () => {
 		assert.deepEqual(order(page("sections", RICH)), ["now", "next", "scheduled", "earlier"]);
-		assert.deepEqual(order(page("block", RICH)), ["now block", "next", "scheduled", "earlier"]);
-		assert.deepEqual(order(page("nowline", RICH)), ["scheduled", "next", "now", "days"]);
 		const alone = ROWS[4]![1];
 		assert.deepEqual(order(page("sections", alone)), ["now"]);
-		assert.deepEqual(order(page("block", alone)), ["now block"]);
-		assert.deepEqual(order(page("nowline", alone)), ["now"]);
 	});
 
 	it("draws every row of the action table as Now, the session it opens as a link and every other press as a button, with no button in the head", () => {
