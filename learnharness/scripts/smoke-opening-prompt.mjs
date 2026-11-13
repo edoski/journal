@@ -16,7 +16,6 @@ import puppeteer from "puppeteer-core";
 const root = path.resolve(import.meta.dirname, "..");
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "lh154-ui-"));
 fs.mkdirSync(path.join(home, "data"));
-fs.writeFileSync(path.join(home, "auth.json"), "{}\n");
 // Next's supported font fixture avoids external font downloads in this check.
 const require = createRequire(import.meta.url);
 const { getFontAxes } = require("next/dist/compiled/@next/font/dist/google/get-font-axes.js");
@@ -34,8 +33,8 @@ await new Promise(resolve => listener.close(resolve));
 const origin = `http://127.0.0.1:${port}`;
 const env = {
 	PATH: process.env.PATH, HOME: home, TMPDIR: home, NODE_ENV: "development",
-	LH_DATA_DIR: path.join(home, "data"), LH_AUTH_FILE: path.join(home, "auth.json"),
-	LH_IGNORE_ENV_KEYS: "1", NEXT_TELEMETRY_DISABLED: "1",
+	LH_DATA_DIR: path.join(home, "data"), LH_CREDENTIALS_DIR: home,
+	NEXT_TELEMETRY_DISABLED: "1",
 	NEXT_FONT_GOOGLE_MOCKED_RESPONSES: path.join(home, "fonts.cjs"),
 };
 const server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
@@ -66,7 +65,7 @@ try {
 	page.on("pageerror", err => errors.push(err.message));
 	const model = { id: "synthetic", name: "Synthetic (no calls)", provider: "fixture", input: ["text"], reasoning: false, supportedLevels: ["off"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 8192, maxTokens: 1024 };
 	const slot = { model: { provider: model.provider, id: model.id }, thinkingLevel: "off" };
-	const catalog = { models: [model], providers: [{ id: "fixture", label: "Fixture", keyPresent: true }], defaults: null,
+	const catalog = { models: [model], providers: [{ id: "fixture", label: "Fixture", connected: true }], defaults: null,
 		slots: { strong: slot, cheap: slot, vision: slot }, rolePins: {} };
 	const posts = [];
 	const creates = [];

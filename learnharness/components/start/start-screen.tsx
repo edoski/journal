@@ -44,7 +44,7 @@ export function StartScreen({
 	const starterRef = useRef(new SessionStarter());
 	const [startError, setStartError] = useState<string | null>(null);
 	const courseChoice = useCourseChoice();
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
 
 	const cycleComposer = useCallback(
@@ -56,7 +56,7 @@ export function StartScreen({
 	/** The pre-send guards: missing models or keys open setup, an unavailable
 	 *  model opens its picker; nothing is created, so no orphan session. */
 	const canStart = (): boolean => {
-		if (!configured || zeroKeys) {
+		if (!configured || unconnected) {
 			setSetupOpen(true);
 			return false;
 		}
@@ -119,20 +119,20 @@ export function StartScreen({
 					/>
 				</div>
 				<div className="mx-auto flex min-h-0 w-full max-w-[46rem] flex-1 flex-col gap-6 overflow-y-auto pt-4 pb-6">
-					{(startError || courseChoice.notice || zeroKeys || !configured) && (
+					{(startError || courseChoice.notice || unconnected || !configured) && (
 						<div className="flex flex-col items-start gap-2 px-4">
 							{startError && <p role="alert" className="text-row text-danger">{startError}</p>}
 							{courseChoice.notice && (
 								<p role="alert" data-testid="course-notice" className="text-row text-danger">{courseChoice.notice}</p>
 							)}
-							{(zeroKeys || !configured) && (
+							{(unconnected || !configured) && (
 								<Button
 									variant="quiet"
-									data-testid={zeroKeys ? "setup-cta-keys" : "setup-cta"}
+									data-testid={unconnected ? "setup-cta-keys" : "setup-cta"}
 									onClick={() => setSetupOpen(true)}
 									className="-ml-3 h-8 px-3 text-row font-normal text-link hover:text-link"
 								>
-									{zeroKeys ? "Add a provider key to start" : "Set up your models to start"}
+									{unconnected ? "Sign in to Claude or ChatGPT to start" : "Set up your models to start"}
 								</Button>
 							)}
 						</div>

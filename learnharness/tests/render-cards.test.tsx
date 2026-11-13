@@ -136,13 +136,13 @@ describe("DispatchCard — the BYOK refusal tone (owner, 2026-09-22)", () => {
 		assert.ok(!html.includes("text-red-500"));
 	});
 
-	it("a key-refused job is INFO: 'needs a provider key', 'Add a key' (zero-keys wave, 66dbea9)", () => {
+	it("a connection-refused job is INFO: 'needs a sign-in', 'Sign in'", () => {
 		const html = renderToStaticMarkup(
-			inJobs([job({ error: "No OpenRouter key is set — add one in Settings → Keys" })]),
+			inJobs([job({ error: "openrouter runs only with an API key, which LearnHarness no longer uses — pick a Claude or ChatGPT model in Settings → Agent" })]),
 		);
 		assert.ok(html.includes('data-testid="dispatch-refused"'));
-		assert.ok(html.includes("needs a provider key"));
-		assert.ok(html.includes("Add a key"));
+		assert.ok(html.includes("needs a sign-in"));
+		assert.ok(html.includes(">Sign in<"));
 		assert.ok(html.includes('data-testid="dispatch-setup-link"'));
 		assert.ok(!html.includes("failed"));
 	});

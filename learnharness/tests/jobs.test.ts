@@ -79,15 +79,15 @@ import { projectView as projectNative } from "../src/core/view.ts";
 import { subscribe } from "../src/core/events.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const JOBS_DIR = path.join(PATHS.data, "jobs");
 
 const createdChats: string[] = [];
 
-// The key-presence turn gate (provider-key interlude, 2026-09-25): scripted
-// turns pin openrouter per chat — the gate reads env-first truth, so the
-// key must be present in the test process like any real setup.
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+// The connection turn gate: scripted turns pin a signed-in (fake) Claude
+// account, the only kind of model the app runs.
+await signInTestClaude();
 const createdJobs: string[] = [];
 
 function trackChat(id: string) {
@@ -503,7 +503,7 @@ describe("dispatch (async protocol §2)", () => {
 		trackChat(chat.id);
 		// BYOK turn gate (owner, 2026-09-22): the scripted chat needs a
 		// conversation model — the per-chat pin, exactly like the setup flow.
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 
 		const delivery = fakeDeliver();
 		const testRunner = createJobRunner({ chatStore, jobStore, deliver: delivery.deliver });
@@ -1786,7 +1786,7 @@ describe("BYOK job refusal (no factory floor)", () => {
 
 describe("provider-key job refusal (key-presence interlude)", () => {
 	it("an engine whose provider key is gone refuses the spawn — envelope wording, no phantom run", async () => {
-		const chat = chatStore.createChat("Test: keyless spawn");
+		const chat = chatStore.createChat("Test: unconnected spawn");
 		trackChat(chat.id);
 		chatStore.saveMessages(chat.id, nativeToolMessages("hi", "research", "call-km1", RESEARCH_INPUT));
 
@@ -1819,7 +1819,7 @@ describe("provider-key job refusal (key-presence interlude)", () => {
 		assert.deepEqual(seen, [[engine.model.provider, "cheap"]], "the check saw the engine's provider + the researcher's tier");
 		assert.equal(delivery.steers.length, 1, "the refusal STEERED — the teacher is not stranded");
 		assert.ok(
-			delivery.steers[0]!.content.includes(`Research failed: No ${engine.model.provider} key is set`),
+			delivery.steers[0]!.content.includes(`Research failed: ${engine.model.provider} runs only with an API key`),
 			"the steer carries the kind's failure shape",
 		);
 		const result = done.result as ResearchResult;

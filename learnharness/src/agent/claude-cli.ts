@@ -1,7 +1,6 @@
 import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { delimiter, dirname, isAbsolute, join } from "node:path";
-import { AUTH_PROVIDER_ENV_VARS } from "../core/auth-keys.ts";
 
 /** The contract with the user's own, unmodified `claude` CLI. LearnHarness
  * stores no Claude credential. A child runs on the user's own Claude Code
@@ -9,12 +8,16 @@ import { AUTH_PROVIDER_ENV_VARS } from "../core/auth-keys.ts";
  * (src/agent/claude-accounts.ts), which only that child's environment sees. */
 
 /** Removed from the child's environment: each would make Claude Code use a
- * credential, provider or endpoint other than the user's own plan sign-in. */
-export const CLAUDE_ENV_DENYLIST = [
-	"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_FOUNDRY_API_KEY", "ANTHROPIC_AWS_API_KEY",
+ * credential, provider or endpoint other than the user's own plan sign-in.
+ * Every ANTHROPIC_* variable and every *_API_KEY / *_AUTH_TOKEN goes too
+ * (claudeEnvDropped), so no key in the user's shell can reach the child. */
+const CLAUDE_ENV_DENYLIST = [
 	"CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_OAUTH_REFRESH_TOKEN", "CLAUDE_CODE_SESSION_ACCESS_TOKEN",
 	"CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "AWS_BEARER_TOKEN_BEDROCK",
 ] as const;
+export function claudeEnvDropped(name: string): boolean {
+	return (CLAUDE_ENV_DENYLIST as readonly string[]).includes(name) || name.startsWith("ANTHROPIC_") || /_(API_KEY|AUTH_TOKEN)$/.test(name) || name.startsWith("LH_");
+}
 
 export const CLAUDE_EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[number];
@@ -58,8 +61,8 @@ export function resolveClaudeBinary({ env = process.env, home = homedir(), execu
 	return null;
 }
 
-/** The user's own environment minus the denylist, the app's own provider
- * keys and its private LH_* settings. The binary's directory joins PATH so an
+/** The user's own environment minus every credential variable
+ * (claudeEnvDropped) and the app's private LH_* settings. The binary's directory joins PATH so an
  * npm-installed `claude` (a `#!/usr/bin/env node` script) finds its node in a
  * GUI app's bare PATH. Tool search stays off so app tools are never deferred;
  * the user's CLAUDE.md files, auto memory and Claude Code's own compaction
@@ -68,7 +71,7 @@ export function resolveClaudeBinary({ env = process.env, home = homedir(), execu
 export function claudeChildEnv(base: ClaudeEnv, { binary, thinking = true, launch }: { binary?: string; thinking?: boolean; launch?: ClaudeLaunch } = {}): NodeJS.ProcessEnv {
 	const env: ClaudeEnv = {};
 	for (const [name, value] of Object.entries(base)) {
-		if ((CLAUDE_ENV_DENYLIST as readonly string[]).includes(name) || AUTH_PROVIDER_ENV_VARS.has(name) || name.startsWith("LH_")) continue;
+		if (claudeEnvDropped(name)) continue;
 		env[name] = value;
 	}
 	if (launch) {

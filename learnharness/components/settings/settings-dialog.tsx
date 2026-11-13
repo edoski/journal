@@ -35,8 +35,6 @@ import {
 	CURRENT_SETTINGS_VERSION,
 	type AgentSettings,
 	type AppearanceSettings,
-	type CompactionSettings,
-	type GraphSettings,
 	type UserSettings,
 } from "@/src/core";
 import { useAppearance } from "./appearance.tsx";
@@ -47,9 +45,9 @@ import { MENU_CLOSE_EVENT, MENU_OPEN_EVENT } from "@/components/menu-shell";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { notifySettingsSaved, useSettingsSaved } from "@/components/settings-signal";
-import { KeysSection } from "./keys-section.tsx";
+import { SubscriptionConnections } from "./subscription-connections.tsx";
 import { Hint } from "@/components/ui/hint";
-import { AppearanceSection, GraphSection } from "./appearance-section.tsx";
+import { AppearanceSection } from "./appearance-section.tsx";
 import { KeyboardSection } from "./keyboard-section.tsx";
 import { ChatGPTUIProvider } from "./chatgpt-connection.tsx";
 import { SettingsDesignContext } from "./settings-design";
@@ -58,16 +56,14 @@ import { NavRow, NavRowLabel } from "@/components/nav/nav-row";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "lucide-react";
-import { NativeSubscriptionUIProvider } from "./subscription-connections.tsx";
 
 /** Owner (2026-09-20): hints earn their place — mechanics-explaining
  *  prose is out; only the keyboard note stays (storage location is a
  *  real question users ask). */
 const SECTIONS = [
-	{ id: "keys", label: "Providers" },
-	{ id: "agent", label: "Agent" },
+	{ id: "keys", label: "Accounts" },
+	{ id: "agent", label: "Tutor" },
 	{ id: "appearance", label: "Appearance" },
-	{ id: "graph", label: "Graph" },
 	{ id: "keyboard", label: "Keyboard", hint: "Stored on this device" },
 	{ id: "general", label: "General" },
 ] as const;
@@ -79,7 +75,7 @@ const DialogContext = createContext<{ open: (section?: string) => void }>({ open
 
 /** AppShell-level mount: the sidebar row and the mod+, chord call this.
  *  `open(section)` lands the dialog on a specific section (the first-run
- *  setup flow deep-links to Keys when no provider key exists yet). */
+ *  setup flow deep-links to Providers when no subscription is signed in). */
 export function SettingsDialogProvider({
 	children,
 }: {
@@ -92,12 +88,12 @@ export function SettingsDialogProvider({
 		setShow(true);
 	}, []);
 	return (
-		<ChatGPTUIProvider><NativeSubscriptionUIProvider><DialogContext.Provider value={{ open }}>
+		<ChatGPTUIProvider><DialogContext.Provider value={{ open }}>
 			{children}
 			{show && (
 				<SettingsDialog onClose={() => setShow(false)} initialSection={landOn} />
 			)}
-		</DialogContext.Provider></NativeSubscriptionUIProvider></ChatGPTUIProvider>
+		</DialogContext.Provider></ChatGPTUIProvider>
 	);
 }
 
@@ -123,7 +119,7 @@ function SettingsDialog({
 					<DialogContent
 						aria-describedby={undefined}
 						data-testid="settings-dialog"
-						className="h-[600px] max-h-[85vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
+						className="h-[792px] max-h-[90vh] w-[880px] max-w-[90vw] flex-row gap-0 overflow-hidden p-0"
 					>
 						<DialogTitle className="sr-only">Settings</DialogTitle>
 						<SettingsDialogBody onClose={onClose} initialSection={initialSection} />
@@ -256,7 +252,7 @@ export function SettingsDialogBody({
 	 *  schema mistake caught by the validation surface). */
 	const write = useCallback(
 		async (
-			section: "agent" | "models" | "appearance" | "graph" | "compaction",
+			section: "agent" | "models" | "appearance",
 			body: object,
 		) => {
 			setError(null);
@@ -334,28 +330,25 @@ export function SettingsDialogBody({
 								</SettingsSection>
 							)}
 							{active === "keys" && (
-								<SettingsSection title="Providers" testid="section-keys">
-									<KeysSection />
+								<SettingsSection title="Accounts" testid="section-keys">
+									<SettingsGroup label="Subscriptions" testid="group-subscriptions">
+										<SubscriptionConnections />
+									</SettingsGroup>
 								</SettingsSection>
 							)}
 							{active === "agent" && (
 								<SettingsSection
-									title="Agent"
+									title="Tutor"
 									testid="section-agent"
 								>
 									<AgentSection
 										agent={record.agent}
 										models={record.models}
-										graph={record.graph}
-										compaction={record.compaction}
 										onModelsChange={(next: ModelsSettings) =>
 											void write("models", next)
 										}
 										onSectionChange={(next: AgentSettings) =>
 											void write("agent", next)
-										}
-										onCompactionChange={(next: CompactionSettings) =>
-											void write("compaction", next)
 										}
 									/>
 								</SettingsSection>
@@ -369,19 +362,6 @@ export function SettingsDialogBody({
 										appearance={record.appearance}
 										onSectionChange={(next: AppearanceSettings) =>
 											void write("appearance", next)
-										}
-									/>
-								</SettingsSection>
-							)}
-							{active === "graph" && (
-								<SettingsSection
-									title="Graph"
-									testid="section-graph"
-								>
-									<GraphSection
-										graph={record.graph}
-										onSectionChange={(next: GraphSettings) =>
-											void write("graph", next)
 										}
 									/>
 								</SettingsSection>
@@ -431,7 +411,7 @@ export function SettingsDialogBody({
 							<XIcon />
 						</Button>
 					</Hint>
-					<div ref={contentRef} className="min-w-0 flex-1 overflow-y-auto" data-testid="settings-content">
+					<div ref={contentRef} className="min-w-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="settings-content">
 						{sections}
 					</div>
 				</TabsContent>

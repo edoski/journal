@@ -35,9 +35,10 @@ import { PATHS } from "../config.ts";
 import { CONCLUDE_ACK_TEXT } from "../src/core/contracts/chat.ts";
 import type { LhMessage } from "../src/core/native-messages.ts";
 import type { ToolResultMessage } from "@earendil-works/pi-ai";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 // The BYOK key-presence gate reads env-first (chat-flow.test.ts's idiom).
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 /** A valid problem pose — the slim schema: statement, mode, target,
  *  modelSolution (the commitment, which is also the reveal). */
@@ -75,7 +76,7 @@ after(() => {
  *  before modes followed the transcript, which stored `kind` instead. */
 function createPracticeChat(title: string, stored = false) {
 	const chat = chatStore.createChat(title);
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	if (stored) {
 		const file = path.join(PATHS.chats, `${chat.id}.json`);
 		fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, "utf-8")), kind: "practice" }));

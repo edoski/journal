@@ -237,7 +237,7 @@ export function toBlobs(feed: ActivityFeed): ActivityBlob[] {
 			activity: isModelsRefusal(job.error)
 				? "needs model setup"
 				: isProviderKeyRefusal(job.error)
-					? "needs a provider key"
+					? "needs a sign-in"
 					: (job.activity ?? ""),
 			model: usage?.model,
 			steps: usage?.steps,

@@ -17,7 +17,7 @@ const START_FAILURE = "Couldn’t open the session. Try again.";
  */
 export function useLessonStart(initialConfigured: boolean) {
 	const router = useRouter();
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const starter = useRef(new SessionStarter());
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function useLessonStart(initialConfigured: boolean) {
 
 	const start = (opening: string, workspace: string, { topics = [], from }: { topics?: readonly string[]; from?: string } = {}) => {
 		if (busy) return;
-		if (!configured || zeroKeys) return setSetupOpen(true);
+		if (!configured || unconnected) return setSetupOpen(true);
 		const strong = catalog?.slots.strong?.model;
 		if (selectedModelUnavailable(catalog, strong ? `${strong.provider}:${strong.id}` : undefined)) return openModelPicker();
 		setBusy(true);

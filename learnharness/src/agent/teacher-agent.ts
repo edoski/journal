@@ -5,7 +5,7 @@ import { providerEventObserver } from "./provider-events.ts";
 import type { Api, Model, Usage } from "@earendil-works/pi-ai";
 import { PATHS } from "../../config.ts";
 import { APP_IDENTITY, piEngineFor, type PiEngine } from "./models.ts";
-import { courseRecordPrompt, effectivePromptSegments } from "./prompt-segments.ts";
+import { courseRecordPrompt, sourcePromptTexts } from "./prompt-segments.ts";
 import { courseTools, type CourseToolContext } from "./tools/course.ts";
 import {
 	askUserQuestionTool,
@@ -56,40 +56,17 @@ import { usageWasAdmitted } from "./subscription-request-cycle.ts";
  *  composes ONLY its own directory — see prompt-segments.ts. */
 export type AgentKind = "prober" | "teacher" | "practice";
 
-// P2 (2026-09-19): segment discovery + override resolution live in ONE
-// canonical place now — src/store/prompt-overrides.ts (listSourceSegments
-// mirrors this loader's rules, shared/ included). The agent imports it for
-// the static-file seam; the local fragment discovery helpers are retired.
-
 /** Exported for tests: assert what composes into the model's prompt.
- *  Composition order: shared base → shared/ fragments (both agents, the
- *  sources-v1 seam for cross-agent doctrine) → the agent's own fragments.
- *
- *  P2 reconciliation (2026-09-19): composition is DELEGATED to the store
- *  module's effectivePromptSegments — one canonical segment-discovery
- *  rule (its listSourceSegments mirrors this loader's, now including
- *  shared/) — so per-segment OVERRIDES ride the same path: a segment
- *  whose switch is ON and whose override file exists composes the
- *  override text instead of the source. `switches` is the settings
- *  record's agent.prompts map (absent key = off), threaded per turn via
- *  AgentBuildOptions.promptSwitches; a switches-less call composes pure
- *  source (byte-identical to the pre-refactor loader — pinned in
- *  tests/prompt-overrides.test.ts). Overrides are a static-file read
- *  through config paths, not request state — the store import carries no
- *  chat/job machinery. */
-export function composeInstructions(kind: AgentKind, switches?: Record<string, boolean>): string {
-	const segments = effectivePromptSegments(kind, switches ?? {});
-	return segments
-		.map((s) => (s.enabled ? s.overrideText! : s.sourceText))
+ *  Composition order: shared base → the agent's own fragments → shared/
+ *  fragments (src/agent/prompt-segments.ts owns the discovery rule). */
+export function composeInstructions(kind: AgentKind): string {
+	return sourcePromptTexts(kind)
 		.map((t) => t.trim())
 		.filter(Boolean)
 		.join("\n\n---\n\n");
 }
 
-// The switch-free source composition, cached per kind (module-load once).
-// With promptSwitches provided, baseAgentOptions composes FRESH per turn —
-// an override file written while its switch is ON must flip the next
-// turn's composition; the cache serves only the switches-less path.
+// The composition, cached per kind (module-load once).
 const composedInstructions: Record<AgentKind, string> = {
 	prober: composeInstructions("prober"),
 	teacher: composeInstructions("teacher"),
@@ -120,12 +97,6 @@ export interface AgentBuildOptions {
 	 *  THE DEFINITIVE toggleable set is TOGGLEABLE_TOOLS (job tools only);
 	 *  the filtering is generic, but writes validate against the list). */
 	toolToggles?: EnabledTools;
-	/** Per-segment system-prompt override SWITCHES (the settings record's
-	 *  agent.prompts map, absent key = off — same keys the settings routes
-	 *  and effectivePromptSegments use). Provided → the prompt composes
-	 *  fresh per turn, honoring enabled overrides (switch on + file
-	 *  exists); absent → the cached pure-source composition. */
-	promptSwitches?: Record<string, boolean>;
 	/** Native conversation identity: the existing persisted chat id, reused
 	 * across reconstructed prober, teacher, and practice Agents.
 	 * Debug: when set AND LH_PROVIDER_EVENTS=1, raw provider stream events
@@ -210,9 +181,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
 	// ("practice" is not a ModelRole) honest about that.
 	const engine = opts.engine ?? piEngineFor(kind as "prober" | "teacher");
 	const stopper = makeQuestionStopper(kind);
-	const composed = opts.promptSwitches
-		? composeInstructions(kind, opts.promptSwitches)
-		: composedInstructions[kind]!;
+	const composed = composedInstructions[kind]!;
 	const systemPrompt = opts.course ? `${composed}\n\n---\n\n${courseRecordPrompt(kind)}` : composed;
 	// Debug recorder (owner, 2026-10-04): raw provider events when
 	// LH_PROVIDER_EVENTS=1 and the caller handed a chatId; undefined is

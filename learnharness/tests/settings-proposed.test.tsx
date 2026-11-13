@@ -41,7 +41,6 @@ async function mount(node: React.ReactElement) {
 		assert.equal(init?.method ?? "GET", "GET", "the kit itself never writes; its host does");
 		const path = new URL(String(input), "http://localhost").pathname;
 		if (path === "/api/models") return Response.json({ providers: [], models: MODELS, slots: {} });
-		if (path === "/api/settings/prompts") return Response.json({ prober: [], teacher: [] });
 		return Response.json({});
 	};
 	host = document.createElement("div");
@@ -83,7 +82,7 @@ describe("Proposed Agent pickers", () => {
 	it("the model picker lists the catalog and a pick writes the slot with a populated level", async () => {
 		const writes: ModelsSettings[] = [];
 		await mount(
-			<AgentSection agent={undefined} models={undefined} graph={undefined} compaction={undefined} onSectionChange={() => {}} onModelsChange={(m) => writes.push(m)} onCompactionChange={() => {}} />,
+			<AgentSection agent={undefined} models={undefined} onSectionChange={() => {}} onModelsChange={(m) => writes.push(m)} />,
 		);
 		await press(element('[data-testid="slot-model-strong"]'), "click");
 		const options = [...document.querySelectorAll('[data-testid^="model-option-"]')];
@@ -97,7 +96,7 @@ describe("Proposed Agent pickers", () => {
 	it("the thinking menu offers the levels the slot's model supports", async () => {
 		const models: ModelsSettings = { cheap: { model: { provider: "anthropic", id: "alpha-large" }, thinkingLevel: "low" } };
 		await mount(
-			<AgentSection agent={undefined} models={models} graph={undefined} compaction={undefined} onSectionChange={() => {}} onModelsChange={() => {}} onCompactionChange={() => {}} />,
+			<AgentSection agent={undefined} models={models} onSectionChange={() => {}} onModelsChange={() => {}} />,
 		);
 		await press(element('[data-testid="slot-thinking-cheap"]'), "keydown", { key: "Enter" });
 		const options = [...document.querySelectorAll('[data-testid^="thinking-option-"]')];

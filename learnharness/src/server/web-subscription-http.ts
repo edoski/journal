@@ -1,4 +1,3 @@
-import { NATIVE_SUBSCRIPTIONS } from "../core/contracts/subscriptions.ts";
 import { webSubscriptionOwner, webSubscriptionsEnabled, webSubscriptionStatus } from "./web-subscriptions.ts";
 
 const HEADERS = { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
@@ -45,13 +44,11 @@ export async function subscriptionControlsResponse(request: Request): Promise<Re
 		const command: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
 		if (!command || typeof command !== "object" || Array.isArray(command)) return error("Invalid command.", 400);
 		const fields = command as Record<string, unknown>;
-		const providerId = fields.providerId;
-		if (providerId !== "chatgpt" && !NATIVE_SUBSCRIPTIONS.some((provider) => provider.providerId === providerId)) return error("Unsupported connection.", 400);
-		const allowed = providerId === "chatgpt" ? ["login", "cancel", "select", "disconnect", "logout", "consent"] : ["login", "cancel", "respond", "open", "retry", "disconnect", "consent"];
-		if (typeof fields.op !== "string" || !allowed.includes(fields.op)) return error("Unsupported control.", 400);
-		return Response.json(await webSubscriptionOwner().control(providerId as string, fields, subscriptionRequestOrigin(request)!), { headers: HEADERS });
+		if (fields.providerId !== "chatgpt") return error("Unsupported connection.", 400);
+		if (typeof fields.op !== "string" || !["login", "cancel", "select", "disconnect", "logout", "consent"].includes(fields.op)) return error("Unsupported control.", 400);
+		return Response.json(await webSubscriptionOwner().control(fields, subscriptionRequestOrigin(request)!), { headers: HEADERS });
 	} catch {
-		return error("The subscription connection could not be changed. Retry or reconnect in Providers.", 400);
+		return error("The subscription connection could not be changed. Retry or reconnect in Settings → Accounts.", 400);
 	}
 }
 /** One-use same-origin navigation. Full provider authorization URLs go only to

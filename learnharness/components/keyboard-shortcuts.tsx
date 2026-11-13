@@ -36,8 +36,8 @@ import {
 	formatBinding,
 	isTypingSurface,
 	kbdEventForAction,
-	KEYBOARD_ACTIONS,
-	type KeyAction,
+	KEY_SCOPES,
+	keyActionsFor,
 	type KeyActionDef,
 	type KeyGroup,
 	type KeyScope,
@@ -160,39 +160,21 @@ export function KeyboardShortcuts() {
 	return <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} variant={design} />;
 }
 
-/** The Proposed sheet's words for each action whose registry label is an
- *  engineering name. */
-const SHEET_WORDS: Partial<Record<KeyAction, string>> = {
-	"open-model-picker": "Choose the model",
-	"cycle-thinking": "Change how long the tutor thinks",
-	"toggle-sidebar": "Show or hide the sidebar",
-	"sessions-search": "Search",
-	"jump-graph": "Go Home",
-	"new-session": "New lesson",
-	"rename-session": "Rename the lesson",
-	"cheat-sheet": "Keyboard shortcuts",
-	"question-focus": "Move between your thinking and the answers",
-	"toggle-user-thinking": "Show or hide your thinking",
-	"question-next-row": "Next answer",
-	"question-prev-row": "Previous answer",
-	"question-pick-row": "Pick the answer",
-	"question-submit": "Submit the answer",
-};
-
-/** The Proposed sheet's sections in order, in plain words: each holds the
- *  registry's actions of its scope and group. */
+/** The Proposed sheet's sections in order: each scope's own actions under
+ *  its heading (KEY_SCOPES), with Anywhere's Pages and Calendar groups
+ *  after it. */
 const SHEET_SECTIONS: readonly { label: string; scope: KeyScope; group?: KeyGroup }[] = [
 	{ label: "Anywhere", scope: "global" },
 	{ label: "Pages", scope: "global", group: "pages" },
 	{ label: "Calendar", scope: "global", group: "calendar" },
-	{ label: "In a lesson", scope: "chat" },
-	{ label: "On the map", scope: "graph" },
+	...KEY_SCOPES.filter(({ scope }) => scope !== "global"),
 ];
 
-export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }[] {
+export function cheatSheetSections(design: DesignVariant = "proposed"): { label: string; actions: KeyActionDef[] }[] {
+	const actions = keyActionsFor(design);
 	return SHEET_SECTIONS.map(({ label, scope, group }) => ({
 		label,
-		actions: KEYBOARD_ACTIONS.filter((a) => a.scope === scope && a.group === group),
+		actions: actions.filter((a) => a.scope === scope && a.group === group),
 	})).filter((section) => section.actions.length > 0);
 }
 
@@ -202,12 +184,7 @@ export function cheatSheetSections(): { label: string; actions: KeyActionDef[] }
 function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => void; variant: DesignVariant }) {
 	const backdropDismiss = useBackdropDismiss(onClose);
 	if (!open) return null;
-	const scopes = ["global", "chat", "graph"] as const;
-	const scopeLabels: Record<(typeof scopes)[number], string> = {
-		global: "Global",
-		chat: "Chat",
-		graph: "Graph view",
-	};
+	const actionsIn = (scope: KeyScope) => keyActionsFor(variant).filter((a) => a.scope === scope);
 	if (variant === "proposed") {
 		// The dialog anatomy (dialog.md) with a two-column list: the action,
 		// then its keys as plain glyphs (kbd.md), in the app's own words.
@@ -220,12 +197,12 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<Hint label="Close" binding="escape" side="left">
 						<DialogClose aria-label="Close shortcuts" />
 					</Hint>
-					{cheatSheetSections().map(({ label, actions }) => (
+					{cheatSheetSections(variant).map(({ label, actions }) => (
 						<section key={label} aria-label={label} className="flex flex-col">
 							<h3 className="flex h-7 items-center text-label font-medium text-muted-foreground">{label}</h3>
 							{actions.map((a) => (
 								<div key={a.id} className="flex h-8 items-center justify-between gap-4 text-row">
-									<span className="truncate text-foreground">{SHEET_WORDS[a.id] ?? a.label}</span>
+									<span className="truncate text-foreground">{a.label}</span>
 									<Kbd>{formatBinding(bindingForAction(a.id))}</Kbd>
 								</div>
 							))}
@@ -249,13 +226,13 @@ function CheatSheet({ open, onClose, variant }: { open: boolean; onClose: () => 
 					<span className="text-sm font-medium text-card-foreground">Keyboard shortcuts</span>
 					<span className="text-xs text-muted-foreground">Esc to close</span>
 				</div>
-				{scopes.map((scope) => {
-					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+				{KEY_SCOPES.map(({ scope, label }) => {
+					const actions = actionsIn(scope);
 					if (actions.length === 0) return null;
 					return (
 						<div key={scope} className="mb-4">
 							<div className="mb-1.5 text-xs uppercase tracking-widest text-muted-foreground/70">
-								{scopeLabels[scope]}
+								{label}
 							</div>
 							<div className="flex flex-col gap-1">
 								{actions.map((a) => (

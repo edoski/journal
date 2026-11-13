@@ -12,7 +12,6 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 	const previous = new Map<string, PropertyDescriptor | undefined>();
 	const bodies: Record<string, unknown> = {
 		"/api/models": { models: [], slots: { strong: null, cheap: null, vision: null } },
-		"/api/settings/prompts": { prober: [], teacher: [] },
 	};
 	for (const [key, value] of Object.entries({
 		window: dom.window,
@@ -36,11 +35,8 @@ it("the Research toggle stays interactive and no search-engine row renders", asy
 			root.render(<AgentSection
 				agent={{ tools: { research: true } }}
 				models={undefined}
-				graph={undefined}
-				compaction={undefined}
 				onSectionChange={(next) => { written = next; }}
 				onModelsChange={() => {}}
-				onCompactionChange={() => {}}
 			/>);
 		});
 		const row = document.querySelector<HTMLElement>('[data-testid="tool-row-research"]')!;

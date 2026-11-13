@@ -18,24 +18,19 @@
 
 import { useEffect, useState } from "react";
 import {
+	KEY_SCOPES,
 	KEYBOARD_ACTIONS,
 	eventBinding,
+	keyActionsFor,
 	formatBinding,
 	loadOverrides,
 	saveOverrides,
 	type KeyAction,
-	type KeyScope,
 } from "@/src/core";
 import { SettingsGroup, SettingsRow } from "./controls.tsx";
 import { useSettingsProposed } from "./settings-design";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
-
-const SCOPES: { scope: KeyScope; label: string }[] = [
-	{ scope: "global", label: "Global" },
-	{ scope: "chat", label: "Chat" },
-	{ scope: "graph", label: "Graph" },
-];
 
 /** The overrides map after ONE change (pure — exported for tests):
  *  binding null = reset the action to its default (key removed). */
@@ -100,10 +95,13 @@ export function KeyboardSection() {
 
 	if (proposed) {
 		const action = "h-7 px-2 font-normal";
+		// Settings lists what can be changed; the keys a screen owns (the
+		// question's) stay in the cheat sheet.
+		const changeable = keyActionsFor("proposed").filter((a) => !a.displayOnly);
 		return (
 			<>
-				{SCOPES.map(({ scope, label }) => {
-					const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
+				{KEY_SCOPES.map(({ scope, label }) => {
+					const actions = changeable.filter((a) => a.scope === scope);
 					if (!actions.length) return null;
 					return (
 						<SettingsGroup key={scope} label={label} testid={`kbd-scope-${scope}`}>
@@ -151,7 +149,7 @@ export function KeyboardSection() {
 
 	return (
 		<>
-			{SCOPES.map(({ scope, label }) => {
+			{KEY_SCOPES.map(({ scope, label }) => {
 				const actions = KEYBOARD_ACTIONS.filter((a) => a.scope === scope);
 				if (!actions.length) return null;
 				return (

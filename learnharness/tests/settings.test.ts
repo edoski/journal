@@ -20,11 +20,6 @@ import {
 describe("FACTORY_SETTINGS (the compiled factory layer)", () => {
 	it("pins the owner-decided defaults", () => {
 		assert.equal(CURRENT_SETTINGS_VERSION, 1);
-		// wave 7 collapse: the master switch ONLY + the extraction-UX
-		// redesign's chunk budget (2026-09-24); doubled to 8192 with the
-		// digest-aware redesign (2026-09-30), then HALVED BACK to 4096
-		// with the message anchors (owner, 2026-10-13)
-		assert.deepEqual(FACTORY_SETTINGS.graph, { enabled: true, rendering: true, extractionChunkTokens: 4096 });
 		const a = FACTORY_SETTINGS.appearance;
 		assert.equal(a.mode, "dark");
 		assert.equal(a.background, null); // the mode's own default, not a factory hex
@@ -61,7 +56,6 @@ describe("sanitizeUserSettings", () => {
 					visualMaker: { thinkingLevel: "max" },
 				},
 				tools: { research: false, quiz: true },
-				prompts: { "system-prompt.md": true, "teacher/20-teaching.md": false },
 			},
 			models: {
 				strong: { model: { provider: "zai", id: "glm-5.3-flash" }, thinkingLevel: "low" },
@@ -98,27 +92,10 @@ describe("sanitizeUserSettings", () => {
 		const out = sanitizeUserSettings({
 			agent: { tools: { research: "no" }, prompts: { "system-prompt.md": 1 }, models: { researcher: "fast" } },
 			appearance: { mode: "sepia", sessionNameSerif: "true" },
-			graph: { enabled: 0 },
 		});
 		assert.ok(out);
 		assert.deepEqual(out.agent, {});
 		assert.deepEqual(out.appearance, {});
-		assert.deepEqual(out.graph, {});
-
-		// extractionChunkTokens (extraction-UX redesign, 2026-09-24):
-		// clamp-never-reject — a finite positive value survives (fractions
-		// floor), below-floor values clamp UP to the cost floor, junk drops
-		// (the factory default resolves at read time).
-		const budget = sanitizeUserSettings({ version: 1, graph: { enabled: true, extractionChunkTokens: 2048 } });
-		assert.deepEqual(budget?.graph, { enabled: true, extractionChunkTokens: 2048 });
-		const fraction = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: 1024.9 } });
-		assert.equal(fraction?.graph?.extractionChunkTokens, 1024, "fractions floor to whole tokens");
-		const tiny = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: 10 } });
-		assert.equal(tiny?.graph?.extractionChunkTokens, 500, "below the floor clamps UP — penny-batches are a cost bug, not a preference");
-		for (const junk of [0, -1000, NaN, Infinity, "4096", null, true]) {
-			const dropped = sanitizeUserSettings({ version: 1, graph: { extractionChunkTokens: junk } });
-			assert.equal(dropped?.graph?.extractionChunkTokens, undefined, `junk ${String(junk)} drops`);
-		}
 	});
 
 	it("out-of-range numbers CLAMP (proseFontSize, headingWeight)", () => {

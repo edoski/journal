@@ -6,11 +6,11 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { ComposerActions, NodePickerControl } from "../components/composer-actions.tsx";
-import { ZeroKeysPill } from "../components/setup-cta.tsx";
+import { SignInPill } from "../components/setup-cta.tsx";
 import { DraftShell } from "../components/new-session.tsx";
 
 const modelSetup = <button data-testid="setup-cta">Set up your models</button>;
-const keySetup = <ZeroKeysPill inline onOpen={() => {}} />;
+const keySetup = <SignInPill inline onOpen={() => {}} />;
 function documentFor(node: React.ReactNode) {
 	return parseHTML(`<html><body>${renderToStaticMarkup(node)}</body></html>`).document;
 }
@@ -71,7 +71,7 @@ describe("composer action row", () => {
 	});
 
 	it("existing chat callers retain the standalone provider-key pill wrapper", () => {
-		const document = documentFor(<ZeroKeysPill onOpen={() => {}} />);
+		const document = documentFor(<SignInPill onOpen={() => {}} />);
 		const wrapper = document.body.firstElementChild!;
 		assert.equal(wrapper.tagName, "DIV");
 		assert.ok(wrapper.classList.contains("justify-center"));

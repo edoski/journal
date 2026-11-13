@@ -5,7 +5,7 @@ import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
+import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
 	Conversation,
@@ -613,7 +613,7 @@ export function Chat({
 	}, []);
 	// Saved slot completeness is live, but the session's selected route
 	// comes from its own ordinary model control, never today's Strong pin.
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const catalogRef = useRef(catalog);
 	catalogRef.current = catalog;
 	const [selectedModel, setSelectedModel] = useState<string | undefined>();
@@ -720,7 +720,7 @@ export function Chat({
 				draftRef.current = null;
 			}
 			clearError();
-			if (keyRefused && catalogRef.current?.providers.some((p) => p.keyPresent)) openModelPicker();
+			if (keyRefused && catalogRef.current?.providers.some((p) => p.connected)) openModelPicker();
 			else setSetupOpen(true);
 		})();
 		return () => {
@@ -1239,7 +1239,7 @@ export function Chat({
 		if (busy || pending || compacting) return;
 		const t = textRef.current.trim();
 		if (!t) return;
-		if (zeroKeys) {
+		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
@@ -1848,8 +1848,8 @@ export function Chat({
 					onReserve={setDockReserve}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
-						zeroKeys ? (
-							<ZeroKeysPill onOpen={() => setSetupOpen(true)} />
+						unconnected ? (
+							<SignInPill onOpen={() => setSetupOpen(true)} />
 						) : (
 							!configured && (
 								<div className="pointer-events-auto mb-2 flex justify-center">

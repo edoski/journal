@@ -9,15 +9,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { appearanceVars, derivedPalette, resolveAppearance, staleVarNames } from "../components/settings/appearance.tsx";
 import {
-	PROMPT_IN_USE_HINT,
-	composePromptSwitch,
 	composeSlotModel,
 	composeTool,
-	sectionedSegments,
 } from "../components/settings/agent-section.tsx";
 import { nextOverrides } from "../components/settings/keyboard-section.tsx";
-import { classifyKeys, keyStatusLine, type ProviderKeyInfo } from "../components/settings/keys-section.tsx";
-import type { AgentSettings, AuthKeyStatus, ModelsSettings } from "../src/core";
+import type { AgentSettings, ModelsSettings } from "../src/core";
 import { slotsConfigured } from "../src/core";
 import { setupStage } from "../components/setup-dialog.tsx";
 
@@ -165,10 +161,10 @@ describe("staleVarNames — the removal half of application (owner repro: resets
 
 describe("agent section compose helpers — the replace-whole PUT body", () => {
 	it("composeTool carries the rest of the section verbatim", () => {
-		const before = { tools: { demo: false }, prompts: { "system-prompt.md": true } };
+		const before = { tools: { demo: false }, graphTools: { enabled: false } };
 		const after = composeTool(before, "visual", false);
 		assert.deepEqual(after.tools, { demo: false, visual: false });
-		assert.deepEqual(after.prompts, { "system-prompt.md": true }, "prompts untouched");
+		assert.deepEqual(after.graphTools, { enabled: false }, "the rest untouched");
 	});
 
 	it("composeSlotModel: empty+empty REMOVES the slot (absent = factory pin)", () => {
@@ -202,11 +198,6 @@ describe("agent section compose helpers — the replace-whole PUT body", () => {
 		const after2 = composeSlotModel(prev, "strong", "zai", "glm-4.7-flash", "");
 		assert.deepEqual(after2.strong, { model: { provider: "zai", id: "glm-4.7-flash" } }, "thinking dropped, model kept");
 	});
-
-	it("composePromptSwitch: on = explicit true, off = key REMOVED (absent = off)", () => {
-		assert.deepEqual(composePromptSwitch({ prompts: { a: true } }, "b", true).prompts, { a: true, b: true });
-		assert.deepEqual(composePromptSwitch({ prompts: { a: true, b: true } }, "b", false).prompts, { a: true });
-	});
 });
 
 describe("nextOverrides — the rebind persistence map", () => {
@@ -218,71 +209,6 @@ describe("nextOverrides — the rebind persistence map", () => {
 	it("null = reset that action to its default (key removed)", () => {
 		const next = nextOverrides({ "toggle-sidebar": "mod+b", find: "mod+f" }, "toggle-sidebar", null);
 		assert.deepEqual(next, { find: "mod+f" });
-	});
-});
-
-describe("classifyKeys — the Keys section's two-group projection", () => {
-	const synth = (id: string, present = false): AuthKeyStatus => ({
-		id,
-		present,
-		masked: present ? `…${id.slice(-4)} (32 chars)` : null,
-		source: present ? "file" : "none",
-		shadowedByEnv: false,
-	});
-	const providers: ProviderKeyInfo[] = [
-		{ id: "groq", envVar: "GROQ_API_KEY", label: "Groq" },
-		{ id: "deepseek", envVar: "DEEPSEEK_API_KEY", label: "DeepSeek" },
-		{ id: "openrouter", envVar: "OPENROUTER_API_KEY", label: "OpenRouter" },
-	];
-
-	it("OpenRouter is UN-pinned (wave-5 owner ruling): no row when absent, a row when stored", () => {
-		const none = classifyKeys([], providers);
-		assert.equal(none.providerRows.length, 0); // nothing synthesized
-		assert.ok(none.addable.some((p) => p.id === "openrouter")); // it's just an Add option
-		const stored = classifyKeys([synth("OPENROUTER_API_KEY", true)], providers);
-		assert.equal(stored.providerRows.length, 1);
-		assert.equal(stored.providerRows[0]!.id, "OPENROUTER_API_KEY");
-		assert.ok(!stored.addable.some((p) => p.id === "openrouter"));
-	});
-
-	it("stored provider keys land in providerRows; the Add dropdown drops them", () => {
-		const out = classifyKeys([synth("GROQ_API_KEY", true)], providers);
-		assert.equal(out.providerRows.length, 1);
-		assert.equal(out.providerRows[0]!.id, "GROQ_API_KEY");
-		// the Add dropdown no longer offers groq
-		assert.ok(!out.addable.some((p) => p.id === "groq"));
-		assert.ok(out.addable.some((p) => p.id === "deepseek"));
-	});
-
-	it("unknown file vars surface read-only, out of the provider rows", () => {
-		const out = classifyKeys([synth("PLANS_LOGIN_TOKEN", true)], providers);
-		assert.equal(out.unknownRows.length, 1);
-		assert.equal(out.providerRows.length, 0);
-	});
-
-	it("providers seam absent = addable empty, nothing crashes", () => {
-		const out = classifyKeys([], undefined);
-		assert.deepEqual(out.addable, []);
-	});
-});
-
-describe("keyStatusLine — the minimal at-a-glance state", () => {
-	it("present file key: tail + chars, no source suffix", () => {
-		assert.equal(
-			keyStatusLine({ id: "X", present: true, masked: "…ab12 (64 chars)", source: "file", shadowedByEnv: false }),
-			"…ab12 · 64",
-		);
-	});
-
-	it("env-owned key carries the 'env' marker (the row renders read-only)", () => {
-		assert.equal(
-			keyStatusLine({ id: "X", present: true, masked: "…ca10 (73 chars)", source: "env", shadowedByEnv: false }),
-			"…ca10 · 73 · env",
-		);
-	});
-
-	it("absent key reads 'not set'", () => {
-		assert.equal(keyStatusLine({ id: "X", present: false, masked: null, source: "none", shadowedByEnv: false }), "not set");
 	});
 });
 
@@ -318,54 +244,7 @@ describe("first-run gate — slotsConfigured + setupStage (model-slots wave)", (
 	it("setupStage: keys before models (owner's dependency ordering)", () => {
 		assert.equal(setupStage(null), "loading", "unknown catalog must not claim keys are missing");
 		assert.equal(setupStage([]), "keys", "no providers = keys");
-		assert.equal(setupStage([{ id: "zai", keyPresent: false }]), "keys", "provider present but keyless");
-		assert.equal(setupStage([{ id: "zai", keyPresent: false }, { id: "openai", keyPresent: true }]), "pickers", "one keyed provider widens the pickers");
-	});
-});
-
-describe("sectionedSegments — the prompts overhaul (2026-09-26)", () => {
-	// The server contract: BOTH per-agent lists include the shared
-	// segments (same paths) — the view must list them ONCE.
-	const view = {
-		prober: [
-			{ path: "system-prompt.md", sourceText: "b", overrideText: null, enabled: false, shared: true },
-			{ path: "shared/10-personality.md", sourceText: "s1", overrideText: "custom", enabled: true, shared: true },
-			{ path: "prober/10-probe-doctrine.md", sourceText: "p1", overrideText: null, enabled: false, shared: false },
-		],
-		teacher: [
-			{ path: "system-prompt.md", sourceText: "b", overrideText: null, enabled: false, shared: true },
-			{ path: "shared/10-personality.md", sourceText: "s1", overrideText: "custom", enabled: true, shared: true },
-			{ path: "teacher/05-method.md", sourceText: "t1", overrideText: null, enabled: false, shared: false },
-			{ path: "teacher/10-planning.md", sourceText: "t2", overrideText: null, enabled: false, shared: false },
-		],
-	};
-
-	it("the owner's ruled order: Teacher, Prober, Shared — Shared last", () => {
-		const ids = sectionedSegments(view).map((s) => s.id);
-		assert.deepEqual(ids, ["teacher", "prober", "shared"]);
-	});
-
-	it("shared chunks appear exactly ONCE across all sections (no duplication)", () => {
-		const all = sectionedSegments(view).flatMap((s) => s.segments.map((seg) => seg.path));
-		assert.equal(all.filter((p) => p === "system-prompt.md").length, 1);
-		assert.equal(all.filter((p) => p === "shared/10-personality.md").length, 1);
-		// every path unique — no chunk listed twice
-		assert.equal(new Set(all).size, all.length);
-	});
-
-	it("the Shared section holds the shared chunks in assembly order; the agents' sections hold their own", () => {
-		const [teacher, prober, shared] = sectionedSegments(view);
-		assert.ok(teacher && prober && shared, "all three sections present");
-		assert.deepEqual(teacher.segments.map((s) => s.path), ["teacher/05-method.md", "teacher/10-planning.md"]);
-		assert.deepEqual(prober.segments.map((s) => s.path), ["prober/10-probe-doctrine.md"]);
-		// assembly order: the base file first, then the shared fragments
-		assert.deepEqual(shared.segments.map((s) => s.path), ["system-prompt.md", "shared/10-personality.md"]);
-		// the Shared header carries the one hint that earns its place
-		assert.equal(shared.hint, "Used by both agents");
-		assert.equal(teacher.hint, undefined);
-	});
-
-	it("the indicator copy is pinned — it states WHICH VERSION IS IN USE (refined 2026-09-26)", () => {
-		assert.equal(PROMPT_IN_USE_HINT, "Your version is in use");
+		assert.equal(setupStage([{ id: "zai", connected: false }]), "keys", "provider present but keyless");
+		assert.equal(setupStage([{ id: "zai", connected: false }, { id: "openai", connected: true }]), "pickers", "one keyed provider widens the pickers");
 	});
 });

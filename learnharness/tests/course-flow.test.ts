@@ -24,6 +24,7 @@ import {
 	type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-flow-")));
 const STUDY = path.join(TMP, "vault", "study");
@@ -37,7 +38,7 @@ const COURSES = [
 ];
 const engineFake = useFakeEngine(TMP, COURSES);
 process.env.LH_DATA_DIR = path.join(TMP, "data");
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 const { POST: createChatRoute } = await import("../app/api/chats/route.ts");
 const { GET: coursesRoute, POST: createCourseRoute, PATCH: renameCourseRoute, DELETE: deleteCourseRoute } = await import("../app/api/courses/route.ts");
@@ -297,7 +298,7 @@ describe("a session without a course", () => {
 describe("a course-linked turn", () => {
 	it("practice: the pose carries course topics and the attempt is saved to the linked course", async () => {
 		const { id } = (await (await createChat({ title: "practice rank", kind: "practice", course: { workspace: LINALG } })).json()) as { id: string };
-		chatStore.saveSettings(id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(id, { model: { ...TEST_MODEL } });
 		const engine = scripted([
 			() => fauxAssistantMessage([fauxToolCall("course_resume", {}, { id: "r1" })], { stopReason: "toolUse" }),
 			() => fauxAssistantMessage([fauxToolCall("problem", {
@@ -367,7 +368,7 @@ describe("a course-linked turn", () => {
 			return agent;
 		};
 		const linked = (await (await createChat({ title: "linked", course: { workspace: LINALG } })).json()) as { id: string };
-		chatStore.saveSettings(linked.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(linked.id, { model: { ...TEST_MODEL } });
 		await turn(linked.id, { type: "text", text: "teach me rank" }, build(linked.id));
 		assert.ok(tools[0]?.includes("recall"), "free recall is the prober's graded tool");
 		assert.ok(!tools[0]?.includes("probe"), "no multiple-choice tool exists");

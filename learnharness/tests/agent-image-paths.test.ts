@@ -26,14 +26,13 @@ const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "lh-agent-image-paths-"));
 const originalEnv = process.env;
 const originalFetch = globalThis.fetch;
 fs.mkdirSync(path.join(scratch, "home"));
-fs.writeFileSync(path.join(scratch, "auth.json"), "{}");
 process.env = {
 	...(originalEnv.NODE_TEST_CONTEXT ? { NODE_TEST_CONTEXT: originalEnv.NODE_TEST_CONTEXT } : {}),
 	...(originalEnv.NODE_OPTIONS ? { NODE_OPTIONS: originalEnv.NODE_OPTIONS } : {}),
 	NODE_ENV: "test",
 	HOME: path.join(scratch, "home"),
 	LH_DATA_DIR: path.join(scratch, "data"),
-	LH_AUTH_FILE: path.join(scratch, "auth.json"),
+	LH_CREDENTIALS_DIR: scratch,
 };
 globalThis.fetch = async () => { throw new Error("CLOSED: unexpected network request"); };
 after(() => {

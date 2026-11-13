@@ -57,14 +57,14 @@ export function DispatchCard({ toolCallId, kind }: { toolCallId: string; kind: J
 	// BYOK (owner, 2026-09-22): a job refused for missing models is INFO,
 	// not scary-error — gray glyph + "needs model setup" + the deep-link
 	// into the SetupDialog (the same flow the send interception uses).
-	// The provider-key refusal twin (zero-keys wave): a pinned model
-	// whose key is gone reads as the key being needed — the deep-link
-	// lands on the SetupDialog's first-key stage on its own.
+	// The connection refusal twin: a pinned model whose subscription is
+	// signed out reads as a sign-in being needed — the deep-link lands on
+	// the SetupDialog's sign-in stage on its own.
 	if (isModelsRefusal(job.error)) {
 		return <DispatchRefusedCard label={label} line="needs model setup" button="Set up models" />;
 	}
 	if (isProviderKeyRefusal(job.error)) {
-		return <DispatchRefusedCard label={label} line="needs a provider key" button="Add a key" />;
+		return <DispatchRefusedCard label={label} line="needs a sign-in" button="Sign in" />;
 	}
 	const failed = job.status === "error";
 	// Delivered: the result arrives in the steer card right below; the

@@ -11,6 +11,7 @@ import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createFauxCore, fauxAssistantMessage, fauxText } from "@earendil-works/pi-ai";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "lh-course-brief-"));
@@ -19,7 +20,7 @@ fs.writeFileSync(PYTHON, `#!/bin/sh\nexec "${process.execPath}" "${path.join(HER
 process.env.LH_DATA_DIR = path.join(TMP, "data");
 process.env.LH_LEARNING_ENGINE = TMP;
 process.env.LH_LEARNING_PYTHON = PYTHON;
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 
 const { projectCourseBrief } = await import("../src/core/course-brief.ts");
 const { visibleCourseBriefKey, newCourseContextMessage, newUserMessage } = await import("../src/core/native-messages.ts");
@@ -176,7 +177,7 @@ describe("course brief markers", () => {
 describe("course brief injection", () => {
 	it("a linked session's learner turn carries one brief; the next turn with the same key adds none", async () => {
 		const chat = chatStore.createChat("rank", { workspace: "/study/linalg", title: "Linear Algebra" });
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 		const faux = createFauxCore({});
 		faux.setResponses([fauxAssistantMessage([fauxText("Where shall we start?")]), fauxAssistantMessage([fauxText("Go on.")])]);
 		const engine = { model: faux.getModel(), streamFn: faux.streamSimple };
@@ -200,7 +201,7 @@ describe("course brief injection", () => {
 		const workspace = "/study/linalg";
 		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-07", courses: [{ workspace, runup: { days_left: 12, unready: ["rank"] } }] });
 		const chat = chatStore.createChat("practise rank", { workspace, title: "Linear Algebra" });
-		chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+		chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 		const handoff = { id: "h1", role: "assistant", content: [{ type: "toolCall", id: "call-h1", name: "practice", arguments: { scope: "rank", reason: "asked" } }], api: "faux", provider: "t", model: "t", usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: "toolUse", timestamp: 1 };
 		const result = { id: "r1", role: "toolResult", toolCallId: "call-h1", toolName: "practice", content: [{ type: "text", text: "ok" }], details: { ok: true, mode: "practice" }, isError: false, timestamp: 2 };
 		chatStore.saveMessages(chat.id, [newUserMessage("give me problems on rank"), handoff as never, result as never]);

@@ -4,10 +4,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CornerDownLeftIcon, DumbbellIcon } from "lucide-react";
 import { GraphView } from "@/components/graph-view";
-import { MinimalHome } from "@/components/minimal-home";
 import { SetupDialog } from "@/components/setup-dialog";
 import { ComposerActions, NodePickerControl } from "@/components/composer-actions";
-import { useModelSetup, selectedModelUnavailable, openModelPicker, ZeroKeysPill } from "@/components/setup-cta";
+import { useModelSetup, selectedModelUnavailable, openModelPicker, SignInPill } from "@/components/setup-cta";
 import { useFieldCycle } from "@/components/field-cycle";
 import { SidebarToggle } from "@/components/sidebar";
 import { StatsBar } from "@/components/stats-bar";
@@ -25,7 +24,7 @@ import { StudyHome } from "@/components/study-home/study-home";
  * under the header and the new-session dock, both of which float over it
  * with no gradient scrims. Sessions live in the toggleable sidebar.
  */
-export function Home(props: { initialConfigured: boolean; rendering?: boolean }) {
+export function Home(props: { initialConfigured: boolean }) {
 	return useDesignVariant() === "proposed" ? <HomeNext initialConfigured={props.initialConfigured} /> : <HomeCurrent {...props} />;
 }
 
@@ -35,16 +34,7 @@ function HomeNext({ initialConfigured }: { initialConfigured: boolean }) {
 	return useHomeVariant() === "proposed" ? <StudyHome initialConfigured={initialConfigured} /> : <StartScreen initialConfigured={initialConfigured} today />;
 }
 
-function HomeCurrent({
-	initialConfigured,
-	rendering = true,
-}: {
-	initialConfigured: boolean;
-	/** GRAPH RENDERING off (owner, 2026-10-06): the home's main view is
-	 * the chains view, not the canvas. Read server-side per navigation —
-	 * changing the setting applies on the next visit home. */
-	rendering?: boolean;
-}) {
+function HomeCurrent({ initialConfigured }: { initialConfigured: boolean }) {
 	const router = useRouter();
 	const [topic, setTopic] = useState("");
 	// First-run gate (model-slots wave, owner 2026-09-20): chats cannot
@@ -52,7 +42,7 @@ function HomeCurrent({
 	// 33 providers. The dock shows the CTA while unconfigured; submitting
 	// a topic opens the setup dialog WITH THE DRAFT PRESERVED (Save
 	// stores slots only; the learner sends the message themselves).
-	const { catalog, configured, zeroKeys } = useModelSetup(initialConfigured);
+	const { catalog, configured, unconnected } = useModelSetup(initialConfigured);
 	const [setupOpen, setSetupOpen] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const startingRef = useRef(false);
@@ -98,7 +88,7 @@ function HomeCurrent({
 		// already created the record). Zero providers opens connection setup;
 		// an unavailable selection with another provider opens its ordinary
 		// picker. The server's admission gate remains the belt.
-		if (zeroKeys) {
+		if (unconnected) {
 			setSetupOpen(true);
 			return;
 		}
@@ -147,27 +137,14 @@ function HomeCurrent({
 
 			{/* The main view — full-bleed (owner, graph-view round 1): no
 			    padding on any side; it runs from the sidebar to the right edge
-			    and from the bottom to the top, under everything else. With
-			    rendering OFF (graph.rendering, owner 2026-10-06) it is the
-			    MINIMAL HOME — a quiet knowledge-base summary + the graph
-			    chrome's survivors; data, extraction, and the pick flow are
-			    untouched, and the chain table stays behind its button. */}
+			    and from the bottom to the top, under everything else. */}
 			<main className="absolute inset-0">
-				{rendering ? (
-					<GraphView
-						chainSelectOpen={chainSelectOpen}
-						practiceSelection={pickedIds}
-						onPracticeSelectionChange={setPracticeProps}
-						onChainSelectClose={() => setChainSelectOpen(false)}
-					/>
-				) : (
-					<MinimalHome
-						chainSelectOpen={chainSelectOpen}
-						practiceSelection={pickedIds}
-						onPracticeSelectionChange={setPracticeProps}
-						onChainSelectClose={() => setChainSelectOpen(false)}
-					/>
-				)}
+				<GraphView
+					chainSelectOpen={chainSelectOpen}
+					practiceSelection={pickedIds}
+					onPracticeSelectionChange={setPracticeProps}
+					onChainSelectClose={() => setChainSelectOpen(false)}
+				/>
 			</main>
 
 			{/* Header floats over the graph — pointer-events-none except the
@@ -203,8 +180,8 @@ function HomeCurrent({
 								onClear={() => setPracticeProps([])}
 							/>
 						)}
-						setup={zeroKeys ? (
-							<ZeroKeysPill inline onOpen={() => setSetupOpen(true)} />
+						setup={unconnected ? (
+							<SignInPill inline onOpen={() => setSetupOpen(true)} />
 						) : (
 							!configured && (
 								<button

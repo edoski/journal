@@ -6,9 +6,9 @@ The settings sheet and its control kit under the Proposed design: `settings-dial
 
 | Slot | Notes |
 |---|---|
-| sheet | 880 × 600 (max 90vw × 85vh), one `popover` surface, 1px `border`, radius 12, `shadow-2xl`; overlay black 50% (dialog.md) |
+| sheet | 880 × 792 (max 90vw × 90vh): the tallest section, Keyboard, fits whole in the owner's 1512 × 982 window, so no section scrolls there; one `popover` surface, 1px `border`, radius 12, `shadow-2xl`; overlay black 50% (dialog.md) |
 | section list | 208px, hairline at its right, padding 8; vertical `Tabs` (components/ui/tabs.md): a `NavSection` titled "Settings" over a `line` `TabsList` whose triggers render one `NavRow` per section (nav-row.md: 32px, 13px, active on `fill-selected`); ↑/↓ move between sections |
-| pane | scrolls; padding 24 (32 at the foot); groups 24 apart. No title: the list names the section (a heading that repeats the selected item is noise) |
+| pane | scrolls only in a window shorter than the sheet, with no visible scrollbar (the app shows none); padding 24 (32 at the foot); groups 24 apart. No title: the list names the section (a heading that repeats the selected item is noise) |
 | close | quiet 32px ✕ at top 12, right 12; Esc closes too |
 
 ## Kit
@@ -22,7 +22,7 @@ The settings sheet and its control kit under the Proposed design: `settings-dial
 | switch (`Toggle`) | the shadcn `Switch` (components/ui/switch.md): 32 × 20 track, 16px disc inset 2; on: `muted-foreground` track with a `foreground` disc (owner, 2026-09-20: grey with a white disc, never a bright track), off: `input` track with a muted disc; 2px ring offset 2 on focus; its tooltip is a `Hint` |
 | disclosure | a prompt part's Show text / Hide text is a `Collapsible`; the original and your version are `Textarea`s |
 | buttons | `Button` at 28px: quiet for secondary actions (Show text, Change, Refresh), outline for Connect, default (the accent) for Save |
-| pickers | model and provider: a modal picker `Popover` with `ModelCommand` / `ProviderCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
+| pickers | model: a modal picker `Popover` with `ModelCommand`; thinking: a `DropdownMenu` with `ThinkingMenuItems` (model-pickers.md). Modal, so the pane holds still while one is open |
 
 ## What Proposed leaves out of Appearance
 

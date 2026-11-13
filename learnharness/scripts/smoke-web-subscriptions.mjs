@@ -18,17 +18,14 @@ const { SCOPES } = require("../electron/chatgpt.cjs");
 const sdk = (file) => import(pathToFileURL(path.join(ROOT, "node_modules/@earendil-works/pi-ai/dist", file)));
 const { createModels } = await sdk("index.js");
 const { builtinProviders } = await sdk("providers/all.js");
-const { githubCopilotProvider } = await sdk("providers/github-copilot.js");
 const models = createModels();
 for (const provider of builtinProviders()) models.setProvider(provider);
 const model = models.getModels("openai").find((entry) => entry.api === "openai-responses");
-const copilot = githubCopilotProvider().getModels()[0];
-assert(model && copilot, "Installed SDK catalogs required.");
+assert(model, "Installed SDK catalog required.");
 
 const profile = await fs.mkdtemp(path.join(os.tmpdir(), "lh-web-runtime-"));
 await fs.chmod(profile, 0o700);
 for (const name of ["home", "config", "cache", "xdg-data", "data", "pi", "claude", "codex", "tmp"]) await fs.mkdir(path.join(profile, name), { mode: 0o700 });
-await fs.writeFile(path.join(profile, "auth.json"), "{}\n", { mode: 0o600 });
 const preload = path.join(profile, "offline-fetch.mjs");
 await fs.writeFile(preload, `const original = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
@@ -42,7 +39,7 @@ const env = {
 	PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: path.join(profile, "home"),
 	XDG_CONFIG_HOME: path.join(profile, "config"), XDG_CACHE_HOME: path.join(profile, "cache"), XDG_DATA_HOME: path.join(profile, "xdg-data"),
 	PI_CODING_AGENT_DIR: path.join(profile, "pi"), PI_AGENT_DIR: path.join(profile, "pi"), CLAUDE_CONFIG_DIR: path.join(profile, "claude"), CODEX_HOME: path.join(profile, "codex"),
-	TMPDIR: path.join(profile, "tmp"), LH_AUTH_FILE: path.join(profile, "auth.json"), LH_DATA_DIR: path.join(profile, "data"),
+	TMPDIR: path.join(profile, "tmp"), LH_CREDENTIALS_DIR: profile, LH_DATA_DIR: path.join(profile, "data"),
 	NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`, NEXT_TELEMETRY_DISABLED: "1",
 };
 const saved = {
@@ -60,10 +57,6 @@ async function freePort() {
 }
 async function run(mode) {
 	await fs.writeFile(path.join(profile, "chatgpt-credentials.json"), JSON.stringify(saved), { mode: 0o600 });
-	for (const id of ["github-copilot", "xai"]) await fs.writeFile(path.join(profile, `${id}-credentials.json`), JSON.stringify({
-		version: 1, allowBackgroundUse: true, connectionId: "00000000-0000-4000-8000-000000000001",
-		credential: { type: "oauth", access: id === "xai" ? "fixture-xai-access" : "tid=fixture;proxy-ep=proxy.individual.githubcopilot.com;", refresh: "fixture-refresh", expires: Date.now() + 3600000, ...(id === "github-copilot" ? { availableModelIds: [copilot.id] } : {}) },
-	}), { mode: 0o600 });
 	const port = await freePort(), origin = `http://localhost:${port}`;
 	let logs = "", exited = false;
 	const child = spawn(process.execPath, [path.join(ROOT, "node_modules/next/dist/bin/next"), mode, "-p", String(port)], { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
@@ -81,10 +74,10 @@ async function run(mode) {
 		});
 		// Controls have not been imported through an HTTP request yet.
 		const catalog = (await (await request("/api/models")).json()).providers;
-		for (const id of ["chatgpt", "github-copilot-subscription", "xai-subscription"]) assert(catalog.find((provider) => provider.id === id)?.keyPresent, `${mode}: cold ${id} unavailable.`);
+		assert(catalog.find((provider) => provider.id === "chatgpt")?.connected, `${mode}: cold chatgpt unavailable.`);
 		let state = await (await request("/api/subscriptions")).json();
-		assert.equal(state.chatgpt.accounts[0].email, "fixture@example.invalid"); assert.equal(state.native.length, 2);
-		for (const secret of ["fixture-chatgpt-access", "fixture-chatgpt-refresh", "fixture-id-token", "fixture-xai-access", "fixture-refresh"]) assert(!JSON.stringify(state).includes(secret));
+		assert.equal(state.chatgpt.accounts[0].email, "fixture@example.invalid");
+		for (const secret of ["fixture-chatgpt-access", "fixture-chatgpt-refresh", "fixture-id-token"]) assert(!JSON.stringify(state).includes(secret));
 		const stream = await fetch(origin + "/api/events", { signal: AbortSignal.timeout(60000) });
 		const reader = stream.body.getReader();
 		try {
@@ -112,7 +105,7 @@ async function run(mode) {
 		assert.equal((await request("/api/subscriptions", { providerId: "chatgpt", op: "cancel" })).status, 200);
 		assert.equal((await fetch(origin + "/api/subscriptions", { method: "POST", headers: { origin: "https://unrelated.invalid", "content-type": "application/json", "x-learnharness-subscriptions": "1" }, body: JSON.stringify({ providerId: "chatgpt", op: "disconnect", id: "offline-account" }) })).status, 403);
 		assert.equal((await request("/api/subscriptions", { providerId: "chatgpt", op: "disconnect", id: "offline-account" })).status, 200);
-		assert.equal((await (await request("/api/models")).json()).providers.find((provider) => provider.id === "chatgpt").keyPresent, false);
+		assert.equal((await (await request("/api/models")).json()).providers.find((provider) => provider.id === "chatgpt").connected, false);
 		console.log(`[smoke-web-subscriptions] ${mode}: cold catalogs, safe status, cross-route SSE/consent/disconnect, opaque redirect/replay, CSRF${mode === "dev" ? ", owner retained across source reload" : ""} passed`);
 	} catch (error) { console.error(logs); throw error; }
 	finally {

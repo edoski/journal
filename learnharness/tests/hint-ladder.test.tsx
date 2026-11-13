@@ -64,7 +64,7 @@ describe("the ladder in every teaching prompt", () => {
 	}
 	it("prober and teacher: a hint request on a check is never answered with the committed answer", () => {
 		for (const agent of ["prober", "teacher"] as const) {
-			assert.match(composeInstructions(agent, {}), /A hint request is not an answer.*never the committed answer, never the proof/s);
+			assert.match(composeInstructions(agent), /A hint request is not an answer.*never the committed answer, never the proof/s);
 		}
 	});
 });

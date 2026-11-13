@@ -10,7 +10,7 @@ import {
 	formatBinding,
 	IS_MAC,
 	kbdEventForAction,
-	KEYBOARD_ACTIONS,
+	keyActionsFor,
 } from "../src/core/index.ts";
 import { cheatSheetSections } from "../components/keyboard-shortcuts.tsx";
 
@@ -38,7 +38,7 @@ describe("the cheat sheet groups them in plain words", () => {
 	it("lists its sections in order", () => {
 		assert.deepEqual(
 			sections.map((s) => s.label),
-			["Anywhere", "Pages", "Calendar", "In a lesson"],
+			["Anywhere", "Pages", "Calendar", "In a lesson", "Answering a question"],
 		);
 	});
 
@@ -70,8 +70,8 @@ describe("the cheat sheet groups them in plain words", () => {
 		]);
 	});
 
-	it("files every registry action somewhere", () => {
+	it("files every action the Proposed design answers to somewhere", () => {
 		const shown = sections.flatMap((s) => s.actions.map((a) => a.id));
-		assert.deepEqual([...shown].sort(), KEYBOARD_ACTIONS.map((a) => a.id).sort());
+		assert.deepEqual([...shown].sort(), keyActionsFor("proposed").map((a) => a.id).sort());
 	});
 });

@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
 	//
 	// SECRETS (2026-10-08, caught in the payload audit): the same sweep
 	// ships the repo-root auth.json — the DEV BYOK key store — byte-identical
-	// into the DMG (the packaged app never reads it: the shell passes
-	// LH_AUTH_FILE → userData). Excluded here; build-server.mjs also REFUSES
+	// into the DMG. The app no longer uses API keys, but a developer's old
+	// copy of that retired store may remain in the checkout. Excluded here; build-server.mjs also REFUSES
 	// to package any standalone still containing it. .env* belt-and-braces
 	// the same class. Next also copies loaded bare .env after tracing;
 	// the build-server refusal remains required even with these excludes.
@@ -56,8 +56,6 @@ const nextConfig: NextConfig = {
 			"**/data/**/*",
 			"auth.json",
 			"chatgpt-credentials.json*",
-			"github-copilot-credentials.json*",
-			"xai-credentials.json*",
 			".env*",
 		],
 	},
@@ -94,11 +92,6 @@ const nextConfig: NextConfig = {
 			// per-platform-binary story as the canvas above (one per build).
 			"node_modules/@resvg/resvg-js-*/**/*",
 			"node_modules/@earendil-works/pi-ai/dist/providers/data/**/*",
-			// Public native OAuth factories load these flows through variable imports.
-			// Electron main uses the same standalone SDK; the offline runtime gate
-			// evaluates their real toAuth paths without login or provider requests.
-			"node_modules/@earendil-works/pi-ai/dist/auth/oauth/{load,github-copilot,xai,device-code}.js",
-			"node_modules/@earendil-works/pi-ai/dist/utils/sleep.js",
 			"node_modules/@earendil-works/pi-agent-core/dist/**/*.json",
 			// Next 16.3.2 and 16.4.3 native Turbopack apply unanchored excludes while
 			// traversing modules; **/data/**/* still prunes gcp-metadata and

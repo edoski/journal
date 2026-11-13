@@ -90,36 +90,6 @@ export function ModelCommand({
 	);
 }
 
-export interface ProviderOption {
-	id: string;
-	envVar: string;
-	label: string;
-}
-
-/** The provider picker (Keys › Add provider key, setup): search, then each
- *  provider with its environment variable at the right. */
-export function ProviderCommand<T extends ProviderOption>({ providers, onPick }: { providers: readonly T[]; onPick: (provider: T) => void }) {
-	const [query, setQuery] = useState("");
-	const results = useMemo(
-		() => ranked(providers, query, (p) => [p.id, p.envVar, p.label], (a, b) => a.id.localeCompare(b.id)),
-		[providers, query],
-	);
-	return (
-		<Command shouldFilter={false} data-testid="provider-command">
-			<CommandInput data-testid="provider-search" placeholder="Search providers…" value={query} onValueChange={setQuery} autoFocus />
-			<CommandList data-testid="provider-list">
-				<CommandEmpty>No providers match.</CommandEmpty>
-				{results.map((p) => (
-					<CommandItem key={p.id} value={p.id} onSelect={() => onPick(p)} data-testid={`provider-option-${optionId(p.id)}`} className="justify-between gap-3">
-						<span className="truncate">{p.label}</span>
-						<CommandShortcut className="ml-0 shrink-0">{p.envVar}</CommandShortcut>
-					</CommandItem>
-				))}
-			</CommandList>
-		</Command>
-	);
-}
-
 /** The thinking levels this model supports, for a DropdownMenuContent: the
  *  effective one checked, a quiet note when there are none, a footer. */
 export function ThinkingMenuItems({

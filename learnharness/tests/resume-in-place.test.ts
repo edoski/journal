@@ -16,10 +16,11 @@ import * as path from "node:path";
 import { after, afterEach, beforeEach, describe, it } from "node:test";
 import { createFauxCore, fauxAssistantMessage, fauxText, type TranscriptContext } from "@earendil-works/pi-ai";
 import { useFakeEngine } from "./fixtures/fake-engine-env.ts";
+import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 
 const TMP_DATA = fs.mkdtempSync(path.join(os.tmpdir(), "lh-resume-in-place-"));
 process.env.LH_DATA_DIR = TMP_DATA;
-process.env.OPENROUTER_API_KEY ??= "test-key-presence-gate";
+await signInTestClaude();
 const WS = "/study/linalg";
 useFakeEngine(TMP_DATA, [{ workspace: WS, title: "Linear Algebra" }]);
 
@@ -37,7 +38,7 @@ const { todayRows, openSessions } = await import("../components/study-home/study
 const { buildInbox, taskSessions } = await import("../components/unit-inbox/units.ts");
 const { SessionStarter } = await import("../components/start-session.ts");
 const { writeSettings } = await import("../src/store/settings.ts");
-writeSettings({ version: 1, models: { strong: { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } } } });
+writeSettings({ version: 1, models: { strong: { model: { ...TEST_MODEL } } } });
 
 import type { AgentKind } from "../src/agent/teacher-agent.ts";
 import type { PiEngine } from "../src/agent/models.ts";
@@ -113,7 +114,7 @@ function lessonUpTo(last: LhMessage): LhMessage[] {
 
 function seedLesson(last: LhMessage): string {
 	const chat = chatStore.createChat("Problem sheet 4", { workspace: WS, title: "Linear Algebra" });
-	chatStore.saveSettings(chat.id, { model: { provider: "openrouter", id: "z-ai/glm-5.3-flash" } });
+	chatStore.saveSettings(chat.id, { model: { ...TEST_MODEL } });
 	chatStore.saveTree(chat.id, TREE);
 	chatStore.saveMessages(chat.id, lessonUpTo(last));
 	return chat.id;

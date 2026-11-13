@@ -13,7 +13,7 @@ import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { parseHTML } from "linkedom";
 import { SettingsDesignContext } from "../components/settings/settings-design.ts";
-import { AppearanceSection, GraphSection } from "../components/settings/appearance-section.tsx";
+import { AppearanceSection } from "../components/settings/appearance-section.tsx";
 import { AgentSection, TOGGLE_TOOLS } from "../components/settings/agent-section.tsx";
 import { KeyboardSection } from "../components/settings/keyboard-section.tsx";
 import { Toggle } from "../components/settings/controls.tsx";
@@ -43,6 +43,8 @@ describe("Settings › Appearance under the Proposed design", () => {
 		for (const gone of ["row-mode", "row-background", "row-font", "font-trigger", "row-session-serif", "row-heading-weight"])
 			assert.ok(!ids.includes(gone), `leaves out ${gone}`);
 		assert.equal(doc.querySelector('[data-testid="row-prose-size"]')?.textContent?.includes("Text size"), true);
+		const text = doc.body.textContent ?? "";
+		assert.ok(!/px|Empty =/.test(text), "no pixel counts or equals-sign notes");
 	});
 
 	it("the Current design keeps every appearance row", () => {
@@ -52,43 +54,40 @@ describe("Settings › Appearance under the Proposed design", () => {
 	});
 });
 
-describe("Settings › Graph and Agent under the Proposed design", () => {
-	it("says the chains view replaces Knowledge, where the graph lives in this design", () => {
-		const doc = documentFor(inSettings(<GraphSection graph={undefined} onSectionChange={() => {}} />));
-		assert.match(doc.querySelector('[data-testid="graph-row-rendering"]')?.textContent ?? "", /Knowledge shows the chains view/);
-	});
-
+describe("Settings › Agent under the Proposed design", () => {
 	it("names the tools plainly inside the Tools group, one switch each", () => {
 		const html = renderToStaticMarkup(
 			inSettings(
 				<AgentSection
 					agent={undefined}
 					models={undefined}
-					graph={undefined}
-					compaction={undefined}
 					onSectionChange={() => {}}
 					onModelsChange={() => {}}
-					onCompactionChange={() => {}}
 				/>,
 			),
 		);
 		const doc = parseHTML(`<html><body>${html}</body></html>`).document;
 		assert.ok(!html.includes("Tool · "), "no repeated Tool prefix");
 		const labels = TOGGLE_TOOLS.map((id) => doc.querySelector(`[data-testid="tool-row-${id}"]`)?.textContent?.trim());
-		assert.deepEqual(labels, ["Research", "Demos", "Figures", "PDF reading"]);
+		assert.deepEqual(labels, ["Research", "Interactive demos", "Figures", "Reading PDFs"]);
 		for (const id of TOGGLE_TOOLS) assert.ok(doc.querySelector(`[data-testid="toggle-tool-${id}"][role="switch"]`), `switch for ${id}`);
 	});
 });
 
 describe("Settings › Keyboard under the Proposed design", () => {
-	it("shows every shortcut as its glyphs, with Change only where the key can be rebound", () => {
+	it("lists every shortcut the Proposed design answers to, each changeable, in the app's words", () => {
 		const doc = documentFor(inSettings(<KeyboardSection />));
 		for (const def of KEYBOARD_ACTIONS) {
 			const row = doc.querySelector(`[data-testid="kbd-row-${def.id}"]`);
-			assert.ok(row, `row for ${def.id}`);
-			assert.equal(row!.querySelector('[data-slot="kbd"]')?.textContent, formatBinding(bindingForAction(def.id)));
-			assert.equal(Boolean(row!.querySelector(`[data-testid="kbd-rebind-${def.id}"]`)), !def.displayOnly, `${def.id} rebindable`);
+			const listed = !def.displayOnly && !def.currentOnly;
+			assert.equal(Boolean(row), listed, `${def.id} ${listed ? "listed" : "left to the cheat sheet or the Current design"}`);
+			if (!row) continue;
+			assert.equal(row.querySelector('[data-slot="kbd"]')?.textContent, formatBinding(bindingForAction(def.id)));
+			assert.ok(row.querySelector(`[data-testid="kbd-rebind-${def.id}"]`), `${def.id} changeable`);
 		}
+		const text = doc.body.textContent ?? "";
+		for (const retired of ["Graph", "Model selector", "Cycle thinking", "session", "Global", "Chat"]) assert.ok(!text.includes(retired), retired);
+		for (const word of ["New lesson", "Go home", "Find in this lesson", "Anywhere", "In a lesson"]) assert.ok(text.includes(word), word);
 		assert.ok(doc.querySelector('[data-testid="kbd-reset-all"]'));
 	});
 });
