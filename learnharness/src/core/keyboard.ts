@@ -32,6 +32,7 @@ export type KeyAction =
 	| "question-next-row"
 	| "question-prev-row"
 	| "question-pick-row"
+	| "question-pick-number"
 	| "question-submit"
 	| "open-settings"
 	| "toggle-user-thinking"
@@ -121,6 +122,8 @@ export const KEYBOARD_ACTIONS: readonly KeyActionDef[] = [
 	{ id: "question-next-row", label: "Next choice", scope: "question", binding: "arrowdown", displayOnly: true },
 	{ id: "question-prev-row", label: "Previous choice", scope: "question", binding: "arrowup", displayOnly: true },
 	{ id: "question-pick-row", label: "Choose", scope: "question", binding: "space", displayOnly: true },
+	// The Slot lesson's answer line picks a choice by the digit beside it.
+	{ id: "question-pick-number", label: "Choose by its number", scope: "question", binding: "digits", displayOnly: true },
 	{ id: "question-submit", label: "Send your answer", scope: "question", binding: "enter", displayOnly: true },
 	// Keyboard reach (13 Nov 2026): the page's own arrows (spatial-arrows.ts)
 	// walk its rows and links, and Enter opens them natively.
@@ -266,6 +269,8 @@ const KEY_GLYPH: Record<string, string> = {
 	space: "Space",
 	// Display-only: the four arrows as one cheat-sheet row (page-move).
 	arrows: "↑ ↓ ← →",
+	// Display-only: a choice's digit (question-pick-number).
+	digits: "1–9",
 };
 
 /** Format a binding for display: "mod+shift+f" → "⌘⇧F". */
