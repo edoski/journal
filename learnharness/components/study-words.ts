@@ -206,6 +206,35 @@ export function startsAfterWords(courses: readonly string[] | undefined): string
 	return `After ${listWords(courses.map((course) => `${course}'s`))} new topics`;
 }
 
+/** What the plan does for a course with no exam, in place of a bare "No
+ *  exam day set" (round 5: Calculus' reviews waited weeks and its head
+ *  said only that): its reviews wait for other courses' exams, whose final
+ *  reviews come first, or for room on earlier days; else they come back
+ *  when memory asks for them. Pure. */
+export function noExamWords(topics: readonly Pick<CourseMapTopic, "review">[]): string {
+	const held = topics.flatMap((t) => (t.review?.kind === "scheduled" && t.review.held ? [t.review.held] : []));
+	const exams = [...new Set(held.flatMap((h) => (h.exam ? [h.exam] : [])))];
+	if (exams.length > 0) return `No exam: reviews wait for your ${listWords(exams)} ${exams.length === 1 ? "exam" : "exams"}`;
+	if (held.length > 0) return `No exam: reviews wait, ${HELD_WORDS.full.toLowerCase()}`;
+	return "No exam: reviews come back when memory asks";
+}
+
+/** When a course he has not studied yet gives its first lesson and why
+ *  then, the plan's day for its earliest start (round 5: a new course had
+ *  nothing in Today and its first lesson 11 days out, with no word why):
+ *  "First lesson today", "First lesson Thu 19 Nov, after Probability's new
+ *  topics"; null when the plan starts none. Pure. */
+export function firstLessonWords(topics: readonly Pick<CourseMapTopic, "starts" | "startsAfter">[], today: string): string | null {
+	const first = topics.filter((t) => t.starts).sort((a, b) => a.starts!.localeCompare(b.starts!))[0];
+	if (!first?.starts) return null;
+	if (first.starts <= today) return "First lesson today";
+	const after = startsAfterWords(first.startsAfter);
+	const day = `First lesson ${SHORT_WEEKDAY.format(new Date(`${first.starts}T00:00:00Z`)).replace(",", "")}`;
+	return after ? `${day}, ${after.charAt(0).toLowerCase()}${after.slice(1)}` : day;
+}
+
+const SHORT_WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+
 /** Where an arc stands, in the engine's own states: no count, since the
  *  pie beside it draws the share. `taught` is a course that takes no
  *  questions, which never offers a check. */

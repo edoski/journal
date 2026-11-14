@@ -76,7 +76,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		exam: runupExam(course),
 		title: stepWords(step),
 		detail: step.kind === "review" && then ? `Then ${then}` : null,
-		action: ACTION[step.kind],
+		action: step.kind === "topic" && course.lastActiveDaysAgo === null ? "Start" : ACTION[step.kind],
 		topics,
 		place: arcPlace(course.map, topics),
 		open: { kind: "course", workspace: course.map.workspace },

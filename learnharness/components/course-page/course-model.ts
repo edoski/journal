@@ -6,7 +6,7 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { ARC_EXAM_WORDS, courseShareWords, startsWhyWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, courseShareWords, firstLessonWords, startsWhyWords } from "@/components/study-words";
 import { nowFor } from "@/components/unit-inbox/now-inbox";
 import { todayTop } from "@/components/unit-inbox/today/today-top";
 import { buildInbox } from "@/components/unit-inbox/units";
@@ -241,7 +241,9 @@ export interface CourseFacts {
 	progress: string | null;
 	/** "Exam in 21 days", "Exam tomorrow", "Exam today". */
 	exam: string | null;
-	/** "Studied 2 days ago", "Studied today", "Not studied yet". */
+	/** "Studied 2 days ago", "Studied today"; a course not studied yet,
+	 *  when its first lesson comes and why ("First lesson Thu 19 Nov, after
+	 *  Probability's new topics"), else "Not studied yet". */
 	studied: string | null;
 	/** His latest session in the course, which "Studied" opens. */
 	lastSession: { id: string; title: string } | null;
@@ -253,7 +255,7 @@ export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] 
 	return {
 		progress: progress ? courseShareWords(progress.solid, progress.of) : null,
 		exam: examWords(course),
-		studied: lastStudied({ kind: "course", course, step: { kind: "none" } }),
+		studied: (course.lastActiveDaysAgo === null ? firstLessonWords(course.map.topics, course.map.today) : null) ?? lastStudied({ kind: "course", course, step: { kind: "none" } }),
 		lastSession: lastSessionOf(course.map.workspace, chats),
 	};
 }

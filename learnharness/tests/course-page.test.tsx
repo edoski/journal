@@ -231,6 +231,15 @@ describe("the header's facts and next lesson", () => {
 		assert.deepEqual(facts, { progress: null, exam: null, studied: "Not studied yet", lastSession: null });
 	});
 
+	it("says when a course not studied yet gives its first lesson and why then, and offers Start, never Continue", () => {
+		const fresh = [topic("ode-intro", { starts: "2026-11-19", startsAfter: ["Probability", "Linear Algebra"] }), topic("ode-sep", { starts: "2026-11-20" })];
+		const odes = course({ exam: { date: "2026-12-18", daysLeft: 40 }, current: null, focus: null, tasks: [], topics: fresh, edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(odes).studied, "First lesson Thu 19 Nov, after Probability's and Linear Algebra's new topics");
+		const today = course({ exam: null, current: null, focus: null, tasks: [], topics: [topic("ode-intro", { starts: "2026-11-08" })], edges: [] }, { lastActiveDaysAgo: null, due: [] });
+		assert.equal(courseFacts(today).studied, "First lesson today");
+		assert.equal(courseNext(today, []).action, "Start");
+	});
+
 	it("takes up Home's next step for the course: today's reviews first, in Today's words", () => {
 		const next = courseNext(course(), []);
 		assert.equal(next.action, "Review");

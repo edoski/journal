@@ -6,6 +6,7 @@ import { ArcPill } from "@/components/course-map/arc-strip";
 import { courseHref } from "@/components/unit-inbox/unit-href";
 import { PageHead } from "@/components/page-frame/page-frame";
 import { MathText } from "@/components/ui/math-text";
+import { noExamWords } from "@/components/study-words";
 import type { CourseView } from "@/components/course-page/course-model";
 import { paceOf, type Pace } from "@/components/course-page/course-head/head-facts";
 import { ContextButton, CourseAction, ExamFact, LessonError, StudiedFact } from "@/components/course-page/course-head/head-parts";
@@ -58,7 +59,7 @@ export function PaceHead({
 			lead={
 				lead ?? <p data-slot="course-pace" data-kind={pace?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", pace?.kind === "short" && "text-warning")}>
 					{Icon && <Icon aria-hidden className={cn("size-4 shrink-0", pace?.kind !== "short" && "text-muted-foreground")} />}
-					{pace ? <MathText>{pace.words}</MathText> : !course.map.exam && <span className="font-normal text-muted-foreground">No exam day set</span>}
+					{pace ? <MathText>{pace.words}</MathText> : !course.map.exam && <span className="font-normal text-muted-foreground">{noExamWords(course.map.topics)}</span>}
 				</p>
 			}
 			standing={

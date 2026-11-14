@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -127,6 +127,11 @@ describe("why a review waits", () => {
 		assert.equal(movedWords(late, "2026-11-08"), "Due since 1 Oct");
 		assert.equal(movedWords({ kind: "scheduled", date: "2026-12-03" }, "2026-11-08"), null);
 		assert.equal(movedWords({ kind: "due", date: "2026-11-08", overdue: 0 }, "2026-11-08"), null);
+	});
+	it("says what the plan does for a course with no exam, never only that no exam is set", () => {
+		assert.equal(noExamWords([{ review: behind }, { review: late }]), "No exam: reviews wait for your Probability exam");
+		assert.equal(noExamWords([{ review: late }]), "No exam: reviews wait, earlier days are full");
+		assert.equal(noExamWords([{ review: { kind: "scheduled", date: "2026-11-20" } }, { review: null }]), "No exam: reviews come back when memory asks");
 	});
 	it("says which courses' new topics a first lesson waits behind", () => {
 		assert.equal(startsAfterWords(["Probability"]), "After Probability's new topics");
