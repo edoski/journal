@@ -207,6 +207,12 @@
       "contrasts": [],
       "level": "new",
       "starts": "2026-11-12",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "determinant"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -221,6 +227,12 @@
       "contrasts": [],
       "level": "new",
       "starts": "2026-11-19",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "invertibility"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -252,6 +264,12 @@
       "contrasts": [],
       "level": "new",
       "starts": "2026-11-20",
+      "starts_why": {
+        "kind": "after",
+        "needs": [
+          "change-basis"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -264,6 +282,12 @@
       "contrasts": [],
       "level": "new",
       "starts": "2026-11-11",
+      "starts_why": {
+        "kind": "early",
+        "waiting_on": [
+          "determinant"
+        ]
+      },
       "weak": false,
       "tasks": []
     },
@@ -277,6 +301,12 @@
       "contrasts": [],
       "level": "new",
       "starts": "2026-11-13",
+      "starts_why": {
+        "kind": "early",
+        "waiting_on": [
+          "invertibility"
+        ]
+      },
       "weak": false,
       "tasks": []
     }

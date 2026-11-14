@@ -46,6 +46,38 @@
     "change-basis": "2026-11-19",
     "diagonalization": "2026-11-20"
   },
+  "starts_why": {
+    "inner-product": {
+      "kind": "early",
+      "waiting_on": [
+        "determinant"
+      ]
+    },
+    "invertibility": {
+      "kind": "after",
+      "needs": [
+        "determinant"
+      ]
+    },
+    "projection": {
+      "kind": "early",
+      "waiting_on": [
+        "invertibility"
+      ]
+    },
+    "change-basis": {
+      "kind": "after",
+      "needs": [
+        "invertibility"
+      ]
+    },
+    "diagonalization": {
+      "kind": "after",
+      "needs": [
+        "change-basis"
+      ]
+    }
+  },
   "path": {
     "current": "eigen",
     "basis": "Lecture order, weeks 1-7 examinable",

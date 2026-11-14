@@ -40,11 +40,51 @@
   ],
   "due_later_more": 4,
   "starts": {
-    "inner-product": "2026-11-11",
-    "invertibility": "2026-11-12",
-    "projection": "2026-11-13",
+    "inner-product": "2026-11-09",
+    "projection": "2026-11-12",
+    "invertibility": "2026-11-13",
     "change-basis": "2026-11-19",
-    "diagonalization": "2026-11-20"
+    "diagonalization": "2026-11-21"
+  },
+  "starts_why": {
+    "inner-product": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "waiting_on": [
+        "rank",
+        "determinant"
+      ],
+      "exam": true
+    },
+    "projection": {
+      "arc": "orthogonality",
+      "kind": "early",
+      "waiting_on": [
+        "determinant"
+      ],
+      "exam": true
+    },
+    "invertibility": {
+      "arc": "determinants",
+      "kind": "after",
+      "needs": [
+        "determinant"
+      ]
+    },
+    "change-basis": {
+      "arc": "eigenvalues",
+      "kind": "after",
+      "needs": [
+        "invertibility"
+      ]
+    },
+    "diagonalization": {
+      "arc": "eigenvalues",
+      "kind": "after",
+      "needs": [
+        "change-basis"
+      ]
+    }
   },
   "path": {
     "current": "eigen",
