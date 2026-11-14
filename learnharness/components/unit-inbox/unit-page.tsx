@@ -3,19 +3,23 @@
 import { useEffect, useState } from "react";
 import type { ChatListItem, StudyCourse, StudyListing } from "@/src/core";
 import { useServerEvent } from "@/components/server-events";
+import { useDayChange } from "@/components/day-change";
 import { SidebarToggle } from "@/components/sidebar";
 import { useLinkVariant } from "@/components/design-variant";
 import { TopicPage } from "@/components/unit-inbox/topic-page/topic-page";
 
 type Read = { status: "loading" } | { status: "missing" } | { status: "ready"; course: StudyCourse; chats: ChatListItem[] };
 
-/** The topic's course and every session, read again when a turn settles or
- *  the list changes. A failed read keeps the last one. */
+/** The topic's course and every session, read again when a turn settles,
+ *  the list changes, the course record changes or the day turns over. A
+ *  failed read keeps the last one. */
 function useUnitRead(workspace: string): Read {
 	const [read, setRead] = useState<Read>({ status: "loading" });
 	const [attempt, setAttempt] = useState(0);
 	useServerEvent("turn-settled", () => setAttempt((n) => n + 1));
 	useServerEvent("chats-changed", () => setAttempt((n) => n + 1));
+	useServerEvent("course-changed", (p) => p.workspace === workspace && setAttempt((n) => n + 1));
+	useDayChange(() => setAttempt((n) => n + 1));
 	useEffect(() => {
 		let live = true;
 		void Promise.all([
