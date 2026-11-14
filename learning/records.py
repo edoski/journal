@@ -109,6 +109,19 @@ def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
     return placed or None
 
 
+def _reviewed(record: dict[str, Any], keys: list[str]) -> list[str]:
+    """The topics whose due review the new answers counted as: the ones the
+    engine had due when each was saved (``due_topics``). An answer on a topic
+    the plan holds for a later day is practice, not its review."""
+    observations = record.get("observations", {})
+    topics = (
+        topic
+        for key in keys
+        for topic in observations.get(key, {}).get("due_topics", ())
+    )
+    return list(dict.fromkeys(topics))
+
+
 def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     """Apply one patch and return the receipt (see the v6 spec, section 3)."""
     changes = schema.check_patch(patch)
@@ -150,6 +163,7 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         "duplicates": outcome.duplicates,
         "saved": outcome.saved,
         "reviews": scheduled.reviews,
+        "reviewed": _reviewed(final, outcome.observations),
         "levels": levels,
         "focus": final.get("focus"),
         "path_current": final.get("path", {}).get("current"),
