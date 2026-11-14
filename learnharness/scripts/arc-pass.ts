@@ -110,7 +110,7 @@ async function copyRun(): Promise<void> {
 	const arcs = await courseRecords.run(workspace, { verb: "arcs", report: true });
 	write(out, "report.json", {
 		status: result.status,
-		...(result.status === "formed" ? { summary: result.summary, stripped: result.formation.stripped, placedByEngine: result.formation.placedByEngine } : { reason: result.reason }),
+		...(result.status === "formed" ? { summary: result.summary, stripped: result.formation.stripped, placedByEngine: result.formation.placedByEngine, blindSortMisses: result.sort } : { reason: result.reason }),
 		...(arcs.ok ? { arcs: arcs.json } : { arcs_error: arcs.message }),
 	});
 	write(out, "run.json", {

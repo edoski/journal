@@ -31,12 +31,19 @@ import {
 	formationWords,
 	liveTopics,
 	passDue,
+	sortAnswerProblems,
+	sortMisses,
+	sortProblems,
+	sortQuiz,
 	storedEdges,
 	type ArcPassView,
 	type ArcSubmit,
 	type EdgeDiff,
 	type EdgeSubmit,
 	type Formation,
+	type SortAnswer,
+	type SortMiss,
+	type SortQuiz,
 	withProposed,
 } from "../../core/arc-pass.ts";
 import { courseView, NO_STANDING, openLessonsOf, sourcesOf, type MapCourseView } from "../../core/course-map-build.ts";
@@ -53,6 +60,7 @@ import { runSubmitAgent } from "./submit-agent.ts";
 
 const EDGES_TOOL = "submit_edges";
 const ARCS_TOOL = "submit_arcs";
+const SORT_TOOL = "submit_sort";
 const NEVER_SUBMITTED = "The grouping pass never submitted.";
 /** Model rounds beyond reading, as the map builder counts them: one to look
  *  at the course, one to submit, and the submit seam's retries. */
@@ -80,6 +88,16 @@ const edgeSchema = Type.Object({
 			reason: Type.String({ description: "Why an exercise on the topic cannot be done without it." }),
 		}),
 		{ description: "True, direct prerequisites the graph misses; an empty list when none." },
+	),
+});
+
+const sortSchema = Type.Object({
+	sort: Type.Array(
+		Type.Object({
+			topic: Type.String({ description: "The topic's id: t1, t2, …" }),
+			arcs: Type.Array(Type.String(), { description: "The arc names it reads as part of, exactly as listed, best first; a second only when it fits exactly as well." }),
+		}),
+		{ description: "Every topic, once." },
 	),
 });
 
@@ -135,6 +153,12 @@ How this differs from the text below:
 - When the course should get no arcs, send none with the reason and an empty arcs list.
 
 `;
+
+export const SORT_INSTRUCTIONS = `You read a course's arc names the way a student does, coming back after days away. Below are the names of its arcs, in no particular order, and its topic titles, shuffled. For each topic, say which arc's name it reads as part of, from the names alone: nothing else about the course is given, and nothing else counts. List a second name only when it fits the topic exactly as well as the first. Answer with one ${SORT_TOOL} call.`;
+
+function sortPrompt(quiz: SortQuiz): string {
+	return ["## Arc names", ...[...quiz.arcs].sort().map((a) => `- ${a}`), "", "## Topics", ...quiz.topics.map((t) => `- ${t.id}: ${t.title}`)].join("\n");
+}
 
 /** A source the agent reads, in one line. */
 function fileLine(f: MaterialFile): string {
@@ -219,14 +243,15 @@ export interface EdgeRun {
 }
 
 export type ArcPassResult =
-	| { status: "formed"; summary: string; edges: EdgeRun; answer: ArcSubmit; formation: Formation; revision: number | null; report: unknown }
+	| { status: "formed"; summary: string; edges: EdgeRun; answer: ArcSubmit; formation: Formation; revision: number | null; report: unknown; sort: SortMiss[] | null }
 	| { status: "none"; reason: string; edges?: EdgeRun; answer?: ArcSubmit }
 	| { status: "failed"; reason: string; edges?: EdgeRun; answer?: ArcSubmit; patch?: Json };
 
 /** One entry of a run's transcript: a model message, an answer the app or
  *  the engine refused, or a save. */
 export type TranscriptEntry =
-	| { at: string; step: "edges" | "cut"; kind: "message"; message: AssistantMessage }
+	| { at: string; step: "edges" | "cut" | "sort"; kind: "message"; message: AssistantMessage }
+	| { at: string; step: "sort"; kind: "sorted"; misses: SortMiss[] }
 	| { at: string; step: "edges" | "cut"; kind: "refused"; problems: string }
 	| { at: string; step: "edges" | "cut" | "note"; kind: "saved" | "save refused"; changes: unknown; message?: string };
 
@@ -368,14 +393,41 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		};
 		const cut = await settled();
 		const edgesEntry = edges.applied.length > 0 ? lastEdgesEntry(cut.record) : undefined;
+		let sorted: SortMiss[] | null = null;
+		const blindSort = async (a: ArcSubmit, formation: Formation): Promise<string | null> => {
+			const quiz = sortQuiz(a, cut.view, formation);
+			const read = await runSubmitAgent<SortAnswer>({
+				role: "teacher",
+				toolName: SORT_TOOL,
+				toolDescription: "Submit the arc each topic reads as part of.",
+				parameters: sortSchema,
+				fill: (input: Json) => ({ sort: (input.sort as SortAnswer["sort"] | undefined) ?? [] }),
+				validate: (answer) => sortAnswerProblems(answer, quiz),
+				systemPrompt: SORT_INSTRUCTIONS,
+				prompt: sortPrompt(quiz),
+				engine,
+				signal,
+				onMessage: (message) => log({ step: "sort", kind: "message", message }),
+				onStep: (usage, model, n, finish, tools) => console.info(`[arc-pass ${workspace}] sort step ${n} ${model}: ${usage.input} in, ${usage.output} out, ${finish}, ${tools}`),
+				neverSubmitted: "The blind sort never submitted.",
+			}).catch((err: unknown) => {
+				if (signal?.aborted) throw aborted();
+				console.info(`[arc-pass ${workspace}] blind sort skipped: ${err instanceof Error ? err.message : String(err)}`);
+				return null;
+			});
+			if (!read) return null;
+			sorted = sortMisses(quiz, read, a);
+			log({ step: "sort", kind: "sorted", misses: sorted });
+			return sortProblems(sorted, a);
+		};
 		const answer = await agent<ArcSubmit>("cut", ARCS_TOOL, arcSchema, composeDoctrine(ARC_CUT_DOCTRINE), ARC_CUT_INSTRUCTIONS, cutPrompt(title, cut.view, cut.record, files), async (a) => {
 			const problems = arcPassProblems(a, cut.view);
 			if (problems) return problems;
 			const formation = arcPassChanges(a, cut.view, { edgesEntry, asked: options.asked, reason: options.reason });
 			if (!formation) return null;
 			const checked = await courseRecords.run(workspace, { verb: "check", changes: formation.changes });
-			if (checked.ok || checked.kind !== "validation") return null;
-			return `The engine refused the arcs: ${checked.message}`;
+			if (!checked.ok && checked.kind === "validation") return `The engine refused the arcs: ${checked.message}`;
+			return blindSort(a, formation);
 		});
 		if (signal?.aborted) throw aborted();
 		if (answer.none?.trim()) return { status: "none", reason: answer.none.trim(), edges, answer };
@@ -392,7 +444,7 @@ export function createArcPass(deps: ArcPassDeps): ArcPass {
 		const after = await readRecord(workspace);
 		const reported = await courseRecords.run(workspace, { verb: "arcs", report: true });
 		const revision = typeof obj(after).revision === "number" ? (obj(after).revision as number) : null;
-		return { status: "formed", summary: formationWords(answer), edges, answer, formation, revision, report: reported.ok ? obj(reported.json).report : null };
+		return { status: "formed", summary: formationWords(answer), edges, answer, formation, revision, report: reported.ok ? obj(reported.json).report : null, sort: sorted };
 	}
 
 	/** Release the course, and run a map build asked for meanwhile. */

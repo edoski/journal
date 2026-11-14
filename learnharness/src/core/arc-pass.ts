@@ -18,6 +18,7 @@
  * of an answer's shape.
  */
 
+import { createHash } from "node:crypto";
 import { sameName, validHandle, type MapCourseView, type MapRef } from "./course-map-build.ts";
 
 type Json = Record<string, unknown>;
@@ -521,6 +522,94 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 		arc_change: { reason, ...(extra.edgesEntry !== undefined ? { edges_entry: extra.edgesEntry } : {}), ...(extra.asked ? { asked: extra.asked } : {}) },
 	};
 	return { changes, stripped, gone, placedByEngine: Object.keys(view.topics).filter((t) => !placed.has(t)) };
+}
+
+// ─── the blind sort ──────────────────────────────────────────────────────────
+
+/**
+ * Rule 8's name test, read by a fresh reader instead of the agent that chose
+ * the names: the arc names alone and every topic title as the learner will
+ * see it, shuffled, under a neutral id, so neither a handle nor the order
+ * gives the answer away.
+ */
+export interface SortQuiz {
+	arcs: string[];
+	topics: { id: string; handle: string; title: string }[];
+}
+
+/** The reader's answer: for each topic id, the arc names it reads as part of,
+ *  best first, several only when they fit equally well. */
+export interface SortAnswer {
+	sort: { topic: string; arcs: string[] }[];
+}
+
+/** One topic the reader sorted away from its arc. */
+export interface SortMiss {
+	topic: string;
+	title: string;
+	arc: string;
+	readsAs: string[];
+}
+
+/** The quiz for a formation: titles after the label strip and any new
+ *  title, ordered by a hash of the handle so the arcs' order does not show.
+ *  Pure. */
+export function sortQuiz(submit: ArcSubmit, view: ArcPassView, formation: Formation): SortQuiz {
+	const titles = new Map((submit.titles ?? []).map((t) => [t.topic, t.title.trim()]));
+	const shown = (t: string) => formation.stripped[t] ?? view.topics[t]?.title ?? titles.get(t) ?? t;
+	const mix = (t: string) => createHash("sha1").update(t).digest("hex");
+	const handles = submit.arcs.flatMap((a) => a.topics.filter((t) => t in view.topics)).sort((x, y) => mix(x).localeCompare(mix(y)));
+	return { arcs: submit.arcs.map((a) => a.title.trim()), topics: handles.map((handle, i) => ({ id: `t${i + 1}`, handle, title: shown(handle) })) };
+}
+
+/** What is wrong with the reader's answer, for it to fix. Pure. */
+export function sortAnswerProblems(answer: SortAnswer, quiz: SortQuiz): string | null {
+	const ids = new Set(quiz.topics.map((t) => t.id));
+	const names = new Set(quiz.arcs);
+	const seen = new Set<string>();
+	const problems: string[] = [];
+	for (const s of answer.sort) {
+		if (!ids.has(s.topic)) problems.push(`"${s.topic}" is no topic id.`);
+		else if (seen.has(s.topic)) problems.push(`"${s.topic}" is sorted twice.`);
+		seen.add(s.topic);
+		if (s.arcs.length === 0) problems.push(`"${s.topic}" names no arc.`);
+		for (const a of s.arcs) if (!names.has(a)) problems.push(`"${a}" is no arc name; use the names exactly as listed.`);
+	}
+	const missing = quiz.topics.filter((t) => !seen.has(t.id)).map((t) => t.id);
+	if (missing.length > 0) problems.push(`sort every topic: ${missing.join(", ")} missing.`);
+	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
+}
+
+/** The topics the reader put in another arc than their own: a miss only
+ *  when no name it fits as well is the topic's own arc. Pure. */
+export function sortMisses(quiz: SortQuiz, answer: SortAnswer, submit: ArcSubmit): SortMiss[] {
+	const home = new Map(submit.arcs.flatMap((a) => a.topics.map((t) => [t, a.title.trim()] as const)));
+	const read = new Map(answer.sort.map((s) => [s.topic, s.arcs]));
+	return quiz.topics.flatMap((t) => {
+		const arc = home.get(t.handle)!;
+		const readsAs = read.get(t.id) ?? [];
+		return readsAs.length > 0 && !readsAs.includes(arc) ? [{ topic: t.handle, title: t.title, arc, readsAs }] : [];
+	});
+}
+
+/**
+ * The refusal the misses give the cut, or null. Rule 8 allows one
+ * borderline miss when the basis explains it (it names the topic); any more,
+ * or one the basis leaves unexplained, goes back to the agent with each
+ * topic and the arc it read as. Pure.
+ */
+export function sortProblems(misses: readonly SortMiss[], submit: ArcSubmit): string | null {
+	if (misses.length === 0) return null;
+	const basis = submit.basis.toLowerCase();
+	if (misses.length === 1 && (basis.includes(misses[0]!.topic.toLowerCase()) || basis.includes(misses[0]!.title.toLowerCase()))) return null;
+	const lines = misses.map((m) => `- "${m.title}" (${m.topic}), in "${m.arc}", reads as part of ${m.readsAs.map((a) => `"${a}"`).join(" or ")}.`);
+	return [
+		"A fresh reader sorted the topic titles into the arc names alone, as the learner will read them after days away (rule 8's name test), and put these topics in another arc than yours:",
+		...lines,
+		misses.length === 1
+			? "One borderline miss may stay only with its reason in the basis, naming the topic. Otherwise move it to the arc it reads as when rule 2 allows, or rename the arcs so it reads as part of its own."
+			: "At most one may stay, explained in the basis. For each, move the topic to the arc it reads as when rule 2 allows; rename only where rule 2 holds it, choosing a name for the arc's one idea that its topics read into. When the material's unit is whole, prefer a name that holds it to moving a topic out of it.",
+	].join("\n");
 }
 
 /** The note a cut's doubts leave in the arc log, saved after the arcs:
