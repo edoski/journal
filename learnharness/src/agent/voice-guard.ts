@@ -50,8 +50,10 @@ export function turnInputOf(messages: readonly LhMessage[]): TurnInput {
 	const none: TurnInput = { kind: "teach", answers: false, words: null };
 	if (!input) return none;
 	if (input.role === "user") {
-		const first = !messages.slice(0, at).some((m) => m.role === "assistant");
-		return { kind: first ? "teach" : "direct", answers: false, words: textOf(input.content) };
+		// A session's first message is the topic it opens on, unless he asks.
+		const words = textOf(input.content);
+		const opens = !messages.slice(0, at).some((m) => m.role === "assistant") && !words.trim().endsWith("?");
+		return { kind: opens ? "teach" : "direct", answers: false, words };
 	}
 	if (input.role === "toolResult") {
 		const details = isRecord(input.details) ? input.details : {};

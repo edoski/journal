@@ -270,7 +270,7 @@ export function afterQuestion(text: string): string[] {
 /** A first sentence that hands his answer back to him or grades a right
  *  one: "You got it right: …", "Yes, …", "That is right, …" always; "That
  *  is X, …" and "The product is X, …" when X is what he answered. */
-const GRADES = /^(?:you got it|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
+const GRADES = /^(?:you got (?:it|(?:[a-z]+ ){0,3}(?:right|correct))\b|you(?:'re| are) right|you said|your answer (?:is|was)|yes\b|(?:that|this|it)(?:'s| is) (?:right|correct)\b|(?:right|correct)[,.])/i;
 /** "Your last answer is right", "Both parts are correct": a right answer
  *  called right, where no "but" goes on to where it broke. */
 const CALLED_RIGHT = /^(?:[a-z]+ ){1,4}(?:is|are|was|were) (?:right|correct)\b/i;

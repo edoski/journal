@@ -113,6 +113,8 @@ describe("the round-6 slips are rewritten before he sees them", () => {
 		const product = "The product is $A^{-1}$, and writing $I$ beside $A$ makes the right-hand block collect $E_k \\cdots E_1 I$ with no multiplication.";
 		assert.deepEqual(rules(new VoiceGuard(answering("It's A^{-1}, apply the same ops to I alongside")), send(product)), ["echo"]);
 		assert.deepEqual(rules(new VoiceGuard(answering("rank 2")), send("You got it right: rank 2, with pivots in columns 1 and 3.")), ["echo"]);
+		const both = "You got both parts right. When you name a basis, take the columns from the original $B$.";
+		assert.deepEqual(rules(new VoiceGuard(answering("rank 2")), send(both)), ["echo"]);
 		const graded = "Your last answer is right, and both reviews today were right on your own. What you built is the **Poisson distribution**.";
 		assert.deepEqual(rules(new VoiceGuard(answering("e^{-3} e^3 = 1")), send(graded)), ["echo"], "a real run's grading of a right answer");
 	});
@@ -150,6 +152,7 @@ describe("turns within the voice pass untouched", () => {
 describe("the guard's turn", () => {
 	it("reads the turn's input: his question, his answer, a hint, a close", () => {
 		assert.equal(turnInputOf([newUserMessage("Poisson")]).kind, "teach", "a lesson's first message is its topic");
+		assert.equal(turnInputOf([newUserMessage("How many overdue reviews do I have?")]).kind, "direct", "unless he asks");
 		assert.equal(turnInputOf([newUserMessage("Poisson"), assistant([send("x")]), newUserMessage("why?")]).kind, "direct");
 		assert.deepEqual(turnInputOf(answering("rank 2")), { kind: "wrong", answers: true, words: "rank 2" });
 		assert.equal(turnInputOf([newUserMessage("x"), assistant([ask("q")]), hinted("q")]).kind, "hint");
