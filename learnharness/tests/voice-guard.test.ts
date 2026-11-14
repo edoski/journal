@@ -192,6 +192,15 @@ describe("the guard's turn", () => {
 		assert.deepEqual(rules(guard, send("What you built from the minutes model is the **Poisson distribution**.")), ["after-probe"]);
 	});
 
+	it("lets a rewrite he is owed through after probe_done: it answers what he asked", () => {
+		const guard = new VoiceGuard([newUserMessage("Invertible matrices"), assistant([ask("q", "recall")]), newUserMessage("Can you just explain diagonalization to me now?")]);
+		const long = Array.from({ length: 8 }, (_, i) => `Sentence ${i + 1} of the explanation.`).join(" ");
+		assert.deepEqual(rules(guard, send(long)), ["length"]);
+		guard.screen({ type: "toolCall", id: "pd2", name: "probe_done", arguments: {} });
+		assert.deepEqual(rules(guard, send("A matrix is diagonalizable when its eigenvectors form a basis.")), []);
+		assert.deepEqual(rules(guard, send("One more word after the probe.")), ["after-probe"]);
+	});
+
 	it("never shows the same message twice in a turn", () => {
 		const guard = new VoiceGuard([newUserMessage("Rank")]);
 		const text = "The rank is the number of pivots.";

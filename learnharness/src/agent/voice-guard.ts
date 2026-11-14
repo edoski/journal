@@ -254,9 +254,12 @@ export class VoiceGuard {
 		if (call.name === SEND_TO_USER_TOOL) {
 			const text = sendToUserText(call);
 			if (!text) return null;
-			if (this.duplicates < 2 && (this.probeEnded || this.said.some((s) => s.trim() === text.trim()))) {
+			// A rewrite he is owed goes through, after probe_done too: it is
+			// the answer he asked for, never a closing sentence.
+			const afterProbe = this.probeEnded && !this.owed;
+			if (this.duplicates < 2 && (afterProbe || this.said.some((s) => s.trim() === text.trim()))) {
 				this.duplicates++;
-				return this.probeEnded ? AFTER_PROBE(text) : DUPLICATE;
+				return afterProbe ? AFTER_PROBE(text) : DUPLICATE;
 			}
 			const kind = this.messageKind();
 			const breaks = this.refused.has("message") ? [] : this.messageBreaks(text, kind);
