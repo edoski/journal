@@ -107,7 +107,7 @@ describe("the topic head", () => {
 		const header = document.querySelector('[data-slot="page-head"]')!;
 		assert.equal(header.querySelector('[data-slot="page-eyebrow"] [data-slot="topic-course-link"]')!.textContent, "Linear Algebra");
 		assert.equal(header.querySelector('h1[data-slot="page-title"]')!.textContent, "Rank and the column space");
-		for (const line of header.children) assert.doesNotMatch(line.getAttribute("class") ?? "", /\b(pl|ml|ps|ms)-/, "no line indented");
+		for (const line of header.children) assert.doesNotMatch(line.getAttribute("class") ?? "", /(^|\s)(pl|ml|ps|ms)-/, "no line indented (a divider's own margin is not the line's)");
 		const words = document.querySelector('[data-slot="page-fact"][data-kind="standing"]')!;
 		const pie = words.firstElementChild!;
 		assert.equal(pie.getAttribute("data-slot"), "topic-glyph", "the pie leads the standing");

@@ -236,7 +236,7 @@ function viewOf(c: StudyCourse) {
 }
 
 describe("the course header", () => {
-	it("draws the name, Add material and the button with the step's word, the facts and the next step with why", () => {
+	it("draws the name, Add material and the button with the step's word, then the next step with why, then the facts", () => {
 		const document = render(<CourseHeader view={viewOf(course())} busy={false} onContinue={() => {}} />);
 		assert.equal(document.querySelector('[data-slot="course-title"]')!.textContent, "Linear Algebra");
 		assert.equal(document.querySelector('[data-slot="course-action"]')!.textContent, "Review");
@@ -245,6 +245,9 @@ describe("the course header", () => {
 			["Some topics on your own", "Exam in 21 days", "Studied 2 days ago"],
 		);
 		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
+		const head = [...document.querySelector('[data-slot="page-head"]')!.children].map((line) => line.getAttribute("data-slot"));
+		assert.ok(head.indexOf("page-lead") < head.indexOf("page-standing"), "what to do next comes before the course's facts");
+		assert.ok(document.querySelector('[data-slot="page-lead"] [data-slot="course-next"]'), "the next step is the head's lead");
 		assert.deepEqual(
 			[...document.querySelectorAll("button, a")].map((c) => c.getAttribute("data-slot")),
 			["course-add-material", "course-action"],
