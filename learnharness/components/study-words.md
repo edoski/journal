@@ -14,6 +14,8 @@ One phrase per step of the topic's pie (`topic-standing.ts` sets the fill from t
 | 3/4 | Right with help |
 | full | On your own |
 
+On a topic not yet solid (`attempted` or `assisted`), the words say how he answered it since his newest answer that was not right, the engine's `right` (`RIGHT_WORDS`, `standingWords`): Right on your own, check another day; Right with help; Right, but a guess; Right, not yet confirmed; Partly right when that newest answer was partly right. Right answers after a review day's wrong first try never read "Tried, not right yet" (round 7); `attempted` with no right answer since keeps it. The pie stays the pie.
+
 ## Why it needs him
 
 One form each, wherever it shows.

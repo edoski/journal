@@ -36,7 +36,13 @@ describe("where he stands, true to the record", () => {
 		assert.equal(assisted("helped"), "Right with help");
 		assert.equal(assisted(), "Right with help", "an engine that does not say keeps the pie's words");
 		assert.equal(standingWords(0.75, { level: "independent" }), "Right with help", "a weak topic he could do on his own keeps its pie's words");
-		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet");
+		assert.equal(standingWords(0.5, { level: "attempted" }), "Tried, not right yet", "no right answer since his newest wrong one");
+	});
+
+	it("says the right answers since a review day's wrong first try, never that he has not got it right (round 7)", () => {
+		assert.equal(standingWords(0.5, { level: "attempted", right: "unaided" }), "Right on your own, check another day");
+		assert.equal(standingWords(0.5, { level: "attempted", right: "helped" }), "Right with help");
+		assert.equal(standingWords(0.5, { level: "attempted", right: "partial" }), "Partly right");
 	});
 });
 

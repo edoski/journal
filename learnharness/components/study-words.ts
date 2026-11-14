@@ -20,9 +20,9 @@ export const STANDING_WORDS: Record<Fill, string> = {
 	1: "On your own",
 };
 
-/** A topic he cannot yet do on his own, by how he has best answered it
- *  (the engine's `right`): the 3/4 pie's words when help is what kept it
- *  there. Right unaided only on the day it was taught says what is left, a
+/** A topic he cannot yet do on his own, by how he answered it since his
+ *  newest answer that was not right (the engine's `right`): the 3/4 pie's
+ *  words when help is what kept it there. Right unaided only on the day it was taught says what is left, a
  *  check on another day, never a count: "once" read false after three
  *  unaided answers that day (round 5). */
 export const RIGHT_WORDS: Record<RightAnswer, string> = {
@@ -34,12 +34,16 @@ export const RIGHT_WORDS: Record<RightAnswer, string> = {
 };
 
 /** Where he stands in words true to the engine's record: the pie step's
- *  words, except at the `assisted` level, which says how he has best
- *  answered the topic, so an unaided or a partial answer never reads
- *  "Right with help". A weak topic he could do on his own keeps its 3/4
- *  pie's words. Pure. */
+ *  words, except on a topic not yet solid, which says how he answered it
+ *  since his newest answer that was not right (the engine's `right`), so
+ *  an unaided or a partial answer never reads "Right with help", and right
+ *  answers after a review day's wrong first try never read "Tried, not
+ *  right yet" (round 7). `attempted` with no right answer since keeps its
+ *  pie's words; a weak topic he could do on his own keeps its 3/4 pie's
+ *  words. Pure. */
 export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | "right">): string {
-	return topic.level === "assisted" ? RIGHT_WORDS[topic.right ?? "helped"] : STANDING_WORDS[fill];
+	if (topic.level === "assisted") return RIGHT_WORDS[topic.right ?? "helped"];
+	return topic.level === "attempted" && topic.right ? RIGHT_WORDS[topic.right] : STANDING_WORDS[fill];
 }
 
 /** A slip's words for each of the engine's signals but a mixed-up method,

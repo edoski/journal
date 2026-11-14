@@ -497,10 +497,18 @@ def _answered(item: dict[str, Any]) -> str | None:
 
 
 def _right(attempts: list[Attempt]) -> str | None:
-    """How the learner has best answered a topic not yet solid, the first of
-    ``RIGHT`` any attempt shows: right with no help (on the day it was
-    learned), with help, as a guess, on doubtful evidence, or partly."""
-    found = {_answered(item) for _, item in attempts}
+    """How the learner has answered a topic not yet solid since his newest
+    counted answer that was not right: the first of ``RIGHT`` the correct
+    answers after it show (right with no help, with help, as a guess, or on
+    doubtful evidence); ``partial`` when the newest answer was partly right,
+    and none when it was wrong. Every answer counts when none was wrong."""
+    results = [item["result"] for _, item in attempts]
+    slip = next(
+        (at for at in reversed(range(len(results))) if results[at] != "correct"), -1
+    )
+    if slip == len(results) - 1:
+        return "partial" if results[slip] == "partial" else None
+    found = {_answered(item) for _, item in attempts[slip + 1 :]}
     return next((kind for kind in RIGHT if kind in found), None)
 
 
@@ -514,8 +522,9 @@ def _standing(
         "attempts": len(attempts),
         "unaided_days": sum(verdict == "solid" for _, verdict in replayed.verdicts),
     }
-    if result["level"] == "assisted":
-        result["right"] = _right(attempts)
+    right = _right(attempts) if result["level"] in ("attempted", "assisted") else None
+    if right:
+        result["right"] = right
     if attempts:
         key, item = attempts[-1]
         last = {"id": key, "date": item["date"], "result": item["result"]}

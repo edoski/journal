@@ -708,7 +708,11 @@ def course_map(workspace: Workspace, here: str | None = None) -> dict[str, Any]:
     whose new topics take the days before that start, and ``starts_why``
     why it comes then in the material (``agenda.Why``). ``exam`` carries the
     run-up: the final review's first day, the topics that do not fit before
-    the exam and those its final review has no room for. ``mistake`` marks a
+    the exam and those its final review has no room for. ``right``, on a
+    topic not yet solid (``attempted`` or ``assisted``), is how he answered
+    it since his newest counted answer that was not right (``unaided``,
+    ``helped``, ``guess``, ``uncertain``), ``partial`` when that newest
+    answer was partly right, and absent when it was wrong. ``mistake`` marks a
     topic with a counted answer not right since his latest right answer on
     his own (``progress.open_mistakes``): a ``gap`` without one is what is
     left to check, never a mistake.
