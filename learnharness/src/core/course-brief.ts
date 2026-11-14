@@ -166,14 +166,34 @@ function pathHealthLine(health: unknown): string | null {
 	return parts.length > 0 ? `Path gaps (fix them in a save when you next touch these topics): ${parts.join("; ")}` : null;
 }
 
+/** The check of the arc a session was started on from Check it (the
+ *  session's `arcCheck`), from the engine's `arcs_ready`: the arc's
+ *  question, its live topics and the method pairs to tell apart, in the
+ *  arcs doctrine's words. Null when that arc is not ready (any more). */
+function arcCheckLines(arcsReady: unknown, arc: string | undefined): string[] | null {
+	if (!arc) return null;
+	const check = list(arcsReady).map(obj).find((a) => a.arc === arc);
+	if (!check) return null;
+	const pairs = list(check.pairs).flatMap((p) => (Array.isArray(p) && p.length === 2 ? [`${String(p[0])} or ${String(p[1])}`] : []));
+	return [
+		`Arc check: he pressed Check it on ${str(check.title) ?? arc} (${arc}), so this session is its check, offered and never required, and it locks nothing.`,
+		...(str(check.question) ? [`  question: ${check.question}`] : []),
+		`  one unaided item per topic, in mixed order: ${handles(check.topics).join(", ")}`,
+		...(pairs.length > 0 ? [`  one choose-the-method item per pair: ${pairs.join("; ")}`] : []),
+		`  tag each item's attempt with checkpoint "${arc}"; a miss follows the relearn rules, with a fresh parallel item in this session or the next.`,
+	];
+}
+
 /** The brief for one role, and the key that decides when it is re-sent.
  *  Practice also reads the run-up from the engine's `plan` for the course
  *  at `workspace`; its figures move with the day (in the key) and with
- *  saves (in the receipts), as levels do. */
+ *  saves (in the receipts), as levels do. `arcCheck` is the arc a session
+ *  started from Check it checks: the brief then carries that arc's check. */
 export function projectCourseBrief(
 	resume: unknown,
 	role: BriefRole,
 	runup?: { plan: unknown; workspace: string },
+	arcCheck?: string,
 ): { key: string; text: string } {
 	const r = obj(resume);
 	const course = obj(r.course);
@@ -196,6 +216,8 @@ export function projectCourseBrief(
 	if (health) lines.push(health);
 	const runupText = role === "practice" && runup ? runupLine(runup.plan, runup.workspace) : null;
 	if (runupText) lines.push(runupText);
+	const check = arcCheckLines(r.arcs_ready, arcCheck);
+	if (check) lines.push(...check);
 	const detail = obj(r.topics);
 	if (due.length > 0) {
 		lines.push(dueHeading(r, due.length), ...due.map((d) => dueLine(withDetail(d, detail), role)));
@@ -238,6 +260,7 @@ export function projectCourseBrief(
 		handles(path.excluded),
 		r.path_health ?? null,
 		course.goal ?? null,
+		check,
 		role,
 	]);
 	return { key, text: lines.join("\n") };

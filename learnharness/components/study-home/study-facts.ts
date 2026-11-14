@@ -147,14 +147,6 @@ export function byUrgency(courses: readonly StudyCourse[]): StudyCourse[] {
 		.map(({ course }) => course);
 }
 
-/** Where a lesson sits in its course: the positions it spans (from 1), of
- *  how many. */
-export interface PathPlace {
-	from: number;
-	to: number;
-	of: number;
-}
-
 /** One line of Today: a session to pick up, or a course's next step. */
 export type TodayRow =
 	| { kind: "session"; chat: ChatListItem; course: StudyCourse | null }

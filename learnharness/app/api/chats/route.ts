@@ -21,7 +21,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown };
+	const body = (await req.json().catch(() => ({}))) as { title?: unknown; kind?: unknown; course?: unknown; resume?: unknown; topics?: unknown; arcCheck?: unknown };
 	const title = typeof body.title === "string" ? body.title : "";
 	// The Current design's Practice switch starts the session in practice;
 	// without it the prober routes the opening, and the agents hand the
@@ -45,7 +45,9 @@ export async function POST(req: Request) {
 	// The course topics it is started on, by handle: a topic's page, Home's
 	// review of those topics. The lists keep only handles the map has.
 	const topics = Array.isArray(body.topics) ? body.topics.filter((t): t is string => typeof t === "string" && t.length > 0).slice(0, 32) : [];
-	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics);
+	// The arc a session started from Check it checks; the brief reads its check from the engine.
+	const arcCheck = typeof body.arcCheck === "string" && body.arcCheck.length > 0 ? body.arcCheck : undefined;
+	const chat = createChat(titleFromPrompt(title || "Untitled session"), course, topics, arcCheck);
 	const opening: LhMessage[] = practice ? [newSessionModeMessage("practice") as LhMessage] : [];
 	if (resumed) {
 		// The lesson's plan carries over as this session's plan map, so the

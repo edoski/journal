@@ -1,9 +1,10 @@
-import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
+import type { ArcHandle, ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StartsWhy, StudyCourse, TopicAttempt, TopicHandle, TopicRecord, TopicRef } from "@/src/core";
 import { standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
+import { agoWords, ATTEMPT_HOW_WORDS, countedWords, heldWords, LESSON_WORDS, MARK_WORDS, reviewWords, SLIP_WORDS, slipMark, startsAfterWords, startsWhyWords, studiedDaysWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import { unitHref } from "@/components/unit-inbox/unit-href";
+import { courseProgress } from "@/components/study-home/agenda-rows/row-facts";
 import { sidebarSays, type Said } from "@/components/unit-inbox/sidebar-says";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
 
@@ -76,8 +77,19 @@ export interface BuildsOn {
 	href: string;
 }
 
+/** Why the plan starts a topic not started when it does, in his course's
+ *  names (`startsWhyWords`), and its kind, which picks its icon. */
+export interface StartsReason {
+	kind: StartsWhy["kind"];
+	words: string;
+}
+
 export interface TopicFacts {
 	course: { workspace: string; title: string };
+	/** The arc the topic lies in, with its ring's share (the topics of it
+	 *  he can do on his own, as Home's ring counts a course); null in a
+	 *  course without arcs. */
+	arc: { handle: ArcHandle; title: string; share: number | null } | null;
 	topic: CourseMapTopic;
 	/** The engine's study day. */
 	today: string;
@@ -99,6 +111,10 @@ export interface TopicFacts {
 	 *  its first lesson and, when it waits behind other courses' new
 	 *  topics, which (`startsAfterWords`); null otherwise. */
 	starts: { day: string; waits: string | null } | null;
+	/** Why the plan starts a topic not started then ("After Expectation
+	 *  and linearity, which it needs"), in a course with arcs; null once
+	 *  taught, with no plan for it, and in a course without arcs. */
+	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
 	/** Every session of the topic, newest first. */
@@ -310,6 +326,17 @@ export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => 
 	return { result, words: counted === MARK_WORDS.ownWork ? null : counted };
 }
 
+/** The arc a topic lies in, by handle and title, with the share of its
+ *  live topics he can do on his own (`courseProgress` over them); null in
+ *  a course without arcs or for a topic the arc list does not hold. Pure. */
+function arcOf(course: StudyCourse, topic: CourseMapTopic): TopicFacts["arc"] {
+	const arc = topic.arc && course.map.arcs?.find((a) => a.handle === topic.arc);
+	if (!arc) return null;
+	const live = course.map.topics.filter((t) => t.arc === arc.handle && t.excluded === undefined);
+	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
+	return { handle: arc.handle, title: arc.title, share: progress ? progress.solid / progress.of : null };
+}
+
 /** Everything the page draws, from the course, every course (Today
  *  weighs them together), the topic, every session and the topic read;
  *  `read` is null when it failed. */
@@ -337,6 +364,7 @@ export function topicFacts({
 	const studied = lastStudiedDay(topic, entries, attempts);
 	return {
 		course: { workspace: map.workspace, title: map.title },
+		arc: arcOf(course, topic),
 		topic,
 		today: map.today,
 		standing: silent ? null : standingOf(topic),
@@ -345,6 +373,7 @@ export function topicFacts({
 		mistake: mistakeOf(topic, attempts),
 		waits: waitsWords(topic.review, map.today),
 		starts: topic.level === "new" && topic.starts && topic.starts > map.today ? { day: topic.starts, waits: startsAfterWords(topic.startsAfter) } : null,
+		startsWhy: topic.level === "new" && topic.startsWhy && map.arcs ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null,
 		action: topicAction(topic, map, chats),
 		pickups,
 		sessions: entries,

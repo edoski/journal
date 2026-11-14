@@ -1,12 +1,14 @@
 import { clearOpeningPrompt, OPENING_PROMPT_FAILURE, stashOpeningPrompt } from "./opening-prompt";
 
-interface SessionCreation {
+export interface SessionCreation {
 	title: string;
 	kind?: "practice";
 	/** The picked course's workspace (the course chooser). */
 	course?: { workspace: string };
 	/** The course topics it is started on, by handle. */
 	topics?: readonly string[];
+	/** The arc a Check it session checks, by handle. */
+	arcCheck?: string;
 	/** The finished lesson a fresh session picks up (FINISHED_LESSON). */
 	resume?: { from: string };
 }

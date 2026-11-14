@@ -16,6 +16,9 @@ The page is the list and the map side by side in the app's linked columns (`spli
 | `course-head/pace-head.tsx` | the head, the shared `PageHead` (course-head/course-head.md) |
 | `course-topic-row.tsx` | one topic as a row (course-topic-row.md) |
 | `course-group.tsx` | a group's header over its rows, with folding and Show more (course-group.md) |
+| `course-arc.tsx` | an arc's folded line over its rows (course-arc.md) |
+| `what-next.tsx` | Pick up and Then above the arcs ("What next") |
+| `standing/` | exam readiness and open mistakes, two candidates behind the Exam & mistakes switch (standing/standing.md) |
 
 The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directly, with its `highlight` prop to light a group's topics.
 
@@ -33,6 +36,16 @@ The split page draws `TopicMap` (`../course-map/topic-map/topic-map.md`) directl
 The current topic says "You are here" in place of when it comes back or when he last studied it, never in place of a reason that needs him. Which reason a topic says when it has several is the app's one order (`../study-words.md`, "Which one a topic says"): unfinished work before a review the plan dates later.
 
 "Needs you" means one thing in the app: what Today puts in front of him. A slip Today does not take up stays in Learning with its slip's words, as on the sidebar's Learning shelf; the map card and the pie's warning ink still show it.
+
+## Arcs
+
+A course with two or more arcs he can see (`shownArcs`; design-v2.md 5.2) leads with them in place of the four groups; one with none, or one, shows exactly as before. `courseArcs(course, chats, courses)` gives one section per arc in study order: its topics in path order as the groups' rows (the same `sidebarSays` words and facts), `needsYou` when Today takes up one of its topics, its ring (`arcShare`: the share of its live topics he can do on his own, as Home's ring counts a course), its exam words when the next exam leaves some arc out (`examCovers`, `ARC_EXAM_WORDS`), and `current`, the arc of You are here (`currentArc`). Each section is a `CourseArc` (course-arc.md). Where he is is open on arrival; `?arc=<handle>` opens and shows another (the head's pill), and the address follows the arc he shows.
+
+"Needs you" on an arc's line means only that Today takes up one of its topics. A slip Today does not take up stays a slip in its arc's rows, and the line says where the arc stands (`ARC_STATE_WORDS`, never literals: Edo is still choosing the words).
+
+## What next
+
+Above the arcs, at most two rows in Today's row style (`what-next.tsx`, `whatNext`): **Pick up**, the course's first line on Home's Today, read through `todayTop` over every course (so a slip in another arc than where he is, when Today puts it first, is what he picks up), which opens as Today's line does (`LineTarget`); **Then**, the next new topic the plan starts (the earliest `starts`, not the one he picks up), with why then (`startsWhyWords`), which opens its page. Each row: the pie beside two lines, what it is and its reason's icon and words flush right, then the title and its arc's pill flush right (left out when the reason names the arc: "Next in Eigenvalues"). No card background, no counts; nothing at all when Today has nothing here and the plan starts nothing. A hairline closes it off from the arcs.
 
 ## States
 

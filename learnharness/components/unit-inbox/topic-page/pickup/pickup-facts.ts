@@ -1,5 +1,5 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
-import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
+import { ACTION_WORDS, dayOf, dayWords, type BuildsOn, type Press, type SessionEntry, type StartsReason, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import type { TopicRef } from "@/src/core";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
 import { FIRST_LESSON, LESSON_WORDS, TUTOR_WRITING, overdueWords, startsAfterWords } from "@/components/study-words";
@@ -33,6 +33,8 @@ export interface NowItem {
 	press: string;
 	/** The session the press opens, which the map can show; null when the press starts one. */
 	chat: string | null;
+	/** While it starts a topic, why the plan starts it then; absent otherwise. */
+	why?: StartsReason | null;
 }
 
 /** A place after Now: another session that waits on him or is being
@@ -49,7 +51,7 @@ export interface PickupSections {
 	/** What the engine's plan dates ahead: the next review, or a topic's
 	 *  first lesson; its day, "Fri 13 Nov", and why it waits that long when
 	 *  something comes first; null when it dated none ahead. */
-	scheduled: { kind: "review" | "start"; day: string; waits: string | null } | null;
+	scheduled: { kind: "review" | "start"; day: string; waits: string | null; why?: StartsReason | null } | null;
 	/** The sessions neither Now nor Next hold, and every scored attempt, by day. */
 	earlier: TrailDay[];
 	/** Why the topic comes now, while Now starts it: what it builds on and
@@ -123,7 +125,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				: { ...base, icon: "standing", words: "Next lesson" };
 		}
 		case "start":
-			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts) };
+			return { ...base, icon: "standing", words: FIRST_LESSON, note: plannedWords(facts), why: facts.startsWhy };
 		case "study":
 			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ? NOTHING_TODAY : NOTHING_DUE };
 	}
@@ -160,7 +162,7 @@ export function pickupSections(facts: TopicFacts): PickupSections {
 			review?.kind === "scheduled"
 				? { kind: "review", day: dayOf(review.date), waits: facts.waits }
 				: facts.starts && now.kind !== "start"
-					? { kind: "start", day: dayOf(facts.starts.day), waits: facts.starts.waits }
+					? { kind: "start", day: dayOf(facts.starts.day), waits: facts.starts.waits, why: facts.startsWhy }
 					: null,
 		earlier: trailDays(
 			facts.sessions.filter((entry) => !held.has(entry.chat.id)),

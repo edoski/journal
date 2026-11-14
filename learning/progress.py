@@ -609,6 +609,25 @@ def standing(record: dict[str, Any], topic: str) -> dict[str, Any]:
     return standings(record)[topic]
 
 
+def open_mistakes(record: dict[str, Any]) -> dict[str, list[Attempt]]:
+    """Each topic's mistakes still open, newest first: its counted answers
+    that were not right (``incorrect`` or ``partial``) since its latest
+    answer right with no help. Only that answer closes them, since help may
+    have carried a right answer (``repaired_with_help``); a wrong answer
+    after it opens a new one. A topic with none is left out."""
+    found: dict[str, list[Attempt]] = {}
+    for key, history in _histories(record["observations"]).items():
+        wrong: list[Attempt] = []
+        for pair in reversed(history.attempts):
+            if pair[1]["result"] == "correct" and unaided(pair[1]):
+                break
+            if pair[1]["result"] != "correct":
+                wrong.append(pair)
+        if wrong:
+            found[key] = wrong
+    return found
+
+
 # --- scheduling ---------------------------------------------------------------
 
 

@@ -6,7 +6,7 @@ Why a line is on Today, as an icon and a few words. `why-mark.tsx` (`WhyMark`, `
 
 | Part | Notes |
 |---|---|
-| icon | one per kind of reason (`WHY_ICON`): a turn that waits, the question bubble; a miss, a crossed circle; a review, History; an open task, a bookmark; the next topic, an arrow |
+| icon | one per kind of reason (`WHY_ICON`): a turn that waits, the question bubble; a miss, a crossed circle; a review, History; an open task, a bookmark; the next topic, an arrow. A new topic in a course with arcs carries `starts`, why the plan starts it in a few words and its kind; at size `row` it shows in place of the words, with an icon from `STARTS_ICON` (next in its arc, the arrow; after what it needs, a turn-down arrow, corner-down-right; early, fast-forward; `data-starts` on the mark), only while it fits on one line, measured in the row, else the plain words and arrow. Size `slot` always keeps the plain words. The topic page's why-now line uses the same icons |
 | words | `whyOf`'s `short` ("Your turn", "3d overdue", "Not right last time: Chain rule", "At part (c)", "Next up"), or the caller's `words` (the sidebar's `NowLine.slot`: "Not right last time" on the lead topic itself, a task's step up to its first colon); one line, truncated |
 
 ## Sizes

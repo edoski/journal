@@ -2,6 +2,15 @@ import type { CourseMapEdge, TopicHandle } from "@/src/core";
 import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, wholeZoom, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import type { CourseGroup, CourseTopic, GroupId } from "@/components/course-page/course-model";
 
+/** One section of the list: a group, or an arc of a course with arcs,
+ *  whose header the walk stops on, then its Check it when it has one. */
+export interface ListSection {
+	id: string;
+	topics: readonly CourseTopic[];
+	/** An arc ready for its check: its line holds Check it. */
+	checkable?: boolean;
+}
+
 /**
  * What ties the split page's two panes (spec: split-course.md): the topic
  * he points at or focuses, and the pane it is in; which groups the list
@@ -40,22 +49,28 @@ export function shownGroups(groups: readonly CourseGroup[]): CourseGroup[] {
  *  wait folded under their headers until he opens them, for the visit. */
 export const OPEN_AT_FIRST: Readonly<Record<GroupId, boolean>> = { "needs-you": true, learning: true, "not-started": false, "on-your-own": false };
 
-/** One stop of the list's arrow walk: a group's header, or a row. */
-export type Stop = { kind: "group"; id: GroupId } | { kind: "row"; handle: TopicHandle };
+/** One stop of the list's arrow walk: a section's header, an arc's Check
+ *  it, or a row. */
+export type Stop = { kind: "group"; id: string } | { kind: "check"; id: string } | { kind: "row"; handle: TopicHandle };
 
 /** A stop's key, for the element that takes its focus. */
-export const stopKey = (stop: Stop): string => (stop.kind === "group" ? `group:${stop.id}` : `row:${stop.handle}`);
+export const stopKey = (stop: Stop): string => (stop.kind === "row" ? `row:${stop.handle}` : `${stop.kind}:${stop.id}`);
 
-/** What the arrows walk, top to bottom: each group's header, then its rows
- *  while it is open; a folded group's rows are skipped. */
-export function walkStops(groups: readonly CourseGroup[], open: Readonly<Record<GroupId, boolean>>): Stop[] {
-	return groups.flatMap((g): Stop[] => [{ kind: "group", id: g.id }, ...(open[g.id] ? g.topics.map((t): Stop => ({ kind: "row", handle: t.topic.handle })) : [])]);
+/** What the arrows walk, top to bottom: each section's header, its Check
+ *  it when it has one, then its rows while it is open; a folded section's
+ *  rows are skipped. */
+export function walkStops(sections: readonly ListSection[], open: Readonly<Record<string, boolean>>): Stop[] {
+	return sections.flatMap((g): Stop[] => [
+		{ kind: "group", id: g.id },
+		...(g.checkable ? [{ kind: "check" as const, id: g.id }] : []),
+		...(open[g.id] ? g.topics.map((t): Stop => ({ kind: "row", handle: t.topic.handle })) : []),
+	]);
 }
 
 /** The topic the map opens on, as every course map opens: where he is
  *  ("You are here"), else the first the header's button takes up that is
  *  on the map, else the list's first row. */
-export function aimOf(current: TopicHandle | null, next: readonly TopicHandle[], groups: readonly CourseGroup[], layout: TopicMapLayout): TopicHandle | null {
+export function aimOf(current: TopicHandle | null, next: readonly TopicHandle[], groups: readonly ListSection[], layout: TopicMapLayout): TopicHandle | null {
 	if (current && layout.topics.has(current)) return current;
 	return next.find((handle) => layout.topics.has(handle)) ?? groups[0]?.topics[0]?.topic.handle ?? null;
 }

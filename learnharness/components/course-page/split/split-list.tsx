@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { TopicHandle } from "@/src/core";
 import { CourseGroup } from "@/components/course-page/course-group";
-import type { CourseGroup as Group, CourseTopic, GroupId } from "@/components/course-page/course-model";
+import { CourseArc } from "@/components/course-page/course-arc";
+import type { CourseArcSection, CourseGroup as Group, CourseTopic } from "@/components/course-page/course-model";
 import { CourseTopicRow } from "@/components/course-page/course-topic-row";
 import { cn } from "@/lib/utils";
-import { OPEN_AT_FIRST, scrollToShow, stopKey, walkStops, walkTo, type Stop } from "@/components/course-page/split/split-tie";
+import { scrollToShow, stopKey, walkStops, walkTo, type ListSection, type Stop } from "@/components/course-page/split/split-tie";
 
 /** What the page asks of the list: focus a topic's row, or its first. */
 export interface SplitListHandle {
@@ -24,10 +25,11 @@ function reducedMotion(): boolean {
 /**
  * The split page's left pane (spec: split-course.md): the course's topics
  * in their groups, each a 32px row ending in its reason's icon and words,
- * flush right so they line up down the list (the title truncates first).
- * Needs you and Learning open, Not started and On your own folded under
- * their headers (`OPEN_AT_FIRST`); a header opens or folds its group, held
- * for the visit only. Pointing at or focusing a row tells the page (`onPoint`); `marked`
+ * flush right so they line up down the list (the title truncates first);
+ * in a course with arcs (`arcs`), its arcs in study order instead, each a
+ * folded line (`CourseArc`) that opens on its topics, a ready one with
+ * Check it (`onCheck`). Which sections are open is the page's (`open`,
+ * `onOpenChange`), held for the visit only. Pointing at or focusing a row tells the page (`onPoint`); `marked`
  * is the topic he points at on the map, whose row holds the hover fill and
  * is brought into view. The pane scrolls with no bar showing; while more
  * is below (or above) its edge fades, so a cut list reads as one that
@@ -45,13 +47,33 @@ function reducedMotion(): boolean {
  */
 export function SplitList({
 	groups,
+	arcs = null,
+	open,
+	onOpenChange,
+	onCheck,
+	checking = null,
 	marked,
 	onPoint,
 	onEnterMap,
 	onExitTop,
+	arcExam,
+	after,
 	ref,
 }: {
+	/** What an arc's line says about the exam in place of its exam words. */
+	arcExam?: (section: CourseArcSection) => ReactNode;
+	/** A section under the groups or arcs, inside the scrolling pane. */
+	after?: ReactNode;
 	groups: readonly Group[];
+	/** The course's arcs, which the list shows in place of its groups. */
+	arcs?: readonly CourseArcSection[] | null;
+	/** Which sections (groups, or arcs by handle) show their rows. */
+	open: Readonly<Record<string, boolean>>;
+	onOpenChange: (id: string, open: boolean) => void;
+	/** Check it on a ready arc. */
+	onCheck?: (section: CourseArcSection) => void;
+	/** The arc whose check is starting. */
+	checking?: string | null;
 	marked: TopicHandle | null;
 	onPoint: (handle: TopicHandle | null) => void;
 	onEnterMap: (handle: TopicHandle) => void;
@@ -61,14 +83,19 @@ export function SplitList({
 	const viewport = useRef<HTMLDivElement>(null);
 	/** Each stop's element: a header's button, a row's link. */
 	const stopsEl = useRef(new Map<string, HTMLElement>());
-	const [open, setOpen] = useState(OPEN_AT_FIRST);
-	const stops = useMemo(() => walkStops(groups, open), [groups, open]);
+	const sections = useMemo<ListSection[]>(
+		() => (arcs ? arcs.map((a) => ({ id: a.arc.handle, topics: a.topics, checkable: a.arc.state === "ready" && onCheck !== undefined })) : [...groups]),
+		[arcs, groups, onCheck],
+	);
+	const stops = useMemo(() => walkStops(sections, open), [sections, open]);
 	const [more, setMore] = useState({ above: false, below: false });
 	/** A topic the map handed back while its group was folded: focused once the group opens. */
 	const pending = useRef<TopicHandle | null>(null);
 
 	const focusStop = (stop: Stop | undefined) => (stop ? stopsEl.current.get(stopKey(stop))?.focus() : undefined);
-	const openGroup = (id: GroupId, to: boolean) => setOpen((was) => (was[id] === to ? was : { ...was, [id]: to }));
+	const openGroup = (id: string, to: boolean) => {
+		if (Boolean(open[id]) !== to) onOpenChange(id, to);
+	};
 	const register = (stop: Stop) => (el: HTMLElement | null) => {
 		if (el) stopsEl.current.set(stopKey(stop), el);
 		else stopsEl.current.delete(stopKey(stop));
@@ -80,14 +107,14 @@ export function SplitList({
 			focus: (handle) => {
 				const row = stopsEl.current.get(stopKey({ kind: "row", handle }));
 				if (row) return row.focus();
-				const group = groups.find((g) => g.topics.some((t) => t.topic.handle === handle));
-				if (!group) return;
+				const section = sections.find((g) => g.topics.some((t) => t.topic.handle === handle));
+				if (!section) return;
 				pending.current = handle;
-				setOpen((was) => ({ ...was, [group.id]: true }));
+				onOpenChange(section.id, true);
 			},
 			focusFirst: () => focusStop(stops[0]),
 		}),
-		[groups, stops],
+		[sections, stops, onOpenChange],
 	);
 
 	useEffect(() => {
@@ -160,7 +187,7 @@ export function SplitList({
 		focusStop(stops[to]);
 	};
 
-	const onHeaderKeyDown = (id: GroupId, e: KeyboardEvent<HTMLButtonElement>) => {
+	const onHeaderKeyDown = (id: string, e: KeyboardEvent<HTMLButtonElement>) => {
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 		if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
 			e.preventDefault();
@@ -186,6 +213,22 @@ export function SplitList({
 		walk({ kind: "row", handle }, e);
 	};
 
+	const row = (row: CourseTopic) => (
+		<CourseTopicRow
+			key={row.topic.handle}
+			row={row}
+			// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900.
+			className="h-8"
+			highlighted={marked === row.topic.handle}
+			ref={register({ kind: "row", handle: row.topic.handle })}
+			onMouseEnter={() => onPoint(row.topic.handle)}
+			onMouseLeave={() => onPoint(null)}
+			onFocus={() => onPoint(row.topic.handle)}
+			onBlur={() => onPoint(null)}
+			onKeyDown={(e) => onRowKeyDown(row, e)}
+		/>
+	);
+
 	return (
 		<section aria-label="Topics" data-slot="course-split-list" className="flex min-h-0 flex-1 flex-col">
 			{/* The rows' hover fill and focus ring reach 12px past the column; the pane makes room for them. */}
@@ -201,36 +244,43 @@ export function SplitList({
 					more.above && "mask-t-from-[calc(100%-2.5rem)]",
 				)}
 			>
-				<div className="flex flex-col gap-4">
-					{groups.map((group) => (
-						<CourseGroup
-							key={group.id}
-							data-group={group.id}
-							title={group.title}
-							items={group.topics}
-							foldable
-							open={open[group.id]}
-							onOpenChange={(to) => openGroup(group.id, to)}
-							headerRef={register({ kind: "group", id: group.id })}
-							onHeaderKeyDown={(e) => onHeaderKeyDown(group.id, e)}
-							renderItem={(row) => (
-								<CourseTopicRow
-									key={row.topic.handle}
-									row={row}
-									// The compact row's 32px with the reason's words showing, so the fullest demo course fits at 1440x900.
-									className="h-8"
-									highlighted={marked === row.topic.handle}
-									ref={register({ kind: "row", handle: row.topic.handle })}
-									onMouseEnter={() => onPoint(row.topic.handle)}
-									onMouseLeave={() => onPoint(null)}
-									onFocus={() => onPoint(row.topic.handle)}
-									onBlur={() => onPoint(null)}
-									onKeyDown={(e) => onRowKeyDown(row, e)}
+				<div className={cn("flex flex-col", arcs ? "gap-0.5" : "gap-4")}>
+					{arcs
+						? arcs.map((section) => (
+								<CourseArc
+									key={section.arc.handle}
+									section={section}
+									items={section.topics}
+									open={Boolean(open[section.arc.handle])}
+									onOpenChange={(to) => openGroup(section.arc.handle, to)}
+									onCheck={onCheck && (() => onCheck(section))}
+									checking={checking === section.arc.handle}
+									headerRef={register({ kind: "group", id: section.arc.handle })}
+									checkRef={register({ kind: "check", id: section.arc.handle })}
+									onHeaderKeyDown={(e) => onHeaderKeyDown(section.arc.handle, e)}
+									onCheckKeyDown={(e) => {
+										if (!e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) walk({ kind: "check", id: section.arc.handle }, e);
+									}}
+									renderItem={row}
+									exam={arcExam?.(section)}
 								/>
-							)}
-						/>
-					))}
+							))
+						: groups.map((group) => (
+								<CourseGroup
+									key={group.id}
+									data-group={group.id}
+									title={group.title}
+									items={group.topics}
+									foldable
+									open={Boolean(open[group.id])}
+									onOpenChange={(to) => openGroup(group.id, to)}
+									headerRef={register({ kind: "group", id: group.id })}
+									onHeaderKeyDown={(e) => onHeaderKeyDown(group.id, e)}
+									renderItem={row}
+								/>
+							))}
 				</div>
+				{after}
 			</div>
 		</section>
 	);

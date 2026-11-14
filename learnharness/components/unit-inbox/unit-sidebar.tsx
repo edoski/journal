@@ -3,7 +3,7 @@
 import { useId, useMemo, useRef } from "react";
 import Link from "next/link";
 import { CalendarDaysIcon, HouseIcon, PanelLeftCloseIcon, SearchIcon, SettingsIcon, SquarePenIcon, XIcon } from "lucide-react";
-import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type StudyCourse } from "@/src/core";
+import { fuzzyScore, KEYBOARD_ACTIONS, type ChatListItem, type CourseMapArc, type StudyCourse } from "@/src/core";
 import { useSidebar } from "@/components/sidebar";
 import { filterSessions, useSessionsSidebar } from "@/components/sidebar-state";
 import { DeleteSessionDialog } from "@/components/delete-session-dialog";
@@ -31,8 +31,15 @@ import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { cn } from "@/lib/utils";
 
-/** Every course, topic and session whose title matches the query, best
- *  first; courses only when the app has a course page to open. Topics are
+/** An arc search found, with its course. */
+export interface FoundArc {
+	course: StudyCourse;
+	arc: CourseMapArc;
+}
+
+/** Every course, arc, topic and session whose title matches the query,
+ *  best first; courses and arcs only when the app has a course page to
+ *  open, an arc read from the course's map (`map.arcs`). Topics are
  *  every topic on the courses' maps in the inbox's scope, those not
  *  started included (a unit built for each, `unitFor`): the inbox lists
  *  only topics he has started, so search missed Poisson until he began it
@@ -42,7 +49,7 @@ export function searchInbox(
 	chats: readonly ChatListItem[],
 	query: string,
 	courses: readonly StudyCourse[] = [],
-): { courses: StudyCourse[]; units: Unit[]; sessions: ChatListItem[] } {
+): { courses: StudyCourse[]; arcs: FoundArc[]; units: Unit[]; sessions: ChatListItem[] } {
 	const best = <T,>(items: readonly T[], title: (item: T) => string): T[] =>
 		items
 			.map((item) => ({ item, score: fuzzyScore(query.trim(), title(item)) }))
@@ -51,6 +58,10 @@ export function searchInbox(
 			.map((r) => r.item);
 	return {
 		courses: best(courses, (c) => c.map.title),
+		arcs: best(
+			courses.flatMap((course) => (course.map.arcs ?? []).map((arc) => ({ course, arc }))),
+			(found) => found.arc.title,
+		),
 		units: best(everyTopic(inbox, chats, courses), (u) => u.topic.title),
 		sessions: filterSessions([...chats], query),
 	};
@@ -237,13 +248,16 @@ export function UnitSidebar() {
 							{!now ? (
 								<NowSkeleton />
 							) : found ? (
-								found.courses.length + found.units.length + found.sessions.length === 0 ? (
+								found.courses.length + found.arcs.length + found.units.length + found.sessions.length === 0 ? (
 									<li className="list-none px-2 py-6 text-center text-label text-muted-foreground">Nothing matches</li>
 								) : (
 									<>
-										{found.courses.length > 0 && <ResultsLabel>Courses</ResultsLabel>}
+										{found.courses.length + found.arcs.length > 0 && <ResultsLabel>Courses</ResultsLabel>}
 										{found.courses.map((c) => (
 											<CourseResultRow key={c.map.workspace} course={c} active={s.pathname === courseHref(c.map.workspace)} />
+										))}
+										{found.arcs.map(({ course, arc }) => (
+											<CourseResultRow key={`${course.map.workspace}#${arc.handle}`} course={course} arc={arc} active={false} />
 										))}
 										{found.units.length > 0 && <ResultsLabel>Topics</ResultsLabel>}
 										{found.units.map((u) =>

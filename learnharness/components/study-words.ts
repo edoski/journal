@@ -233,6 +233,19 @@ export function startsWhyWords(why: StartsWhy, map: Pick<CourseMap, "title" | "t
 	return `Next in ${arc ?? map.title}`;
 }
 
+/** `startsWhyWords` cut to fit a row's reason beside its icon, where the
+ *  topic page keeps the whole sentence: "Next in Matrices"; "After
+ *  Expectation"; "After Separable equations"; "Early, from Orthogonality"
+ *  ("Early, ahead of its place" without arcs). Pure. */
+export function startsWhyShort(why: StartsWhy, map: Pick<CourseMap, "title" | "topics" | "arcs">): string {
+	if (why.kind === "early") return startsWhyWords({ ...why, waitingOn: [], exam: false }, map);
+	if (why.kind === "after" && (why.needs.length > 0 || why.partners.length > 0)) {
+		const handles = why.needs.length > 0 ? why.needs : why.partners;
+		return `After ${listWords(handles.map((h) => map.topics.find((t) => t.handle === h)?.title ?? h))}`;
+	}
+	return startsWhyWords(why, map);
+}
+
 /** How far a day is from the engine's, one form wherever a distance shows
  *  (an exam, a planned review): "Today", "Tomorrow", "In 18 days",
  *  "Yesterday", "3 days ago". Always days, never rounded to weeks, so the
@@ -388,3 +401,34 @@ export const CHOICE_NOTE = "Anything to add?";
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
 }
+/** How ready he is for the exam, in the engine's own sorting (its
+ *  `standing`): every part solid, not yet, or not all of it fits. "Not
+ *  ready yet in" leads the bubbles of the arcs that are not. */
+export const READY_WORDS = {
+	ready: "Ready for the exam",
+	notYet: "Not ready for the exam yet",
+	notYetIn: "Not ready yet in",
+} as const;
+
+/** Where one arc stands for the exam, on its line beside its name, so a
+ *  few words: never "ready", which its check's state already says. */
+export const PART_WORDS = {
+	ready: "Solid for the exam",
+	notYet: "Not solid yet",
+	short: "Won't all fit",
+} as const;
+
+/** A course without arcs, not ready: the topics not yet solid, else those
+ *  still to start. "Not yet solid for the exam: Basis and Rank". */
+export function notReadyWords(kind: "notYet" | "toStart", names: string): string {
+	return kind === "notYet" ? `Not yet solid for the exam: ${names}` : `Still to start before the exam: ${names}`;
+}
+
+/** The mistakes still open in a course: the list's name, the head's press,
+ *  a mistake made with help, and a list with nothing in it. */
+export const MISTAKE_WORDS = {
+	title: "Mistakes to fix",
+	press: "Mistakes",
+	helped: "With help",
+	none: "No mistakes to fix",
+} as const;
