@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { courseShareWords, heldWords, moreWords, overdueWords, returnWords, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { courseShareWords, heldWords, moreWords, overdueWords, returnWords, slipMark, slipWords, STANDING_WORDS, standingWords, type Fill } from "../components/study-words.ts";
+import { SLIP_ICON } from "../components/slip-icons.ts";
 
 // The app's one wording for where he stands and why a topic needs him
 // (study-words.ts), which every surface reads.
@@ -50,6 +51,17 @@ describe("why a slip needs him", () => {
 		assert.equal(slip({ ...all, repaired: false, lapsed: false }), "Mistake to fix");
 		assert.equal(slip({ ...all, repaired: false, lapsed: false, gap: null }), "Mixed up with Cramer's rule");
 		assert.equal(slip({ confidentErrors: 1, choiceErrors: {} }), "Sure, but wrong");
+	});
+
+	it("never calls a mistake fixed when only help repaired it: the signal under it shows", () => {
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, gap: "Counts nonzero rows" }), "Mistake to fix");
+		assert.equal(slip({ repaired: true, repairedWithHelp: true, lapsed: true }), "Missed last time");
+	});
+
+	it("gives each slip its own icon, so a fix never wears the mistake's", () => {
+		const keys = [{ repaired: true }, { lapsed: true }, { gap: "g" }, { choiceErrors: { cramer: 1 } }, { confidentErrors: 1 }, {}].map((s) => slipMark({ ...QUIET, ...s }, titleOf).key);
+		assert.deepEqual(keys, ["repaired", "lapsed", "gap", "mixed", "confident", "none"]);
+		assert.equal(new Set(keys.map((k) => SLIP_ICON[k])).size, keys.length);
 	});
 
 	it("names a method by its handle when the map has no title for it", () => {

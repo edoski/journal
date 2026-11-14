@@ -70,7 +70,7 @@ function weakLine(w: Json, role: BriefRole): string {
 		str(w.level),
 		w.lapsed === true ? "lapsed" : undefined,
 		w.stale === true ? "judgement older than the evidence" : undefined,
-		w.repaired === true ? "answered right since" : undefined,
+		w.repaired === true ? (w.repaired_with_help === true ? "answered right since, only with help" : "answered right since") : undefined,
 	]
 		.filter(Boolean)
 		.join(", ");

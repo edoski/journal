@@ -276,7 +276,7 @@ def _weak(
         item = {"topic": key, "level": standing["level"]}
         if "gap" in topic:
             item["gap"] = topic["gap"]
-        for flag in (*WEAK_FLAGS, "repaired", "last"):
+        for flag in (*WEAK_FLAGS, "repaired", "repaired_with_help", "last"):
             if flag in standing:
                 item[flag] = standing[flag]
         weak.append(_brief(item, shown))
@@ -564,7 +564,7 @@ def course_map(workspace: Workspace) -> dict[str, Any]:
             "excluded": topic.get("excluded"),
             **{
                 flag: standing[flag]
-                for flag in (*WEAK_FLAGS, "repaired")
+                for flag in (*WEAK_FLAGS, "repaired", "repaired_with_help")
                 if flag in standing
             },
             "tasks": [

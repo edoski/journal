@@ -1,6 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, SessionPlan, StudyCourse, TopicAttempt, TopicRecord } from "@/src/core";
 import { needOf, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
-import { heldWords, overdueWords, returnWords } from "@/components/study-words";
+import { heldWords, overdueWords, returnWords, type SlipKey } from "@/components/study-words";
 import { continueMove, resumableSession, sessionState, type ContinueMove, type SessionState } from "@/components/nav/session-state";
 import { daysBetween, shelfOf, taskSessions, topicSessions } from "@/components/unit-inbox/units";
 import type { TopicRead } from "@/components/unit-inbox/topic-page/use-topic-read";
@@ -62,6 +62,8 @@ export interface SessionEntry {
 export interface HeadMark {
 	kind: "slip" | "review";
 	words: string;
+	/** A slip's own kind, which picks its icon (`slip-icons.ts`). */
+	slip?: SlipKey;
 }
 
 export interface TopicFacts {
@@ -164,14 +166,14 @@ export function studiedWords(days: number): string {
  * the map, Home and the sidebar say it. `today` is the engine's study day.
  */
 export function headMarks(topic: CourseMapTopic, titleOf: (handle: string) => string, today: string): HeadMark[] {
-	const slip = topic.weak ? needOf(topic, titleOf)?.words : null;
+	const need = topic.weak ? needOf(topic, titleOf) : null;
 	const review =
 		topic.review?.kind === "due"
 			? overdueWords(topic.review.overdue)
 			: topic.review?.kind === "scheduled"
 				? returnWords(Math.max(1, daysBetween(today, topic.review.date)))
 				: null;
-	return [...(slip ? [{ kind: "slip" as const, words: slip }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
+	return [...(need ? [{ kind: "slip" as const, words: need.words, ...(need.slip ? { slip: need.slip } : {}) }] : []), ...(review ? [{ kind: "review" as const, words: review }] : [])];
 }
 
 /** The latest day anything says he studied the topic: its newest attempt,

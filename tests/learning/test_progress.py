@@ -194,6 +194,17 @@ def test_a_mistake_answered_right_since_is_repaired_until_a_later_check() -> Non
     assert (standing["lapsed"], standing["repaired"]) == (True, True)
 
 
+def test_a_repair_only_with_help_says_so_and_one_on_his_own_does_not() -> None:
+    gap = {"gap": "Writes det as ad + bc"}
+    slip = attempt("rank", "incorrect", offset=0)
+    helped = attempt("rank", help="Reminded him det is ad - bc", offset=0)
+    own = attempt("rank", offset=0)
+    with_help = progress.standing(course([slip, helped], **gap), "rank")
+    assert with_help["repaired"] is True and with_help["repaired_with_help"] is True
+    on_his_own = progress.standing(course([slip, helped, own], **gap), "rank")
+    assert on_his_own["repaired"] is True and "repaired_with_help" not in on_his_own
+
+
 @pytest.mark.parametrize(
     ("observations", "right"),
     [

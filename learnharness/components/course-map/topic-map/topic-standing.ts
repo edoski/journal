@@ -1,6 +1,6 @@
 import type { CourseMapTask, CourseMapTopic, TopicHandle, TopicLevel } from "@/src/core";
 import { mathPlain } from "@/components/ui/math-text";
-import { overdueWords, slipWords, standingWords, type Fill } from "@/components/study-words";
+import { overdueWords, slipMark, standingWords, type Fill, type SlipKey } from "@/components/study-words";
 import { taskWords } from "@/components/unit-inbox/units";
 
 /** Where the learner stands on a topic, as the map draws and says it. */
@@ -38,6 +38,8 @@ export interface Need {
 	kind: "slip" | "review";
 	/** The reason in the app's words (study-words.ts). */
 	words: string;
+	/** A slip's own kind, which picks its icon (`slip-icons.ts`). */
+	slip?: SlipKey;
 }
 
 /**
@@ -48,7 +50,7 @@ export interface Need {
  * fields only. Pure.
  */
 export function needOf(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): Need | null {
-	if (topic.weak) return { kind: "slip", words: slipWords(topic.signals, titleOf) };
+	if (topic.weak) return slipNeed(topic, titleOf);
 	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	return null;
 }
@@ -59,6 +61,14 @@ export function needOf(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => 
 export interface Status {
 	kind: "slip" | "review" | "task";
 	words: string;
+	/** A slip's own kind, which picks its icon (`slip-icons.ts`). */
+	slip?: SlipKey;
+}
+
+/** A weak topic's slip as a need: its words and its kind. */
+function slipNeed(topic: CourseMapTopic, titleOf: (handle: TopicHandle) => string): { kind: "slip"; words: string; slip: SlipKey } {
+	const { key, words } = slipMark(topic.signals, titleOf);
+	return { kind: "slip", words, slip: key };
 }
 
 /**
@@ -68,7 +78,7 @@ export interface Status {
  * left ("Left off 3d ago"). Engine fields only. Pure.
  */
 export function statusOf(topic: CourseMapTopic, tasks: readonly CourseMapTask[], titleOf: (handle: TopicHandle) => string, today: string): Status | null {
-	if (topic.weak) return { kind: "slip", words: slipWords(topic.signals, titleOf) };
+	if (topic.weak) return slipNeed(topic, titleOf);
 	if (ON_HIS_OWN.has(topic.level) && topic.review?.kind === "due") return { kind: "review", words: overdueWords(topic.review.overdue) };
 	if (topic.tasks.length === 0) return null;
 	const task = tasks.find((t) => topic.tasks.includes(t.key));
