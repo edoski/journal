@@ -11,7 +11,6 @@ import {
 	Conversation,
 	ConversationContent,
 	ConversationEmptyState,
-	ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
@@ -84,6 +83,12 @@ import { useSettingsDialog } from "@/components/settings/settings-dialog";
 import { SectionBreak } from "@/components/lesson/section-break";
 import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
+import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
+import { ScrollCueButton } from "@/components/lesson/scroll-cue";
+import { showsWorking } from "@/components/lesson/working-sign";
+
+/** The transcript's own column inside the scroller (the docks have their own find roots). */
+const TRANSCRIPT_COLUMN = "[data-transcript-column]";
 
 // The dock overlay's gradient band (h-24) — part of the reserved tail.
 const GRADIENT_H = 96;
@@ -208,11 +213,41 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send, continueIfOwed, steer, steerQueue, submitAnswer, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	const sessionFindScopeRef = useRef<HTMLDivElement | null>(null);
 	const scrollContextRef = useRef<StickToBottomContext | null>(null);
+
+	/* THE SCROLL MODEL (components/lesson/reading-position.ts): every action
+	 * of his that starts a turn passes here, so the lesson goes to its end
+	 * and the reply that follows holds at its own first line. Automatic
+	 * continuations go straight to the session and anchor nothing. */
+	const replyAnchorRef = useRef<ReplyAnchor>(null);
+	const followAction = useCallback(() => {
+		const context = scrollContextRef.current;
+		if (!context) return;
+		replyAnchorRef.current = sessionFindScopeRef.current?.querySelector<HTMLElement>(TRANSCRIPT_COLUMN)?.lastElementChild as HTMLElement | null ?? null;
+		void context.scrollToBottom();
+	}, []);
+	const followTargetScrollTop = useCallback((bottom: number, { scrollElement }: { scrollElement: HTMLElement }) =>
+		followTarget(bottom, replyStart(replyAnchorRef.current, scrollElement)), []);
+	const jumpToLatest = useCallback(() => {
+		replyAnchorRef.current = null;
+		void scrollContextRef.current?.scrollToBottom();
+	}, []);
+	const send = useCallback<typeof sendInput>((...args) => {
+		followAction();
+		return sendInput(...args);
+	}, [sendInput, followAction]);
+	const steer = useCallback<typeof steerInput>((...args) => {
+		followAction();
+		return steerInput(...args);
+	}, [steerInput, followAction]);
+	const submitAnswer = useCallback<typeof submitInput>((...args) => {
+		followAction();
+		return submitInput(...args);
+	}, [submitInput, followAction]);
 	const sourceTextParts = useMemo(() => firstSourceTextParts(messages), [messages]);
 
 	// The reattach settled terminal → the sync-and-continue seam (below).
@@ -1245,10 +1280,10 @@ export function Chat({
 
 				<SessionFind scopeRef={sessionFindScopeRef} scrollContextRef={scrollContextRef} />
 				<div ref={sessionFindScopeRef} className="relative flex min-h-0 flex-1">
-				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef}>
+				<Conversation className="h-full min-w-0 flex-1" initial="instant" contextRef={scrollContextRef} targetScrollTop={followTargetScrollTop}>
 					<SessionMessageNavigation />
 					<ConversationContent className="min-h-full gap-0 p-0" scrollClassName="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<div data-session-find-root="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
+						<div data-session-find-root="" data-transcript-column="" className={`${LESSON_COLUMN} flex flex-1 flex-col gap-4 pt-6`}>
 							{messages.length === 0 && !busy && (
 								<ConversationEmptyState
 									title="New session"
@@ -1463,7 +1498,7 @@ export function Chat({
 						    the THINKING placeholder by construction (the gate sits
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
-							{(status === "submitted" || turnInFlight) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
@@ -1499,6 +1534,9 @@ export function Chat({
 					onReadingThinking={applyReadingThinking}
 					phase={phases.at(-1) ?? "probe"}
 					onReserve={setDockReserve}
+					busy={busy}
+					replyAnchorRef={replyAnchorRef}
+					onJumpToLatest={jumpToLatest}
 					queuedSteers={visibleQueuedSteers(steerQueue, nativeMessages)}
 					setupCta={
 						unconnected && <SignInPill onOpen={() => setSetupOpen(true)} />
@@ -1699,6 +1737,9 @@ function DockOverlay({
 	composer,
 	onSubmitAnswer,
 	onReserve,
+	busy,
+	replyAnchorRef,
+	onJumpToLatest,
 	setupCta,
 	queuedSteers,
 }: {
@@ -1730,6 +1771,12 @@ function DockOverlay({
 	/** Reports the dock's settled height (block + gradient) — ChatView's
 	 *  dockReserve state feeds the transcript's spacer from it. */
 	onReserve: (h: number) => void;
+	/** Where the reply to his latest action starts (reading-position.ts);
+	 *  the cue lets go of it once he reads to the end. */
+	/** A turn is running for this lesson (the practice dock waits). */
+	busy: boolean;
+	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
+	onJumpToLatest: () => void;
 	/** The queued-steer indicator's lines (composer steering, 2026-10-03):
 	 *  already filtered by visibleQueuedSteers — only undrained steers. */
 	queuedSteers: QueuedSteerLine[];
@@ -2131,6 +2178,7 @@ function DockOverlay({
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
 									compactionRunning={compactionRunning}
+									busy={busy}
 								/>
 							) : (
 								composer
@@ -2150,7 +2198,7 @@ function DockOverlay({
 					    overlay is none by default. The isAtBottom/scrollToBottom
 					    context still reaches it — DockOverlay is a Conversation
 					    child. */}
-					<ConversationScrollButton className="pointer-events-auto bottom-full mb-2" />
+					<ScrollCueButton anchorRef={replyAnchorRef} onJump={onJumpToLatest} className="bottom-full mb-2" />
 				</div>
 			</div>
 		</div>

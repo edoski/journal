@@ -52,6 +52,7 @@ second pillar of input).
 | Rename session | F2 | `lh:kbd-rename-session` (chat.tsx) |
 | Cheat sheet | ? | keyboard-shortcuts.tsx |
 | Find in this lesson | ⌘F | `lh:kbd-find` (session-find.tsx) |
+| Go to the newest reply | ⌘↓ | `lh:kbd-jump-latest` (lesson/scroll-cue.tsx; acts only while the cue above the dock shows) |
 
 ## Model menu keyboard machine (owner polish, 2026-09-17)
 
