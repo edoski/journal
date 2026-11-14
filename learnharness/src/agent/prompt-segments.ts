@@ -138,3 +138,13 @@ export function courseRecordPrompt(agent: PromptAgent, dir: string = PATHS.tutor
 	const adapter = fs.readFileSync(path.join(PROMPTS_DIR, "course", "10-record.md"), "utf-8").trim();
 	return [adapter, ...ENGINE_DOCTRINE[agent].map((part) => doctrineText(dir, part))].join("\n\n");
 }
+
+/** What the course map builder composes: the one path-building recipe
+ *  every host follows. */
+export const COURSE_MAP_DOCTRINE: readonly DoctrinePart[] = [{ file: "course.md", sections: ["Building the path"], intro: false }];
+
+/** The path-building recipe, read from `dir`. Throws like courseRecordPrompt
+ *  when the section is renamed. */
+export function courseMapDoctrine(dir: string = PATHS.tutorReferences): string {
+	return COURSE_MAP_DOCTRINE.map((part) => doctrineText(dir, part)).join("\n\n");
+}

@@ -5,7 +5,7 @@ import math
 from datetime import date, timedelta
 from typing import Any
 
-from hypothesis import given, settings
+from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
 from learning import agenda, capacity, progress, schema
@@ -148,8 +148,29 @@ weeks = st.builds(
 )
 
 
+def _study_week(rates: list[tuple[float, float]], study: set[int]) -> Capacity:
+    return Capacity(
+        tuple(
+            Weekday(
+                1.0 if day in study else 0.0, Limit(r, shown=True), Limit(n, shown=True)
+            )
+            for day, (r, n) in enumerate(rates)
+        ),
+        frozenset(study),
+        10.0,
+    )
+
+
 @settings(max_examples=150, deadline=None)
 @given(steps, steps, weeks, st.one_of(st.none(), st.integers(-5, 60)))
+@example(
+    first=[],
+    second=[],
+    week=_study_week(
+        [(0, 0), (0, 0.1), (0, 0), (0, 0), (0, 1.0), (0, 0), (0, 0)], {1, 4}
+    ),
+    exam_day=None,
+)
 def test_the_plan_never_exceeds_his_capacity_or_touches_a_day_off(
     first: list[Step], second: list[Step], week: Capacity, exam_day: int | None
 ) -> None:

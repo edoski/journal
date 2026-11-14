@@ -12,6 +12,7 @@ import type { CourseLink, CourseListing, CourseSummary } from "../core/contracts
 import { courseLabel } from "../core/contracts/course.ts";
 import { emit } from "../core/events.ts";
 import { stores } from "./stores.ts";
+import { startCourseMap } from "./course-map.ts";
 
 /** The registered courses plus the study roots a new course can go in.
  *  Until the engine exposes its study roots, a root is the parent folder
@@ -170,6 +171,7 @@ export async function createCourse(input: NewCourse): Promise<CourseCreation> {
 		}
 	}
 	emit("courses-changed", {});
+	if (copied.length > 0) startCourseMap(created.workspace);
 	// The engine's own entry, so the exam countdown is the engine's count.
 	const fresh = await listCourses();
 	const listed = fresh.available ? fresh.courses.find((c) => c.workspace === created.workspace) : undefined;

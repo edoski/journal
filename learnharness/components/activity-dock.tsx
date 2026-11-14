@@ -358,9 +358,18 @@ export function ActivitySection({ feed: feedProp }: { feed?: ActivityFeed }) {
 	);
 }
 
+/** A run of the shared background registry in words: a finished lesson's
+ *  digest, a course's map being built from its material, or the graph
+ *  extraction's phase. */
+function extractionLabel(phase: string | undefined): string {
+	if (phase === "digesting") return "Digesting lesson";
+	if (phase === "mapping") return "Building the course map";
+	return `Extraction — ${phase ?? "running"}`;
+}
+
 /** What a blob is, in words: "Researcher", "Extraction — merging". */
 function blobLabel(blob: ActivityBlob): string {
-	if (blob.process === "extraction") return blob.phase === "digesting" ? "Digesting lesson" : `Extraction — ${blob.phase ?? "running"}`;
+	if (blob.process === "extraction") return extractionLabel(blob.phase);
 	switch (blob.jobKind) {
 		case "research":
 			return "Researcher";

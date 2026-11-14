@@ -102,7 +102,7 @@ export type NodeDeleteOutcome =
  *     existingIds guard) — no dangling edges, no resurrection.
  */
 export function deleteGraphNode(nodeId: string): NodeDeleteOutcome {
-	if (extractionStatuses().some((run) => run.kind !== "digest")) {
+	if (extractionStatuses().some((run) => run.kind === "chat" || run.kind === "notes")) {
 		return {
 			ok: false,
 			status: 409,

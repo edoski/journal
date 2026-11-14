@@ -8,6 +8,7 @@ export * from "./chat-handler.ts";
 export * from "./events-stream.ts";
 export * from "./chats.ts";
 export * from "./courses.ts";
+export { addMaterial, courseMapStatus, startCourseMap } from "./course-map.ts";
 export * from "./study.ts";
 export * from "./calendar.ts";
 export * from "./topic.ts";

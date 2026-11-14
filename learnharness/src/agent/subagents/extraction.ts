@@ -627,13 +627,14 @@ function runAuditor(
  *  audit+merge critical section is queued behind another job's; the
  *  extractor is done but the auditor may not start until the graph is
  *  stable. */
-export type ExtractionPhase = "queued" | "extracting" | "waiting" | "auditing" | "merging" | "digesting";
+export type ExtractionPhase = "queued" | "extracting" | "waiting" | "auditing" | "merging" | "digesting" | "mapping";
 
 /** One in-flight pipeline run. Module-level: one process, one registry.
  *  Exported for the status payload's consumer typing (the dock). */
 /** Which front door a run came through: a session's graph extraction, a
- *  notes import, or a finished lesson's digest into the course record. */
-export type RunKind = "chat" | "notes" | "digest";
+ *  notes import, a finished lesson's digest into the course record, or a
+ *  course's topic map built from its material. */
+export type RunKind = "chat" | "notes" | "digest" | "course-map";
 
 export interface RunningExtraction {
 	/** The registry key: the source id, "src#i" for a chunk job, or

@@ -12,7 +12,7 @@ import { chatStore, extractionStatuses } from "@/src/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-	const runs = extractionStatuses().filter((run) => run.kind !== "digest").map((run) => ({
+	const runs = extractionStatuses().filter((run) => run.kind === "chat" || run.kind === "notes").map((run) => ({
 		// Unique row id (the registry job key: source id, or "src#i" for
 		// chunk jobs) — one source's rows share chatId, and React keys on
 		// it would collide. chatId stays the SOURCE id: reveal/cost

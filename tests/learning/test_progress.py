@@ -461,9 +461,9 @@ def test_path_order_is_topological_with_order_then_handle_ties() -> None:
     assert progress.path_order(path_course(["eigen", "basis", "systems"])) == [
         "basis",
         "systems",
-        "aside",
         "rank",
         "eigen",
+        "aside",
     ]
 
 

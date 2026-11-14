@@ -8,6 +8,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { CoursePicker, NewCourseBody } from "../components/course-picker.tsx";
 import { DeleteCourseDialog, RenameCourseDialog } from "../components/course-manage-dialogs.tsx";
 import { pickWords } from "../components/new-course-facts.ts";
+import { CourseMapStatus } from "../components/course-map-status.tsx";
 import { kbdEventForAction } from "../src/core/keyboard.ts";
 import { Dialog } from "../components/ui/dialog.tsx";
 
@@ -151,7 +152,9 @@ describe("New course", () => {
 
 	it("sends the title, the picked exam day and every picked file under its folder path", async () => {
 		const created: unknown[] = [];
-		const { sent, fetchLike } = recorder(() => Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }));
+		const { sent, fetchLike } = recorder((init) =>
+			init.method === "POST" ? Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }) : Response.json({ state: "building" }),
+		);
 		await mount(
 			<Dialog open>
 				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => {}} onCreated={(c) => created.push(c)} />
@@ -174,13 +177,41 @@ describe("New course", () => {
 
 		await press(element('[data-testid="new-course-create"]'), "click");
 		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
-		assert.equal(sent.length, 1);
-		const form = sent[0]!.body as FormData;
+		const posts = sent.filter((init) => init.method === "POST");
+		assert.equal(posts.length, 1);
+		const form = posts[0]!.body as FormData;
 		assert.equal(form.get("title"), "Group Theory");
 		assert.match(String(form.get("exam")), /^\d{4}-\d{2}-\d{2}$/);
 		assert.equal(form.get("root"), "/vault/courses");
 		assert.deepEqual(form.getAll("material").map((f) => (f as File).name), ["Syllabus.pdf", "Lectures/Week 1.md"]);
 		assert.equal(created.length, 1);
+		await act(async () => {});
+		assert.match(element('[data-testid="course-map-status"]').textContent ?? "", /Group Theory is ready.*topic map is being built from your material/, "with material, the dialog stays to show the map being built");
+	});
+
+	it("says in plain words when the map could not be built, that nothing changed, and offers Try again", async () => {
+		const { fetchLike } = recorder(() => Response.json({ state: "failed", reason: "it was stopped before it finished" }));
+		await mount(
+			<Dialog open>
+				<CourseMapStatus course={{ workspace: "/vault/courses/group-theory", title: "Group Theory", due: 0, reviews: [], current: null, currentTitle: null, task: null, step: null, exam: null, lastActiveDaysAgo: null }} fetchLike={fetchLike} onClose={() => {}} />
+			</Dialog>,
+		);
+		await act(async () => {});
+		assert.equal(element('[data-testid="course-map-status"] [role="status"]').textContent, "Its topic map could not be built, because it was stopped before it finished. Nothing in the course changed.");
+		assert.ok(document.querySelector('[data-testid="course-map-retry"]'));
+	});
+
+	it("closes at once after Create when no material came with the course", async () => {
+		let closed = 0;
+		const { fetchLike } = recorder(() => Response.json({ workspace: "/vault/courses/group-theory", title: "Group Theory" }));
+		await mount(
+			<Dialog open>
+				<NewCourseBody roots={["/vault/courses"]} fetchLike={fetchLike} onClose={() => closed++} onCreated={() => {}} />
+			</Dialog>,
+		);
+		await typeInto(element('[data-testid="new-course-title"]') as HTMLInputElement, "Group Theory");
+		await act(async () => { element('[data-testid="new-course-dialog"] form').dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })); });
+		assert.equal(closed, 1);
 	});
 
 	it("shows the server's plain sentence when a course cannot be made, and keeps the form", async () => {

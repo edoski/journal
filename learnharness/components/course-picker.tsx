@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ExamDayField, MaterialField } from "@/components/new-course-fields";
 import { DeleteCourseDialog, RenameCourseDialog } from "@/components/course-manage-dialogs";
 import { useServerEvent } from "@/components/server-events";
+import { CourseMapStatus } from "@/components/course-map-status";
 import { newCourseForm, type MaterialPick } from "@/components/new-course-facts";
 import { courseLabel, kbdEventForAction, type CourseListing, type CourseSummary } from "@/src/core";
 
@@ -159,10 +160,7 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 				<NewCourseDialog
 					roots={state.roots}
 					onClose={() => setCreating(false)}
-					onCreated={(course) => {
-						setCreating(false);
-						choice.add(course);
-					}}
+					onCreated={(course) => choice.add(course)}
 				/>
 			)}
 			{managing?.action === "rename" && (
@@ -319,6 +317,8 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 	const [picks, setPicks] = useState<MaterialPick[]>([]);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	/** Created with material: the dialog stays to show its map being built. */
+	const [created, setCreated] = useState<CourseSummary | null>(null);
 	const submit = async (e: FormEvent) => {
 		e.preventDefault();
 		if (!title.trim() || !root || busy) return;
@@ -329,11 +329,20 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 			const body = (await res.json()) as CourseSummary | { error?: string };
 			if (!res.ok) throw new Error("error" in body && body.error ? body.error : "The course could not be made. Try again.");
 			onCreated(body as CourseSummary);
+			if (picks.length > 0) setCreated(body as CourseSummary);
+			else onClose();
 		} catch (err) {
 			setError(err instanceof TypeError ? "LearnHarness could not be reached. Check it is running, then try again." : (err as Error).message);
 			setBusy(false);
 		}
 	};
+	if (created) {
+		return (
+			<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">
+				<CourseMapStatus course={created} onClose={onClose} fetchLike={fetchLike} />
+			</DialogContent>
+		);
+	}
 	const field = "flex flex-col gap-2 text-row font-medium text-foreground";
 	return (
 		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">

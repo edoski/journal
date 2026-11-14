@@ -92,6 +92,23 @@ def _check_pinned(before: dict[str, Any], after: dict[str, Any]) -> None:
     )
 
 
+def _placed(record: dict[str, Any], created: set[str]) -> dict[str, Any] | None:
+    """Where each new topic outside a stored ``path.order`` went in the study order."""
+    stored = set(record.get("path", {}).get("order", ()))
+    if not stored:
+        return None
+    order = progress.path_order(record)
+    placed = {}
+    for index, key in enumerate(order):
+        if key in created and key in record["topics"] and key not in stored:
+            neighbours = {
+                "after": order[index - 1] if index else None,
+                "before": order[index + 1] if index + 1 < len(order) else None,
+            }
+            placed[key] = {name: v for name, v in neighbours.items() if v is not None}
+    return placed or None
+
+
 def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     """Apply one patch and return the receipt (see the v6 spec, section 3)."""
     changes = schema.check_patch(patch)
@@ -102,10 +119,12 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
     scheduled = progress.Scheduled()
     final: dict[str, Any] = {}
     levels: dict[str, Any] = {}
+    known: set[str] = set()
 
     def transform(stored: dict[str, Any]) -> dict[str, Any]:
-        nonlocal outcome, scheduled, final, levels
+        nonlocal outcome, scheduled, final, levels, known
         before = _readable(workspace, stored)
+        known = set(before["topics"])
         patched, outcome = schema.apply_patch(before, changes, today=today, now=now)
         planned, scheduled = progress.schedule(patched, outcome, today)
         final = schema.validate_record(planned)
@@ -136,6 +155,8 @@ def save(workspace: Workspace, patch: Any) -> dict[str, Any]:
         "due_count": len(progress.due(final, today)),
         "notes": scheduled.notes,
     }
+    if placed := _placed(final, set(changes.get("topics") or ()) - known):
+        receipt["placed"] = placed
     if "knowledge" in changes:
         receipt["pinned"] = {
             "bytes": packing.size(_pinned(final)),

@@ -112,9 +112,25 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 		assert.doesNotMatch(text, /unpinned fact|long help text/);
 	});
 
+	it("a half-built path shows its gaps, from the real engine's path_health", () => {
+		const { text } = projectCourseBrief(RESUME, "teach");
+		assert.match(text, /^Path gaps \(fix them in a save when you next touch these topics\): no title: [^;]*\bpivots\b/m);
+		assert.match(text, /no reference to its material: systems, pivots, rank/);
+		const built = projectCourseBrief({ ...RESUME, path_health: undefined }, "teach");
+		assert.doesNotMatch(built.text, /Path gaps/);
+		assert.notEqual(built.key, projectCourseBrief(RESUME, "teach").key, "a gap closing re-sends the brief");
+	});
+
+	it("topics left out of the course are named, so the tutor does not teach them", () => {
+		const resume = { ...RESUME, path: { ...(RESUME.path as object), excluded: ["lasso", "ridge"] } };
+		assert.match(projectCourseBrief(resume, "teach").text, /^Left out of the course: lasso, ridge$/m);
+	});
+
 	it("the due backlog shows its total and the most overdue review past the five", () => {
 		const { text } = projectCourseBrief(RESUME, "teach");
-		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them systems \(9 days overdue\):/);
+		assert.match(text, /Due: 6 topics; today's review is the 5 below, 1 more wait:/, "in the run-up the overdue unready review is among today's five");
+		const hidden = projectCourseBrief({ ...RESUME, due_oldest: { topic: "t4", overdue: 9 } }, "teach").text;
+		assert.match(hidden, /Due: 6 topics; today's review is the 5 below, 1 more wait, the most overdue among them t4 \(9 days overdue\):/);
 	});
 
 	it("practice adds the current topic's review prompt, points and gap, and its wrongly chosen method", () => {

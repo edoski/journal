@@ -138,7 +138,7 @@ class _Course:
 
     def ready(self, topic: str) -> bool:
         """Its prerequisites are solid, and no competing method is half-learned."""
-        needs = self.record["topics"][topic].get("needs", ())
+        needs = progress.needs(self.record, topic)
         return all(solid(self.levels[need]) for need in needs) and not any(
             self.levels[other]["level"] != "new" and not solid(self.levels[other])
             for other in self.partners[topic]
@@ -206,7 +206,9 @@ class _Allowance:
         self.carry = {"reviews": 0.5, "new": 0.5}
 
     def take(self, kind: str, rate: float) -> int:
-        whole = math.floor(self.carry[kind] + rate)
+        """A day's whole items: never more than its own rate rounded up, so a
+        remainder carried from lighter days never doubles a day's load."""
+        whole = min(math.floor(self.carry[kind] + rate), math.ceil(rate))
         self.carry[kind] += rate - whole
         return whole
 

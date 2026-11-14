@@ -65,6 +65,7 @@ import {
 	type TurnInput,
 } from "../core/input-events.ts";
 import { steerDelivered } from "../core/contracts.ts";
+import { listenForCourseMaps } from "./course-map.ts";
 import type {CallUsage} from "../core/contracts.ts";
 
 /**
@@ -199,6 +200,8 @@ function compactionKind(record: ChatRecord): "teach" | "practice" | "probe" {
 }
 
 setJobRespawn((jobId) => void jobRunner.runJob(jobId));
+// A lesson's save that registers material extends the course's map.
+listenForCourseMaps();
 
 /** The route-facing entry: parse {chatId, input} and run one turn. */
 export async function handleChatRequest(

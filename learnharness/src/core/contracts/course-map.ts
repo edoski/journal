@@ -45,6 +45,9 @@ export interface CourseMapTopic {
 	signals: TopicSignals;
 	/** Keys of open tasks that hold this topic. */
 	tasks: readonly string[];
+	/** Why the course leaves the topic out (off the exam): the engine keeps
+	 *  it off the plan and keeps its history. */
+	excluded?: string;
 }
 
 /** `needs`: the prerequisite comes before the topic that needs it.
