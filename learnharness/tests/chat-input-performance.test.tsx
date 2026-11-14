@@ -242,7 +242,9 @@ describe("session text fields keep keystrokes local", () => {
 		await act(async () => { update({ busy: true, nextProblem: false }); });
 		assert.ok(host.querySelector('[aria-label="Stop"]'));
 		await submit(host);
-		assert.equal(stops, 1);
+		assert.equal(stops, 0, "Enter on the empty field never stops a turn (round 3)");
+		await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="Stop"]')!.click(); });
+		assert.equal(stops, 1, "the square stops it by a click");
 		await typeText(fieldIn(host), "steer now");
 		assert.ok(host.querySelector('[aria-label="Send"]'));
 		await submit(host);

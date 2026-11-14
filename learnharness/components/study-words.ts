@@ -194,11 +194,14 @@ export const LESSON_WORDS = {
 	youStoppedReply: "You stopped the tutor before it replied.",
 	tryAgain: "Try again",
 	connectionDropped: "The connection dropped before the tutor finished replying.",
+	tryAgainPlaceholder: "Press Enter to try again, or write something new.",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
+	courseDeleted: "This course was deleted. Its lessons stay as history.",
+	startLesson: "Start a new lesson",
 } as const;
 
 /** What a lesson's top bar says it is doing: asking its opening questions

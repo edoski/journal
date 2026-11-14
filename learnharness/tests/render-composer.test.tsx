@@ -76,8 +76,8 @@ describe("Composer", () => {
 });
 
 // The Enter decision (composer steering, 2026-10-03): while a turn runs,
-// typed text makes Enter a STEER; Enter with an empty composer stays the
-// stop shortcut. (The plan-verdict accept branch died 2026-09-26 with the
+// typed text makes Enter a STEER; Enter with an empty composer does nothing
+// (round 3: stopping is the square's or Esc's, through the confirm). (The plan-verdict accept branch died 2026-09-26 with the
 // verdict itself — the post-plan reply is a natural text message.) Pure
 // function so the static-render harness can pin it (key events can't be
 // simulated in renderToStaticMarkup).
@@ -86,8 +86,14 @@ describe("enterAction", () => {
 		assert.equal(enterAction({ busy: true, canSend: true }), "send");
 	});
 
-	it("busy stream, empty composer: Enter stops", () => {
-		assert.equal(enterAction({ busy: true, canSend: false }), "stop");
+	it("busy stream, empty composer: Enter does nothing, so a second Enter after a send never kills the reply (round 3)", () => {
+		assert.equal(enterAction({ busy: true, canSend: false }), "none");
+		assert.equal(enterAction({ busy: true, canSend: false, nextProblem: true, emptyAction: true }), "none");
+	});
+
+	it("a reply that never came: Enter on the empty field runs Try again", () => {
+		assert.equal(enterAction({ busy: false, canSend: false, emptyAction: true }), "empty-action");
+		assert.equal(enterAction({ busy: false, canSend: true, emptyAction: true }), "send");
 	});
 
 	it("idle: send when there is the text, nothing when there is not", () => {
@@ -103,8 +109,8 @@ describe("enterAction", () => {
 		assert.equal(enterAction({ busy: false, canSend: true, nextProblem: true }), "send");
 	});
 
-	it("busy outranks the pause — steering and Stop keep their lanes", () => {
-		assert.equal(enterAction({ busy: true, canSend: false, nextProblem: true }), "stop");
+	it("busy outranks the pause — steering keeps its lane and the empty Enter stays inert", () => {
+		assert.equal(enterAction({ busy: true, canSend: false, nextProblem: true }), "none");
 		assert.equal(enterAction({ busy: true, canSend: true, nextProblem: true }), "send");
 	});
 });

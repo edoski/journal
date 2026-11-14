@@ -13,6 +13,7 @@ import { courseLabel } from "../core/contracts/course.ts";
 import { emit } from "../core/events.ts";
 import { stores } from "./stores.ts";
 import { startCourseMap } from "./course-map.ts";
+import { courseRecordForgotten } from "../store/course-records.ts";
 
 /** The registered courses plus the study roots a new course can go in.
  *  Until the engine exposes its study roots, a root is the parent folder
@@ -221,6 +222,18 @@ export async function deleteCourse(workspace: string): Promise<CourseChange> {
 	stores.courseMapLedgers.forget(workspace);
 	emit("courses-changed", {});
 	return { ok: true };
+}
+
+/** The words for a lesson whose course was deleted: the lesson shows them
+ *  and a turn there is refused with them. */
+export const COURSE_DELETED = "This course was deleted. Its lessons stay as history.";
+
+/** True when the session's course record is gone: the course was deleted.
+ *  A turn there would write a fresh record and bring the course back, so
+ *  the lesson is history. */
+export function courseDeleted(chatId: string): boolean {
+	const workspace = stores.chatStore.getChat(chatId)?.course?.workspace;
+	return !!workspace && courseRecordForgotten(workspace);
 }
 
 /** True when the session exists and has no course: its learner turns are

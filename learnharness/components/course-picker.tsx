@@ -143,11 +143,21 @@ export function useCourseChoice({ remember = true }: { remember?: boolean } = {}
 export function CourseControl({ choice }: { choice: CourseChoice }) {
 	const [creating, setCreating] = useState(false);
 	const [managing, setManaging] = useState<{ action: "rename" | "delete"; course: CourseSummary } | null>(null);
+	// A course made: focus goes on to the composer's field, where he types
+	// his first question, never to the page (round 3, 14 Nov 2026).
+	const anchorRef = useRef<HTMLSpanElement>(null);
+	const focusComposer = (e: Event) => {
+		const field = anchorRef.current?.closest('[data-testid="composer"]')?.querySelector("textarea");
+		if (!field) return;
+		e.preventDefault();
+		field.focus();
+	};
 	const { state } = choice;
 	if (state.status === "loading") return null;
 	if (state.status === "unavailable") return null;
 	return (
 		<>
+			<span ref={anchorRef} hidden />
 			<CoursePicker
 				courses={state.courses}
 				workspace={choice.workspace}
@@ -161,6 +171,7 @@ export function CourseControl({ choice }: { choice: CourseChoice }) {
 					roots={state.roots}
 					onClose={() => setCreating(false)}
 					onCreated={(course) => choice.add(course)}
+					onCloseAutoFocus={focusComposer}
 				/>
 			)}
 			{managing?.action === "rename" && (
@@ -322,10 +333,12 @@ function RootSelect({ roots, value, onChange }: { roots: readonly string[]; valu
  *  one folder is known. The server makes `<root>/<slug>`, copies the
  *  material in, and has the engine make it a course with that exam day and
  *  material. */
-export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: {
+export function NewCourseBody({ roots, onClose, onCreated, onCloseAutoFocus, fetchLike = fetch }: {
 	roots: readonly string[];
 	onClose: () => void;
 	onCreated: (course: CourseSummary) => void;
+	/** Where focus goes once the dialog closes (the host's field). */
+	onCloseAutoFocus?: (e: Event) => void;
 	fetchLike?: typeof fetch;
 }) {
 	const [title, setTitle] = useState("");
@@ -355,14 +368,14 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 	};
 	if (created) {
 		return (
-			<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">
+			<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
 				<CourseMapStatus course={created} onClose={onClose} fetchLike={fetchLike} />
 			</DialogContent>
 		);
 	}
 	const field = "flex flex-col gap-2 text-row font-medium text-foreground";
 	return (
-		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md">
+		<DialogContent aria-describedby={undefined} data-testid="new-course-dialog" className="max-w-md" onCloseAutoFocus={onCloseAutoFocus}>
 			<form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
 				<DialogHeader>
 					<DialogTitle>New course</DialogTitle>
@@ -405,7 +418,7 @@ export function NewCourseBody({ roots, onClose, onCreated, fetchLike = fetch }: 
 	);
 }
 
-export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void }) {
+export function NewCourseDialog(props: { roots: readonly string[]; onClose: () => void; onCreated: (course: CourseSummary) => void; onCloseAutoFocus?: (e: Event) => void }) {
 	return (
 		<Dialog open onOpenChange={(open) => !open && props.onClose()}>
 			<NewCourseBody {...props} />

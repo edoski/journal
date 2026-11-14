@@ -320,6 +320,15 @@ const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources",
  *  app). The engine keeps the record at `<workspace>/.study/course.json` and
  *  replaces it whole on each save, so the folder is watched, not the file.
  *  Returns the unwatch; a course whose folder is missing is not watched. */
+/** Whether the course was deleted: the engine's `forget --course` unlinks
+ *  the record and leaves the initialised `.study` folder behind. An
+ *  unreadable or damaged record is still there; a folder never made a
+ *  course has no `.study`. A cheap, synchronous read for every turn. */
+export function courseRecordForgotten(workspace: string): boolean {
+	const study = path.join(workspace, ".study");
+	return fs.existsSync(study) && !fs.existsSync(path.join(study, "course.json"));
+}
+
 export function watchCourseRecord(workspace: string, onChange: () => void): () => void {
 	try {
 		const watcher = fs.watch(path.join(workspace, ".study"), (_event, file) => {
@@ -334,6 +343,7 @@ export function watchCourseRecord(workspace: string, onChange: () => void): () =
 
 export function createCourseRecords(engine: EngineCommand): CourseRecords {
 	return {
+		forgotten: courseRecordForgotten,
 		async list() {
 			const result = toResult(await exec(engine, ["plan", "--all", "--days", "1"], ""), "plan");
 			if (!result.ok) return { available: false, reason: result.message };

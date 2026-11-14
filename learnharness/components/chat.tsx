@@ -93,9 +93,15 @@ import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
 import { LESSON_WORDS, PHASE_WORDS } from "@/components/study-words";
+import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
+import { CourseGoneLine } from "@/components/lesson/course-gone";
+
+/** The chat routes' answer for a deleted lesson: TurnError reads it as
+ *  "This lesson was deleted." with Go to Home. */
+const LESSON_GONE = JSON.stringify({ error: "Unknown chat" });
 
 /** The transcript's own column inside the scroller (the docks have their own find roots). */
 const TRANSCRIPT_COLUMN = "[data-transcript-column]";
@@ -188,12 +194,15 @@ export function Chat({
 	initiallyCompacting = false,
 	startedIn,
 	course,
+	initiallyCourseDeleted = false,
 }: {
 	chatId: string;
 	title: string;
 	/** The session's course. Absent on sessions older than the rule that
 	 *  every session has one: the link banner replaces the dock. */
 	course?: CourseLink;
+	/** The course was deleted: the lesson is history, with no box to write in. */
+	initiallyCourseDeleted?: boolean;
 	initialMessages: LhMessage[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
@@ -262,6 +271,9 @@ export function Chat({
 		return sendInput(...args);
 	}, [sendInput, followAction]);
 	const steer = useCallback<typeof steerInput>((...args) => {
+		// His overtaken words go out as this steer: the line that says they
+		// wait in the box goes with them (round 3: it stayed, box empty).
+		setAnsweredElsewhere(false);
 		followAction();
 		return steerInput(...args);
 	}, [steerInput, followAction]);
@@ -382,6 +394,10 @@ export function Chat({
 	// the plan popup, or the setup dialog over a pending question must not
 	// dismiss the question underneath.
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
+	// The lesson was deleted elsewhere (chats-changed `deleted`).
+	const [gone, setGone] = useState(false);
+	// Its course was deleted: the lesson stays readable as history.
+	const [courseGone, setCourseGone] = useState(initiallyCourseDeleted);
 	// Bumped when something that held focus goes away (a rename ends, a
 	// confirm closes): the dock puts focus back where he types (focus-home.ts).
 	const [focusEpoch, setFocusEpoch] = useState(0);
@@ -600,23 +616,42 @@ export function Chat({
 	/* The composer draft ref is synchronous, so sends read the latest text
 	 * without a parent render per input event. Explicit resets still bump a
 	 * revision so the local field can sync. */
+	// What he types here is kept per box on this Mac (kept-drafts.ts), so
+	// a reload or a restart never empties it.
+	const composerScope = `${chatId}:composer`;
+	const carryScope = course ? `carry:${course.workspace}` : undefined;
 	const textRef = useRef("");
 	// His photos waiting in the composer (photos.tsx): they stay while a
 	// question or problem holds the dock, and go with the next message.
-	const composerPhotos = usePhotoDraft();
+	const composerPhotos = usePhotoDraft(undefined, composerScope);
+	const restoreComposerPhotos = composerPhotos.restore;
 	const applyText = useCallback((v: string) => {
 		textRef.current = v;
+		keepWords(composerScope, { text: v });
 		setComposerDraftRevision((revision) => revision + 1);
-	}, []);
+	}, [composerScope]);
 	const recordComposerText = useCallback((v: string) => {
 		textRef.current = v;
-	}, []);
+		keepWords(composerScope, { text: v });
+		// An emptied box no longer holds the words another window overtook.
+		if (!v.trim()) setAnsweredElsewhere(false);
+	}, [composerScope]);
+	// What he typed before a reload comes back after mount, so the server's
+	// page and the first client render agree.
+	useEffect(() => {
+		const kept = keptWords(composerScope)?.text;
+		if (kept && !textRef.current) applyText(kept);
+	}, [composerScope, applyText]);
 
 	// ANSWERED IN ANOTHER WINDOW (stranded-draft.ts): the open question or
 	// problem left without this window sending what he typed in it, so the
 	// words go to the composer and one line says why.
 	const dockKey = pending ? `q:${pending.key}` : activeProblem ? `p:${activeProblem.toolCallId}` : null;
 	dockKeyRef.current = dockKey;
+	// Boxes of questions and problems that have closed keep nothing.
+	useEffect(() => {
+		forgetClosedBoxes(chatId, dockKey ? [`${chatId}:${dockKey}`] : []);
+	}, [chatId, dockKey]);
 	const prevDockKeyRef = useRef(dockKey);
 	useEffect(() => {
 		const before = prevDockKeyRef.current;
@@ -657,16 +692,18 @@ export function Chat({
 		setOpeningError(false);
 		draftRef.current = prompt; // The existing 503 flow must restore it too.
 		applyText("");
-		void send({ type: "text", text: prompt }, () => {
+		// Photos from the New lesson box go with the first message.
+		void takeKeptPhotos(`${chatId}:opening`).then((photos) => send({ type: "text", text: prompt, ...(photos.length ? { photos } : {}) }, () => {
 			clearOpeningPrompt(chatId);
 			openingDraftRef.current = null;
 			if (draftRef.current === prompt) draftRef.current = null;
 		}).then(accepted => {
+			if (!accepted && photos.length) restoreComposerPhotos(photos.map((photo, i) => ({ id: `opening_${i}`, photo })));
 			if (!accepted && openingMountedRef.current && openingDraftRef.current === prompt && !textRef.current) {
 				applyText(prompt);
 			}
-		});
-	}, [chatId, send, applyText]);
+		}));
+	}, [chatId, send, applyText, restoreComposerPhotos]);
 
 	const sentInitial = useRef(false);
 	useEffect(() => {
@@ -778,6 +815,10 @@ export function Chat({
 	// before the reply began) says so, with Try again (turn-cut.ts).
 	const replyCut = status === "ready" && !busy && !compacting && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem && !compacting;
+	// Try again's key (round 3): Enter on the empty composer, from the field
+	// or anywhere outside one, runs the same retry as the button.
+	// A question or problem still open owns Enter (its own resend).
+	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : retryable && !claudeLimit ? retryFailedTurn : undefined;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -791,8 +832,16 @@ export function Chat({
 	const closedForToday = closedTonight(nativeMessages);
 	const sendTonight = useCallback(() => {
 		if (busy || compacting || doneTonight) return;
+		// His half-typed answer waits for the same question next time
+		// (kept-drafts.ts); the answer itself stays hidden.
+		if (pending && carryScope) {
+			const box = `${chatId}:q:${pending.key}`;
+			const kept = keptWords(box);
+			if (kept) keepWords(carryScope, kept);
+			void keptPhotos(box).then((photos) => { if (photos.length) void keepPhotos(carryScope, photos); });
+		}
 		void send({ type: "tonight" });
-	}, [busy, compacting, doneTonight, send]);
+	}, [busy, compacting, doneTonight, send, pending, carryScope, chatId]);
 	const sendTonightRef = useRef(sendTonight);
 	sendTonightRef.current = sendTonight;
 	useEffect(() => {
@@ -829,6 +878,7 @@ export function Chat({
 	 * pause — the dock-mounted listeners are gone by then (docks unmount
 	 * when nothing is active; the two never overlap). */
 	useEnterSubmits(sendNext);
+	useEnterSubmits(() => tryAgain?.());
 
 	const syncFromServer = useCallback(async () => {
 		const res = await fetch(`/api/chats/${chatId}`);
@@ -1203,6 +1253,24 @@ export function Chat({
 		// The first plan named this session (ChatStore.nameSession): the
 		// header takes the name the list now shows.
 		if (p.named?.id === chatId) setTitleText(p.named.title);
+		// Deleted in another window: say so now, not at his next send.
+		if (p.deleted === chatId) {
+			setGone(true);
+			keepWords(composerScope, null);
+			forgetClosedBoxes(chatId, []);
+		}
+	});
+	useServerEvent("courses-changed", () => {
+		// A course was deleted or made: is this lesson's still listed?
+		const workspace = course?.workspace;
+		if (!workspace) return;
+		void fetch("/api/courses")
+			.then((res) => (res.ok ? res.json() : null))
+			.then((listing: { available?: boolean; courses?: { workspace: string }[]; unreadable?: { workspace: string }[] } | null) => {
+				if (!listing?.available) return;
+				setCourseGone(![...(listing.courses ?? []), ...(listing.unreadable ?? [])].some((c) => c.workspace === workspace));
+			})
+			.catch(() => {});
 	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
@@ -1383,7 +1451,7 @@ export function Chat({
 						courseHref={course ? courseHref(course.workspace) : undefined}
 						phase={closedForToday ? PHASE_WORDS.done : mode === "practice" ? PHASE_WORDS.practice : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
+						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
@@ -1616,8 +1684,10 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{replyCut && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
+							{replyCut && !courseGone && !gone && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
+							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
+							{courseGone && !gone && <CourseGoneLine />}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
@@ -1638,7 +1708,7 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				{!course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
+				{gone || courseGone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}
@@ -1655,6 +1725,8 @@ export function Chat({
 					busy={busy}
 					focusEpoch={focusEpoch}
 					onDockDraft={recordDockDraft}
+					keepScope={chatId}
+					carryScope={carryScope}
 					answeredElsewhere={answeredElsewhere}
 					replyAnchorRef={replyAnchorRef}
 					onJumpToLatest={jumpToLatest}
@@ -1673,14 +1745,17 @@ export function Chat({
 							revision={composerDraftRevision}
 							onChange={recordComposerText}
 							onSend={onSend}
-							onStop={abortInFlightTurn}
+							// The square asks first, as Esc does (abort-turn-dialog.tsx).
+							onStop={() => setAbortAsk("turn")}
 							sendAllowed={sendAllowed}
 							// The pause affordance (owner round 16): the placeholder
 							// IS the hint — empty state, exactly where Enter-on-empty
-							// applies.
+							// applies. A reply that never came, or a turn that
+							// failed, takes Try again the same way.
 							nextProblem={nextReady}
 							onNext={sendNext}
-							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : undefined}
+							onEmptyEnter={tryAgain}
+							placeholder={nextReady ? "Ask anything, or press Enter for the next one." : tryAgain ? LESSON_WORDS.tryAgainPlaceholder : undefined}
 							photos={composerPhotos}
 						/>
 					}
@@ -1813,8 +1888,11 @@ export function escAbortTarget(s: {
 	return null;
 }
 
-export function revealArrival(wasQuestion: boolean): { expanded: boolean; revealed: boolean } {
-	return wasQuestion ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
+/** How a question lands in the dock: a teach check after the composer
+ *  waits folded behind its invitation; one that follows a question, or the
+ *  same question coming back after a failed send, opens. */
+export function revealArrival(wasQuestion: boolean, returned = false): { expanded: boolean; revealed: boolean } {
+	return wasQuestion || returned ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
 }
 
 /**
@@ -1863,6 +1941,8 @@ function DockOverlay({
 	busy,
 	focusEpoch,
 	onDockDraft,
+	keepScope,
+	carryScope,
 	answeredElsewhere,
 	replyAnchorRef,
 	onJumpToLatest,
@@ -1906,6 +1986,10 @@ function DockOverlay({
 	focusEpoch: number;
 	/** What he types in the open dock, keyed by its question or problem. */
 	onDockDraft: (key: string, text: string) => void;
+	/** The lesson's prefix for kept boxes (kept-drafts.ts). */
+	keepScope: string;
+	/** The course's carry: work Hint or Done for today leaves for the next question. */
+	carryScope?: string;
 	/** Another window answered the question he was typing in. */
 	answeredElsewhere: boolean;
 	replyAnchorRef: React.MutableRefObject<ReplyAnchor>;
@@ -1946,11 +2030,18 @@ function DockOverlay({
 	// measures the bar, the reserve keeps the composer's height, and the
 	// only motion is the teaching text itself.
 	const prevPendingIdRef = useRef(pendingId);
+	// The last question this dock held: one that comes back is his own
+	// answer refused or never delivered (a failed send), so it reopens as
+	// he left it, open with his words, never folded behind its invitation
+	// with focus on the page (round 3, 14 Nov 2026).
+	const lastPendingIdRef = useRef(pendingId);
 	if (pendingId !== prevPendingIdRef.current) {
 		const wasQuestion = prevPendingIdRef.current !== null;
+		const returned = pendingId !== null && pendingId === lastPendingIdRef.current;
 		prevPendingIdRef.current = pendingId;
-		if (pendingId && requiresReveal) {
-			const arrival = revealArrival(wasQuestion);
+		if (pendingId) lastPendingIdRef.current = pendingId;
+		if (pendingId && (requiresReveal || returned)) {
+			const arrival = revealArrival(wasQuestion, returned);
 			setExpanded(arrival.expanded);
 			setRevealed(arrival.revealed);
 		} else if (pendingId) {
@@ -2329,6 +2420,8 @@ function DockOverlay({
 									initialDraft={initialQuestionDraft}
 									onSaveDraft={onSaveQuestionDraft}
 									onDraftChange={(text) => onDockDraft(`q:${pending.key}`, text)}
+									keepAs={`${keepScope}:q:${pending.key}`}
+									carryAs={carryScope}
 									compactionRunning={compactionRunning}
 								/>
 							) : practice ? (
@@ -2343,6 +2436,7 @@ function DockOverlay({
 									onSubmit={onSubmitThinking}
 									onRequest={onPracticeRequest}
 									onDraftChange={(text) => onDockDraft(`p:${practice.toolCallId}`, text)}
+									keepAs={`${keepScope}:p:${practice.toolCallId}`}
 									compactionRunning={compactionRunning}
 									busy={busy}
 								/>

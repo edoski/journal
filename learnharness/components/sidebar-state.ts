@@ -161,22 +161,26 @@ export function useSessionsSidebar({ open, toggle }: { open: boolean; toggle: ()
 		}
 		// Modified keys belong to the surface (⇧↵ etc.).
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-		const n = shown?.length ?? 0;
-		if (n === 0) return;
+		// Results only: an empty field's list is Today, which its own keys walk.
+		if (shown === null) return;
+		// Every result is a row, courses and topics as well as lessons
+		// (round 3: the walk counted lessons only, so a course found by
+		// name was out of the keyboard's reach). The arrows put focus on
+		// the first or last row, and the list's own arrows walk on from it.
+		const rows = Array.from(listRef.current?.querySelectorAll<HTMLElement>("[data-sidebar-row]") ?? []);
+		if (rows.length === 0) return;
 		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-			// The rows move, not the caret.
 			e.preventDefault();
-			const dir = e.key === "ArrowDown" ? 1 : -1;
-			setKbdIndex((i) => (i === null || i >= n ? (dir === 1 ? 0 : n - 1) : (i + dir + n) % n));
+			setKbdIndex(null);
+			(e.key === "ArrowDown" ? rows[0] : rows[rows.length - 1])!.focus();
 			return;
 		}
 		if (e.key === "Enter") {
-			const target = shown![kbdIndex !== null && kbdIndex < n ? kbdIndex : 0];
-			if (!target) return;
+			// The quick-open: the first result shown.
 			e.preventDefault();
-			router.push(`/chat/${target.id}`);
 			setKbdIndex(null);
 			e.currentTarget.blur();
+			rows[0]!.click();
 		}
 	};
 

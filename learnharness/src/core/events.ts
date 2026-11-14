@@ -38,8 +38,9 @@ export interface ServerEvents {
 	"activity-changed": Record<string, never>;
 	/** The session list changed (create, delete, title). `named` carries a
 	 *  session's new title when its first plan named it, so its open header
-	 *  shows the one name the list does. */
-	"chats-changed": { named?: { id: string; title: string } };
+	 *  shows the one name the list does. `deleted` names a session just
+	 *  deleted, so a window that has it open says so at once. */
+	"chats-changed": { named?: { id: string; title: string }; deleted?: string };
 	/** The course list changed: a course was created, renamed or deleted. */
 	"courses-changed": Record<string, never>;
 	/** A course's engine record changed: a save through the app, or another

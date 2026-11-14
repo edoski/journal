@@ -43,8 +43,8 @@ second pillar of input).
 | Lesson details | ⌘K | `lh:kbd-open-model-picker` (lesson-top-bar.tsx; the id predates the details panel and stays, since saved rebinds key on it) |
 | Toggle sidebar | ⌘B | `lh:toggle-sidebar` (sidebar.tsx) |
 | Sessions search | ⌘⇧F | `lh:kbd-sessions-search` (sidebar.tsx) |
-| Walk search results | ↑ / ↓ *in the search field* | sidebar.tsx (cycles the filtered rows, wraps) |
-| Open search result | Enter *in the search field* | sidebar.tsx (walked row, else the first match) |
+| Walk search results | ↑ / ↓ *in the search field* | sidebar-state.ts: focus goes to the first (↓) or last (↑) result row, course, topic or lesson, and the list's own arrows walk on (sidebar-tree.ts) |
+| Open search result | Enter *in the search field* (the first result shown), or on a walked row | sidebar-state.ts |
 | ~~Cycle session~~ | ~~⌥↑ / ⌥↓~~ | RETIRED (owner, 2026-10-10) — the search walk above replaces it |
 | ~~Open selected session~~ | ~~⌥Enter~~ | RETIRED (owner, 2026-10-10) — the search Enter above replaces it |
 | Jump to graph (home) | ⌘G | router.push in keyboard-shortcuts.tsx |
@@ -52,6 +52,8 @@ second pillar of input).
 | Rename session | F2 | `lh:kbd-rename-session` (chat.tsx) |
 | Cheat sheet | ? | keyboard-shortcuts.tsx |
 | Find in this lesson | ⌘F | `lh:kbd-find` (session-find.tsx) |
+| Try again | Enter *on the empty message box, or outside any field* | composer.tsx `enterAction` (`empty-action`) after a reply that never came or a failed turn |
+| Stop the tutor | Esc, or a click on the square | the "Abort this turn?" confirm (abort-turn-dialog.tsx); Enter never stops a turn (round 3, 14 Nov 2026) |
 | Go to the newest reply | ⌘↓ | `lh:kbd-jump-latest` (lesson/scroll-cue.tsx; acts only while the cue above the dock shows) |
 
 ## Model menu keyboard machine (owner polish, 2026-09-17)

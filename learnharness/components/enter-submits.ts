@@ -63,6 +63,8 @@ export function useEnterSubmits(submit: () => void): void {
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key !== "Enter") return;
+			// A surface already acted on this Enter (the dock's row machine).
+			if (e.defaultPrevented) return;
 			if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 			if (isTypingSurface(e)) return;
 			const target = e.target as HTMLElement | null;

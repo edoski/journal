@@ -50,10 +50,47 @@ function AlertDialogOverlay({
   )
 }
 
+const FOOTER_BUTTONS = '[data-slot="alert-dialog-footer"] button:not(:disabled)'
+
+/** The keyboard contract every confirmation shares (round 3, 14 Nov
+ *  2026), since Tab is dead: focus opens on Cancel, ← and → move between
+ *  the footer's buttons, Enter presses the focused one, and ⌘↵ presses
+ *  the action, the footer's last button. Exported for pins. */
+export function alertDialogKeys(e: React.KeyboardEvent<HTMLElement>) {
+  if (e.defaultPrevented) return
+  const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>(FOOTER_BUTTONS)]
+  if (buttons.length === 0) return
+  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    e.preventDefault()
+    buttons.at(-1)!.click()
+    return
+  }
+  if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+  const target = e.target as HTMLElement
+  if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return
+  e.preventDefault()
+  const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
+  const next = e.key === "ArrowRight" ? (at < 0 ? buttons.length - 1 : Math.min(at + 1, buttons.length - 1)) : Math.max(at - 1, 0)
+  buttons[next]!.focus()
+}
+
+/** Opening focus when the footer has no `AlertDialogCancel` for Radix to
+ *  focus: its first button, so focus never stays behind the modal. */
+function focusFooter(e: Event) {
+  const content = e.currentTarget as HTMLElement | null
+  if (!content || content.querySelector('[data-slot="alert-dialog-cancel"]')) return
+  const first = content.querySelector<HTMLButtonElement>(FOOTER_BUTTONS)
+  if (!first) return
+  e.preventDefault()
+  first.focus({ preventScroll: true })
+}
+
 /** The panel: radius 12, the raised popover fill, padding 24, slots 16 apart. */
 function AlertDialogContent({
   className,
   onEscapeKeyDown,
+  onKeyDown,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content>) {
   return (
@@ -62,6 +99,14 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         onEscapeKeyDown={claimEscape(onEscapeKeyDown)}
+        onKeyDown={(e) => {
+          onKeyDown?.(e)
+          alertDialogKeys(e)
+        }}
+        onOpenAutoFocus={(e) => {
+          onOpenAutoFocus?.(e)
+          if (!e.defaultPrevented) focusFooter(e)
+        }}
         className={cn(
           DIALOG_LAYER,
           "fixed top-1/2 left-1/2 flex w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-2xl outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:animate-none",

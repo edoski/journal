@@ -8,27 +8,29 @@ import { Textarea } from "@/components/ui/textarea";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { PendingPhotos, PhotoAttachButton, type PhotoDraft } from "@/components/photos";
 
-/** What one Enter press does, in precedence order: stop a busy stream,
- *  otherwise send the message, otherwise — practice sessions only — fire
- *  the next-problem signal while the between-problems pause is live
- *  (owner round 16: Enter on an EMPTY composer is the go-ahead; typing
- *  anything makes Enter a send again). Pure so the static-render harness
- *  can pin the decision (key events can't be simulated in
- *  renderToStaticMarkup). */
+/** What one Enter press does, in precedence order: send the message,
+ *  otherwise run the empty field's go-ahead: the practice pause's next
+ *  problem (owner round 16), or Try again after a reply that never came.
+ *  Enter never stops a turn (round 3, 14 Nov 2026): a second Enter a
+ *  second after a send landed on the empty field and killed the reply.
+ *  Stopping is the square's or Esc's, through the confirm. Pure so the
+ *  static-render harness can pin the decision (key events can't be
+ *  simulated in renderToStaticMarkup). */
 export function enterAction(state: {
 	busy: boolean;
 	canSend: boolean;
 	/** The between-problems pause is live: practice session, nothing
 	 *  active, no turn/compaction in flight (the caller's fold). */
 	nextProblem?: boolean;
-}): "stop" | "send" | "next" | "none" {
+	/** The empty field's own go-ahead (Try again), when the host has one. */
+	emptyAction?: boolean;
+}): "send" | "next" | "empty-action" | "none" {
 	// Composer steering (owner arc 2026-10-03): while a turn runs, typed
-	// text makes Enter a STEER (the queue-and-redirect send); Enter with
-	// an empty composer stays the stop shortcut. The button itself keeps
-	// the square — Stop stays one click away at all times.
-	if (state.busy) return state.canSend ? "send" : "stop";
+	// text makes Enter a STEER (the queue-and-redirect send).
 	if (state.canSend) return "send";
+	if (state.busy) return "none";
 	if (state.nextProblem) return "next";
+	if (state.emptyAction) return "empty-action";
 	return "none";
 }
 
@@ -48,11 +50,14 @@ export function ChatSessionComposer({
 	placeholder,
 	nextProblem,
 	onNext,
+	onEmptyEnter,
 	photos,
 }: {
 	busy: boolean;
 	value: string;
 	revision: number;
+	/** Enter on the empty, idle field runs this (Try again after a cut reply). */
+	onEmptyEnter?: () => void;
 	/** His photos waiting to go with the message (photos.tsx). */
 	photos?: PhotoDraft;
 	onChange: (value: string) => void;
@@ -83,6 +88,7 @@ export function ChatSessionComposer({
 			placeholder={placeholder}
 			nextProblem={nextProblem}
 			onNext={onNext}
+			onEmptyEnter={onEmptyEnter}
 			photos={photos}
 		/>
 	);
@@ -105,6 +111,7 @@ export function Composer({
 	toolbar,
 	head,
 	emptyAction,
+	onEmptyEnter,
 	photos,
 }: {
 	busy: boolean;
@@ -121,6 +128,9 @@ export function Composer({
 	 *  practice pause's Next problem does: its label on the button, and
 	 *  Enter on the empty field runs it. */
 	emptyAction?: { label: string; run: () => void };
+	/** What Enter on the empty, idle field does when no button says so:
+	 *  Try again after a reply that never came (the placeholder names it). */
+	onEmptyEnter?: () => void;
 	/** The controls on the toolbar's left (course, mode). */
 	toolbar?: ReactNode;
 	/** The textarea's placeholder (owner refinement round, 2026-09-24):
@@ -145,10 +155,9 @@ export function Composer({
 			? { ...emptyAction, testId: "composer-action" }
 			: undefined;
 	const act = () => {
-		const action = enterAction({ busy, canSend, nextProblem: Boolean(next) });
-		if (action === "stop") onStop();
-		else if (action === "send") onSend();
-		else if (action === "next") next?.run();
+		const action = enterAction({ busy, canSend, nextProblem, emptyAction: Boolean(next ?? onEmptyEnter) });
+		if (action === "send") onSend();
+		else if (action === "next" || action === "empty-action") (next ? next.run : onEmptyEnter)?.();
 	};
 	// The button follows the text (owner report 2026-10-03): while a turn
 	// runs WITH text typed it stays the send (click = steer); only an empty
@@ -201,7 +210,10 @@ export function Composer({
 					</Button>
 				) : (
 					<Button
-						type="submit"
+						// The square stops the turn by a click only (through
+						// the host's confirm); Enter never reaches it.
+						type={stopping ? "button" : "submit"}
+						onClick={stopping ? onStop : undefined}
 						size="icon-sm"
 						data-slot="composer-send"
 						aria-label={stopping ? "Stop" : "Send"}

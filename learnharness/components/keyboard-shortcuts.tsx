@@ -31,8 +31,8 @@ import {
 	actionForBinding,
 	bindingForAction,
 	eventBinding,
+	fieldKeepsKey,
 	formatBinding,
-	isTypingSurface,
 	kbdEventForAction,
 	KEY_SCOPES,
 	KEYBOARD_ACTIONS,
@@ -47,6 +47,11 @@ import { useSpatialArrows } from "@/components/spatial-arrows";
 // the dispatcher composes event names through the ONE helper — a second
 // spelling here is how the ⌘B bug happened.
 export { kbdEventForAction };
+
+/** A dialog or confirmation is open over the page. */
+function modalOpen(): boolean {
+	return document.querySelector('[role="alertdialog"], [role="dialog"]') !== null;
+}
 
 export function KeyboardShortcuts() {
 	const router = useRouter();
@@ -76,7 +81,9 @@ export function KeyboardShortcuts() {
 				// composer-bearing page answers with its own chain. The quiz
 				// dock's rows↔thinking claim stops propagation at document
 				// level, so a claimed Tab never reaches this dispatch.
-				if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey)
+				// An open dialog is modal: Tab never reaches the fields
+				// behind it (round 3: typing landed in the composer).
+				if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && !modalOpen())
 					window.dispatchEvent(new CustomEvent("lh:kbd-cycle-fields"));
 				return;
 			}
@@ -106,10 +113,11 @@ export function KeyboardShortcuts() {
 			const action = actionForBinding(eventBinding(e));
 			if (!action) return;
 
-			// The input guard: inside a typing surface only mod/alt combos
-			// fire (they never type a character). Bare keys — "?" included —
-			// pass through so the field keeps them. Tab already returned above.
-			if (isTypingSurface(e) && !(e.metaKey || e.ctrlKey || e.altKey)) return;
+			// The input guard: inside a typing surface only keys that never
+			// type a character fire (mod/alt combos, F2). Bare keys — "?"
+			// included — stay with the field. Tab already returned above.
+			if (fieldKeepsKey(e)) return;
+			if (action === "rename-session") e.preventDefault();
 
 			// Dispatch: global commands we own run here; surface commands
 			// ride the window event for the mounted surface to catch.

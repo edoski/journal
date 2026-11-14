@@ -44,6 +44,17 @@ describe("chat store events (S6: the silence law)", () => {
 		off();
 	});
 
+	it("a delete names the session, so a window that has it open says so at once (round 3)", () => {
+		let deleted: string | undefined;
+		const off = subscribe((e) => {
+			if (e.type === "chats-changed") deleted = e.deleted ?? deleted;
+		});
+		const chat = chatStore.createChat("Deleted elsewhere");
+		chatStore.deleteChat(chat.id);
+		assert.equal(deleted, chat.id);
+		off();
+	});
+
 	it("deleteChat on a missing id stays silent", () => {
 		let announces = 0;
 		const off = subscribe((e) => {
