@@ -22,7 +22,7 @@ const ICON: Record<Exclude<UnitStatus["kind"], "working" | "studied" | "none">, 
  *  icon and a few words. "Your turn" wears the accent at 500, the spinner
  *  shows while the tutor writes, and every other fact is muted at 400. The
  *  root is `contents`, so the icon and the words are the status slot's own
- *  items and the words can give way (`STATUS_SLOT`). */
+ *  items (`TRAILING_SLOT`). */
 export function UnitStatusText({ status }: { status: UnitStatus }) {
 	switch (status.kind) {
 		case "none":

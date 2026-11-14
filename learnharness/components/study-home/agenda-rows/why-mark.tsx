@@ -16,8 +16,7 @@ export const WHY_ICON: Record<Why["kind"], LucideIcon> = {
 };
 
 /** "row": Home's line end, a 14px icon; "slot": a sidebar row's status
- *  slot, a 12px icon, T3 Code's status label, whose words give way to the
- *  icon when the row's name needs the room. */
+ *  slot, a 12px icon, T3 Code's status label, its words always whole. */
 export type WhyMarkSize = "row" | "slot";
 
 /**
@@ -41,7 +40,7 @@ export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: 
 		);
 	}
 	return (
-		// `contents`: the icon and the words are the status slot's own items, so the words can give way (`STATUS_SLOT`).
+		// `contents`: the icon and the words are the status slot's own items (`TRAILING_SLOT`).
 		<span data-slot="why-mark" data-kind={why.kind} className={cn("contents text-label", tone)}>
 			<span className="flex h-4 shrink-0 items-center">
 				<Icon aria-hidden className="size-3" />

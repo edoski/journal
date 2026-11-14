@@ -15,20 +15,28 @@ export const rowSurface = (active: boolean) =>
 	);
 
 /**
- * Every row's trailing slot, flush to the row's right padding, so the
- * slots of cards, shelf rows and session rows end on one edge. The course
- * name and title beside it take the room they need first; the slot gets
- * the rest and gives way: its mark is a flat run of icon and words
- * (`contents` roots, every part 16px tall), and words that do not fit
- * beside the icon wrap onto a second line pushed out of the slot and
- * clipped, so the icon stays alone and nothing is cut mid-word (Edo, 14
- * Nov 2026: the name and title win the space). Give it its line's height
- * with the padding that centres one 16px line (`py-0.5` in 20px, `py-1`
- * in 24px). Words with no icon ("3d ago") have nothing to give way to,
- * so they keep their width.
+ * Every row's trailing slot: an icon and a few words, always whole (Edo,
+ * 14 Nov 2026: the status keeps its words whatever the title's length).
+ * It never shrinks; the text beside it makes the room instead. A shelf
+ * row's title moves the slot onto a line of its own when the two do not
+ * fit side by side (`ROW_BODY`); a card's course name wraps beside it.
+ * Its mark is a flat run of icon and words (`contents` roots, every part
+ * 16px tall). Give it its line's height with the padding that centres
+ * one 16px line (`py-0.5` in 20px, `py-1` in 24px).
  */
 export const TRAILING_SLOT =
-	"relative ml-auto flex min-w-3 flex-1 basis-0 flex-wrap content-start items-center justify-end gap-x-1 gap-y-8 overflow-hidden text-label tabular-nums text-muted-foreground has-[[data-kind=studied]]:min-w-fit";
+	"ml-auto flex shrink-0 items-center justify-end gap-x-1 whitespace-nowrap text-label tabular-nums text-muted-foreground";
+
+/** A shelf row's title and status, beside the course mark: one line when
+ *  both fit, else the title takes the full width (wrapping as it needs)
+ *  and the status drops under it, right-aligned, so neither is cut. The
+ *  status is therefore always on the row's last line, where the row's
+ *  action sits (`SLIM_ACTION_PLACE`). Give the title `ROW_TITLE`. */
+export const ROW_BODY = "flex min-w-0 flex-1 flex-wrap items-start gap-x-2";
+
+/** A shelf row's title inside `ROW_BODY`: as wide as its words, down to
+ *  the full width, never cut. */
+export const ROW_TITLE = "min-w-0 flex-[1_1_auto] py-0.5 text-control text-pretty";
 
 /** The trailing slot of a row with an action: its mark fades out while the
  *  row is hovered or its action has keyboard focus, so the action takes
@@ -49,7 +57,7 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
 /**
  * The sidebar's two-line card (60px, spec: unit-inbox.md), the shell every
  * card shares: line 1 the course's mark and name with the status slot,
- * which gives way to its icon before the name is cut; line 2 the title at
+ * whose words stay whole while a long name wraps beside it; line 2 the title at
  * 14/500 on the name's edge, where a shelf row's title starts, as Home's
  * row keeps its pie beside both lines, wrapping onto a second line rather
  * than cut; the whole card one link, its action (if any) over the status
@@ -97,9 +105,9 @@ export function RowCard({
 					recede && !active && "opacity-70 group-hover/sidebar-row:opacity-100 group-has-[:focus-visible]/sidebar-row:opacity-100",
 				)}
 			>
-				<span className="flex h-5 items-center gap-2">
-					{mark}
-					<span className="min-w-0 truncate text-label text-muted-foreground">{course}</span>
+				<span className="flex min-h-5 items-start gap-2">
+					<span className="flex h-5 shrink-0 items-center">{mark}</span>
+					<span className="min-w-0 py-0.5 text-label text-pretty text-muted-foreground">{course}</span>
 					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-5 py-0.5")}>
 						{status}
 					</span>
