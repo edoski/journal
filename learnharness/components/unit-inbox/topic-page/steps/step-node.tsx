@@ -80,7 +80,8 @@ export function StepNode({ data }: NodeProps<StepFlowNode>) {
 			)}
 		>
 			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", DOT[status])} />
-			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground">
+			{/* KaTeX's fonts have no medium face, so a hairline stroke sets the math at the title's weight. */}
+			<span className="line-clamp-2 min-w-0 text-row font-medium text-foreground [&_.katex]:[-webkit-text-stroke:0.015em_currentcolor]">
 				<MathText>{title}</MathText>
 			</span>
 		</Link>
