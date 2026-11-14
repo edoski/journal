@@ -123,7 +123,7 @@ export function MathText({ children }: { children: string }) {
 					piece.kind === "text" ? (
 						<Fragment key={at}>{piece.text}</Fragment>
 					) : (
-						<span key={at} data-slot="math-text" className="[&_.katex]:text-[1.05em]" dangerouslySetInnerHTML={{ __html: formula(piece.tex) }} />
+						<span key={at} data-slot="math-text" dangerouslySetInnerHTML={{ __html: formula(piece.tex) }} />
 					),
 				);
 				return keepWhole(word) ? (

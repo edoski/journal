@@ -6,7 +6,7 @@ A one-line label made from text written for a page: a folded question in the les
 |---|---|
 | inline marks | `**bold**`, `__bold__`, `*italics*` and `_italics_` (a `_` only at a word's edge, so snake_case stays) are drawn as `strong` and `em`; a link reads as its words; code reads as its words, since the app sets no mono type |
 | block marks | a heading's hashes, a quote's bar, a bullet or a number at a line's start are dropped; a table's rule rows are dropped and its bars read as " · "; lines join with a space |
-| formulas | kept whole before any mark is read, so a `*` or `\|` in TeX is never markdown; display math joins the line; a matrix or a case split becomes KaTeX's `smallmatrix`, fenced as written (round 3: "B = ⋯" said nothing); rows of equations sit side by side; `\dfrac` becomes `\tfrac`; a bare number reads in the label's own type (plain-numbers.ts) |
+| formulas | kept whole before any mark is read, so a `*` or `\|` in TeX is never markdown; display math joins the line; a matrix or a case split becomes KaTeX's `smallmatrix` set one size up (`\large`), fenced as written, so its entries read at about the label's 12px rather than script size (round 3: "B = ⋯" said nothing; round 5: a bare `smallmatrix` drew 7px digits); rows of equations sit side by side; `\dfrac` becomes `\tfrac`; a bare number reads in the label's own type (plain-numbers.ts) |
 | dollars | a literal `\$` stays a dollar |
 | truncation | the caller's: everything is inline |
 

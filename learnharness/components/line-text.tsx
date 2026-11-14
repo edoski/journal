@@ -41,8 +41,11 @@ const FENCES: Record<string, [string, string] | null> = {
 const ROWS = new Set(["aligned", "align", "align*", "gathered", "gather", "gather*", "split", "eqnarray", "eqnarray*"]);
 
 /** A formula as one line can hold it: a matrix or a case split as a small
- *  matrix (KaTeX's `smallmatrix`, sized to the line), rows of equations
- *  side by side, a tall fraction as a text one. Pure. */
+ *  matrix (KaTeX's `smallmatrix`) set one size up (`\large`), so its
+ *  entries read at the label's size where a bare `smallmatrix` shrank them
+ *  to script size (round 5: 7px digits), at the cost of a few pixels of
+ *  line height; rows of equations side by side, a tall fraction as a text
+ *  one. Pure. */
 export function lineTex(tex: string): string {
 	return tex
 		.replace(/\\begin\{(\w+\*?)\}(\{[^}]*\})?([\s\S]*?)\\end\{\1\}/g, (whole, env: string, _cols: string | undefined, body: string) => {
@@ -50,7 +53,7 @@ export function lineTex(tex: string): string {
 			if (!(env in FENCES)) return "\\cdots";
 			const small = `\\begin{smallmatrix}${body}\\end{smallmatrix}`;
 			const fence = FENCES[env];
-			return fence ? `\\left${fence[0]}${small}\\right${fence[1]}` : small;
+			return `{\\large${fence ? `\\left${fence[0]}${small}\\right${fence[1]}` : small}}`;
 		})
 		.replace(/\\dfrac/g, "\\tfrac")
 		.replace(/\s+/g, " ")

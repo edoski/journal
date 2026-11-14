@@ -322,6 +322,16 @@ body {
 	height: auto !important;
 }
 
+/* The app's one maths size (spec: components/ui/math-text.md). KaTeX's own
+   sheet sets 1.21em, which matches a serif's x-height; beside SF Pro its
+   capitals and digits stood 17% taller than the words (round 5). Matching
+   SF Pro's x-height would take 1.19em and its capitals 1.03em (KaTeX_Math x
+   0.442, KaTeX_Main caps 0.683, SF Pro 0.526 and 0.704, measured per em);
+   1.1em splits the two mismatches evenly. Unlayered and after KaTeX's sheet,
+   so it wins: a Tailwind utility on a wrapper lives in a cascade layer and
+   never could. Tested in tests/katex-size.test.ts. */
+.katex { font-size: 1.1em; }
+
 /* Display math: long equations scroll instead of overflowing the column. */
 .katex-display {
 	overflow-x: auto;
