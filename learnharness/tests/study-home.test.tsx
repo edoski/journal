@@ -25,7 +25,7 @@ import {
 	withLessonHere,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
-import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
+import { lessonOf } from "../components/study-home/lesson-facts.ts";
 import { LessonButton } from "../components/study-home/lesson-button.tsx";
 import { Today } from "../components/study-home/today.tsx";
 import { courseProgress, foldLines, lessonTitle, studiedAgo, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
@@ -243,15 +243,15 @@ describe("today's lines", () => {
 describe("lessons", () => {
 	const lesson = (course: StudyCourse) => lessonOf(todayRows([course], [], TODAY)[0]!);
 
-	it("words a course's step as a lesson: its name, what follows, its button and its topics' place in the path", () => {
+	it("words a course's step as a lesson: its name, what follows and its button, with no place in a course without arcs", () => {
 		const review = lesson(LINALG);
 		assert.equal(review.title, "Review Linear independence, Rank, Span");
 		assert.equal(review.detail, "Then Problem sheet 4");
 		assert.equal(review.action, "Review");
 		assert.equal(review.exam, "Exam in 21 days");
-		assert.deepEqual(review.place, { from: 2, to: 4, of: 5 });
+		assert.equal(review.place, null);
 		const topic = lesson(PROB);
-		assert.deepEqual([topic.title, topic.detail, topic.action, topic.place], ["Continue Bayes' rule", null, "Continue", { from: 2, to: 2, of: 2 }]);
+		assert.deepEqual([topic.title, topic.detail, topic.action, topic.place], ["Continue Bayes' rule", null, "Continue", null]);
 		const later = lesson({ ...PROB, map: { ...PROB.map, current: null } });
 		assert.deepEqual([later.title, later.action], ["Review Conditional probability", "Review"], "with no current topic, the plan's next item, the review it dates first");
 		assert.equal(lesson({ ...PROB, map: { ...PROB.map, current: null, topics: [] } }).action, "Start");
@@ -262,15 +262,13 @@ describe("lessons", () => {
 		assert.deepEqual([lesson(course).title, lesson(course).detail], ["Review Sequences", null]);
 	});
 
-	it("places a waiting session at the course topics its transcript worked on", () => {
+	it("words a waiting session from the course topics its transcript worked on", () => {
 		const waiting = chat({ id: "q", pendingQuestion: true, course: { workspace: "/s/linalg", title: "Linear Algebra" }, topics: ["eigen", "charpoly"] });
 		const reply = lessonOf(todayRows([LINALG], [waiting], TODAY)[0]!);
 		assert.deepEqual([reply.kind, reply.title, reply.detail, reply.action], ["reply", "Eigen lesson", "Waiting for your reply", "Open"]);
 		assert.deepEqual(reply.open, { kind: "session", href: "/chat/q" });
-		assert.deepEqual(reply.place, { from: 5, to: 5, of: 5 });
-		const unplaced = lessonOf(todayRows([LINALG], [{ ...waiting, topics: [] }], TODAY)[0]!);
-		assert.equal(unplaced.place, null);
-		assert.equal(topicSpan(LINALG, ["gone"] as TopicHandle[]), null);
+		assert.deepEqual(reply.topics, ["eigen"]);
+		assert.equal(reply.place, null, "no arc to name in a course without arcs");
 	});
 
 });

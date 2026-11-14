@@ -1,5 +1,6 @@
-import { courseLabel, type CourseMapTopic, type StudyCourse } from "@/src/core";
-import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, studiedDaysWords } from "@/components/study-words";
+import { courseLabel, type CourseMapTopic, type StartsWhy, type StudyCourse } from "@/src/core";
+import { LESSON_WORDS, TUTOR_WRITING, agoWords, lapsedOnWords, overdueWords, startsWhyShort, studiedDaysWords } from "@/components/study-words";
+import { lessonOf } from "@/components/study-home/lesson-facts";
 import { sessionState } from "@/components/nav/session-state";
 import { planDay, stepWords, type TodayRow } from "@/components/study-home/study-facts";
 import { taskWords } from "@/components/unit-inbox/units";
@@ -58,6 +59,18 @@ export function courseTitle(row: TodayRow): string {
 	return row.kind === "session" && row.chat.course ? courseLabel(row.chat.course) : "No course";
 }
 
+/** A course line with the arc its lesson sits in: "Calculus I ·
+ *  Derivatives"; the course alone when no one arc holds it. Pure. */
+export function courseLine(course: string, arc: string | null | undefined): string {
+	return arc ? `${course} · ${arc}` : course;
+}
+
+/** A line's course, then the arc every topic of its lesson lies in
+ *  (`arcPlace`): "Linear Algebra · Linear systems". Pure. */
+export function placeOf(row: TodayRow): string {
+	return courseLine(courseTitle(row), lessonOf(row).place);
+}
+
 /** A line's lesson in words: the waiting session's title, or the course's
  *  next step ("Review A, B and more"). Pure. */
 export function lessonTitle(row: TodayRow): string {
@@ -70,6 +83,9 @@ export interface Why {
 	kind: "reply" | "working" | "stopped" | "missed" | "review" | "task" | "next";
 	/** "Not right last time: Chain rule". */
 	short: string;
+	/** For a new topic in a course with arcs, why the plan starts it now
+	 *  (the engine's `starts_why`), which picks its own icon. */
+	starts?: StartsWhy["kind"];
 }
 
 /** A review's reason from the engine's own fields: a lapse first (the
@@ -96,7 +112,9 @@ const SESSION_WHY: Record<ReturnType<typeof sessionState>, Why | null> = {
  * session waiting on the learner, the tutor writing in it, stopped
  * mid-reply in it or left for next time, why a review is due (a lapse, or how
  * long it is overdue), when an open task was left, that the topic is
- * next on the course's map, or the day the plan dates its next item
+ * next on the course's map (in a course with arcs, why the plan starts a
+ * new topic now: "Next in Matrices", "After Expectation, which it
+ * needs", cut to fit as "After Expectation"), or the day the plan dates its next item
  * ("Planned Sun 15 Nov", the course page's line when nothing is today). Engine fields only, never the tutor's prose.
  * Pure.
  */
@@ -111,8 +129,12 @@ export function whyOf(row: TodayRow): Why | null {
 		}
 		case "task":
 			return { kind: "task", short: taskWords(step, course.map.today) };
-		case "topic":
-			return { kind: "next", short: step.on ? `Planned ${planDay(step.on)}` : step.planned ? "Planned today" : "Next up" };
+		case "topic": {
+			if (step.on) return { kind: "next", short: `Planned ${planDay(step.on)}` };
+			const why = step.fresh && course.map.arcs ? course.map.topics.find((t) => t.handle === step.topics[0])?.startsWhy : undefined;
+			if (why) return { kind: "next", starts: why.kind, short: startsWhyShort(why, course.map) };
+			return { kind: "next", short: step.planned ? "Planned today" : "Next up" };
+		}
 		case "none":
 			return null;
 	}

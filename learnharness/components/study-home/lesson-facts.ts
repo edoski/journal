@@ -1,5 +1,5 @@
-import { courseLabel, type StudyCourse, type TopicHandle } from "@/src/core";
-import { runupExam, stepWords, type NextStep, type PathPlace, type TodayRow } from "@/components/study-home/study-facts";
+import { courseLabel, type CourseMap, type StudyCourse, type TopicHandle } from "@/src/core";
+import { runupExam, stepWords, type NextStep, type TodayRow } from "@/components/study-home/study-facts";
 
 /** What a lesson's button does: open the session that waits, or take up the
  *  course's next step. The word names the step. */
@@ -8,7 +8,7 @@ export type LessonAction = "Open" | "Review" | "Continue" | "Start";
 /**
  * One lesson of Today in plain words, the same for every study home: what
  * it is by name, the course it belongs to, what its second line says and
- * where it sits in the course's path. Engine fields only.
+ * the arc it sits in. Engine fields only.
  */
 export interface Lesson {
 	key: string;
@@ -22,18 +22,23 @@ export interface Lesson {
 	action: LessonAction;
 	/** The course topics the lesson works on. */
 	topics: readonly TopicHandle[];
-	place: PathPlace | null;
+	/** The arc every topic of the lesson lies in, by its title (`arcPlace`). */
+	place: string | null;
 	open: { kind: "session"; href: string } | { kind: "course"; workspace: string };
 }
 
 const ACTION: Record<NextStep["kind"], LessonAction> = { review: "Review", task: "Continue", topic: "Continue", none: "Start" };
 
-/** Where some topics sit in the course's path (the engine's order,
- *  prerequisites first, from 1); null when none is on the map. Pure. */
-export function topicSpan(course: StudyCourse, topics: readonly TopicHandle[]): PathPlace | null {
-	const at = topics.map((h) => course.map.topics.findIndex((t) => t.handle === h)).filter((i) => i >= 0);
-	if (at.length === 0) return null;
-	return { from: Math.min(...at) + 1, to: Math.max(...at) + 1, of: course.map.topics.length };
+/** The arc some topics lie in, by its title, when every one of them lies
+ *  in the same arc; null when they span arcs (a review mixes arcs by
+ *  design), when none is on the map, and in a course without arcs. Pure. */
+export function arcPlace(map: Pick<CourseMap, "arcs" | "topics">, topics: readonly TopicHandle[]): string | null {
+	if (!map.arcs) return null;
+	const wanted = new Set<string>(topics);
+	const arcs = new Set(map.topics.filter((t) => wanted.has(t.handle)).map((t) => t.arc));
+	const [arc] = arcs;
+	if (arcs.size !== 1 || !arc) return null;
+	return map.arcs.find((a) => a.handle === arc)?.title ?? null;
 }
 
 /** A line of Today as a lesson. A waiting session sits at the course topics
@@ -54,7 +59,7 @@ export function lessonOf(row: TodayRow): Lesson {
 			detail: "Waiting for your reply",
 			action: "Open",
 			topics,
-			place: course ? topicSpan(course, topics) : null,
+			place: course ? arcPlace(course.map, topics) : null,
 			open: { kind: "session", href: `/chat/${chat.id}` },
 		};
 	}
@@ -72,7 +77,7 @@ export function lessonOf(row: TodayRow): Lesson {
 		detail: step.kind === "review" && then ? `Then ${then}` : null,
 		action: ACTION[step.kind],
 		topics,
-		place: topicSpan(course, topics),
+		place: arcPlace(course.map, topics),
 		open: { kind: "course", workspace: course.map.workspace },
 	};
 }

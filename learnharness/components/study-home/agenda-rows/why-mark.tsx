@@ -1,4 +1,5 @@
-import { ArrowRightIcon, BookmarkIcon, CircleXIcon, HistoryIcon, MessageCircleQuestionIcon, PauseIcon, PenLineIcon, type LucideIcon } from "lucide-react";
+import { ArrowRightIcon, BookmarkIcon, CircleXIcon, CornerDownRightIcon, FastForwardIcon, HistoryIcon, MessageCircleQuestionIcon, PauseIcon, PenLineIcon, type LucideIcon } from "lucide-react";
+import type { StartsWhy } from "@/src/core";
 import { cn } from "@/lib/utils";
 import type { Why } from "@/components/study-home/agenda-rows/row-facts";
 import { MathText } from "@/components/ui/math-text";
@@ -15,6 +16,15 @@ export const WHY_ICON: Record<Why["kind"], LucideIcon> = {
 	next: ArrowRightIcon,
 };
 
+/** Why a new topic starts now, one icon each: next in its arc, the
+ *  arrow; after what it needs, a turn that follows on; early, ahead of
+ *  its place. */
+export const STARTS_ICON: Record<StartsWhy["kind"], LucideIcon> = {
+	next: ArrowRightIcon,
+	after: CornerDownRightIcon,
+	early: FastForwardIcon,
+};
+
 /** "row": Home's line end, a 14px icon; "slot": a sidebar row's status
  *  slot, a 12px icon, T3 Code's status label, its words always whole. */
 export type WhyMarkSize = "row" | "slot";
@@ -27,11 +37,11 @@ export type WhyMarkSize = "row" | "slot";
  */
 export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: WhyMarkSize; words?: string | null }) {
 	if (!why) return <span />;
-	const Icon = WHY_ICON[why.kind];
+	const Icon = why.starts ? STARTS_ICON[why.starts] : WHY_ICON[why.kind];
 	const tone = why.kind === "reply" ? "font-medium text-link" : "text-muted-foreground";
 	if (size === "row") {
 		return (
-			<span data-slot="today-why" data-kind={why.kind} className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-label", tone)}>
+			<span data-slot="today-why" data-kind={why.kind} data-starts={why.starts} className={cn("inline-flex max-w-56 items-center gap-1.5 justify-self-end text-label", tone)}>
 				<Icon aria-hidden className="size-3.5" />
 				<span className="truncate">
 					<MathText>{words ?? why.short}</MathText>
@@ -41,7 +51,7 @@ export function WhyMark({ why, size = "row", words }: { why: Why | null; size?: 
 	}
 	return (
 		// `contents`: the icon and the words are the status slot's own items (`TRAILING_SLOT`).
-		<span data-slot="why-mark" data-kind={why.kind} className={cn("contents text-label", tone)}>
+		<span data-slot="why-mark" data-kind={why.kind} data-starts={why.starts} className={cn("contents text-label", tone)}>
 			<span className="flex h-4 shrink-0 items-center">
 				<Icon aria-hidden className="size-3" />
 			</span>

@@ -1,6 +1,6 @@
 # Lessons
 
-Today's lines as lessons in plain words, which the study home, the course page and the sidebar read, and the pieces that draw one: `lesson-facts.ts` (`lessonOf`, `topicSpan`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), `map-frame.ts`, and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`).
+Today's lines as lessons in plain words, which the study home, the course page and the sidebar read, and the pieces that draw one: `lesson-facts.ts` (`lessonOf`, `arcPlace`), `lesson-button.tsx`, `day-heading.tsx` (`day-heading`), `map-frame.ts`, and the page frame `home-frame.tsx`. The lines and their order are Today's (today.md, `todayRows`).
 
 ## A lesson
 
@@ -8,12 +8,12 @@ Today's lines as lessons in plain words, which the study home, the course page a
 |---|---|---|
 | course | the course's title; "No course" for a session without one | the engine's map, the session's record |
 | exam | "Exam in 11 days", only inside the exam run-up | `plan`'s run-up, the map's exam |
-| place | the lesson's first and last topic in the course's path, of how many (`topicSpan`) | the lesson's topics among the course's topics in the engine's path order (prerequisites first) |
+| place | the arc the lesson sits in, by its title, when every one of its topics lies in that arc (`arcPlace`); none when its topics span arcs (a review mixes arcs by design) and in a course without arcs | the lesson's topics' `arc` on the course map, the arc's title from `map.arcs` |
 | title | the session's title, "Review A, B, C", "Continue <task or topic>", "Start a lesson" | `stepWords` |
 | detail | "Waiting for your reply"; "Then <task or topic>" after reviews, left out when it only repeats a review; the open task's step | the session's state, the map's tasks |
 | action | Open (a session), Review, Continue, Start | the lesson's kind |
 
-A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place counts topics, not the map's rows: the drawing's layers ("steps") stay the study home's map's.
+A waiting session sits at the course topics its transcript worked on (`ChatListItem.topics`), so it has a place too. Reviews are named, never counted. The place replaced "topic 5–7 of 24" when arcs landed (design v2, 5.4): an arc is the place he can read after days away, and Home's course line, the sidebar's cards and the course page all name the same one.
 
 ## The page frame
 
