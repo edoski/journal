@@ -95,22 +95,29 @@ describe("the edge step", () => {
 		add: [{ topic: "chain", need: "continuity", reason: "test add" }],
 	};
 
+	const READ = { ...CALC, riemann: topic("Riemann sums", ["limits", "chain"], { refs: [{ source: "book", locator: "5.1" }] }) };
+
 	it("takes an answer that judges every stored edge once, each with its reason", () => {
-		assert.equal(edgeProblems(all, view(CALC)), null);
+		assert.equal(edgeProblems(all, view(READ)), null);
+	});
+
+	it("keeps every need of a topic with no refs in a course with material: its material cannot be read to drop one", () => {
+		assert.match(edgeProblems(all, view(CALC))!, /"riemann" has no refs, so its material cannot be read to answer the test against: keep "riemann" needs "chain"/);
+		assert.equal(edgeProblems(all, view(CALC, { sources: [] })), null, "a course with no material judges by meaning");
 	});
 
 	it("refuses an answer that skips an edge, judges one twice or gives no reason", () => {
-		const problems = edgeProblems({ verdicts: [all.verdicts[0]!, all.verdicts[0]!, { ...all.verdicts[1]!, reason: " " }], add: [] }, view(CALC))!;
+		const problems = edgeProblems({ verdicts: [all.verdicts[0]!, all.verdicts[0]!, { ...all.verdicts[1]!, reason: " " }], add: [] }, view(READ))!;
 		assert.match(problems, /twice/);
 		assert.match(problems, /gives no reason/);
 		assert.match(problems, /no verdict for "chain" needs "derivative", "riemann" needs "limits", "riemann" needs "chain"/);
 	});
 
 	it("refuses an added edge that is stored already, names no topic, or closes a loop", () => {
-		const stored = edgeProblems({ ...all, add: [{ topic: "chain", need: "derivative", reason: "x" }] }, view(CALC))!;
+		const stored = edgeProblems({ ...all, add: [{ topic: "chain", need: "derivative", reason: "x" }] }, view(READ))!;
 		assert.match(stored, /stored already/);
-		assert.match(edgeProblems({ ...all, add: [{ topic: "chain", need: "ghost", reason: "x" }] }, view(CALC))!, /both must be topics/);
-		assert.match(edgeProblems({ ...all, add: [{ topic: "limits", need: "chain", reason: "x" }] }, view(CALC))!, /form a loop/);
+		assert.match(edgeProblems({ ...all, add: [{ topic: "chain", need: "ghost", reason: "x" }] }, view(READ))!, /both must be topics/);
+		assert.match(edgeProblems({ ...all, add: [{ topic: "limits", need: "chain", reason: "x" }] }, view(READ))!, /form a loop/);
 	});
 
 	it("saves per-topic diffs against the record read at save time: a need added meanwhile stays", () => {
@@ -234,6 +241,12 @@ describe("the cut's shape rules", () => {
 		assert.match(sortProblems([...misses, { ...misses[0]!, topic: "chain", title: "Chain rule" }], { ...good, basis: "riemann chain" })!, /At most one may stay/);
 	});
 
+	it("two blind readers: a topic either sorts away from its arc is a miss, with every arc it read as", () => {
+		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs });
+		assert.deepEqual(mergeMisses([m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])]), [m("x", ["B", "C"]), m("y", ["B"])]);
+		assert.deepEqual(mergeMisses([], []), []);
+	});
+
 	it("an arc handle no topic, source, task or knowledge entry has", () => {
 		assert.match(arcPassProblems({ ...good, arcs: [{ ...good.arcs[0]!, handle: "limits" }, good.arcs[1]!] }, view(CALC))!, /needs a handle no topic/);
 		assert.match(arcPassProblems({ ...good, arcs: [{ ...good.arcs[0]!, handle: "book" }, good.arcs[1]!] }, view(CALC))!, /needs a handle no topic/);
@@ -241,12 +254,6 @@ describe("the cut's shape rules", () => {
 
 	it("the merge never sends needs: a doubted edge is a note, kept", () => {
 		const formation = arcPassChanges({ ...good, doubts: [{ topic: "riemann", need: "chain", reason: "no derivative in a sum" }] }, view(CALC))!;
-	it("two blind readers: a topic either sorts away from its arc is a miss, with every arc it read as", () => {
-		const m = (topic: string, readsAs: string[]) => ({ topic, title: topic, arc: "A", readsAs });
-		assert.deepEqual(mergeMisses([m("x", ["B"])], [m("x", ["C"]), m("y", ["B"])]), [m("x", ["B", "C"]), m("y", ["B"])]);
-		assert.deepEqual(mergeMisses([], []), []);
-	});
-
 		for (const t of Object.values(formation.changes.topics as Record<string, object>)) assert.equal("needs" in t, false);
 		assert.deepEqual(doubtNote({ ...good, doubts: [{ topic: "riemann", need: "chain", reason: "no derivative in a sum" }] }), {
 			arc_change: { reason: 'prerequisites the grouping pass doubts, kept as they are: "riemann" needs "chain" (no derivative in a sum)' },

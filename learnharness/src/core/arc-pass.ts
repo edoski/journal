@@ -136,9 +136,11 @@ function cyclic(needs: ReadonlyMap<string, readonly string[]>): boolean {
 }
 
 /** What is wrong with an edge answer, for the agent to fix; null when it
- *  can be used. Every stored edge needs one verdict with its reason; an
- *  added edge names two topics, is new, and closes no loop. Pure. */
-export function edgeProblems(submit: EdgeSubmit, view: Pick<MapCourseView, "topics">): string | null {
+ *  can be used. Every stored edge needs one verdict with its reason; a drop
+ *  needs the topic's material, so in a course with registered material a
+ *  topic with no `refs` keeps its needs;
+ *  an added edge names two topics, is new, and closes no loop. Pure. */
+export function edgeProblems(submit: EdgeSubmit, view: Pick<MapCourseView, "topics" | "sources">): string | null {
 	const problems: string[] = [];
 	const stored = new Set(storedEdges(view).map(([t, n]) => edgeKey(t, n)));
 	const judged = new Set<string>();
@@ -148,6 +150,9 @@ export function edgeProblems(submit: EdgeSubmit, view: Pick<MapCourseView, "topi
 		else if (judged.has(key)) problems.push(`verdicts lists "${v.topic}" needs "${v.need}" twice; judge each edge once.`);
 		judged.add(key);
 		if (!v.reason?.trim()) problems.push(`the verdict on "${v.topic}" needs "${v.need}" gives no reason: answer the prerequisite test for it.`);
+		if (!v.keep && stored.has(key) && view.sources.length > 0 && view.topics[v.topic]!.refs.length === 0) {
+			problems.push(`"${v.topic}" has no refs, so its material cannot be read to answer the test against: keep "${v.topic}" needs "${v.need}".`);
+		}
 	}
 	const missing = storedEdges(view).filter(([t, n]) => !judged.has(edgeKey(t, n)));
 	if (missing.length > 0) problems.push(`no verdict for ${missing.map(([t, n]) => `"${t}" needs "${n}"`).join(", ")}: judge every stored edge.`);
@@ -543,11 +548,6 @@ export interface SortAnswer {
 	sort: { topic: string; arcs: string[] }[];
 }
 
-/** One topic the reader sorted away from its arc. */
-export interface SortMiss {
-	topic: string;
-	title: string;
-	arc: string;
 /** Each topic either reader sorted away from its arc, once, with every arc
  *  name it read as: the rubric takes the lower of two blind scorers, so a
  *  name passes only when both readers place the topic home. Pure. */
@@ -560,6 +560,11 @@ export function mergeMisses(...readings: readonly SortMiss[][]): SortMiss[] {
 	return [...merged.values()];
 }
 
+/** One topic the reader sorted away from its arc. */
+export interface SortMiss {
+	topic: string;
+	title: string;
+	arc: string;
 	readsAs: string[];
 }
 
