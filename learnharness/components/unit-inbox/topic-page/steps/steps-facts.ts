@@ -1,5 +1,5 @@
 import type { CourseMapEdge, CourseMapTopic, PlanNodeStatus, SessionPlan, TopicHandle } from "@/src/core";
-import { layoutTopicMap, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
+import { layoutTopicMap, WHOLE_COURSE_ZOOM, type Camera, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
 import { dayWords } from "@/components/unit-inbox/topic-page/topic-facts";
 
 /**
@@ -57,7 +57,62 @@ export function stepsLayout(plan: SessionPlan): StepsDrawing {
 	}
 	// The layout reads a topic's handle and nothing else.
 	const steps = ids.map((id) => ({ handle: id as TopicHandle }) as CourseMapTopic);
-	return { layout: layoutTopicMap(steps, needs), needs };
+	return { layout: layoutTopicMap(steps, needs, STEP_SIZE), needs };
+}
+
+/** A step's card: narrower than a course topic's, so a lesson three steps
+ *  wide fits the topic page's map column whole at 1512×982. */
+export const STEP_SIZE: NodeSize = { width: 184, height: 64 };
+/** A step's tag ("Next", "Left off here") sits this far above its card. */
+export const TAG_ROOM = 20;
+
+type Frame = { width: number; height: number };
+type Fade = { x: number; y: number };
+
+/** One axis of the opening view: the plan's span `lo`..`hi` centred in
+ *  the frame's clear middle when it fits there, else `at` at the frame's
+ *  middle, pulled back so the plan's edge never leaves the clear middle. */
+function along(lo: number, hi: number, at: number, frame: number, fade: number, zoom: number): number {
+	if ((hi - lo) * zoom <= frame - fade * 2) return frame / 2 - ((lo + hi) / 2) * zoom;
+	return Math.min(fade - lo * zoom, Math.max(frame - fade - hi * zoom, frame / 2 - at * zoom));
+}
+
+/** The scale at which a plan and the tags over its top row fit a frame's
+ *  clear middle (inside the fade), up to full size. */
+function fitZoom(layout: TopicMapLayout, frame: Frame, fade: Fade): number {
+	if (layout.width === 0 || layout.height === 0) return 1;
+	return Math.min(1, (frame.width - fade.x * 2) / layout.width, (frame.height - fade.y * 2) / (layout.height + TAG_ROOM));
+}
+
+/**
+ * Where a lesson's step map opens in a frame whose edges fade by `fade`:
+ * the whole plan, tags included, clear of the fade at the largest scale up
+ * to full size; never below the topic map's whole-course scale, where a
+ * plan still too big is framed on the step `current` (the first step when
+ * none), the plan's edges kept inside the clear middle. Pure.
+ */
+export function stepsCamera(layout: TopicMapLayout, current: TopicHandle | null, frame: Frame, fade: Fade): Camera {
+	const zoom = Math.max(WHOLE_COURSE_ZOOM, fitZoom(layout, frame, fade));
+	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
+	const [cx, cy] = at ? [at.x + layout.node.width / 2, at.y + layout.node.height / 2] : [layout.width / 2, layout.height / 2];
+	return {
+		x: along(0, layout.width, cx, frame.width, fade.x, zoom),
+		y: along(-TAG_ROOM, layout.height, cy, frame.height, fade.y, zoom),
+		zoom,
+	};
+}
+
+/**
+ * How far the opening view may move up or down, in screen pixels, while
+ * what it frames stays clear of the fade: the whole plan when it fits the
+ * frame's height, else the step it is framed on, with its tag. Pure.
+ */
+export function stepsShiftRange(layout: TopicMapLayout, current: TopicHandle | null, camera: Camera, frame: Frame, fade: Fade): [number, number] {
+	const { zoom } = camera;
+	const whole = (layout.height + TAG_ROOM) * zoom <= frame.height - fade.y * 2;
+	const at = (current && layout.topics.get(current)) ?? layout.topics.get(layout.layers[0]?.[0] as TopicHandle);
+	const [top, bottom] = whole || !at ? [-TAG_ROOM, layout.height] : [at.y - TAG_ROOM, at.y + layout.node.height];
+	return [fade.y - (camera.y + top * zoom), frame.height - fade.y - (camera.y + bottom * zoom)];
 }
 
 export interface StepMark {

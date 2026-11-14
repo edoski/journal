@@ -4,11 +4,11 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type Keyboard
 import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
 import type { TopicHandle } from "@/src/core";
 import { NeedEdge, type NeedFlowEdge } from "@/components/course-map/topic-map/need-edge";
-import { MIN_ZOOM, NODE_HEIGHT, NODE_WIDTH, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbourOf, openingCamera, wholeZoom } from "@/components/course-map/topic-map/topic-map-layout";
+import { MIN_ZOOM, type Camera, cameraAt, centreOf, chainOf, isWalkKey, neighbourOf, wholeZoom } from "@/components/course-map/topic-map/topic-map-layout";
 import { TopicMapContext, type TopicMapState } from "@/components/course-map/topic-map/topic-node";
 import { mapFade } from "@/components/study-home/map-frame";
 import { StepNode, type StepFlowNode } from "@/components/unit-inbox/topic-page/steps/step-node";
-import { stepsLayout, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
+import { STEP_SIZE, TAG_ROOM, stepsCamera, stepsLayout, stepsShiftRange, type StepsDrawing } from "@/components/unit-inbox/topic-page/steps/steps-facts";
 import { hybridMarks, type PlannedEntry } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { cn } from "@/lib/utils";
 import { useTieAnchor } from "@/components/linked-columns/linked-columns";
@@ -18,12 +18,12 @@ import { mathPlain } from "@/components/ui/math-text";
 const nodeTypes = { step: StepNode };
 const edgeTypes = { need: NeedEdge };
 
-/** How far the fade reaches in from the sides and from the top and bottom: Home's map frame's. */
-const FADE = { x: 64, y: 40 };
+/** How far the fade reaches in from the sides and from the top and bottom:
+ *  Home's map frame's, slimmer at the sides of this narrower column. */
+const FADE = { x: 24, y: 40 };
 /** The frame's edges fade into the page on every side, like Home's map. */
 const VIGNETTE = mapFade(FADE.x, FADE.y);
-/** A step's tag sits this far above its node, inside the room. */
-const TAG_ROOM = 20;
+const { width: NODE_WIDTH, height: NODE_HEIGHT } = STEP_SIZE;
 /** As much room around the drawing as the fade, so a step at the edge pans clear of it. */
 const MARGIN = { x: FADE.x, y: FADE.y + TAG_ROOM };
 /** How long the camera takes to follow the keyboard to a step out of view. */
@@ -37,12 +37,14 @@ function reducedMotion(): boolean {
  * One lesson's plan in a bounded frame (spec: hybrid.md): the frame keeps
  * its size and fades its edges as Home's course map does, and the plan
  * pans inside it by wheel, trackpad or drag, with no bar. It opens on the
- * whole plan when that fits at three quarters size or more, else at full
- * size on the step the lesson stopped on. That step is ringed, the steps
+ * whole plan clear of the fade when that fits at three quarters size or
+ * more, else at three quarters size on the step the lesson stopped on
+ * (`stepsCamera`). That step is ringed, the steps
  * right after it say Next, and every step opens the lesson. In the linked
  * columns, while a line ties the lesson's row to that step, the plan opens
  * moved up or down so the step sits beside its row whenever the line
- * would otherwise have no clear route (`clearShift`).
+ * would otherwise have no clear route (`clearShift`), never so far that
+ * a step it framed meets the fade (`stepsShiftRange`).
  */
 export function LessonMap({ entry, label }: { entry: PlannedEntry; label: string }) {
 	const { plan } = entry;
@@ -153,36 +155,37 @@ function Flow({
 	const [opening, setOpening] = useState<Camera | null>(null);
 	useEffect(() => {
 		if (frameWidth <= 0 || frameHeight <= 0) return;
-		const camera = openingCamera(layout, current, { width: frameWidth, height: frameHeight }, MARGIN);
+		const frame = { width: frameWidth, height: frameHeight };
+		const camera = stepsCamera(layout, current, frame, FADE);
 		const at = current ? layout.topics.get(current) : undefined;
 		const anchor = tieAnchor?.();
 		if (anchor && at) {
-			// The step its row is tied to moves beside the row when that gives the line a clear route, staying clear of the fade.
+			// The step its row is tied to moves beside the row when that gives the line a clear route, keeping what the view frames clear of the fade.
 			const onScreen = (x: number, y: number, width: number, height: number): Box => ({ left: x * camera.zoom + camera.x, top: y * camera.zoom + camera.y, right: (x + width) * camera.zoom + camera.x, bottom: (y + height) * camera.zoom + camera.y });
 			const to = onScreen(at.x, at.y, NODE_WIDTH, NODE_HEIGHT);
 			const obstacles = nodes.flatMap((node) => {
 				const box = node.id === current ? [] : [onScreen(node.position.x, node.position.y, NODE_WIDTH, NODE_HEIGHT)];
 				return node.data.tag || node.data.status === "current" ? [...box, onScreen(node.position.x, node.position.y - TAG_ROOM, NODE_WIDTH / 2, 14)] : box;
 			});
-			const keepsInView = (dy: number) => to.top + dy >= FADE.y + TAG_ROOM && to.bottom + dy <= frameHeight - FADE.y;
-			const dy = clearShift({ ...anchor, to, obstacles }, tieShifts(anchor.from, to).filter(keepsInView));
+			const [least, most] = stepsShiftRange(layout, current, camera, frame, FADE);
+			const dy = clearShift({ ...anchor, to, obstacles }, tieShifts(anchor.from, to).filter((dy) => dy >= least && dy <= most));
 			if (dy) camera.y += dy;
 		}
 		setOpening(camera);
 	}, [layout, current, frameWidth, frameHeight, tieAnchor, nodes]);
 
-	// The plan and its room, and whatever more the opening view shows when it moved the plan beside its row.
+	// The plan and its room, and whatever more the opening view shows around a plan smaller than the frame or moved beside its row.
 	const extent = useMemo<CoordinateExtent>(() => {
 		const base: CoordinateExtent = [
 			[-MARGIN.x, -MARGIN.y],
 			[layout.width + MARGIN.x, layout.height + MARGIN.y],
 		];
-		if (!opening || frameHeight <= 0) return base;
+		if (!opening || frameWidth <= 0 || frameHeight <= 0) return base;
 		return [
-			[base[0][0], Math.min(base[0][1], -opening.y / opening.zoom)],
-			[base[1][0], Math.max(base[1][1], (frameHeight - opening.y) / opening.zoom)],
+			[Math.min(base[0][0], -opening.x / opening.zoom), Math.min(base[0][1], -opening.y / opening.zoom)],
+			[Math.max(base[1][0], (frameWidth - opening.x) / opening.zoom), Math.max(base[1][1], (frameHeight - opening.y) / opening.zoom)],
 		];
-	}, [layout, opening, frameHeight]);
+	}, [layout, opening, frameWidth, frameHeight]);
 
 	// Set once the extent above holds the view, so the camera is not pulled back inside the plan's own room.
 	const [placed, setPlaced] = useState(false);
