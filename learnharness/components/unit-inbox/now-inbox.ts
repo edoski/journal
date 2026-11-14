@@ -58,6 +58,10 @@ export interface RestShelves {
 /** The key a session card on top holds in `restShelves`' `onTop`. */
 export const sessionKey = (chatId: string) => `chat:${chatId}`;
 
+/** The keyboard walk's name for a course card on top: a course's line with
+ *  no topic to lead with. */
+export const courseKey = (workspace: string) => `course:${workspace}`;
+
 /** Everything the top does not show, by shelf. `onTop` holds the unit keys
  *  the top lists, and `sessionKey` for each session card; each listed unit
  *  and each session is on the top or on one shelf, never both. Pure. */

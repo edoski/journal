@@ -23,7 +23,7 @@ function noteOf({ unavailable, courses, unreadable }: Pick<NowListProps, "unavai
  * The sidebar's list (spec: ../inbox-today.md): its top
  * is exactly Home's Today, one card per line in Today's order with Today's
  * reason, each drawn as the topic its line leads with (a waiting session on
- * no topic as itself), then a card for each course whose record can't be
+ * no topic as itself, a course line on no topic as its course), then a card for each course whose record can't be
  * read; everything else folds onto the shelves at the foot.
  * No header and no totals on top: cards leave as the day's plan empties,
  * and a card stays in its place, at 70% with Working, while the tutor
@@ -41,7 +41,10 @@ export function TodayList(props: NowListProps) {
 		setDrawn({ fresh, top });
 	}
 	const shelves = useMemo(() => restShelves(inbox, new Set(top.flatMap(claimedKeys))), [inbox, top]);
-	const isOpen = (item: NowItem) => (item.kind === "topic" ? isUnitOpen(item.unit, pathname) : pathname === `/chat/${item.chat.id}`);
+	const isOpen = (item: NowItem) => {
+		if (item.kind === "topic") return isUnitOpen(item.unit, pathname);
+		return pathname === (item.kind === "course" ? courseHref(item.workspace) : `/chat/${item.chat.id}`);
+	};
 	const note = noteOf(props, top.length + unreadable.length);
 	return (
 		<>

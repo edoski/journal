@@ -2,20 +2,27 @@ import type { ChatListItem } from "@/src/core";
 import { sessionState } from "@/components/nav/session-state";
 import { lessonTitle } from "@/components/study-home/agenda-rows/row-facts";
 import type { NeedsYou, NowLine } from "@/components/study-home/needs-you";
-import { sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
+import { courseKey, sessionKey, topicUnit } from "@/components/unit-inbox/now-inbox";
 import { unitKey, type Unit, type UnitInbox } from "@/components/unit-inbox/units";
 
 /**
  * One card on the sidebar's top (spec:
- * ../inbox-today.md): a course's line drawn as the topic it leads with, or
- * a session's line drawn as the session itself, under the one title Home
- * and its header give it.
+ * ../inbox-today.md), under the one title Home gives its line: a course's
+ * line drawn as the topic it leads with, or as the course when it has no
+ * topic to lead with (a task that holds none), or a session's line drawn
+ * as the session itself.
  */
-export type NowItem = { kind: "topic"; line: NowLine; unit: Unit } | { kind: "session"; line: NowLine; chat: ChatListItem };
+export type NowItem =
+	| { kind: "topic"; line: NowLine; unit: Unit }
+	| { kind: "course"; line: NowLine; workspace: string }
+	| { kind: "session"; line: NowLine; chat: ChatListItem };
 
 /** The key an item holds in `restShelves`' `onTop`, and the keyboard walk's
- *  row name: the unit's key, or `chat:<id>`. Pure. */
-export const itemKey = (item: NowItem): string => (item.kind === "topic" ? item.unit.key : sessionKey(item.chat.id));
+ *  row name: the unit's key, `course:<workspace>`, or `chat:<id>`. Pure. */
+export function itemKey(item: NowItem): string {
+	if (item.kind === "topic") return item.unit.key;
+	return item.kind === "course" ? courseKey(item.workspace) : sessionKey(item.chat.id);
+}
 
 /** The keys an item takes off the shelves: its own, and every topic a
  *  session's card stands for (`NowLine.topics`: its own topics and those
@@ -34,8 +41,9 @@ export function claimedKeys(item: NowItem): string[] {
  * order), one card each. A session's line is its session card, one per
  * session however many topics its lesson touched; a course's line with a
  * lead topic is that topic's unit, the inbox's own else one built for it
- * (a lead not started yet); a course line with no lead (nothing to start)
- * is skipped. A topic two lines lead with is listed once, at the first.
+ * (a lead not started yet), and one with no lead is its course's card, so
+ * every line Home draws has its card. A topic two lines lead with is
+ * listed once, at the first.
  * Home's "also" lines are not drawn: their topics stay on the shelves.
  * Pure.
  */
@@ -44,13 +52,13 @@ export function todayTop(needs: NeedsYou, inbox: UnitInbox, chats: readonly Chat
 	const items: NowItem[] = [];
 	for (const line of needs.lines) {
 		const { row, lead } = line;
-		const item: NowItem | null =
+		const item: NowItem =
 			row.kind === "session"
 				? { kind: "session", line, chat: row.chat }
 				: lead
 					? { kind: "topic", line, unit: topicUnit(inbox, row.course, lead, chats) }
-					: null;
-		if (!item || seen.has(itemKey(item))) continue;
+					: { kind: "course", line, workspace: row.course.map.workspace };
+		if (seen.has(itemKey(item))) continue;
 		seen.add(itemKey(item));
 		items.push(item);
 	}

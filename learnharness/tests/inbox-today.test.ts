@@ -49,6 +49,29 @@ describe("todayTop", () => {
 		assert.ok(top.length <= 5);
 	});
 
+	it("draws a course line with no topic to lead with (a task that holds none) as its course's card", () => {
+		const sheet: StudyCourse = {
+			map: map({ workspace: "/s/exam", title: "Exam prep", tasks: [{ key: "paper", title: "Past paper 2024", step: "Question 3", updated: TODAY }], focus: "paper" }),
+			unready: null,
+			due: [],
+			lastActiveDaysAgo: 0,
+			newToday: [],
+		};
+		const { needs, top } = topOf([sheet, PROB], []);
+		assert.deepEqual(
+			top.map((i) => i.line.key),
+			needs.lines.map((l) => l.key),
+			"every line Home draws has its card",
+		);
+		assert.deepEqual(
+			top.map((i) => [i.kind, itemKey(i)]),
+			[
+				["topic", "/s/prob#rv"],
+				["course", "course:/s/exam"],
+			],
+		);
+	});
+
 	it("lists a lead not started yet as its topic, resting on Learning", () => {
 		const { inbox, top } = topOf([QUIET_LA], []);
 		assert.equal(top.length, 1);
@@ -113,7 +136,7 @@ describe("todayTop", () => {
 		const units = [...top.flatMap((i) => claimedKeys(i).filter((k) => k !== sessionKey(i.line.key))), ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => u.key)];
 		assert.equal(new Set(units).size, units.length, "no topic twice");
 		for (const u of [...inbox.active, ...inbox.working, ...inbox.known]) assert.ok(units.includes(u.key), `${u.key} placed`);
-		const shown = new Set([...top, ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => ({ kind: "topic" as const, unit: u }))].flatMap((i) => (i.kind === "topic" ? i.unit.sessions.map((c) => c.id) : [i.chat.id])));
+		const shown = new Set([...top, ...[...shelves.learning, ...shelves.working, ...shelves.known].map((u) => ({ kind: "topic" as const, unit: u }))].flatMap((i) => (i.kind === "topic" ? i.unit.sessions.map((c) => c.id) : i.kind === "session" ? [i.chat.id] : [])));
 		for (const c of shelves.other) shown.add(c.id);
 		for (const c of CHATS) assert.ok(shown.has(c.id), `${c.id} reachable`);
 	});

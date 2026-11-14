@@ -1,7 +1,8 @@
 /**
  * A Today line as a sidebar card (components/unit-inbox/now-card.tsx):
  * Home's name for the line, the line's reason in the status slot and the
- * line's action, on its lead topic, or a waiting session's own card. Same tsx classic-JSX shim as the
+ * line's action, on its lead topic, its course, or a waiting session's own
+ * card. Same tsx classic-JSX shim as the
  * other render tests.
  */
 import React from "react";
@@ -16,7 +17,9 @@ import { needsYouNow } from "../components/study-home/needs-you.ts";
 import { NowCard, nowActionOf } from "../components/unit-inbox/now-card.tsx";
 import { topicUnit } from "../components/unit-inbox/now-inbox.ts";
 import { buildInbox } from "../components/unit-inbox/units.ts";
-import { CHATS, COURSES, TODAY } from "./fixtures/now-demo.ts";
+import type { StudyCourse } from "../src/core/index.ts";
+import { courseHref } from "../components/unit-inbox/unit-href.ts";
+import { CHATS, COURSES, map, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
 const render = (node: React.ReactNode) =>
@@ -60,6 +63,24 @@ describe("NowCard", () => {
 		assert.equal(link.getAttribute("aria-current"), "page");
 		assert.match(link.textContent ?? "", /No course.*Your turn.*Eigenvalues lesson/);
 		assert.equal(doc.querySelector('[data-slot="row-action"]'), null);
+	});
+
+	it("draws a course line with no topic to lead with as its course's card, under Home's name, opening the course page, with Home's action", () => {
+		const exam: StudyCourse = {
+			map: map({ workspace: "/s/exam", title: "Exam prep", tasks: [{ key: "paper", title: "Past paper 2024", step: "Question 3", updated: TODAY }], focus: "paper" }),
+			unready: null,
+			due: [],
+			lastActiveDaysAgo: 0,
+			newToday: [],
+		};
+		const [line] = needsYouNow([exam], [], TODAY).lines;
+		assert.equal(line!.lead, null, "the task holds no topic");
+		const doc = render(<NowCard line={line!} unit={null} active={false} />);
+		const link = doc.querySelector('[data-testid="unit-row"]')!;
+		assert.equal(link.getAttribute("href"), courseHref("/s/exam"));
+		assert.equal(link.getAttribute("data-sidebar-row"), "course:/s/exam");
+		assert.match(link.textContent ?? "", /Exam prep.*Left off today.*Continue Past paper 2024/);
+		assert.equal(doc.querySelector('[data-slot="row-action"]')?.textContent, "Continue");
 	});
 
 	it("takes Home's word for a course line's action", () => {

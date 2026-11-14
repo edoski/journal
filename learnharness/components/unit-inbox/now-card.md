@@ -12,6 +12,10 @@ One of Today's lines as a sidebar card (`unit-inbox.md`, "Today on top"). `now-c
 | line 2 | the line's one name, the same as Home's line (`NowLine.title`, Home's lesson: "Continue Problem sheet 4: rank and nullity", "Review Law of total probability, Binomial distribution", a session's title), 14/500, full ink, wrapping rather than cut; a click still opens the lead topic's page |
 | action | `data-slot="row-action"`, over the status slot on hover or keyboard focus (the slot fades): a session line's Resume (play, a link to the session); a course line's Home word, Review, Continue or Start (play), which starts the course's lesson as Home's line does (`useContinueCourse`, Home's "Let's continue" opening) |
 
+## The course card
+
+A course's line with no topic to lead with (an open task that holds no topic of the map, on a course with no current topic): line 1 is its course's mark and name and the line's reason ("Left off today"); line 2 the line's name ("Continue Past exam paper 2024"); the action is the line's Home word, as on a topic card. A click opens the course's page. `data-sidebar-row` is `course:<workspace>`.
+
 ## The session card
 
 A waiting session whose transcript holds no topic of its course's map, or that has no course: line 1 is its course's mark and name, or a dashed circle and "No course"; line 2 its title; the slot says Your turn, or the spinner and Working at 70% while the tutor writes in it (a card the list keeps in place through a turn). A click opens the session; it has no action. `data-sidebar-row` is `chat:<id>`.
