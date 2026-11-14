@@ -204,6 +204,16 @@ describe("engine doctrine", () => {
 		}
 	});
 
+	it("the course adapter defers every arc rule to arcs.md, which each agent composes below it", () => {
+		assert.ok(normalize(ADAPTER).includes("In a course with arcs, place a new topic and change arcs or the exam's scope only as *Arcs* below says."));
+		for (const agent of AGENTS) {
+			const prompt = courseRecordPrompt(agent);
+			const below = prompt.slice(ADAPTER.length);
+			assert.ok(below.includes("\n# Arcs\n"), `${agent}: *Arcs* is composed below the adapter`);
+			for (const title of RECORD) assert.ok(below.includes(arcSections().get(title)!), `${agent}: "## ${title}" follows the adapter`);
+		}
+	});
+
 	it("every section of arcs.md is read by some prompt path", () => {
 		const read = new Set(ARC_PATHS.flatMap((p) => p.sections));
 		for (const title of arcSections().keys()) assert.ok(read.has(title), `arcs.md "## ${title}" reaches no prompt`);
