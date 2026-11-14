@@ -1245,6 +1245,17 @@ def test_show_search_and_the_run_up_read_arcs(workspace: Workspace) -> None:
             }
         ],
     }
+    records.save(workspace, {"topics": {"parts": {"excluded": "Not examined"}}})
+    shown = retrieval.show(workspace, ["integrals"])["items"]["integrals"]
+    listed = retrieval.course_arcs(workspace)["arcs"][2]
+    assert (shown["topics"], shown["excluded"]) == (
+        ["riemann", "substitution"],
+        ["parts"],
+    )
+    assert (shown["topics"], shown["excluded"]) == (
+        listed["topics"],
+        listed["excluded"],
+    ), "show and the arcs verb read an arc's topics alike"
     hits = retrieval.search(workspace, "derivatives")["hits"]
     assert hits[0] == {
         "kind": "arc",

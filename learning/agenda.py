@@ -802,6 +802,10 @@ def _new(
         taken = 0
         while taken < count:
             front = course.front(among if pool is None else pool)
+            # Ready topics go in path order, arc by arc, so a free arc later in
+            # the path gives one only when no earlier arc in the window has one
+            # ready, bar one related to today's start. capacity._opened mirrors
+            # this order: change the two together.
             ready = [
                 topic
                 for topic in course.untaught
@@ -845,9 +849,10 @@ def _new(
         room = max(room, sum(paces.values()) - begun)
     others = [course for course in courses if course.new_end(day) is None]
     for course in [*exams, *others]:
-        gaps = course.gaps.intersection(course.startable(day))
+        startable = course.startable(day)
+        gaps = course.gaps.intersection(startable)
         if room > 0 and gaps:
-            room -= take(course, room, gaps, bound=False)
+            room -= take(course, room, gaps, pool=startable, bound=False)
     for course in exams:
         if room > 0 and course.name in paces:
             pace = paces[course.name]
@@ -945,15 +950,15 @@ def _waited(courses: list[_Course], chosen: dict[str, list[str]], day: date) -> 
     the topics it starts next."""
     starters = [course.title for course in courses if chosen[course.name]]
     for course in courses:
+        startable = course.startable(day)
+        front = course.front(startable)
         if chosen[course.name]:
             if course.pending:
                 for topic in chosen[course.name]:
                     course.starts_after[topic] = list(course.pending)
                 course.pending.clear()
         elif any(
-            course.ready(topic) and course.opens(topic, course.front(startable))
-            for startable in [course.startable(day)]
-            for topic in startable
+            course.ready(topic) and course.opens(topic, front) for topic in startable
         ):
             course.pending.extend(t for t in starters if t not in course.pending)
 

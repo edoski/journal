@@ -25,6 +25,7 @@ import {
 	dropRefusedEdge,
 	ledgerSources,
 	mapChanges,
+	NO_STANDING,
 	openLessonsOf,
 	proposesArcs,
 	sourcesOf,
@@ -291,7 +292,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 	/** The course as the build sees it. In a course with arcs, the engine
 	 *  says where he stands, told the lessons only the app has open. */
 	async function viewOf(workspace: string, record: unknown): Promise<MapCourseView> {
-		if (!recordHasArcs(record)) return courseView(record);
+		if (!recordHasArcs(record)) return courseView(record, NO_STANDING);
 		const lessons = openLessonsOf(deps.sessions?.() ?? [], workspace, record);
 		const standing = await courseRecords.run(workspace, { verb: "arcs", here: lessons.here, open: lessons.topics });
 		if (!standing.ok) throw new Error(`course record: ${standing.message}`);

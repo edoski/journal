@@ -28,6 +28,7 @@ import {
 	dropRefusedEdge,
 	duplicateOf,
 	mapChanges,
+	NO_STANDING,
 	openLessonsOf,
 	withoutArcs,
 	sameName,
@@ -327,7 +328,7 @@ describe("where he stands in the arcs", () => {
 		assert.deepEqual(said, { studied: ["vectors", "eigen"], held: ["spaces", "spectra"], currentArc: "spectra" });
 		assert.deepEqual(arcStandingOf({ studied: [], held: [], arcs: [] }), { studied: [], held: [], currentArc: null }, "no current_arc in a course without arcs");
 		assert.deepEqual([courseView(record(), said).currentArc, courseView(record(), said).held], ["spectra", ["spaces", "spectra"]]);
-		assert.deepEqual(courseView(record()).held, [], "told nothing, it holds nothing");
+		assert.deepEqual(courseView(record(), NO_STANDING).held, [], "told nothing, it holds nothing");
 	});
 
 	it("a record with a broken arc entry reads as a course without arcs", () => {

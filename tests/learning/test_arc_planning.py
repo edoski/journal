@@ -462,6 +462,20 @@ def test_a_second_topic_on_one_day_keeps_the_window() -> None:
     assert started.index("a3") < started.index("c1")
 
 
+def test_a_topic_he_started_stands_on_reads_its_reason_from_where_he_is() -> None:
+    topics = {
+        "a1": {"arc": "a"},
+        "a2": {"arc": "a", "needs": ["a1"]},
+        "b1": {"arc": "b", "needs": ["a1"]},
+        "c1": {"arc": "c", "needs": ["a1"]},
+        "c2": {"arc": "c", "needs": ["c1"]},
+    }
+    result = plan({"c": spread(topics, "c2")}, MONDAY, 3, week(10, 1))
+    assert result.days["c"][0]["new"] == ["c1"], "c2 stands on it"
+    why = result.when("c", MONDAY, True).why["c1"]
+    assert why["kind"] == "early" and why["behind"] == "a", "A still has a2"
+
+
 def test_the_doctrine_names_every_field_of_a_starts_reason() -> None:
     doctrine = (
         Path(__file__).parents[2] / "learning/skills/tutor/references/arcs.md"

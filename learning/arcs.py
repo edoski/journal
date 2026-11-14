@@ -270,7 +270,8 @@ def _out_of_place(record: dict[str, Any], order: list[str]) -> list[str]:
 def report(record: dict[str, Any], held_arcs: Collection[str]) -> dict[str, Any]:
     """The rubric's computable checks (Part A), for evaluators and the arc
     pass. Structure reads every topic and every stored need, excluded ones
-    included, as the needs rule does; ``entry`` is the standing's."""
+    included, as the needs rule does; ``entry`` is the structural entry, every
+    stored need from another arc in path order, not the standing's."""
     topics = record["topics"]
     arcs = arc_rules.order(record)
     index = {arc: at for at, arc in enumerate(arcs)}

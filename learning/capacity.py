@@ -191,7 +191,8 @@ def _opened(
     free: frozenset[str],
 ) -> list[str]:
     """Up to ``pace`` of ``ready`` as the plan takes them from its window
-    (``progress.opens``), which each start moves on."""
+    (``progress.opens``), which each start moves on, in the order the plan
+    takes them (``agenda._new``'s ``take``)."""
     left, taken = list(untaught), list[str]()
     while len(taken) < pace and left:
         front = left[0]
@@ -303,9 +304,9 @@ def activity(records: Iterable[dict[str, Any]], today: date) -> dict[date, Done]
     left: set[date] = set()
     short: set[date] = set()
     for record, replays in zip(records, replayed, strict=True):
-        exam_of = progress.examining(record)
-        for key, replay in progress.replays({**record, "exam": {}}).items():
-            if progress.asks(record):
+        if progress.asks(record):
+            exam_of = progress.examining(record)
+            for key, replay in progress.replays({**record, "exam": {}}).items():
                 left |= _reviews_left(replay, exam_of(key), today)
         short |= _new_short(record, replays, week.planned, week.study)
     return {
