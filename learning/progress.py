@@ -22,7 +22,7 @@ import heapq
 from itertools import groupby
 from typing import Any
 
-from learning import preferences
+from learning import arc_rules, preferences
 from learning.schema import PatchResult, number, unaided
 
 LADDER = (3, 7, 16, 35, 75, 160)
@@ -851,7 +851,8 @@ def path_order(record: dict[str, Any], *, everything: bool = False) -> list[str]
 def path_health(record: dict[str, Any]) -> dict[str, list[str]]:
     """What a half-built path leaves undone, per studied topic: no title, no
     place in ``path.order``, no link to any other topic (with two or more
-    topics), no reference to where it is taught. Empty when nothing is."""
+    topics), no reference to where it is taught; and each arc whose stored
+    title a save would now refuse (``arc_names``). Empty when nothing is."""
     topics = record["topics"]
     order = path_order(record)
     stored = set(record.get("path", {}).get("order", []))
@@ -868,6 +869,7 @@ def path_health(record: dict[str, Any]) -> dict[str, list[str]]:
         if len(order) > 1
         else [],
         "unreferenced": [key for key in order if not topics[key].get("refs")],
+        "arc_names": arc_rules.misnamed(record),
     }
     return {name: keys for name, keys in health.items() if keys}
 

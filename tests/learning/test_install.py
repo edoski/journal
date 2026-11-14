@@ -74,7 +74,7 @@ def vault(tmp_path: Path) -> tuple[Path, Path, Workspace]:
     (msc / "Algebra").mkdir(parents=True)
     learn.mkdir()
     course = initialize(msc / "Algebra")
-    course.record.write_text('{"schema": 6}')
+    course.record.write_text('{"schema": 7}')
     return msc, learn, course
 
 

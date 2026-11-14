@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from learning import clock, preferences, records, storage
+from learning import clock, preferences, records, schema, storage
 from learning.workspace import Workspace
 
 TODAY = "2026-10-10"
@@ -46,7 +46,7 @@ COURSE = {
 def test_a_missing_course_loads_empty_and_the_first_save_creates_it(
     workspace: Workspace,
 ) -> None:
-    assert records.load(workspace)["schema"] == 6
+    assert records.load(workspace)["schema"] == schema.SCHEMA
     assert "revision" not in records.load(workspace)
     receipt = records.save(
         workspace, {**COURSE, "observations": [attempt(result="partial", help="Hint")]}
@@ -225,7 +225,7 @@ def test_forget_course_deletes_only_the_record(workspace: Workspace) -> None:
 def test_stored_records_are_validated_on_load(workspace: Workspace) -> None:
     workspace.record.parent.mkdir(parents=True)
     workspace.record.write_text(
-        '{"schema": 6, "topics": {"rank": {"level": "x"}}}', encoding="utf-8"
+        '{"schema": 7, "topics": {"rank": {"level": "x"}}}', encoding="utf-8"
     )
     with pytest.raises(ValueError, match="topics.rank.level is helper-owned"):
         records.load(workspace)
@@ -251,7 +251,7 @@ def test_a_corrupt_global_file_fails_the_save_before_the_course_changes(
 
 @pytest.mark.parametrize(
     "content",
-    ["{", "[]", '{"schema": 5}', '{"schema": 6, "topics": {"Bad Handle": {}}}'],
+    ["{", "[]", '{"schema": 6}', '{"schema": 7, "topics": {"Bad Handle": {}}}'],
 )
 def test_unreadable_stored_courses_are_io_failures(
     workspace: Workspace, content: str
@@ -305,7 +305,7 @@ def test_pinned_knowledge_over_budget_may_shrink_but_not_grow(
         workspace.record,
         storage.encode(
             {
-                "schema": 6,
+                "schema": 7,
                 "knowledge": {name: pinned(note) for name in ("a", "b", "c")},
             }
         ),

@@ -246,8 +246,8 @@ def test_study_prints_usage_for_anything_else(
     "broken",
     [
         ("course", "{"),
-        ("course", '{"schema": 5}'),
-        ("course", '{"schema": 6, "focus": "missing"}'),
+        ("course", '{"schema": 6}'),
+        ("course", '{"schema": 7, "focus": "missing"}'),
         ("global", "{not json"),
         ("global", '{"schema": 1, "preferences": {"Bad": "x"}}'),
     ],
