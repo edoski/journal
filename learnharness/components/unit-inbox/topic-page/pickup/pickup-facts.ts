@@ -52,6 +52,18 @@ export interface PickupSections {
 	earlier: TrailDay[];
 }
 
+/** Now's words on a topic with nothing to take up today: nothing is due,
+ *  or, for a review memory asked for already that the plan holds for a
+ *  later day, nothing is planned today, since Scheduled says since when it
+ *  was due (round 4: "Nothing due" sat above "Due since 6 Nov"). */
+export const NOTHING_DUE = "Nothing due";
+export const NOTHING_TODAY = "Nothing planned today";
+
+/** A review the plan holds past the day memory asked for it. */
+function heldPastDue(review: TopicFacts["topic"]["review"], today: string): boolean {
+	return review?.kind === "scheduled" && !!review.held && review.held.since <= today;
+}
+
 /** The step a lesson stopped on, when its tutor planned. */
 function stoppedOn(entry: SessionEntry | undefined): string | null {
 	if (!entry || !isPlanned(entry)) return null;
@@ -96,7 +108,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 		case "start":
 			return { ...base, icon: "standing", words: FIRST_LESSON };
 		case "study":
-			return { ...base, icon: "review", words: "Nothing due" };
+			return { ...base, icon: "review", words: heldPastDue(facts.topic.review, facts.today) ? NOTHING_TODAY : NOTHING_DUE };
 	}
 }
 
