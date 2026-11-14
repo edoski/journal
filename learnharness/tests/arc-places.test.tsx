@@ -19,6 +19,11 @@ import { arcPlace, lessonOf } from "../components/study-home/lesson-facts.ts";
 import { nextStepOf, todayRows, type TodayRow } from "../components/study-home/study-facts.ts";
 import { placeOf, whyOf } from "../components/study-home/agenda-rows/row-facts.ts";
 import { HybridRows } from "../components/study-home/agenda-rows/hybrid/hybrid-rows.tsx";
+import { needsYouNow } from "../components/study-home/needs-you.ts";
+import { NowCard } from "../components/unit-inbox/now-card.tsx";
+import { topicUnit, unitFor } from "../components/unit-inbox/now-inbox.ts";
+import { buildInbox } from "../components/unit-inbox/units.ts";
+import { TopicCard } from "../components/unit-inbox/unit-row.tsx";
 import { chat, LINALG, LINALG_ARCS, TODAY } from "./fixtures/now-demo.ts";
 
 const router = { push() {}, replace() {}, prefetch() {}, back() {}, forward() {}, refresh() {} };
@@ -76,5 +81,27 @@ describe("Home's rows", () => {
 	it("keep today's words for a planned topic in a course without arcs", () => {
 		const plain = planned(LINALG, { kind: "next" });
 		assert.deepEqual(whyOf(row(plain)), { kind: "next", short: "Planned today" });
+	});
+});
+
+describe("the sidebar's cards", () => {
+	it("name the line's arc on a Today card's course line, and only the course without arcs", () => {
+		const draw = (course: StudyCourse) => {
+			const [line] = needsYouNow([course], [], TODAY).lines;
+			const inbox = buildInbox([course], [], null);
+			return render(<NowCard line={line!} unit={topicUnit(inbox, course, line!.lead!, [])} active={false} />);
+		};
+		assert.equal(draw(LINALG_ARCS).querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra · Vector spaces");
+		assert.equal(draw(LINALG).querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
+	});
+
+	it("name a topic card's own arc, which every unit carries", () => {
+		const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
+		const unit = unitFor(LINALG_ARCS, rank, []);
+		assert.equal(unit.arc, "Linear systems");
+		assert.ok(buildInbox([LINALG_ARCS], [], null).active.every((u) => u.arc !== null), "every listed unit has its arc");
+		assert.equal(unitFor(LINALG, rank, []).arc, null);
+		const doc = render(<TopicCard unit={unit} today={TODAY} active={false} />);
+		assert.equal(doc.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra · Linear systems");
 	});
 });

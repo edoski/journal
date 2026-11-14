@@ -5,6 +5,7 @@ import { CircleDashedIcon, PlayIcon, SquarePenIcon } from "lucide-react";
 import type { ChatListItem } from "@/src/core";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { resumableSession, sessionState } from "@/components/nav/session-state";
+import { courseLine } from "@/components/study-home/agenda-rows/row-facts";
 import { STUDY_WORDS, useStartUnit } from "@/components/unit-inbox/start-unit";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { UnitStatusText } from "@/components/unit-inbox/unit-status";
@@ -85,8 +86,9 @@ export function isUnitOpen(unit: Unit, pathname: string): boolean {
 }
 
 /**
- * A topic on the list, a two-line card (60px): the course's mark and name
- * with the status slot, then the topic's title at 14/500. A click opens
+ * A topic on the list, a two-line card (60px): the course's mark and name,
+ * with the arc the topic lies in ("Linear Algebra · Linear systems"), and
+ * the status slot, then the topic's title at 14/500. A click opens
  * the topic's page; a topic the tutor writes in recedes until hovered.
  */
 export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: string; active: boolean; parent?: string }) {
@@ -97,7 +99,7 @@ export function TopicCard({ unit, today, active, parent }: { unit: Unit; today: 
 			rowKey={unit.key}
 			parent={parent}
 			mark={<CourseMark title={unit.course.title} />}
-			course={unit.course.title}
+			course={courseLine(unit.course.title, unit.arc)}
 			status={<UnitStatusText status={unitStatus(unit, today)} />}
 			title={unit.topic.title}
 			action={<RowAction unit={unit} className={CARD_ACTION_PLACE} />}

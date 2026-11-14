@@ -1,6 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse } from "@/src/core";
 import { needsYouNow, type NeedsYou } from "@/components/study-home/needs-you";
 import { todaysReview } from "@/components/study-home/study-facts";
+import { arcPlace } from "@/components/study-home/lesson-facts";
 import { TUTOR_WRITING, overdueWords } from "@/components/study-words";
 import { byLearning, nowOf, shelfOf, slipOf, taskOf, topicSessions, unitKey, unitStatus, type Unit, type UnitInbox, type UnitStatus } from "@/components/unit-inbox/units";
 
@@ -37,7 +38,7 @@ export function unitFor(course: StudyCourse, topic: CourseMapTopic, chats: reado
 	const { workspace, title } = course.map;
 	const sessions = topicSessions(chats, workspace, topic.handle);
 	const now = nowOf(sessions, topic.handle);
-	return { key: unitKey(workspace, topic.handle), course: { workspace, title }, topic, shelf: shelfOf(topic, now) ?? "learning", sessions, now, task: taskOf(course.map, topic), slip: slipOf(course.map, topic) };
+	return { key: unitKey(workspace, topic.handle), course: { workspace, title }, topic, shelf: shelfOf(topic, now) ?? "learning", sessions, now, task: taskOf(course.map, topic), slip: slipOf(course.map, topic), arc: arcPlace(course.map, [topic.handle]) };
 }
 
 /** The shelves' rows: every listed unit not on top, and the sessions on no
