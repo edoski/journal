@@ -271,6 +271,8 @@ export interface CourseView {
 	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
+	/** Every session, those started on a topic's page linked to it. */
+	chats: readonly ChatListItem[];
 }
 
 /** The course page's read: still reading; the engine not answering; the
@@ -309,6 +311,7 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 					said: sidebarSays(state.courses, state.chats, workspace),
 					facts: courseFacts(course, state.chats),
 					next: courseNext(course, state.open),
+					chats: state.chats,
 				},
 			};
 		}

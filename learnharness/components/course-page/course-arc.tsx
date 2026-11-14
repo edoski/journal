@@ -55,9 +55,12 @@ export function CourseArc<T>({
 	checkRef,
 	onHeaderKeyDown,
 	onCheckKeyDown,
+	exam,
 	className,
 	...rest
 }: Omit<React.ComponentProps<"section">, "children"> & {
+	/** What the line says about the exam in place of its exam words. */
+	exam?: React.ReactNode;
 	section: CourseArcSection;
 	items: readonly T[];
 	renderItem: (item: T) => React.ReactNode;
@@ -99,11 +102,12 @@ export function CourseArc<T>({
 									<MathText>{arc.title}</MathText>
 								</span>
 								<ChevronDownIcon aria-hidden className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 motion-reduce:transition-none", !open && "-rotate-90")} />
-								{section.exam && (
-									<span data-slot="course-arc-exam" className="ml-1 min-w-0 truncate text-label font-normal text-muted-foreground">
-										{section.exam}
-									</span>
-								)}
+								{exam ??
+									(section.exam && (
+										<span data-slot="course-arc-exam" className="ml-1 min-w-0 truncate text-label font-normal text-muted-foreground">
+											{section.exam}
+										</span>
+									))}
 							</span>
 							<span
 								data-slot="course-arc-state"

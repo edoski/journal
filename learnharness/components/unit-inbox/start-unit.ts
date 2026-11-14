@@ -8,17 +8,20 @@ import type { Unit } from "@/components/unit-inbox/units";
 /** The row action that starts a session on a unit, worded as the course map's. */
 export const STUDY_WORDS = "Study";
 
+/** What a start needs of a unit: its key, its topic and its course. */
+export type StartableUnit = Pick<Unit, "key"> & { topic: Pick<Unit["topic"], "title" | "handle">; course: Pick<Unit["course"], "workspace"> };
+
 /** Starts a session on a unit in its course, opened on the topic's title as
  *  the course map's Study this does, so the tutor routes it: a due review
  *  is tried first. The session is linked to the topic from its first turn.
  *  When the session cannot start (no models set up), the composer opens
  *  instead. */
-export function useStartUnit(): { start: (unit: Unit) => void; starting: string | null } {
+export function useStartUnit(): { start: (unit: StartableUnit) => void; starting: string | null } {
 	const router = useRouter();
 	const starter = useRef(new SessionStarter());
 	const [starting, setStarting] = useState<string | null>(null);
 	const start = useCallback(
-		(unit: Unit) => {
+		(unit: StartableUnit) => {
 			if (starting) return;
 			setStarting(unit.key);
 			starter.current

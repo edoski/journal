@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { CircleCheckIcon, CircleDotDashedIcon, TriangleAlertIcon } from "lucide-react";
 import { ArcPill } from "@/components/course-map/arc-strip";
 import { courseHref } from "@/components/unit-inbox/unit-href";
@@ -23,7 +24,21 @@ const PACE_ICON: Record<Pace["kind"], typeof CircleCheckIcon> = { fits: CircleCh
  * with arcs, the arc he is in leads that line, as its pill (`ArcPill`),
  * which shows that arc on the page.
  */
-export function PaceHead({ view, busy, onContinue }: { view: CourseView; busy: boolean; onContinue: (workspace: string) => void }) {
+export function PaceHead({
+	view,
+	busy,
+	onContinue,
+	lead,
+	action,
+}: {
+	view: CourseView;
+	busy: boolean;
+	onContinue: (workspace: string) => void;
+	/** A first line in place of the pace's (the Exam & mistakes candidates). */
+	lead?: ReactNode;
+	/** A quiet action before Context. */
+	action?: ReactNode;
+}) {
 	const { course, facts } = view;
 	const runup = useCourseRunup(course.map.workspace);
 	const pace = paceOf(course, runup);
@@ -35,12 +50,13 @@ export function PaceHead({ view, busy, onContinue }: { view: CourseView; busy: b
 			title={<span data-slot="course-title">{course.map.title}</span>}
 			actions={
 				<>
+					{action}
 					<ContextButton course={course} />
 					<CourseAction view={view} busy={busy} onContinue={onContinue} />
 				</>
 			}
 			lead={
-				<p data-slot="course-pace" data-kind={pace?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", pace?.kind === "short" && "text-warning")}>
+				lead ?? <p data-slot="course-pace" data-kind={pace?.kind} className={cn("flex min-h-5 min-w-0 items-center gap-1.5", pace?.kind === "short" && "text-warning")}>
 					{Icon && <Icon aria-hidden className={cn("size-4 shrink-0", pace?.kind !== "short" && "text-muted-foreground")} />}
 					{pace ? <MathText>{pace.words}</MathText> : !course.map.exam && <span className="font-normal text-muted-foreground">No exam day set</span>}
 				</p>

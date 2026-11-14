@@ -443,3 +443,35 @@ export function roomWords(used: number | null, room: number): string {
 	if (used === null) return DETAIL_WORDS.unmeasured;
 	return used * 2 < room ? DETAIL_WORDS.plenty : DETAIL_WORDS.filling;
 }
+
+/** How ready he is for the exam, in the engine's own sorting (its
+ *  `standing`): every part solid, not yet, or not all of it fits. "Not
+ *  ready yet in" leads the bubbles of the arcs that are not. */
+export const READY_WORDS = {
+	ready: "Ready for the exam",
+	notYet: "Not ready for the exam yet",
+	notYetIn: "Not ready yet in",
+} as const;
+
+/** Where one arc stands for the exam, on its line beside its name, so a
+ *  few words: never "ready", which its check's state already says. */
+export const PART_WORDS = {
+	ready: "Solid for the exam",
+	notYet: "Not solid yet",
+	short: "Won't all fit",
+} as const;
+
+/** A course without arcs, not ready: the topics not yet solid, else those
+ *  still to start. "Not yet solid for the exam: Basis and Rank". */
+export function notReadyWords(kind: "notYet" | "toStart", names: string): string {
+	return kind === "notYet" ? `Not yet solid for the exam: ${names}` : `Still to start before the exam: ${names}`;
+}
+
+/** The mistakes still open in a course: the list's name, the head's press,
+ *  a mistake made with help, and a list with nothing in it. */
+export const MISTAKE_WORDS = {
+	title: "Mistakes to fix",
+	press: "Mistakes",
+	helped: "With help",
+	none: "No mistakes to fix",
+} as const;
