@@ -3,6 +3,8 @@
 import { useCallback, useLayoutEffect, useState, type ReactNode } from "react";
 import { ArrowRightIcon, ArrowUpIcon, SquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 
 /** What one Enter press does, in precedence order: stop a busy stream,
@@ -153,7 +155,7 @@ export function Composer({
 			}}
 		>
 			{head}
-			<textarea
+			<Textarea
 				value={value}
 				onChange={(e) => onChange(e.target.value)}
 				onKeyDown={(e) => {
@@ -167,35 +169,35 @@ export function Composer({
 				placeholder={placeholder}
 				autoFocus={autoFocus}
 				rows={1}
-				className="field-sizing-content max-h-48 min-h-12 resize-none bg-transparent px-4 pb-2 pt-3.5 text-control text-foreground outline-none placeholder:text-muted-foreground"
+				className="max-h-48 min-h-12 resize-none rounded-none border-0 px-4 pb-2 pt-3.5 text-control focus-visible:ring-0"
 			/>
 			<div data-slot="composer-toolbar" className="flex min-w-0 items-center gap-1 p-2">
 				<div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{toolbar}</div>
 				{next && !busy && !canSend ? (
-					<button
+					<Button
 						type="submit"
+						size="pill"
 						data-testid={next.testId}
 						aria-label={next.label}
-						className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-row font-medium text-primary-foreground outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none"
+						className="px-3 transition-opacity hover:bg-primary hover:opacity-90 has-[>svg]:px-3 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none"
 					>
 						{next.label}
-						<ArrowRightIcon className="size-4" />
-					</button>
+						<ArrowRightIcon />
+					</Button>
 				) : (
-					<button
+					<Button
 						type="submit"
+						size="icon-sm"
 						data-slot="composer-send"
 						aria-label={stopping ? "Stop" : "Send"}
 						disabled={!busy && !canSend}
 						className={cn(
-							"flex size-8 shrink-0 items-center justify-center rounded-full outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none",
-							stopping
-								? "bg-fill-selected text-foreground hover:opacity-90"
-								: "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40",
+							"rounded-full transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-card motion-reduce:transition-none",
+							stopping ? "bg-fill-selected text-foreground hover:bg-fill-selected" : "hover:bg-primary disabled:opacity-40",
 						)}
 					>
-						{stopping ? <SquareIcon className="size-4" /> : <ArrowUpIcon className="size-4" />}
-					</button>
+						{stopping ? <SquareIcon /> : <ArrowUpIcon />}
+					</Button>
 				)}
 			</div>
 		</form>
