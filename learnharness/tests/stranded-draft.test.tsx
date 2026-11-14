@@ -8,8 +8,21 @@ import { parseHTML } from "linkedom";
 import type { Root } from "react-dom/client";
 import { StickToBottom } from "use-stick-to-bottom";
 import { ProseComposer } from "../components/lesson/prose/prose-composer.tsx";
-import { strandedDraft } from "../components/lesson/stranded-draft.ts";
+import { dropRescue, keepRescue, strandedDraft } from "../components/lesson/stranded-draft.ts";
+import { setKeptWindow } from "../components/lesson/kept-drafts.ts";
 import { emptyDockSelection } from "../src/core/index.ts";
+
+class MemoryStorage {
+	private map = new Map<string, string>();
+	get length() { return this.map.size; }
+	key(i: number) { return [...this.map.keys()][i] ?? null; }
+	getItem(k: string) { return this.map.get(k) ?? null; }
+	setItem(k: string, v: string) { this.map.set(k, v); }
+	removeItem(k: string) { this.map.delete(k); }
+	clear() { this.map.clear(); }
+}
+Object.defineProperty(globalThis, "localStorage", { value: new MemoryStorage(), configurable: true });
+setKeptWindow("w-one", { live: ["w-one"] });
 
 const { window, document } = parseHTML("<html><body></body></html>");
 Object.assign(document, { oninput: null });
@@ -24,6 +37,23 @@ afterEach(async () => {
 test("words typed in a question another window answered are rescued", () => {
 	// Round 2: tab 0's typed draft was wiped with no word when tab 1 answered.
 	assert.equal(strandedDraft("q:1", null, { key: "q:1", text: "(1,1) and (1,-1)" }), "(1,1) and (1,-1)");
+});
+
+test("a question replaced by the next one takes its draft with it", () => {
+	// Round 6 (robustness major 2): window two's draft for a question window
+	// one answered came back under the next question.
+	assert.equal(strandedDraft("q:1", "q:2", { key: "q:1", text: "trace is 7, det is" }), null);
+	assert.equal(strandedDraft("q:1", "p:3", { key: "q:1", text: "trace is 7, det is" }), null);
+});
+
+test("rescued words leave the message box when the next question opens, unless he made them his", () => {
+	keepRescue("c1", "trace is 7, det is");
+	assert.equal(dropRescue("c1", "a note of my own\n\ntrace is 7, det is"), "a note of my own", "only the rescued words go");
+	assert.equal(dropRescue("c1", "a note of my own"), null, "the rescue is forgotten once dropped");
+	keepRescue("c1", "trace is 7, det is");
+	assert.equal(dropRescue("c1", "trace is 7, det is 10, so 5 and 2"), null, "words he typed on are his message");
+	keepRescue("c1", "trace is 7, det is");
+	assert.equal(dropRescue("c1", "trace is 7, det is"), "", "untouched, the box empties");
 });
 
 test("nothing is rescued when the dock stays, nothing was typed, or the words belong to another dock", () => {

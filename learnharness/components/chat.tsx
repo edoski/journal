@@ -82,7 +82,7 @@ import { LESSON_COLUMN } from "@/components/lesson/lesson-column";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
-import { strandedDraft } from "@/components/lesson/stranded-draft";
+import { dropRescue, keepRescue, strandedDraft } from "@/components/lesson/stranded-draft";
 import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { carryBox, forgetClosedBoxes, keepWords, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
@@ -598,10 +598,16 @@ export function Chat({
 		const live = liveDraftRef.current;
 		const words = before === sentFromDockRef.current ? null : strandedDraft(before, dockKey, live);
 		liveDraftRef.current = null;
+		const left = dockKey === null ? null : dropRescue(chatId, textRef.current);
+		if (left !== null) {
+			applyText(left);
+			setAnsweredElsewhere(false);
+		}
 		if (words === null) return;
 		applyText(textRef.current.trim() ? `${textRef.current.trim()}\n\n${words}` : words);
+		keepRescue(chatId, words);
 		setAnsweredElsewhere(true);
-	}, [dockKey, applyText]);
+	}, [chatId, dockKey, applyText]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
 	/** The explicitly-sent draft (composer send) until the server accepts
