@@ -541,15 +541,29 @@ def _select(
     """Take ``candidates`` in order within ``room`` and each final review's
     quota, less the ``held`` ones, which wait for a competing method rather
     than for room (not ``When.held``); a competing method due the same day
-    comes right after the one taken, so the two are reviewed side by side."""
+    comes right after the one taken, so the two are reviewed side by side. On
+    a day that holds two or more, the last place goes to a review without a
+    partner due, so a pair is never split across days for want of one place."""
     order = [entry for entry in candidates if (entry[1], entry[3]) not in held]
     picked = _Picked({course.name: [] for course in courses}, [], [])
+    pairs = room >= 2
     index = 0
     while index < len(order):
         key, _, course, topic = order[index]
         index += 1
+        partners = [
+            entry
+            for entry in order[index:]
+            if entry[2] is course and entry[3] in course.partners[topic]
+        ]
         if room <= 0:
             picked.left.append((course, topic))
+            continue
+        if room == 1 and pairs and partners:
+            for entry in [order[index - 1], *partners]:
+                picked.left.append((entry[2], entry[3]))
+            for entry in partners:
+                order.remove(entry)
             continue
         if course.final(topic, day):
             if quota[course.name] <= 0:
@@ -559,11 +573,6 @@ def _select(
             picked.taken.append((key[1], course))
         picked.chosen[course.name].append(topic)
         room -= 1
-        partners = [
-            entry
-            for entry in order[index:]
-            if entry[2] is course and entry[3] in course.partners[topic]
-        ]
         for entry in partners:
             order.remove(entry)
         order[index:index] = partners

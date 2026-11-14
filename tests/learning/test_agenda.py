@@ -516,6 +516,18 @@ def test_competing_methods_due_together_are_reviewed_side_by_side() -> None:
     assert together.days["free"][0]["reviews"] == []
 
 
+def test_a_pair_of_competing_methods_is_not_split_for_want_of_one_place() -> None:
+    free = solid(course(3), on(-30))
+    free = save(
+        free, {"topics": {"t02": {"review": {"due": on(-2).isoformat()}}}}, MONDAY
+    )
+    pair = solid(course(2, contrasts={"t00": ["t01"]}), on(-5))
+    together = plan({"free": free, "pair": pair}, 2, week(3, 0, frozenset(range(7))))
+    assert together.days["free"][0]["reviews"] == ["t00", "t01", "t02"]
+    assert together.days["pair"][0]["reviews"] == []
+    assert together.days["pair"][1]["reviews"] == ["t00", "t01"]
+
+
 def test_a_review_waits_a_short_while_for_its_competing_method() -> None:
     def days(partner_due: int) -> dict[str, str]:
         record = solid(course(2, contrasts={"t00": ["t01"]}), MONDAY)
