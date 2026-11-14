@@ -149,7 +149,8 @@ const length = (points: readonly Point[]) => points.slice(1).reduce((sum, p, i) 
 
 /** Every curve worth trying: into the left edge's middle, square to it, as
  *  an S across the gutter; and into the top (or bottom) edge from the side
- *  the row is on, square to it, at points either side of its middle. Each
+ *  the row is on, square to it, a quarter or a third in from either corner,
+ *  clear of its middle. Each
  *  with a few handle lengths, from a gentle sweep to one rounded elbow. */
 function candidates({ from, to }: TieGeometry): { side: Side; curve: Cubic }[] {
 	const out: { side: Side; curve: Cubic }[] = [];
@@ -164,7 +165,7 @@ function candidates({ from, to }: TieGeometry): { side: Side; curve: Cubic }[] {
 	}
 	const width = to.right - to.left;
 	const middle = (to.left + to.right) / 2;
-	const xs = [0.12, 0.25, 0.75, 0.88].map((f) => to.left + f * width).filter((x) => Math.abs(x - middle) >= NEED_CLEAR);
+	const xs = [0.25, 0.35, 0.65, 0.75].map((f) => to.left + f * width).filter((x) => Math.abs(x - middle) >= NEED_CLEAR);
 	for (const side of ["top", "bottom"] as const) {
 		const y = side === "top" ? to.top : to.bottom;
 		const dy = y - from.y;

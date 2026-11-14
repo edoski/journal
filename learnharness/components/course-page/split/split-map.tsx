@@ -76,6 +76,8 @@ export function SplitMap({
 	const [pane, setPane] = useState<Size>({ width: 0, height: 0 });
 
 	const surface = surfaceOf(layout, pane, FADE, TAG_ROOM, tieAnchor !== null);
+	/** The room the surface keeps above and below the course for the tie (`surfaceOf`). */
+	const beside = tieAnchor !== null ? pane.height : 0;
 	const fade = useMemo(() => ({ x: fadeAcross(pane.width, FADE.x, layout.node), y: FADE.y }), [pane.width, layout.node]);
 	const boxes = useMemo(() => boxesOf(layout, { width: surface.width, height: surface.height, zoom: surface.zoom }), [layout, surface.width, surface.height, surface.zoom]);
 
@@ -92,7 +94,11 @@ export function SplitMap({
 			const el = scroller.current;
 			if (!el || el.clientWidth === 0) return;
 			const view = { left: el.scrollLeft, top: el.scrollTop, width: el.clientWidth, height: el.clientHeight };
-			let to = scrollOn(boxes, handle, view, { width: el.scrollWidth, height: el.scrollHeight }, fade, settle);
+			// The opening view stays on the course itself; the room the tie keeps above and below is only for bringing a topic beside its row.
+			const room = settle === "centre" ? beside : 0;
+			const inCourse = room ? new Map([...boxes].map(([key, box]) => [key, { ...box, y: box.y - room }])) : boxes;
+			let to = scrollOn(inCourse, handle, { ...view, top: view.top - room }, { width: el.scrollWidth, height: el.scrollHeight - room * 2 }, fade, settle);
+			if (to && room) to = { left: to.left, top: to.top + room };
 			const anchor = settle === "near" ? tieAnchor?.() : null;
 			if (anchor) to = besideRow(boxes, handle, anchor, to ?? view, { ...view, maxTop: el.scrollHeight - el.clientHeight }, fade, map.current) ?? to;
 			cancelAnimationFrame(glide.current);
@@ -108,7 +114,7 @@ export function SplitMap({
 			};
 			glide.current = requestAnimationFrame(step);
 		},
-		[boxes, fade, tieAnchor, map.current],
+		[boxes, fade, tieAnchor, map.current, beside],
 	);
 
 	// The pane's size sets the surface's width and where it opens.
