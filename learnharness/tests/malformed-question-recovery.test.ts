@@ -83,7 +83,7 @@ const blockTexts = (m: Context[number] | undefined) => typeof m?.content === "st
 const userTexts = (context: Context) => context.filter(m => m.role === "user").flatMap(blockTexts);
 const recover = (messageId = "fixture-assistant", contentIndex = 0, toolCallId = "bad"): Extract<ChatInput, { type: "retry-question" }> => ({ type: "retry-question", messageId, contentIndex, toolCallId });
 const saves = () => engineFake.calls().filter(call => call.args[0] === "--workspace" && call.args[1] === COURSE && call.args[2] === "save");
-const observation = { topics: ["rank"], text: valid.question, response: "Divisible by two", result: "correct", sure: "confident" };
+const observation = { topics: ["rank"], question: "first", text: valid.question, response: "Divisible by two", result: "correct", sure: "confident" };
 /** An older record's truncated input: the call stays, its arguments no longer display. */
 function truncate(messages: LhMessage[], callId: string): LhMessage[] {
 	return messages.map(m => m.role !== "assistant" ? m : { ...m, content: m.content.map(b => b.type === "toolCall" && b.id === callId ? { ...b, arguments: partial } : b) });

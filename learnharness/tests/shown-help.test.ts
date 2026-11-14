@@ -74,8 +74,8 @@ describe("which questions he answered, and whether he had seen their solution fi
 		const first = asked("Run BFS from $s$ and give every dist.");
 		const second = asked("Explain why no path to $e$ is shorter than 3.");
 		const answers = answeredQuestionsOf([...first.messages, ...second.messages]);
-		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false });
-		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false });
+		assert.deepEqual(answers.get(first.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, recorded: false });
+		assert.deepEqual(answers.get(second.id), { tool: "explain", seenBefore: false, predicted: false, confidence: null, recorded: false });
 	});
 
 	it("the same words asked again after he answered them were seen", () => {
@@ -100,7 +100,7 @@ describe("which questions he answered, and whether he had seen their solution fi
 		const again = pose(["rank"]);
 		const solved = conclude({ outcome: "solved", result: "correct" });
 		const answers = answeredQuestionsOf([...ended, ...again, ...solved]);
-		assert.deepEqual(answers.get(concludeId.id), { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: false });
+		assert.deepEqual(answers.get(concludeId.id), { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: false, predicted: false, recorded: true });
 		assert.equal([...answers.values()].at(-1)?.seenBefore, true);
 		const dismissed = answeredQuestionsOf([...pose(["rank"]), ...call(PRACTICE_CONCLUDE_TOOL, { outcome: "dismissed" }), ...pose(["rank"]), ...solved]);
 		assert.equal([...dismissed.values()].at(-1)?.seenBefore, false);
@@ -130,7 +130,7 @@ describe("saving an answer to a question whose solution he had seen", () => {
 	it("the question field is the app's: checked, and taken off before the engine reads the patch", async () => {
 		const check = asked("Compute the eigenvalues of $A$.");
 		const { saves, tools } = savingCourse(check.messages);
-		await courseSave(tools, [attempt(["eigen"], "correct", "none", { question: check.id }), attempt(["eigen"], "correct")]);
+		await courseSave(tools, [attempt(["eigen"], "correct", "none", { question: check.id }), attempt(["kernel"], "correct", "none", { question: check.id })]);
 		assert.equal("question" in saves[0]!.observations![0]!, false);
 		assert.equal(saves[0]!.observations!.length, 2);
 	});

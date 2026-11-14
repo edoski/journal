@@ -50,7 +50,7 @@ import {
 	type SessionMode,
 	disputeText,
 } from "./contracts/chat.ts";
-import { compactAnswerForModel, type QuestionAnswerData } from "./question-core.ts";
+import { compactAnswerForModel, normalizeQuestionType, type QuestionAnswerData } from "./question-core.ts";
 import { chosenConfidence, type Confidence } from "./contracts/course.ts";
 import type { MarkResult } from "./contracts/marks.ts";
 import { parseQuestionInput } from "./tool-parts.ts";
@@ -779,6 +779,18 @@ export interface AnsweredQuestion {
 	 *  were asked earlier in the session and answered, or posed as a
 	 *  problem that ended (shown-help.ts). */
 	seenBefore: boolean;
+	/** Asked as a prediction (an `explain` with `type` predict): only such
+	 *  an answer is saved `predicted`. Absent for an answer in words, which
+	 *  no question declared. */
+	predicted?: boolean;
+	/** The confidence he chose with this answer, null for none (the meter
+	 *  left alone, or a message, which has no meter). Absent for a
+	 *  problem's conclude, whose attempts carry the confidence of each
+	 *  submission. */
+	confidence?: Exclude<Confidence, "neutral"> | null;
+	/** A save that went through already recorded it, or its problem's
+	 *  conclude did. */
+	recorded: boolean;
 }
 
 /** The name a save gives an answer he gave in words, in a message of his
@@ -812,27 +824,38 @@ export function seenBeforeAsked(messages: readonly LhMessage[], callId: string):
 	return questionScan(messages).posed.get(callId)?.seen === true;
 }
 
-function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean }>; answered: Map<string, AnsweredQuestion> } {
+/** A conclude's result says its attempts were not recorded: the save
+ *  failed or the pose was lost (tools/practice.ts). Any other result of a
+ *  problem that ended recorded them, or had nothing to record. */
+const UNSAVED_CONCLUDE = /The attempt was not saved|The attempt could not be recorded/;
+
+function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { key: string; seen: boolean; predicted: boolean }>; answered: Map<string, AnsweredQuestion> } {
 	const clean = cleanToolCallIds(messages);
 	const revealed = new Set<string>();
-	const posed = new Map<string, { key: string; seen: boolean }>();
+	const posed = new Map<string, { key: string; seen: boolean; predicted: boolean }>();
 	const answered = new Map<string, AnsweredQuestion>();
+	// Each save's named answers, until its result says whether it went
+	// through; an answer in words stands for his newest message then.
+	const naming = new Map<string, string[]>();
+	const recorded = new Set<string>();
 	let problem: string | null = null;
-	let said = false;
-	const pose = (callId: string, text: unknown) => {
+	let lastSaid: string | null = null;
+	const pose = (callId: string, text: unknown, type?: unknown) => {
 		if (typeof text !== "string") return;
 		const key = sameQuestionKey(text);
-		posed.set(callId, { key, seen: revealed.has(key) });
+		posed.set(callId, { key, seen: revealed.has(key), predicted: normalizeQuestionType(type) === "predict" });
 	};
 	for (const m of messages) {
-		if (m.role === "user") said = true;
+		if (m.role === "user") lastSaid = m.id;
 		else if (m.role === "custom" && m.customType === "problem-dismissed") problem = null;
 		else if (m.role === "assistant") {
 			for (const block of m.content) {
 				if (block.type !== "toolCall") continue;
 				const args = (block.arguments ?? {}) as Record<string, unknown>;
-				if (GRADED_QUESTION_TOOLS.includes(block.name)) pose(block.id, args.question);
-				else if (block.name === PRACTICE_PROBLEM_TOOL && clean.has(block.id)) {
+				if (GRADED_QUESTION_TOOLS.includes(block.name)) pose(block.id, args.question, args.type);
+				else if (block.name === "course_save") {
+					naming.set(block.id, savedQuestionsOf(args).flatMap((q) => (q === null ? [] : [q === HIS_MESSAGE ? `${HIS_MESSAGE}:${lastSaid}` : q])));
+				} else if (block.name === PRACTICE_PROBLEM_TOOL && clean.has(block.id)) {
 					pose(block.id, args.statement);
 					problem = block.id;
 				} else if (block.name === PRACTICE_CONCLUDE_TOOL && clean.has(block.id) && problem) {
@@ -840,18 +863,28 @@ function questionScan(messages: readonly LhMessage[]): { posed: Map<string, { ke
 					problem = null;
 					if (!asked || args.outcome === "dismissed") continue;
 					revealed.add(asked.key);
-					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen });
+					answered.set(block.id, { tool: PRACTICE_CONCLUDE_TOOL, seenBefore: asked.seen, predicted: false, recorded: false });
 				}
 			}
+		} else if (m.role === "toolResult" && !m.isError && m.toolName === "course_save") {
+			for (const key of naming.get(m.toolCallId) ?? []) recorded.add(key);
+		} else if (m.role === "toolResult" && !m.isError && m.toolName === PRACTICE_CONCLUDE_TOOL) {
+			if (!UNSAVED_CONCLUDE.test(resultText(m))) recorded.add(m.toolCallId);
 		} else if (m.role === "toolResult" && GRADED_QUESTION_TOOLS.includes(m.toolName) && !m.isError && isRealAnswer(m.details)) {
 			const asked = posed.get(m.toolCallId);
 			if (!asked) continue;
 			revealed.add(asked.key);
-			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen });
+			const confidence = chosenConfidence((m.details as { confidence?: unknown }).confidence) ?? null;
+			answered.set(m.toolCallId, { tool: m.toolName, seenBefore: asked.seen, predicted: asked.predicted, confidence, recorded: false });
 		}
 	}
-	if (said) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false });
+	for (const [key, answer] of answered) answer.recorded = recorded.has(key);
+	if (lastSaid) answered.set(HIS_MESSAGE, { tool: "message", seenBefore: false, confidence: null, recorded: recorded.has(`${HIS_MESSAGE}:${lastSaid}`) });
 	return { posed, answered };
+}
+
+function resultText(m: ToolResultMessage): string {
+	return m.content.map((part) => (part.type === "text" ? part.text : "")).join("");
 }
 
 /** The question each observation of a course_save call names

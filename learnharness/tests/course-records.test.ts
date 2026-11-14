@@ -447,7 +447,7 @@ describe("course tools", () => {
 		const tools = courseTools({ course: COURSE, records, arcs: false });
 		assert.deepEqual(Object.keys(tools).sort(), ["course_resume", "course_save", "course_search", "course_show"]);
 		assert.match(tools.course_save!.description, /Linear Algebra/);
-		const changes = { observations: [{ topics: ["rank"], text: "q", help: "none", result: "partial" }] };
+		const changes = { observations: [{ kind: "self_report", topics: ["rank"], text: "Says he worked through the rank exercises" }] };
 		const result = await tools.course_save!.execute("call-1", { changes }, undefined);
 		assert.deepEqual(JSON.parse((result.content[0] as { text: string }).text), { revision: 2, observations: ["o4"] });
 		assert.deepEqual(seen, [{ workspace: "/s/linalg", verb: { verb: "save", changes } }]);
