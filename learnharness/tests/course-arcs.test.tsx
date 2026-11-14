@@ -276,10 +276,10 @@ describe("what next, above the arcs", () => {
 		assert.equal(waiting.pickUp?.arc?.handle, "eigenvalues");
 	});
 
-	it("then names the next new topic the plan starts, with why then in the plan's words", () => {
+	it("then names the next new topic the plan starts, with why then as Today's rows say it", () => {
 		const next = whatNext(planned)!;
 		assert.equal(next.then?.topic.handle, "diag");
-		assert.equal(next.then?.why, "After Eigenvalues and eigenvectors, which it needs");
+		assert.equal(next.then?.why, "After Eigenvalues and eigenvectors", "as Today's rows say it");
 		assert.equal(next.then?.arc?.handle, "eigenvalues");
 	});
 
@@ -304,6 +304,24 @@ describe("what next, above the arcs", () => {
 		const then = document.querySelector('[data-slot="what-next-then"]')!;
 		assert.match(text(then), /Next in Eigenvalues/);
 		assert.equal(then.querySelector('[data-slot="arc-pill"]'), null);
+	});
+
+	it("says Then goes back to an earlier arc once a lesson moved You are here past it, so the head's arc and Then never disagree (round 6)", () => {
+		const ahead: StudyCourse = {
+			...ARCS,
+			map: {
+				...ARCS.map,
+				current: h("eigen"),
+				topics: ARCS.map.topics.map((t) => (t.handle === "det" ? { ...t, introduced: null, level: "new" as const, review: null, starts: "2026-11-09", startsWhy: { kind: "next" as const, arc: a("systems") } } : t)),
+			},
+		};
+		assert.equal(courseArcs(ahead)!.find((s) => s.current)?.arc.handle, "eigenvalues", "the head names Eigenvalues");
+		const next = whatNext(ahead)!;
+		assert.equal(next.then?.topic.handle, "det");
+		assert.equal(next.then?.why, "Back to Linear systems");
+		const then = render(<WhatNextRows next={next} course={ahead} busy={false} onContinue={noop} />).querySelector('[data-slot="what-next-then"]')!;
+		assert.doesNotMatch(text(then), /Next in/);
+		assert.equal(then.querySelector('[data-slot="arc-pill"]'), null, "the words name the arc");
 	});
 
 	it("says nothing for a course without arcs, or with nothing to pick up and nothing planned", () => {

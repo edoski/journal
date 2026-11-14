@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { TopicHandle, TopicSignals } from "../src/core/contracts/course-map.ts";
-import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
+import { ARC_EXAM_WORDS, ARC_STATE_WORDS, ATTEMPT_WORDS, courseShareWords, distanceWords, heldWords, lapsedOnWords, leftOutWords, moreWords, movedWords, noExamWords, overdueWords, returnWords, reviewWords, startsAfterWords, slipMark, slipWords, STANDING_WORDS, standingWords, startsWhyShort, startsWhyTells, startsWhyWords, type Fill } from "../components/study-words.ts";
 import { ARC_STATES, type ArcHandle } from "../src/core/contracts/course-arcs.ts";
 import type { CourseMap } from "../src/core/contracts/course-map.ts";
 import { courseMapOf } from "../src/store/course-records.ts";
@@ -189,9 +189,18 @@ describe("why a topic starts then", () => {
 		assert.equal(leftOutWords(covariance, { ...exam, daysLeft: -1 }), null, "once the exam has passed");
 		assert.equal(leftOutWords(covariance, null), null);
 	});
-	it("says next in its arc, else in the course", () => {
-		assert.equal(startsWhyWords({ kind: "next", arc: "systems" as ArcHandle }, arcs), "Next in Linear systems");
+	it("says next in its arc when that is where he is or further on, else in the course", () => {
+		assert.equal(arcs.current, "eigen", "You are here is in Eigenvalues");
+		assert.equal(startsWhyWords({ kind: "next", arc: "eigenvalues" as ArcHandle }, arcs), "Next in Eigenvalues and diagonalization");
+		assert.equal(startsWhyWords({ kind: "next", arc: "orthogonality" as ArcHandle }, arcs), "Next in Orthogonality");
 		assert.equal(startsWhyWords({ kind: "next" }, plain), "Next in Linear Algebra");
+	});
+	it("says the plan goes back when its next start sits in an arc before the one You are here is in (round 6: You are here z tests, Next in Sampling distributions)", () => {
+		const systems = { kind: "next" as const, arc: "systems" as ArcHandle };
+		assert.equal(startsWhyWords(systems, arcs), "Back to Linear systems, earlier in the course");
+		assert.equal(startsWhyShort(systems, arcs), "Back to Linear systems");
+		assert.equal(startsWhyWords(systems, { ...arcs, current: "rank" as TopicHandle }), "Next in Linear systems", "once You are here is in Linear systems");
+		assert.equal(startsWhyWords(systems, { ...arcs, current: null, currentArc: undefined }), "Next in Linear systems", "with nowhere he is");
 	});
 	it("is worth saying in every course but as plain next in a course without arcs, which only repeats the course beside it", () => {
 		assert.equal(startsWhyTells({ kind: "early", waitingOn: ["change-basis" as TopicHandle], exam: false }), true, "early in a course without arcs");
