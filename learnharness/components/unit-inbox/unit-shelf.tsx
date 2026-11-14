@@ -57,7 +57,7 @@ export function UnitShelf<T>({
 					data-sidebar-row={`shelf:${id}`}
 					aria-expanded={!folded}
 					onClick={() => onFoldedChange(!folded)}
-					className="h-8 gap-2 px-2 text-label font-medium hover:bg-transparent"
+					className="h-8 gap-2 px-2 text-label font-medium hover:bg-transparent focus-visible:ring-inset"
 				>
 					<span className="min-w-0 truncate">{label}</span>
 					<span aria-hidden className="flex-1" />
@@ -83,7 +83,7 @@ export function UnitShelf<T>({
 							data-sidebar-row={`more:${id}`}
 							data-sidebar-parent={`shelf:${id}`}
 							onClick={() => setShownCount((n) => n + SHELF_PAGE)}
-							className="h-9 gap-2 px-2.5 text-control"
+							className="h-9 gap-2 px-2.5 text-control focus-visible:ring-inset"
 						>
 							<ChevronDownIcon aria-hidden className="size-4 shrink-0" />
 							Show {more} more
