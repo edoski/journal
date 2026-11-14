@@ -147,6 +147,10 @@ export interface CourseRecords {
 	>;
 	/** Run one verb against one course workspace. */
 	run(workspace: string, verb: CourseVerb): Promise<CourseResult>;
+	/** Whether the course was deleted: its folder is a course whose record
+	 *  the engine forgot. A save there would bring the course back as an
+	 *  untitled ghost. Absent where nothing keeps records on disk. */
+	forgotten?(workspace: string): boolean;
 	/** The course map: the engine's read-only `map` verb, parsed. */
 	map(workspace: string): Promise<{ ok: true; map: CourseMap } | Extract<CourseResult, { ok: false }>>;
 	/** Make an existing directory a titled, registered course: the engine's

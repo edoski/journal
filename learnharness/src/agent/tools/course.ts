@@ -52,7 +52,16 @@ const saveInput = Type.Object({
 	}),
 });
 
+/** What the tutor reads when the lesson's course was deleted: a save there
+ *  would write a fresh, untitled record and bring the course back as a
+ *  ghost beside its successor (round 3, 14 Nov 2026). */
+export const COURSE_DELETED_FOR_TUTOR =
+	"This lesson's course was deleted, so nothing was saved. Tell the learner in one plain sentence that the course is gone and its lessons stay as history.";
+
 async function call(ctx: CourseToolContext, verb: CourseVerb): Promise<string> {
+	if ((verb.verb === "save" || (verb.verb === "sources" && "add" in verb)) && ctx.records.forgotten?.(ctx.course.workspace)) {
+		throw new Error(COURSE_DELETED_FOR_TUTOR);
+	}
 	const result: CourseResult = await ctx.records.run(ctx.course.workspace, verb);
 	if (result.ok) return JSON.stringify(result.json);
 	if (result.kind === "validation") throw new Error(`Nothing was saved or read. ${result.message}`);

@@ -301,6 +301,16 @@ describe("course tools", () => {
 		);
 	});
 
+	it("a save into a deleted course is refused before the engine runs, so the course never comes back (round 3)", async () => {
+		const { records, seen } = memoryRecords(() => ({ ok: true, json: {} }));
+		const tools = courseTools({ course: COURSE, records: { ...records, forgotten: () => true } });
+		await assert.rejects(
+			() => tools.course_save!.execute("call-3", { changes: { observations: [] } }, undefined) as Promise<unknown>,
+			/course was deleted, so nothing was saved/,
+		);
+		assert.deepEqual(seen, []);
+	});
+
 	it("show needs handles or all", async () => {
 		const { records, seen } = memoryRecords(() => ({ ok: true, json: {} }));
 		const tools = courseTools({ course: COURSE, records });

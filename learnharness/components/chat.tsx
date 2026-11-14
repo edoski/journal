@@ -96,6 +96,7 @@ import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKe
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
+import { CourseGoneLine } from "@/components/lesson/course-gone";
 
 /** The chat routes' answer for a deleted lesson: TurnError reads it as
  *  "This lesson was deleted." with Go to Home. */
@@ -192,12 +193,15 @@ export function Chat({
 	initiallyCompacting = false,
 	startedIn,
 	course,
+	initiallyCourseDeleted = false,
 }: {
 	chatId: string;
 	title: string;
 	/** The session's course. Absent on sessions older than the rule that
 	 *  every session has one: the link banner replaces the dock. */
 	course?: CourseLink;
+	/** The course was deleted: the lesson is history, with no box to write in. */
+	initiallyCourseDeleted?: boolean;
 	initialMessages: LhMessage[];
 	/** Memory-only settlement notice supplied on reopening. */
 	initialError?: string;
@@ -391,6 +395,8 @@ export function Chat({
 	const [abortAsk, setAbortAsk] = useState<AbortMode | null>(null);
 	// The lesson was deleted elsewhere (chats-changed `deleted`).
 	const [gone, setGone] = useState(false);
+	// Its course was deleted: the lesson stays readable as history.
+	const [courseGone, setCourseGone] = useState(initiallyCourseDeleted);
 	// Bumped when something that held focus goes away (a rename ends, a
 	// confirm closes): the dock puts focus back where he types (focus-home.ts).
 	const [focusEpoch, setFocusEpoch] = useState(0);
@@ -811,7 +817,7 @@ export function Chat({
 	// Try again's key (round 3): Enter on the empty composer, from the field
 	// or anywhere outside one, runs the same retry as the button.
 	// A question or problem still open owns Enter (its own resend).
-	const tryAgain = pending || activeProblem ? undefined : replyCut ? () => void send({ type: "continue" }) : retryable && !claudeLimit ? retryFailedTurn : undefined;
+	const tryAgain = pending || activeProblem || gone || courseGone ? undefined : replyCut ? () => void send({ type: "continue" }) : retryable && !claudeLimit ? retryFailedTurn : undefined;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
 	 * kind, nothing active, nothing in flight, and at least one problem
@@ -1250,6 +1256,18 @@ export function Chat({
 			forgetClosedBoxes(chatId, []);
 		}
 	});
+	useServerEvent("courses-changed", () => {
+		// A course was deleted or made: is this lesson's still listed?
+		const workspace = course?.workspace;
+		if (!workspace) return;
+		void fetch("/api/courses")
+			.then((res) => (res.ok ? res.json() : null))
+			.then((listing: { available?: boolean; courses?: { workspace: string }[]; unreadable?: { workspace: string }[] } | null) => {
+				if (!listing?.available) return;
+				setCourseGone(![...(listing.courses ?? []), ...(listing.unreadable ?? [])].some((c) => c.workspace === workspace));
+			})
+			.catch(() => {});
+	});
 	useServerEvent("record-changed", (p) => {
 		// A turn-less write (the silent dismissal, A2 2026-10-03), or a wake
 		// turn's markers landing at its write-ahead. Idle: adopt the record
@@ -1429,7 +1447,7 @@ export function Chat({
 						courseHref={course ? courseHref(course.workspace) : undefined}
 						phase={mode === "practice" ? "Practice" : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone} />}
+						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight || gone || courseGone} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
@@ -1662,9 +1680,10 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
+							{replyCut && !courseGone && !gone && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{gone && !error && <TurnError message={LESSON_GONE} onOpenSettings={() => openSettings("keys")} />}
+							{courseGone && !gone && <CourseGoneLine />}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>
 									{claudeLimit && <ClaudeLimitPrompt key={claudeLimit.id} failure={claudeLimit} onContinue={retryFailedTurn} />}
@@ -1685,7 +1704,7 @@ export function Chat({
 				    anchored to the dock block's top edge, so it rides every
 				    height morph (typing, a question growing the band, the
 				    fold) and NEVER overlaps the composer. */}
-				{gone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
+				{gone || courseGone ? null : !course ? <CourseLinkBanner chatId={chatId} /> : <DockOverlay
 					pending={pending}
 					initialQuestionDraft={pending ? questionDraft(pending.key)?.form : undefined}
 					onSaveQuestionDraft={(form) => { if (pending) saveQuestionDraft(pending.key, { form }); }}

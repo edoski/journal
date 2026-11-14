@@ -1,4 +1,5 @@
 import type { Usage } from "@earendil-works/pi-ai";
+import { COURSE_DELETED, courseDeleted } from "./courses.ts";
 import {
 	createPracticeAgent,
 	createProberAgent,
@@ -196,6 +197,11 @@ export async function handleChatInput(
 	let record = stores.chatStore.getChat(chatId);
 	if (!record) {
 		return Response.json({ error: "Unknown chat" }, { status: 404 });
+	}
+	// A lesson of a deleted course is history: no turn, so nothing can write
+	// its course record back (round 3: a ghost "calculus" course appeared).
+	if (courseDeleted(chatId)) {
+		return Response.json({ error: COURSE_DELETED, code: "course_deleted" }, { status: 410 });
 	}
 
 	// Refuse an ineligible Retry before catalog refresh, compaction, or any

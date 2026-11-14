@@ -121,6 +121,8 @@ export const LESSON_WORDS = {
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
 	unreadableCourse: "Couldn't read this course's record",
+	courseDeleted: "This course was deleted. Its lessons stay as history.",
+	startLesson: "Start a new lesson",
 } as const;
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;

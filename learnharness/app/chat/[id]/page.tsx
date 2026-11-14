@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Chat } from "@/components/chat";
-import { compactionInFlight, getChat, isTurnRunning, turnFailure } from "@/src/server";
+import { compactionInFlight, courseDeleted, getChat, isTurnRunning, turnFailure } from "@/src/server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +21,8 @@ export default async function ChatPage({
 			title={chat.title}
 			startedIn={chat.kind}
 			course={chat.course}
+			// A deleted course's lesson is history (courses.ts courseDeleted).
+			initiallyCourseDeleted={courseDeleted(chat.id)}
 			// Wave D: the record IS native agent history — the client view is
 				// derived app-side (core/view.ts projectView; GET serves the same
 				// native messages).
