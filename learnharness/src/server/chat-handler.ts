@@ -45,6 +45,7 @@ import { catalogContextLimits } from "./model-catalog.ts";
 import { refreshClaudeConnections } from "../agent/claude-connection.ts";
 import { emit } from "../core/events.ts";
 import { settledTurnResponse } from "./turn-runs.ts";
+import { stoppedReplyIds } from "../core/turn-cut.ts";
 import { asAgentMessages } from "../core/native-messages.ts";
 import {
 	ChatInputError,
@@ -283,6 +284,9 @@ export async function handleChatInput(
 	// A compaction marker or another writer may have landed during awaits.
 	// These omissions affect ONLY the agent context, never the saved record.
 	let retryOmissions = new Set<string>();
+	// Try again after a stop: the empty stopped reply stays in the record,
+	// and the tutor resumes from the input before it.
+	if (input.type === "continue") retryOmissions = stoppedReplyIds(record.messages);
 	if (input.type === "retry") {
 		try {
 			retryOmissions = retryDrops(record.messages);
@@ -363,7 +367,7 @@ export async function handleChatInput(
 	// tail to start continue(), so its temporary history omits the trailing
 	// failures only. Count that SAME temporary prefix at settlement, or the
 	// retained failures would make persistTurn skip genuinely new output.
-	const agentMessages = input.type === "retry" ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
+	const agentMessages = retryOmissions.size > 0 ? merged.filter((m) => !retryOmissions.has(m.id)) : merged;
 	const persistBaseCount = agentMessages.length;
 	try {
 		stores.chatStore.saveMessages(chatId, merged);
@@ -519,7 +523,12 @@ export async function handleChatInput(
 			// transcript directly (the retry context the model saw).
 			onError: (error) => {
 				console.error(`[chat ${chatId}] Claude turn error:`, error);
-				return claudeTurnError(error instanceof Error ? error.message : String(error));
+				const text = claudeTurnError(error instanceof Error ? error.message : String(error));
+				// The submitter attaches after the POST's ack, often after a
+				// turn that failed at once has left the registry: keep the
+				// notice for it, or the failure reaches no screen.
+				rememberTurnFailure(chatId, text);
+				return text;
 			},
 			onSettleError: settlementErrorText,
 			onSettleFailure: (error, reportedErrorText) => {

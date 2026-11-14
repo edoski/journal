@@ -12,6 +12,14 @@ export function replyNeverCame(messages: readonly LhMessage[]): boolean {
 	return replyCutOf(messages) !== null;
 }
 
+const isNeutral = (m: LhMessage): boolean => m.role === "custom" && NEUTRAL_MARKERS.includes((m as { customType: string }).customType);
+
+/** A reply someone stopped before its first word: thinking at most. */
+function isEmptyStop(m: LhMessage): boolean {
+	return m.role === "assistant" && m.stopReason === "aborted" &&
+		!m.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall");
+}
+
 /** Why the reply never came (`replyNeverCame`): "stopped" when the record
  *  ends at an empty reply someone stopped (only a stop press, his, from
  *  any window, aborts a turn), "lost" when it ends at his input with no
@@ -19,13 +27,23 @@ export function replyNeverCame(messages: readonly LhMessage[]): boolean {
  *  Pure. */
 export function replyCutOf(messages: readonly LhMessage[]): "stopped" | "lost" | null {
 	let i = messages.length - 1;
-	while (i >= 0 && messages[i]!.role === "custom" && NEUTRAL_MARKERS.includes((messages[i] as { customType: string }).customType)) i--;
+	while (i >= 0 && isNeutral(messages[i]!)) i--;
 	const last = messages[i];
 	if (!last) return null;
-	if (last.role === "assistant") {
-		const empty = last.stopReason === "aborted" && !last.content.some((b) => (b.type === "text" && b.text.trim() !== "") || b.type === "toolCall");
-		return empty ? "stopped" : null;
-	}
+	if (last.role === "assistant") return isEmptyStop(last) ? "stopped" : null;
 	if (last.role === "toolResult") return null;
 	return nativeInputCause(last as never, messages.slice(0, i) as never) === "learner" ? "lost" : null;
+}
+
+/** The empty stopped replies a `continue` steps past (round 4): the record
+ *  keeps them, since they show his stop, but the tutor resumes from the
+ *  input before them, which pi needs as the history's last message. Pure. */
+export function stoppedReplyIds(messages: readonly LhMessage[]): Set<string> {
+	const ids = new Set<string>();
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const m = messages[i]!;
+		if (isEmptyStop(m)) ids.add(m.id);
+		else if (!isNeutral(m)) break;
+	}
+	return ids;
 }
