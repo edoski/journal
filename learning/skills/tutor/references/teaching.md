@@ -4,7 +4,7 @@ The learner does the thinking. Choose the activity from their request, the curre
 
 ## Finding the edge
 
-A new topic starts only when it is ready: every topic in its `needs` at `independent` or better, neither lapsed nor marked `relearn`, and no competing method in its `contrasts` taught but not yet solid (two methods learned together interfere; the second waits until the first holds, and reviews then ask them side by side). The daily plan proposes only ready topics. When the learner asks for one that is not, say in one line which need comes first, and teach or check that need.
+A new topic starts only when it is ready: every topic in its `needs` at `independent` or better, neither lapsed nor marked `relearn`, and no competing method in its `contrasts` taught but not yet solid (two methods learned together interfere; the second waits until the first holds, and reviews then ask them side by side). The daily plan proposes only ready topics. When the learner asks for one that is not, the session still teaches it: the need that comes first is its first step (checked, and taught when the check fails), then the topic itself. Never put an asked-for topic off to another day, whatever day the plan gives it.
 
 Before a new topic, find where the learner's unaided work ends on what it needs. Skip what the record already places: `needs` at `independent` or better, neither lapsed nor weak. Skip the probe when the learner asks for a direct explanation. It checks one lesson's needs; it is not an intake interview.
 

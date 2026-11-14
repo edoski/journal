@@ -143,9 +143,10 @@ describe("the engine's re-teach and readiness rules in the prompts", () => {
 	it("practice hands a topic marked relearn to teaching, as it does a second lapse", () => {
 		assert.match(composeInstructions("practice"), /lapses again or the record marks it `relearn`/);
 	});
-	it("the teacher starts only ready topics and re-teaches after two failures at one step", () => {
+	it("the teacher picks only ready topics itself, teaches one he asks for today, and re-teaches after two failures at one step", () => {
 		const teacher = composeInstructions("teacher");
-		assert.match(teacher, /Start only ready topics\..*`needs` is `independent` or better.*`relearn`/s);
+		assert.match(teacher, /An open-ended start picks a new topic only when every topic in its `needs` is `independent` or better.*`relearn`/s);
+		assert.match(teacher, /A topic he asks for, or opened from its page, is taught today/);
 		assert.match(teacher, /Two failures at the same step mean stop asking/);
 	});
 });
