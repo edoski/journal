@@ -139,13 +139,20 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 	);
 }
 
-/** Scheduled: the engine's next review, its day in the date column. A
- *  date, not a control. */
-export function ScheduledEntry({ day }: { day: string }) {
+/** Scheduled: the engine's next review, why it waits when a nearer exam
+ *  holds it, and its day in the date column. A date, not a control. */
+export function ScheduledEntry({ day, waits }: { day: string; waits: string | null }) {
 	return (
 		<p data-slot="pickup-scheduled" className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
 			<HistoryIcon aria-hidden className={ICON} />
-			<span className="truncate text-row text-muted-foreground">Review</span>
+			<span className="truncate text-row text-muted-foreground">
+				Review
+				{waits && (
+					<span data-slot="pickup-scheduled-waits" className="ml-2 text-label">
+						{waits}
+					</span>
+				)}
+			</span>
 			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>

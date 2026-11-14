@@ -140,3 +140,26 @@ def test_a_new_course_s_whole_path_is_planned_up_to_its_exam(
     assert run(monkeypatch, capsys, root, "resume")["starts"] == starts
     topics = run(monkeypatch, capsys, root, "map")["topics"]
     assert {item["topic"]: item["starts"] for item in topics} == starts
+
+
+def test_the_map_says_a_review_waits_for_a_nearer_exam(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    exam = course(tmp_path / "exam")
+    free = course(tmp_path / "free")
+    due = {"topic": {"introduced": day(-20), "review": {"due": day(0)}}}
+    run(
+        monkeypatch,
+        capsys,
+        exam,
+        "save",
+        stdin={"topics": due, "exam": {"date": day(20)}},
+    )
+    run(monkeypatch, capsys, free, "save", stdin={"topics": due})
+
+    exams = run(monkeypatch, capsys, exam, "map")["topics"]
+    assert [(item["review"], "held" in item) for item in exams] == [(day(0), False)]
+    frees = run(monkeypatch, capsys, free, "map")["topics"]
+    assert [(item["review"], item.get("held")) for item in frees] == [(day(1), True)]

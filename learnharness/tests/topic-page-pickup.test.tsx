@@ -150,7 +150,7 @@ describe("the sections' order", () => {
 	it("dates only a review the engine set ahead, as Scheduled", () => {
 		assert.deepEqual(
 			ROWS.map(([, facts]) => pickupSections(facts).scheduled),
-			[null, null, null, null, null, null, "Fri 13 Nov"],
+			[null, null, null, null, null, null, { day: "Fri 13 Nov", waits: null }],
 		);
 	});
 });
@@ -178,6 +178,14 @@ describe("the sections drawn", () => {
 			if ("chat" in facts.action) assert.equal(press.getAttribute("href"), `/chat/${facts.action.chat.id}`, name);
 			else assert.equal(press.tagName, "BUTTON", name);
 		}
+	});
+
+	it("says why the scheduled review waits when a nearer exam holds it, and only then", () => {
+		const held = factsOf({ ...VECTORS, review: { kind: "scheduled", date: "2026-12-03", held: true } });
+		assert.deepEqual(pickupSections(held).scheduled, { day: "Thu 3 Dec", waits: "Waits for your exams" });
+		const line = page(held).querySelector('[data-slot="pickup-scheduled"]')!;
+		assert.equal(line.querySelector('[data-slot="pickup-scheduled-waits"]')!.textContent, "Waits for your exams");
+		assert.equal(page(factsOf(VECTORS)).querySelector('[data-slot="pickup-scheduled-waits"]'), null);
 	});
 
 	it("keeps the lesson Now opens on the map, its map button pressed, Now itself a plain row with no fill", () => {

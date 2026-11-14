@@ -152,6 +152,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 	} else if (entry.kind === "review") {
 		const date = entry.topic.review?.date ?? entry.day;
 		lines.push(entry.overdue ? `Was due ${longDayWords(date)}` : entry.day === today ? overdueWords(0) : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
+		if (entry.waits) lines.push(entry.waits);
 	} else if (entry.kind === "new") {
 		lines.push(entry.day === today ? "Planned for today" : `Planned for ${longDayWords(entry.day)}, ${distanceWords(entry.day, today).toLowerCase()}`);
 	} else if (entry.task.step) {

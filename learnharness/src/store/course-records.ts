@@ -229,7 +229,7 @@ function mapTopicOf(entry: unknown): (CourseMapTopic & { needs: string[]; contra
 		review: reviewDate
 			? typeof e.overdue === "number"
 				? { kind: "due", date: reviewDate, overdue: count(e.overdue) }
-				: { kind: "scheduled", date: reviewDate }
+				: { kind: "scheduled", date: reviewDate, ...(e.held === true ? { held: true as const } : {}) }
 			: null,
 		weak: e.weak === true,
 		...(isRightAnswer(e.right) ? { right: e.right } : {}),

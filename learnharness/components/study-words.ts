@@ -92,6 +92,22 @@ export function returnWords(days: number): string {
 	return `Back in ${Math.round(days / 30)}mo`;
 }
 
+/** Why a review waits past the day memory asks for it, when the engine's
+ *  plan says a nearer exam's reviews filled the evenings before it
+ *  (`held`): a course with no exam ahead of the review waits for the exam
+ *  courses, one whose own exam is still ahead waits for a nearer one. */
+export const HELD_WORDS = {
+	exams: "Waits for your exams",
+	nearer: "Waits for a nearer exam",
+} as const;
+
+/** The words for a review the plan holds back (`HELD_WORDS`); null for one
+ *  it does not. `exam` is the course's exam day, null with none. */
+export function heldWords(review: CourseMapTopic["review"], exam: string | null): string | null {
+	if (review?.kind !== "scheduled" || !review.held) return null;
+	return exam !== null && exam > review.date ? HELD_WORDS.nearer : HELD_WORDS.exams;
+}
+
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
  *  2026): a reply below the fold, a reply that never came, a draft another
  *  window overtook, stopping for the night, and a course whose record

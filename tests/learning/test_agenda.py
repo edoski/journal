@@ -349,3 +349,33 @@ def test_a_nearer_exam_keeps_its_topics_ahead_of_a_later_exams_pace() -> None:
     together = plan({"near": near, "far": far}, 40, week(10, 1, frozenset(range(7))))
     assert "near" not in together.does_not_fit
     assert max(started(together.days["near"]).values()) < on(8).isoformat()
+
+
+def solid(record: dict[str, Any], due: date) -> dict[str, Any]:
+    """Every topic taught, answered right on its own, and due on ``due``."""
+    every = {key: {"introduced": True} for key in record["topics"]}
+    record = save(record, {"topics": every}, on(-10))
+    record = save(record, {"observations": [answer(t) for t in every]}, on(-9))
+    pins = {key: {"review": {"due": due.isoformat()}} for key in record["topics"]}
+    return save(record, {"topics": pins}, MONDAY)
+
+
+def test_a_review_left_out_while_a_nearer_exams_reviews_fill_the_evening_is_held() -> (
+    None
+):
+    exam = solid(course(4, exam=20), on(-1))
+    free = solid(course(2), on(-1))
+    together = plan({"exam": exam, "free": free}, 10, week(2, 0, frozenset(range(7))))
+    assert together.days["exam"][0]["reviews"] == ["t00", "t01"]
+    assert together.days["free"][0]["reviews"] == []
+    assert together.held == {"free": {"t00", "t01"}}
+    assert together.when("free", MONDAY, True).held == frozenset({"t00", "t01"})
+    assert together.when("exam", MONDAY, True).held == frozenset()
+
+
+def test_a_review_that_waits_only_on_its_own_course_is_not_held() -> None:
+    free = solid(course(4), on(-1))
+    together = plan({"free": free}, 10, week(2, 0, frozenset(range(7))))
+    assert together.days["free"][0]["reviews"] == ["t00", "t01"]
+    assert together.days["free"][1]["reviews"] == ["t02", "t03"]
+    assert together.held == {}

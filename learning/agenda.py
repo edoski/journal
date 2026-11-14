@@ -16,7 +16,9 @@ Reviews, when there are more than fit:
   2. other reviews of courses with an exam ahead, nearest exam first;
   3. reviews of courses with no exam;
   4. reviews of courses whose exam has passed, on their spaced dates.
-Within each, the course's own order (``progress.due``). A course's final review
+Within each, the course's own order (``progress.due``). A review left out of a
+full evening while a nearer exam's reviews were in it waits for that exam; the
+plan says so (``When.held``). A course's final review
 is spread over its study days to the exam in proportion to the reviews he
 completes on each, so a lighter evening takes less of it and a day off none.
 
@@ -84,6 +86,9 @@ class _Course:
     days: list[dict[str, Any]] = field(default_factory=list)
     introduced: set[str] = field(default_factory=set)
     projected: set[str] = field(default_factory=set)
+    holding: set[str] = field(default_factory=set)
+    placed: set[str] = field(default_factory=set)
+    held: set[str] = field(default_factory=set)
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -155,6 +160,14 @@ class _Course:
         entry["review"] = {**entry.get("review", {}), "due": due.isoformat()}
         self.record["topics"][topic] = entry
 
+    def place(self, topic: str) -> None:
+        """Its review is on today's plan: held when its first placement
+        came after a nearer exam's reviews filled an evening it was due."""
+        if topic not in self.placed and topic in self.holding:
+            self.held.add(topic)
+        self.placed.add(topic)
+        self.holding.discard(topic)
+
     def reviewed(self, topic: str, day: date) -> None:
         stored = self.record["topics"][topic].get("review", {}).get("due")
         engine = self.replayed[topic].due if topic not in self.projected else None
@@ -208,6 +221,7 @@ class When:
     starts: dict[str, date]
     studies: bool
     does_not_fit: list[str]
+    held: frozenset[str] = frozenset()
 
     def review(self, topic: str, stored: str | None) -> str | None:
         placed = self.reviews.get(topic)
@@ -221,11 +235,13 @@ class When:
 
 @dataclass
 class Plan:
-    """Each course's days (``{date, reviews, new}``) and the path topics it
-    cannot start before its exam."""
+    """Each course's days (``{date, reviews, new}``), the path topics it
+    cannot start before its exam, and the topics whose next review it put
+    later because a nearer exam's reviews filled the evenings before it."""
 
     days: dict[str, list[dict[str, Any]]]
     does_not_fit: dict[str, list[str]]
+    held: dict[str, set[str]] = field(default_factory=dict)
 
     def when(self, name: str, today: date, studies: bool) -> When:
         reviews: dict[str, date] = {}
@@ -237,7 +253,14 @@ class Plan:
                     reviews.setdefault(topic, on)
             for topic in day["new"]:
                 starts.setdefault(topic, on)
-        return When(today, reviews, starts, studies, self.does_not_fit.get(name, []))
+        return When(
+            today,
+            reviews,
+            starts,
+            studies,
+            self.does_not_fit.get(name, []),
+            frozenset(self.held.get(name, ())),
+        )
 
 
 class _Allowance:
@@ -263,6 +286,9 @@ def _study_days(week: Capacity, first: date, last: date) -> int:
 def _reviews(
     courses: list[_Course], day: date, room: float, week: Capacity
 ) -> dict[str, list[str]]:
+    """The day's reviews within ``room``. Each one left out once the room is
+    full while a nearer exam's review was taken goes on its course's
+    ``holding``."""
     candidates: list[tuple[tuple[int, float, int], _Course, str]] = []
     quota: dict[str, int] = {}
     for course in courses:
@@ -283,15 +309,22 @@ def _reviews(
         )
     candidates.sort(key=lambda item: (item[0], item[1].name))
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
-    for _, course, topic in candidates:
+    nearest = math.inf
+    left: list[tuple[float, _Course, str]] = []
+    for (_, distance, _), course, topic in candidates:
         if room <= 0:
-            break
+            left.append((distance, course, topic))
+            continue
         if course.final(topic, day):
             if quota[course.name] <= 0:
                 continue
             quota[course.name] -= 1
         chosen[course.name].append(topic)
+        nearest = min(nearest, distance)
         room -= 1
+    for distance, course, topic in left:
+        if nearest < distance:
+            course.holding.add(topic)
     return chosen
 
 
@@ -385,6 +418,7 @@ def plan(
         reviews = _reviews(courses, day, reviews_room, week)
         for course in courses:
             for topic in reviews[course.name]:
+                course.place(topic)
                 course.reviewed(topic, day)
         new = _new(courses, day, new_room, week, begun)
         for course in courses:
@@ -402,4 +436,5 @@ def plan(
             for course in courses
             if course.ahead(today) and course.untaught
         },
+        {course.name: course.held for course in courses if course.held},
     )
