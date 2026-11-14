@@ -2,7 +2,7 @@
 
 import { createContext, Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useChatSession } from "@/components/session";
-import { visibleQueuedSteers } from "@/components/session-core";
+import { STREAM_DROPPED, visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
 import { useModelSetup, SignInPill } from "@/components/setup-cta";
@@ -70,6 +70,7 @@ import {
 	toolQuestionKind,
 	questionNeedsReveal,
 	doneTonightAtEnd,
+	replyNeverCame,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -87,6 +88,7 @@ import { DOCK_SURFACE } from "@/components/lesson/dock-surface";
 import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/reading-position";
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
+import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
 
@@ -724,6 +726,9 @@ export function Chat({
 	const retryFailedTurn = () => retryFailedResponse(send, draftRef);
 	const failure = failedResponseAtEnd(nativeMessages);
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
+	// A turn that ended with no word after his input (a restart, a stop
+	// before the reply began) says so, with Try again (turn-cut.ts).
+	const replyCut = status === "ready" && !busy && !compacting && !error && replyNeverCame(nativeMessages);
 	const sendAllowed = !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
@@ -1057,7 +1062,13 @@ export function Chat({
 		}, 250);
 	});
 	// Reconnect catch-up: events missed while the channel was down.
-	useServerResync(() => fetchJobsRef.current());
+	useServerResync(() => {
+		fetchJobsRef.current();
+		// The channel came back after the app restarted: a turn the restart
+		// cut never settles, so the dropped stream's line would stand
+		// forever. Ask the record what is true now.
+		if (statusRef.current === "error" && errorMessageRef.current === STREAM_DROPPED) void healDroppedStreamRef.current();
+	});
 	useEffect(
 		() => () => {
 			if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
@@ -1074,6 +1085,24 @@ export function Chat({
 	// between renders, and a ref holds the live value at event time.
 	const statusRef = useRef(status);
 	statusRef.current = status;
+	const errorMessageRef = useRef(error?.message);
+	errorMessageRef.current = error?.message;
+	const healDroppedStreamRef = useRef(async () => {});
+	healDroppedStreamRef.current = async () => {
+		try {
+			const res = await fetch(`/api/chats/${chatId}`);
+			if (!res.ok) return;
+			const record = (await res.json()) as { turnInFlight?: boolean };
+			if (record.turnInFlight === true) {
+				attachToRunningTurn();
+				return;
+			}
+			clearError();
+			void syncFromServer();
+		} catch {
+			/* still unreachable: the next resync asks again */
+		}
+	};
 	/** Fix B (2026-10-02): turn-settled arrived for OUR OWN turn — the
 	 * record is durable (endTurn fires only after persistTurn); the ready
 	 * flip consumes this flag to canonize the view onto the record. See the
@@ -1530,6 +1559,7 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
+							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>

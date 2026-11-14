@@ -1198,7 +1198,14 @@ function trailingBatchOwner(messages: readonly LhMessage[]): number {
 	return messages[i]?.role === "assistant" ? i : -1;
 }
 
-export function needsContinuation(messages: readonly LhMessage[]): boolean {
+export function needsContinuation(record: readonly LhMessage[]): boolean {
+	// Context markers written after an answer (the course brief rides every
+	// learner input) carry no input of their own: what is owed is read from
+	// the input before them. Without this, a turn the app's restart cut
+	// right after his answer was never resumed.
+	let end = record.length;
+	while (end > 0 && record[end - 1]!.role === "custom" && NEUTRAL_MARKERS.includes((record[end - 1] as { customType: string }).customType)) end--;
+	const messages = end === record.length ? record : record.slice(0, end);
 	const last = messages[messages.length - 1];
 	if (!last || (last as { role?: string }).role !== "toolResult") return false;
 	// The dismissal rule (A2 + owner ruling 2026-10-03, round-1 incident):
