@@ -15,11 +15,6 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Hint } from "@/components/ui/hint";
 
-/** The field look (spec: settings.md): 28px, radius 8, the input
- *  edge (white 11%), 13px, the 2px focus ring. */
-export const SETTINGS_FIELD =
-	"h-7 rounded-md border border-input bg-transparent px-2 text-row text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none";
-
 /** A section block: pronounced mono heading + content. */
 export function SettingsSection({
 	title,
@@ -161,36 +156,6 @@ export function Toggle({
 				{discIcon}
 			</span>
 		</button>
-	);
-}
-
-/** A thin select — native element, options as given. */
-export function ThinSelect({
-	value,
-	onChange,
-	children,
-	ariaLabel,
-	testid,
-	disabled,
-}: {
-	value: string;
-	onChange: (next: string) => void;
-	children: React.ReactNode;
-	ariaLabel: string;
-	testid?: string;
-	disabled?: boolean;
-}) {
-	return (
-		<select
-			value={value}
-			aria-label={ariaLabel}
-			data-testid={testid}
-			disabled={disabled}
-			onChange={(e) => onChange(e.target.value)}
-			className={SETTINGS_FIELD}
-		>
-			{children}
-		</select>
 	);
 }
 
