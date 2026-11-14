@@ -129,6 +129,31 @@ describe("the close marks the lesson's new topics introduced", () => {
 		assert.match((res.content[0] as { text: string }).text, /Marked introduced: eigen/);
 	});
 
+	it("gives each lesson topic's day as the plan holds it after the close's save, in words, for the close to copy", async () => {
+		const maps = [
+			{ today: "2026-11-08", topics: [mapTopic("eigen", null), mapTopic("rank", "2026-11-03")] },
+			{
+				today: "2026-11-08",
+				topics: [
+					{ ...mapTopic("eigen", "2026-11-08"), review: { kind: "scheduled", date: "2026-11-13", held: { reason: "full", due: "2026-11-09" } } },
+					{ ...mapTopic("rank", "2026-11-03"), review: { kind: "scheduled", date: "2026-11-09" } },
+				],
+			},
+		];
+		const course = {
+			course: { workspace: "/study/la", title: "Linear Algebra" },
+			records: { map: async () => ({ ok: true, map: maps.shift() }), run: async () => ({ ok: true, json: {} }) },
+		};
+		const messages = [assistant([call("s1", "course_save", { changes: { observations: [{ topics: ["rank"], result: "correct" }] } })]), result("s1", "course_save", null)];
+		const tool = planTools({ chatId: "c1", chatStore: { getChat: () => ({ tree: TOPIC_TREE, messages, topics: ["eigen"] }) } as never, course: course as never })[LESSON_PROGRESS_TOOL]!;
+		const res = await tool.execute("t1", { done: ["eigen"], close: true });
+		const body = JSON.parse((res.content[0] as { text: string }).text) as { days: Record<string, { planned: string; planned_words: string }> };
+		assert.deepEqual(body.days, {
+			eigen: { planned: "2026-11-13", planned_words: "Friday 13 November, in 5 days" },
+			rank: { planned: "2026-11-09", planned_words: "tomorrow, Monday 9 November" },
+		});
+	});
+
 	it("saves nothing without a close, or when every topic is already introduced", async () => {
 		const open = closeWith({ topics: [mapTopic("eigen", null)] });
 		await open.tool.execute("t1", { done: ["eigen"] });
@@ -143,9 +168,10 @@ describe("the engine's re-teach and readiness rules in the prompts", () => {
 	it("practice hands a topic marked relearn to teaching, as it does a second lapse", () => {
 		assert.match(composeInstructions("practice"), /lapses again or the record marks it `relearn`/);
 	});
-	it("the teacher starts only ready topics and re-teaches after two failures at one step", () => {
+	it("the teacher picks only ready topics itself, teaches one he asks for today, and re-teaches after two failures at one step", () => {
 		const teacher = composeInstructions("teacher");
-		assert.match(teacher, /Start only ready topics\..*`needs` is `independent` or better.*`relearn`/s);
+		assert.match(teacher, /An open-ended start picks a new topic only when every topic in its `needs` is `independent` or better.*`relearn`/s);
+		assert.match(teacher, /A topic he asks for, or opened from its page, is taught today/);
 		assert.match(teacher, /Two failures at the same step mean stop asking/);
 	});
 });

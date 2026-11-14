@@ -30,7 +30,7 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 		]);
 		if (planned && !planned.ok) console.error(`[chat ${record.id}] exam run-up skipped: ${planned.message}`);
 		const runup = planned?.ok ? { plan: planned.json, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan });
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, { runup, arcCheck: record.arcCheck, plan, opened: openedOn(record) });
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);
@@ -63,6 +63,14 @@ async function fetchCoursePlans(chatId: string, workspace: string): Promise<Cour
 		console.error(`[chat ${chatId}] daily plan skipped:`, err);
 		return undefined;
 	}
+}
+
+/** The topics a session was opened on: a topic's page or Home's review
+ *  set `topics` at creation. A session the tutor named took its topic from
+ *  that name instead (and is `named`), and an arc's check carries its own
+ *  block, so neither was opened on a topic. */
+function openedOn(record: ChatRecord): readonly string[] {
+	return record.named || record.arcCheck ? [] : (record.topics ?? []);
 }
 
 /** Whether the session's course groups its topics into arcs, read every

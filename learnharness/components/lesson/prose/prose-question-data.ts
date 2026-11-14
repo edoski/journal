@@ -9,6 +9,7 @@ import {
 	normalizeOptions,
 	normalizeQuestionType,
 	parseQuestionInput,
+	QUESTION_TOOLS,
 	toolQuestionKind,
 	type AskToolInput,
 	type Confidence,
@@ -100,4 +101,36 @@ export function digitOption(key: string, optionCount: number): number | null {
 	if (!/^[1-9]$/.test(key)) return null;
 	const index = Number(key) - 1;
 	return index < optionCount ? index : null;
+}
+
+/** A transcript part as the re-ask reading needs it. */
+interface QuestionPart {
+	type: string;
+	toolCallId?: string;
+	input?: unknown;
+	output?: unknown;
+}
+
+/** The question calls that ask again, word for word, the question he just
+ *  pressed Hint on. The tutor re-asks after every hint (a hint is not an
+ *  answer, so the question must come back open), and the transcript draws
+ *  those words once, above the hint, so the re-ask shows only "Your turn"
+ *  (round 5, 14 Nov 2026: the whole question printed twice). A re-ask in
+ *  new words is a rephrasing and draws them. */
+export function reaskedAfterHint(messages: ReadonlyArray<{ parts: readonly QuestionPart[] }>): ReadonlySet<string> {
+	const reasked = new Set<string>();
+	const words = (part: QuestionPart) => {
+		const question = (part.input as { question?: unknown } | undefined)?.question;
+		return typeof question === "string" ? question.replace(/\s+/g, " ").trim() : null;
+	};
+	let previous: QuestionPart | null = null;
+	for (const message of messages) {
+		for (const part of message.parts) {
+			if (!part.type.startsWith("tool-") || !(QUESTION_TOOLS as readonly string[]).includes(part.type.slice("tool-".length))) continue;
+			const hinted = (previous?.output as Partial<QuestionAnswerData> | undefined)?.hintRequested === true;
+			if (previous && hinted && part.toolCallId && words(part) !== null && words(part) === words(previous)) reasked.add(part.toolCallId);
+			previous = part;
+		}
+	}
+	return reasked;
 }

@@ -122,9 +122,9 @@ def test_courses_share_one_day_and_the_nearest_exam_starts_first() -> None:
         assert reviews <= 4 and new <= 1
     assert together.days["near"][0]["new"] == ["t00"]
     assert together.days["far"][0]["new"] == []
-    assert max(started(together.days["near"]).values()) < min(
-        started(together.days["far"]).values()
-    )
+    assert together.does_not_fit == {}
+    last = progress.last_new_day(progress.exam_plan(planned(near))).isoformat()
+    assert max(started(together.days["near"]).values()) <= last
 
 
 def test_new_topics_finish_before_the_final_review_and_the_rest_does_not_fit() -> None:
@@ -379,7 +379,7 @@ def test_doing_exactly_what_the_plan_proposes_never_shows_a_limit() -> None:
 
 
 def test_each_day_he_starts_fewer_than_a_pace_of_several_is_a_short_day() -> None:
-    record = course(12, exam=9)
+    record = course(20, exam=9)
     paced = 0
     for offset in range(5):
         today = plan_for(record, on(offset))
@@ -674,3 +674,105 @@ def test_the_engines_dates_follow_the_final_review_as_read() -> None:
     }
     read = progress.redated(progress.with_final_review(record, on(16)), MONDAY)
     assert read["topics"]["t00"]["review"]["due"] == on(16).isoformat()
+
+
+def reviews_by_date(result: agenda.Plan, name: str) -> dict[str, int]:
+    return {day["date"]: len(day["reviews"]) for day in result.days[name]}
+
+
+def test_a_plan_made_tomorrow_gives_each_date_the_room_todays_plan_gave_it() -> None:
+    record = taught(course(40), on(-1))
+    capacity_ = week(2.5, 0)
+    today = reviews_by_date(agenda.plan({"c": record}, MONDAY, 14, capacity_), "c")
+    tomorrow = agenda.plan({"c": record}, on(1), 13, capacity_)
+    assert reviews_by_date(tomorrow, "c") == {
+        day: count for day, count in today.items() if day > MONDAY.isoformat()
+    }
+
+
+def test_the_same_records_and_day_give_the_same_plan() -> None:
+    first = solid(taught(course(8, exam=20), on(-1)), on(2))
+    second = course(6, exam=12)
+    third = taught(course(5), on(-2))
+    records = {"a": first, "b": second, "c": third}
+    capacity_ = week(2.5, 1.5)
+    once = plan(records, 28, capacity_)
+    again = plan(dict(reversed(list(records.items()))), 28, capacity_)
+    assert once.days == again.days
+    assert once.held == again.held and once.why == again.why
+
+
+def test_a_save_that_changes_no_topic_moves_no_courses_days() -> None:
+    first = taught(course(8, exam=20), on(-1))
+    other = taught(course(6), on(-2))
+    capacity_ = week(2.5, 1.5)
+    before = plan({"a": first, "b": other}, 28, capacity_)
+    noted = save(
+        first,
+        {
+            "knowledge": {"notation": {"text": "Vectors are columns."}},
+            "tasks": {"sheet": {"title": "Sheet 1", "step": "part (b)"}},
+            "path": {"current": "t03"},
+        },
+        MONDAY,
+    )
+    after = plan({"a": noted, "b": other}, 28, capacity_)
+    assert after.days == before.days
+
+
+EVERY_DAY = frozenset(range(7))
+
+
+def test_a_fractional_pace_starts_on_some_days_and_leaves_the_rest_to_a_course_without_an_exam() -> (
+    None
+):
+    exam = course(27, exam=60)
+    end = progress.new_end(progress.exam_plan(planned(exam)), MONDAY)
+    left = (end - MONDAY).days + 1
+    assert 0.4 < 27 / left < 0.6, left
+    together = plan({"exam": exam, "open": course(30)}, 28, week(10, 1, EVERY_DAY))
+    paced = [len(day["new"]) for day in together.days["exam"]]
+    others = [len(day["new"]) for day in together.days["open"]]
+    assert 0.8 * 27 / left * 28 <= sum(paced) <= 1.2 * 27 / left * 28 + 1, paced
+    assert [a + b for a, b in zip(paced, others, strict=True)] == [1] * 28
+
+
+def test_the_plan_made_on_two_consecutive_days_gives_the_same_dates() -> None:
+    capacity_ = week(10, 1, EVERY_DAY)
+    records = {"exam": course(27, exam=60), "open": course(30)}
+    first = plan(records, 28, capacity_)
+    for name, days in first.days.items():
+        if days[0]["new"]:
+            begun = {topic: {"introduced": True} for topic in days[0]["new"]}
+            records[name] = save(records[name], {"topics": begun}, MONDAY)
+    tomorrow = agenda.plan(records, on(1), 27, capacity_)
+    for name, days in first.days.items():
+        assert started(tomorrow.days[name]) == started(days[1:]), name
+
+
+def test_an_exam_course_beside_one_without_an_exam_starts_every_topic_before_its_final_review() -> (
+    None
+):
+    chain = {f"t{index:02d}": [f"t{index - 1:02d}"] for index in range(1, 27, 3)}
+    exam = course(27, exam=60, needs=chain)
+    together = plan({"exam": exam, "open": course(30)}, 60, week(10, 1, EVERY_DAY))
+    last = progress.last_new_day(progress.exam_plan(planned(exam))).isoformat()
+    assert together.does_not_fit == {}
+    assert len(started(together.days["exam"])) == 27
+    assert max(started(together.days["exam"]).values()) <= last
+
+
+def test_a_pace_never_leaves_a_topic_to_days_with_no_room_for_it() -> None:
+    rates = (1.0, 0.6, 0.7, 1.6, 0.9, 1.0, 1.2)
+    uneven = Capacity(
+        tuple(Weekday(1.0, Limit(10, True), Limit(rate, True)) for rate in rates),
+        EVERY_DAY,
+        20.0,
+    )
+    exam = course(1, exam=12)
+    last = progress.last_new_day(progress.exam_plan(planned(exam)))
+    assert last == on(2), "Wednesday holds no new topic after Monday and Tuesday"
+    days = plan({"c": exam, "open": course(10)}, 12, uneven)
+    assert started(days.days["c"]) and max(started(days.days["c"]).values()) <= (
+        last.isoformat()
+    )

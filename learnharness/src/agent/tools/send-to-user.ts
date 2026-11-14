@@ -20,7 +20,7 @@ export const sendToUserTool: AgentTool<typeof sendToUserInput> = {
 	description:
 		"## REQUIRED OUTPUT CHANNEL — ALWAYS USE `send_to_user`\n\n" +
 		"**ALL learner-facing messages MUST be sent using `send_to_user`.** This includes explanations, teaching, " +
-		"feedback, corrections, hints, introductions, progress messages, and final responses. " +
+		"feedback, corrections, hints and final responses. " +
 		"There is no exception for short messages or the end of a turn.\n\n" +
 		"Ordinary response text may be converted into summarized thinking instead of reaching the learner. " +
 		"**Never rely on ordinary response text to communicate with the learner. Thinking is not delivery.**\n\n" +

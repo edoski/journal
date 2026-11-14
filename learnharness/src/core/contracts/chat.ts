@@ -177,7 +177,7 @@ export const HANDOFF_TEXT =
 	"Apply the teaching methodology in your system prompt, and find the optimal way to teach me this. " +
 	"Find the unconditional truths, plan the motivated derivations/discoveries, so every reasoning step has to land as obviously true. " +
 	"Take your time here and really think this through. " +
-	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away; I'll interrupt if I want something else.";
+	"When it's genuinely reasoned out, call plan_init, tell me the lesson's goal in one line, and start teaching straight away with the first step alone: one idea in two to four sentences, then its question; I'll interrupt if I want something else.";
 
 /** The model-facing opening of a fresh session that picks up a finished
  *  lesson: its plan carries over, so the teacher neither probes nor plans
@@ -197,7 +197,7 @@ export function sessionResumeText(title: string, steps: readonly { id: string; t
  *  scope to practise, or the topic to teach. */
 export const MODE_HANDOFF_TEXT: Readonly<Record<"teach" | "practice", string>> = {
 	practice:
-		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says, say in one line what you picked, and pose the first problem.",
+		"[PRACTICE] — the session moves to practice, on the scope the handoff above names (a whole lesson when it lists `topics`). Choose the material as your system prompt says and pose the first problem, with no line before it about what you chose or why.",
 	teach:
 		"[TEACHING] — the session moves back to teaching, on what the handoff above names. Carry on from there as your system prompt says.",
 };
@@ -233,20 +233,30 @@ export const CONCLUDE_ACK_TEXT =
  *  like THINKING_LABEL. The button/Enter-on-empty path appends the
  *  marker; the model reads this and poses (or wraps) per the doctrine. */
 export const NEXT_PROBLEM_TEXT =
-	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or wrap the session in text if the arc is complete.";
+	"[NEXT PROBLEM] — the learner's explicit go-ahead: pose the next problem now per the selection rules, or, if the arc is complete, close in at most two sentences: the one move the session showed was not obvious yet, or what comes next.";
 
 /** What the agent reads when he presses Done for today: the
  *  done-tonight marker's content, per answering agent (only the teacher
  *  has `lesson_progress`). Anything he left open arrives just before it
  *  already resolved: a question as a dismissal with reason "tonight", a
  *  problem as a dismissed conclude. */
+/** How every agent closes on Done for today, in the voice's budget for a
+ *  close. What he left open comes back as it was, so the close says only
+ *  what he picks up and when: a cue toward its answer would make the
+ *  pick-up count as helped (round 5, 14 Nov 2026). */
+const DONE_CLOSE =
+	"Then close in at most two sentences: what he picks up next, named by its topic or its place (the kernel problem, part (c) of the sheet), never by what it asks, and its day when the plan gives one. Never a step, cue, method or hint toward anything he left open, and no praise or summary of the session.";
+
 export const DONE_TONIGHT_TEXT = {
 	prober:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close in two or three short lines: what you learned about where he stands, and where the lesson will start next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. " +
+		DONE_CLOSE,
 	teacher:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished), then two or three short lines naming where to start next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A question he left open was never answered and its answer was never shown: don't grade it, record no attempt for it, and don't ask anything more today. Close the session now: call `lesson_progress` with `close: true` (and `done` for any step he finished). " +
+		DONE_CLOSE,
 	practice:
-		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. Close the session in two lines: what went well, and what to pick up next time.",
+		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. " +
+		DONE_CLOSE,
 } as const;
 
 /** The mark he thinks is right, in the record's words and his. */

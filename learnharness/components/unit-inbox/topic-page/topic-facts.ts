@@ -113,9 +113,8 @@ export interface TopicFacts {
 	starts: { day: string; waits: string | null } | null;
 	/** Why the plan starts a topic not started then ("After Expectation
 	 *  and linearity, which it needs", "Early, ahead of its place, while
-	 *  earlier topics wait on Change of basis", and for a topic the exam
-	 *  leaves out "Not on the exam; after it"); null once taught and with
-	 *  no plan for it. */
+	 *  earlier topics wait on Change of basis"), or for a topic the exam leaves out ("Not on
+	 *  the exam; after it"); null once taught and with no plan for it. */
 	startsWhy: StartsReason | null;
 	action: TopicAction;
 	pickups: readonly Pickup[];
@@ -169,6 +168,9 @@ export function buildsOn(topic: CourseMapTopic, map: CourseMap): BuildsOn[] {
 	return map.topics.filter((t) => needs.has(t.handle)).map((t) => ({ topic: t, standing: standingOf(t), href: unitHref(map.workspace, t.handle) }));
 }
 
+/** Why the review waits past the day memory asked for it, after from
+ *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
+ *  from 9 Nov, earlier days are full". */
 /** `TopicFacts.startsWhy`: the exam's scope first, since a topic it leaves
  *  out waits for the exam whatever else it waits on. */
 function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | null {
@@ -177,9 +179,6 @@ function startsReason(topic: CourseMapTopic, map: CourseMap): StartsReason | nul
 	return topic.startsWhy && startsWhyTells(topic.startsWhy) ? { kind: topic.startsWhy.kind, words: startsWhyWords(topic.startsWhy, map) } : null;
 }
 
-/** Why the review waits past the day memory asked for it, after from
- *  when (`movedWords`): "Due since 1 Oct, earlier days are full", "Moved
- *  from 9 Nov, earlier days are full". */
 function waitsWords(review: CourseMapTopic["review"], today: string): string | null {
 	const why = heldWords(review);
 	const moved = movedWords(review, today);

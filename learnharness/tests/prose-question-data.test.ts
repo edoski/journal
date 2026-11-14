@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec } from "../components/lesson/prose/prose-question-data.ts";
+import { digitOption, proseAnswer, proseAnswerReady, proseHintRequest, prosePlaceholder, proseQuestionSpec, reaskedAfterHint } from "../components/lesson/prose/prose-question-data.ts";
 import { emptyDockSelection } from "../src/core/index.ts";
 
 const check = { question: "Which way does $A$ stretch?", correctAnswer: "Along $(1,1)$, by 3.", type: "check" };
@@ -69,5 +69,29 @@ describe("the Prose question", () => {
 		assert.equal(digitOption("4", 3), null);
 		assert.equal(digitOption("0", 3), null);
 		assert.equal(digitOption("a", 3), null);
+	});
+});
+
+describe("a question asked again after a hint", () => {
+	const spec = proseQuestionSpec("explain", "q1", check)!;
+	const hinted = proseHintRequest(spec, "it stretches somewhere?");
+	const answered = proseAnswer(spec, emptyDockSelection(), "Along (1,1)", "confident");
+	const ask = (id: string, input: unknown, output?: unknown) => ({ type: "tool-explain", toolCallId: id, input, output });
+	const hint = { type: "text" };
+
+	it("is drawn once when its words are the same, however they are spaced", () => {
+		const spaced = { ...check, question: "Which way does   $A$\nstretch?" };
+		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted)] }, { parts: [hint, ask("q2", spaced)] }])], ["q2"]);
+	});
+
+	it("stays drawn after each of several hints", () => {
+		const second = proseHintRequest(proseQuestionSpec("explain", "q2", check)!, "");
+		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted), hint, ask("q2", check, second), hint, ask("q3", check)] }])], ["q2", "q3"]);
+	});
+
+	it("draws a rephrasing, and a question that follows an answer", () => {
+		const reworded = { ...check, question: "Along which line does $A$ stretch vectors?" };
+		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, hinted), ask("q2", reworded)] }])], []);
+		assert.deepEqual([...reaskedAfterHint([{ parts: [ask("q1", check, answered), ask("q2", check)] }])], []);
 	});
 });
