@@ -16,11 +16,11 @@ A good plan is what makes the teaching feel inevitable instead of arbitrary.
 
 The session has a live dependency map the learner sees — where he is, what he's passed, what's coming — and it updates itself from your questions. Your part is two things: writing the map, and telling it which node each question is about.
 
-You write the map with `plan_init` (a mermaid `graph TD` block), and on the first call name the lesson's `goal`: a short title and the course topic it teaches. It is a **map, not a syllabus**: nodes are structural landmarks — the unconditional truths at the bottom, the major stations, his goal at the sink — not turns of teaching. The reasoning step (one move from what he holds to the next fact) is the fine unit; a single node may take one step or five.
+You write the map with `plan_init` (a mermaid `graph TD` block), and on the first call name the lesson's `goal`: a short title and the course topic it teaches. It is a **map, not a syllabus**: nodes are structural landmarks — the unconditional truths at the bottom, the major stations, his goal at the sink — not turns of teaching. **Each node holds one idea**: one move from what he holds to the next fact, however many questions it takes to land.
 
 - Slugs are the one strict part: lowercase a-z 0-9 plus hyphens/underscores, chosen once, permanent (`chain-rule-intuition`). Checks reference them via `nodeId`; titles and the rest of the block are lenient.
 - Math in a title is LaTeX in `$…$`, as everywhere else he reads it: `det-product[$\det(AB) = \det A \det B$]`, never a bare `det(AB) = det A · det B`. The map typesets it. A title whose formula holds square brackets takes the quoted form: `closed-interval("Continuity on $[a, b]$")`.
-- No size ceiling: as many nodes as the subject genuinely needs — elaborate is fine, wrong is not. What keeps a map readable isn't compression, it's correct structure: find the unconditional truths underneath and hang everything off those.
+- **One screen.** The map fits his lesson map on one screen: at most 12 steps, and no chain of steps longer than 8 (`PLAN_MAP_CAP`, what the topic page's map shows whole at his window). `plan_init` refuses a bigger map. When the subject needs more, the lesson is too big: prune what he already holds, or split it — map the part that reaches the first goal he can use, and leave the rest for the next lesson. Within the cap, correct structure is what keeps it readable: find the unconditional truths underneath and hang everything off those.
 - `-->` edges are `requires` edges: from = must be understood before to.
 
 (Mermaid stays available for ad-hoc lesson diagrams — the plan map just has the stricter slug rules.)

@@ -33,6 +33,21 @@ export interface PlanTree {
 	version: number;
 }
 
+/**
+ * How big a lesson's plan map may be: what the topic page's lesson map
+ * shows whole, without panning, at Edo's window (1512×982, his ruling of
+ * 14 Nov 2026), each step one idea. Measured there with the sidebar open,
+ * the map's pane is 696×786; inside its fade it opens a plan whole down to
+ * the 75% scale its titles stay readable at (`WHOLE_COURSE_ZOOM`), which
+ * holds 8 rows of steps, 4 across. A plan's rows are its longest chain of
+ * steps, so `deep` caps that chain; `steps` caps the count, since a map
+ * that fills its rows spreads past 4 across: at 12 steps 9 plans in 10 of
+ * a tutor's shapes still open whole. Pinned to the pane's geometry in
+ * tests/plan-map-cap.test.ts; the planning prompt and plan_init state
+ * these numbers and point here.
+ */
+export const PLAN_MAP_CAP = { steps: 12, deep: 8 } as const;
+
 // NOTE (2026-09-11 pivot, docs/probe-teach-split.md): the tree once carried
 // `currentNodeId` / `doneNodeIds` — progress fields. They are GONE by
 // design: the tree carries structure ONLY; position and visited-ness derive

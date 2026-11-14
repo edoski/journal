@@ -1,9 +1,9 @@
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { serverExecute } from "../tool-execute.ts";
-import { LESSON_PROGRESS_TOOL, lessonProgressInput, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
+import { LESSON_PROGRESS_TOOL, lessonProgressInput, PLAN_MAP_CAP, type PlanToolResult, type PlanTree } from "../../core/contracts.ts";
 import type { ChatStore } from "../../core/ports.ts";
-import { createTree, PlanTreeError } from "../../core/plan-tree.ts";
+import { createTree, planMapTooBig, PlanTreeError } from "../../core/plan-tree.ts";
 import { parseMermaidPlan } from "./mermaid-plan.ts";
 import type { CourseToolContext } from "./course.ts";
 import { sessionTopicsOf } from "../../core/native-messages.ts";
@@ -53,6 +53,8 @@ async function introduceLessonTopics(course: CourseToolContext, candidates: read
  *     lesson's goal in one line and starts teaching in the same turn (Edo,
  *     14 Nov 2026: no approval of a map of material he doesn't know yet —
  *     he interrupts when he wants)
+ *   - the map fits his lesson map on one screen (PLAN_MAP_CAP); a bigger
+ *     one is refused with what to prune or split
  *   - statuses (current / visited / upcoming) are DERIVED from the quiz
  *     nodeId tags the teacher fires (contracts.ts derivePlanStatuses) — the
  *     teacher never declares them, and there is no "done" bookkeeping
@@ -125,7 +127,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 				"Call once right after the probe concludes, then state the lesson's goal in one line and start teaching in the same turn: he sees the map live and needs to approve nothing. " +
 				"Re-call whenever the map is wrong (the new block replaces the old tree). " +
 				"A mermaid graph block (any direction): one node per line (`slug[Short Title]` — slugs are permanent lowercase ids: a-z, 0-9, hyphens/underscores), " +
-				"`-->` edges meaning 'from must be understood before to' (chains fine). 5–15 nodes: a map, not a syllabus — one reasoning step per node, compress. " +
+				"`-->` edges meaning 'from must be understood before to' (chains fine). " +
+				`One idea per step, and the map fits his lesson map on one screen: at most ${PLAN_MAP_CAP.steps} steps, no chain longer than ${PLAN_MAP_CAP.deep}; a bigger map is refused. ` +
 				"Every check you fire names the node it assesses via `nodeId`; where the lesson stands derives from those tags.",
 			parameters: planInitInput,
 			execute: serverExecute("plan_init", planInitInput, async ({ mermaid, goal }) => {
@@ -144,6 +147,8 @@ export function planTools(ctx: PlanToolContext): Record<string, AgentTool<any>> 
 					// createTree validates the structure (duplicate ids, missing
 					// edge endpoints, self-loops, cycles → PlanTreeError).
 					const next = createTree(parsed.plan.nodes, parsed.plan.edges);
+					const tooBig = planMapTooBig(next);
+					if (tooBig) return { ok: false, error: tooBig };
 					chatStore.saveTree(chatId, next);
 					if (goal && !record.tree) chatStore.nameSession(chatId, goal);
 					// Context diet: content = the validated nodeIds + the reminder (the
