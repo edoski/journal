@@ -147,7 +147,6 @@ export function lessonTopics(chats: readonly ChatSummary[], workspace: string): 
 export interface MapCourseView extends ArcStanding {
 	topics: Record<string, ViewTopic>;
 	order: string[];
-	current: string | null;
 	basis: string | null;
 	exam: { coverage?: string; format?: string };
 	/** Every registered source handle. */
@@ -223,7 +222,6 @@ export function courseView(record: unknown, standing: ArcStanding): MapCourseVie
 	return {
 		topics,
 		order: strs(path.order),
-		current: text(path.current) ?? null,
 		basis: text(path.basis) ?? null,
 		exam: { ...(coverage ? { coverage } : {}), ...(format ? { format } : {}) },
 		sources: Object.keys(obj(r.sources)),
@@ -284,7 +282,6 @@ export interface MapSubmit {
 	topics: MapTopic[];
 	/** Every topic it proposes, in study order. */
 	order: string[];
-	current?: string;
 	/** Where the order comes from. */
 	basis?: string;
 	exam?: { coverage?: string; format?: string };
@@ -457,7 +454,6 @@ export function answerProblems(submit: MapSubmit, view: MapCourseView): string |
 		problems.push("No topics: read the material and propose its topics, or list every source you could not read under unread.");
 	}
 	for (const h of submit.order) if (!known(h)) problems.push(`order lists "${h}", which is neither proposed nor in the course.`);
-	if (submit.current && !known(submit.current)) problems.push(`current "${submit.current}" is neither proposed nor in the course.`);
 	if (view.arcs.length > 0) problems.push(...arcProblems(submit, view, arcs));
 	return problems.length > 0 ? [...new Set(problems)].join("\n") : null;
 }
@@ -546,7 +542,9 @@ export interface MapCounts {
  *    not (the engine keeps its answers), and never cleared: an exclusion
  *    the learner or the tutor lifted is theirs to set again.
  *  - New topics join `path.order` after the topic the answer's own order
- *    puts before them; `current` and `basis` are set only where none is.
+ *    puts before them; `basis` is set only where none is. `path.current`
+ *    is never set: it says where he is, which the engine counts as
+ *    studied, and a build knows only the material.
  *  - In a course with arcs: a new topic carries its answer's `arc`, or none
  *    and the engine places it; new arcs are spliced into `path.arcs` after
  *    the arc each follows; an existing arc's texts are never sent; a move
@@ -661,9 +659,6 @@ export function mapChanges(submit: MapSubmit, view: MapCourseView): { changes: J
 	const isExcluded = (k: string) => !!(view.topics[k]?.excluded ?? topics[k]?.excluded);
 	const path: Json = {};
 	if (order.length !== view.order.length) path.order = order;
-	const current = submit.current ? h(submit.current) : undefined;
-	if (!view.current && current && exists.has(current) && !isExcluded(current)) path.current = current;
-	else if (!view.current && order.length > 0) path.current = order.find((k) => !isExcluded(k)) ?? order[0];
 	if (!view.basis && submit.basis?.trim()) path.basis = submit.basis.trim();
 
 	const exam: Json = {};

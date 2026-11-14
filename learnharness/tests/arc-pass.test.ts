@@ -43,7 +43,6 @@ const topic = (title: string, needs: string[] = [], over: Partial<ViewTopic> = {
 const view = (topics: Record<string, ViewTopic>, over: Partial<ArcPassView> = {}): ArcPassView => ({
 	topics,
 	order: Object.keys(topics),
-	current: null,
 	basis: null,
 	exam: {},
 	sources: ["book"],
