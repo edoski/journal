@@ -23,6 +23,9 @@ process.env.LH_LEARNING_PYTHON = PYTHON;
 await signInTestClaude();
 
 const { projectCourseBrief } = await import("../src/core/course-brief.ts");
+type CourseMap = import("../src/core/contracts/course-map.ts").CourseMap;
+type CourseMapTopic = import("../src/core/contracts/course-map.ts").CourseMapTopic;
+type TopicHandle = import("../src/core/contracts/course-map.ts").TopicHandle;
 const { visibleCourseBriefKey, newCourseContextMessage, newUserMessage } = await import("../src/core/native-messages.ts");
 const { buildModeHandoffSteer } = await import("../src/core/contracts/jobs.ts");
 const { handleChatInput, handleChatRequest } = await import("../src/server/chat-handler.ts");
@@ -145,7 +148,7 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 
 	it("practice reads the run-up the real engine's plan reports for the course", () => {
 		const workspace = String((PLAN.courses as Resume[])[0]!.workspace);
-		const { text } = projectCourseBrief(RESUME, "practice", { plan: PLAN, workspace });
+		const { text } = projectCourseBrief(RESUME, "practice", { runup: { plan: PLAN, workspace } });
 		assert.match(text, /\nExam run-up: 10 days left; not_introduced: [^;\n]*eigen[^;\n]*; unready: [^;\n]*rank/);
 	});
 
@@ -158,11 +161,11 @@ describe("course brief projection of the real engine's resume", { skip: !realEng
 			],
 		};
 		const runup = { plan, workspace: "/study/linalg" };
-		const practice = projectCourseBrief(RESUME, "practice", runup).text;
+		const practice = projectCourseBrief(RESUME, "practice", { runup }).text;
 		assert.match(practice, /\nExam run-up: 12 days left; not_introduced: eigen; unready: rank, systems; study_days: 6; pace: 0\.17 new topics a study day\n/);
-		assert.doesNotMatch(projectCourseBrief(RESUME, "teach", runup).text, /Exam run-up/);
+		assert.doesNotMatch(projectCourseBrief(RESUME, "teach", { runup }).text, /Exam run-up/);
 		const outside = { plan: { courses: [{ workspace: "/study/linalg" }] }, workspace: "/study/linalg" };
-		assert.doesNotMatch(projectCourseBrief(RESUME, "practice", outside).text, /Exam run-up/, "outside the run-up the engine reports none");
+		assert.doesNotMatch(projectCourseBrief(RESUME, "practice", { runup: outside }).text, /Exam run-up/, "outside the run-up the engine reports none");
 	});
 
 	it("a focused task shows its goal and step and names the other open tasks", () => {
@@ -251,33 +254,139 @@ describe("course brief injection", () => {
 	});
 });
 
-describe("the brief's review days are the daily plan's", () => {
-	it("a review the plan puts on a later day shows with that day, not as due or overdue", () => {
-		const resume = {
-			today: "2026-11-08",
-			due: [{ topic: "rank", due: "2026-11-08", overdue: 0, level: "independent" }],
-			due_later: [{ topic: "sequences", planned: "2026-11-26" }],
-		};
-		const { text, key } = projectCourseBrief(resume, "teach");
-		assert.match(text, /Due today:\n- rank \(independent\)\nDue, but planned for later days: sequences \(Thursday 26 November, in 18 days\)/);
-		assert.doesNotMatch(text, /sequences \(.*overdue/);
-		const moved = projectCourseBrief({ ...resume, due_later: [{ topic: "sequences", planned: "2026-11-27" }] }, "teach").key;
-		assert.notEqual(moved, key, "a review the plan moves re-sends the brief");
+// The daily plan of every course, as each course's map gives it (the demo
+// world of 8 Nov 2026): the tutor of a Probability lesson was asked "when
+// does Calculus Monotonicity come back?" and "does every topic get a review
+// in the final days?" and could answer neither.
+const signals: CourseMapTopic["signals"] = { gap: null, lapsed: false, stale: false, choiceErrors: {}, confidentErrors: 0, repaired: false };
+const topic = (handle: string, title: string, extra: Partial<CourseMapTopic> = {}): CourseMapTopic => ({
+	handle: handle as TopicHandle,
+	title,
+	level: "retained",
+	introduced: "2026-10-01",
+	review: null,
+	weak: false,
+	signals,
+	tasks: [],
+	...extra,
+});
+const scheduled = (date: string, held?: { exam: string | null; since: string }): CourseMapTopic["review"] => ({ kind: "scheduled", date, ...(held ? { held } : {}) });
+const untaught = (starts: string, startsWhy: CourseMapTopic["startsWhy"]): Partial<CourseMapTopic> => ({ level: "new", introduced: null, starts, startsWhy });
+const courseMap = (workspace: string, title: string, exam: CourseMap["exam"], topics: CourseMapTopic[]): CourseMap => ({
+	workspace,
+	title,
+	today: "2026-11-08",
+	revision: 1,
+	exam,
+	current: null,
+	focus: null,
+	tasks: [],
+	topics,
+	edges: [],
+});
+
+const PROBABILITY = courseMap("/study/probability", "Probability", { date: "2026-11-19", daysLeft: 11, finalReview: "2026-11-14" }, [
+	topic("random-variables", "Random variables and distributions", { review: { kind: "due", date: "2026-11-08", overdue: 0 } }),
+	topic("binomial", "Binomial distribution", { review: { kind: "due", date: "2026-11-08", overdue: 2 } }),
+	topic("total-probability", "Law of total probability", { review: scheduled("2026-11-14", { exam: null, since: "2026-11-07" }) }),
+	topic("bayes", "Bayes' rule", { review: scheduled("2026-11-16") }),
+	topic("poisson", "Poisson distribution", untaught("2026-11-09", { kind: "next" })),
+	topic("expectation", "Expectation and linearity", untaught("2026-11-13", { kind: "next" })),
+	topic("variance", "Variance", untaught("2026-11-14", { kind: "after", needs: ["expectation" as TopicHandle], partners: [] })),
+	topic("covariance", "Covariance and correlation", { level: "new", introduced: null, excluded: "off the exam" }),
+]);
+const CALCULUS = courseMap("/study/calculus", "Calculus I", null, [
+	topic("chain-rule", "Chain rule", { review: scheduled("2026-11-11", { exam: null, since: "2026-11-06" }) }),
+	topic("monotonicity", "Monotonicity", { review: scheduled("2026-11-19", { exam: "Probability", since: "2026-10-02" }) }),
+]);
+const LINEAR_ALGEBRA = courseMap(
+	"/study/linalg",
+	"Linear Algebra",
+	{ date: "2026-12-03", daysLeft: 25, finalReview: "2026-11-25", unreviewed: ["kernel" as TopicHandle], doesNotFit: ["projection" as TopicHandle] },
+	[
+		topic("kernel", "Kernel and rank-nullity", { review: scheduled("2026-11-12") }),
+		topic("change-basis", "Change of basis", untaught("2026-11-15", { kind: "next" })),
+		topic("inner-product", "Inner products", untaught("2026-11-17", { kind: "early", waitingOn: ["change-basis" as TopicHandle], exam: false })),
+		topic("projection", "Orthogonal projection", { level: "new", introduced: null }),
+	],
+);
+const TODAY = { today: "2026-11-08", due: [{ topic: "binomial", overdue: 2, level: "assisted" }] };
+const plan = (maps: CourseMap[]) => ({ plan: { workspace: "/study/probability", maps } });
+
+describe("the daily plan of every course", () => {
+	it("names each course's planned days, its own course first, so a plan question about any course has an answer", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", plan([CALCULUS, LINEAR_ALGEBRA, PROBABILITY]));
+		const section = text.slice(text.indexOf("Daily plan"));
+		assert.match(section, /^Daily plan of every course[^\n]*"due"[^\n]*earlier days are full/, "the heading says once why a review without an exam waits");
+		assert.ok(section.indexOf("Probability (this course)") < section.indexOf("Calculus I"), "the open course comes first");
+		assert.match(section, /\nCalculus I\n- Wed 11 Nov: review Chain rule \(due Fri 6 Nov\)\n- Thu 19 Nov: review Monotonicity \(due Fri 2 Oct; waits for your Probability exam\)\n/);
+	});
+
+	it("gives the final review's days and what it has no room for, and what cannot start before the exam", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY, LINEAR_ALGEBRA]));
+		assert.match(text, /\nProbability \(this course\) · exam Thu 19 Nov · final review from Sat 14 Nov to the exam, with room for every taught topic\n/);
+		assert.match(text, /\nLinear Algebra · exam Thu 3 Dec · final review from Wed 25 Nov to the exam, no room for Kernel and rank-nullity · no room before the exam to start Orthogonal projection\n/);
+	});
+
+	it("lists each day's reviews and new topics by title, with why each new topic starts then", () => {
+		const { text } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY, LINEAR_ALGEBRA]));
+		assert.match(text, /\n- Sun 8 Nov: review Random variables and distributions, Binomial distribution \(2 days overdue\)\n- Mon 9 Nov: start Poisson distribution \(next in the course\)\n/);
+		assert.match(text, /\n- Sat 14 Nov: review Law of total probability \(due Sat 7 Nov\); start Variance \(after Expectation and linearity\)\n/);
+		assert.match(text, /\n- Tue 17 Nov: start Inner products \(ahead of its place, while the topics before it wait on Change of basis\)/);
+		assert.doesNotMatch(text, /Covariance/, "a topic left out of the course has no day");
+	});
+
+	it("re-sends the brief when another course's plan moves, not when only a level changes", () => {
+		const { key } = projectCourseBrief(TODAY, "teach", plan([PROBABILITY, CALCULUS]));
+		const moved = courseMap("/study/calculus", "Calculus I", null, [CALCULUS.topics[0]!, { ...CALCULUS.topics[1]!, review: scheduled("2026-11-20", { exam: "Probability", since: "2026-10-02" }) }]);
+		assert.notEqual(projectCourseBrief(TODAY, "teach", plan([PROBABILITY, moved])).key, key);
+		const leveled = courseMap("/study/calculus", "Calculus I", null, CALCULUS.topics.map((t) => ({ ...t, level: "transferred" as const })));
+		assert.equal(projectCourseBrief(TODAY, "teach", plan([PROBABILITY, leveled])).key, key);
+	});
+
+	it("without the plan the brief still carries the day's due topics", () => {
+		const { text } = projectCourseBrief(TODAY, "teach");
+		assert.match(text, /Due today:\n- binomial \(assisted, 2 days overdue\)/);
+		assert.doesNotMatch(text, /Daily plan/);
 	});
 });
 
-describe("the brief's road is the daily plan's", () => {
-	it("the days the plan starts each new topic, and what does not fit, by day", () => {
-		const resume = {
-			today: "2026-11-08",
-			starts: { poisson: "2026-11-09", geometric: "2026-11-11", expectation: "2026-11-11" },
-			does_not_fit: ["covariance"],
-		};
-		const { text, key } = projectCourseBrief(resume, "teach");
-		assert.match(
-			text,
-			/New topics on the days the daily plan starts them: tomorrow, Monday 9 November: poisson; Wednesday 11 November, in 3 days: geometric, expectation\nNo room before the exam to start: covariance/,
-		);
-		assert.notEqual(projectCourseBrief({ ...resume, starts: { poisson: "2026-11-10" } }, "teach").key, key, "a moved start re-sends the brief");
+describe("the brief fetch reads every course's plan", () => {
+	const MAP = {
+		today: "2026-11-08",
+		revision: 1,
+		title: "Calculus I",
+		topics: [{ topic: "monotonicity", title: "Monotonicity", level: "retained", review: "2026-11-19", held: true, held_for: "Probability", due: "2026-10-02" }],
+	};
+	const linked = (workspace: string) => chatStore.getChat(chatStore.createChat("plan", { workspace, title: "Probability" }).id)!;
+
+	it("maps every listed course beside the open one", async () => {
+		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
+		process.env.FAKE_ENGINE_PLAN = JSON.stringify({ today: "2026-11-08", courses: [{ workspace: "/study/calculus", title: "Calculus I" }, { workspace: "/study/probability", title: "Probability" }] });
+		process.env.FAKE_ENGINE_MAP = JSON.stringify(MAP);
+		const log = path.join(TMP, "plan-log.jsonl");
+		process.env.FAKE_ENGINE_LOG = log;
+		try {
+			const brief = await fetchCourseBrief(linked("/study/probability"));
+			assert.match(brief!.text, /- Thu 19 Nov: review Monotonicity \(due Fri 2 Oct; waits for your Probability exam\)/);
+			const mapped = fs.readFileSync(log, "utf-8").trim().split("\n").map((l) => JSON.parse(l).args as string[]).filter((a) => a.includes("map")).map((a) => a[1]);
+			assert.deepEqual(mapped.sort(), ["/study/calculus", "/study/probability"]);
+		} finally {
+			delete process.env.FAKE_ENGINE_PLAN;
+			delete process.env.FAKE_ENGINE_MAP;
+			delete process.env.FAKE_ENGINE_LOG;
+		}
+	});
+
+	it("a failed map costs the turn nothing: the brief comes without the plan", async () => {
+		const { fetchCourseBrief } = await import("../src/server/course-brief.ts");
+		process.env.FAKE_ENGINE_FAIL = "map";
+		try {
+			const brief = await fetchCourseBrief(linked("/study/probability"));
+			assert.match(brief!.text, /Due today:/);
+			assert.doesNotMatch(brief!.text, /Daily plan/);
+		} finally {
+			delete process.env.FAKE_ENGINE_FAIL;
+		}
 	});
 });

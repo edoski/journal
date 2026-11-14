@@ -8,12 +8,18 @@
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const LONG = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const SHORT = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 
 const at = (day: string) => new Date(`${day}T00:00:00Z`);
 
 /** "Thursday 12 November". */
 export function longDay(day: string): string {
 	return LONG.format(at(day)).replace(",", "");
+}
+
+/** "Thu 12 Nov". */
+export function shortDay(day: string): string {
+	return SHORT.format(at(day)).replace(",", "");
 }
 
 /** A planned day against the study day: "today", "tomorrow, Monday 9
