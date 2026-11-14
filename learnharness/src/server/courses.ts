@@ -177,6 +177,8 @@ export async function createCourse(input: NewCourse): Promise<CourseCreation> {
 			return { ok: false, status: 502, code: "material_failed", error: "The material could not be added to the course. Try again with the files that matter most." };
 		}
 	}
+	// A course the app makes may get its arcs from the grouping pass.
+	stores.arcPassLedgers.save(created.workspace, { state: "new", at: new Date().toISOString(), topics: 0 });
 	emit("courses-changed", {});
 	if (copied.length > 0) startCourseMap(created.workspace);
 	// The engine's own entry, so the exam countdown is the engine's count.
@@ -220,6 +222,7 @@ export async function deleteCourse(workspace: string): Promise<CourseChange> {
 	const forgotten = await stores.courseRecords.run(workspace, { verb: "forget-course" });
 	if (!forgotten.ok) return engineFailure("delete", forgotten.message);
 	stores.courseMapLedgers.forget(workspace);
+	stores.arcPassLedgers.forget(workspace);
 	emit("courses-changed", {});
 	return { ok: true };
 }

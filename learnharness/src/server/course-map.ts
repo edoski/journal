@@ -8,6 +8,10 @@
  *   files (course-context.ts);
  * - the app starts: a build a quit cut short runs again.
  *
+ * A finished build that saved may start the grouping pass, which forms the
+ * arcs of a course the app made (agent/subagents/arc-former.ts); so does the
+ * app's start, for such a course whose pass a quit cut short.
+ *
  * The builder runs on the app's default model, the conversation's, at high
  * effort (Edoardo, 14 Nov 2026: every agent runs on Opus 5.5 at high
  * effort), resolved fresh per build.
@@ -15,6 +19,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createArcPass, type ArcPass } from "../agent/subagents/arc-former.ts";
 import { createCourseMapBuilder, type CourseMapBuilder, type CourseMapStatus } from "../agent/subagents/course-map-builder.ts";
 import { claudeEngine, type PiEngine } from "../agent/models.ts";
 import { emit, subscribe, type ServerEvent } from "../core/events.ts";
@@ -34,6 +39,7 @@ function defaultEngine(): PiEngine | undefined {
 
 interface LhCourseMapServerGlobal {
 	__lhCourseMapBuilder?: CourseMapBuilder;
+	__lhArcPass?: ArcPass;
 	__lhCourseMapUnsubscribe?: () => void;
 }
 
@@ -45,8 +51,27 @@ export function courseMapBuilder(): CourseMapBuilder {
 		ledgers: stores.courseMapLedgers,
 		engineFor: defaultEngine,
 		sessions: () => stores.chatStore.listChats(),
+		onSaved: (workspace) => {
+			emit("courses-changed", {});
+			arcPass().built(workspace);
+		},
+		onStatus: (workspace) => {
+			emit("courses-changed", {});
+			void arcPass().settle(workspace);
+		},
+	}));
+}
+
+/** The one grouping pass, beside the builder it shares each course's hold with. */
+export function arcPass(): ArcPass {
+	const g = globalThis as typeof globalThis & LhCourseMapServerGlobal;
+	return (g.__lhArcPass ??= createArcPass({
+		courseRecords: stores.courseRecords,
+		ledgers: stores.arcPassLedgers,
+		engineFor: defaultEngine,
+		sessions: () => stores.chatStore.listChats(),
 		onSaved: () => emit("courses-changed", {}),
-		onStatus: () => emit("courses-changed", {}),
+		rebuild: startCourseMap,
 	}));
 }
 
@@ -82,9 +107,11 @@ export function listenForCourseMaps(): void {
 	});
 }
 
-/** At app start: run again every build a quit cut short. */
+/** At app start: run again every build a quit cut short, then every
+ *  grouping pass; a pass whose course is being built waits for the build. */
 export function resumeCourseMaps(): void {
 	courseMapBuilder().resumeCut();
+	void arcPass().resumeCut();
 }
 
 export type MaterialAdded = { ok: true; added: string[] } | { ok: false; status: 400 | 404 | 500 | 502; error: string };
