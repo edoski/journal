@@ -6,7 +6,7 @@ import type { TopicHandle } from "@/src/core";
 import { TOPIC_NODE_SIZE, layoutTopicMap } from "@/components/course-map/topic-map/topic-map-layout";
 import { CourseFrame } from "@/components/course-page/course-frame";
 import { PageFrame } from "@/components/page-frame/page-frame";
-import { CourseHeader } from "@/components/course-page/course-header";
+import { PaceHead } from "@/components/course-page/course-head/pace-head";
 import type { CourseView } from "@/components/course-page/course-model";
 import { SplitList, type SplitListHandle } from "@/components/course-page/split/split-list";
 import { SplitMap, type SplitMapHandle } from "@/components/course-page/split/split-map";
@@ -23,7 +23,7 @@ import { aimOf, litOf, markedOf, revealOf, shownGroups, type Pointed } from "@/c
 export function SplitCourse({ workspace }: { workspace: string }) {
 	return (
 		<CourseFrame workspace={workspace}>
-			{({ view, busy, onContinue }) => <SplitBody view={view} header={<CourseHeader view={view} busy={busy} onContinue={onContinue} />} />}
+			{({ view, busy, onContinue }) => <SplitBody view={view} header={<PaceHead view={view} busy={busy} onContinue={onContinue} />} />}
 		</CourseFrame>
 	);
 }
@@ -80,6 +80,7 @@ function SplitBody({ view, header }: { view: CourseView; header: React.ReactNode
 					}
 					map={
 						<SplitMap
+							key={map.workspace}
 							ref={drawing}
 							map={map}
 							layout={layout}

@@ -26,7 +26,19 @@ The settings sheet and its control kit: `settings-dialog.tsx` draws the frame, `
 
 ## What Settings and Accounts leave out
 
-There is no Tutor section: research, interactive demos, figures and reading PDFs are always on (owner, 2026-11-14), so nothing switches a tool off. Every agent runs Claude Opus 5.5 at high effort (owner, 2026-11-14), so there are no model or thinking rows either. The only choice left is the Claude account they run on: in Accounts each signed-in Claude account offers Use this account, and the one in use reads "In use" (12/16 muted) instead. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
+There is no Tutor section: research, interactive demos, figures and reading PDFs are always on (owner, 2026-11-14), so nothing switches a tool off. Every agent runs Claude Opus 5.5 at high effort (owner, 2026-11-14), so there are no model or thinking rows either. The only choice left is the Claude account they run on: in Accounts each signed-in Claude account offers Use this account, and the one in use reads "In use" (12/16 muted) instead.
+
+## Accounts
+
+The Subscriptions group's box holds rows parted by hairlines, each padded 12 × 16 like the settings rows: Claude with Refresh, then one row per account, then the note "Your lessons run on your Claude plan through Claude Code and count toward its limits." as the last row (round 4 found it crammed 8px under the last account).
+
+| Part | Words |
+|---|---|
+| name (13/18, full ink) | the email the account signs in with, from Claude Code or its config folder's `.claude.json` (round 4: T3 Code's one-letter names "Claude · A/E/F" meant nothing); without an email, T3 Code's name for it. When two rows share an email, each adds ", named E in T3 Code" in muted ink so they never read the same |
+| sign-in (12/16 muted) | "Signed in through Claude Code", with "on the Max plan" when Claude Code reports the plan; the other states say what to do |
+| usage (12/16 muted) | no percentage (Edo's ruling): "Plenty left this week", "About half left this week", "Little left this week" or "Nothing left this week", then ", resets Tuesday 13:00"; at a limit, "At its limit until Tuesday 04:00". The bands are thirds of what Claude Code reports, the coarsest split that tells carrying on from watching it from switching soon |
+
+`src/agent/claude-accounts.ts`, the setup-token route and the switch are unchanged: only the words and the spacing moved. An account whose plan or Claude Code version lacks the model shows one danger line saying so (`claude-model-missing`); nothing falls back to another model. The sign-in dialog (`setup-dialog.tsx`) shows the same Claude rows and closes once the account in use is signed in.
 
 ## What Appearance leaves out
 

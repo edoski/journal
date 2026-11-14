@@ -19,7 +19,8 @@ export const rowSurface = (active: boolean) =>
  * 14 Nov 2026: the status keeps its words whatever the title's length).
  * It never shrinks; the text beside it makes the room instead. A shelf
  * row's title moves the slot onto a line of its own when the two do not
- * fit side by side (`ROW_BODY`); a card's course name wraps beside it.
+ * fit side by side (`ROW_BODY`); a card's status drops under its course
+ * name, which stays on one line (`RowCard`).
  * Its mark is a flat run of icon and words (`contents` roots, every part
  * 16px tall). Give it its line's height with the padding that centres
  * one 16px line (`py-0.5` in 20px, `py-1` in 24px).
@@ -56,8 +57,10 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
 
 /**
  * The sidebar's two-line card (60px, spec: unit-inbox.md), the shell every
- * card shares: line 1 the course's mark and name with the status slot,
- * whose words stay whole while a long name wraps beside it; line 2 the title at
+ * card shares: line 1 the course's mark and name with the status slot. The
+ * name stays on one line and the status keeps its words: when both do not
+ * fit, the status drops to a line of its own under the name, right-aligned,
+ * and only a name wider than the whole line ends in an ellipsis. Line 2 the title at
  * 14/500 on the name's edge, where a shelf row's title starts, as Home's
  * row keeps its pie beside both lines, wrapping onto a second line rather
  * than cut; the whole card one link, its action (if any) over the status
@@ -105,9 +108,11 @@ export function RowCard({
 					recede && !active && "opacity-70 group-hover/sidebar-row:opacity-100 group-has-[:focus-visible]/sidebar-row:opacity-100",
 				)}
 			>
-				<span className="flex min-h-5 items-start gap-2">
+				<span className="flex min-h-5 flex-wrap items-start gap-x-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
-					<span className="min-w-0 py-0.5 text-label text-pretty text-muted-foreground">{course}</span>
+					<span data-slot="unit-card-course" className="min-w-0 truncate py-0.5 text-label text-muted-foreground">
+						{course}
+					</span>
 					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-5 py-0.5")}>
 						{status}
 					</span>

@@ -12,6 +12,8 @@
  * keeps a per-course ledger of the material it read.
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { Type, type Static } from "typebox";
 import type { CourseMapLedgers, CourseRecords } from "../../core/ports.ts";
 import {
@@ -81,8 +83,10 @@ How this differs from the recipe's tools:
 `;
 
 /** The course and its material, as the agent reads them. */
-function mapPrompt(title: string, view: MapCourseView, files: readonly MaterialFile[], examDate: string | null, record: unknown): string {
+function mapPrompt(title: string, view: MapCourseView, files: readonly MaterialFile[], examDate: string | null, record: unknown, folders: ReadonlySet<string>): string {
 	const lines = [`# Course: ${title}`];
+	const about = obj(record).goal;
+	if (typeof about === "string" && about.trim()) lines.push(`About the course, in the learner's words: ${about.trim()}`);
 	if (examDate) lines.push(`Exam: ${examDate}`);
 	if (view.exam.coverage) lines.push(`Exam coverage on record: ${view.exam.coverage}`);
 	lines.push("", "## Material to read");
@@ -98,6 +102,7 @@ function mapPrompt(title: string, view: MapCourseView, files: readonly MaterialF
 	const fresh = new Set(files.map((f) => f.handle));
 	lines.push("", "## Every registered source (cite these handles)");
 	for (const [handle, source] of Object.entries(obj(obj(record).sources))) {
+		if (folders.has(handle)) continue;
 		const s = obj(source);
 		lines.push(`- ${handle}: ${typeof s.title === "string" ? `${s.title}, ` : ""}${String(s.path ?? "")}${fresh.has(handle) ? " (to read now)" : " (read before; its topics are on the map)"}`);
 	}
@@ -152,6 +157,8 @@ export interface CourseMapBuilderDeps {
 	engineFor?: () => PiEngine | undefined;
 	/** The subscription's background consent for the engine's provider. */
 	backgroundAllowed?: (provider: string) => boolean;
+	/** Test seam: how a linked website's page is read (the web tool's reader). */
+	fetchPage?: (url: string) => Promise<string>;
 	/** A build saved to a course record (Home and the course page refetch). */
 	onSaved?: (workspace: string) => void;
 	/** A build started or ended (the dialog refetches its status). */
@@ -172,6 +179,20 @@ export interface CourseMapBuilder {
 	 *  Rebuilding a course's map from all its material is the learner's
 	 *  call. No-op for a course with a ledger. */
 	adopt(workspace: string, except: readonly string[]): Promise<void>;
+}
+
+/** The ledger line for new sources with nothing of their own to read: a
+ *  linked folder, read through the files registered from it. */
+export const NOTHING_TO_READ = "a linked folder; its files are read on their own";
+
+/** Whether a registered source is a folder on disk (a linked folder). */
+function isFolder(registered: string, directory: string): boolean {
+	if (/^https?:\/\//i.test(registered)) return false;
+	try {
+		return fs.statSync(path.isAbsolute(registered) ? registered : path.join(directory, registered)).isDirectory();
+	} catch {
+		return false;
+	}
 }
 
 /** The ledger line for material a course had before the map builder. */
@@ -229,7 +250,12 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		update(workspace, (ledger) => ({ ...ledger, pending: { fingerprint: window.fingerprint, sources } }));
 		const title = typeof obj(record).title === "string" ? (obj(record).title as string) : workspace;
 		const signal = start(title);
-		const files = await measureMaterial(directory, window.fresh);
+		const files = (await measureMaterial(directory, window.fresh, deps.fetchPage)).filter((f) => f.kind !== "folder");
+		if (files.length === 0) {
+			update(workspace, ({ done }) => ({ done: [...done, { sources, fingerprint: window.fingerprint, at: new Date().toISOString(), outcome: NOTHING_TO_READ }] }));
+			return { status: "nothing" };
+		}
+		const folders = new Set(sourcesOf(record).filter((s) => isFolder(s.path, directory)).map((s) => s.handle));
 		const view = courseView(record);
 		const examDate = typeof obj(obj(record).exam).date === "string" ? (obj(obj(record).exam).date as string) : null;
 		const submit = await withBgLlmSlot(signal, () =>
@@ -245,7 +271,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 					return problems;
 				},
 				systemPrompt: COURSE_MAP_INSTRUCTIONS + courseMapDoctrine({ arcs: recordHasArcs(record) }),
-				prompt: mapPrompt(title, view, files, examDate, record),
+				prompt: mapPrompt(title, view, files, examDate, record, folders),
 				engine,
 				signal,
 				extraTools: createMaterialTools(files, engine.model),
@@ -316,7 +342,7 @@ export function createCourseMapBuilder(deps: CourseMapBuilderDeps): CourseMapBui
 		if (mapRuns().inFlight.has(workspace)) return { state: "building" };
 		const ledger = ledgers.get(workspace);
 		if (ledger?.failed) return { state: "failed", reason: ledger.failed.reason, at: ledger.failed.at };
-		const last = ledger?.done.filter((d) => d.outcome !== ADOPTED).at(-1);
+		const last = ledger?.done.filter((d) => d.outcome !== ADOPTED && d.outcome !== NOTHING_TO_READ).at(-1);
 		return last ? { state: "built", outcome: last.outcome, at: last.at } : { state: "none" };
 	}
 

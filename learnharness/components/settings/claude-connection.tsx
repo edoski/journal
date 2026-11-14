@@ -5,7 +5,14 @@ import { CLAUDE_MODEL, type ClaudeAccount, type ClaudeAccountStatus, type Claude
 import { Button } from "@/components/ui/button";
 import { notifySettingsSaved } from "@/components/settings-signal";
 import { useModelStatus } from "@/components/model-status";
-import { CONNECTION_BLOCK, ConnectionRow, connectionNoteClass } from "./connection-controls";
+import { cn } from "@/lib/utils";
+import { ConnectionRow, connectionNoteClass } from "./connection-controls";
+
+/** Each part of Claude's block is a row of the Accounts group, padded like
+ *  the settings rows, so the group's hairlines part the accounts and the
+ *  closing note sits as far from the last account as any row from the next
+ *  (round 4: the note was crammed 8px under it). */
+const CLAUDE_ROW = "px-4 py-3";
 
 export const CLAUDE_LABEL = "Claude";
 export const CLAUDE_NOTICE = "Your lessons run on your Claude plan through Claude Code and count toward its limits.";
@@ -25,19 +32,20 @@ function plan(value: string): string {
 	return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-export function claudeAccountLabel(account: Pick<ClaudeAccount, "label">): string {
-	return `Claude · ${account.label}`;
+/** An account's name in Settings: the email it signs in with, the name
+ *  Edo knows it by (round 4: "Claude · A" used T3 Code's one-letter display
+ *  name, which meant nothing). Without an email, the name T3 Code gives it. */
+export function claudeAccountName(status: Pick<ClaudeAccountStatus, "account" | "connection">): string {
+	const live = status.connection.state === "connected" ? status.connection.email : null;
+	return live ?? status.account.email ?? status.account.label;
 }
 
 /** One plain sentence per state. Sign-in always happens in Claude Code or T3 Code itself. */
-export function claudeConnectionSentence(connection: ClaudeConnection | null, account?: Pick<ClaudeAccount, "email" | "auth">): string {
+export function claudeConnectionSentence(connection: ClaudeConnection | null, account?: Pick<ClaudeAccount, "auth">): string {
 	if (!connection) return "Checking Claude Code…";
 	switch (connection.state) {
-		case "connected": {
-			const email = connection.email ?? account?.email;
-			const who = email ? `Signed in as ${email}` : "Signed in";
-			return `${who}${connection.plan ? ` · ${plan(connection.plan)} plan` : ""} via Claude Code`;
-		}
+		case "connected":
+			return `Signed in through Claude Code${connection.plan ? ` on the ${plan(connection.plan)} plan` : ""}`;
 		case "missing":
 			return "Claude Code is not installed. Install Claude Code, run `claude` in a terminal and sign in, then press Refresh.";
 		case "signed-out":
@@ -51,14 +59,26 @@ export function claudeConnectionSentence(connection: ClaudeConnection | null, ac
 	}
 }
 
-/** resetsAt is Unix seconds; reads like "Thu 04:00". */
+/** resetsAt is Unix seconds; reads like "Thursday 04:00". */
 export function claudeResetLabel(resetsAt: number): string {
-	return new Date(resetsAt * 1000).toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+	return new Date(resetsAt * 1000).toLocaleString(undefined, { weekday: "long", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+/** How much of the week is left, in words that need no number (Edo's
+ *  ruling: no percentages). Three even bands of the share Claude Code
+ *  reports, the coarsest split that still tells "carry on" from "keep an
+ *  eye on it" from "switch soon"; nothing finer is worth a word. */
+function leftWords(percentLeft: number): string {
+	if (percentLeft <= 0) return "Nothing left this week";
+	if (percentLeft * 3 > 200) return "Plenty left this week";
+	if (percentLeft * 3 >= 100) return "About half left this week";
+	return "Little left this week";
 }
 
 export function claudeUsageSentence(usage: ClaudeUsage): string {
-	const reset = usage.resetsAt ? ` · resets ${claudeResetLabel(usage.resetsAt)}` : "";
-	return usage.limited ? `limit reached${reset}` : `${usage.percentLeft}% left this week${reset}`;
+	const reset = usage.resetsAt ? claudeResetLabel(usage.resetsAt) : null;
+	if (usage.limited) return reset ? `At its limit until ${reset}` : "At its limit for now";
+	return reset ? `${leftWords(usage.percentLeft)}, resets ${reset}` : leftWords(usage.percentLeft);
 }
 
 /** The one line under an account whose plan or Claude Code lacks the model. */
@@ -83,15 +103,20 @@ export async function readClaudeAccounts(refresh: boolean): Promise<ClaudeAccoun
 	return body.accounts;
 }
 
-/** One account: its sign-in, its usage, and whether every agent runs on it.
- * `current` is undefined until the model status loads. Exported for tests. */
-export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void }) {
+/** One account, as a settings row: its name, its sign-in and usage under
+ *  it, and Use this account (or In use) at the right. `current` is
+ *  undefined until the model status loads. `alias` names the account as T3
+ *  Code does when another row signs in with the same email. Exported for tests. */
+export function AccountRow({ status, current, busy, onUse, alias }: { status: ClaudeAccountStatus; current: string | undefined; busy: boolean; onUse: () => void; alias?: string }) {
 	const { account, connection, usage, modelMissing } = status;
 	const connected = connection.state === "connected";
 	const inUse = current === account.providerId;
-	return <div className="flex flex-col gap-0.5 pt-1" data-testid="claude-account" data-provider={account.providerId}>
+	return <div className={cn(CLAUDE_ROW, "flex flex-col gap-0.5")} data-testid="claude-account" data-provider={account.providerId}>
 		<div className="flex min-h-7 items-center gap-3">
-			<span className="min-w-0 flex-1 truncate text-row text-foreground">{claudeAccountLabel(account)}</span>
+			<span className="min-w-0 flex-1 truncate text-row text-foreground" data-testid="claude-account-name">
+				{claudeAccountName(status)}
+				{alias && <span className="text-muted-foreground">, named {alias} in T3 Code</span>}
+			</span>
 			{inUse
 				? <span className="text-label text-muted-foreground" data-testid="claude-in-use">In use</span>
 				: connected && current !== undefined && <Button type="button" size="compact" variant="outline" className="cursor-pointer disabled:cursor-not-allowed" data-testid="claude-use-account" disabled={busy} onClick={onUse}>Use this account</Button>}
@@ -100,6 +125,14 @@ export function AccountRow({ status, current, busy, onUse }: { status: ClaudeAcc
 		{connected && usage && <p className={connectionNoteClass("muted")} data-testid="claude-usage">{claudeUsageSentence(usage)}</p>}
 		{modelMissing && <p className={connectionNoteClass("danger")} data-testid="claude-model-missing">{CLAUDE_MODEL_MISSING_LINE}</p>}
 	</div>;
+}
+
+/** T3 Code's name for each account whose email another row shares, so two
+ *  rows never read the same. */
+function aliases(statuses: readonly ClaudeAccountStatus[]): Map<string, string> {
+	const rows = new Map<string, number>();
+	for (const status of statuses) rows.set(claudeAccountName(status), (rows.get(claudeAccountName(status)) ?? 0) + 1);
+	return new Map(statuses.filter((status) => rows.get(claudeAccountName(status))! > 1 && status.account.label !== claudeAccountName(status)).map((status) => [status.account.providerId, status.account.label]));
 }
 
 export function ClaudeConnectionRow() {
@@ -142,11 +175,14 @@ export function ClaudeConnectionRow() {
 		}
 	}
 
-	return <div className={CONNECTION_BLOCK} data-testid="claude-connection">
-		<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
-		{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
-		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} onUse={() => void switchTo(status.account.providerId)} />)}
-		<p className={connectionNoteClass("muted")}>{CLAUDE_NOTICE}</p>
-		{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
-	</div>;
+	const alias = aliases(accounts ?? []);
+	return <>
+		<div className={CLAUDE_ROW} data-testid="claude-connection">
+			<ConnectionRow label={CLAUDE_LABEL} action="Refresh" actionTestid="claude-refresh" disabled={busy} onAction={() => void refresh()} />
+			{!accounts && !error && <p className={connectionNoteClass("muted")} role="status" data-testid="claude-connection-state">{claudeConnectionSentence(null)}</p>}
+			{error && <p role="alert" className={connectionNoteClass("danger")}>{error}</p>}
+		</div>
+		{accounts?.map((status) => <AccountRow key={status.account.providerId} status={status} current={current} busy={busy} alias={alias.get(status.account.providerId)} onUse={() => void switchTo(status.account.providerId)} />)}
+		<p className={cn(CLAUDE_ROW, connectionNoteClass("muted"))} data-testid="claude-notice">{CLAUDE_NOTICE}</p>
+	</>;
 }

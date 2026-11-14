@@ -53,22 +53,26 @@ async function open(scopes: (string | null)[] = []) {
 }
 
 describe("the course filter menu", () => {
-	it("lists every course to filter by, then each course again under Open a course page, linking to its page", async () => {
+	it("lists each course once to filter by, with an arrow on its row that opens its page", async () => {
 		await open();
 		assert.deepEqual(
 			[...document.querySelectorAll('[role="menuitemradio"]')].map((item) => item.textContent),
 			["All courses", "LALinear Algebra", "CICalculus I"],
 		);
-		assert.equal(document.querySelector('[data-slot="dropdown-menu-label"]')!.textContent, "Open a course page");
+		assert.equal(document.querySelector('[data-slot="dropdown-menu-label"]'), null, "no second list under a label");
 		const pages = [...document.querySelectorAll('[data-testid="course-scope-page"]')];
 		assert.deepEqual(
-			pages.map((link) => [link.tagName, link.getAttribute("href"), link.textContent]),
+			pages.map((link) => [link.tagName, link.getAttribute("href"), link.getAttribute("aria-label")]),
 			[
-				["A", courseHref("/study/linalg"), "LALinear Algebra"],
-				["A", courseHref("/study/calc"), "CICalculus I"],
+				["A", courseHref("/study/linalg"), "Open the Linear Algebra course page"],
+				["A", courseHref("/study/calc"), "Open the Calculus I course page"],
 			],
 		);
 		assert.ok(pages.every((link) => link.getAttribute("role") === "menuitem"), "a page link is a menu item the arrow keys reach");
+		assert.ok(
+			pages.every((link) => link.closest('[data-slot="course-scope-row"]')?.querySelector('[role="menuitemradio"]')),
+			"each arrow sits on its course's own row",
+		);
 	});
 
 	it("still filters the sidebar by the course picked above the links", async () => {

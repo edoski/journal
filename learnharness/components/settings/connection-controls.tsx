@@ -1,10 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
 
-/** Claude's block inside the Accounts group: one grouped row, padded like
- *  the settings rows; its notes stack under it. */
-export const CONNECTION_BLOCK = "flex flex-col gap-1 px-4 py-2.5";
-
 /** A note or error under a connection row. */
 export function connectionNoteClass(tone: "muted" | "danger"): string {
 	return tone === "danger" ? "text-label text-danger" : "text-label text-muted-foreground";

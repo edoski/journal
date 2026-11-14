@@ -1,5 +1,7 @@
 import React, { act } from "react";
 (globalThis as Record<string, unknown>).React = React;
+// next/link schedules its prefetch on `self`.
+(globalThis as Record<string, unknown>).self = globalThis;
 import { dom } from "./helpers/radix-dom.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
@@ -154,6 +156,7 @@ describe("activity section render", () => {
 		assert.match(html, /Building a demo for Chain-rule demo/);
 		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g), null, "no timer: a count he never asked for");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
+		assert.equal(html.match(/>Stop<\/button>/g)?.length, 2, "each stop button says Stop in a word beside its icon");
 		assert.match(html, /aria-label="Stop: Building a demo for Chain-rule demo"/, "the stop button names what it stops");
 		assert.match(html, /aria-label="Stop: Building the topic map of Algebra"/);
 		assert.match(html, /Background work/);

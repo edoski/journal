@@ -1,4 +1,6 @@
+import { createHash } from "node:crypto";
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
 import * as path from "node:path";
 import { Type } from "typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -7,6 +9,7 @@ import { serverExecute, type ImageFileResult } from "../tool-execute.ts";
 import { pdfExtract, pdfInfo, pdfSearch, parsePageSpec, type PdfInfo } from "../subagents/pdf-ops.ts";
 import { getHeadless } from "../subagents/headless.ts";
 import { processImage } from "../image-processing/index.ts";
+import { fetchAndExtract } from "./web.ts";
 
 /**
  * The course map builder's reading tools: a course's registered material,
@@ -30,13 +33,15 @@ const RENDER_DPI = 100;
  *  cannot be read here, and the agent says so under `unread`. */
 const TEXT_SUFFIXES = new Set([".md", ".txt", ".tex", ".py", ".csv", ".html", ".org", ".rst", ".ipynb"]);
 
-export type MaterialKind = "pdf" | "text" | "unreadable";
+/** `folder`: a linked folder, read through its own registered files. */
+export type MaterialKind = "pdf" | "text" | "unreadable" | "folder";
 
 /** One registered source, located and measured before the agent starts. */
 export interface MaterialFile {
 	handle: string;
 	title?: string;
-	/** As registered (relative to the course's material folder, or absolute). */
+	/** As registered (relative to the course's material folder, absolute,
+	 *  or a website's address). */
 	registered: string;
 	absolute: string;
 	kind: MaterialKind;
@@ -49,16 +54,42 @@ export interface MaterialFile {
 	chars: number;
 }
 
+/** A website's readable text, fetched once per build into the system's
+ *  temporary folder, so it reads like a text file. */
+async function fetchWebsite(url: string, fetchPage: (url: string) => Promise<string>): Promise<{ absolute: string; chars: number } | { problem: string }> {
+	try {
+		const page = await fetchPage(url);
+		const folder = path.join(os.tmpdir(), "learnharness-websites");
+		await fs.mkdir(folder, { recursive: true });
+		const absolute = path.join(folder, `${createHash("sha1").update(url).digest("hex")}.md`);
+		await fs.writeFile(absolute, page);
+		return { absolute, chars: page.length };
+	} catch (err) {
+		return { problem: `the website could not be read (${(err as Error).message})` };
+	}
+}
+
 /** Locate and measure every source. Never throws: a missing or broken
- *  file comes back unreadable with its reason. */
-export async function measureMaterial(directory: string, sources: ReadonlyArray<{ handle: string; path: string; title?: string }>): Promise<MaterialFile[]> {
+ *  file, or a website that does not answer, comes back unreadable with
+ *  its reason. A website is fetched now (`fetchPage`, the web tool's
+ *  reader); a folder is marked as one. */
+export async function measureMaterial(
+	directory: string,
+	sources: ReadonlyArray<{ handle: string; path: string; title?: string }>,
+	fetchPage: (url: string) => Promise<string> = fetchAndExtract,
+): Promise<MaterialFile[]> {
 	return Promise.all(
 		sources.map(async (s): Promise<MaterialFile> => {
+			const named = { handle: s.handle, ...(s.title ? { title: s.title } : {}), registered: s.path };
+			if (/^https?:\/\//i.test(s.path)) {
+				const page = await fetchWebsite(s.path, fetchPage);
+				return "problem" in page ? { ...named, absolute: s.path, kind: "unreadable", problem: page.problem, chars: 0 } : { ...named, ...page, kind: "text" };
+			}
 			const absolute = path.isAbsolute(s.path) ? s.path : path.join(directory, s.path);
-			const base = { handle: s.handle, ...(s.title ? { title: s.title } : {}), registered: s.path, absolute };
+			const base = { ...named, absolute };
 			const suffix = path.extname(absolute).toLowerCase();
 			try {
-				await fs.access(absolute);
+				if ((await fs.stat(absolute)).isDirectory()) return { ...base, kind: "folder", chars: 0 };
 			} catch {
 				return { ...base, kind: "unreadable", problem: "the file is missing", chars: 0 };
 			}
@@ -175,7 +206,7 @@ export function createMaterialTools(files: readonly MaterialFile[], model?: Pick
 		read_material: {
 			name: "read_material",
 			label: "read_material",
-			description: "Read a source of the course's material: a PDF by pages, a text file by lines.",
+			description: "Read a source of the course's material: a PDF by pages, a text file or a website by lines.",
 			parameters: readInput,
 			execute: serverExecute("read_material", readInput, async ({ source, pages, offset }) => {
 				const file = find(source);

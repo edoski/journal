@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { BotIcon, FileTextIcon, PenToolIcon, PlayIcon, SearchIcon, SquareIcon, WaypointsIcon } from "lucide-react";
+import Link from "next/link";
+import { ArrowRightIcon, BotIcon, CircleStopIcon, FileTextIcon, PenToolIcon, PlayIcon, SearchIcon, WaypointsIcon } from "lucide-react";
 import type { CallUsage, JobKind, JobRecord } from "@/src/core";
 import { isProviderKeyRefusal } from "@/src/core";
 import { courseHref } from "@/components/unit-inbox/unit-href";
@@ -10,7 +11,6 @@ import { NavRow } from "@/components/nav/nav-row";
 import { BACKGROUND_WORDS, backgroundWorkWords } from "@/components/study-words";
 import { NavSection } from "@/components/nav/nav-section";
 import { Button } from "@/components/ui/button";
-import { Hint } from "@/components/ui/hint";
 import { MathText, mathPlain } from "@/components/ui/math-text";
 
 /**
@@ -38,8 +38,8 @@ import { MathText, mathPlain } from "@/components/ui/math-text";
  * a clearer observability story wants building). Per blob: kind icon,
  * what it does for which lesson or course, an explicit END button (POST
  * /api/activity/abort — the wave-4 backend is live): 404/409 mean the
- * process is already gone (refresh, no error); real failures degrade to
- * an inline "Abort failed", never a dead control. Detail (what it is
+ * process is already gone (refresh, no error); real failures read
+ * "Couldn't stop" on the button, which stays pressable: never a dead control. Detail (what it is
  * doing, a link to its lesson or course) EXPANDS INLINE —
  * the section scrolls, so a floating popover would clip at its bounds.
  */
@@ -303,10 +303,14 @@ function openTarget(blob: ActivityBlob): { href: string; words: string } {
 	return { href: `/chat/${blob.chatId}`, words: "Open the lesson" };
 }
 
+/** What the stop button says: an icon with a word, as the app's other
+ *  controls do (round 4: a bare square read as nothing). */
+const STOP_WORDS: Record<AbortState | "idle", string> = { idle: "Stop", pending: "Stopping…", failed: "Couldn't stop" };
+
 /** One process as a sidebar row: kind icon, what it does for which
  *  lesson or course in full (the words wrap, never cut, its TeX typeset),
- *  and a stop button at the right edge; a click opens its detail (what it
- *  is doing, a link to its lesson or course) under the row. */
+ *  and Stop at the right edge; a click opens its detail (what it is doing,
+ *  the app's quiet arrow link to its lesson or course) under the row. */
 function ActivityRow({
 	blob,
 	detailOpen,
@@ -325,32 +329,33 @@ function ActivityRow({
 	const target = openTarget(blob);
 	return (
 		<div data-testid={`activity-blob-${blob.process}`} className="relative">
-			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="h-auto min-h-8 items-start py-1.5 pr-9 [&>svg]:mt-0.5">
+			<NavRow aria-expanded={detailOpen} onClick={onToggleDetail} highlighted={detailOpen} className="h-auto min-h-8 items-start py-1.5 pr-16 [&>svg]:mt-0.5">
 				<Icon />
 				<span data-slot="nav-row-label" data-testid="activity-blob-label" className="min-w-0 flex-1 text-pretty break-words">
 					<MathText>{words}</MathText>
 				</span>
 			</NavRow>
-			<Hint label={abortState === "failed" ? "Couldn't stop it. Try again" : "Stop"} side="right">
-				<Button
-					variant="quiet"
-					size="icon-inline"
-					data-testid="activity-abort"
-					onClick={onAbort}
-					disabled={abortState !== undefined}
-					aria-label={`Stop: ${mathPlain(words)}`}
-					className="absolute right-1 top-1 hover:text-danger"
-				>
-					<SquareIcon />
-				</Button>
-			</Hint>
+			<Button
+				variant="quiet"
+				size="xs"
+				data-testid="activity-abort"
+				onClick={onAbort}
+				disabled={abortState === "pending"}
+				aria-label={`Stop: ${mathPlain(words)}`}
+				className="absolute right-1 top-1 font-normal hover:text-danger"
+			>
+				<CircleStopIcon aria-hidden />
+				{STOP_WORDS[abortState ?? "idle"]}
+			</Button>
 			{detailOpen && (
 				<div data-testid="activity-blob-detail" className="flex flex-col gap-1 pb-2 pl-8 pr-2 pt-1 text-label text-muted-foreground">
 					{blob.activity && <p className="break-words text-foreground">{blob.activity}</p>}
-					<a href={target.href} className="w-fit text-link underline-offset-2 hover:underline">
-						{target.words}
-					</a>
-					{abortState && <p>{abortState === "failed" ? "Couldn't stop it. Try again" : "Stopping…"}</p>}
+					<Button variant="quiet" size="xs" asChild className="-ml-1.5 w-fit font-normal">
+						<Link href={target.href}>
+							{target.words}
+							<ArrowRightIcon aria-hidden />
+						</Link>
+					</Button>
 				</div>
 			)}
 		</div>

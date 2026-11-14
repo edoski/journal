@@ -161,20 +161,22 @@ function Flow({
 	// A hovered or focused topic's chain, else the page's highlight.
 	const lit = useMemo(() => (active ? chainOf(active, map.edges) : highlight), [active, map.edges, highlight]);
 
-	// As far as a framed opening may look (`framedCamera`): the room at the smallest scale it opens at, and one topic past it.
-	const extent = useMemo<CoordinateExtent>(() => {
-		const slack = slackOf(layout.node);
-		const x = margin.x / READABLE_ZOOM + slack.x;
-		const y = margin.y / READABLE_ZOOM + slack.y;
-		return [
-			[-x, -y],
-			[layout.width + x, layout.height + y],
-		];
-	}, [layout, margin.x, margin.y]);
 	const frame = frameWidth > 0 && frameHeight > 0 ? { width: frameWidth, height: frameHeight } : null;
 	// Zoomed out as far as the whole course, however small: the enlarged map's overview.
 	const fitted = frame ? Math.min(1, wholeZoom(layout, frame, margin)) : 1;
 	const minZoom = fixedZoom === undefined ? fitted : Math.min(fitted, fixedZoom);
+	// As far as an opening may look (`framedCamera`): the room (in the frame's pixels) at the smallest scale the map
+	// shows, and one topic past it.
+	const extent = useMemo<CoordinateExtent>(() => {
+		const slack = slackOf(layout.node);
+		const smallest = Math.min(READABLE_ZOOM, minZoom);
+		const x = margin.x / smallest + slack.x;
+		const y = margin.y / smallest + slack.y;
+		return [
+			[-x, -y],
+			[layout.width + x, layout.height + y],
+		];
+	}, [layout, margin.x, margin.y, minZoom]);
 	const opensWhole = frame ? wholeZoom(layout, frame, margin) >= READABLE_ZOOM : null;
 	const told = useRef(onOpensWhole);
 	told.current = onOpensWhole;

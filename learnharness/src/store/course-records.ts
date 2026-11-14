@@ -312,8 +312,11 @@ export function courseMapOf(workspace: string, json: unknown): CourseMap | null 
 	};
 }
 
-/** The verbs that write the course record. */
+/** The verbs that write the course record. `sources --scan` only lists
+ *  the material folder, so it announces nothing: announcing it made every
+ *  reader that refetches on `course-changed` and scans again loop. */
 const WRITE_VERBS: ReadonlySet<CourseVerb["verb"]> = new Set(["save", "sources", "forget-course"]);
+const writes = (verb: CourseVerb): boolean => WRITE_VERBS.has(verb.verb) && !("scan" in verb);
 
 /** Watch one course's record for writes from any host (Claude Code and
  *  Claude Desktop save through the engine's MCP server, never through the
@@ -359,7 +362,7 @@ export function createCourseRecords(engine: EngineCommand): CourseRecords {
 			const { args, stdin } = argsFor(verb);
 			const result = toResult(await exec(engine, ["--workspace", workspace, ...args], stdin), verb.verb);
 			// A save that timed out may have landed too: announce it.
-			if (WRITE_VERBS.has(verb.verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
+			if (writes(verb) && (result.ok || result.kind === "io")) emit("course-changed", { workspace });
 			return result;
 		},
 		async map(workspace) {
