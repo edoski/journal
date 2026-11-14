@@ -38,7 +38,7 @@ function Lines({ label, why, title, arc }: { label: string; why: Why | null; tit
 			</span>
 			<span className="flex min-w-0 items-center gap-3">
 				<MathLine className="min-w-0 flex-1 text-row font-medium text-foreground">{title}</MathLine>
-				{arc && <ArcPill arc={arc} className="max-w-40 shrink-0" />}
+				{arc && <ArcPill arc={arc} className="max-w-3/5 shrink-0" />}
 			</span>
 		</span>
 	);

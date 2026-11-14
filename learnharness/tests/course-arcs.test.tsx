@@ -240,6 +240,17 @@ describe("the arc strip", () => {
 		assert.ok(tabs.every((t) => t.querySelector("svg")), "each arc wears its ring");
 		assert.doesNotMatch(text(document.body), /\d/);
 	});
+
+	it("keeps each name whole by wrapping onto another row, never by squeezing or clipping the pills (round 6: Sam…, De…)", () => {
+		const long = ["Sampling distributions", "Point estimation and confidence intervals", "Efficiency, sufficiency and the method of moments", "Hypothesis testing"];
+		const document = render(<ArcStrip arcs={long.map((title, i) => ({ handle: a(`arc${i}`), title, share: null }))} value={a("arc0")} onSelect={noop} />);
+		const strip = document.querySelector('[data-slot="arc-strip"]')!;
+		assert.match(strip.className, /\bflex-wrap\b/);
+		assert.doesNotMatch(strip.className, /overflow-(hidden|x-auto|scroll)/, "no clip and no scrollbar");
+		const tabs = [...strip.querySelectorAll('[data-slot="toggle-group-item"]')];
+		assert.ok(tabs.every((t) => /\bshrink-0\b/.test(t.className) && !/\bshrink\b(?!-)/.test(t.className)), "a pill never shrinks below its name");
+		assert.deepEqual(tabs.map((t) => t.querySelector('[data-slot="arc-name"]')?.textContent), long, "each name whole in the markup");
+	});
 });
 
 describe("the arc pill", () => {
