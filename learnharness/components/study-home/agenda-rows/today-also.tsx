@@ -8,7 +8,7 @@ import { courseTitle, lessonTitle, whyOf } from "@/components/study-home/agenda-
 import type { TodayRow } from "@/components/study-home/study-facts";
 
 /** What a folded line's button leaves out, for its tooltip: its course and
- *  why it is on Today, as a full line says them: "Calculus I. Back in 3w".
+ *  why it is on Today, as a full line says them: "Calculus I. Back in 21d".
  *  Pure. */
 export function alsoHint(row: TodayRow): string {
 	const why = whyOf(row);

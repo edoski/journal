@@ -91,31 +91,49 @@ export const ATTEMPT_WORDS = {
 	wrong: "Not right",
 } as const;
 
-/** A review come due: "Due today", "3d overdue", "2w overdue". */
+/*
+ * Every distance in time counts whole days, one scheme wherever it shows:
+ * "3d ago", "13d ago", "45d ago", never weeks or months (round 4: search
+ * put "13d ago" beside "2w ago" and "4w ago", where 13 days read as more
+ * recent than 14 by a different unit). `distanceWords` already said days.
+ */
+
+/** A review come due: "Due today", "3d overdue", "16d overdue". */
 export function overdueWords(overdue: number): string {
 	if (overdue <= 0) return "Due today";
-	if (overdue < 7) return `${overdue}d overdue`;
-	return `${Math.floor(overdue / 7)}w overdue`;
+	return `${overdue}d overdue`;
 }
 
 /** Where unfinished work holding a topic was left, by when, never by the
  *  tutor's step: "Left off today", "Left off yesterday", "Left off 3d
- *  ago", "Left off 2w ago"; "Unfinished" when no day is known. */
+ *  ago", "Left off 20d ago"; "Unfinished" when no day is known. */
 export function leftOffWords(days: number | null): string {
 	if (days === null) return "Unfinished";
 	if (days <= 0) return "Left off today";
 	if (days === 1) return "Left off yesterday";
-	if (days < 14) return `Left off ${days}d ago`;
-	if (days < 60) return `Left off ${Math.floor(days / 7)}w ago`;
-	return `Left off ${Math.floor(days / 30)}mo ago`;
+	return `Left off ${days}d ago`;
 }
 
 /** A review the engine has dated ahead, some days away: "Back in 5d",
- *  "Back in 3w", "Back in 2mo". */
+ *  "Back in 21d". */
 export function returnWords(days: number): string {
-	if (days < 14) return `Back in ${days}d`;
-	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
-	return `Back in ${Math.round(days / 30)}mo`;
+	return `Back in ${days}d`;
+}
+
+/** Some days ago in a trailing column: "Today", "Yesterday", "3d ago",
+ *  "40d ago". */
+export function agoWords(days: number): string {
+	if (days <= 0) return "Today";
+	if (days === 1) return "Yesterday";
+	return `${days}d ago`;
+}
+
+/** When he last studied something, as a phrase: "Studied today",
+ *  "Studied yesterday", "Studied 3 days ago", "Studied 40 days ago". */
+export function studiedDaysWords(days: number): string {
+	if (days <= 0) return "Studied today";
+	if (days === 1) return "Studied yesterday";
+	return `Studied ${days} days ago`;
 }
 
 /** What a topic page's Now row offers on a topic not started: its first

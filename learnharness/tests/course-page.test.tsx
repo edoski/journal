@@ -128,7 +128,7 @@ describe("every topic once, in the group he would act on it from", () => {
 		assert.deepEqual(handles(groupOf(groups, "needs-you")), ["kernel", "independence", "span"]);
 		assert.deepEqual(
 			groupOf(groups, "needs-you").topics.map((t) => t.fact?.words),
-			["Sure, but wrong", "Mistake to fix", "1w overdue"],
+			["Sure, but wrong", "Mistake to fix", "10d overdue"],
 		);
 	});
 
@@ -198,7 +198,7 @@ describe("the header's facts and next lesson", () => {
 		assert.equal(next.action, "Review");
 		assert.equal(next.lesson.title, "Review Span");
 		assert.deepEqual(next.lesson.open, { kind: "course", workspace: WS });
-		assert.equal(next.why?.short, "1w overdue");
+		assert.equal(next.why?.short, "10d overdue");
 	});
 
 	it("resumes a session in this course that has waited on him since yesterday, and ignores one in another course", () => {
@@ -259,7 +259,7 @@ describe("the course header", () => {
 			[...document.querySelectorAll('[data-slot="page-fact"]')].map((f) => f.textContent),
 			["Some topics on your own", "Exam in 21 days", "Studied 2 days ago"],
 		);
-		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span1w overdue");
+		assert.equal(document.querySelector('[data-slot="course-next"]')!.textContent, "Review Span10d overdue");
 		const head = [...document.querySelector('[data-slot="page-head"]')!.children].map((line) => line.getAttribute("data-slot"));
 		assert.ok(head.indexOf("page-lead") < head.indexOf("page-standing"), "what to do next comes before the course's facts");
 		assert.ok(document.querySelector('[data-slot="page-lead"] [data-slot="course-next"]'), "the next step is the head's lead");

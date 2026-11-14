@@ -307,7 +307,7 @@ describe("Today", () => {
 		const lines = [...doc.querySelectorAll('[data-slot="today-line"]')];
 		assert.deepEqual(
 			lines.map((l) => l.textContent),
-			["Linear AlgebraTodayEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue", "Real Analysis11d agoReview Sequences1d overdue"],
+			["Linear AlgebraTodayEigen lessonYour turn", "Probability4d agoContinue Bayes' ruleNext up", "Linear Algebra2d agoReview Linear independence, Rank, Span16d overdue", "Real Analysis11d agoReview Sequences1d overdue"],
 		);
 		assert.equal(lines[0]!.getAttribute("href"), "/chat/q");
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);
@@ -353,7 +353,7 @@ describe("what a line of Today reads", () => {
 			return why && [why.kind, why.short];
 		};
 		assert.deepEqual(short(todayRows([LINALG], [waiting], TODAY)[0]!), ["reply", "Your turn"]);
-		assert.deepEqual(short(rowOf(LINALG)), ["review", "2w overdue"]);
+		assert.deepEqual(short(rowOf(LINALG)), ["review", "16d overdue"]);
 		assert.deepEqual(short(rowOf(ANALYSIS)), ["review", "1d overdue"]);
 		assert.deepEqual(short(rowOf(lapsed)), ["missed", "Not right last time: Sequences"]);
 		assert.deepEqual(short(rowOf({ ...LINALG, due: [] })), ["task", "Left off 3d ago"], "when the task was left, never the tutor's step");
@@ -382,7 +382,7 @@ describe("what a line of Today reads", () => {
 
 	it("says how long ago a course was studied in a few characters", () => {
 		const ago = (days: number | null) => studiedAgo(rowOf({ ...LINALG, lastActiveDaysAgo: days }));
-		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "2w ago", "8w ago", "2mo ago", null]);
+		assert.deepEqual([0, 1, 2, 13, 14, 59, 60, null].map(ago), ["Today", "Yesterday", "2d ago", "13d ago", "14d ago", "59d ago", "60d ago", null]);
 	});
 
 	it("gives each row one clock: a session its own last turn, an open task none beside its Left off", () => {
@@ -421,7 +421,7 @@ describe("what a line of Today reads", () => {
 		assert.deepEqual(lines, [
 			"Linear AlgebraTodayEigen lessonYour turn",
 			"Probability4d agoContinue Bayes' ruleNext up",
-			"Linear Algebra2d agoReview Linear independence, Rank, Span2w overdue",
+			"Linear Algebra2d agoReview Linear independence, Rank, Span16d overdue",
 			"Real Analysis11d agoReview Sequences1d overdue",
 		]);
 		assert.equal(doc.querySelectorAll('[data-slot="today-progress"]').length, 4);

@@ -187,15 +187,15 @@ describe("where he stands, in the app's one wording", () => {
 		const lines: [CourseMapTopic, string][] = [
 			[TOPICS.rank, "Right with help. Mistake to fix. 3d overdue"],
 			[TOPICS.matmul, "Right with help. Not right last time. 2d overdue"],
-			[TOPICS.span, "On your own. 1w overdue"],
+			[TOPICS.span, "On your own. 10d overdue"],
 			[TOPICS.vectors, "On your own. Back in 5d"],
 			[TOPICS.cramer, "Taught, not tried. 2d overdue"],
 			[TOPICS.riemann, "Right with help. Not right last time. Due today"],
 			[TOPICS.elimination, "Right with help. Mixed up with Cramer's rule. 2d overdue"],
 			[TOPICS.kernel, "Tried, not right yet. Sure, but wrong. 1d overdue"],
-			[TOPICS.basis, "On your own. 1w overdue"],
-			[TOPICS.independence, "Right with help. Mistake to fix. 2w overdue"],
-			[TOPICS.chain, "Right with help. Not right last time. 4w overdue"],
+			[TOPICS.basis, "On your own. 9d overdue"],
+			[TOPICS.independence, "Right with help. Mistake to fix. 16d overdue"],
+			[TOPICS.chain, "Right with help. Not right last time. 30d overdue"],
 			[TOPICS.eigen, "Not started"],
 		];
 		const said = (t: CourseMapTopic) => [topicFacts({ course: COURSE, topic: t, chats: [], read: null }).standing!.words, ...headMarks(t, titleOf, TODAY).map((mark) => mark.words)].join(". ");
@@ -230,7 +230,7 @@ describe("the page's words for time", () => {
 	});
 
 	it("say when he last studied the topic, in days, then weeks, then months", () => {
-		assert.deepEqual([0, 1, 2, 13, 14, 59, 60].map(studiedWords), ["Studied today", "Studied yesterday", "Studied 2 days ago", "Studied 13 days ago", "Studied 2 weeks ago", "Studied 8 weeks ago", "Studied 2 months ago"]);
+		assert.deepEqual([0, 1, 2, 13, 14, 59, 60].map(studiedWords), ["Studied today", "Studied yesterday", "Studied 2 days ago", "Studied 13 days ago", "Studied 14 days ago", "Studied 59 days ago", "Studied 60 days ago"]);
 	});
 
 	it("name a day against the engine's: today, yesterday, else the date", () => {
@@ -347,7 +347,7 @@ describe("the topic's sessions", () => {
 			[
 				[newest.id, "your-turn", "Today"],
 				[second.id, "your-turn", "Yesterday"],
-				[old.id, "finished", "2w ago"],
+				[old.id, "finished", "19d ago"],
 			],
 		);
 		assert.deepEqual(
