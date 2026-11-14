@@ -70,11 +70,12 @@ test("one row per account with its email and weekly usage; Use this account swit
 		account("claude-subscription-spare", "Spare", { state: "signed-out" }, null),
 	]]);
 	await mount();
-	assert.deepEqual(rows().map((r) => r.querySelector("span")!.textContent), ["Claude · Main", "Claude · Work", "Claude · Spare"]);
-	assert.equal(text(row("claude-subscription"), "claude-connection-state"), "Signed in as learner@example.com · Max plan via Claude Code");
-	assert.equal(text(row("claude-subscription-work"), "claude-connection-state"), "Signed in as work@example.com via Claude Code", "a token account's email comes from its config dir");
-	assert.equal(text(row("claude-subscription"), "claude-usage"), `62% left this week · resets ${claudeResetLabel(RESET)}`);
-	assert.equal(text(row("claude-subscription-work"), "claude-usage"), `limit reached · resets ${claudeResetLabel(RESET)}`);
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["learner@example.com", "work@example.com", "Spare"], "named by email, a token account's from its config dir; T3 Code's name only without one");
+	assert.equal(text(row("claude-subscription"), "claude-connection-state"), "Signed in through Claude Code on the Max plan");
+	assert.equal(text(row("claude-subscription-work"), "claude-connection-state"), "Signed in through Claude Code");
+	assert.equal(text(row("claude-subscription"), "claude-usage"), `About half left this week, resets ${claudeResetLabel(RESET)}`);
+	assert.equal(text(row("claude-subscription-work"), "claude-usage"), `At its limit until ${claudeResetLabel(RESET)}`);
+	assert.doesNotMatch(document.body.textContent!, /%|\d+ left/, "no percentages or counts");
 	assert.equal(text(row("claude-subscription-spare"), "claude-usage"), null);
 	assert.equal(text(row("claude-subscription"), "claude-in-use"), "In use");
 	assert.equal(row("claude-subscription").querySelector('[data-testid="claude-use-account"]'), null, "the account in use offers no switch");
@@ -110,6 +111,40 @@ test("Refresh forces a fresh check of every account and tells readers the connec
 	assert.deepEqual(calls.filter((c) => c.path.startsWith("/api/subscriptions/claude")).map((c) => c.path), ["/api/subscriptions/claude"]);
 	await click(document.querySelector('[data-testid="claude-refresh"]'));
 	assert(calls.some((c) => c.path === "/api/subscriptions/claude?refresh=1"));
-	assert.equal(text(rows()[0], "claude-connection-state"), "Signed in · Pro plan via Claude Code");
+	assert.equal(text(rows()[0], "claude-connection-state"), "Signed in through Claude Code on the Pro plan");
 	assert(signals.includes("keys"));
+});
+
+test("usage reads in words from plenty to nothing, with the day it resets", async () => {
+	const usage = (percentLeft: number) => ({ percentLeft, resetsAt: RESET, limited: false, checkedAt: 1 });
+	install([[
+		account("claude-subscription", "Main", connected, usage(93), "a@example.com", "default"),
+		account("claude-subscription-b", "B", connected, usage(13), "b@example.com"),
+		account("claude-subscription-c", "C", connected, usage(0), "c@example.com"),
+	]]);
+	await mount();
+	assert.deepEqual(rows().map((r) => text(r, "claude-usage")), [
+		`Plenty left this week, resets ${claudeResetLabel(RESET)}`,
+		`Little left this week, resets ${claudeResetLabel(RESET)}`,
+		`Nothing left this week, resets ${claudeResetLabel(RESET)}`,
+	]);
+	assert.match(claudeResetLabel(RESET), /^[A-Z][a-z]+day \d\d:\d\d$/, "the reset names its whole day");
+});
+
+test("two accounts on one email keep their names apart with T3 Code's name for each", async () => {
+	install([[
+		account("claude-subscription", "E", connected, null, "edo@example.com"),
+		account("claude-subscription-f", "F", connected, null, "edo@example.com"),
+		account("claude-subscription-a", "A", connected, null, "amir@example.com"),
+	]]);
+	await mount();
+	assert.deepEqual(rows().map((r) => text(r, "claude-account-name")), ["edo@example.com, named E in T3 Code", "edo@example.com, named F in T3 Code", "amir@example.com"]);
+});
+
+test("the note about the plan is a row of its own after the last account", async () => {
+	install([[account("claude-subscription", "Main", connected, null, "a@example.com", "default")]]);
+	await mount();
+	const parts = [...host!.children];
+	assert.deepEqual(parts.map((el) => el.getAttribute("data-testid")), ["claude-connection", "claude-account", "claude-notice"], "the header, each account and the note are sibling rows the group parts with hairlines");
+	assert.equal(parts.at(-1)!.textContent, CLAUDE_NOTICE);
 });
