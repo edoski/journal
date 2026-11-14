@@ -78,7 +78,8 @@ import type { SdkEngine } from "../src/agent/models.ts";
 import { PATHS } from "../config.ts";
 import { projectView as projectNative } from "../src/core/view.ts";
 import { emit, subscribe } from "../src/core/events.ts";
-import type { LhMessage } from "../src/core/native-messages.ts";
+import { newAnswerResult, newDoneTonightMessage, type LhMessage } from "../src/core/native-messages.ts";
+import { buildAnswer } from "../src/core/question-core.ts";
 import type { SteerInput, TurnInput } from "../src/core/input-events.ts";
 import { signInTestClaude, TEST_MODEL } from "./claude-fixture.ts";
 import { fakeEngine, fakeFor, onFake, type ScriptedModel } from "./helpers/fake-sdk.ts";
@@ -1148,6 +1149,100 @@ describe("wake pipeline (src/server/jobs.ts)", () => {
 		await deliverJobResult(steer);
 		assert.equal(fired, 0, "no duplicate wake for an already-delivered steer");
 		assert.equal(jobStore.getJob(jobId)!.status, "done", "the job still flips — recovery completes");
+	});
+
+	/** A tutor reply holding these tool calls (the record's assistant shape). */
+	function reply(id: string, calls: [string, string, unknown][], stopReason = "toolUse"): LhMessage {
+		return {
+			id, role: "assistant", content: calls.map(([callId, name, args]) => ({ type: "toolCall", id: callId, name, arguments: args })),
+			api: "anthropic-messages", provider: "claude-subscription", model: "test",
+			usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, stopReason, timestamp: 1,
+		} as never;
+	}
+	function result(id: string, callId: string, name: string, details: unknown): LhMessage {
+		return { id, role: "toolResult", toolCallId: callId, toolName: name, content: [{ type: "text", text: "ok" }], details, isError: false, timestamp: 1 } as never;
+	}
+	function assistantText(id: string, text: string): LhMessage {
+		return { ...reply(id, [], "stop"), content: [{ type: "text", text }] } as LhMessage;
+	}
+	function answerTo(callId: string): LhMessage {
+		const answer = buildAnswer({ id: callId, kind: "explain", question: "Q?", mode: "text", options: [], createdAt: "fixture" }, { text: "rank 2" });
+		return { ...newAnswerResult(callId, "explain", answer), id: `ans_${callId}` } as LhMessage;
+	}
+	/** Round 6, report 8 B1: the prober concluded, then asked once more in
+	 *  the same turn, so the handoff queued behind that question. */
+	function probedThenAsked(): LhMessage[] {
+		return [
+			{ id: "u1", role: "user", content: "Invertible matrices", timestamp: 1 } as never,
+			reply("a_pd", [["pd", "probe_done", { strands: [] }]]),
+			result("r_pd", "pd", "probe_done", { ok: true }),
+			reply("a_q1", [["q1", "explain", { question: "Q?" }]]),
+		];
+	}
+
+	it("a probe handoff the teacher already acted on never fires, even once a close leaves the lesson idle", async () => {
+		const chat = chatStore.createChat("Test: stale probe handoff");
+		trackChat(chat.id);
+		chatStore.saveMessages(chat.id, probedThenAsked());
+		let fired = 0;
+		setTurnRunner(async () => {
+			fired++;
+			return 200;
+		});
+		const delivery = deliverJobResult(buildProbeHandoffSteer(chat.id));
+		await delay(300);
+		assert.equal(fired, 0, "the question he owes holds the wake");
+
+		// He answers: the teacher's run plans and teaches, then poses its own
+		// question; he presses Done for today and the tutor closes.
+		const taught = [
+			...probedThenAsked(),
+			answerTo("q1"),
+			reply("a_plan", [["pi", "plan_init", { nodes: [] }], ["q2", "explain", { question: "Q2?" }]]),
+			result("r_pi", "pi", "plan_init", { ok: true }),
+		];
+		chatStore.saveMessages(chat.id, taught);
+		settleSteers(chat.id, taught.slice(4));
+		const closed = [
+			...taught,
+			{ ...newDoneTonightMessage("teacher"), id: "done" },
+			reply("a_close", [["lp", "lesson_progress", { done: [], close: true }]]),
+			result("r_lp", "lp", "lesson_progress", { ok: true }),
+			assistantText("a_bye", "Tomorrow: rank by pivots."),
+		];
+		chatStore.saveMessages(chat.id, closed);
+		settleSteers(chat.id, closed.slice(taught.length));
+		emit("record-changed", { chatId: chat.id });
+
+		await delivery;
+		await delay(300);
+		assert.equal(fired, 0, "the handoff his answer overtook never wakes the closed lesson");
+	});
+
+	it("a job result that lands after a close waits for his next message, then rides it", async () => {
+		const { chatId, steer } = setup();
+		const closed = [
+			{ id: "u1", role: "user", content: "hello", timestamp: 1 } as never,
+			{ ...newDoneTonightMessage("teacher"), id: "done" },
+			reply("a_close", [["lp", "lesson_progress", { done: [], close: true }]]),
+			result("r_lp", "lp", "lesson_progress", { ok: true }),
+			assistantText("a_bye", "Tomorrow: rank by pivots."),
+		];
+		chatStore.saveMessages(chatId, closed);
+		let fired = 0;
+		setTurnRunner(async () => {
+			fired++;
+			return 200;
+		});
+		const delivery = deliverJobResult(steer);
+		await delay(600);
+		assert.equal(fired, 0, "nothing queued may reopen a lesson closed for today");
+
+		const reopened = [...closed, { id: "u2", role: "user", content: "one more thing", timestamp: 2 } as never];
+		chatStore.saveMessages(chatId, reopened);
+		settleSteers(chatId, reopened);
+		await waitFor(() => fired > 0, 8000, "the held result rides his next message");
+		await delivery;
 	});
 
 // ─── continuation coalescing (the delivery-starvation fix) ───────────────────
