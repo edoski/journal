@@ -1,7 +1,7 @@
 import { currentArc, examCovers, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapArc, type CourseMapTopic, type StudyCourse, type TopicHandle, type UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
-import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
+import { examWords, nextStepOf, todayRows, type TodayRow } from "@/components/study-home/study-facts";
 import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
@@ -227,10 +227,13 @@ export interface CourseNext {
 
 /** What the course's button takes up, exactly as Home's line for it would:
  *  a session in this course to pick up since yesterday, else the course's
- *  next step. `open` are the sessions to pick up (`openSessions`). Pure. */
+ *  next step. Home has no line for a course whose lesson he ended today
+ *  with Done for today (`todayRows`); its page still has its one button,
+ *  on the course's next step, which the press takes up (`courseMove`).
+ *  `open` are the sessions to pick up (`openSessions`). Pure. */
 export function courseNext(course: StudyCourse, open: readonly ChatListItem[]): CourseNext {
 	const mine = open.filter((c) => c.course?.workspace === course.map.workspace);
-	const row = todayRows([course], mine, course.map.today)[0]!;
+	const row: TodayRow = todayRows([course], mine, course.map.today)[0] ?? { kind: "course", course, step: nextStepOf(course) };
 	const lesson = lessonOf(row);
 	return { row, lesson, why: whyOf(row), action: lesson.action === "Open" ? "Resume" : lesson.action };
 }
