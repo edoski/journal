@@ -15,7 +15,7 @@ The topic page (`/unit/<course>/<topic>`): `UnitPage` in `../unit-page.tsx` draw
 | # | When | Button | What it does |
 |---|---|---|---|
 | 1 | a session of the topic waits on him or the tutor stopped in it mid-reply (`sessionState`: your turn, paused) | Resume | opens `/chat/<id>` |
-| 2 | else the tutor is writing in one (`busy`, `compacting`) | Open | opens `/chat/<id>` |
+| 2 | else the tutor is writing in one (`busy`; a compaction is not writing) | Open | opens `/chat/<id>` |
 | 3 | else its review is due, whatever its level (as Home and the calendar say) | Review | starts a review session on the topic whose first message is "Review <title>"; never an older lesson |
 | 4 | else an open task holds it (the focused one first) | Continue | `continueMove` over the sessions holding the task: reopens the finished lesson that holds it (or, with `FINISHED_LESSON` on `fresh`, starts a session from it that skips the probe and keeps its plan); with none, first message "Continue <task title>" |
 | 5 | else not started | Start | first message "<title>" |
