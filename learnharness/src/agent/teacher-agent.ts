@@ -23,7 +23,7 @@ import { createFindTool, findTool } from "./tools/find.ts";
 import { createGrepTool, grepTool } from "./tools/grep.ts";
 import { createLsTool, lsTool } from "./tools/ls.ts";
 import { explainInputObject, explainInputProblems } from "../core/question-core.ts";
-import { QUESTION_TOOLS, type EnabledTools } from "../core/pending.ts";
+import { QUESTION_TOOLS } from "../core/pending.ts";
 import { toLlmMessages, nativeInputCause, MODE_HANDOFF_TOOLS, PRACTICE_PROBLEM_TOOL } from "../core/native-messages.ts";
 import type { ChatGPTRequestCycle } from "./chatgpt-request-cycle.ts";
 import { usageWasAdmitted } from "./subscription-request-cycle.ts";
@@ -88,15 +88,8 @@ export interface AgentBuildOptions {
 	messages?: AgentMessage[];
 	/** Money channel: one call per model request. */
 	onUsage?: StepUsageCollector;
-	/** Tests may pass a bare tool registry to drive deterministic flows.
-	 *  An explicit registry is NEVER toggle-filtered — the caller owns it. */
+	/** Tests may pass a bare tool registry to drive deterministic flows. */
 	tools?: Record<string, AgentTool<any>>;
-	/** The resolved per-user tool toggles (core/pending EnabledTools — the
-	 *  2026-09-19 P2 bridge: Platform's chat-handler passes
-	 *  effective.agent.tools; the factories drop any tool explicitly false.
-	 *  THE DEFINITIVE toggleable set is TOGGLEABLE_TOOLS (job tools only);
-	 *  the filtering is generic, but writes validate against the list). */
-	toolToggles?: EnabledTools;
 	/** Native conversation identity: the existing persisted chat id, reused
 	 * across reconstructed prober, teacher, and practice Agents.
 	 * Debug: when set AND LH_PROVIDER_EVENTS=1, raw provider stream events
@@ -273,7 +266,7 @@ function baseAgentOptions(kind: AgentKind, opts: AgentBuildOptions, tools: Agent
  * handler keys teacher construction on.
  */
 export function createProberAgent(ctx: ProberToolContext, opts: AgentBuildOptions = {}) {
-	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx, opts.toolToggles)));
+	return baseAgentOptions("prober", opts, Object.values(createProberTools(ctx)));
 }
 
 /**
@@ -289,7 +282,7 @@ export function createTeacherAgent(
 	ctx?: TeacherToolContext,
 	opts: AgentBuildOptions = {},
 ) {
-	const tools = opts.tools ?? (ctx ? createTeacherTools({ ...ctx, ...(opts.course ? { course: opts.course } : {}) }, opts.toolToggles) : bareQuestionTools());
+	const tools = opts.tools ?? (ctx ? createTeacherTools({ ...ctx, ...(opts.course ? { course: opts.course } : {}) }) : bareQuestionTools());
 	return baseAgentOptions("teacher", opts, Object.values(tools));
 }
 

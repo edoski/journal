@@ -50,7 +50,6 @@ describe("sanitizeUserSettings", () => {
 	it("round-trips a fully valid record field-for-field", () => {
 		const record = {
 			version: 1,
-			agent: { tools: { research: false, quiz: true } },
 			claude: { account: "claude-subscription-work" },
 			appearance: {
 				mode: "light",
@@ -81,11 +80,9 @@ describe("sanitizeUserSettings", () => {
 
 	it("wrong-typed fields DROP (resolve to factory), never crash", () => {
 		const out = sanitizeUserSettings({
-			agent: { tools: { research: "no" }, prompts: { "system-prompt.md": 1 }, models: { researcher: "fast" } },
 			appearance: { mode: "sepia", sessionNameSerif: "true" },
 		});
 		assert.ok(out);
-		assert.deepEqual(out.agent, {});
 		assert.deepEqual(out.appearance, {});
 	});
 
@@ -136,7 +133,7 @@ describe("sanitizeUserSettings", () => {
 				vision: { model: { provider: "claude-subscription", id: "claude-opus-5-5" }, thinkingLevel: "high" },
 			},
 		});
-		assert.deepEqual(out, { version: 1, agent: { tools: { demo: false } }, claude: { account: "claude-subscription-work" } });
+		assert.deepEqual(out, { version: 1, claude: { account: "claude-subscription-work" } });
 		assert.deepEqual(sanitizeUserSettings({ version: 1, models: { strong: { model: { provider: "chatgpt", id: "gpt-5" } } } }), { version: 1 }, "no Claude slot, no account: the default runs");
 		assert.deepEqual(
 			sanitizeUserSettings({ version: 1, claude: { account: "claude-subscription" }, models: { strong: { model: { provider: "claude-subscription-work", id: "claude-opus-5-5" } } } })?.claude,
@@ -145,20 +142,8 @@ describe("sanitizeUserSettings", () => {
 		);
 	});
 
-	it("a retired search engine pin drops", () => {
-		const out = sanitizeUserSettings({ version: 1, agent: { search: { engine: "tavily" }, tools: { demo: false } } });
-		assert.equal("search" in (out?.agent ?? {}), false);
-		assert.deepEqual(out?.agent?.tools, { demo: false });
-	});
-
-	it("a stored graphTools key (the retired knowledge-graph tools switch) is dropped on read", () => {
-		const out = sanitizeUserSettings({ version: 1, agent: { tools: { demo: false }, graphTools: { enabled: false } } });
-		assert.deepEqual(out?.agent, { tools: { demo: false } });
-	});
-
-	it("partial maps: booleans survive, non-boolean entries drop individually", () => {
-		const out = sanitizeUserSettings({ agent: { tools: { quiz: false, demo: true, visual: "x" } } });
-		assert.ok(out);
-		assert.deepEqual(out.agent?.tools, { quiz: false, demo: true });
+	it("a stored agent section (the retired tool switches) is dropped on read, whatever it says", () => {
+		const out = sanitizeUserSettings({ version: 1, agent: { tools: { research: false, demo: false, visual: false, pdf: false }, search: { engine: "tavily" } } });
+		assert.deepEqual(out, { version: 1 });
 	});
 });

@@ -380,12 +380,12 @@ describe("a course-linked turn", () => {
 		assert.equal((listing.content[0] as { text: string }).text, path.join(LINALG, "lecture-1.md"), "ls with no path lists the course folder, as paths read opens");
 	});
 
-	it("probe phase: a course-linked prober asks by free recall, even under the retired multiple-choice setting", async () => {
+	it("probe phase: a course-linked prober asks by free recall", async () => {
 		const tools: string[][] = [];
 		const build = (chatId: string): Factory => (opts) => {
 			const agent = createProberAgent(
 				{ chatId, chatStore, deliver: () => {}, jobStore: { createJob: () => { throw new Error("unused"); } } as never, spawn: () => {} },
-				{ ...opts, toolToggles: { ...opts.toolToggles, explain: false }, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
+				{ ...opts, engine: scripted([() => fauxAssistantMessage([fauxText("What do you already know about rank?")])]) },
 			);
 			tools.push(agent.state.tools.map((t) => t.name));
 			return agent;

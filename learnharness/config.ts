@@ -82,11 +82,11 @@ export type ModelRole =
 /**
  * THE USER SETTINGS RECORD (settings-storage wave, 2026-09-19): one
  * versioned, DELTA-shaped JSON blob at the data-dir seam holding every
- * non-secret product preference — agent (tool toggles), claude (the
- * account every agent runs on), appearance. Explicit user choices only: ABSENT keys resolve to the
+ * non-secret product preference — claude (the account every agent runs
+ * on) and appearance. Explicit user choices only: ABSENT keys resolve to the
  * factory defaults compiled into src/core/settings.ts (FACTORY_SETTINGS), so
- * a software update that adds a knob (new tool, new role, new appearance
- * field) needs no migration — old records simply lack the new keys. The
+ * a software update that adds a knob (a new appearance field) needs no
+ * migration — old records simply lack the new keys. The
  * version field is a PRIVATE schema counter for breaking shape changes
  * only (field renamed/meaning changed), unrelated to the app release
  * version. Secrets (login tokens) NEVER live here.

@@ -108,7 +108,6 @@ describe("every agent runs Claude Opus 5.5 at high effort", () => {
 		writeRecord(SLOT_DAYS_RECORD);
 		await assertOpusHigh(await conversationEngine(), "the conversation");
 		await assertOpusHigh(agentEngine(), "the background roles");
-		assert.deepEqual(effectiveSettings().agent.tools, { demo: false }, "the rest of the old file still loads");
 	});
 });
 
@@ -125,7 +124,7 @@ describe("PUT /api/settings/claude", () => {
 		const written = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8"));
 		assert.deepEqual(written.claude, { account: "claude-subscription" });
 		assert.equal("models" in written, false, "the slots are gone from disk");
-		assert.equal("models" in written.agent, false, "the role pins are gone from disk");
+		assert.equal("agent" in written, false, "the role pins and tool switches are gone from disk");
 		assert.equal(effectiveSettings().claude.account, "claude-subscription");
 	});
 

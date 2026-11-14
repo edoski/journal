@@ -1,6 +1,6 @@
 /**
  * Tests for the section parsers (settings-storage wave, 2026-09-19):
- * src/server/settings-body.ts — agent/appearance/claude strictness: every
+ * src/server/settings-body.ts — appearance/claude strictness: every
  * known field is strict (bad type/shape → 400-style error, never a silent
  * clamp), unknown keys drop, absent fields mean absent overrides. Pure — no
  * fs.
@@ -9,45 +9,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
-	parseAgentSettingsBody,
 	parseAppearanceSettingsBody,
 	parseClaudeSettingsBody,
 	SETTINGS_SECTIONS,
 } from "../src/server/settings-body.ts";
-
-describe("parseAgentSettingsBody", () => {
-	it("a stale client's per-role model pins are dropped like any unknown key", () => {
-		const r = parseAgentSettingsBody({ models: { researcher: { model: { provider: "chatgpt", id: "gpt-5" } } }, tools: { demo: false } });
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, { tools: { demo: false } });
-	});
-
-	it("tools: a boolean map; non-boolean values are 400s; the retired prompt switches are dropped", () => {
-		const r = parseAgentSettingsBody({ tools: { research: false }, prompts: { "system-prompt.md": true } });
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, { tools: { research: false } });
-		assert.equal(parseAgentSettingsBody({ tools: { quiz: "no" } }).ok, false);
-	});
-
-	it("a stale search field is dropped like any unknown key", () => {
-		const r = parseAgentSettingsBody({ search: { engine: "tavily" }, tools: { research: true } });
-		assert.ok(r.ok);
-		assert.equal("search" in r.settings, false);
-		assert.deepEqual(r.settings.tools, { research: true });
-	});
-
-	it("a graphTools key (the retired knowledge-graph tools switch) is ignored, never written", () => {
-		const r = parseAgentSettingsBody({ tools: { research: true }, graphTools: { enabled: false } });
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, { tools: { research: true } });
-	});
-
-	it("an empty {} agent section parses to {} (replace-whole clear)", () => {
-		const r = parseAgentSettingsBody({});
-		assert.ok(r.ok);
-		assert.deepEqual(r.settings, {});
-	});
-});
 
 describe("parseAppearanceSettingsBody", () => {
 	it("parses every field; hex-or-null colors; clamps happen at sanitize, rejects here", () => {
@@ -103,10 +68,10 @@ describe("parseAppearanceSettingsBody", () => {
 });
 
 describe("SETTINGS_SECTIONS (the route's section map)", () => {
-	it("maps exactly the record sections", () => {
+	it("maps exactly the record sections: no agent section, so its PUT is an unknown section", () => {
 		assert.deepEqual(
 			Object.keys(SETTINGS_SECTIONS),
-			["agent", "appearance", "claude"],
+			["appearance", "claude"],
 		);
 	});
 });

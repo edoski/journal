@@ -12,8 +12,7 @@
 
 import { isHexColor } from "../core";
 import { isClaudeProvider } from "../core/contracts/claude.ts";
-import type { AgentSettings, AppearanceSettings, ClaudeSettings } from "../core/settings.ts";
-import { TOGGLEABLE_TOOLS } from "../core/pending.ts";
+import type { AppearanceSettings, ClaudeSettings } from "../core/settings.ts";
 
 /** Parsed-or-rejected — `ok: false` carries the 400's error message. */
 export type SettingsBodyResult<T> =
@@ -28,47 +27,6 @@ export type SettingsBodyResult<T> =
 function asRecord(body: unknown): Record<string, unknown> | null {
 	if (!body || typeof body !== "object" || Array.isArray(body)) return null;
 	return body as Record<string, unknown>;
-}
-
-/** A boolean map (tool switches): every value must be boolean. */
-function parseBooleanMap(value: unknown, field: string): { map?: Record<string, boolean>; error?: string } {
-	if (value === undefined) return {};
-	const raw = asRecord(value);
-	if (!raw) return { error: `${field} must be an object` };
-	const out: Record<string, boolean> = {};
-	for (const [key, entry] of Object.entries(raw)) {
-		if (typeof entry !== "boolean") return { error: `${field}.${key} must be a boolean` };
-		out[key] = entry;
-	}
-	return { map: out };
-}
-
-/** agent: { tools? }. A stored graphTools key (the retired knowledge-graph
- *  tools switch) is ignored, never written back. */
-export function parseAgentSettingsBody(body: unknown): SettingsBodyResult<AgentSettings> {
-	const raw = asRecord(body);
-	if (!raw) return { ok: false, error: "Invalid JSON body" };
-	const settings: AgentSettings = {};
-	const tools = parseBooleanMap(raw.tools, "tools");
-	if (tools.error) return { ok: false, error: tools.error };
-	if (tools.map) {
-		// Unknown tool keys are rejected at WRITE time (user decision
-		// 2026-09-19): the delta is inert while unread, but once the bridge
-		// honors it a persisted bogus key would drift. The read-side
-		// sanitizer stays lenient for forward-compat. `explain` was the
-		// quizzing-mechanics switch, retired with multiple choice (7 Nov
-		// 2026): stored records still carry it and the panel writes the
-		// stored section back, so it is dropped rather than rejected.
-		const { explain: _retired, ...map } = tools.map;
-		const supported = TOGGLEABLE_TOOLS as readonly string[];
-		for (const key of Object.keys(map)) {
-			if (!supported.includes(key)) {
-				return { ok: false, error: `unknown tool "${key}" (supported: ${supported.join(", ")})` };
-			}
-		}
-		settings.tools = map;
-	}
-	return { ok: true, settings };
 }
 
 /** A hex-or-null color field (appearance colors): null = default. */
@@ -164,7 +122,6 @@ export function parseClaudeSettingsBody(body: unknown): SettingsBodyResult<Claud
 
 /** The section→parser map for PUT /api/settings/[section]. */
 export const SETTINGS_SECTIONS = {
-	agent: parseAgentSettingsBody,
 	appearance: parseAppearanceSettingsBody,
 	claude: parseClaudeSettingsBody,
 } as const;

@@ -9,7 +9,6 @@ import {
 	explainInputProblems,
 	parseOptionsIfString,
 } from "../core/question-core.ts";
-import { filterEnabledTools, type EnabledTools } from "../core/pending.ts";
 import type { JobRecord, SteerMessage } from "../core/contracts.ts";
 import type { JobStore } from "../core/ports.ts";
 import { jobTools, type DemoInput, type PdfInput, type ResearchInput, type VisualInput } from "./tools/jobs.ts";
@@ -170,17 +169,9 @@ export interface ProberToolContext extends ProbeDoneContext {
 }
 
 /** The prober's tool set: recall (no nodeId) + ask + the learner-fs
- *  set + probe_done + the two phase-omnipresent job dispatch tools.
- *  `enabled` is the resolved
- *  settings seam (core/pending.ts): any tool explicitly false is dropped
- *  from the registry. recall and probe_done stay always-on regardless —
- *  they are how the phase measures and ENDS. */
-export function createProberTools(
-	ctx: ProberToolContext,
-	enabled?: EnabledTools,
-): Record<string, AgentTool<any>> {
-	// probe_done is re-added AFTER the filter, always-on by construction — it
-	// is how the phase ENDS; a prober that can never conclude is a lockout.
+ *  set + probe_done + the two phase-omnipresent job dispatch tools. Every
+ *  tool is always on (owner, 2026-11-14): nothing switches one off. */
+export function createProberTools(ctx: ProberToolContext): Record<string, AgentTool<any>> {
 	const done = probeDoneTool(ctx);
 	// The job tools build over the SAME context/gates as the teacher's
 	// (one builder, one gating semantic); the prober carries a SUBSET:
@@ -193,28 +184,20 @@ export function createProberTools(
 	// the standard argument heal over the WHOLE registry — every tool,
 	// not just the one the latest wobble incident landed on.
 	return withPracticeHandoff(healToolRecord({
-		...filterEnabledTools(
-			{
-				ask_user_question: askUserQuestionTool,
-				// The learner-filesystem set is always-on (user-decided 2026-09,
-				// sources v1): the prober inspects and LOCATES learner-referenced
-				// files while assessing the edge. Read-only by construction.
-				read: readTool,
-				ls: lsTool,
-				find: findTool,
-				grep: grepTool,
-				// Job dispatch in the probe phase (owner ruling, 2026-09-20):
-				// research + pdf are ALWAYS available in every phase — the
-				// prober can verify facts or read learner PDFs while assessing.
-				// demo/visual stay teach-phase-only (they need the lesson's plan
-				// context). Same user-toggle filtering as the teacher.
-				...(jobs.research ? { research: jobs.research } : {}),
-				pdf: jobs.pdf!,
-			},
-			enabled,
-		),
-		// Past the filter: a stored `explain: false` from the retired
-		// quizzing switch must never drop the only graded tool.
+		ask_user_question: askUserQuestionTool,
+		// The learner-filesystem set (sources v1): the prober inspects and
+		// LOCATES learner-referenced files while assessing the edge.
+		// Read-only by construction.
+		read: readTool,
+		ls: lsTool,
+		find: findTool,
+		grep: grepTool,
+		// Job dispatch in the probe phase (owner ruling, 2026-09-20):
+		// research + pdf are available in every phase — the prober can
+		// verify facts or read learner PDFs while assessing. demo/visual
+		// stay teach-phase-only (they need the lesson's plan context).
+		...(jobs.research ? { research: jobs.research } : {}),
+		pdf: jobs.pdf!,
 		recall: probeExplainTool,
 		...done,
 	}), ctx); // the prober routes the opening: a request to practise hands off
@@ -253,38 +236,22 @@ export interface TeacherToolContext extends PlanToolContext {
 
 /**
  * Per-request teacher tool registry: teach questions (validated nodeId) +
- * plan tools + job tools, all closing over the ctx.
- *
- * `enabled` is the resolved settings seam (core/pending.ts EnabledTools —
- * Platform's chat-handler wiring passes it through from settings). Today
- * only the sub-agent tools (research/demo/visual) are user-toggleable, but
- * the filtering is GENERIC: any name explicitly false is dropped, so
- * future toggleables need no change here. The graded question tool is
- * added past the filter, never toggleable.
- * Absent/undefined = enabled — tests and old records see today's set.
+ * plan tools + job tools, all closing over the ctx. Every tool is always
+ * on (owner, 2026-11-14): nothing switches one off.
  */
-export function createTeacherTools(
-	ctx: TeacherToolContext,
-	enabled?: EnabledTools,
-): Record<string, AgentTool<any>> {
+export function createTeacherTools(ctx: TeacherToolContext): Record<string, AgentTool<any>> {
 	// healToolRecord — same standard as the prober's registry (above).
 	const tools = healToolRecord({
-		...filterEnabledTools(
-			{
-			ask_user_question: askUserQuestionTool,
-			// The learner-filesystem set is always-on (user-decided 2026-09,
-			// sources v1): the teacher locates and reads learner-referenced
-			// files on its own terms — nothing auto-injects. Read-only by
-			// construction (fs-shared.ts).
-			read: readTool,
-			ls: lsTool,
-			find: findTool,
-			grep: grepTool,
-			...planTools(ctx),
-			...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
-		},
-		enabled,
-		),
+		ask_user_question: askUserQuestionTool,
+		// The learner-filesystem set (sources v1): the teacher locates and
+		// reads learner-referenced files on its own terms — nothing
+		// auto-injects. Read-only by construction (fs-shared.ts).
+		read: readTool,
+		ls: lsTool,
+		find: findTool,
+		grep: grepTool,
+		...planTools(ctx),
+		...jobTools({ chatId: ctx.chatId, jobStore: ctx.jobStore, spawn: ctx.spawn }),
 		explain: teachExplainToolFor(ctx),
 	});
 	return ctx.deliver ? withPracticeHandoff(tools, { chatId: ctx.chatId, chatStore: ctx.chatStore, deliver: ctx.deliver }) : tools;
