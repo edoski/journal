@@ -243,6 +243,29 @@ def test_courses_without_an_exam_share_his_new_topic_room() -> None:
     assert [len(day["new"]) for day in together.days["b"]] == [1, 1]
 
 
+def test_a_day_starts_one_new_topic_unless_his_rate_or_a_pace_needs_two() -> None:
+    together = plan(
+        {"a": course(10), "b": course(10)}, 4, week(10, 1.5, frozenset(range(7)))
+    )
+    per_day = [
+        len(together.days["a"][n]["new"]) + len(together.days["b"][n]["new"])
+        for n in range(4)
+    ]
+    assert per_day == [1, 1, 1, 1]
+    assert {len(started(together.days[name])) for name in ("a", "b")} == {2}
+    paced = plan({"c": course(4, exam=11)}, 1, week(10, 1.5, frozenset(range(7))))
+    assert len(paced.days["c"][0]["new"]) == 2
+
+
+def test_a_second_topic_on_one_day_is_one_that_belongs_with_the_first() -> None:
+    record = course(4, exam=11, needs={"t00": ["t03"], "t02": ["t03"]})
+    order = {"path": {"order": ["t03", "t00", "t01", "t02"]}}
+    record = save(record, {**order, "topics": {"t03": {"introduced": True}}}, on(-9))
+    record = save(record, {"observations": [answer("t03")]}, on(-8))
+    together = plan({"c": record}, 1, week(10, 1.5, frozenset(range(7))))
+    assert together.days["c"][0]["new"] == ["t00", "t02"]
+
+
 def test_a_pinned_date_on_an_untaught_topic_does_not_unlock_what_needs_it() -> None:
     record = course(3, needs={"t01": ["t00"]})
     pin = {"t00": {"review": {"due": on(2).isoformat()}}}

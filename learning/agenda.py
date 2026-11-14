@@ -68,7 +68,12 @@ before the exam), nearest exam first, past the pace he has shown until he has
 shown a limit; so a nearer exam's last topics come before a later exam's pace,
 since a topic started late is better known at the exam than one never started.
 Spare new-topic capacity then goes to the nearest exam with topics left; then
-to courses with no exam. A topic a course cannot start before its exam does not
+to courses with no exam, the one that started a topic least recently first.
+Spare capacity starts one topic on a day that starts none, and a second only
+when it belongs with the first (one needs the other, or both rest on the same
+prerequisites) or his own rate that weekday holds two: two unrelated topics in
+one sitting split his attention, and nothing but a pace asks for them. A pace
+that needs two still takes two, related ones first. A topic a course cannot start before its exam does not
 fit. Before any pace, an untaught topic that a taught topic needs starts first,
 nearest exam first: what he has already started stands on it. A start that
 waits while other courses' new topics take the days names them
@@ -133,6 +138,7 @@ class _Course:
     pending: list[str] = field(default_factory=list)
     starts_after: dict[str, list[str]] = field(default_factory=dict)
     paired: dict[str, date] = field(default_factory=dict)
+    began: date | None = None
 
     @classmethod
     def of(cls, name: str, record: dict[str, Any]) -> _Course:
@@ -314,6 +320,7 @@ class _Course:
         self._set_due(topic, day, step, solid=True)
 
     def start(self, topic: str, day: date) -> None:
+        self.began = day
         self.untaught.remove(topic)
         self.projected.add(topic)
         self.introduced.add(topic)
@@ -324,6 +331,19 @@ class _Course:
             "last": {"date": day.isoformat()},
         }
         self._set_due(topic, day, progress.FIRST_RETRIEVAL_DAYS, solid=False)
+
+    def related(self, topic: str, started: list[str]) -> bool:
+        """Whether it belongs with one of the topics ``started`` today: one
+        needs the other, or both rest on the same prerequisites. Sharing one
+        of several is not enough: a foundation many topics need links
+        topics from different chapters."""
+        needs = set(progress.needs(self.record, topic))
+        return any(
+            other in needs
+            or topic in progress.needs(self.record, other)
+            or (bool(needs) and needs == set(progress.needs(self.record, other)))
+            for other in started
+        )
 
     def new_end(self, day: date) -> date | None:
         """The last day this course takes new topics before its exam."""
@@ -563,15 +583,34 @@ def _new(
     chosen: dict[str, list[str]] = {course.name: [] for course in courses}
 
     def take(course: _Course, count: float, among: set[str] | None = None) -> int:
+        """Up to ``count`` ready topics in path order, those related to one it
+        starts today first: a second topic on one day builds on what the
+        first does."""
         taken = 0
-        for topic in list(course.untaught):
-            if taken >= count:
+        while taken < count:
+            ready = [
+                topic
+                for topic in course.untaught
+                if (among is None or topic in among) and course.ready(topic)
+            ]
+            near = [t for t in ready if course.related(t, chosen[course.name])]
+            if not ready:
                 break
-            if (among is None or topic in among) and course.ready(topic):
-                course.start(topic, day)
-                chosen[course.name].append(topic)
-                taken += 1
+            topic = (near or ready)[0]
+            course.start(topic, day)
+            chosen[course.name].append(topic)
+            taken += 1
         return taken
+
+    def spare(course: _Course) -> int:
+        """One topic beyond what the paces and the gaps need. Two unrelated
+        topics on one day split his attention, so it starts one only on a day
+        that starts none yet, or one related to a topic this course starts
+        today, unless his own rate that weekday holds two."""
+        if not any(chosen.values()) or week.on(day).new.value >= 2:
+            return take(course, 1)
+        started = chosen[course.name]
+        return take(course, 1, {t for t in course.untaught if course.related(t, started)})
 
     exams = sorted(
         (course for course in courses if course.new_end(day) is not None),
@@ -593,13 +632,16 @@ def _new(
         if room > 0 and course.name in paces:
             room -= take(course, min(room, paces[course.name]))
     for course in exams:
-        if room > 0:
-            room -= take(course, room)
-    open_ = [course for course in courses if course.exam is None]
+        while room > 0 and spare(course):
+            room -= 1
+    open_ = sorted(
+        (course for course in courses if course.exam is None),
+        key=lambda course: course.began or date.min,
+    )
     while room > 0 and open_:
         started = []
         for course in open_:
-            if room > 0 and take(course, 1):
+            if room > 0 and spare(course):
                 started.append(course)
                 room -= 1
         open_ = started
