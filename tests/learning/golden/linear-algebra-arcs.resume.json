@@ -50,6 +50,7 @@
     "inner-product": {
       "arc": "orthogonality",
       "kind": "early",
+      "behind": "determinants",
       "waiting_on": [
         "rank",
         "determinant"
@@ -59,6 +60,7 @@
     "projection": {
       "arc": "orthogonality",
       "kind": "early",
+      "behind": "determinants",
       "waiting_on": [
         "determinant"
       ],

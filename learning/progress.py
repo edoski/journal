@@ -54,9 +54,9 @@ def counts(observation: dict[str, Any]) -> bool:
 
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
-# New topics come from the arc he is in and the next one (Edo's ruling of 14
-# Nov 2026): the material keeps its chapters' order, and at most one chapter
-# runs early while the one he is in waits on evidence.
+# New topics come from the earliest arc with topics left and the next one
+# (Edo's ruling of 14 Nov 2026): the material keeps its chapters' order, and
+# at most one chapter runs early while the earliest waits on evidence.
 NEW_TOPIC_ARCS = 2
 RECENT_SOLID_DAYS = 14
 WEEK_DAYS = 7
@@ -964,22 +964,23 @@ def window(
     front: str | None,
     free: frozenset[str] | None = None,
 ) -> frozenset[str] | None:
-    """The arcs new topics may come from: the current arc and the next
-    (``NEW_TOPIC_ARCS``), and every arc that needs nothing from another
-    (``free_arcs``, or ``free`` when the caller has them). None without arcs.
+    """The arcs new topics may come from: the earliest arc with topics left
+    and the next (``NEW_TOPIC_ARCS``), and every arc that needs nothing from
+    another (``free_arcs``, or ``free`` when the caller has them). None
+    without arcs.
 
-    The current arc here is the arc of ``front``, the earliest untaught
-    topic: the arc he is in whenever he studies in order, and the current
-    arc's own rule when "You are here" names no topic (``arcs.current``).
-    "You are here" itself can lag in an arc he has finished, where its
-    window would close every arc with topics left, or lead into the next arc
-    after an early start, where its window would open the arc after that,
-    so early starts would chain away from the material."""
+    The earliest arc with topics left is the arc of ``front``, the earliest
+    untaught topic. It is not the current arc, the arc of "You are here"
+    (``arcs.current``), though the two agree whenever he studies in order.
+    "You are here" can lag in an arc he has finished, where a window read
+    from it would close every arc with topics left, or lead into the next
+    arc after an early start, where it would open the arc after that, so
+    early starts would chain away from the material."""
     arcs = arc_rules.order(record)
     if not arcs:
         return None
-    current = record["topics"][front].get("arc") if front is not None else None
-    last = arcs.index(current) + NEW_TOPIC_ARCS if current in arcs else len(arcs)
+    earliest = record["topics"][front].get("arc") if front is not None else None
+    last = arcs.index(earliest) + NEW_TOPIC_ARCS if earliest in arcs else len(arcs)
     return frozenset(arcs[:last]) | (free_arcs(record) if free is None else free)
 
 
