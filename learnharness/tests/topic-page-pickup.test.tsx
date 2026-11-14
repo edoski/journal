@@ -290,3 +290,71 @@ describe("Earlier", () => {
 		assert.ok(earlier.querySelector('[data-slot="topic-history-date"]'));
 	});
 });
+
+describe("the history's gutter (Edo, 14 Nov 2026: Now's rule on the Now label, every icon still in line)", () => {
+	/** A class's length in px: Tailwind's 4px steps, or an arbitrary `[…rem]`. */
+	const px = (value: string) => (value.startsWith("[") ? parseFloat(value.slice(1)) * 16 : Number(value) * 4);
+	/** An element's left margin, from the classes it renders. */
+	function margin(el: Element): number {
+		let at = 0;
+		for (const c of (el.getAttribute("class") ?? "").split(/\s+/)) {
+			const m = /^(-?)m[xl]-(.+)$/.exec(c);
+			if (m) at = (m[1] ? -1 : 1) * px(m[2]!);
+		}
+		return at;
+	}
+	/** How far an element moves its content right of its parent's content
+	 *  edge: its left margin, then its left padding, the `has-[>svg]` one
+	 *  when it leads with an icon. */
+	function inset(el: Element): number {
+		const leadsWithIcon = el.firstElementChild?.tagName.toLowerCase() === "svg";
+		let padding = 0;
+		let iconPadding: number | null = null;
+		for (const c of (el.getAttribute("class") ?? "").split(/\s+/)) {
+			const p = /^p[xl]-(.+)$/.exec(c);
+			if (p) padding = px(p[1]!);
+			const ip = /^has-\[>svg\]:p[xl]-(.+)$/.exec(c);
+			if (ip) iconPadding = px(ip[1]!);
+		}
+		return margin(el) + (leadsWithIcon && iconPadding !== null ? iconPadding : padding);
+	}
+	/** An element's x from the pane's content edge, where the section labels start. */
+	function x(el: Element, column: Element): number {
+		let at = 0;
+		for (let node = el.parentElement; node && node !== column; node = node.parentElement) at += inset(node);
+		return at;
+	}
+	const ROW = '[data-slot="pickup-now"], [data-slot="pickup-next"], [data-slot="pickup-scheduled"], [data-slot="pickup-builds-on"], [data-slot="pickup-material"], [data-testid="unit-page-session"], [data-slot="topic-attempt"]';
+	const kindOf = (row: Element) => row.getAttribute("data-testid") ?? row.getAttribute("data-slot")!;
+	const pages = [...ROWS.map(([, facts]) => facts), factsOf(RANK, [chat("chat_rank", "Rank, second pass", "2026-11-03T14:32:01.000Z", { topics: ["rank"] })], [], RANK_RECORD)];
+
+	it("puts Now's rule on the Now label's x, and every row's icon on one x past it, on every page", () => {
+		const kinds = new Set<string>();
+		for (const facts of pages) {
+			const doc = page(facts);
+			const column = doc.querySelector('[data-slot="pickup-section"]')!.parentElement!;
+			const label = doc.querySelector('[data-slot="pickup-divider"]')!;
+			const now = doc.querySelector('[data-slot="pickup-now"]')!;
+			const left = /(?:^|\s)before:left-(\S+)/.exec(now.getAttribute("class")!)![1]!;
+			assert.equal(x(now, column) + margin(now) + px(left), x(label, column), "the rule starts where Now's text starts");
+			for (const row of doc.querySelectorAll(ROW)) {
+				kinds.add(kindOf(row));
+				const icon = row.querySelector("svg") ?? row.firstElementChild!;
+				assert.equal(x(icon, column), 18, `${kindOf(row)}: its icon on the gutter's x`);
+			}
+		}
+		for (const kind of ["pickup-now", "pickup-next", "pickup-scheduled", "unit-page-session", "topic-attempt"]) assert.ok(kinds.has(kind), `measured a ${kind} row`);
+	});
+
+	it("bleeds every hover fill 12px past the column on each side, the rule's row as the others", () => {
+		for (const facts of pages) {
+			const doc = page(facts);
+			const column = doc.querySelector('[data-slot="pickup-section"]')!.parentElement!;
+			for (const row of doc.querySelectorAll('[data-slot="pickup-now"], [data-slot="pickup-next"], [data-slot="pickup-builds-on"], [data-testid="unit-page-session"]')) {
+				assert.equal(x(row, column) + margin(row), -12, `${kindOf(row)}: left bleed`);
+				const right = /(?:^|\s)-m[xr]-(\S+)/.exec(row.getAttribute("class")!);
+				assert.equal(right ? px(right[1]!) : 0, 12, `${kindOf(row)}: right bleed`);
+			}
+		}
+	});
+});
