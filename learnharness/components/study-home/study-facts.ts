@@ -251,6 +251,28 @@ export function courseMove(course: StudyCourse, chats: readonly ChatListItem[]):
 const PICK_UP: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused", "left"]);
 const pickUp = (sessions: readonly ChatListItem[]) => sessions.some((c) => PICK_UP.has(sessionState(c)));
 
+/** The states of a lesson he is in now: it waits on him, the tutor writes
+ *  in it, or the tutor stopped mid-reply. */
+const IN_PROGRESS: ReadonlySet<SessionState> = new Set(["your-turn", "working", "paused"]);
+
+/**
+ * Each course with "You are here" (`map.current`) on the lesson he is in:
+ * when the course's newest session is a lesson still in progress and
+ * belongs to a topic on the map, that topic; else the engine's current
+ * topic, which moves only when a lesson's digest runs, so during a lesson
+ * on NFAs the map said he was on a topic he had not started. Practice and
+ * reviews leave it where it is. Pure.
+ */
+export function withLessonHere(courses: readonly StudyCourse[], chats: readonly ChatListItem[]): StudyCourse[] {
+	return courses.map((course) => {
+		const { workspace, topics } = course.map;
+		const newest = chats.filter((c) => c.course?.workspace === workspace && c.messageCount > 0).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+		if (!newest || newest.kind !== "teach" || !IN_PROGRESS.has(sessionState(newest))) return course;
+		const here = topics.find((t) => (newest.ownTopics ?? []).includes(t.handle));
+		return here && here.handle !== course.map.current ? { ...course, map: { ...course.map, current: here.handle } } : course;
+	});
+}
+
 /** The sessions to pick up, most recent first. Pure. */
 export function openSessions(chats: readonly ChatListItem[]): ChatListItem[] {
 	return chats

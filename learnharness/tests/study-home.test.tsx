@@ -23,6 +23,7 @@ import {
 	todayCourses,
 	courseMove,
 	studyQuestion,
+	withLessonHere,
 	type TodayRow,
 } from "../components/study-home/study-facts.ts";
 import { lessonOf, topicSpan } from "../components/study-home/lesson-facts.ts";
@@ -430,5 +431,18 @@ describe("a course whose record can't be read", () => {
 				"Probability Couldn't read this course's record. The app isn't allowed to open its files.",
 			],
 		);
+	});
+});
+
+describe("You are here during a lesson", () => {
+	const la = { workspace: "/s/linalg", title: "Linear Algebra" };
+	it("sits on the topic of the lesson he is in, not the engine's stale current topic, and goes back once it is finished", () => {
+		const lessonOn = (over: Partial<ChatListItem>) => chat({ id: "l", kind: "teach", course: la, topics: ["eigen"], ownTopics: ["eigen"], messageCount: 4, updatedAt: "2026-11-08T09:00:00.000Z", ...over });
+		const [during] = withLessonHere([LINALG], [lessonOn({ pendingQuestion: true })]);
+		assert.equal(during!.map.current, "eigen");
+		const [after] = withLessonHere([LINALG], [lessonOn({ ended: "closed" })]);
+		assert.equal(after!.map.current, LINALG.map.current, "a finished lesson leaves the engine's topic");
+		const [practice] = withLessonHere([LINALG], [lessonOn({ kind: "practice", pendingProblem: true })]);
+		assert.equal(practice!.map.current, LINALG.map.current, "practice leaves it where it is");
 	});
 });

@@ -24,3 +24,7 @@ Edo, 13 Nov 2026: Home felt disjointed, its map showing one course behind tabs a
 - The page's arrows (`components/spatial-arrows.ts`) walk Today's lines by where they sit; a line the arrows reach takes focus, so the map follows it at once. Enter opens the line.
 
 `followedRow` and `pointProps` (`agenda-rows/row-facts.ts`) are the pure parts, tested in `tests/home-follow.test.ts`.
+
+## You are here
+
+The course's newest session, when it is a lesson still in progress (waiting on him, the tutor writing, or stopped mid-reply) on a topic of the map, puts "You are here" on that topic (`withLessonHere`, `study-facts.ts`, applied to Home's and the course page's read). Otherwise it is the engine's current topic, which moves when a lesson's digest runs. Practice and reviews leave it where it is.
