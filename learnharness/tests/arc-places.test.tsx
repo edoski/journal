@@ -172,6 +172,14 @@ describe("the topic page", () => {
 		assert.deepEqual(plain.startsWhy, facts.startsWhy, "a course without arcs says why too");
 		assert.deepEqual(pickupSections(plain).now.why, facts.startsWhy);
 	});
+
+	it("says a topic the exam leaves out waits for it, in a course without arcs too", () => {
+		const diag = { ...LINALG.map.topics.find((t) => t.handle === "diag")!, starts: "2026-12-04" };
+		const map = { ...LINALG.map, exam: { date: "2026-11-29", daysLeft: 21, leavesOut: h("diag") }, topics: LINALG.map.topics.map((t) => (t.handle === "diag" ? diag : t)) };
+		const facts = topicFacts({ course: { ...LINALG, map }, topic: diag, chats: [], read: null });
+		assert.deepEqual(facts.startsWhy, { kind: "after", words: "Not on the exam; after it" });
+		assert.equal(pickupSections(facts).now.why, facts.startsWhy);
+	});
 });
 
 describe("search", () => {
