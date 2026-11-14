@@ -83,6 +83,7 @@ import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { strandedDraft } from "@/components/lesson/stranded-draft";
+import { sendHoldingDraft } from "@/components/lesson/sent-draft";
 import { LESSON_WORDS } from "@/components/study-words";
 import { forgetClosedBoxes, keepPhotos, keepWords, keptPhotos, keptWords, takeKeptPhotos } from "@/components/lesson/kept-drafts";
 import { ReplyCut } from "@/components/lesson/reply-cut";
@@ -203,7 +204,7 @@ export function Chat({
 	// (core/view.ts projectView); sends are ONE explicit input event each
 	// ({chatId, input} — the stash indirection died with the SDK), and the
 	// turn stream is the VERBATIM AgentEvent passthrough the server emits.
-	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, resumeStream, setReattachSettled } =
+	const { messages, nativeMessages, hasConfirmedConversation, contextTokens, send: sendInput, continueIfOwed, steer: steerInput, steerQueue, submitAnswer: submitInput, dismissQuestion, dismissProblem, questionDraft, saveQuestionDraft, setMessages, adoptRecord, status, error, stop, clearError, recoverDroppedStream, resumeStream, setReattachSettled } =
 		useChatSession({ chatId, initialMessages, initialError, initiallyInFlight });
 
 	// The question is the tutor's words and the one composer answers it
@@ -604,7 +605,8 @@ export function Chat({
 	}, [dockKey, applyText]);
 	const { unconnected } = useModelSetup();
 	const [setupOpen, setSetupOpen] = useState(false);
-	/** The last explicitly-sent draft (composer send): the
+	/** The explicitly-sent draft (composer send) until the server accepts
+	 *  it (sent-draft.ts): the
 	 *  refusal flow restores it into the composer, where it waits for the
 	 *  learner to re-send (Save never auto-sends, owner 2026-10-09).
 	 *  Auto-continuations (probe answers) never set it — their refusal
@@ -1124,7 +1126,7 @@ export function Chat({
 				attachToRunningTurn();
 				return;
 			}
-			clearError();
+			recoverDroppedStream();
 			void syncFromServer();
 		} catch {
 			/* still unreachable: the next resync asks again */
@@ -1253,9 +1255,8 @@ export function Chat({
 			deliverOpeningPrompt(t);
 			return;
 		}
-		draftRef.current = t; // the refusal flow's preserve-and-replay seam
 		applyText("");
-		sendWithPhotos((photos) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }));
+		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, ...(photos ? { photos } : {}) }, onAccepted)));
 	};
 
 	/* STEER VS SEND (owner arc 2026-10-03): a send while a turn runs steers
@@ -1302,9 +1303,8 @@ export function Chat({
 			sendWithPhotos((photos) => steer(t, photos));
 			return;
 		}
-		draftRef.current = t;
 		applyText("");
-		sendWithPhotos((photos) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }));
+		sendWithPhotos((photos) => sendHoldingDraft(draftRef, t, (onAccepted) => send({ type: "text", text: t, asked: true, ...(photos ? { photos } : {}) }, onAccepted)));
 	};
 
 	// THE ANSWER IS THE QUESTION CALL'S TOOL RESULT (fork 1, owner
