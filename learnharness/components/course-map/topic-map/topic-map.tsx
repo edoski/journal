@@ -2,7 +2,7 @@
 
 import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Position, ReactFlow, ReactFlowProvider, useReactFlow, useStore, type CoordinateExtent } from "@xyflow/react";
-import type { CourseMap, TopicHandle } from "@/src/core";
+import type { ArcHandle, CourseMap, TopicHandle } from "@/src/core";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { cn } from "@/lib/utils";
 import { NeedEdge, type NeedFlowEdge } from "./need-edge";
@@ -10,6 +10,7 @@ import { READABLE_ZOOM, TOPIC_NODE_SIZE as node, cameraAt, centreOf, chainOf, fr
 import { TopicMapContext, TopicNode, type TopicFlowNode, type TopicMapState } from "./topic-node";
 import { cardLine, standingOf, topicLabel } from "./topic-standing";
 import type { Said } from "@/components/unit-inbox/sidebar-says";
+import { arcView } from "./arc-view";
 
 const nodeTypes = { topic: TopicNode };
 const edgeTypes = { need: NeedEdge };
@@ -41,9 +42,13 @@ function reducedMotion(): boolean {
  * topics while nothing is hovered or focused, for a page that points at
  * them from elsewhere, and `marked` the one topic among them a page
  * points at, whose card glows (`lh-card-mark`); both off by default.
+ * `arc` draws one arc of a course with arcs (`arcView`): its topics whole
+ * and the topics it builds on from earlier arcs, faded and captioned with
+ * their arc, in the top layer; the lit chain then stays inside it.
  */
 export function TopicMap({
-	map,
+	map: course,
+	arc,
 	said,
 	margin = ROOM,
 	highlight = null,
@@ -53,6 +58,8 @@ export function TopicMap({
 	onOpensWhole,
 }: {
 	map: CourseMap;
+	/** The one arc to draw; unset, the whole course. */
+	arc?: ArcHandle;
 	/** What the sidebar says for each topic (`sidebarSays`), so each card's
 	 *  line is the sidebar row's. */
 	said: ReadonlyMap<TopicHandle, Said>;
@@ -72,7 +79,9 @@ export function TopicMap({
 	 *  when there is more to see. */
 	onOpensWhole?: (fits: boolean) => void;
 }) {
-	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node), [map.topics, map.edges]);
+	const view = useMemo(() => arcView(course, arc), [course, arc]);
+	const map = view.map;
+	const layout = useMemo(() => layoutTopicMap(map.topics, map.edges, node, new Set(view.entry.keys())), [map.topics, map.edges, view.entry]);
 	const titleOf = useCallback((handle: TopicHandle) => map.topics.find((t) => t.handle === handle)?.title ?? handle, [map.topics]);
 	const nodes = useMemo<TopicFlowNode[]>(
 		() =>
@@ -104,10 +113,11 @@ export function TopicMap({
 						label: topicLabel(topic, map.current === topic.handle, line),
 						needs: needs.length ? `Needs ${needs.join(", ")}` : null,
 						href: unitHref(map.workspace, topic.handle),
+						from: view.entry.get(topic.handle) ?? null,
 					},
 				};
 			}),
-		[map, said, layout, titleOf],
+		[map, said, layout, titleOf, view.entry],
 	);
 	const edges = useMemo<NeedFlowEdge[]>(
 		() =>
