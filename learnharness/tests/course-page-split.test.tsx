@@ -16,7 +16,7 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import type { CourseMapTopic, StudyCourse, TopicHandle } from "../src/core/index.ts";
 import { courseGroups } from "../components/course-page/course-model.ts";
 import { layoutTopicMap, NODE_WIDTH, slackOf } from "../components/course-map/topic-map/topic-map-layout.ts";
-import { aimOf, boxesOf, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
+import { OPEN_AT_FIRST, aimOf, boxesOf, walkStops, fadeAcross, litOf, markedOf, revealOf, scrollOfCamera, scrollOn, scrollToShow, shownGroups, surfaceOf, topicAt, walkTo, type Box } from "../components/course-page/split/split-tie.ts";
 import { SplitList } from "../components/course-page/split/split-list.tsx";
 import { SplitMap } from "../components/course-page/split/split-map.tsx";
 import { unitHref } from "../components/unit-inbox/unit-href.ts";
@@ -124,16 +124,32 @@ describe("the list's groups and rows", () => {
 		);
 	});
 
-	it("draws every topic as a 32px row linking to its page, none folded away, its reason's icon and words showing", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} marked={null} onPoint={noop} onEnterMap={noop} />);
+	it("draws each topic of an open group as a 32px row linking to its page, its reason's icon and words showing", () => {
+		const shown = shownGroups(groups);
+		const document = render(<SplitList groups={shown} marked={null} onPoint={noop} onEnterMap={noop} />);
 		const rows = [...document.querySelectorAll('[data-slot="course-topic-row"]')];
-		assert.equal(rows.length, MAP.topics.length);
+		const openTopics = shown.filter((g) => OPEN_AT_FIRST[g.id]).flatMap((g) => g.topics);
+		assert.equal(rows.length, openTopics.length);
 		assert.ok(rows.every((r) => r.className.includes("h-8") && !r.className.includes("h-9")), "every row is 32px");
 		const fact = document.querySelector(`[href="${unitHref(WS, "independence")}"] [data-slot="course-topic-fact"]`)!;
 		assert.equal(fact.textContent, "Sure, but wrong");
 		assert.equal(fact.querySelectorAll(".sr-only").length, 0, "the words show, not only for a screen reader");
 		assert.equal(document.querySelectorAll('[data-slot="course-group-more"]').length, 0);
-		assert.equal(document.querySelectorAll('[data-slot="course-group-header"][aria-expanded="false"]').length, 0);
+	});
+
+	it("opens Needs you and Learning and folds Not started and On your own under headers he can open", () => {
+		const document = render(<SplitList groups={shownGroups(groups)} marked={null} onPoint={noop} onEnterMap={noop} />);
+		const headers = [...document.querySelectorAll('[data-slot="course-group-header"]')];
+		assert.deepEqual(
+			headers.map((h) => [h.textContent, h.tagName, h.getAttribute("aria-expanded")]),
+			[
+				["Needs you", "BUTTON", "true"],
+				["Learning", "BUTTON", "true"],
+				["Not started", "BUTTON", "false"],
+				["On your own", "BUTTON", "false"],
+			],
+		);
+		assert.equal(document.querySelector(`[href="${unitHref(WS, "vectors")}"]`), null, "a folded group's rows are not drawn");
 	});
 
 	it("marks the row of the topic he points at on the map, and only that row", () => {
@@ -190,6 +206,21 @@ describe("the keyboard walk over the rows", () => {
 		assert.equal(walkTo("Home", 3, 5), 0);
 		assert.equal(walkTo("ArrowRight", 1, 5), null);
 		assert.equal(walkTo("a", 1, 5), null);
+	});
+});
+
+describe("what the arrows walk in the list", () => {
+	const groups = shownGroups(courseGroups(COURSE));
+	it("walks each group's header and the rows of the open groups, skipping a folded group's rows", () => {
+		const keys = (open: typeof OPEN_AT_FIRST) => walkStops(groups, open).map((s) => (s.kind === "group" ? `[${s.id}]` : s.handle));
+		const atFirst = keys(OPEN_AT_FIRST);
+		for (const g of groups) {
+			assert.ok(atFirst.includes(`[${g.id}]`), `${g.title}'s header is a stop`);
+			for (const t of g.topics) assert.equal(atFirst.includes(t.topic.handle), OPEN_AT_FIRST[g.id], `${t.topic.handle} walked only while ${g.title} is open`);
+		}
+		const opened = keys({ ...OPEN_AT_FIRST, "on-your-own": true });
+		const own = groups.find((g) => g.id === "on-your-own")!;
+		assert.deepEqual(opened.slice(opened.indexOf("[on-your-own]") + 1), own.topics.map((t) => t.topic.handle), "an opened group's rows follow its header");
 	});
 });
 

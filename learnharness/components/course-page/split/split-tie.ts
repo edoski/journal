@@ -1,6 +1,6 @@
 import type { CourseMapEdge, TopicHandle } from "@/src/core";
 import { NODE_GAP, NODE_SIZE, cardFit, chainOf, slackOf, type NodeSize, type TopicMapLayout } from "@/components/course-map/topic-map/topic-map-layout";
-import type { CourseGroup, CourseTopic } from "@/components/course-page/course-model";
+import type { CourseGroup, CourseTopic, GroupId } from "@/components/course-page/course-model";
 
 /**
  * What ties the split page's two panes (spec: split-course.md): the topic
@@ -45,6 +45,23 @@ export function shownGroups(groups: readonly CourseGroup[]): CourseGroup[] {
 			return { ...g, topics: g.id === "needs-you" ? [...waiting, ...rest] : rest };
 		})
 		.filter((g) => g.topics.length > 0);
+}
+
+/** Which groups show their rows when the page opens (Edo, 14 Nov 2026):
+ *  what needs him and what he is learning; Not started and On your own
+ *  wait folded under their headers until he opens them, for the visit. */
+export const OPEN_AT_FIRST: Readonly<Record<GroupId, boolean>> = { "needs-you": true, learning: true, "not-started": false, "on-your-own": false };
+
+/** One stop of the list's arrow walk: a group's header, or a row. */
+export type Stop = { kind: "group"; id: GroupId } | { kind: "row"; handle: TopicHandle };
+
+/** A stop's key, for the element that takes its focus. */
+export const stopKey = (stop: Stop): string => (stop.kind === "group" ? `group:${stop.id}` : `row:${stop.handle}`);
+
+/** What the arrows walk, top to bottom: each group's header, then its rows
+ *  while it is open; a folded group's rows are skipped. */
+export function walkStops(groups: readonly CourseGroup[], open: Readonly<Record<GroupId, boolean>>): Stop[] {
+	return groups.flatMap((g): Stop[] => [{ kind: "group", id: g.id }, ...(open[g.id] ? g.topics.map((t): Stop => ({ kind: "row", handle: t.topic.handle })) : [])]);
 }
 
 /** The topic the map opens on, as every course map opens: where he is
