@@ -1514,7 +1514,7 @@ export function Chat({
 									// and centered like the teacher's artifacts (contracts.ts "THE ASYNC
 									// PROTOCOL" §4). Key fallback: legacy transcripts (pre id-hygiene)
 									// can still hold empty ids — the index keeps keys unique for them.
-									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} />
+									<SubagentSteerCard key={m.id || `m-${mi}`} message={m} figures={reading ? "inline" : "card"} />
 								) : m.role === "user" && m.parts.some((p) => p.type === "data-session-resume") ? (
 								// A session that picks up an earlier lesson opens teaching:
 								// the plan carried over, so no probe or planning came first.
