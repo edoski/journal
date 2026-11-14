@@ -1,0 +1,30 @@
+# Answer mark
+
+`answer-mark.tsx`: how the record marked an answer, on the answered card itself, and one press to dispute it (Edo, 14 Nov 2026: one answer wrongly marked right can hide a topic for months, and he never saw the mark). The checks, recalls and practice problems all show it.
+
+## Where the mark comes from
+
+Never the app's judgement. `core/answer-marks.ts` links each answer to the attempts a save recorded after it (a question's call, or a problem's `conclude` and its receipt), and `GET /api/chats/:id/marks` reads them whole from the engine with `show`, following `corrected_by` to the attempts that stand. The session reads the marks again whenever a turn settles.
+
+## The line
+
+The card's foot, under a hairline, 13px muted, icons with a few words:
+
+| Fact | Words |
+|---|---|
+| result | Right, Partly right, Not right (the result in `foreground`) |
+| counted | On your own; With help (the attempt records help); Counted as helped (no help, but a guess, an unsure answer or a partly right one) |
+| confidence recorded | Guessing, Neutral, Confident. Once a mark is shown the card's label row drops the confidence he picked: a dispute may have corrected it |
+| disputed | Disputed: and the tutor's ruling, math rendered |
+
+A practice problem with two attempts reads two rows, First try and Then; rows split by topic carry the topic's title. Dispute sits at the right: a quiet 32px button with a flag, its tooltip "Dispute this mark ⌘⇧M", off while a turn runs.
+
+## The dialog
+
+shadcn Dialog, 448 wide: "Dispute this mark", the current mark and one line, the three marks as a segmented toggle (optional), a field for what's wrong, Cancel and Send to the tutor (needs words or a pick). The field takes focus; ↑ from its start reaches the marks, ← → move between them, ↓ comes back, ⌘↵ sends, Esc closes.
+
+## What happens
+
+The dispute is its own input (`dispute`) and its own message to the tutor (`[MARK DISPUTED]`, naming the answer, the attempts that stand, his words and his pick); the transcript shows it as a learner row. The tutor re-judges and records a re-marked attempt that corrects the old one, agreeing or not, with `disputed` and `ruling` (the engine's correction path, `learning/skills/tutor/references/evidence.md`). A question open when he disputed is set aside unanswered, and the tutor asks it again.
+
+⌘⇧M opens the dialog on the newest marked answer.

@@ -17,6 +17,8 @@ import {
 import { Message, MessageContent, MessageResponse } from "@/components/ai-elements/message";
 import { LiveToolCard } from "@/components/artifacts/live-tool-card";
 import { AnsweredCard } from "@/components/answered-card";
+import { AnswerMarksProvider, DisputeDialog, DisputeRow, type DisputeDraft } from "@/components/answer-mark";
+import { useAnswerMarks } from "@/components/answer-marks-fetch";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { artifactRenderers } from "@/components/artifacts";
 import { SubagentSteerCard } from "@/components/artifacts/steer-card";
@@ -54,7 +56,7 @@ import { GraphContextCard, type GraphContextData } from "@/components/graph-cont
 import { TopBar } from "@/components/top-bar";
 import { CourseLinkBanner } from "@/components/course-link-banner";
 import type { ArtifactPartProps, Confidence, Photo, JobRecord, PracticeRequest, PracticeRequestDetails, Phase3, QuestionAnswerData, QuestionFormDraft, TurnUsage, SessionPricing } from "@/src/core";
-import type { CourseLink, LhViewMessage, SessionMode } from "@/src/core";
+import type { AnswerMark, CourseLink, DisputeDetails, LhViewMessage, SessionMode } from "@/src/core";
 import { chipLabel, ModeDivider, PhaseDivider } from "@/components/phase-divider";
 import { CompactionCutDivider } from "@/components/compaction-divider";
 import {
@@ -74,6 +76,7 @@ import {
 	closedTonight,
 	doneTonightAtEnd,
 	replyCutOf,
+	latestMarkedAnswer,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -850,6 +853,28 @@ export function Chat({
 		return () => window.removeEventListener(kbdEventForChat("done-tonight"), onTonight);
 	}, []);
 
+	// Each answer's mark, as the engine recorded it (answer-mark.tsx): read
+	// again whenever a turn settles, since a save or a re-mark may have
+	// landed. ⌘⇧M disputes the newest one.
+	const marks = useAnswerMarks(chatId, busy ? null : nativeMessages.length);
+	const [disputing, setDisputing] = useState<string | null>(null);
+	const canDispute = !!course && !busy && !compacting;
+	const disputeMark = marks[disputing ?? ""];
+	const sendDispute = (answerId: string, mark: AnswerMark, draft: DisputeDraft) => {
+		setDisputing(null);
+		void send({ type: "dispute", answerId, observations: mark.rows.map((row) => row.id), ...draft });
+	};
+	const disputeLatestRef = useRef(() => {});
+	disputeLatestRef.current = () => {
+		const latest = canDispute ? latestMarkedAnswer(nativeMessages, marks) : null;
+		if (latest) setDisputing(latest);
+	};
+	useEffect(() => {
+		const onDispute = () => disputeLatestRef.current();
+		window.addEventListener(kbdEventForChat("dispute-mark"), onDispute);
+		return () => window.removeEventListener(kbdEventForChat("dispute-mark"), onDispute);
+	}, []);
+
 	const nextReady =
 		!doneTonight &&
 		mode === "practice" &&
@@ -1379,6 +1404,7 @@ export function Chat({
 		>
 		<JobsContext.Provider value={jobs}>
 		<ActiveProblemContext.Provider value={activeProblemCallId}>
+		<AnswerMarksProvider value={{ marks, onDispute: setDisputing, canDispute }}>
 		{/* The session surface: the transcript column (header + scroller) and
 		    the plan-tree panel as full-height SIBLINGS — the panel spans top to
 		    bottom exactly like the left sidebar, and the header (name + phase
@@ -1521,6 +1547,8 @@ export function Chat({
 												return <SectionBreak key={pi} testId="practice-next-line" label="Next problem" />;
 											case "data-done-tonight":
 												return <DoneTonightLine key={pi} />;
+											case "data-dispute":
+												return <DisputeRow key={pi} data={part.data as DisputeDetails} />;
 											// data-compaction (the moment the summary ran) stays
 											// unmarked: the cut's hairline is enough.
 											default:
@@ -1632,7 +1660,7 @@ export function Chat({
 														// transcript; answered ones render as records.
 														if (part.state === "output-available") {
 															return (
-																<AnsweredCard key={pi} answer={part.output as QuestionAnswerData} input={part.input} photos={part.photos as Photo[] | undefined} />
+																<AnsweredCard key={pi} answerId={part.toolCallId} answer={part.output as QuestionAnswerData} input={part.input} photos={part.photos as Photo[] | undefined} />
 															);
 														}
 														return null;
@@ -1794,9 +1822,13 @@ export function Chat({
 					/>
 				)}
 				<AbortTurnDialog mode={abortAsk} onClose={() => setAbortAsk(null)} onConfirm={confirmAbort} busy={busy} />
+				{disputing && disputeMark && (
+					<DisputeDialog key={disputing} mark={disputeMark} onClose={() => setDisputing(null)} onSend={(draft) => sendDispute(disputing, disputeMark, draft)} />
+				)}
 				</div>
 			</div>
 		</div>
+		</AnswerMarksProvider>
 		</ActiveProblemContext.Provider>
 		</JobsContext.Provider>
 		</SessionMermaidContext.Provider>

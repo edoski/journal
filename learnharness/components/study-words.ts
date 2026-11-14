@@ -1,4 +1,4 @@
-import type { CourseMapTopic, JobKind, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
+import type { CourseMapTopic, JobKind, MarkResult, MarkRow, MarkSure, RightAnswer, TopicHandle, TopicSignals, UnreadableProblem } from "@/src/core";
 
 /**
  * The app's one wording for where he stands on a topic and why it needs
@@ -224,6 +224,33 @@ export const QUESTION_WORDS = {
 	recall: "Recall",
 	question: "Question",
 } as const;
+
+/** An answer's mark as the record keeps it (Edo, 14 Nov 2026): the
+ *  result, whether it counted as his own or as helped, the confidence
+ *  recorded, and a dispute. */
+export const MARK_WORDS = {
+	result: { correct: "Right", partial: "Partly right", incorrect: "Not right" } satisfies Record<MarkResult, string>,
+	sure: { guess: "Guessing", neutral: "Neutral", confident: "Confident" } satisfies Record<MarkSure, string>,
+	ownWork: "On your own",
+	withHelp: "With help",
+	countedHelped: "Counted as helped",
+	disputed: "Disputed",
+	dispute: "Dispute",
+	disputeTitle: "Dispute this mark",
+	disputeLine: "Say what's wrong, or pick the mark you think is right. The tutor looks at your answer again.",
+	disputePlaceholder: "What's wrong with the mark?",
+	disputeSend: "Send to the tutor",
+	youDisputed: "You disputed the mark",
+	youThink: "You think",
+} as const;
+
+/** Whether an attempt counted as his own or as helped, from the engine's
+ *  grade and the help it records: a right guess, an unsure answer or a
+ *  partly right one with no help counts as helped all the same. */
+export function countedWords(row: Pick<MarkRow, "grade" | "helped">): string {
+	if (row.helped) return MARK_WORDS.withHelp;
+	return row.grade === "helped" ? MARK_WORDS.countedHelped : MARK_WORDS.ownWork;
+}
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
  *  `stopped` when the kind is unknown. */

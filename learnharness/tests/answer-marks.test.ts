@@ -1,0 +1,167 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { answerMarksOf, correctorsToRead, latestMarkedAnswer, markLinks } from "../src/core/answer-marks.ts";
+import { ChatInputError, inputAppends, parseChatInput } from "../src/core/input-events.ts";
+import { toLlmMessages, type LhMessage } from "../src/core/native-messages.ts";
+import { countedWords } from "../components/study-words.ts";
+
+let n = 0;
+const id = () => `m${++n}`;
+
+function call(callId: string, name: string, args: unknown = {}): LhMessage {
+	return {
+		id: id(),
+		role: "assistant",
+		content: [{ type: "toolCall", id: callId, name, arguments: args }],
+		api: "anthropic-messages",
+		provider: "anthropic",
+		model: "claude",
+		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+		stopReason: "toolUse",
+		timestamp: 0,
+	} as LhMessage;
+}
+
+function result(callId: string, toolName: string, text: string, details: unknown = null, isError = false): LhMessage {
+	return { id: id(), role: "toolResult", toolCallId: callId, toolName, content: [{ type: "text", text }], details, isError, timestamp: 0 } as LhMessage;
+}
+
+const answer = (question: string, extra: object = {}) => ({ kind: "explain", tool: "explain", questionText: question, answers: [], text: "rank 2", confidence: "confident", answeredAt: "", ...extra });
+const receipt = (...ids: string[]) => JSON.stringify({ revision: 3, changed: true, observations: ids });
+
+/** A check answered, then marked by a save, then the next check asked. */
+function lesson(): LhMessage[] {
+	return [
+		call("q1", "explain", { question: "Rank of A?", correctAnswer: "2" }),
+		result("q1", "explain", "{}", answer("Rank of A?")),
+		call("s1", "course_save", { changes: {} }),
+		result("s1", "course_save", receipt("o4")),
+		call("q2", "explain", { question: "Kernel of A?", correctAnswer: "span" }),
+		result("q2", "explain", "{}", answer("Kernel of A?", { hintRequested: true })),
+		call("s2", "course_save", { changes: {} }),
+		result("s2", "course_save", receipt("o5")),
+	];
+}
+
+describe("which attempts mark which answer", () => {
+	it("a save after an answer marks it; a hint request is no answer", () => {
+		assert.deepEqual(markLinks(lesson()), { q1: ["o4"] });
+	});
+
+	it("a practice problem's marks are its conclude receipt and any save that re-sends them", () => {
+		const messages = [
+			call("p1", "problem", { statement: "Find the rank.", topics: ["rank"] }),
+			result("p1", "problem", "posed"),
+			call("c1", "conclude", { outcome: "solved" }),
+			result("c1", "conclude", `Problem concluded.\n\nCourse record: ${receipt("o7", "o8")}`),
+			call("s3", "course_save", {}),
+			result("s3", "course_save", receipt("o9")),
+		];
+		assert.deepEqual(markLinks(messages), { c1: ["o7", "o8", "o9"] });
+	});
+
+	it("a save after his own message or a dispute marks nothing", () => {
+		const messages = [
+			...lesson().slice(0, 2),
+			{ id: id(), role: "user", content: [{ type: "text", text: "wait" }], timestamp: 0 } as LhMessage,
+			call("s9", "course_save", {}),
+			result("s9", "course_save", receipt("o6")),
+		];
+		assert.deepEqual(markLinks(messages), {});
+	});
+});
+
+const shown = {
+	o4: { kind: "attempt", topics: ["rank"], result: "incorrect", help: "none", sure: "confident", grade: "missed", corrected_by: ["o6"] },
+	o6: { kind: "attempt", topics: ["rank"], result: "correct", help: "none", sure: "confident", grade: "solid", disputed: "It is 2", ruling: "He is right: the pivots give rank 2." },
+};
+
+describe("the mark that stands", () => {
+	it("follows a re-mark to the attempt that corrects it and keeps the ruling", () => {
+		assert.deepEqual(correctorsToRead({ o4: shown.o4 }, ["o4"]), ["o6"]);
+		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, shown), {
+			q1: {
+				rows: [{ id: "o6", topics: ["rank"], label: null, result: "correct", grade: "solid", helped: false, sure: "confident" }],
+				disputed: true,
+				ruling: "He is right: the pivots give rank 2.",
+			},
+		});
+	});
+
+	it("a rejected dispute keeps the mark and says it was disputed", () => {
+		const held = { ...shown, o6: { ...shown.o6, result: "incorrect", grade: "missed", ruling: "The sign is wrong." } };
+		const mark = answerMarksOf({ q1: ["o4"] }, held).q1!;
+		assert.equal(mark.rows[0]!.result, "incorrect");
+		assert.equal(mark.disputed, true);
+		assert.equal(mark.ruling, "The sign is wrong.");
+	});
+
+	it("a first try and a final attempt read as two rows", () => {
+		const practice = {
+			o7: { kind: "attempt", topics: ["rank"], result: "incorrect", help: "none", grade: "missed" },
+			o8: { kind: "attempt", topics: ["rank"], result: "correct", help: "Hint R3: named the idea to use", grade: "helped" },
+		};
+		const mark = answerMarksOf({ c1: ["o7", "o8"] }, practice).c1!;
+		assert.deepEqual(mark.rows.map((r) => [r.label, r.result, countedWords(r)]), [
+			["First try", "incorrect", "On your own"],
+			["Then", "correct", "With help"],
+		]);
+	});
+
+	it("a self-report that supersedes an attempt leaves no mark", () => {
+		const reported = { o4: { ...shown.o4, corrected_by: ["o5"] }, o5: { kind: "self_report", topics: ["rank"] } };
+		assert.deepEqual(answerMarksOf({ q1: ["o4"] }, reported), {});
+	});
+
+	it("a right guess counted as helped says so", () => {
+		assert.equal(countedWords({ grade: "helped", helped: false }), "Counted as helped");
+		assert.equal(countedWords({ grade: "solid", helped: false }), "On your own");
+	});
+
+	it("⌘⇧M picks the newest marked answer", () => {
+		const marks = answerMarksOf({ q1: ["o4"] }, shown);
+		assert.equal(latestMarkedAnswer(lesson(), marks), "q1");
+		assert.equal(latestMarkedAnswer(lesson(), {}), null);
+	});
+});
+
+describe("the dispute input", () => {
+	it("parses his words or his pick, and refuses neither", () => {
+		assert.deepEqual(parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], said: " It is 2 " }), {
+			type: "dispute",
+			answerId: "q1",
+			observations: ["o4"],
+			said: "It is 2",
+		});
+		assert.throws(() => parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"] }), ChatInputError);
+		assert.throws(() => parseChatInput({ type: "dispute", answerId: "q1", observations: ["x"], proposed: "correct" }), ChatInputError);
+		assert.throws(() => parseChatInput({ type: "dispute", answerId: "q1", observations: ["o4"], proposed: "maybe" }), ChatInputError);
+	});
+
+	it("goes to the tutor as its own message naming the answer and its attempts", () => {
+		const appends = inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is 2", proposed: "correct" });
+		assert.equal(appends.length, 1);
+		const marker = appends[0]!;
+		assert.equal(marker.role, "custom");
+		const content = (marker as { content: string }).content;
+		assert.match(content, /^\[MARK DISPUTED\]/);
+		assert.match(content, /"Rank of A\?"/);
+		assert.match(content, /o4/);
+		assert.match(content, /"It is 2"/);
+		assert.match(content, /right \(correct\)/);
+		assert.deepEqual((marker as { details: unknown }).details, { answerId: "q1", observations: ["o4"], said: "It is 2", proposed: "correct" });
+	});
+
+	it("is refused for an answer with no mark", () => {
+		assert.throws(() => inputAppends({ messages: lesson() }, { type: "dispute", answerId: "q2", observations: ["o5"], said: "x" }), /no marked answer/);
+	});
+
+	it("leaves an open question set aside: the wire reads it as interrupted", () => {
+		const open = [...lesson().slice(0, 4), call("q3", "explain", { question: "Nullity?", correctAnswer: "1" })];
+		const appends = inputAppends({ messages: open }, { type: "dispute", answerId: "q1", observations: ["o4"], said: "It is 2" });
+		const wire = toLlmMessages([...open, ...appends]);
+		const last = wire.slice(-2);
+		assert.equal(last[0]!.role, "toolResult");
+		assert.equal(last[1]!.role, "user");
+	});
+});

@@ -29,6 +29,7 @@ import {
 	newUserMessage,
 	projectView,
 	tonightAppends,
+	disputeAppends,
 	type ChatInput,
 	type LhMarkerMessage,
 	type LhMessage,
@@ -731,6 +732,13 @@ export class SessionModel {
 			for (const m of tonightAppends({ messages: [...this.base, ...this.tail] })) {
 				if (m.role === "custom" || (m.role === "toolResult" && isQuestionTool(m.toolName))) optimistic.push({ ...m, id: localId() });
 			}
+		} else if (input.type === "dispute") {
+			// His dispute row lands at once; the record refuses one with no mark.
+			try {
+				for (const m of disputeAppends({ messages: [...this.base, ...this.tail] }, input)) {
+					if (m.role === "custom") optimistic.push({ ...m, id: localId() });
+				}
+			} catch { /* the POST's 400 says why */ }
 		} else if (input.type === "answer") {
 			const tool = pendingCallTool([...this.base, ...this.tail], input.toolCallId) ?? "explain";
 			const result = { ...newAnswerResult(input.toolCallId, tool, input.answer, input.photos), id: localId() };
@@ -803,7 +811,7 @@ export class SessionModel {
 			// existing setup recovery. A newer send/reattach ALWAYS owns errors
 			// and status instead, even if that request has since been stopped.
 			// Ordinary text and answer teardown behavior stays unchanged.
-			if (input.type === "answer" || input.type === "tonight") {
+			if (input.type === "answer" || input.type === "tonight" || input.type === "dispute") {
 				const ids = new Set(optimistic.map(m => m.id));
 				this.mutate(() => {
 					this.tail = this.tail.filter(m => !ids.has(m.id));

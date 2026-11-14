@@ -57,6 +57,17 @@ Home's line names the lapsed topic when the line is about another one ("Not righ
 
 `BACKGROUND_WORDS`: one name, Background work, for the sidebar's foot and every mention of it ("You can follow it under Background work in the sidebar and start studying now."). Each piece says what it does for which lesson or course in full, never cut and never timed (`backgroundWorkWords`): Building the topic map of Graph Theory; Saving what you learned in Eigenvalues; Drawing a figure for, Looking things up for, Building a demo for, Reading a PDF for a lesson.
 
+## An answer's mark
+
+`MARK_WORDS` and `countedWords`: the record's mark on an answered card (answer-mark.md).
+
+| Fact | Words |
+|---|---|
+| result | Right, Partly right, Not right |
+| counted | On your own; With help; Counted as helped (a right guess, an unsure or a partly right answer with no help) |
+| confidence recorded | Guessing, Neutral, Confident |
+| a dispute | Dispute; Disputed: and the tutor's ruling; in the transcript, You disputed the mark, You think: Partly right |
+
 ## Counts
 
 | Where | Words |

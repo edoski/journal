@@ -25,6 +25,7 @@ import { ThinkingBlock } from "@/components/thinking-block";
 import { useActiveProblemCallId } from "@/components/lesson/active-problem";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { LESSON_WORDS } from "@/components/study-words";
+import { AnswerMarkLine } from "@/components/answer-mark";
 
 /** The practice-thinking marker's details (native-messages.ts). */
 export interface PracticeThinkingData {
@@ -95,6 +96,7 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 					<ToolContentResponse>{reveal}</ToolContentResponse>
 				</div>
 			)}
+			<AnswerMarkLine answerId={part.toolCallId} />
 		</LessonCard>
 	);
 }

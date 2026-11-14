@@ -549,6 +549,90 @@ def test_an_attempt_from_an_earlier_day_stands_as_recorded() -> None:
     assert reported["observations"]["o2"]["corrects"] == ["o1"]
 
 
+def remark(*targets: str, **fields: Any) -> dict[str, Any]:
+    return attempt(
+        "rank",
+        text=fields.pop("text", "Worked an exercise"),
+        corrects=list(targets),
+        disputed=fields.pop("disputed", "My answer was right"),
+        ruling=fields.pop("ruling", "The rank is 2 as he said; the mark missed it"),
+        **fields,
+    )
+
+
+def test_a_disputed_mark_is_re_marked_from_any_day() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    tomorrow = date(2026, 10, 11)
+    remarked = apply(
+        record, {"observations": [remark("o1")]}, today=tomorrow, now=NEXT_DAY
+    )[0]
+    stored = remarked["observations"]["o2"]
+    assert stored["corrects"] == ["o1"]
+    assert stored["date"] == "2026-10-10"
+    assert stored["disputed"] == "My answer was right"
+    assert stored["ruling"].startswith("The rank is 2")
+
+
+@pytest.mark.parametrize(
+    ("observation", "fragment"),
+    [
+        (attempt("rank", disputed="It was right"), "disputed needs corrects"),
+        (
+            attempt("rank", corrects=["o1"], disputed="It was right"),
+            "needs both disputed",
+        ),
+        (attempt("rank", corrects=["o1"], ruling="Holds"), "needs both disputed"),
+        (
+            {
+                "kind": "self_report",
+                "topics": ["rank"],
+                "text": "It was right",
+                "corrects": ["o1"],
+                "disputed": "It was right",
+                "ruling": "Holds",
+            },
+            "rides only an attempt",
+        ),
+    ],
+)
+def test_a_re_mark_names_the_dispute_and_its_ruling(
+    observation: dict[str, Any], fragment: str
+) -> None:
+    record = apply(course(BASE), {"observations": [attempt("rank")]})[0]
+    fails(record, {"observations": [observation]}, fragment)
+
+
+def test_a_re_mark_judges_the_mark_that_stands() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    record = apply(record, {"observations": [remark("o1")]}, now=LATER)[0]
+    fails(
+        record,
+        {"observations": [remark("o1", text="Again")]},
+        "o1 was already superseded",
+    )
+    report = {"kind": "self_report", "topics": ["rank"], "text": "Had my notes open"}
+    record = apply(record, {"observations": [report]}, now=LATER)[0]
+    fails(record, {"observations": [remark("o3")]}, "o3 is a self_report")
+    chained = apply(record, {"observations": [remark("o2", text="Again")]}, now=LATER)[
+        0
+    ]
+    assert chained["observations"]["o4"]["corrects"] == ["o2"]
+
+
+def test_forgetting_a_disputed_attempt_keeps_its_re_mark_valid() -> None:
+    record = apply(
+        course(BASE), {"observations": [attempt("rank", result="incorrect")]}
+    )[0]
+    record = apply(record, {"observations": [remark("o1")]}, now=LATER)[0]
+    forgotten = schema.remove(record, ["o1"])
+    assert "corrects" not in forgotten["observations"]["o2"]
+    assert schema.validate_record(forgotten) == forgotten
+
+
 @pytest.mark.parametrize(("minutes", "skipped"), [(5, True), (30, True), (31, False)])
 def test_identical_observations_within_30_minutes_are_skipped(
     minutes: int, skipped: bool

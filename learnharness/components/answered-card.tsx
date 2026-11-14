@@ -9,6 +9,7 @@ import { SentPhotos } from "@/components/photos";
 import { questionLabel } from "@/components/question-dock";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
+import { AnswerMarkLine, useAnswerMark } from "@/components/answer-mark";
 import { LESSON_WORDS } from "@/components/study-words";
 
 /**
@@ -24,13 +25,18 @@ import { LESSON_WORDS } from "@/components/study-words";
  * removed multiple-choice tools (quiz, probe) in older transcripts render
  * the same plain way: the question and the option he picked, no grading.
  */
-export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
+export function AnsweredCard({ answerId, answer: savedAnswer, input, photos = [] }: {
+	/** The question's call: the key of its mark (answer-mark.tsx). */
+	answerId?: string;
 	answer: QuestionAnswerData;
 	input?: unknown;
 	/** Photos of his working that went with the answer. */
 	photos?: readonly Photo[];
 }) {
 	const answer = answerForPresentation(savedAnswer, input);
+	// Once the record holds a mark, its confidence is the one that counts:
+	// a dispute may have corrected the one he picked.
+	const recorded = useAnswerMark(answerId)?.rows.some((row) => row.sure !== null) ?? false;
 	if (answer.dismissed && answer.reason === "tonight") {
 		// The whole question, so the record still says which matrix he left;
 		// its answer was never shown, and is not here either.
@@ -49,7 +55,7 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 	}
 	const isExplain = answer.kind === "explain";
 	const selectedIdx = new Set(answer.answers.map((a) => a.index));
-	const confidenceLabel = isExplain ? CONFIDENCE_CHOICES.find((c) => c.state === answer.confidence)?.label : undefined;
+	const confidenceLabel = isExplain && !recorded ? CONFIDENCE_CHOICES.find((c) => c.state === answer.confidence)?.label : undefined;
 	const askInput = answer.kind === "ask" ? parseAskInput(input) : undefined;
 	const descByIndex = new Map((askInput?.options ?? []).map((o, i) => [i + 1, o.description]));
 	const small = "text-muted-foreground [--lh-prose-leading:calc(18/13)] [--lh-prose-size:13px]";
@@ -98,6 +104,7 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 						<ToolContentResponse>{answer.committed}</ToolContentResponse>
 					</div>
 				)}
+				{answerId && <AnswerMarkLine answerId={answerId} />}
 			</LessonCard>
 		</>
 	);

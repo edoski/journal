@@ -9,6 +9,7 @@ import type { LhMessage } from "../native-messages.ts";
 import type { Phase3 } from "../phases.ts";
 import type { PlanNodeStatus, PlanTree } from "./plan.ts";
 import type { CourseLink } from "./course.ts";
+import type { MarkResult } from "./marks.ts";
 
 // ─── Chat records (the session store's on-disk format) ───────────────────────
 
@@ -238,6 +239,37 @@ export const DONE_TONIGHT_TEXT = {
 	practice:
 		"[DONE FOR TODAY] — the learner pressed Done for today. He is stopping now. A problem he left open was dropped with nothing recorded, and a question he left open was never answered: don't grade either, and pose nothing more today. Close the session in two lines: what went well, and what to pick up next time.",
 } as const;
+
+/** The mark he thinks is right, in the record's words and his. */
+const PROPOSED_WORDS: Readonly<Record<MarkResult, string>> = {
+	correct: "right (correct)",
+	partial: "partly right (partial)",
+	incorrect: "not right (incorrect)",
+};
+
+/** The longest question excerpt a dispute quotes. */
+const DISPUTE_QUOTE = 400;
+
+/** What the agent reads when he disputes a mark (Edo, 14 Nov 2026): the
+ *  dispute marker's content. The rules for judging it live in the course
+ *  record's doctrine; this names the answer, its attempts and what he
+ *  said. Pure. */
+export function disputeText(
+	dispute: { observations: readonly string[]; said?: string; proposed?: MarkResult },
+	question: string,
+): string {
+	const quoted = question.length > DISPUTE_QUOTE ? `${question.slice(0, DISPUTE_QUOTE)}…` : question;
+	return [
+		`[MARK DISPUTED] — the learner pressed Dispute on the mark recorded for his answer to: "${quoted}".`,
+		`The attempts that stand for it: ${dispute.observations.join(", ")}.`,
+		dispute.said ? `What he says is wrong with the mark: "${dispute.said}"` : null,
+		dispute.proposed ? `The mark he thinks is right: ${PROPOSED_WORDS[dispute.proposed]}.` : null,
+		"Re-judge it now, as the course record says for a disputed mark: read those attempts whole, judge his response against the question and its committed answer, record the re-marked attempt with `course_save` whether you agree or not, then give him your ruling in one or two lines.",
+		"A question he had open when he disputed was set aside unanswered, its answer not shown: after your ruling, ask it again as it was. An active problem stays active.",
+	]
+		.filter(Boolean)
+		.join("\n");
+}
 
 /** The practice dock's request buttons: a hint, the rest of the
  *  solution, or teaching instead of this problem. A request is never an
