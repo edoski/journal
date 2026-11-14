@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { BookOpenIcon, MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
-import { MathText } from "@/components/ui/math-text";
+import { MathText, mathPlain } from "@/components/ui/math-text";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { focusWhereHeTypes } from "@/components/ui/overlay";
 import { courseHref, unitHref } from "@/components/unit-inbox/unit-href";
 import { kbdEventForAction, type LessonPlace } from "@/src/core";
 import { roadmapLabel, type RoadmapStep } from "@/components/lesson/roadmap-facts";
@@ -20,7 +21,8 @@ function stripDot(step: RoadmapStep): string {
 }
 
 /** The panel's marker: the plan list's 8px circle (the topic page's
- *  step map wears the same). */
+ *  step map wears the same), centred in the 16px slot the links' icons
+ *  take, so steps and links share one column. */
 function rowDot(step: RoadmapStep): string {
 	if (step.status === "current") return "bg-primary";
 	return step.status === "visited" ? "bg-muted-foreground" : "ring-1 ring-inset ring-muted-foreground";
@@ -32,6 +34,24 @@ function rowWord(step: RoadmapStep): string | null {
 	if (step.status === "current") return "Now";
 	if (step.next) return "Next";
 	return step.done ? "Done" : null;
+}
+
+/** The panel's stops, in order: the taught steps, then the topic's page
+ *  and the course map. */
+const STOPS = '[data-slot="roadmap-step"]:is(button), [data-slot="roadmap-link"]';
+
+/** Tab is dead, so the panel takes its own arrows (the page's arrows leave
+ *  an open popover alone): ↑ ↓ move between its stops, Home and End go to
+ *  its ends, Enter opens one. */
+function walkStops(e: KeyboardEvent<HTMLElement>) {
+	const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : e.key === "Home" ? -Infinity : e.key === "End" ? Infinity : 0;
+	if (step === 0) return;
+	const stops = Array.from(e.currentTarget.querySelectorAll<HTMLElement>(STOPS));
+	if (stops.length === 0) return;
+	e.preventDefault();
+	const at = stops.indexOf(document.activeElement as HTMLElement);
+	const next = Number.isFinite(step) ? Math.min(stops.length - 1, Math.max(0, (at < 0 ? -1 : at) + step)) : step < 0 ? 0 : stops.length - 1;
+	stops[next].focus();
 }
 
 /**
@@ -72,7 +92,7 @@ export function LessonRoadmap({
 						size="row"
 						data-slot="lesson-roadmap-trigger"
 						data-testid="roadmap"
-						aria-label={`Where this lesson is: ${label}`}
+						aria-label={`Where this lesson is: ${mathPlain(label)}`}
 						className="min-w-0 max-w-[22rem] shrink gap-2.5 font-normal"
 					>
 						<span data-slot="roadmap-strip" aria-hidden className="flex shrink-0 items-center gap-1">
@@ -86,13 +106,27 @@ export function LessonRoadmap({
 					</Button>
 				</PopoverTrigger>
 			</Hint>
-			<PopoverContent align="end" aria-label="Where this lesson is" data-testid="roadmap-panel" className="w-80 p-1">
+			<PopoverContent
+				align="end"
+				aria-label="Where this lesson is"
+				data-testid="roadmap-panel"
+				className="w-80 p-1"
+				onKeyDown={walkStops}
+				// Closed by Esc, a jump or a link: his next key goes to the
+				// box he answers in, not back to the strip.
+				onCloseAutoFocus={(e) => {
+					e.preventDefault();
+					focusWhereHeTypes(document, false);
+				}}
+			>
 				<ol data-slot="roadmap-steps" className="flex flex-col">
 					{steps.map((s) => {
 						const word = rowWord(s);
 						const inner = (
 							<>
-								<span aria-hidden className={cn("size-2 shrink-0 rounded-full", rowDot(s))} />
+								<span aria-hidden className="flex size-4 shrink-0 items-center justify-center">
+									<span className={cn("size-2 rounded-full", rowDot(s))} />
+								</span>
 								<span className={cn("min-w-0 flex-1 truncate", s.status === "current" ? "text-foreground" : "text-muted-foreground")}>
 									<MathText>{s.title}</MathText>
 								</span>
