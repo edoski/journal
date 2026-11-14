@@ -38,7 +38,7 @@ export function CalendarPage() {
 				scope={courses.some((c) => c.map.workspace === scope) ? scope : null}
 				onScopeChange={setScope}
 				busy={lesson.busy}
-				onStart={(opening, workspace, handle) => lesson.start(opening, workspace, { topics: handle ? [handle] : [] })}
+				onStart={lesson.start}
 			/>
 			{lesson.error && (
 				<p role="alert" className="absolute bottom-4 left-1/2 -translate-x-1/2 text-row text-danger">
