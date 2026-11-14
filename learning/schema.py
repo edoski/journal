@@ -1685,6 +1685,14 @@ def _check_disputed(
         )
 
 
+def _sure_as_given(item: dict[str, Any], target: dict[str, Any]) -> dict[str, Any]:
+    """A re-mark keeps the confidence the learner gave the answer it re-marks:
+    a dispute re-judges the mark, and the confidence was his, never the
+    tutor's to set."""
+    kept = {name: value for name, value in item.items() if name != "sure"}
+    return {**kept, "sure": target["sure"]} if "sure" in target else kept
+
+
 def _default_day(item: dict[str, Any], record: dict[str, Any], today: date) -> str:
     """A correction takes the day of the earliest observation it corrects."""
     stored = record["observations"]
@@ -1715,6 +1723,8 @@ def _append_observations(
         item = {**addition}
         item.setdefault("date", _default_day(item, record, today))
         _check_new(item, path, record, tasks, today)
+        if "disputed" in item:
+            item = _sure_as_given(item, record["observations"][item["corrects"][0]])
         duplicate = next(
             (
                 key

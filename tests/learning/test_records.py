@@ -447,3 +447,31 @@ def test_a_topic_taught_without_any_question_is_still_introduced(
     )
     assert receipt["reviews"]["diag"]["by"] == "engine"
     assert receipt["path_current"] == "diag"
+
+
+def test_a_re_marked_answer_keeps_the_confidence_he_gave_it(
+    workspace: Workspace,
+) -> None:
+    records.save(workspace, COURSE)
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(result="partial"),
+                attempt(text="Again", sure="guess"),
+            ]
+        },
+    )
+    remark = {"disputed": "It was right", "ruling": "It was right", "result": "correct"}
+    records.save(
+        workspace,
+        {
+            "observations": [
+                attempt(corrects=["o1"], sure="confident", **remark),
+                attempt(text="Again", corrects=["o2"], sure="confident", **remark),
+            ]
+        },
+    )
+    stored = records.load(workspace)["observations"]
+    assert "sure" not in stored["o3"]
+    assert stored["o4"]["sure"] == "guess"
