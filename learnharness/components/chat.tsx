@@ -5,6 +5,8 @@ import { useChatSession } from "@/components/session";
 import { visibleQueuedSteers } from "@/components/session-core";
 import { SetupDialog } from "@/components/setup-dialog";
 import { Hint } from "@/components/ui/hint";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useModelSetup, SignInPill } from "@/components/setup-cta";
 import { useStickToBottomContext, type StickToBottomContext } from "use-stick-to-bottom";
 import {
@@ -1197,7 +1199,8 @@ export function Chat({
 					<LessonTopBar
 						title={
 							renaming ? (
-								<input
+								<Input
+									variant="quiet"
 									ref={titleInputRef}
 									value={titleDraft}
 									onChange={(e) => setTitleDraft(e.target.value)}
@@ -1211,20 +1214,20 @@ export function Chat({
 									onBlur={() => void commitRename(titleDraft)}
 									spellCheck={false}
 									aria-label="Session title"
-									className="lh-no-drag -mx-1.5 min-w-[8ch] max-w-full shrink-0 rounded-md bg-fill-hover px-1.5 text-control font-medium caret-current outline-none [field-sizing:content]"
+									className="lh-no-drag -mx-1.5 h-auto w-auto min-w-[8ch] max-w-full shrink-0 bg-fill-hover px-1.5 text-control font-medium text-inherit caret-current focus-visible:ring-0 [field-sizing:content]"
 								/>
 							) : (
 								<Hint label="Rename session" action="rename-session" side="bottom">
-									<button
-										type="button"
+									<Button
+										variant="quiet"
 										onClick={() => {
 											setTitleDraft(titleText);
 											setRenaming(true);
 										}}
-										className="lh-no-drag -mx-1.5 min-w-4 shrink cursor-text truncate rounded-md px-1.5 text-left text-control font-medium outline-none transition-colors hover:bg-fill-hover focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+										className="lh-no-drag -mx-1.5 block h-auto min-w-4 shrink cursor-text truncate px-1.5 text-left text-control font-medium text-inherit hover:text-inherit"
 									>
 										{titleText}
-									</button>
+									</Button>
 								</Hint>
 							)
 						}
