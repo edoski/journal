@@ -1,12 +1,14 @@
 "use client";
 
 import { createContext, useContext, type KeyboardEvent } from "react";
+import { CornerLeftUpIcon } from "lucide-react";
 import Link from "next/link";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { CourseMapTopic, TopicHandle } from "@/src/core";
 import { cn } from "@/lib/utils";
 import { TopicGlyph } from "./topic-glyph";
 import { CURRENT_TAG, type CardFact, type Standing } from "./topic-standing";
+import { entryCaption } from "./arc-view";
 import { BrailleSpinner } from "@/components/braille-spinner";
 import { FACT_ICON } from "@/components/unit-inbox/fact-icon";
 import { MathText } from "@/components/ui/math-text";
@@ -26,6 +28,9 @@ export type TopicFlowNode = Node<
 		needs: string | null;
 		/** The topic's page. */
 		href: string;
+		/** An arc's entry topic: the earlier arc it comes from, its card
+		 *  faded and captioned with that arc ("From Vector spaces"). */
+		from: string | null;
 	},
 	"topic"
 >;
@@ -68,13 +73,20 @@ function LineMark({ line }: { line: CardFact }) {
  * taller; under it, on its left edge, its line (`cardLine`), or else where
  * he stands in words.
  */
-export function NodeBody({ topic, standing, line }: { topic: CourseMapTopic; standing: Standing; line: CardFact | null }) {
+export function NodeBody({ topic, standing, line, from = null }: { topic: CourseMapTopic; standing: Standing; line: CardFact | null; from?: string | null }) {
 	return (
 		<span className="flex w-full min-w-0 items-center gap-4">
 			<TopicGlyph standing={standing} />
 			<span className="flex min-w-0 flex-1 flex-col gap-1">
 				<MathLine className={cn("h-4.5 text-row font-medium", topic.level !== "new" ? "text-foreground" : "text-muted-foreground")}>{topic.title}</MathLine>
-				{line ? (
+				{from ? (
+					<span data-slot="topic-from" className="flex h-3.5 min-w-0 items-center gap-1 text-caption text-muted-foreground">
+						<CornerLeftUpIcon aria-hidden="true" className="size-3 shrink-0" />
+						<span className="truncate">
+							<MathText>{entryCaption(from)}</MathText>
+						</span>
+					</span>
+				) : line ? (
 					<LineMark line={line} />
 				) : (
 					<span data-slot="topic-standing" className="block h-3.5 truncate text-caption text-muted-foreground">
@@ -92,8 +104,10 @@ export function NodeBody({ topic, standing, line }: { topic: CourseMapTopic; sta
  */
 export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 	const state = useContext(TopicMapContext);
-	const { topic, current, standing, line, label, needs, href } = data;
+	const { topic, current, standing, line, label, needs, href, from } = data;
 	const dim = state?.lit ? !state.lit.has(topic.handle) : false;
+	// An entry topic stays faded unless its chain is lit.
+	const faded = from !== null && !dim && !state?.lit?.has(topic.handle);
 	const marked = state?.marked === topic.handle;
 	return (
 		<div
@@ -101,6 +115,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 				"relative size-full transition-opacity duration-[120ms] motion-reduce:transition-none",
 				// Dimmed past its muted line's 3:1 (Edo, 14 Nov 2026: the pointed chain must stand out); the title still reads.
 				dim && "opacity-50",
+				faded && "opacity-60",
 			)}
 		>
 			{current && (
@@ -115,6 +130,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 				data-slot="course-map-node"
 				data-level={topic.level}
 				data-current={current || undefined}
+				data-entry={from !== null || undefined}
 				data-marked={marked || undefined}
 				data-testid={`map-node-${topic.handle}`}
 				aria-label={label}
@@ -134,7 +150,7 @@ export function TopicNode({ data }: NodeProps<TopicFlowNode>) {
 					marked && "lh-card-mark",
 				)}
 			>
-				<NodeBody topic={topic} standing={standing} line={line} />
+				<NodeBody topic={topic} standing={standing} line={line} from={from} />
 			</Link>
 			<Handle type="target" position={Position.Top} isConnectable={false} className="invisible" />
 			<Handle type="source" position={Position.Bottom} isConnectable={false} className="invisible" />

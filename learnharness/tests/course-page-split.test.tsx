@@ -124,7 +124,7 @@ describe("the list's groups and rows", () => {
 
 	it("draws each topic of an open group as a 32px row linking to its page, its reason's icon and words showing", () => {
 		const shown = shownGroups(groups);
-		const document = render(<SplitList groups={shown} marked={null} onPoint={noop} onEnterMap={noop} />);
+		const document = render(<SplitList groups={shown} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} />);
 		const rows = [...document.querySelectorAll('[data-slot="course-topic-row"]')];
 		const openTopics = shown.filter((g) => OPEN_AT_FIRST[g.id]).flatMap((g) => g.topics);
 		assert.equal(rows.length, openTopics.length);
@@ -136,7 +136,7 @@ describe("the list's groups and rows", () => {
 	});
 
 	it("opens Needs you and Learning and folds Not started and On your own under headers he can open", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} marked={null} onPoint={noop} onEnterMap={noop} />);
+		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={null} onPoint={noop} onEnterMap={noop} />);
 		const headers = [...document.querySelectorAll('[data-slot="course-group-header"]')];
 		assert.deepEqual(
 			headers.map((h) => [h.textContent, h.tagName, h.getAttribute("aria-expanded")]),
@@ -151,7 +151,7 @@ describe("the list's groups and rows", () => {
 	});
 
 	it("marks the row of the topic he points at on the map, and only that row", () => {
-		const document = render(<SplitList groups={shownGroups(groups)} marked={h("span")} onPoint={noop} onEnterMap={noop} />);
+		const document = render(<SplitList groups={shownGroups(groups)} open={OPEN_AT_FIRST} onOpenChange={noop} marked={h("span")} onPoint={noop} onEnterMap={noop} />);
 		const marked = [...document.querySelectorAll('[data-slot="course-topic-row"][data-highlighted]')];
 		assert.deepEqual(
 			marked.map((r) => r.getAttribute("href")),
@@ -211,7 +211,7 @@ describe("the keyboard walk over the rows", () => {
 describe("what the arrows walk in the list", () => {
 	const groups = shownGroups(courseGroups(COURSE, [WAITING]));
 	it("walks each group's header and the rows of the open groups, skipping a folded group's rows", () => {
-		const keys = (open: typeof OPEN_AT_FIRST) => walkStops(groups, open).map((s) => (s.kind === "group" ? `[${s.id}]` : s.handle));
+		const keys = (open: typeof OPEN_AT_FIRST) => walkStops(groups, open).map((s) => (s.kind === "row" ? s.handle : `[${s.id}]`));
 		const atFirst = keys(OPEN_AT_FIRST);
 		for (const g of groups) {
 			assert.ok(atFirst.includes(`[${g.id}]`), `${g.title}'s header is a stop`);

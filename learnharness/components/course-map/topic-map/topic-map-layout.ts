@@ -75,7 +75,16 @@ function column(topics: readonly CourseMapTopic[], node: NodeSize): TopicMapLayo
 	};
 }
 
-export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE): TopicMapLayout {
+/** The rank that holds `top` in the first layer: 0 for those, 1 for every
+ *  other topic with no prerequisite drawn, so none sits beside them. */
+function rankUnder(top: ReadonlySet<TopicHandle>, parents: ReadonlyMap<string, readonly string[]>, id: string): number | undefined {
+	if (top.has(id as TopicHandle)) return 0;
+	return (parents.get(id) ?? []).length === 0 ? 1 : undefined;
+}
+
+/** The layered drawing of a course's needs. `top` are topics held in the
+ *  first layer, above every other (an arc's entry topics, arc-view.ts). */
+export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonly CourseMapEdge[], node: NodeSize = NODE_SIZE, top: ReadonlySet<TopicHandle> = new Set()): TopicMapLayout {
 	const needs = edges.filter((e): e is Need => e.kind === "needs");
 	if (needs.length === 0) return column(topics, node);
 	const parents = new Map<string, string[]>(topics.map((t) => [t.handle, []]));
@@ -84,7 +93,7 @@ export function layoutTopicMap(topics: readonly CourseMapTopic[], edges: readonl
 	const { width, height } = sugiyama()
 		.nodeSize([node.width, node.height])
 		.gap([NODE_GAP, LAYER_GAP])
-		.layering(layeringSimplex())
+		.layering(top.size > 0 ? layeringSimplex().rank(({ data }: { data: { id: string } }) => rankUnder(top, parents, data.id)) : layeringSimplex())
 		.decross(topics.length <= OPTIMAL_DECROSS_LIMIT ? decrossOpt() : decrossTwoLayer())
 		.coord(coordSimplex())(dag);
 

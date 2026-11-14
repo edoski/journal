@@ -1,7 +1,7 @@
 // A stand-in for `python -m learning`: the same argv shape, the same JSON
 // on stdout and error JSON on stderr. Every call is appended to
 // FAKE_ENGINE_LOG as {args, stdin}. FAKE_ENGINE_PLAN is the `plan --all`
-// stdout, FAKE_ENGINE_MAP the `map` stdout, FAKE_ENGINE_SHOW the `show` stdout. With FAKE_ENGINE_PLAN_FILE instead, the plan is that file, `init`
+// stdout, FAKE_ENGINE_MAP the `map` stdout, FAKE_ENGINE_RESUME the `resume` stdout, FAKE_ENGINE_SHOW the `show` stdout. With FAKE_ENGINE_PLAN_FILE instead, the plan is that file, `init`
 // registers its workspace there and a save's `title` renames the entry, as
 // the real registry does. FAKE_ENGINE_FAIL names a verb that fails with an
 // io error. Topic "unknown" in a save is refused like the real engine
@@ -57,7 +57,7 @@ switch (verb) {
 		break;
 	}
 	case "resume":
-		process.stdout.write(JSON.stringify({ today: "2026-11-07", due: [{ topic: "rank", level: "assisted" }], task: null }));
+		process.stdout.write(process.env.FAKE_ENGINE_RESUME ?? JSON.stringify({ today: "2026-11-07", due: [{ topic: "rank", level: "assisted" }], task: null }));
 		break;
 	case "show":
 		if (operands.includes("slow")) setTimeout(() => {}, 60_000);

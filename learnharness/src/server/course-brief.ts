@@ -27,7 +27,7 @@ export async function fetchCourseBrief(record: ChatRecord): Promise<CourseBrief 
 		]);
 		if (planned && !planned.ok) console.error(`[chat ${record.id}] exam run-up skipped: ${planned.message}`);
 		const runup = planned?.ok ? { plan: planned.json, workspace } : undefined;
-		if (resumed.ok) return projectCourseBrief(resumed.json, role, runup);
+		if (resumed.ok) return projectCourseBrief(resumed.json, role, runup, record.arcCheck);
 		console.error(`[chat ${record.id}] course brief skipped: ${resumed.message}`);
 	} catch (err) {
 		console.error(`[chat ${record.id}] course brief skipped:`, err);

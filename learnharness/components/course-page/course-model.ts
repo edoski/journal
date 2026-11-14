@@ -1,4 +1,4 @@
-import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle, UnreadableCourse } from "@/src/core";
+import { currentArc, examCovers, type ArcHandle, type ChatListItem, type CourseMap, type CourseMapArc, type CourseMapTopic, type StudyCourse, type TopicHandle, type UnreadableCourse } from "@/src/core";
 import { CURRENT_TAG, standingOf, type Standing } from "@/components/course-map/topic-map/topic-standing";
 import { courseProgress, lastStudied, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { examWords, todayRows, type TodayRow } from "@/components/study-home/study-facts";
@@ -6,7 +6,11 @@ import { lessonOf, type Lesson } from "@/components/study-home/lesson-facts";
 import type { StudyHomeState } from "@/components/study-home/use-study-home";
 import { unitHref } from "@/components/unit-inbox/unit-href";
 import { sidebarSays, type Said, type SidebarPlace, type TopicFact } from "@/components/unit-inbox/sidebar-says";
-import { courseShareWords } from "@/components/study-words";
+import { ARC_EXAM_WORDS, courseShareWords, startsWhyWords } from "@/components/study-words";
+import { nowFor } from "@/components/unit-inbox/now-inbox";
+import { todayTop } from "@/components/unit-inbox/today/today-top";
+import { buildInbox } from "@/components/unit-inbox/units";
+import type { NowLine } from "@/components/study-home/needs-you";
 import { lastSessionOf } from "@/components/course-page/course-head/head-facts";
 
 /**
@@ -68,18 +72,8 @@ const HERE: TopicFact = { kind: "here", words: CURRENT_TAG };
  * four groups, an empty one included. Pure.
  */
 export function courseGroups(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): CourseGroup[] {
-	const { map } = course;
-	const said = sidebarSays(courses, chats, map.workspace);
+	const { rows, said } = courseRows(course, chats, courses);
 	const order = [...said.keys()];
-
-	const rows = map.topics.map((topic): CourseTopic => {
-		const current = map.current === topic.handle;
-		const { place, fact = null } = said.get(topic.handle) ?? {};
-		const group = place ? GROUP_OF[place] : "not-started";
-		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
-		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
-		return { topic, group, fact: here ? HERE : fact, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
-	});
 	const at = (row: CourseTopic) => order.indexOf(row.topic.handle);
 	const NEVER = "9999-12-31";
 	const byStart = (a: CourseTopic, b: CourseTopic) => (a.topic.starts ?? NEVER).localeCompare(b.topic.starts ?? NEVER);
@@ -88,6 +82,134 @@ export function courseGroups(course: StudyCourse, chats: readonly ChatListItem[]
 		const sorted = id === "not-started" ? mine.sort(byStart) : mine.sort((a, b) => at(a) - at(b));
 		return { id, title: GROUP_WORDS[id], topics: sorted };
 	});
+}
+
+/** Every topic of the course as a row, in the engine's path order, each in
+ *  the group the sidebar puts it in with the sidebar's fact (`sidebarSays`). */
+function courseRows(course: StudyCourse, chats: readonly ChatListItem[], courses: readonly StudyCourse[]): { rows: CourseTopic[]; said: ReadonlyMap<TopicHandle, Said> } {
+	const { map } = course;
+	const said = sidebarSays(courses, chats, map.workspace);
+	const rows = map.topics.map((topic): CourseTopic => {
+		const current = map.current === topic.handle;
+		const { place, fact = null } = said.get(topic.handle) ?? {};
+		const group = place ? GROUP_OF[place] : "not-started";
+		// "You are here" in place of when it comes back or was studied, never in place of what needs him.
+		const here = current && group !== "needs-you" && (fact === null || fact.kind === "back" || fact.kind === "studied");
+		return { topic, group, fact: here ? HERE : fact, standing: standingOf(topic), current, href: unitHref(map.workspace, topic.handle) };
+	});
+	return { rows, said };
+}
+
+/** The arcs the course page leads with: the map's, when it has two or more
+ *  he can see; null otherwise, and the page shows its four groups as a
+ *  course without arcs does. Pure. */
+export function shownArcs(map: Pick<CourseMap, "arcs">): readonly CourseMapArc[] | null {
+	return map.arcs && map.arcs.length >= 2 ? map.arcs : null;
+}
+
+/** One arc as the course page lists it (spec: course-page.md, "Arcs"). */
+export interface CourseArcSection {
+	arc: CourseMapArc;
+	/** Its topics in path order, each as the groups' rows say it. */
+	topics: readonly CourseTopic[];
+	/** One of its topics is one Home's Today takes up: the line says
+	 *  "Needs you" in place of where the arc stands. */
+	needsYou: boolean;
+	/** Its ring: the share of its live topics he can do on his own, as
+	 *  Home's ring counts a course; null for an arc with none live. */
+	share: number | null;
+	/** "Partly on the exam" or "Not on the exam", when the next exam leaves
+	 *  some arc out and this one is not wholly on it; else null. */
+	exam: string | null;
+	/** Where he is (`currentArc`): the arc open on arrival. */
+	current: boolean;
+}
+
+/**
+ * The course's arcs in study order (spec: course-page.md, "Arcs"), each
+ * with its topics as the page's rows (the groups' words and facts), its
+ * ring, "Needs you" when Today takes up one of its topics, and its exam
+ * words. Null for a course `shownArcs` gives none. `chats` and `courses`
+ * as `courseGroups` reads them. Pure.
+ */
+export function courseArcs(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): CourseArcSection[] | null {
+	const { map } = course;
+	const arcs = shownArcs(map);
+	if (!arcs) return null;
+	const { rows } = courseRows(course, chats, courses);
+	const here = currentArc(map);
+	const covers = new Map(arcs.map((arc) => [arc.handle, examCovers(map.exam, arc, map.topics)]));
+	const leavesSomeOut = [...covers.values()].some((c) => c === "part" || c === "none");
+	return arcs.map((arc) => {
+		const topics = rows.filter((row) => row.topic.arc === arc.handle);
+		const cover = covers.get(arc.handle);
+		return {
+			arc,
+			topics,
+			needsYou: topics.some((row) => row.group === "needs-you"),
+			share: arcShare(course, arc.handle),
+			exam: leavesSomeOut && (cover === "part" || cover === "none") ? ARC_EXAM_WORDS[cover] : null,
+			current: arc.handle === here,
+		};
+	});
+}
+
+/** An arc's ring: the share of its live topics he can do on his own, as
+ *  Home's ring counts a course (`courseProgress`); null with none live. */
+export function arcShare(course: StudyCourse, arc: ArcHandle): number | null {
+	const live = course.map.topics.filter((t) => t.arc === arc && t.excluded === undefined);
+	const progress = courseProgress({ ...course, map: { ...course.map, topics: live } });
+	return progress ? progress.solid / progress.of : null;
+}
+
+/** Where he picks up in a course with arcs, and what new topic comes next
+ *  (spec: course-page.md, "What next"). */
+export interface WhatNext {
+	/** What Home's Today puts first for this course (`todayTop`), with the
+	 *  arc of the topic it leads with; null when Today has nothing here. */
+	pickUp: { line: NowLine; arc: CourseMapArc | null } | null;
+	/** The next new topic the plan starts (the earliest `starts`), other
+	 *  than the one he picks up, with why it starts then (`startsWhyWords`)
+	 *  and its arc; null when the plan starts none. */
+	then: { topic: CourseMapTopic; why: string; arc: CourseMapArc | null; href: string; whyNamesArc: boolean } | null;
+}
+
+/**
+ * The course page's "what next", across arcs: the course's first line on
+ * Home's Today, read through `todayTop` over every course, so a slip in
+ * another arc that Today puts first is what he picks up; then the next new
+ * topic the plan starts, in the plan's words. Null for a course the page
+ * shows without arcs, or when there is nothing to say. Pure.
+ */
+export function whatNext(course: StudyCourse, chats: readonly ChatListItem[] = [], courses: readonly StudyCourse[] = [course]): WhatNext | null {
+	const { map } = course;
+	const arcs = shownArcs(map);
+	if (!arcs) return null;
+	const arcOf = (topic: CourseMapTopic | null | undefined) => (topic?.arc ? (arcs.find((a) => a.handle === topic.arc) ?? null) : null);
+	const top = todayTop(nowFor(courses, chats, null, map.today), buildInbox(courses, chats, null), chats).find((item) => item.line.row.course?.map.workspace === map.workspace);
+	const pickUp = top ? { line: top.line, arc: arcOf(top.line.lead ?? top.line.topics[0]) } : null;
+	const NEVER = "9999-12-31";
+	const next = map.topics
+		.filter((t) => t.starts && t.excluded === undefined && !top?.line.topics.some((o) => o.handle === t.handle))
+		.sort((a, b) => (a.starts ?? NEVER).localeCompare(b.starts ?? NEVER))[0];
+	const why = next ? (next.startsWhy ?? { kind: "next" as const, arc: next.arc }) : null;
+	const then =
+		next && why
+			? {
+					topic: next,
+					why: startsWhyWords(why, map),
+					arc: arcOf(next),
+					href: unitHref(map.workspace, next.handle),
+					// "Next in Eigenvalues", "Early, from Orthogonality" name the arc already.
+					whyNamesArc: why.arc !== undefined && (why.kind !== "after" || (why.needs.length === 0 && why.partners.length === 0)),
+				}
+			: null;
+	return pickUp || then ? { pickUp, then } : null;
+}
+
+/** The arc a page shows first: where he is, else the first. */
+export function openingArc(sections: readonly CourseArcSection[]): ArcHandle | null {
+	return (sections.find((s) => s.current) ?? sections[0])?.arc.handle ?? null;
 }
 
 /** The words on the course's one button: the same as Home's lesson, with
@@ -142,6 +264,10 @@ export function courseFacts(course: StudyCourse, chats: readonly ChatListItem[] 
 export interface CourseView {
 	course: StudyCourse;
 	groups: readonly CourseGroup[];
+	/** The course's arcs, when the page leads with them (`courseArcs`). */
+	arcs: readonly CourseArcSection[] | null;
+	/** Where he picks up and what comes next, above the arcs (`whatNext`). */
+	whatNext: WhatNext | null;
 	said: ReadonlyMap<TopicHandle, Said>;
 	facts: CourseFacts;
 	next: CourseNext;
@@ -178,6 +304,8 @@ export function courseRead(state: StudyHomeState, workspace: string): CourseRead
 				view: {
 					course,
 					groups: courseGroups(course, state.chats, state.courses),
+					arcs: courseArcs(course, state.chats, state.courses),
+					whatNext: whatNext(course, state.chats, state.courses),
 					said: sidebarSays(state.courses, state.chats, workspace),
 					facts: courseFacts(course, state.chats),
 					next: courseNext(course, state.open),

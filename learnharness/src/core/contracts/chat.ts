@@ -44,6 +44,10 @@ export interface ChatRecord {
 	 *  topics), set at creation, else the topic its first plan's goal names
 	 *  (`SessionGoal`). Set once; the step the lesson is on never moves it. */
 	topics?: readonly string[];
+	/** The arc this session checks, by handle: set at creation when he
+	 *  starts it from an arc's Check it on the course page, so the course
+	 *  brief carries that arc's check (`arcs_ready`). */
+	arcCheck?: string;
 	/** The learner renamed the session: a plan's goal no longer names it. */
 	renamed?: true;
 	/** The session was named once (`ChatStore.nameSession`): only its first
