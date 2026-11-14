@@ -11,6 +11,7 @@ import { useSessionMermaid } from "@/components/session-overlay";
 import { downloadFile } from "@/components/artifacts/download";
 import { DispatchCard } from "@/components/artifacts/dispatch-card";
 import { SvgImage } from "@/components/artifacts/svg-image";
+import { FIGURE_ON_DARK } from "@/components/artifacts/figure-on-dark";
 import type { ArtifactPartProps, VisualResult } from "@/src/core";
 
 /**
@@ -46,10 +47,12 @@ export function VisualCard({ part }: ArtifactPartProps) {
 export function VisualOutputCard({
 	output,
 	messageId,
-	initialInverted = false,
+	initialInverted = true,
 }: {
 	output: unknown;
 	messageId?: string;
+	/** Drawn for the dark page (FIGURE_ON_DARK), unless he switched it to
+	 *  its own white. */
 	initialInverted?: boolean;
 }) {
 	const result = output as VisualResult | undefined;
@@ -116,7 +119,7 @@ export function VisualOutputCard({
 						? "w-fit max-w-full overflow-hidden rounded-lg bg-white"
 						: "w-full overflow-hidden rounded-lg bg-white"
 				}
-				style={{ filter: inverted ? "invert(1) hue-rotate(180deg)" : undefined }}
+				style={{ filter: inverted ? FIGURE_ON_DARK : undefined }}
 				data-testid="visual-svg"
 			>
 				<SvgImage

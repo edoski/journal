@@ -5,13 +5,14 @@ import Link from "next/link";
 import { CheckIcon, CircleDotIcon, CircleXIcon, DumbbellIcon, MessageSquareIcon, WaypointsIcon } from "lucide-react";
 import type { TopicAttempt } from "@/src/core";
 import { cn } from "@/lib/utils";
+import { ATTEMPT_WORDS } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { attemptMark, type SessionEntry } from "@/components/unit-inbox/topic-page/topic-facts";
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { WhyMark } from "@/components/unit-inbox/topic-page/why-mark";
-import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -55,9 +56,9 @@ function DateCell({ date, className }: { date: string | null; className?: string
 const spine = ({ above, below }: Ends) => cn("relative", (above || below) && SPINE, above ? ABOVE : "before:hidden", below ? BELOW : "after:hidden");
 
 const RESULT = {
-	right: { Icon: CheckIcon, words: "Right" },
-	partly: { Icon: CircleDotIcon, words: "Partly right" },
-	missed: { Icon: CircleXIcon, words: "Missed" },
+	right: { Icon: CheckIcon, words: ATTEMPT_WORDS.right },
+	partly: { Icon: CircleDotIcon, words: ATTEMPT_WORDS.partly },
+	wrong: { Icon: CircleXIcon, words: ATTEMPT_WORDS.wrong },
 } as const;
 
 /** One scored attempt: how it went and the tutor's sentence. Not a
@@ -70,7 +71,7 @@ export function AttemptEntry({ attempt, titleOf, ends, date }: { attempt: TopicA
 		<li data-slot="topic-attempt" data-result={result} className={cn("grid min-h-10 items-baseline gap-x-4 py-2.75", date === undefined ? "grid-cols-[1rem_minmax(0,1fr)]" : DATED, spine(ends))}>
 			<Icon role="img" aria-label={words} className={cn(ICON, "mt-px self-start")} />
 			<p className={cn("line-clamp-2 text-row text-muted-foreground", date !== undefined && "col-span-2")}>
-				<MathText>{attempt.text}</MathText>
+				<LineText>{attempt.text}</LineText>
 			</p>
 			{date !== undefined && <DateCell date={date} />}
 		</li>
@@ -116,7 +117,7 @@ export function SessionItem({
 				<Link href={`/chat/${chat.id}`}>
 					{chat.kind === "practice" ? <DumbbellIcon aria-label="Practice" className={ICON} /> : <MessageSquareIcon aria-label="Lesson" className={ICON} />}
 					<span className="truncate text-row text-foreground">
-						<MathText>{chat.title}</MathText>
+						<LineText>{chat.title}</LineText>
 					</span>
 					{(planned || why) && (
 						<span className="flex items-center gap-2 justify-self-end">

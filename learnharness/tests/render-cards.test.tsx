@@ -379,10 +379,12 @@ describe("render smoke tests", () => {
 		assert.match(html, /Somewhat/);
 	});
 
-	it("AnsweredCard renders dismissal as skipped", () => {
+	it("AnsweredCard renders dismissal as skipped, the question typeset", () => {
 		const answer = { ...buildAnswer(askQD(), {}), dismissed: true };
 		const html = renderToStaticMarkup(<AnsweredCard answer={answer} />);
-		assert.match(html, /Skipped: How confident are you\?/);
+		const card = parseHTML(`<html><body>${html}</body></html>`).document;
+		assert.equal(card.querySelector('[data-slot="lesson-card-label"]')?.textContent, "Skipped");
+		assert.match(card.body.textContent ?? "", /How confident are you\?/);
 	});
 
 	it("AnsweredCard renders a check left for tonight with its question and never its answer", () => {
@@ -391,6 +393,7 @@ describe("render smoke tests", () => {
 		const html = renderToStaticMarkup(<AnsweredCard answer={{ ...answer, tool: "explain" }} input={input} />);
 		assert.match(html, /Left for next time/);
 		assert.ok(html.includes("katex"), "the question's math typesets");
+		assert.ok(!html.includes("\\cdots"), "the whole question, never a cut");
 		assert.ok(!html.includes("The answer"), "no answer section");
 		assert.ok(!html.includes("only eigenvalue"), "the committed answer never shows");
 	});
@@ -580,13 +583,13 @@ describe("predict vs check rendering", () => {
 		assert.ok(html.includes("Prediction"), `chip missing: ${html.slice(0, 200)}`);
 	});
 
-	it("a collapsed check reads 'Explain'", () => {
+	it("a collapsed check reads 'Check'", () => {
 		const html = renderToStaticMarkup(
 			<QuestionDock toolName="explain" toolCallId="call-c1" input={explainInput as never}
 				expanded={false} onExpand={() => {}} onSubmit={() => {}} />,
 		);
 		const bar = parseHTML(`<html><body>${html}</body></html>`).document.querySelector('[data-testid="question-dock-bar"]')!;
-		assert.equal(bar.firstElementChild!.textContent, "Explain");
+		assert.equal(bar.firstElementChild!.textContent, "Check");
 	});
 
 	it("the reading-thinking channel is LIFTED above the card as its own user-side block", () => {

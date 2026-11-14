@@ -261,8 +261,8 @@ export function pickupsOf(topic: CourseMapTopic, map: CourseMap, entries: readon
 /** How an attempt went, and the one thing worth saying about it: the
  *  method he reached for in its place, that he was sure and wrong, or
  *  that he had a hint. */
-export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "missed"; words: string | null } {
-	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "missed";
+export function attemptMark(attempt: TopicAttempt, titleOf: (handle: string) => string): { result: "right" | "partly" | "wrong"; words: string | null } {
+	const result = attempt.result === "correct" ? "right" : attempt.result === "partial" ? "partly" : "wrong";
 	if (attempt.chose) return { result, words: `Mixed up with ${titleOf(attempt.chose)}` };
 	if (attempt.result === "incorrect" && attempt.sure === "confident") return { result, words: "Sure, but wrong" };
 	return { result, words: attempt.unaided ? null : "With a hint" };

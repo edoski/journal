@@ -44,7 +44,9 @@ export function standingWords(fill: Fill, topic: Pick<CourseMapTopic, "level" | 
  *  which names the method (`slipWords`). */
 export const SLIP_WORDS = {
 	repaired: "Fixed, check again later",
-	lapsed: "Missed last time",
+	// Not "Missed": beside an overdue review he read that as a review he
+	// skipped (round 3). A lapse is an answer that was not right.
+	lapsed: "Not right last time",
 	gap: "Mistake to fix",
 	confident: "Sure, but wrong",
 	none: "Look again",
@@ -75,6 +77,20 @@ export function slipWords(signals: TopicSignals, titleOf: (handle: TopicHandle) 
 	return slipMark(signals, titleOf).words;
 }
 
+/** A lapse on a line about another topic, naming the lapsed one: "Not
+ *  right last time: Chain rule". */
+export function lapsedOnWords(title: string): string {
+	return `${SLIP_WORDS.lapsed}: ${title}`;
+}
+
+/** How one scored attempt went, in a topic's history: right, partly right,
+ *  or not right (wrong, or given up). */
+export const ATTEMPT_WORDS = {
+	right: "Right",
+	partly: "Partly right",
+	wrong: "Not right",
+} as const;
+
 /** A review come due: "Due today", "3d overdue", "2w overdue". */
 export function overdueWords(overdue: number): string {
 	if (overdue <= 0) return "Due today";
@@ -101,6 +117,11 @@ export function returnWords(days: number): string {
 	if (days < 60) return `Back in ${Math.round(days / 7)}w`;
 	return `Back in ${Math.round(days / 30)}mo`;
 }
+
+/** What a topic page's Now row offers on a topic not started: its first
+ *  lesson, since the head already says "Not started" (round 3 found it
+ *  twice). */
+export const FIRST_LESSON = "First lesson";
 
 const SHORT_DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 /** "1 Oct". */
@@ -161,17 +182,44 @@ function daysBetween(from: string, to: string): number {
 }
 
 /** The lesson's words for what just happened to his work (round 2, 14 Nov
- *  2026): a reply below the fold, a reply that never came, a draft another
- *  window overtook, stopping for the night, and a course whose record
- *  can't be read. One form each, wherever it shows. */
+ *  2026): a reply below the fold, a reply that never came (he stopped it,
+ *  or the app lost it), a connection that dropped mid-reply, a draft
+ *  another window overtook, stopping for the day, a problem he skipped,
+ *  and a course whose record can't be read. One form each, wherever it
+ *  shows. */
 export const LESSON_WORDS = {
 	newReply: "New reply",
+	skippedQuestion: "Skipped",
 	stoppedBeforeReply: "The tutor stopped before replying.",
+	youStoppedReply: "You stopped the tutor before it replied.",
 	tryAgain: "Try again",
+	connectionDropped: "The connection dropped before the tutor finished replying.",
 	answeredElsewhere: "Answered in another window. What you typed here is in the box below.",
 	doneTonight: "Done for today",
 	leftForTonight: "Left for next time",
+	skippedProblem: "You skipped this problem.",
 	unreadableCourse: "Couldn't read this course's record",
+} as const;
+
+/** What a lesson's top bar says it is doing: asking its opening questions
+ *  (the same word as their label), planning, teaching, practice, or
+ *  stopped for the day. A lesson is never called a quiz (round 3). */
+export const PHASE_WORDS = {
+	probe: "Recall",
+	plan: "Planning",
+	teach: "Teaching",
+	practice: "Practice",
+	done: LESSON_WORDS.doneTonight,
+} as const;
+
+/** A question's label on its card and folded bar, by what it asks: a
+ *  check of what was just taught, a prediction before it, a recall of
+ *  what he knows, else a plain question. */
+export const QUESTION_WORDS = {
+	check: "Check",
+	predict: "Prediction",
+	recall: "Recall",
+	question: "Question",
 } as const;
 
 /** The lesson's mark for a helper he stopped, one sentence per kind;
@@ -184,6 +232,16 @@ export const STOPPED_WORDS: Record<JobKind | "unknown", string> = {
 	unknown: "Stopped by you",
 };
 
+/** Esc's confirm, in his words: skip the question or problem waiting on
+ *  him, or stop the tutor's reply. `alsoStops` follows a skip made while
+ *  the tutor is still writing. */
+export const STOP_WORDS = {
+	turn: { title: "Stop the tutor's reply?", line: "What it has written so far stays.", action: "Stop" },
+	question: { title: "Skip this question?", line: "The tutor goes on without your answer.", action: "Skip" },
+	problem: { title: "Skip this problem?", line: "The tutor moves on, and the solution stays hidden.", action: "Skip" },
+	alsoStops: "The tutor's reply stops too.",
+} as const;
+
 /** What stops a course's record being read, after
  *  `LESSON_WORDS.unreadableCourse`, in a student's words. */
 export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
@@ -191,6 +249,36 @@ export const UNREADABLE_WORDS: Record<UnreadableProblem, string> = {
 	damaged: "Its file is damaged.",
 	unreadable: "Its file can't be opened.",
 };
+
+/** What the sidebar's foot calls the work the app does on its own (a
+ *  figure, a course's topic map, what a finished lesson taught), one name
+ *  wherever it is mentioned (round 3: "Activity" against "Working in the
+ *  background"). */
+export const BACKGROUND_WORDS = {
+	name: "Background work",
+	followIt: "You can follow it under Background work in the sidebar and start studying now.",
+} as const;
+
+/** One piece of background work in full: what it does, for which lesson or
+ *  course. */
+export function backgroundWorkWords(kind: JobKind | "mapping" | "digest" | "unknown", title: string): string {
+	switch (kind) {
+		case "mapping":
+			return `Building the topic map of ${title}`;
+		case "digest":
+			return `Saving what you learned in ${title}`;
+		case "visual":
+			return `Drawing a figure for ${title}`;
+		case "research":
+			return `Looking things up for ${title}`;
+		case "demo":
+			return `Building a demo for ${title}`;
+		case "pdf":
+			return `Reading a PDF for ${title}`;
+		default:
+			return `Working on ${title}`;
+	}
+}
 
 /** How much of a course he can do on his own, in words beside the ring
  *  that draws the share: no count, since the app shows none (Edo's
@@ -201,9 +289,35 @@ export function courseShareWords(solid: number, of: number): string {
 	return solid * 2 > of ? "Most topics on your own" : "Some topics on your own";
 }
 
+/** The free field under a choice question, which asks for nothing in
+ *  particular: it may be his goal, not an answer to justify (round 3:
+ *  "Why this answer?" under a goal-picking question). */
+export const CHOICE_NOTE = "Anything to add?";
+
 /** A folded list's last row: "Show the rest" when one press shows every
  *  hidden row, else "Show more". How many is left out: a bare number told
  *  him nothing (Edo, 13 Nov 2026). */
 export function moreWords(hidden: number, page: number): string {
 	return hidden <= page ? "Show the rest" : "Show more";
+}
+
+/** The lesson's details panel, in his words: which tutor, how much room
+ *  the lesson has before the tutor sums it up, and what it has cost. */
+export const DETAIL_WORDS = {
+	tutor: "Tutor",
+	room: "Room left",
+	cost: "Cost so far",
+	unmeasured: "Not measured yet",
+	plenty: "Plenty",
+	filling: "Over half used. When it fills, the tutor sums up the lesson so far",
+	plan: "Included in your Claude plan",
+} as const;
+
+/** How much room the lesson has before the tutor sums it up (`used` of
+ *  `room`, both in the model's own units, never shown): plenty until half
+ *  is used, since half is the one split that needs no tuning, then a
+ *  warning of what happens when it fills. */
+export function roomWords(used: number | null, room: number): string {
+	if (used === null) return DETAIL_WORDS.unmeasured;
+	return used * 2 < room ? DETAIL_WORDS.plenty : DETAIL_WORDS.filling;
 }

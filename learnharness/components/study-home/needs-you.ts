@@ -1,7 +1,7 @@
 import type { ChatListItem, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { foldLines, lessonTitle, lineKey, whyOf, type Why } from "@/components/study-home/agenda-rows/row-facts";
 import { laterOnly, openSessions, todayRows, type TodayRow } from "@/components/study-home/study-facts";
-import { SLIP_WORDS } from "@/components/study-words";
+import { lapsedOnWords, SLIP_WORDS } from "@/components/study-words";
 
 /** One of Today's lines with what the sidebar draws it by: its reason, the
  *  topics it takes up (resolved on its course's map) and the one it leads
@@ -54,11 +54,11 @@ export function lineTopics(row: TodayRow): TopicHandle[] {
 }
 
 /** The reason's words for a status slot: Home's short words, except a lapse
- *  on the lead topic itself ("Missed last time", since the card already
+ *  on the lead topic itself ("Not right last time", since the card already
  *  names it). Pure. */
 export function slotWords(why: Why | null, lead: CourseMapTopic | null): string | null {
 	if (!why) return null;
-	if (why.kind === "missed" && lead && why.short === `Missed ${lead.title}`) return SLIP_WORDS.lapsed;
+	if (why.kind === "missed" && lead && why.short === lapsedOnWords(lead.title)) return SLIP_WORDS.lapsed;
 	return why.short;
 }
 

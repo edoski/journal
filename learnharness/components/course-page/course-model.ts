@@ -37,7 +37,7 @@ export type TopicFact =
 	| { kind: "your-turn"; words: string }
 	/** The tutor is writing in a session on it: "Working". */
 	| { kind: "working"; words: string }
-	/** The engine calls it weak, and why: "Missed last time", "Sure, but wrong". */
+	/** The engine calls it weak, and why: "Not right last time", "Sure, but wrong". */
 	| { kind: "slip"; words: string }
 	/** He can do it on his own and its review is due, in Home's words: "3d overdue". */
 	| { kind: "review"; words: string }

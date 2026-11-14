@@ -1,7 +1,7 @@
 import { isPlanned } from "@/components/unit-inbox/topic-page/hybrid/hybrid-facts";
 import { ACTION_WORDS, dayOf, dayWords, type Press, type SessionEntry, type TopicAction, type TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { trailDays, type TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-facts";
-import { LESSON_WORDS, overdueWords } from "@/components/study-words";
+import { FIRST_LESSON, LESSON_WORDS, overdueWords } from "@/components/study-words";
 
 /**
  * What Pick up draws (spec: pickup.md), pure, from the shared
@@ -22,7 +22,7 @@ export interface NowItem {
 	kind: TopicAction["kind"];
 	icon: NowIconKind;
 	/** What to pick up: the step a lesson stopped on, else the session's
-	 *  title, a task's title, or the state in two words ("Not started"). May hold TeX. */
+	 *  title, a task's title, or what to begin ("First lesson"). May hold TeX. */
 	words: string;
 	/** Where it stands: "Your turn", "Tutor writing", "Left off yesterday", a
 	 *  task's "Part (c)"; null when the words say it all. */
@@ -94,7 +94,7 @@ export function nowItem(facts: TopicFacts): NowItem {
 				: { ...base, icon: "standing", words: "Next lesson" };
 		}
 		case "start":
-			return { ...base, icon: "standing", words: "Not started" };
+			return { ...base, icon: "standing", words: FIRST_LESSON };
 		case "study":
 			return { ...base, icon: "review", words: "Nothing due" };
 	}

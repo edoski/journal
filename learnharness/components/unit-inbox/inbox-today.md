@@ -10,7 +10,7 @@ Thesis: the sidebar's top is exactly Home's Today. One card per line, in the sam
 |---|---|
 | Today's lines (`needsYouNow(...).lines`, under the course filter `nowFor`), in Home's order, at most five; Home's "Also today" lines are not drawn and their topics stay on the shelves | `../study-home/needs-you.ts` |
 | A session's line is its session card (`now-card.md`, "The session card"), one per session however many topics its lesson touched; it takes every topic it stands for (its own and those it worked on) off the shelves, so a review of two topics never leaves a second row under Working or Learning (`claimedKeys`) | `todayTop`, `claimedKeys` |
-| A course's line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Missed last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
+| A course's line with a lead topic is that topic's card (`NowCard`): the inbox's unit, else `unitFor` (a lead not started yet, resting on Learning). The lead is the topic the line's reason is about, so title and reason agree: a lapse's lapsed topic ("Not right last time"), an open task's current topic ("At part (c)" on Rank and the column space, the sheet's topic), else the line's first | `topicUnit` in `now-inbox.ts`; `leadOf` in `../study-home/needs-you.ts` |
 | A course line with nothing to take up (step `none`, Home's "Start a lesson") has no card | `todayTop` |
 | A topic is listed once, at the first line that leads with it; a topic on top is on no shelf | `restShelves(inbox, keys)` with `itemKey` |
 
@@ -26,7 +26,7 @@ No header, no count and no total on top: cards leave as the day's plan empties, 
 | 1100×700 | the same | 554 to 652 | none |
 | 1512×982 | the same | 836 to 934 | none |
 
-The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, 3d overdue, Random variables and distributions; Real Analysis, 1w overdue, Convergent sequences; Calculus I, Missed last time, Chain rule. Home's Today shows the same five lines in that order with the same reasons.
+The demo's cards: Linear Algebra, Your turn, Eigenvalues and eigenvectors (the lesson); Linear Algebra, Your turn, Rank practice; Probability, 3d overdue, Random variables and distributions; Real Analysis, 1w overdue, Convergent sequences; Calculus I, Not right last time, Chain rule. Home's Today shows the same five lines in that order with the same reasons.
 
 The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowShelves`, `NowSkeleton` and `SidebarNote` (`now-shelves.md`).
 
@@ -37,7 +37,7 @@ The card is `NowCard` (`now-card.md`); the shelves, skeleton and notes are `NowS
 | loading | three 60px skeleton cards, `aria-busy`, sr-only "Loading"; no shelves |
 | a quiet day | one card per line with a lead: "At part (c)" (bookmark) on the topic the task is about (the course's current topic), "Next up" (arrow) for a current topic; a course with nothing to start has none (Home still shows its "Start a lesson") |
 | nothing needs him | "Nothing needs you today", then the shelves |
-| everything due | still one card per course line (the engine plans at most five reviews a course, Today at most five lines), a lapse's card titled by the lapsed topic with "Missed last time"; every other due topic sits on On your own with Review, or on Learning when the engine calls it weak |
+| everything due | still one card per course line (the engine plans at most five reviews a course, Today at most five lines), a lapse's card titled by the lapsed topic with "Not right last time"; every other due topic sits on On your own with Review, or on Learning when the engine calls it weak |
 | a lesson running | a card whose topic the tutor writes in shows the spinner and Working at 70%, in its place through every turn (`steadyTop`); a topic not on top (or one already running when the sidebar first draws) sits on Working, whose open row stays in view while folded |
 | a session waiting since yesterday | its own card, first, with Your turn |
 | an older waiting session | the accent dot on Learning's (or Other sessions') folded header |

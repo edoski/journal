@@ -2,14 +2,14 @@
 
 import { ThinkingBlock } from "@/components/thinking-block";
 import { cn } from "@/lib/utils";
-import { MessageResponse, ToolContentResponse } from "@/components/ai-elements/message";
+import { ToolContentResponse } from "@/components/ai-elements/message";
+import { TypedText } from "@/components/typed-text";
 import type { Photo, QuestionAnswerData } from "@/src/core";
 import { SentPhotos } from "@/components/photos";
+import { questionLabel } from "@/components/question-dock";
 import { answerForPresentation, CONFIDENCE_CHOICES, parseAskInput } from "@/src/core";
 import { LessonCard } from "@/components/lesson/lesson-card";
 import { LESSON_WORDS } from "@/components/study-words";
-import { MathText } from "@/components/ui/math-text";
-import { teaserLine } from "@/components/question-dock";
 
 /**
  * Static rendering of an answered question (tool part in `output-available`):
@@ -32,16 +32,18 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 }) {
 	const answer = answerForPresentation(savedAnswer, input);
 	if (answer.dismissed && answer.reason === "tonight") {
+		// The whole question, so the record still says which matrix he left;
+		// its answer was never shown, and is not here either.
 		return (
-			<LessonCard data-testid="answered-card" className="text-row text-muted-foreground">
-				{LESSON_WORDS.leftForTonight}: <MathText>{teaserLine(answer.questionText)}</MathText>
+			<LessonCard data-testid="answered-card" label={LESSON_WORDS.leftForTonight}>
+				<ToolContentResponse className="text-muted-foreground">{answer.questionText}</ToolContentResponse>
 			</LessonCard>
 		);
 	}
 	if (answer.dismissed) {
 		return (
-			<LessonCard data-testid="answered-card" className="text-row text-muted-foreground">
-				Skipped: {answer.questionText}
+			<LessonCard data-testid="answered-card" label={LESSON_WORDS.skippedQuestion}>
+				<ToolContentResponse className="text-muted-foreground">{answer.questionText}</ToolContentResponse>
 			</LessonCard>
 		);
 	}
@@ -58,7 +60,7 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 			)}
 			<LessonCard
 				data-testid="answered-card"
-				label={answer.tool === "recall" ? "Recall" : isExplain ? "Explain" : "Question"}
+				label={questionLabel(answer.tool ?? (isExplain ? "explain" : "ask_user_question"), (input as { type?: unknown } | undefined)?.type)}
 				note={answer.hintRequested ? <span data-testid="answered-hint">You asked for a hint</span> : confidenceLabel && <span data-testid="answered-confidence">{confidenceLabel}</span>}
 			>
 				<ToolContentResponse>{answer.questionText}</ToolContentResponse>
@@ -80,12 +82,12 @@ export function AnsweredCard({ answer: savedAnswer, input, photos = [] }: {
 						{answer.other && (
 							<li data-testid="answered-other" className="flex items-start gap-3">
 								<span aria-hidden className="mt-[9px] size-2 shrink-0 rounded-full bg-primary" />
-								<MessageResponse className="min-w-0">{`“${answer.other}”`}</MessageResponse>
+								<TypedText className="min-w-0">{`“${answer.other}”`}</TypedText>
 							</li>
 						)}
 					</ul>
 				)}
-				{answer.text && <MessageResponse className="mt-3">{`“${answer.text}”`}</MessageResponse>}
+				{answer.text && <TypedText className="mt-3">{`“${answer.text}”`}</TypedText>}
 				<SentPhotos photos={photos} className="mt-3" />
 				{(answer.thinking ?? answer.note) && (
 					<ThinkingBlock testId="your-thinking" label="YOUR THINKING" text={answer.thinking ?? answer.note ?? ""} inCard />

@@ -24,6 +24,7 @@ import { BookOpenIcon, EyeIcon, LightbulbIcon, type LucideIcon } from "lucide-re
 import { ThinkingBlock } from "@/components/thinking-block";
 import { useActiveProblemCallId } from "@/components/lesson/active-problem";
 import { LessonCard } from "@/components/lesson/lesson-card";
+import { LESSON_WORDS } from "@/components/study-words";
 
 /** The practice-thinking marker's details (native-messages.ts). */
 export interface PracticeThinkingData {
@@ -73,11 +74,13 @@ export function ConcludeCard({ part }: ArtifactPartProps) {
 		typeof part.reveal === "string" ? part.reveal : typeof input.solutionReveal === "string" ? input.solutionReveal : "";
 
 	// The dismissal synthesis: no verdict, no reveal — one muted line (the
-	// learner clicked; the record needs only the fact).
+	// learner clicked; the record needs only the fact): a skip, or a
+	// problem Done for today left for next time.
 	if (outcome === "dismissed") {
+		const tonight = (part.output as { reason?: unknown } | undefined)?.reason === "tonight";
 		return (
 			<p data-testid="conclude-card" className="my-1 text-row text-muted-foreground">
-				Problem dismissed.
+				{tonight ? `${LESSON_WORDS.leftForTonight}.` : LESSON_WORDS.skippedProblem}
 			</p>
 		);
 	}

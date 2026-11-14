@@ -5,7 +5,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { cn } from "@/lib/utils";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { MessageResponse } from "@/components/ai-elements/message";
+import { TypedText } from "@/components/typed-text";
 
 /** The unified user-thinking row (owner round, 2026-10-05): ONE visual
  *  language for every surface where the learner's own thinking renders —
@@ -93,7 +93,7 @@ export function ThinkingBlock({
 			</CollapsibleTrigger>
 			<CollapsibleContent asChild>
 				<div className="mt-1">
-					<MessageResponse className="italic text-muted-foreground">{text}</MessageResponse>
+					<TypedText className="italic text-muted-foreground">{text}</TypedText>
 				</div>
 			</CollapsibleContent>
 		</Collapsible>

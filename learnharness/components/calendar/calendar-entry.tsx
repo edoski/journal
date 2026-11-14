@@ -9,10 +9,8 @@ import {
 	DumbbellIcon,
 	GraduationCapIcon,
 	HistoryIcon,
-	ListChecksIcon,
 	MessageCircleQuestionIcon,
 	MessageSquareIcon,
-	RouteIcon,
 	type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +21,7 @@ import { unitHref } from "@/components/unit-inbox/unit-href";
 import { ACTION_WORDS } from "@/components/unit-inbox/topic-page/topic-facts";
 import { distanceWords, finalReviewWords, longDayWords, lookOf, LOOKS, misfitWords, spanWords, unreviewedWords, type CalendarEntry, type EntryLook } from "@/components/calendar/calendar-facts";
 import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 import { overdueWords } from "@/components/study-words";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +33,6 @@ const ICONS: Record<EntryLook, LucideIcon> = {
 	task: ClipboardListIcon,
 	lesson: MessageSquareIcon,
 	practice: DumbbellIcon,
-	plan: RouteIcon,
-	"check-in": ListChecksIcon,
 };
 
 /** What a press on an entry can start: a session whose first message is
@@ -69,7 +66,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 					<Icon aria-label={LOOKS[look].words} className={cn("size-3.5 shrink-0 text-muted-foreground", ICON_INK[look])} />
 				</span>
 				<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 flex-1 text-foreground">
-					<MathText>{entry.title}</MathText>
+					<LineText>{entry.title}</LineText>
 				</span>
 			</>
 		);
@@ -77,7 +74,7 @@ function Face({ entry, today, compact }: { entry: CalendarEntry; today: string; 
 	return (
 		<>
 			<span data-slot="calendar-entry-title" className="line-clamp-2 min-w-0 text-foreground">
-				<MathText>{entry.title}</MathText>
+				<LineText>{entry.title}</LineText>
 			</span>
 			<span className="flex min-w-0 items-center gap-1.5 text-label text-muted-foreground">
 				<Mark entry={entry} />
@@ -172,7 +169,7 @@ function EntryDetail({ entry, today, busy, onStart }: { entry: Exclude<CalendarE
 			</div>
 			<div className="flex flex-col gap-1">
 				<p className="text-row font-medium text-foreground">
-					<MathText>{entry.title}</MathText>
+					<LineText>{entry.title}</LineText>
 				</p>
 				<p className={cn("flex items-center gap-1 text-label text-muted-foreground", LOOK_INK[look])}>
 					<Icon aria-hidden className={cn("size-3.5 shrink-0", ICON_INK[look])} />

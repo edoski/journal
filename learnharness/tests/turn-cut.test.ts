@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { needsContinuation, type LhMessage } from "../src/core/native-messages.ts";
-import { replyNeverCame } from "../src/core/turn-cut.ts";
+import { replyCutOf, replyNeverCame } from "../src/core/turn-cut.ts";
 
 const ask = { id: "a1", role: "assistant", content: [{ type: "toolCall", id: "q1", name: "explain", arguments: { question: "Which directions stay on their line?", correctAnswer: "(1,1) and (1,-1)" } }], stopReason: "toolUse", timestamp: 1 } as unknown as LhMessage;
 const answer = { id: "r1", role: "toolResult", toolCallId: "q1", toolName: "explain", isError: false, timestamp: 2,
@@ -33,4 +33,11 @@ test("a reply, or an answer the continuation resumes, is not a cut reply", () =>
 	assert.equal(replyNeverCame([message, reply]), false);
 	assert.equal(replyNeverCame([ask, answer, courseNote]), false);
 	assert.equal(replyNeverCame([]), false);
+});
+
+test("a reply he stopped reads as his stop, a reply the app lost as the tutor's", () => {
+	// Round 3: his own stop read "The tutor stopped before replying."
+	assert.equal(replyCutOf([reply, message, stoppedEmpty]), "stopped");
+	assert.equal(replyCutOf([reply, courseNote, message]), "lost");
+	assert.equal(replyCutOf([message, reply]), null);
 });

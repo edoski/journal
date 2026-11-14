@@ -39,6 +39,7 @@ import {
 	type Photo,
 	PHOTO_STEER_LINE,
 } from "../src/core";
+import { LESSON_WORDS } from "./study-words.ts";
 
 export type SessionStatus = "ready" | "submitted" | "streaming" | "error";
 
@@ -88,7 +89,7 @@ async function turnInFlight(model: SessionModel): Promise<boolean | null> {
 	}
 }
 
-export const STREAM_DROPPED = "The connection dropped before the turn completed.";
+export const STREAM_DROPPED = LESSON_WORDS.connectionDropped;
 
 /** Mark transport failures without confusing JSON/application bugs with drops. */
 class StreamReadError extends Error {

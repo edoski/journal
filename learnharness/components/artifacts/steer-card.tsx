@@ -60,7 +60,7 @@ export function SubagentSteerCard({ message }: { message: LhViewMessage }) {
 		case "demo":
 			return <DemoOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? false} />;
 		case "visual":
-			return <VisualOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? false} />;
+			return <VisualOutputCard output={data.result} messageId={message.id} initialInverted={data.ui?.inverted ?? true} />;
 	}
 }
 

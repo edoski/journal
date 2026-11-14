@@ -155,7 +155,7 @@ export function daysBetween(from: string, to: string): number {
  *   - a session waits on the learner ("Your turn"), the tutor writes in
  *     one (Working), or one is left for next time, as the session state
  *     reads them;
- *   - the engine calls the topic weak ("Missed last time", "Mistake to
+ *   - the engine calls the topic weak ("Not right last time", "Mistake to
  *     fix", "Mixed up with Rank", "Sure, but wrong");
  *   - a solid topic's review is due ("Due today", "3d overdue");
  *   - an open task holds it, and when he left off ("Left off 3d ago");

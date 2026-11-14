@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useEnterSubmits } from "@/components/enter-submits";
 import { MalformedQuestion } from "@/components/malformed-question";
 import { ToolContentResponse } from "@/components/ai-elements/message";
-import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 import { cn } from "@/lib/utils";
 import { formDraftText } from "@/components/lesson/stranded-draft";
+import { QUESTION_WORDS } from "@/components/study-words";
 import {
 	buildAnswer,
 	kbdEventForAction,
@@ -37,6 +38,7 @@ import {
 	type Phase3,
 } from "@/src/core";
 import { ConfidenceChoice } from "@/components/confidence-choice";
+import { CHOICE_NOTE } from "@/components/study-words";
 import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
 import type { Photo } from "@/src/core";
 
@@ -111,9 +113,6 @@ export function QuestionDock({
 	// The probe-phase name (owner, 2026-10-09) canonicalizes onto its teach
 	// twin for every dock concern — parse dispatch, labels, kinds.
 	const canonical = toolName === "recall" ? "explain" : toolName;
-	// The chip's display name carries the tool's OWN name (owner
-	// 2026-10-09): probe-phase questions label Recall in the composer.
-	const toolLabel = toolName === "recall" ? "Recall" : undefined;
 	// Parse, don't cast (src/core/tool-parts.ts): the model authored this
 	// input, and only the schema the tool declared vouches for its shape.
 	// The dock mounts on input-available parts (already validated at the
@@ -132,12 +131,7 @@ export function QuestionDock({
 					question={parsed.question}
 					onExpand={onExpand}
 					variant={reveal ? "reveal" : "collapsed"}
-					toolLabel={toolLabel}
-					label={
-						canonical === "explain" && normalizeQuestionType((parsed as { type?: unknown }).type) === "predict"
-							? "Prediction"
-							: undefined
-					}
+					label={questionLabel(toolName, (parsed as { type?: unknown }).type)}
 				/>
 			)}
 			<div className={expanded ? "dock-variant" : "invisible h-0 overflow-hidden"}>
@@ -158,25 +152,13 @@ export function QuestionDock({
 	);
 }
 
-/** The question as one line of words and inline formulas, for MathText:
- *  display math joins the line, a matrix or a case split (one line can't
- *  hold its rows) folds to ⋯, a tall fraction becomes a text one, and
- *  markdown marks drop. */
-export function teaserLine(q: string): string {
-	return repairMathForDisplay(q)
-		.replace(/\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$]+?)\$/g, (_, a, b, c, d) => `$${inline(a ?? b ?? c ?? d)}$`)
-		.replace(/\*\*|__|`/g, "")
-		.replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, "")
-		.replace(/\s+/g, " ")
-		.trim();
-}
-
-function inline(tex: string): string {
-	return tex
-		.replace(/\\begin\{(\w+\*?)\}[\s\S]*?\\end\{\1\}/g, "\\cdots")
-		.replace(/\\dfrac/g, "\\tfrac")
-		.replace(/\s+/g, " ")
-		.trim();
+/** A question's label by what it asks (QUESTION_WORDS): a recall while
+ *  the tutor finds what he holds, a prediction before teaching, a check
+ *  after it, else a plain question. Pure. */
+export function questionLabel(toolName: string, type: unknown): string {
+	if (toolName === "recall") return QUESTION_WORDS.recall;
+	if (toolName !== "explain") return QUESTION_WORDS.question;
+	return normalizeQuestionType(type) === "predict" ? QUESTION_WORDS.predict : QUESTION_WORDS.check;
 }
 
 /** The collapsed strip. Two species (W5): "collapsed" is the scroll minimization
@@ -213,10 +195,10 @@ export function QuestionDockBar({
 			className="dock-variant h-12 gap-3 rounded-none px-4 focus-visible:ring-inset"
 		>
 			<span className={cn("shrink-0", reveal ? "font-medium text-foreground" : "text-muted-foreground")}>
-				{reveal ? "Check your understanding" : (label ?? toolLabel ?? (toolName === "explain" ? "Explain" : "Question"))}
+				{reveal ? "Check your understanding" : (label ?? toolLabel ?? questionLabel(toolName, undefined))}
 			</span>
 			<span className="min-w-0 flex-1 truncate text-muted-foreground">
-				<MathText>{teaserLine(question)}</MathText>
+				<LineText>{repairMathForDisplay(question)}</LineText>
 			</span>
 			<span className={cn("flex shrink-0 items-center gap-1", reveal ? "text-link" : "text-foreground")}>
 				{reveal ? "Open" : "Answer"}
@@ -599,7 +581,7 @@ function QuestionDockForm({
 						value={thinking}
 						onChange={(e) => setThinking(e.target.value)}
 						onKeyDown={fieldKeys}
-						placeholder="Why this answer? Whatever comes to mind."
+						placeholder={CHOICE_NOTE}
 						rows={1}
 						className={cn(
 							"block max-h-48 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0",

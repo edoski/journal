@@ -14,7 +14,7 @@ import { parseHTML } from "linkedom";
 import { PlanCard, PlanPanel, planMapSteps } from "../components/lesson/plan-map.tsx";
 import { ActiveProblemContext } from "../components/lesson/active-problem.ts";
 import { ConfidenceChoice } from "../components/confidence-choice.tsx";
-import { QuestionDock, QuestionDockBar, teaserLine } from "../components/question-dock.tsx";
+import { QuestionDock, QuestionDockBar } from "../components/question-dock.tsx";
 import { ReadingThinkingField } from "../components/reading-thinking.tsx";
 import { PracticeDock } from "../components/practice-dock.tsx";
 import { ProblemCard, ConcludeCard, ThinkingCard } from "../components/practice-cards.tsx";
@@ -123,15 +123,27 @@ describe("the docks", () => {
 		assert.equal(dock.querySelector('button[type="submit"]')!.textContent, "Submit");
 	});
 
+	it("a choice question's free field asks what he wants to add, never why he chose: the choice may be his goal", () => {
+		const document = documentFor(
+			<QuestionDock toolName="ask_user_question" toolCallId="q2" input={{ question: "What do you want from today's lesson?", options: [{ label: "Speed" }, { label: "Why it works" }] } as never}
+				expanded onExpand={() => {}} onSubmit={() => {}} />,
+		);
+		const placeholder = document.querySelector('textarea[data-testid="thinking-field"]')!.getAttribute("placeholder")!;
+		assert.equal(placeholder, "Anything to add?");
+		assert.doesNotMatch(placeholder, /why/i);
+	});
+
 	it("a check waiting behind its reveal invites in sentence case; the reading field sits on the same dock surface", () => {
 		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" />);
 		const reveal = bar.querySelector('[data-testid="teach-check-reveal"]')!;
 		assert.equal(reveal.querySelectorAll(".katex").length, 1, "the formula is typeset");
 		assert.match(reveal.textContent!, /^Check your understandingWhy is /);
-		const matrix = "Let $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$. Find $\\lambda$ with **one** $$\\dfrac{a+b}{2}$$";
-		assert.equal(teaserLine(matrix), "Let $A = \\cdots$. Find $\\lambda$ with one $\\tfrac{a+b}{2}$");
+		const matrix = "Let $A = \\begin{pmatrix} 4 & 1 \\\\ 2 & 3 \\end{pmatrix}$ stretch *something*. Find $\\lambda$ with **one** $$\\dfrac{a+b}{2}$$";
 		const collapsed = documentFor(<QuestionDockBar toolName="explain" question={matrix} onExpand={() => {}} variant="reveal" />);
-		assert.doesNotMatch(collapsed.body.textContent!, /beginpmatrix|\*\*|\$/);
+		assert.doesNotMatch(collapsed.body.textContent!, /beginpmatrix|\*|\$|⋯/, "no raw marks, and the matrix is not folded to dots");
+		assert.equal(collapsed.querySelector("em")?.textContent, "something", "his emphasis is drawn");
+		assert.equal(collapsed.querySelector("strong")?.textContent, "one");
+		assert.equal(collapsed.querySelectorAll(".katex").length, 3, "every formula typeset, the matrix included");
 		const field = documentFor(<ReadingThinkingField value="" revision={0} onChange={() => {}} />).querySelector('[data-testid="reading-thinking-field"]')!;
 		assert.equal(field.getAttribute("data-slot"), "dock-surface");
 		assert.match(field.textContent!, /^Thinking while reading$/);
@@ -212,7 +224,7 @@ describe("lesson cards", () => {
 			confidence: "confident", committed: "A nonzero kernel means not invertible.",
 		} as unknown as QuestionAnswerData;
 		const card = documentFor(<AnsweredCard answer={answer} />).querySelector('[data-testid="answered-card"]')!;
-		assert.match(card.textContent!, /^Explain·Confident/);
+		assert.match(card.textContent!, /^Check·Confident/);
 		assert.match(card.textContent!, /“The kernel is nonzero\.”/);
 		assert.match(card.textContent!, /The answerA nonzero kernel means not invertible\./);
 		assert.doesNotMatch(card.textContent!, /EXPLAIN|Correct|Incorrect/);

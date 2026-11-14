@@ -134,12 +134,16 @@ describe("the practice transcript cards", () => {
 		assert.match(html, /Pair them; each pair is even\./);
 	});
 
-	it("ConcludeCard: the dismissal synthesis is one muted line — no reveal card", () => {
+	it("ConcludeCard: the dismissal synthesis is one muted line — no reveal card — a skip, or left for next time by Done for today", () => {
 		const html = renderToStaticMarkup(
 			<ConcludeCard part={part({ type: "tool-conclude", input: { outcome: "dismissed" } })} />,
 		);
-		assert.match(html, /Problem dismissed\./);
+		assert.match(html, /You skipped this problem\./);
 		assert.doesNotMatch(html, /The solution/);
+		const left = renderToStaticMarkup(
+			<ConcludeCard part={part({ type: "tool-conclude", input: { outcome: "dismissed" }, output: { outcome: "dismissed", problemCallId: "p1", reason: "tonight" } })} />,
+		);
+		assert.match(left, /Left for next time\./);
 	});
 
 	it("ThinkingCard: one label, expanded arrival (owner round, 2026-10-07)", () => {

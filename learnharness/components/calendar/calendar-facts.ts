@@ -21,7 +21,7 @@ export interface CourseRef {
 
 /** What a session is, from its transcript: practice, or a teaching
  *  session at its phase (the prober's questions, the plan, the lesson). */
-export type SessionType = "check-in" | "plan" | "lesson" | "practice";
+export type SessionType = "lesson" | "practice";
 
 export type CalendarEntry =
 	| {
@@ -94,8 +94,6 @@ export const LOOKS: Record<EntryLook, { words: string; rank: number }> = {
 	task: { words: "Unfinished", rank: 3 },
 	lesson: { words: "Lesson", rank: 4 },
 	practice: { words: "Practice", rank: 4 },
-	plan: { words: "Plan", rank: 4 },
-	"check-in": { words: "Quiz", rank: 4 },
 };
 
 /** Each look as the thing it is, singular and plural, for More's words. */
@@ -107,8 +105,6 @@ const THINGS: Record<EntryLook, [string, string]> = {
 	task: ["unfinished work", "unfinished work"],
 	lesson: ["a lesson", "lessons"],
 	practice: ["practice", "practice"],
-	plan: ["a lesson", "lessons"],
-	"check-in": ["a lesson", "lessons"],
 };
 
 /** What a day's More hides, by kind and never by number: "Also reviews
@@ -144,9 +140,11 @@ export function rankOf(entry: CalendarEntry): number {
 	return entry.kind === "session" && entry.waits ? 0.5 : LOOKS[lookOf(entry)].rank;
 }
 
+/** A session as the calendar names it: practice, else a lesson, whatever
+ *  step it reached (a lesson still asking its opening questions is not a
+ *  quiz, round 3). */
 export function sessionType(chat: ChatListItem): SessionType {
-	if (chat.kind === "practice") return "practice";
-	return chat.phase === "probe" ? "check-in" : chat.phase === "plan" ? "plan" : "lesson";
+	return chat.kind === "practice" ? "practice" : "lesson";
 }
 
 /** The topics a session worked on that its course's map lists. */

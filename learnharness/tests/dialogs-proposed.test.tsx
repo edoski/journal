@@ -72,10 +72,10 @@ describe("dialogs keep their actions", () => {
 			</AlertDialog>,
 		);
 		assert.equal($('[data-testid="abort-turn-dialog"]')?.getAttribute("role"), "alertdialog");
-		assert.equal($('[data-testid="abort-turn-title"]')?.textContent, "Discard this problem?");
-		assert.match($('[data-testid="abort-turn-line"]')?.textContent ?? "", /The working turn stops too\./);
+		assert.equal($('[data-testid="abort-turn-title"]')?.textContent, "Skip this problem?");
+		assert.match($('[data-testid="abort-turn-line"]')?.textContent ?? "", /The tutor's reply stops too\./);
 		const footer = [...document.querySelectorAll('[data-slot="alert-dialog-footer"] button')].map((b) => b.textContent);
-		assert.deepEqual(footer, ["Cancel", "Discard"]);
+		assert.deepEqual(footer, ["Cancel", "Skip"]);
 	});
 
 	it("delete lesson: plain words with the lesson named, no engine talk or traces checkbox, and a plain retry on failure", async () => {

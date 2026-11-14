@@ -71,8 +71,9 @@ import {
 	teachStepIndex,
 	toolQuestionKind,
 	questionNeedsReveal,
+	closedTonight,
 	doneTonightAtEnd,
-	replyNeverCame,
+	replyCutOf,
 } from "@/src/core";
 import { ReadingThinkingField } from "@/components/reading-thinking";
 import { ClaudeLimitPrompt } from "@/components/claude-limit-prompt";
@@ -91,7 +92,7 @@ import { followTarget, replyStart, type ReplyAnchor } from "@/components/lesson/
 import { ScrollCueButton } from "@/components/lesson/scroll-cue";
 import { showsWorking } from "@/components/lesson/working-sign";
 import { formDraftText, strandedDraft } from "@/components/lesson/stranded-draft";
-import { LESSON_WORDS } from "@/components/study-words";
+import { LESSON_WORDS, PHASE_WORDS } from "@/components/study-words";
 import { ReplyCut } from "@/components/lesson/reply-cut";
 import { landFocus, readingKeyScroll } from "@/components/lesson/focus-home";
 import { DoneTonightButton, DoneTonightLine } from "@/components/lesson/done-tonight";
@@ -775,7 +776,7 @@ export function Chat({
 	const claudeLimit = retryable && failure && isClaudeLimitFailure(failure) ? failure : undefined;
 	// A turn that ended with no word after his input (a restart, a stop
 	// before the reply began) says so, with Try again (turn-cut.ts).
-	const replyCut = status === "ready" && !busy && !compacting && !error && replyNeverCame(nativeMessages);
+	const replyCut = status === "ready" && !busy && !compacting && !error ? replyCutOf(nativeMessages) : null;
 	const sendAllowed = !pending && !activeProblem && !compacting;
 
 	/* THE PRACTICE PAUSE (owner round 16): between problems — practice
@@ -785,6 +786,9 @@ export function Chat({
 	// Done for tonight (done-tonight.tsx): stops the session whatever is
 	// open; until he writes again, the session waits on nothing.
 	const doneTonight = doneTonightAtEnd(nativeMessages);
+	// Stopped for today, by him or by the tutor's close, until he writes
+	// again: the top bar says so, and has nothing left to stop.
+	const closedForToday = closedTonight(nativeMessages);
 	const sendTonight = useCallback(() => {
 		if (busy || compacting || doneTonight) return;
 		void send({ type: "tonight" });
@@ -1377,9 +1381,9 @@ export function Chat({
 						}
 						course={course?.title}
 						courseHref={course ? courseHref(course.workspace) : undefined}
-						phase={mode === "practice" ? "Practice" : chipLabel(messages, phases)}
+						phase={closedForToday ? PHASE_WORDS.done : mode === "practice" ? PHASE_WORDS.practice : chipLabel(messages, phases)}
 						plan={planTree ? { open: planOpen, onOpenChange: setPlanOpen, body: <PlanPanel messages={messages} onClose={closePlan} /> } : undefined}
-						tonight={<DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
+						tonight={closedForToday ? undefined : <DoneTonightButton onDone={sendTonight} disabled={busy || compacting || doneTonight} />}
 						details={
 							<LessonDetails turns={turns} contextTokens={contextTokens} pricing={pricing} />
 						}
@@ -1612,7 +1616,7 @@ export function Chat({
 						    BEFORE beginTurn; the settle kick runs after endTurn). */}
 							{compacting && <ActivityLine testId="compacting" label="Compacting the conversation…" />}
 							{showsWorking(messages, busy) && <ActivityLine testId="thinking-placeholder" label="Thinking…" />}
-							{replyCut && <ReplyCut onRetry={() => void send({ type: "continue" })} />}
+							{replyCut && <ReplyCut byYou={replyCut === "stopped"} onRetry={() => void send({ type: "continue" })} />}
 							{openingError && <p role="alert" className="text-row text-danger">{OPENING_PROMPT_FAILURE}</p>}
 							{error && (
 								<TurnError message={error.message} onRetry={retryable ? retryFailedTurn : undefined} onOpenSettings={() => openSettings("keys")}>

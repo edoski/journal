@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createRoot } from "react-dom/client";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { ActivitySection, formatElapsed, toBlobs, type ActivityFeed, type FeedRun } from "../components/activity-dock.tsx";
+import { ActivitySection, toBlobs, type ActivityFeed, type FeedRun } from "../components/activity-dock.tsx";
+import { backgroundWorkWords, BACKGROUND_WORDS } from "../components/study-words.ts";
 import { formatTokens, formatUsd } from "../components/usage-format.ts";
 import { courseHref } from "../components/unit-inbox/unit-href.ts";
 import { jobCost } from "../src/server/pricing.ts";
@@ -94,12 +95,6 @@ describe("activity dock pure layer", () => {
 		assert.equal(map!.activity, "Reading the course's material to build its topic map");
 	});
 
-	it("formatElapsed ticks compactly", () => {
-		assert.equal(formatElapsed(45_000), "45s");
-		assert.equal(formatElapsed(184_000), "3m 04s");
-		assert.equal(formatElapsed(4_320_000), "1h 12m");
-	});
-
 	it("formatUsd keeps four decimals under $1, two above", () => {
 		assert.equal(formatUsd(0.0014), "$0.0014");
 		assert.equal(formatUsd(1.5), "$1.50");
@@ -140,12 +135,12 @@ describe("activity section render", () => {
 	it("renders the ALWAYS-PRESENT header when idle — empty means empty, nothing hides", () => {
 		const html = renderToStaticMarkup(<ActivitySection feed={{ jobs: [], runs: [] }} />);
 		assert.match(html, /data-testid="activity-section"/);
-		assert.match(html, /Working in the background/);
+		assert.match(html, /Background work/);
 		assert.doesNotMatch(html, /activity-blob-(job|run)/, "no rows while idle");
 		assert.doesNotMatch(html, /activity-total-cost/, "the cost span is population, not decoration");
 	});
 
-	it("renders one row per running process with elapsed time and the abort affordance; the detail says what it does, for how long, in words", async () => {
+	it("renders one row per running process, what it does for which lesson or course in full, and the abort affordance; no timer anywhere", async () => {
 		const feed: ActivityFeed = {
 			jobs: [job({ id: "j1", kind: "demo", activity: "building sandbox…", title: "Chain-rule demo" })],
 			runs: [{ id: "algebra#course-map", chatId: "algebra", title: "Algebra", phase: "mapping", startedAt: NOW - 60_000 }],
@@ -155,18 +150,19 @@ describe("activity section render", () => {
 		assert.match(html, /data-testid="activity-blob-job"/);
 		assert.match(html, /data-testid="activity-blob-run"/);
 		assert.match(html, /Chain-rule demo/);
-		assert.match(html, /Mapping course[\s\S]*data-testid="activity-blob-for"[^>]*>Algebra</, "what it does, then the course it works for");
-		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g)?.length, 2, "elapsed on every row");
+		assert.match(html, /Building the topic map of Algebra/);
+		assert.match(html, /Building a demo for Chain-rule demo/);
+		assert.equal(html.match(/data-testid="activity-blob-elapsed"/g), null, "no timer: a count he never asked for");
 		assert.equal(html.match(/data-testid="activity-abort"/g)?.length, 2, "END on every row's face, detail-independent");
-		assert.match(html, /aria-label="End Demo builder in Chain-rule demo"/, "the stop button names what it stops");
-		assert.match(html, /aria-label="End Mapping course in Algebra"/);
-		assert.match(html, /Working in the background/);
+		assert.match(html, /aria-label="Stop: Building a demo for Chain-rule demo"/, "the stop button names what it stops");
+		assert.match(html, /aria-label="Stop: Building the topic map of Algebra"/);
+		assert.match(html, /Background work/);
 		assert.doesNotMatch(html, /building sandbox…/, "what it is doing waits in the detail");
 
 		const detail = await openDetail(feed, "Chain-rule demo");
 		assert.equal(detail.expanded, "true");
 		assert.match(detail.text, /building sandbox…/);
-		assert.match(detail.text, /Running for \d/);
+		assert.doesNotMatch(detail.text, /Running for|\d+s\b/, "no timer in the detail either");
 		assert.match(detail.text, /Open the lesson/);
 		assert.equal(detail.href, "/chat/c1");
 		assert.doesNotMatch(detail.text, /Cost|Context|Model|Steps|tokens|\$|—/, "no counts or engine words");
@@ -189,10 +185,18 @@ describe("activity section render", () => {
 				feed={{ jobs: [], runs: [{ id: "cx#digest", chatId: "cx", title: "Invertible matrices", phase: "digesting", startedAt: NOW }] }}
 			/>,
 		);
-		const label = html.match(/data-slot="nav-row-label"[^>]*>([^<]*)</)?.[1] ?? "";
-		const forWhat = html.match(/data-testid="activity-blob-for"[^>]*>([^<]*)</)?.[1] ?? "";
-		assert.match(label, /Saving what you learned/);
-		assert.equal(forWhat, "Invertible matrices", "the lesson it works for, whole, on the row");
+		const label = html.match(/data-slot="nav-row-label"[^>]*>(?:<[^>]*>)*([^<]*)</)?.[1] ?? "";
+		assert.equal(label, "Saving what you learned in Invertible matrices", "what it does and the lesson it works for, whole, on the row");
 		assert.doesNotMatch(html, /activity-blob-detail/, "the row is closed");
+	});
+});
+
+describe("background work's words", () => {
+	it("gives it one name and says each piece in full, for which lesson or course", () => {
+		assert.equal(BACKGROUND_WORDS.name, "Background work");
+		assert.match(BACKGROUND_WORDS.followIt, /Background work/);
+		assert.equal(backgroundWorkWords("mapping", "Graph Theory"), "Building the topic map of Graph Theory");
+		assert.equal(backgroundWorkWords("visual", "Eigenvalues"), "Drawing a figure for Eigenvalues");
+		assert.equal(backgroundWorkWords("digest", "Eigenvalues"), "Saving what you learned in Eigenvalues");
 	});
 });

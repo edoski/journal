@@ -29,7 +29,7 @@ function topic(over: Partial<CourseMapTopic> = {}): CourseMapTopic {
 describe("a card's status", () => {
 	it("says a slip first, in the app's one wording", () => {
 		const status = (signals: Partial<TopicSignals>) => statusOf(topic({ level: "attempted", weak: true, signals: { ...QUIET, ...signals } }), TASKS, titleOf, TODAY);
-		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Missed last time", slip: "lapsed" });
+		assert.deepEqual(status({ lapsed: true }), { kind: "slip", words: "Not right last time", slip: "lapsed" });
 		assert.equal(status({ gap: "sign error" })!.words, "Mistake to fix");
 		assert.deepEqual(status({ choiceErrors: { cramer: 2 } }), { kind: "slip", words: "Mixed up with Cramer's rule", slip: "mixed" });
 		assert.equal(status({ confidentErrors: 1 })!.words, "Sure, but wrong");
@@ -61,7 +61,7 @@ describe("the card", () => {
 		{ name: "learning", topic: topic({ level: "attempted" }), line: "Tried, not right yet" },
 		{ name: "on his own, resting", topic: topic({ level: "retained", review: { kind: "scheduled", date: "2026-11-20" } }), line: "On your own" },
 		{ name: "review a week late", topic: topic({ level: "retained", review: due(9) }), line: "1w overdue" },
-		{ name: "missed after he had it", topic: weak("retained", { lapsed: true }), line: "Missed last time" },
+		{ name: "missed after he had it", topic: weak("retained", { lapsed: true }), line: "Not right last time" },
 		{ name: "mixed up with a method", topic: weak("attempted", { choiceErrors: { cramer: 1 } }), line: "Mixed up with Cramer's rule" },
 		{ name: "an open task", topic: topic({ level: "attempted", tasks: ["sheet-4"] }), line: "Left off 3d ago" },
 	];

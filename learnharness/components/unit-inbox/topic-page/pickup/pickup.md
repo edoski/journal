@@ -12,7 +12,7 @@ Edo picked `sections` on 13 Nov 2026 over `block` (a bordered block on top) and 
 |---|---|---|
 | Now | The page's action (`topicAction`, all seven rows): what to pick up, where it stands in a few words, the press, and the session it opens | always |
 | Next | Every other place that waits on him, most pressing first: another session whose turn is his, one the tutor is writing in, a due review the action does not already start, each open task the action does not continue | not empty |
-| Scheduled | The engine's next review when dated ahead: Review, then why it waits that long when the plan held it back for a nearer exam's reviews (`heldWords` in `components/study-words.ts`: "Waits for your exams", or "Waits for a nearer exam" while the course's own exam is still ahead; `data-slot="pickup-scheduled-waits"`, 12 muted), its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
+| Scheduled | The engine's next review when dated ahead: Review, then why it waits that long when the plan held it back (`heldWords` in `components/study-words.ts`, from the engine's `held`: "Waits for your Probability exam" when another course's final review came first, "Earlier days are full" otherwise, after "Due since 21 Oct" once memory's day has passed, `waitsWords` in topic-facts.ts; `data-slot="pickup-scheduled-waits"`, 12 muted, on its own line under Review so it never cuts), its day ("Fri 13 Nov") in the date column. A date, not a control | dated |
 | Earlier | Every session neither Now nor Next holds, and every scored attempt, newest first on the history's line (`trailDays`), each day's words ("Yesterday", "Tue 3 Nov") in a trailing date column on its first row | not empty |
 
 Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a few words, no sentences), what on top and where under it:
@@ -23,11 +23,11 @@ Now's words per row (Edo's copy ruling, 13 Nov 2026: literal words, icons with a
 | Open | the same | Tutor writing |
 | Review | "2d overdue", the head's mark | |
 | Continue a task | the task's title | its step, "Part (c)" |
-| Start | Not started | |
+| Start | First lesson (the head already says Not started) | |
 | Continue | the step the newest lesson that planned stopped on, which the new session continues from; "Next lesson" when none planned | Left off yesterday |
 | Study | Nothing due (Scheduled holds the date) | |
 
-The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step or session title may hold TeX (`MathText`).
+The press is the head button's word. The step after it is the map's Next, beside the list, so Now does not repeat it. The hybrid's head drops its review mark and "Studied yesterday" (`HybridTopic`), which Now, Scheduled and Earlier say. A step may hold TeX (`MathText`); a session or task title may hold markdown and TeX, drawn on one line (`LineText`, components/line-text.md).
 
 Dates in Earlier: tried on 13 Nov as a trailing column aligned with the rows (kept) and in a gutter on the spine's left (dropped: it pushed Earlier's icons off the column's left edge and wrapped "Tue 3 Nov" onto two lines).
 

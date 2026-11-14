@@ -29,6 +29,7 @@ import {
   useState,
 } from "react";
 import remarkBreaks from "remark-breaks";
+import { remarkPlainNumbers } from "@/components/plain-numbers";
 import {
   Streamdown,
   type PluginConfig,
@@ -340,7 +341,9 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 // PluginConfig API): Streamdown's bare `remarkPlugins` PROP would REPLACE the
 // defaults ([remark-gfm, codeMeta]), silently dropping GFM and code-fence
 // metastring parsing. The slot appends after the defaults, which is the
-// standard remark-gfm → remark-breaks order.
+// standard remark-gfm → remark-breaks order. remarkPlainNumbers rides the
+// same slot: a bare number written as math reads in the prose's type
+// (plain-numbers.ts).
 //
 // MERMAID is app-owned since the chrome-melt wave (2026-09-19): the md-blocks
 // `code` override intercepts mermaid fences and renders via
@@ -349,7 +352,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 export const streamdownPlugins = {
   cjk: {
     ...cjk,
-    remarkPluginsAfter: [...cjk.remarkPluginsAfter, remarkBreaks],
+    remarkPluginsAfter: [...cjk.remarkPluginsAfter, remarkBreaks, remarkPlainNumbers],
   },
   code,
   math: createMathPlugin({ singleDollarTextMath: true }),

@@ -121,7 +121,7 @@ describe("calendar entries", () => {
 		assert.equal(misfitWords([]), null);
 	});
 
-	it("says why a review waits on the day the plan holds it to, and only there", () => {
+	it("says why a review waits on the day the plan holds it to, naming the exams it waits for, and only there", () => {
 		const FREE = course(
 			"/study/calc",
 			"Calculus",
@@ -160,7 +160,7 @@ describe("calendar entries", () => {
 			"2026-11-02 lesson A general question",
 			"2026-11-06 lesson Rank, second pass",
 			"2026-11-08 practice Rank practice",
-			"2026-11-08 check-in From tomorrow",
+			"2026-11-08 lesson From tomorrow",
 		]);
 		const [orphan, second, waiting] = entries;
 		assert.equal(orphan?.course, null);
@@ -211,10 +211,10 @@ describe("calendar entries", () => {
 		assert.deepEqual(summary(entries), ["2026-11-09 review Bayes' rule", "2026-11-19 exam Probability exam"]);
 	});
 
-	it("names a session's type from its transcript", () => {
+	it("names a session practice or lesson, a lesson still asking its opening questions included, never a quiz", () => {
 		assert.equal(sessionType(chat({ kind: "practice", phase: "probe" })), "practice");
-		assert.equal(sessionType(chat({ phase: "probe" })), "check-in");
-		assert.equal(sessionType(chat({ phase: "plan" })), "plan");
+		assert.equal(sessionType(chat({ phase: "probe" })), "lesson");
+		assert.equal(sessionType(chat({ phase: "plan" })), "lesson");
 		assert.equal(sessionType(chat({ phase: "teach" })), "lesson");
 	});
 

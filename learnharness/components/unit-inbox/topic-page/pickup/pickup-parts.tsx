@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRightIcon, BookmarkIcon, BookOpenIcon, CircleDashedIcon, HistoryIcon, MessageCircleQuestionIcon, WaypointsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FIRST_LESSON } from "@/components/study-words";
 import { Button } from "@/components/ui/button";
 import { Hint } from "@/components/ui/hint";
 import { AttemptEntry, SessionItem, type Ends } from "@/components/unit-inbox/topic-page/hybrid/history";
@@ -14,6 +15,7 @@ import type { TrailDay } from "@/components/unit-inbox/topic-page/trail/trail-fa
 import type { NextItem, NowIconKind, NowItem } from "@/components/unit-inbox/topic-page/pickup/pickup-facts";
 import type { TopicFacts } from "@/components/unit-inbox/topic-page/topic-facts";
 import { MathText } from "@/components/ui/math-text";
+import { LineText } from "@/components/line-text";
 
 const ICON = "size-4 text-muted-foreground";
 
@@ -125,7 +127,7 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 					<li key={item.kind === "task" ? item.key : "review"}>
 						<Button variant="quiet" data-slot="pickup-next" data-kind={item.kind} disabled={busy} onClick={() => onTask(item.press)} className={item.kind === "task" && item.step ? TWO_LINE_ROW : ONE_LINE_ROW}>
 							{item.kind === "task" ? <BookmarkIcon aria-label="Unfinished" className={ICON} /> : <HistoryIcon aria-label="Review" className={ICON} />}
-							<span className="col-span-2 truncate text-row text-foreground"><MathText>{item.kind === "task" ? item.title : item.words}</MathText></span>
+							<span className="col-span-2 truncate text-row text-foreground"><LineText>{item.kind === "task" ? item.title : item.words}</LineText></span>
 							{item.kind === "task" && item.step && (
 								<span data-slot="pickup-next-step" className="col-span-2 col-start-2 truncate text-label text-muted-foreground">
 									<MathText>{item.step}</MathText>
@@ -145,19 +147,17 @@ export function NextList({ items, busy, onTask, shown, onShow }: { items: readon
 export function ScheduledEntry({ kind, day, waits }: { kind: "review" | "start"; day: string; waits: string | null }) {
 	const Icon = kind === "review" ? HistoryIcon : BookOpenIcon;
 	return (
-		<p data-slot="pickup-scheduled" data-kind={kind} className="grid h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4">
+		<p data-slot="pickup-scheduled" data-kind={kind} className={cn("grid min-h-10 grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-x-4", waits && "py-2")}>
 			<Icon aria-hidden className={ICON} />
-			<span className="truncate text-row text-muted-foreground">
-				{kind === "review" ? "Review" : "First lesson"}
-				{waits && (
-					<span data-slot="pickup-scheduled-waits" className="ml-2 text-label">
-						{waits}
-					</span>
-				)}
-			</span>
+			<span className="truncate text-row text-muted-foreground">{kind === "review" ? "Review" : FIRST_LESSON}</span>
 			<span data-slot="topic-history-date" className="text-label text-muted-foreground tabular-nums">
 				{day}
 			</span>
+			{waits && (
+				<span data-slot="pickup-scheduled-waits" className="col-span-2 col-start-2 text-label text-muted-foreground">
+					{waits}
+				</span>
+			)}
 		</p>
 	);
 }
@@ -206,7 +206,7 @@ export function NowRow({ now, facts, busy, onAct, shown, onShow, marked }: { now
 		>
 			<NowIcon now={now} facts={facts} />
 			<span data-slot="pickup-now-words" className="line-clamp-2 text-control font-medium text-foreground">
-				<MathText>{now.words}</MathText>
+				<LineText>{now.words}</LineText>
 			</span>
 			<NowPress now={now} busy={busy} onAct={onAct} className="justify-self-end" />
 			{now.note && (

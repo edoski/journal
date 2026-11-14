@@ -11,6 +11,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { STOP_WORDS } from "@/components/study-words";
 
 /**
  * The ESC-abort guard (owner, 2026-10-02): the global Esc → abort chain
@@ -36,23 +37,8 @@ import {
 /** What Esc is aborting — drives copy and the confirm action. */
 export type AbortMode = "turn" | "question" | "problem";
 
-const COPY: Record<AbortMode, { title: string; line: string; action: string }> = {
-	turn: {
-		title: "Abort this turn?",
-		line: "The partial answer stays in the transcript.",
-		action: "Abort",
-	},
-	question: {
-		title: "Dismiss this question?",
-		line: "Skipped — the teacher moves on without it.",
-		action: "Dismiss",
-	},
-	problem: {
-		title: "Discard this problem?",
-		line: "The problem is dropped — no solution is revealed.",
-		action: "Discard",
-	},
-};
+/** The dialog's words per mode, in his words (study-words.ts). */
+const COPY: Record<AbortMode, { title: string; line: string; action: string }> = STOP_WORDS;
 
 /** The dialog's body in the shared dialog anatomy (components/ui/dialog.md) —
  * exported for render pins. */
@@ -90,7 +76,7 @@ export function AbortTurnBody({
 					<AlertDialogTitle data-testid="abort-turn-title">{copy.title}</AlertDialogTitle>
 					<AlertDialogDescription data-testid="abort-turn-line">
 						{copy.line}
-						{busy && mode !== "turn" ? " The working turn stops too." : ""}
+						{busy && mode !== "turn" ? ` ${STOP_WORDS.alsoStops}` : ""}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter className="pt-2">

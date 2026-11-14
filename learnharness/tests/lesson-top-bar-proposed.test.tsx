@@ -7,6 +7,7 @@ import { afterEach, describe, it } from "node:test";
 import { createRoot, type Root } from "react-dom/client";
 import { LessonDetails, LessonTopBar } from "../components/lesson/lesson-top-bar.tsx";
 import { CLAUDE_MODEL } from "../src/core/index.ts";
+import { roomWords } from "../components/study-words.ts";
 
 // The lesson's top bar under the Proposed design on the real Radix layers:
 // the details popover and the plan popover. Fetch is stubbed read-only;
@@ -75,13 +76,14 @@ describe("Proposed lesson details", () => {
 		assert.equal(await escapeReachesWindow(), true, "a closed panel leaves Esc to the turn");
 	});
 
-	it("names the one model with no picker, and divides the context by its window", async () => {
+	it("names the one tutor with no picker, and says the room left in words, never a token count", async () => {
 		await mount(details);
 		await click(element('[data-testid="session-details"]'));
 		assert.equal(panelOpen(), true);
 		assert.equal(element('[data-testid="stats-model"]').textContent, CLAUDE_MODEL.name);
 		assert.equal(document.querySelector('[data-testid="stats-model"] button'), null, "no model or thinking control");
-		assert.match(element('[data-testid="stats-context"]').textContent!, /\/ 200k/);
+		assert.equal(element('[data-testid="stats-context"]').textContent, "Plenty");
+		assert.doesNotMatch(document.querySelector('[data-testid="session-details-panel"]')!.textContent!, /Context|\d+k|tokens/);
 		assert.equal(await escapeReachesWindow(), false);
 		assert.equal(panelOpen(), false, "one Esc closes the panel, and the turn never hears it");
 	});
@@ -104,5 +106,13 @@ describe("Proposed plan popover", () => {
 		assert.equal(element('[data-testid="plan-panel"]').textContent, "Steps");
 		assert.equal(await escapeReachesWindow(), false);
 		assert.equal(document.querySelector('[data-testid="plan-panel"]'), null);
+	});
+});
+
+describe("the room a lesson has left", () => {
+	it("says it in words, plenty until half is used", () => {
+		assert.equal(roomWords(null, 150_000), "Not measured yet");
+		assert.equal(roomWords(9_200, 150_000), "Plenty");
+		assert.equal(roomWords(80_000, 150_000), "Over half used. When it fills, the tutor sums up the lesson so far");
 	});
 });
