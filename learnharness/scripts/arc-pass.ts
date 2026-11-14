@@ -31,7 +31,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { LEARNING_ENGINE } from "../config.ts";
-import { againstCut, arcPassChanges, arcPassView, edgeChanges, type ArcSubmit, type EdgeDiff } from "../src/core/arc-pass.ts";
+import { againstCut, arcPassChanges, arcPassView, edgeChanges, withProposed, type ArcSubmit, type EdgeDiff } from "../src/core/arc-pass.ts";
 import { courseView, NO_STANDING } from "../src/core/course-map-build.ts";
 import { createArcPass, type EdgeMode, type TranscriptEntry } from "../src/agent/subagents/arc-former.ts";
 import { loadClaudeAccounts } from "../src/agent/claude-accounts.ts";
@@ -110,7 +110,7 @@ async function copyRun(): Promise<void> {
 	const arcs = await courseRecords.run(workspace, { verb: "arcs", report: true });
 	write(out, "report.json", {
 		status: result.status,
-		...(result.status === "formed" ? { summary: result.summary, stripped: result.formation.stripped, placedByEngine: result.formation.placedByEngine } : { reason: result.reason }),
+		...(result.status === "formed" ? { summary: result.summary, stripped: result.formation.stripped, placedByEngine: result.formation.placedByEngine, blindSortMisses: result.sort } : { reason: result.reason }),
 		...(arcs.ok ? { arcs: arcs.json } : { arcs_error: arcs.message }),
 	});
 	write(out, "run.json", {
@@ -158,8 +158,9 @@ async function apply(): Promise<void> {
 	if (!shown.ok) fail(`the course record: ${shown.message}`);
 	const record = obj(shown.ok ? shown.json : {});
 	if (Object.keys(obj(record.arcs)).length > 0) fail(`${workspace} has arcs already`);
-	const view = arcPassView(courseView(record, NO_STANDING), record);
-	const settled = accepted.length > 0 ? edgeChanges(accepted, view) : null;
+	const stored = arcPassView(courseView(record, NO_STANDING), record);
+	const settled = accepted.length > 0 ? edgeChanges(accepted, stored) : null;
+	const view = withProposed(stored, accepted);
 	const day = new Date().toISOString().slice(0, 10);
 	const formation = arcPassChanges(answer, view, { asked: approval, reason: `approved by Edo on ${day}: ${approval}` }) ?? fail(`${runDir} forms no arcs`);
 	const topics = obj(formation.changes.topics);
