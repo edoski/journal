@@ -51,7 +51,7 @@ function walkStops(e: KeyboardEvent<HTMLElement>) {
 	e.preventDefault();
 	const at = stops.indexOf(document.activeElement as HTMLElement);
 	const next = Number.isFinite(step) ? Math.min(stops.length - 1, Math.max(0, (at < 0 ? -1 : at) + step)) : step < 0 ? 0 : stops.length - 1;
-	stops[next].focus();
+	stops[next]?.focus();
 }
 
 /**

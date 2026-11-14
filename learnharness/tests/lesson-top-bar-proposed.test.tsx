@@ -141,7 +141,7 @@ describe("where the lesson is", () => {
 		await act(async () => { window.dispatchEvent(new dom.window.CustomEvent("lh:kbd-open-model-picker")); });
 		const panel = element('[data-testid="roadmap-panel"]');
 		const stops = [element('[data-testid="roadmap-step-maps"] button'), element('[data-testid="roadmap-step-equation"] button'), element('[data-testid="roadmap-topic"]'), element('[data-testid="roadmap-course"]')];
-		await act(async () => stops[0].focus());
+		await act(async () => stops[0]!.focus());
 		const key = async (k: string) => press(document.activeElement ?? panel, "keydown", { key: k });
 		await key("ArrowDown");
 		assert.equal(document.activeElement, stops[1], "down to the next taught step");
