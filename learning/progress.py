@@ -34,6 +34,17 @@ RETAINED_VERDICTS = 2
 RELEARN_MISSES = 2
 FINAL_REVIEW_DAYS = 6
 SCHEDULING_KINDS = frozenset({"attempt", "exam"})
+
+
+def counts(observation: dict[str, Any]) -> bool:
+    """An answer that counts for levels and reviews: an attempt or an exam,
+    except a prediction made before its step was taught (``predicted``).
+    Before the teaching a wrong guess is expected, so it says nothing about
+    what is held, and a right one is not yet recall of what was taught; it
+    stays in the history as what happened."""
+    return observation["kind"] in SCHEDULING_KINDS and not observation.get("predicted")
+
+
 DUE_LIMIT = 5
 RUNUP_DAYS = 21
 RECENT_SOLID_DAYS = 14
@@ -161,7 +172,7 @@ def _histories(observations: dict[str, Any]) -> dict[str, _History]:
         for topic in item["topics"]:
             history = histories[topic]
             history.latest = max(history.latest, item["date"])
-            if item["kind"] in SCHEDULING_KINDS:
+            if counts(item):
                 history.attempts.append((key, item))
     for history in histories.values():
         history.attempts.sort(
@@ -516,7 +527,7 @@ def _stamp_due(record: dict[str, Any], changes: PatchResult) -> None:
     observations = record["observations"] = dict(record["observations"])
     for key in changes.observations:
         item = observations[key]
-        if item["kind"] not in SCHEDULING_KINDS:
+        if not counts(item):
             continue
         inherited = {
             topic
@@ -1079,7 +1090,7 @@ def week(record: dict[str, Any], today: date) -> dict[str, Any]:
     errors: list[dict[str, str]] = []
     confident = 0
     for item in effective(record["observations"]).values():
-        if item["date"] < first or item["kind"] not in SCHEDULING_KINDS:
+        if item["date"] < first or not counts(item):
             continue
         attempts["unaided" if unaided(item) else "assisted"] += 1
         confident += confident_error(item)

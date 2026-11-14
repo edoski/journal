@@ -151,6 +151,7 @@ FIELDS: dict[str, dict[str, str]] = {
         "transfer": _FLAG,
         "shown": _FLAG,
         "gave_up": _FLAG,
+        "predicted": _FLAG,
         "date": _DAY,
         "task": _HANDLE,
         "refs": _REFS,
@@ -252,6 +253,7 @@ class Observation(TypedDict, total=False):
     transfer: bool
     shown: bool
     gave_up: bool
+    predicted: bool
     date: str
     task: str
     refs: list[Reference]
@@ -722,6 +724,11 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 f"{path}.help: exams count as unaided; omit help, or record a "
                 "helped attempt with kind attempt"
             )
+        if "predicted" in observation:
+            raise ValueError(
+                f"{path}.predicted marks a prediction made in a session before "
+                "its step was taught; an exam is never one"
+            )
     else:
         given = [
             name
@@ -733,6 +740,7 @@ def _observation_rules(observation: dict[str, Any], path: str) -> None:
                 "chose",
                 "shown",
                 "gave_up",
+                "predicted",
             )
             if name in observation
         ]

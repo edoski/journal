@@ -894,3 +894,40 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
     )[0]
     assert asked["observations"]["o1"]["text"] == "He flips a coin twice"
     assert course({"tasks": {"t": {"title": "T", "help": "o3, 2026-11-08, he"}}})
+
+
+def test_only_an_attempt_can_be_a_prediction() -> None:
+    record = course({"topics": {"rank": {"title": "Rank"}}})
+    fails(
+        record,
+        {
+            "observations": [
+                {
+                    "kind": "exam",
+                    "topics": ["rank"],
+                    "text": "Q1",
+                    "result": "correct",
+                    "predicted": True,
+                }
+            ]
+        },
+        "observations[0].predicted",
+    )
+    fails(
+        record,
+        {
+            "observations": [
+                {
+                    "kind": "self_report",
+                    "topics": ["rank"],
+                    "text": "I get it",
+                    "predicted": True,
+                }
+            ]
+        },
+        "takes no predicted",
+    )
+    saved = apply(
+        record, {"observations": [attempt("rank", result="incorrect", predicted=True)]}
+    )[0]
+    assert saved["observations"]["o1"]["predicted"] is True
