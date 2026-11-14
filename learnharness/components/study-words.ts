@@ -245,6 +245,11 @@ export function courseShareWords(solid: number, of: number): string {
 	return solid * 2 > of ? "Most topics on your own" : "Some topics on your own";
 }
 
+/** The free field under a choice question, which asks for nothing in
+ *  particular: it may be his goal, not an answer to justify (round 3:
+ *  "Why this answer?" under a goal-picking question). */
+export const CHOICE_NOTE = "Anything to add?";
+
 /** A folded list's last row: "Show the rest" when one press shows every
  *  hidden row, else "Show more". How many is left out: a bare number told
  *  him nothing (Edo, 13 Nov 2026). */

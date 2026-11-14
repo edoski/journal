@@ -123,6 +123,16 @@ describe("the docks", () => {
 		assert.equal(dock.querySelector('button[type="submit"]')!.textContent, "Submit");
 	});
 
+	it("a choice question's free field asks what he wants to add, never why he chose: the choice may be his goal", () => {
+		const document = documentFor(
+			<QuestionDock toolName="ask_user_question" toolCallId="q2" input={{ question: "What do you want from today's lesson?", options: [{ label: "Speed" }, { label: "Why it works" }] } as never}
+				expanded onExpand={() => {}} onSubmit={() => {}} />,
+		);
+		const placeholder = document.querySelector('textarea[data-testid="thinking-field"]')!.getAttribute("placeholder")!;
+		assert.equal(placeholder, "Anything to add?");
+		assert.doesNotMatch(placeholder, /why/i);
+	});
+
 	it("a check waiting behind its reveal invites in sentence case; the reading field sits on the same dock surface", () => {
 		const bar = documentFor(<QuestionDockBar toolName="explain" question="Why is $\\det(A)=0$?" onExpand={() => {}} variant="reveal" />);
 		const reveal = bar.querySelector('[data-testid="teach-check-reveal"]')!;

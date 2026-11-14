@@ -38,6 +38,7 @@ import {
 	type Phase3,
 } from "@/src/core";
 import { ConfidenceChoice } from "@/components/confidence-choice";
+import { CHOICE_NOTE } from "@/components/study-words";
 import { PendingPhotos, PhotoAttachButton, sentPhotos, usePhotoDraft } from "@/components/photos";
 import type { Photo } from "@/src/core";
 
@@ -580,7 +581,7 @@ function QuestionDockForm({
 						value={thinking}
 						onChange={(e) => setThinking(e.target.value)}
 						onKeyDown={fieldKeys}
-						placeholder="Why this answer? Whatever comes to mind."
+						placeholder={CHOICE_NOTE}
 						rows={1}
 						className={cn(
 							"block max-h-48 resize-none rounded-none border-0 px-4 pb-1 pt-3 text-control focus-visible:ring-0",
