@@ -1817,8 +1817,11 @@ export function escAbortTarget(s: {
 	return null;
 }
 
-export function revealArrival(wasQuestion: boolean): { expanded: boolean; revealed: boolean } {
-	return wasQuestion ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
+/** How a question lands in the dock: a teach check after the composer
+ *  waits folded behind its invitation; one that follows a question, or the
+ *  same question coming back after a failed send, opens. */
+export function revealArrival(wasQuestion: boolean, returned = false): { expanded: boolean; revealed: boolean } {
+	return wasQuestion || returned ? { expanded: true, revealed: true } : { expanded: false, revealed: false };
 }
 
 /**
@@ -1950,11 +1953,18 @@ function DockOverlay({
 	// measures the bar, the reserve keeps the composer's height, and the
 	// only motion is the teaching text itself.
 	const prevPendingIdRef = useRef(pendingId);
+	// The last question this dock held: one that comes back is his own
+	// answer refused or never delivered (a failed send), so it reopens as
+	// he left it, open with his words, never folded behind its invitation
+	// with focus on the page (round 3, 14 Nov 2026).
+	const lastPendingIdRef = useRef(pendingId);
 	if (pendingId !== prevPendingIdRef.current) {
 		const wasQuestion = prevPendingIdRef.current !== null;
+		const returned = pendingId !== null && pendingId === lastPendingIdRef.current;
 		prevPendingIdRef.current = pendingId;
-		if (pendingId && requiresReveal) {
-			const arrival = revealArrival(wasQuestion);
+		if (pendingId) lastPendingIdRef.current = pendingId;
+		if (pendingId && (requiresReveal || returned)) {
+			const arrival = revealArrival(wasQuestion, returned);
 			setExpanded(arrival.expanded);
 			setRevealed(arrival.revealed);
 		} else if (pendingId) {

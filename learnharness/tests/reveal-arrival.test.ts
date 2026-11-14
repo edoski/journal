@@ -38,6 +38,10 @@ describe("revealArrival — how a teach question lands", () => {
 		assert.deepEqual(revealArrival(false), { expanded: false, revealed: false });
 	});
 
+	it("his own check coming back after a failed send reopens, never folds behind its invitation (round 3)", () => {
+		assert.deepEqual(revealArrival(false, true), { expanded: true, revealed: true });
+	});
+
 	it("queued behind another question: open — the reading already happened", () => {
 		assert.deepEqual(revealArrival(true), { expanded: true, revealed: true });
 	});
