@@ -462,6 +462,14 @@ function studyOrder(listed: readonly string[], topics: ArcPassView["topics"]): s
 	return out;
 }
 
+/** The path's basis once arcs form: where the order came from, then that
+ *  it now reads arc by arc, so a topic the cut moved out of the material's
+ *  order is explained by the basis the learner and the tutors read. Pure. */
+export function pathBasis(before: string | null, arcs: readonly { title: string }[]): string {
+	const now = `read arc by arc (${arcs.map((a) => a.title.trim()).join("; ")}), each arc's topics in the material's order with prerequisites first; the arc log says where the arcs depart from the material`;
+	return before?.trim() ? `${before.trim().replace(/[.;]\s*$/, "")}; ${now}` : now[0]!.toUpperCase() + now.slice(1);
+}
+
 /** What a formation save holds, beyond the engine patch. */
 export interface Formation {
 	changes: Json;
@@ -482,6 +490,8 @@ export interface Formation {
  * - Each topic the answer places and the course still has gets its `arc`.
  *   A topic added since the agent read the course gets none, and the engine
  *   places it.
+ * - `path.basis` keeps where the order came from and says it now reads
+ *   arc by arc.
  * - `path.order` is re-derived arc by arc, each arc's topics in the order
  *   the answer lists them (the material's, read by the agent), moved only
  *   so a prerequisite in the same arc comes first: a hint the engine's own
@@ -535,7 +545,7 @@ export function arcPassChanges(submit: ArcSubmit, view: ArcPassView, extra: { ed
 			}),
 		),
 		topics,
-		path: { arcs: handles, order },
+		path: { arcs: handles, order, basis: pathBasis(view.basis, arcs) },
 		...(Object.keys(exam).length > 0 ? { exam } : {}),
 		arc_change: { reason, ...(extra.edgesEntry !== undefined ? { edges_entry: extra.edgesEntry } : {}), ...(extra.asked ? { asked: extra.asked } : {}) },
 	};

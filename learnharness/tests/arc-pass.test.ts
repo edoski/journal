@@ -24,6 +24,7 @@ import {
 	edgeDiffs,
 	edgeProblems,
 	passDue,
+	pathBasis,
 	stripPrefixes,
 	type ArcPassLedger,
 	type ArcPassView,
@@ -277,7 +278,17 @@ describe("the cut's shape rules", () => {
 		assert.deepEqual(formation.gone, ["continuity"]);
 		assert.deepEqual(formation.placedByEngine, ["implicit"]);
 		assert.deepEqual(Object.keys(formation.changes.topics as object), ["limits", "derivative", "chain", "riemann"]);
-		assert.deepEqual(formation.changes.path, { arcs: ["limits-continuity", "derivatives"], order: ["limits", "derivative", "chain", "riemann", "implicit"] });
+		assert.deepEqual(formation.changes.path, {
+			arcs: ["limits-continuity", "derivatives"],
+			order: ["limits", "derivative", "chain", "riemann", "implicit"],
+			basis:
+				"Read arc by arc (Limits and continuity; Derivatives), each arc's topics in the material's order with prerequisites first; the arc log says where the arcs depart from the material",
+		});
+		assert.equal(
+			pathBasis("Lecture order, weeks 1-7 examinable.", [{ title: "Vectors" }, { title: "Bases" }]),
+			"Lecture order, weeks 1-7 examinable; read arc by arc (Vectors; Bases), each arc's topics in the material's order with prerequisites first; the arc log says where the arcs depart from the material",
+			"the basis the order came from stays, and says it now reads arc by arc",
+		);
 		assert.deepEqual(formation.changes.arc_change, { reason: "the book's chapters 2 and 3", edges_entry: 0, asked: "copy run" });
 	});
 });
