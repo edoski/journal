@@ -19,7 +19,7 @@ process.env.LH_DATA_DIR = TMP_DATA;
 const { chatStore } = await import("../src/store/chats.ts");
 const { emit, subscribe } = await import("../src/core/events.ts");
 const { newSessionModeMessage, newUserMessage } = await import("../src/core/native-messages.ts");
-const { digestChanges, digestWindow, knowledgeHandle } = await import("../src/core/lesson-digest.ts");
+const { digestArcs, digestChanges, digestProblems, digestWindow, knowledgeHandle, placedIn } = await import("../src/core/lesson-digest.ts");
 const { createLessonDigest } = await import("../src/agent/subagents/lesson-digest.ts");
 const { backgroundRuns } = await import("../src/agent/subagents/background-runs.ts");
 const { onLessonEvents, resumeCutDigests } = await import("../src/server/lesson-finish.ts");
@@ -134,7 +134,7 @@ const MAP: CourseMap = {
 const KNOWN = { handle: "rank-notation", text: "The course writes rank as $r(A)$", topics: ["rank"] };
 
 /** An in-memory engine: the map above, one note and one knowledge entry, and every save kept. */
-function memoryCourse(refuse: (changes: Record<string, unknown>) => string | null = () => null) {
+function memoryCourse(refuse: (changes: Record<string, unknown>) => string | null = () => null, arcs?: { whole: Record<string, unknown>; receipt: Record<string, unknown> }) {
 	const saves: Array<Record<string, unknown>> = [];
 	const records: CourseRecords = {
 		list: async () => ({ available: true, courses: [], unreadable: [] }),
@@ -142,14 +142,14 @@ function memoryCourse(refuse: (changes: Record<string, unknown>) => string | nul
 		create: async () => ({ ok: true, workspace: "/courses/linalg" }),
 		run: async (_workspace, verb) => {
 			if (verb.verb === "show" && verb.handles === "all") {
-				return { ok: true, json: { topics: { rank: { note: "Reads matrices by rows" } }, knowledge: { [KNOWN.handle]: { text: KNOWN.text, topics: KNOWN.topics } } } };
+				return { ok: true, json: { topics: { rank: { note: "Reads matrices by rows" } }, knowledge: { [KNOWN.handle]: { text: KNOWN.text, topics: KNOWN.topics } }, ...arcs?.whole } };
 			}
 			if (verb.verb === "show") return { ok: true, json: { items: { rank: { kind: "topic", note: "Reads matrices by rows" } } } };
 			if (verb.verb === "save") {
 				const refused = refuse(verb.changes as Record<string, unknown>);
 				if (refused) return { ok: false, kind: "validation", message: refused };
 				saves.push(verb.changes as Record<string, unknown>);
-				return { ok: true, json: { saved: true } };
+				return { ok: true, json: { saved: true, ...arcs?.receipt } };
 			}
 			return { ok: false, kind: "io", message: `unexpected ${verb.verb}` };
 		},
@@ -267,6 +267,84 @@ describe("the digest's patch", () => {
 	});
 });
 
+describe("the digest in a course with arcs", () => {
+	const RECORD = {
+		arcs: { spaces: { title: "Vector spaces" }, systems: { title: "Linear systems" }, spectra: { title: "Eigenvalues" } },
+		path: { arcs: ["spaces", "systems", "spectra"] },
+		topics: {
+			basis: { title: "Basis", arc: "spaces" },
+			rank: { title: "Rank", arc: "systems" },
+			nullity: { title: "Nullity", arc: "systems", aliases: ["Dimension of the kernel"] },
+			eigen: { title: "Eigenvalues", arc: "spectra" },
+		},
+	};
+	const plain = {
+		topics: [
+			{ handle: "basis", title: "Basis", introduced: true, gap: null, note: null },
+			{ handle: "rank", title: "Rank", introduced: true, gap: null, note: null },
+			{ handle: "nullity", title: "Nullity", introduced: false, gap: null, note: null },
+			{ handle: "eigen", title: "Eigenvalues", introduced: false, gap: null, note: null },
+		],
+		current: "rank",
+		tasks: [],
+		planFinished: false,
+		knowledge: [],
+		reached: null,
+	};
+	const arcs = digestArcs(RECORD, ["rank"])!;
+	const view = { ...plain, arcs };
+
+	it("reads the arcs and the arc of the lesson's own topics", () => {
+		assert.equal(arcs.ownArc, "systems");
+		assert.deepEqual(arcs.order.map((a) => a.title), ["Vector spaces", "Linear systems", "Eigenvalues"]);
+		assert.equal(digestArcs({ topics: {} }, ["rank"]), undefined, "a course without arcs");
+	});
+
+	it("a new topic joins the lesson's arc when its prerequisites allow; otherwise it carries no arc and the engine places it", () => {
+		const patch = digestChanges(
+			{
+				topics: [
+					{ handle: "pivots", title: "Pivots", needs: ["rank", "basis"], step: "warm-up" },
+					{ handle: "spectral", title: "Spectral radius", needs: ["eigen"], step: "warm-up" },
+					{ handle: "power", title: "Power method", needs: ["spectral"], step: "warm-up" },
+				],
+				knowledge: [],
+			},
+			view,
+		);
+		const topics = patch?.changes.topics as Record<string, { arc?: string }>;
+		assert.equal(topics.pivots?.arc, "systems");
+		assert.equal(topics.spectral?.arc, undefined, "its prerequisite sits in a later arc");
+		assert.equal(topics.power?.arc, undefined, "nor can a topic that needs it");
+		assert.equal(patch?.summary, "new topic pivots in Linear systems; new topic spectral; new topic power");
+		assert.equal(placedIn(patch!.summary, { spectral: "spectra", power: "spectra" }, view), "new topic pivots in Linear systems; new topic spectral in Eigenvalues; new topic power in Eigenvalues");
+	});
+
+	it("a new topic that names a course topic it could join is that topic, before anything is created", () => {
+		const patch = digestChanges(
+			{ topics: [{ handle: "kernel-dimension", title: "Dimension of the kernel", needs: ["rank"], gap: "You count pivots, not free columns", step: "warm-up" }, { handle: "free", title: "Free variables", needs: ["kernel-dimension"], step: "warm-up" }], knowledge: [], current: "kernel-dimension" },
+			view,
+		);
+		assert.deepEqual(patch?.changes.topics, {
+			nullity: { introduced: true, gap: "You count pivots, not free columns" },
+			free: { title: "Free variables", introduced: true, needs: ["nullity"], arc: "systems" },
+		});
+		assert.deepEqual((patch?.changes.path as { current: string }).current, "nullity");
+		assert.equal(digestProblems({ topics: [{ handle: "kernel-dimension", title: "Dimension of the kernel", step: "warm-up" }], knowledge: [] }, view), null);
+	});
+
+	it("a twin in an arc the new topic cannot join goes back to the agent, never folded", () => {
+		const answer = { topics: [{ handle: "eigen-basis", title: "Basis", needs: ["eigen"], step: "warm-up" }], knowledge: [] };
+		assert.match(digestProblems(answer, view) ?? "", /eigen-basis \("Basis"\) has the name of the course's topic basis \("Basis"\) in "Vector spaces"/);
+	});
+
+	it("a course without arcs digests exactly as before: no arc, no fold, no problem", () => {
+		const answer = { topics: [{ handle: "kernel-dimension", title: "Dimension of the kernel", needs: ["rank"], step: "warm-up" }], knowledge: [] };
+		assert.deepEqual(digestChanges(answer, plain)?.changes.topics, { "kernel-dimension": { title: "Dimension of the kernel", introduced: true, needs: ["rank"] } });
+		assert.equal(digestProblems(answer, plain), null);
+	});
+});
+
 describe("the digest's window", () => {
 	it("reads what no earlier digest read, and nothing twice", () => {
 		const messages = lesson(FINISHED);
@@ -340,6 +418,26 @@ describe("a digest run", () => {
 		assert.equal((await digest.digestLesson(chatId)).status, "saved");
 		assert.equal(course.saves.length, 1);
 		assert.deepEqual((course.saves[0]!.topics as Record<string, unknown>).rank, { gap: "You count rows instead of pivots" });
+	});
+
+	it("in a course with arcs, a new topic joins the lesson's arc, and the summary names the arc the engine placed the others in", async () => {
+		const record = chatStore.createChat("Bases", { workspace: "/courses/linalg", title: "Linear algebra" }, ["basis"]);
+		chatStore.saveMessages(record.id, closedLesson());
+		chatStore.saveTree(record.id, TREE);
+		const course = memoryCourse(() => null, {
+			whole: {
+				arcs: { spaces: { title: "Vector spaces" }, systems: { title: "Linear systems" } },
+				path: { arcs: ["spaces", "systems"] },
+				topics: { rank: { title: "Rank", arc: "systems", note: "Reads matrices by rows" }, nullity: { title: "Nullity", arc: "systems" }, basis: { title: "Basis", arc: "spaces" } },
+			},
+			receipt: { arcs_placed: { pivots: "systems" } },
+		});
+		const answer = { topics: [{ handle: "pivots", title: "Pivots", needs: ["rank"], step: "rank-picture" }, { handle: "span", title: "Span", step: "rank-picture" }], knowledge: [] };
+		const outcome = await createLessonDigest({ chatStore, courseRecords: course.records, engine: submitEngine(answer) }).digestLesson(record.id);
+		assert.deepEqual(outcome, { status: "saved", summary: "new topic pivots in Linear systems; new topic span in Vector spaces" });
+		const topics = course.saves[0]!.topics as Record<string, { arc?: string }>;
+		assert.equal(topics.span?.arc, "spaces", "the lesson's own arc");
+		assert.equal(topics.pivots?.arc, undefined, "its prerequisite sits later, so the engine places it");
 	});
 
 	it("skips practice sessions and chats with no course", async () => {
