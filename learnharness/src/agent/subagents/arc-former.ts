@@ -112,7 +112,7 @@ export const ARC_EDGES_INSTRUCTIONS = `You settle a course's prerequisites befor
 - Judge each edge from the topics' meaning and the material, never from the order the material teaches them in. A topic taught earlier is not a prerequisite for that alone.
 - Keep every direct prerequisite. An edge is only implied, and dropped, when B uses A solely through another of B's prerequisites. When an exercise on B itself works with A (continuity is defined by a limit; an improper integral is a limit of integrals), the edge is direct: keep it, even when another path also leads to A.
 - When the test leaves you unsure, keep the edge. A false drop hides what the learner must recall before B; a kept edge only orders the path.
-- Under add, list true, direct prerequisites the graph misses, each with its reason; send an empty list when there are none.
+- Look for missing prerequisites as hard as for false ones. For each topic, read what its material works with that another topic of the course teaches (a definition, a result, a method, a tool or service it runs on: a deploy runbook that ships through a hosting platform needs the topic that teaches that platform), and test each. Under add, list every such prerequisite the graph misses, direct and passing the same test as a kept edge, each with its reason; send an empty list when there are none.
 - The material is registered: read it with read_material, search_material and render_pages where a test needs it. You need not read every source whole.
 - Each handle is its own topic. Two topics whose names share words are still two topics: never treat one as the other.
 
