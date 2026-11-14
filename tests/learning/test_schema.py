@@ -875,6 +875,18 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
         'as "learner"',
     )
     fails(
+        schema.empty(),
+        {"topics": {"rank": {"gap": "You count rows \u2014 not pivots"}}},
+        "topics.rank.gap",
+        "uses a dash as punctuation",
+    )
+    fails(
+        schema.empty(),
+        {"tasks": {"rank": {"title": "Rank", "step": "Part (c) \u2013 the kernel"}}},
+        "tasks.rank.step",
+        "uses a dash as punctuation",
+    )
+    fails(
         course({"topics": {"rank": {"title": "Rank"}}}),
         {"observations": [attempt("rank", text="Retest of o56")]},
         "observations[0].text",
@@ -889,6 +901,20 @@ def test_text_the_learner_reads_is_written_to_them() -> None:
         }
     )
     assert record["topics"]["walks"]["gap"] == "You stop one step early"
+    named = course(
+        {
+            "topics": {
+                "cs": {
+                    "title": "Cauchy\u2013Schwarz \u2014 the inequality",
+                    "note": "You apply Cauchy\u2013Schwarz on exercises 1\u20135",
+                }
+            }
+        }
+    )
+    assert (
+        named["topics"]["cs"]["note"]
+        == "You apply Cauchy\u2013Schwarz on exercises 1\u20135"
+    )
     asked = apply(
         record, {"observations": [attempt("walks", text="He flips a coin twice")]}
     )[0]
