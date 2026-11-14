@@ -238,13 +238,13 @@ export function openingCamera(layout: TopicMapLayout, current: TopicHandle | nul
 
 /** The scales a map may open at when the whole course does not fit: full
  *  size, down to the floor where titles stay readable. */
-const FRAMED_ZOOMS = [1, 0.9, 0.8, WHOLE_COURSE_ZOOM];
+const FRAMED_ZOOMS = [1, 0.95, 0.9, 0.85, 0.8, WHOLE_COURSE_ZOOM];
 /** What a view is worth, per topic: one wholly clear of the fade earns its
  *  place, more for a prerequisite or a next step of the topic it opens on;
  *  one partly in the fade costs a little; one the frame's edge cuts where
  *  it shows costs most. Zooming out costs per step below full size, and
  *  each pixel of empty room shown past the drawing's room costs one. */
-const VIEW_WORTH = { whole: 450, near: 250, faded: 120, cut: 1000, zoom: 3000 };
+const VIEW_WORTH = { whole: 450, near: 250, faded: 120, cut: 2500, zoom: 3000 };
 /** The empty room a view may show past the drawing's room on an axis the
  *  course overflows: one topic and its gap, so a topic at the course's
  *  edge can sit clear of the fade with the one beside it wholly out of
