@@ -154,8 +154,11 @@ describe("the calendar page", () => {
 		const exam = document.querySelector("[data-slot=calendar-entry][data-look=exam]");
 		assert.ok(exam, "the exam");
 		await press(exam);
-		const next = document.querySelector("[data-slot=calendar-entry-detail] [data-slot=exam-next] [data-slot=calendar-entry-start]");
-		assert.equal(next?.textContent, "Review Span");
+		const step = document.querySelector("[data-slot=calendar-entry-detail] [data-slot=exam-next]");
+		assert.equal(step?.querySelector("[data-slot=exam-next-what]")?.textContent, "Span", "what comes next is a line of its own");
+		const next = step?.querySelector("[data-slot=calendar-entry-start]");
+		// Round 5: "Review Random variables and distributions, Binomial distribution" wrapped the filled button onto two lines.
+		assert.equal(next?.textContent, "Review", "the button holds only the verb, so it never wraps");
 		await press(next!);
 		assert.deepEqual(started, [["Review Span", "/study/linalg", { topics: ["span"] }]]);
 	});

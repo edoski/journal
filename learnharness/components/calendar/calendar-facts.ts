@@ -3,7 +3,7 @@ import { sessionState } from "@/components/nav/session-state";
 import { daysBetween } from "@/components/unit-inbox/units";
 import { distanceWords, heldWords, reviewWords, startsAfterWords } from "@/components/study-words";
 import { localDay, topicAction, type TopicAction } from "@/components/unit-inbox/topic-page/topic-facts";
-import { courseMove, nextStepOf, stepWords, type CourseMove } from "@/components/study-home/study-facts";
+import { courseMove, nextStepOf, titleList, type CourseMove, type NextStep } from "@/components/study-home/study-facts";
 
 /**
  * What the calendar draws (spec: calendar.md): the engine's dates and the
@@ -70,10 +70,26 @@ export type CalendarEntry =
 	  };
 
 /** The next step toward an exam: the course's step as Home's line takes it
- *  up (`nextStepOf`, `courseMove`), in Home's words. */
+ *  up (`nextStepOf`, `courseMove`), split into Home's verb and what it works
+ *  on, so the panel's button says only the verb and never wraps (round 5:
+ *  "Review Random variables and distributions, Binomial distribution" drew a
+ *  two-line button). */
 export interface NextMove {
-	words: string;
+	verb: "Review" | "Continue" | "Start";
+	what: string;
 	move: CourseMove;
+}
+
+/** A step's verb and what it works on: `stepWords` in two halves. Pure. */
+function nextParts(step: Exclude<NextStep, { kind: "none" }>): Pick<NextMove, "verb" | "what"> {
+	switch (step.kind) {
+		case "review":
+			return { verb: "Review", what: titleList(step.titles) };
+		case "task":
+			return { verb: "Continue", what: step.title };
+		case "topic":
+			return { verb: step.fresh ? "Start" : "Continue", what: step.title };
+	}
 }
 
 /** One week of the road to an exam: the days in it that start new topics
@@ -270,7 +286,7 @@ export function calendarEntries({
 			const road = roadOf(planned, map.exam.date, titleOf);
 			const allStarted = map.topics.length > 0 && road.length === 0 && doesNotFit.length === 0;
 			const step = nextStepOf(studied);
-			const next = map.exam.date > today && step.kind !== "none" ? { words: stepWords(step), move: courseMove(studied, chats) } : null;
+			const next = map.exam.date > today && step.kind !== "none" ? { ...nextParts(step), move: courseMove(studied, chats) } : null;
 			const unreviewed = (map.exam.unreviewed ?? []).map(titleOf);
 			entries.push({ kind: "exam", id: `exam:${map.workspace}`, day: map.exam.date, title: `${map.title} exam`, course, road, finalReview, doesNotFit: doesNotFit.map(titleOf), unreviewed, allStarted, next });
 		}

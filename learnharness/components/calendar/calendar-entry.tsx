@@ -230,30 +230,37 @@ function Road({ entry, today }: { entry: Extract<CalendarEntry, { kind: "exam" }
 	);
 }
 
-/** The exam's next step, the one Home's line for its course takes. */
+/** The exam's next step, the one Home's line for its course takes: what it
+ *  works on as a line under its own heading, as the road's are, then the
+ *  verb alone on the button, as every other panel's action reads. */
 function ExamActions({ entry, busy, onStart }: { entry: Extract<CalendarEntry, { kind: "exam" }>; busy: boolean; onStart: StartSession }) {
 	const { next } = entry;
 	if (!next) return null;
 	const { move } = next;
 	return (
-		<div data-slot="exam-next" className="flex min-w-0 items-center gap-2">
-			{move.kind === "open" ? (
-				<Button asChild size="sm" className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left">
-					<Link href={`/chat/${move.chat.id}`}>
-						<MathText>{next.words}</MathText>
-					</Link>
-				</Button>
-			) : (
-				<Button
-					size="sm"
-					disabled={busy}
-					className="h-auto min-h-8 min-w-0 max-w-full justify-start whitespace-normal py-1.5 text-left"
-					onClick={() => onStart(move.opening, entry.course.workspace, { topics: move.topics, ...(move.from ? { from: move.from } : {}) })}
-					data-slot="calendar-entry-start"
-				>
-					<MathText>{next.words}</MathText>
-				</Button>
-			)}
+		<div data-slot="exam-next" className="flex flex-col gap-3">
+			<div className="flex flex-col gap-1.5">
+				<p className="text-label font-medium text-muted-foreground">Next step</p>
+				<p data-slot="exam-next-what" className="text-label text-foreground">
+					<MathText>{next.what}</MathText>
+				</p>
+			</div>
+			<div className="flex items-center gap-2">
+				{move.kind === "open" ? (
+					<Button asChild size="sm">
+						<Link href={`/chat/${move.chat.id}`}>{next.verb}</Link>
+					</Button>
+				) : (
+					<Button
+						size="sm"
+						disabled={busy}
+						onClick={() => onStart(move.opening, entry.course.workspace, { topics: move.topics, ...(move.from ? { from: move.from } : {}) })}
+						data-slot="calendar-entry-start"
+					>
+						{next.verb}
+					</Button>
+				)}
+			</div>
 		</div>
 	);
 }
