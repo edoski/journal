@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CircleDashedIcon, PlayIcon } from "lucide-react";
 import { blurAfterPointerClick } from "@/components/focus-hygiene";
 import { sessionState } from "@/components/nav/session-state";
-import { placeOf } from "@/components/study-home/agenda-rows/row-facts";
+import { courseTitle } from "@/components/study-home/agenda-rows/row-facts";
 import { WhyMark } from "@/components/study-home/agenda-rows/why-mark";
 import { lessonOf } from "@/components/study-home/lesson-facts";
 import type { NowLine } from "@/components/study-home/needs-you";
@@ -67,8 +67,7 @@ export function NowAction({ line, title, className }: { line: NowLine; title: st
 /**
  * One of Today's lines as a sidebar card (spec: now-card.md), under the
  * line's one name (Home's lesson, `NowLine.title`), with the line's reason
- * in its status slot and Home's course line (`placeOf`: the course, then
- * the arc its lesson sits in). With a `unit` it is the topic the line leads with:
+ * in its status slot. With a `unit` it is the topic the line leads with:
  * the line's action over the slot, and a click opens the topic's page.
  * Without one it is a waiting session on no topic of its course's map (or
  * on no course): its course or "No course", Your turn (or Working at 70%
@@ -88,7 +87,7 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				rowKey={unit.key}
 				parent={parent}
 				mark={<CourseMark title={unit.course.title} />}
-				course={placeOf(row)}
+				course={unit.course.title}
 				status={working ? <UnitStatusText status={{ kind: "working" }} /> : reason}
 				title={line.title}
 				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} />}
@@ -105,7 +104,7 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 				rowKey={courseKey(workspace)}
 				parent={parent}
 				mark={<CourseMark title={title} />}
-				course={placeOf(row)}
+				course={title}
 				status={reason}
 				title={line.title}
 				action={<NowAction line={line} title={line.title} className={CARD_ACTION_PLACE} />}
@@ -121,7 +120,7 @@ export function NowCard({ line, unit, active, parent }: { line: NowLine; unit: U
 			rowKey={sessionKey(chat.id)}
 			parent={parent}
 			mark={chat.course ? <CourseMark title={chat.course.title} /> : <CircleDashedIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
-			course={placeOf(row)}
+			course={courseTitle(row)}
 			status={running ? <UnitStatusText status={{ kind: "working" }} /> : reason}
 			title={line.title}
 			recede={running}

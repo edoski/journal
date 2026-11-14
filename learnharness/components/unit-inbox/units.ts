@@ -1,7 +1,6 @@
 import type { ChatListItem, CourseMap, CourseMapTask, CourseMapTopic, StudyCourse, TopicHandle } from "@/src/core";
 import { LESSON_WORDS, leftOffWords, overdueWords, reviewWords, slipMark, slipWords, STANDING_WORDS, type SlipKey } from "@/components/study-words";
 import { agoWords } from "@/components/study-home/agenda-rows/row-facts";
-import { arcPlace } from "@/components/study-home/lesson-facts";
 import { sessionState } from "@/components/nav/session-state";
 
 /**
@@ -38,9 +37,6 @@ export interface Unit {
 	task: CourseMapTask | null;
 	/** Why the engine calls the topic weak (`slipOf`), or null. */
 	slip: string | null;
-	/** The title of the arc its topic lies in; null or absent in a course
-	 *  without arcs. */
-	arc?: string | null;
 }
 
 /**
@@ -134,7 +130,7 @@ export function buildInbox(courses: readonly StudyCourse[], chats: readonly Chat
 			const sessions = topicSessions(chats, map.workspace, topic.handle);
 			const now = nowOf(sessions, topic.handle);
 			const shelf = shelfOf(topic, now);
-			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic), arc: arcPlace(map, [topic.handle]) });
+			if (shelf) units.push({ key: unitKey(map.workspace, topic.handle), course, topic, shelf, sessions, now, task: taskOf(map, topic), slip: slipOf(map, topic) });
 		}
 	}
 	const handles = new Set<string>(units.map((u) => u.topic.handle));

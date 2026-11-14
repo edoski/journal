@@ -1,9 +1,9 @@
 /**
  * Arcs carried through the rest of the app: Home's rows name the arc a
- * lesson sits in and why a new topic starts now, the sidebar's cards name
- * the arc on their course line, the topic page's head links its course and
- * its arc and says why a topic not started comes when it does, and search
- * finds arcs by name. A course without arcs reads as it did. Linear Algebra
+ * lesson sits in and why a new topic starts now, the sidebar's cards show
+ * no arc (Edo kept them as they were), the topic page's head links its
+ * course and its arc and says why a topic not started comes when it does,
+ * and search finds arcs by name. A course without arcs reads as it did. Linear Algebra
  * cut into three arcs (`LINALG_ARCS`), engine day 2026-11-08.
  */
 import React from "react";
@@ -92,24 +92,14 @@ describe("Home's rows", () => {
 });
 
 describe("the sidebar's cards", () => {
-	it("name the line's arc on a Today card's course line, and only the course without arcs", () => {
-		const draw = (course: StudyCourse) => {
-			const [line] = needsYouNow([course], [], TODAY).lines;
-			const inbox = buildInbox([course], [], null);
-			return render(<NowCard line={line!} unit={topicUnit(inbox, course, line!.lead!, [])} active={false} />);
-		};
-		assert.equal(draw(LINALG_ARCS).querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra · Vector spaces");
-		assert.equal(draw(LINALG).querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
-	});
-
-	it("name a topic card's own arc, which every unit carries", () => {
+	it("keep the course line alone, with no arc, even in a course with arcs (Edo, 14 Nov 2026)", () => {
+		const [line] = needsYouNow([LINALG_ARCS], [], TODAY).lines;
+		const inbox = buildInbox([LINALG_ARCS], [], null);
+		const today = render(<NowCard line={line!} unit={topicUnit(inbox, LINALG_ARCS, line!.lead!, [])} active={false} />);
+		assert.equal(today.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 		const rank = LINALG_ARCS.map.topics.find((t) => t.handle === "rank")!;
-		const unit = unitFor(LINALG_ARCS, rank, []);
-		assert.equal(unit.arc, "Linear systems");
-		assert.ok(buildInbox([LINALG_ARCS], [], null).active.every((u) => u.arc !== null), "every listed unit has its arc");
-		assert.equal(unitFor(LINALG, rank, []).arc, null);
-		const doc = render(<TopicCard unit={unit} today={TODAY} active={false} />);
-		assert.equal(doc.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra · Linear systems");
+		const found = render(<TopicCard unit={unitFor(LINALG_ARCS, rank, [])} today={TODAY} active={false} />);
+		assert.equal(found.querySelector('[data-slot="unit-card-course"]')?.textContent, "Linear Algebra");
 	});
 });
 

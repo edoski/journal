@@ -57,8 +57,7 @@ export const CARD_ACTION_PLACE = "right-2.5 top-2.5 h-5";
 
 /**
  * The sidebar's two-line card (60px, spec: unit-inbox.md), the shell every
- * card shares: line 1 the course's mark and name with the status slot (the
- * caller's `course`, which names the arc too in a course with arcs). The
+ * card shares: line 1 the course's mark and name with the status slot. The
  * name stays on one line and the status keeps its words: when both do not
  * fit, the status drops to a line of its own under the name, right-aligned,
  * and only a name wider than the whole line ends in an ellipsis. Line 2 the title at
@@ -112,7 +111,7 @@ export function RowCard({
 				<span className="flex min-h-5 flex-wrap items-start gap-x-2">
 					<span className="flex h-5 shrink-0 items-center">{mark}</span>
 					<span data-slot="unit-card-course" className="min-w-0 truncate py-0.5 text-label text-muted-foreground">
-						<MathText>{course}</MathText>
+						{course}
 					</span>
 					<span data-slot="unit-status-slot" className={cn(STATUS_SLOT, "h-5 py-0.5")}>
 						{status}
