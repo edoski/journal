@@ -95,7 +95,8 @@ export interface LhMarkerMessage {
 		| "problem-dismissed"
 		| "compaction"
 		| "session-resume"
-		| "ungraded-answer";
+		| "ungraded-answer"
+		| "asked";
 	/** The model-facing text ("" for plan blocks — UI-only). */
 	content: string;
 	display: boolean;
@@ -531,6 +532,43 @@ export function newUngradedAnswerMessage(question: string): LhMarkerMessage {
 		details: {},
 		timestamp: Date.now(),
 	};
+}
+
+/** The note riding a message he sent from Ask (round 5: an answer typed
+ *  while Ask stayed on was graded, with an earlier note's confidence):
+ *  what follows is a question to the tutor, never an answer. Model-facing
+ *  only. */
+export function newAskedMessage(open: "question" | "problem"): LhMarkerMessage {
+	const beside = open === "problem" ? "while the problem stays open" : "after setting the question aside";
+	return {
+		id: newMessageId(),
+		role: "custom",
+		customType: "asked",
+		content: `[ASKED] He sent his next message from Ask, ${beside}: a question to you, not his answer. Answer it. Never grade it, save it as an attempt or conclude a problem from it as solved; his answer comes as his work.`,
+		display: false,
+		details: {},
+		timestamp: Date.now(),
+	};
+}
+
+/** What he sent last on a problem: his work, with the confidence he chose
+ *  for it, or a message from Ask (any message of his while the problem is
+ *  open, a question by the composer's rule); null before either. A request
+ *  (Hint, Show me, Explain instead) is neither. Pure. */
+export function finalSubmissionOf(messages: readonly LhMessage[], problemCallId: string): { kind: "work"; confidence?: Confidence } | { kind: "asked" } | null {
+	const posed = messages.findIndex((m) => m.role === "assistant" && m.content.some((b) => b.type === "toolCall" && b.id === problemCallId));
+	if (posed < 0) return null;
+	for (let i = messages.length - 1; i > posed; i--) {
+		const m = messages[i]!;
+		if (m.role === "user") return { kind: "asked" };
+		if (m.role === "custom" && m.customType === "practice-thinking") {
+			const details = m.details as { problemCallId?: unknown; confidence?: unknown } | null;
+			if (details?.problemCallId !== problemCallId) continue;
+			const confidence = chosenConfidence(details.confidence);
+			return { kind: "work", ...(confidence ? { confidence } : {}) };
+		}
+	}
+	return null;
 }
 
 /** His Done for tonight: he stops now. The content tells the agent that
