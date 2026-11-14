@@ -1018,6 +1018,19 @@ def test_an_arcs_entry_is_what_it_needs_from_earlier_arcs_lapsed_first(
     ], "a hidden arc is drawn nowhere"
 
 
+def test_with_every_live_topic_taught_the_current_arc_is_the_last_drawn_one(
+    workspace: Workspace,
+) -> None:
+    with_arcs(workspace)
+    taught(workspace, -20, "limit", "continuity", "derivative", "chain-rule")
+    integrals = ("riemann", "substitution", "parts")
+    hide = {key: {"excluded": "Not examined"} for key in integrals}
+    records.save(workspace, {"topics": hide})
+    mapped = retrieval.course_map(workspace)
+    assert mapped["current_arc"] == "derivatives", "never an arc drawn nowhere"
+    assert [arc["arc"] for arc in mapped["arcs"] if arc["current"]] == ["derivatives"]
+
+
 def test_the_current_arc_follows_the_lesson_in_progress(
     workspace: Workspace,
 ) -> None:

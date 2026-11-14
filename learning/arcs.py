@@ -47,7 +47,8 @@ def untaught(record: dict[str, Any]) -> set[str]:
 def current(record: dict[str, Any], here: str | None = None) -> str | None:
     """The arc of the topic the learner is on (``here``, else ``path.current``);
     when that topic is missing, excluded or has no arc, the earliest arc with
-    an untaught topic, else the last arc. None without arcs."""
+    an untaught topic, else the last arc with a live topic, so it is never
+    an arc drawn nowhere. None without arcs."""
     arcs = arc_rules.order(record)
     if not arcs:
         return None
@@ -57,7 +58,8 @@ def current(record: dict[str, Any], here: str | None = None) -> str | None:
     if "arc" in topic and "excluded" not in topic:
         return str(topic["arc"])
     waiting = {topics[key].get("arc") for key in untaught(record)}
-    return next((arc for arc in arcs if arc in waiting), arcs[-1])
+    live = arc_rules.live(record)
+    return next((arc for arc in arcs if arc in waiting), (live or arcs)[-1])
 
 
 def held(
